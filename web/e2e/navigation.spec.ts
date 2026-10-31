@@ -60,8 +60,24 @@ test.describe('Sidebar navigation (admin)', () => {
     await expect(page.getByRole('columnheader', { name: 'Slug' })).toBeVisible();
   });
 
-  test('Settings section loads its page', async ({ adminPage, page }) => {
+  test('Settings opens the Settings area, whose sub-nav reaches the data pages too', async ({
+    adminPage,
+    page,
+  }) => {
     await adminPage.shell.clickNav('Settings');
+    await page.waitForURL('**/admin/settings');
+    const area = page.getByTestId('settings-area-nav');
+    await expect(area).toBeVisible();
+    await expect(area.getByText('Sign-in and security')).toBeVisible();
+    // Tags keeps its own route, inside the same area (WHIT-806, owner decision D1).
+    await area.getByTestId('settings-area-link-tags').click();
+    await page.waitForURL('**/admin/tags');
+    await expect(page.getByTestId('settings-area-nav')).toBeVisible();
+    await expect(page.getByTestId('settings-area-link-tags')).toHaveAttribute('aria-current', 'page');
+  });
+
+  test('the user row opens the account page', async ({ adminPage, page }) => {
+    await adminPage.shell.openAccountSettings();
     await page.waitForURL('**/settings');
     await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
     // The Account Information card became the editable Profile card (WC-64).
@@ -134,17 +150,17 @@ test.describe('Sidebar navigation (admin)', () => {
     await expect(page.getByRole('heading', { name: 'Users' })).toBeVisible();
 
     const people = shell.navGroupToggle('people');
-    const settings = shell.navGroupToggle('settings');
+    const ai = shell.navGroupToggle('ai');
     await expect(people).toHaveAttribute('aria-expanded', 'true');
-    await expect(settings).toHaveAttribute('aria-expanded', 'false');
+    await expect(ai).toHaveAttribute('aria-expanded', 'false');
 
     // Present but hidden — the distinction the RBAC specs depend on.
-    await expect(shell.navLink('Website Settings')).toHaveCount(1);
-    await expect(shell.navLink('Website Settings')).toBeHidden();
+    await expect(shell.navLink('AI Principals')).toHaveCount(1);
+    await expect(shell.navLink('AI Principals')).toBeHidden();
 
-    await settings.click();
-    await expect(settings).toHaveAttribute('aria-expanded', 'true');
-    await expect(shell.navLink('Website Settings')).toBeVisible();
+    await ai.click();
+    await expect(ai).toHaveAttribute('aria-expanded', 'true');
+    await expect(shell.navLink('AI Principals')).toBeVisible();
   });
 
   test('the nav filter reaches a page sitting in a closed group', async ({
@@ -155,11 +171,11 @@ test.describe('Sidebar navigation (admin)', () => {
     await page.goto('/admin/users');
     await expect(page.getByRole('heading', { name: 'Users' })).toBeVisible();
 
-    await expect(shell.navLink('Website Settings')).toBeHidden();
+    await expect(shell.navLink('AI Principals')).toBeHidden();
 
-    await shell.navSearch.fill('website');
+    await shell.navSearch.fill('principals');
     // Reached without knowing which group holds it, and without opening it.
-    await expect(shell.navLink('Website Settings')).toBeVisible();
+    await expect(shell.navLink('AI Principals')).toBeVisible();
     // A query narrows to matches, so a non-matching link leaves the DOM.
     await expect(shell.navLink('Users')).toHaveCount(0);
 

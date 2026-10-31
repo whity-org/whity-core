@@ -795,8 +795,8 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'label' => 'Tag Groups',
         'href' => '/admin/tag-groups',
         'icon' => 'tags',
-        'group' => 'platform',
-        'order' => 12,
+        'group' => 'settings',
+        'order' => 3,
         // WC-621: the taxonomy admin. The nav item carries tags:read so a
         // permission-aware client hides it; the schema-driven CrudScreen also
         // fails closed (a 403 on the list renders the access-denied state).
@@ -807,8 +807,8 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'label' => 'Tags',
         'href' => '/admin/tags',
         'icon' => 'tag',
-        'group' => 'platform',
-        'order' => 13,
+        'group' => 'settings',
+        'order' => 2,
         'requiredPermission' => \Whity\Core\RBAC\CorePermissions::TAGS_READ,
     ];
     // FORMS (migrations 127/128). Three entries because they are three jobs done
@@ -1188,8 +1188,8 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'label' => 'Languages',
         'href' => '/admin/languages',
         'icon' => 'language',
-        'group' => 'platform',
-        'order' => 10,
+        'group' => 'settings',
+        'order' => 4,
         // WC-583: languages are a GLOBAL catalogue (no tenant_id column at
         // all) — create/update/enable/disable is a SYSTEM-TENANT-ONLY
         // PLATFORM capability (mirrors the Feature Flags/Email/Storage
@@ -1203,8 +1203,8 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'label' => 'Translations',
         'href' => '/admin/translations',
         'icon' => 'world',
-        'group' => 'platform',
-        'order' => 11,
+        'group' => 'settings',
+        'order' => 5,
         // WC-583: translation rows ARE tenant-scoped (system default vs a
         // tenant's own override) — unlike Languages above, every tenant
         // holding translations:manage may reach this page to edit its own
