@@ -119,9 +119,10 @@ final class GetProposalRealEngineTest extends TestCase
     {
         $id = $this->ask();
 
+        // assertEquals: PostgreSQL's JSONB does not keep key order.
         $expected = ['creates' => ['form' => 'Leave request'], 'tenant' => self::TENANT];
-        self::assertSame($expected, $this->proposals->find($id, self::TENANT)['diff'] ?? null);
-        self::assertSame($expected, $this->get($id)['diff']);
+        self::assertEquals($expected, $this->proposals->find($id, self::TENANT)['diff'] ?? null);
+        self::assertEquals($expected, $this->get($id)['diff']);
         self::assertSame([], $this->created, 'previewing ran nothing');
     }
 

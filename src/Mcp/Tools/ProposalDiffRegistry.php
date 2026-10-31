@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Whity\Mcp\Tools;
 
+use Whity\Core\Container\HostWiredService;
+
 /**
  * What an agent's proposal would change, by tool (WHIT-833; register 7.5a; MCP-
  * TOOL-SURFACE §5.11, proposals item 3).
@@ -19,7 +21,7 @@ namespace Whity\Mcp\Tools;
  *
  * Registered while the worker boots and read-only after that: worker-safe.
  */
-final class ProposalDiffRegistry
+final class ProposalDiffRegistry implements HostWiredService
 {
     /** @var array<string, callable(array<string, mixed>, int): ?array<string, mixed>> */
     private array $previews = [];
