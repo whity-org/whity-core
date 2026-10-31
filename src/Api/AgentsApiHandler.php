@@ -140,7 +140,8 @@ final class AgentsApiHandler
         [$tenantId, $profileId] = $caller;
         $id = (int) ($params['id'] ?? 0);
 
-        if ($this->agents->find($id, $tenantId) === null) {
+        $existing = $this->agents->find($id, $tenantId);
+        if ($existing === null) {
             return Response::error('Agent not found', 404);
         }
         $body = json_decode($request->getBody(), true);
@@ -166,8 +167,7 @@ final class AgentsApiHandler
             'metadata'    => ['fields' => array_keys($fields)],
         ]);
 
-        $agent = $this->agents->find($id, $tenantId);
-        return Response::json(['data' => $agent !== null ? self::present($agent) : null], 200);
+        return Response::json(['data' => self::present($this->agents->find($id, $tenantId) ?? $existing)], 200);
     }
 
     /** @param array<string, string> $params */

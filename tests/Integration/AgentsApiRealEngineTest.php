@@ -64,6 +64,7 @@ final class AgentsApiRealEngineTest extends TestCase
         self::assertSame('active', $agent['status']);
 
         $stored = $this->agents->find($agent['id'], self::BAKERY);
+        self::assertIsArray($stored);
         self::assertSame(self::RANA, $stored['created_by_profile_id']);
     }
 
