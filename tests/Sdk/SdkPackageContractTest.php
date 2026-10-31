@@ -242,9 +242,16 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsOneEightForInteractiveBlocks(): void
     {
         $this->assertSame(
-            '1.48.0',
+            '1.51.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.48 ADDS MANIFEST EXPRESSIONS: Expression\Expression validates and evaluates the '
+            'SDK 1.51 ADDS RECORD RULES: record types may declare rules (require, when, an English and '
+            . 'Arabic message) and fields may declare default, computed and lockedWhen, all as manifest '
+            . 'expressions over the record type own fields (WHIT-762). Purely additive. '
+            . 'SDK 1.50 ADDS MANIFEST RECORDS: plugin.json gains records, record types a workspace plugin '
+            . 'keeps in the shared record store, with typed fields, an optional lifecycle and declared '
+            . 'read/create/edit/delete permissions; an installed ManifestPlugin refuses them (WHIT-761). '
+            . 'Purely additive. '
+            . 'SDK 1.48 ADDS MANIFEST EXPRESSIONS: Expression\Expression validates and evaluates the '
             . 'closed JSON-tree language manifest rules are written in, bounded by node, depth and step '
             . 'caps, with an English and Arabic describer; the TypeScript twin passes the same fixtures '
             . '(WHIT-759). Purely additive. '
