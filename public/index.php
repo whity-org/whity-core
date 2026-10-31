@@ -2064,23 +2064,26 @@ $router->register('PUT', '/api/workspace-plugins/{plugin:[a-z][a-z0-9_]*}/automa
 // see what publishing it would change, publish, list history, and activate a
 // version (rollback). Drafting is plugins:build; putting a version live is
 // plugins:publish. Install-wide plugin names are reserved.
+$tenantManifestPublisher = new \Whity\Core\Plugin\Tenant\TenantManifestPublisher(
+    $db->getPdo(),
+    $tenantPluginRepository,
+    new PluginRoleSeeder($db->getPdo(), $logger),
+    array_values(array_map(static fn ($plugin): string => $plugin->getName(), $pluginLoader->getPlugins())),
+    $auditLogger
+);
+$manifestImpact = new \Whity\Core\Plugin\Tenant\ManifestImpact($tenantRecordRepository);
+// The publish check: a version's own tests, through a writer with no audit
+// and no automations, in a transaction that is always rolled back.
+$manifestTestRunner = new \Whity\Core\Plugin\Tenant\ManifestTestRunner(
+    $db->getPdo(),
+    $tenantRecordRepository,
+    new \Whity\Core\Plugin\Tenant\RecordWriter($db->getPdo(), $tenantRecordRepository, $roleChecker)
+);
 $tenantPluginVersionsHandler = new \Whity\Api\TenantPluginVersionsApiHandler(
     $tenantPluginRepository,
-    new \Whity\Core\Plugin\Tenant\TenantManifestPublisher(
-        $db->getPdo(),
-        $tenantPluginRepository,
-        new PluginRoleSeeder($db->getPdo(), $logger),
-        array_values(array_map(static fn ($plugin): string => $plugin->getName(), $pluginLoader->getPlugins())),
-        $auditLogger
-    ),
-    new \Whity\Core\Plugin\Tenant\ManifestImpact($tenantRecordRepository),
-    // The publish check: a version's own tests, through a writer with no
-    // audit and no automations, in a transaction that is always rolled back.
-    new \Whity\Core\Plugin\Tenant\ManifestTestRunner(
-        $db->getPdo(),
-        $tenantRecordRepository,
-        new \Whity\Core\Plugin\Tenant\RecordWriter($db->getPdo(), $tenantRecordRepository, $roleChecker)
-    ),
+    $tenantManifestPublisher,
+    $manifestImpact,
+    $manifestTestRunner,
     $auditLogger
 );
 $router->register('GET', '/api/workspace-plugins', [$tenantPluginVersionsHandler, 'list'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_READ);
@@ -4769,6 +4772,14 @@ $agentProposals = new \Whity\Core\Agent\AgentProposalRepository($db->getPdo());
 // $proposalDiffs->register('<tool name>', fn (array $arguments, int $tenantId): ?array => ...).
 $proposalDiffs = new \Whity\Mcp\Tools\ProposalDiffRegistry();
 \Whity\register_service(\Whity\Mcp\Tools\ProposalDiffRegistry::class, $proposalDiffs); // @phpstan-ignore-line
+// An agent's proposal to publish or roll back a workspace plugin (Whity
+// Builder) shows the person its impact plan, and for a publish its tests.
+(new \Whity\Core\Plugin\Tenant\WorkspacePluginProposalDiffs(
+    $tenantPluginRepository,
+    $tenantManifestPublisher,
+    $manifestImpact,
+    $manifestTestRunner
+))->registerOn($proposalDiffs);
 $mcpToolsCallHandler = new ToolsCallHandler($toolDeriver, $router, $roleChecker, $tokenValidator, auditLogger: $auditLogger, authoredTools: $authoredMcpTools, proposals: $agentProposals, proposalDiffs: $proposalDiffs);
 // The approvals inbox: the person an agent acts for approves, edits or
 // declines what it asked to do. Session-gated and never on the MCP surface:
