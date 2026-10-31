@@ -281,7 +281,11 @@ The source of truth is the agent model in `00-decision-register.md`: the Scope g
 
 **Who is an agent.** An agent is an **AI principal**: a credential of principal kind `ai-agent` (ADR-0006 §3 names this kind, but nothing mints it yet). It is issued by a person, the *granting person*, and always acts for them. The owner's "agent flag on the token" is this principal kind. A person's own client (their Claude, their Cursor) holds an ordinary `user` or `oauth` token and acts as that person, under that person's RBAC, with no grant and no proposals. Whity ID, the OIDC service and ADR-0015's authorization server, marks an OAuth client registration as an agent client so that its tokens map to `ai-agent`.
 
-**Scope grant (register: Scope grant; handoff item 11).** For each `resource:action` permission, the grant says **Off**, **Ask first** or **Allowed**. It is stored with the credential's scope, and every change to it is logged.
+**Scope grant (register: Scope grant; handoff item 11).** For each `resource:action` permission, the grant says **Off**, **Ask first** or **Allowed**. It is stored with the credential's scope, and every change to it is logged. Built in WHIT-832:
+   - `GET /api/mcp/tokens/{jti}/grant` explains it per permission: the mode set (null for the default), the modes the person may set and why any is withheld (`not_held`, `outside_credential`, `always_asks`, `refused_for_agents`), and what the agent can do now with that permission's reads and writes.
+   - `PATCH` with `{permission: off|ask|allow|default}` accepts only offered modes, so a grant never goes above the granting person. Only that person may change it, and every change is audit-logged (`mcp.token.grant_changed`).
+   - The token validator takes grant entries from the stored row, not the token, so a change applies to a token the client already holds.
+   - Neither route is declared in the API reference: a declared route becomes an MCP tool, and an agent must never reach its own grant.
 
 | Mode | Search and list | `call_operation` / `tools/call` / REST |
 |---|---|---|

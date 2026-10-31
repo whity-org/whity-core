@@ -4582,10 +4582,24 @@ $router->register('DELETE', '/api/relations/{id:\d+}', [$relationsHandler, 'dele
 // WC-149b2fc9: create and revoke are gated by mcp:tokens:manage so an admin
 // controls who may mint AI credentials. List is read-only and ungated.
 $mcpTokenService = new McpTokenService($db->getPdo(), $jwtParser);
-$mcpTokenHandler = new McpTokenHandler($tokenValidator, $mcpTokenService, $permissionRegistry);
+// WHIT-832: the grant screen needs the operations an agent could be offered,
+// with their gates; derived once per worker from the same catalogue as tools/list.
+$mcpAgentOperations = null;
+$mcpTokenHandler = new McpTokenHandler(
+    $tokenValidator,
+    $mcpTokenService,
+    $permissionRegistry,
+    $roleChecker,
+    static function () use (&$mcpAgentOperations): array {
+        return $mcpAgentOperations !== null ? ($mcpAgentOperations)() : [];
+    },
+    $auditLogger,
+);
 $router->register('POST',   '/api/mcp/tokens',       [$mcpTokenHandler, 'create'], null, null, CorePermissions::MCP_TOKENS_MANAGE);
 $router->register('GET',    '/api/mcp/tokens',       [$mcpTokenHandler, 'list']);
 $router->register('DELETE', '/api/mcp/tokens/{jti}', [$mcpTokenHandler, 'revoke'], null, null, CorePermissions::MCP_TOKENS_MANAGE);
+$router->register('GET',    '/api/mcp/tokens/{jti}/grant', [$mcpTokenHandler, 'grant']);
+$router->register('PATCH',  '/api/mcp/tokens/{jti}/grant', [$mcpTokenHandler, 'updateGrant'], null, null, CorePermissions::MCP_TOKENS_MANAGE);
 
 // WC-0208ce4d: AI-principal admin endpoints (tenant-scoped, admin surface).
 // Gated by mcp:tokens:manage so only admins who hold the credential-management
@@ -4661,6 +4675,15 @@ $authoredMcpTools = new AuthoredToolRegistry();
 $mcpEnabledPluginAlwaysOn = static function (int $tenantId) use ($settingsService): array {
     $raw = (string) ($settingsService->effective($tenantId)[\Whity\Core\Settings\SettingsRegistry::MCP_ALWAYS_ON_PLUGIN_TOOLS] ?? '');
     return array_values(array_filter(array_map('trim', explode(',', $raw)), static fn (string $n): bool => $n !== ''));
+};
+// WHIT-832: what an agent could be offered, core and plugin, for the grant
+// screen (wired into $mcpTokenHandler above). Both sources cache their catalogue.
+$mcpAgentOperations = static function () use ($toolDeriver, $authoredMcpTools): array {
+    $exposed = array_filter($toolDeriver->deriveTools(), static fn (array $tool): bool => $toolDeriver->isExposed((string) ($tool['name'] ?? '')));
+    return [
+        ...\Whity\Mcp\Auth\AgentGrantView::operationsFrom($exposed, $toolDeriver->buildAccessMap()),
+        ...\Whity\Mcp\Auth\AgentGrantView::operationsFrom($authoredMcpTools->toolObjects(), $authoredMcpTools->accessMap()),
+    ];
 };
 // WC-0208ce4d: admin read-only view of the MCP tools and their access
 // requirements, plugin-authored tools included (WHIT-754).

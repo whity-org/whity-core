@@ -4,6 +4,7 @@ namespace Whity\Auth;
 
 use PDO;
 use Whity\Auth\Exception\InvalidMembershipException;
+use Whity\Mcp\Auth\AgentScopeGrant;
 use Whity\Mcp\Auth\McpPrincipal;
 use Whity\Mcp\Auth\OAuth\OAuthAccessTokenVerifier;
 use Whity\Mcp\Auth\OAuth\OAuthTokenRefusedException;
@@ -248,7 +249,8 @@ class TokenValidator
             return null;
         }
 
-        if (!$this->isMcpTokenRegistered($jti)) {
+        $registered = $this->registeredMcpScope($jti);
+        if ($registered === null) {
             return null;
         }
 
@@ -272,6 +274,14 @@ class TokenValidator
         if (!is_array($scope)) {
             return null;
         }
+
+        // WHIT-832: an agent's grant can change after issue, so its grant
+        // entries come from the stored row, never from the token. Everything
+        // else in the scope is as issued.
+        $scope = [
+            ...array_values(array_filter($scope, static fn (mixed $e): bool => is_string($e) && !str_starts_with($e, AgentScopeGrant::PREFIX))),
+            ...array_values(array_filter($registered, static fn (string $e): bool => str_starts_with($e, AgentScopeGrant::PREFIX))),
+        ];
 
         /** @var string[] $scope */
         return new McpPrincipal(
@@ -512,16 +522,27 @@ class TokenValidator
      *
      * Guards against hand-crafted tokens with valid signatures.
      */
-    private function isMcpTokenRegistered(string $jti): bool
+    /**
+     * The stored scope of a registered MCP token, or null when the jti was never
+     * issued (WHIT-832: its grant entries are the authority).
+     *
+     * @return list<string>|null
+     */
+    private function registeredMcpScope(string $jti): ?array
     {
         try {
             // @tenant-guard-ignore: jti is a platform-wide unique handle (like revoked_tokens.jti);
             // querying by jti alone cannot pull a different tenant's row.
-            $stmt = $this->db->prepare('SELECT 1 FROM mcp_tokens WHERE jti = ? LIMIT 1');
+            $stmt = $this->db->prepare('SELECT scope FROM mcp_tokens WHERE jti = ? LIMIT 1');
             $stmt->execute([$jti]);
-            return (bool) $stmt->fetchColumn();
+            $raw = $stmt->fetchColumn();
+            if ($raw === false) {
+                return null;
+            }
+            $decoded = is_string($raw) ? json_decode($raw, true) : null;
+            return is_array($decoded) ? array_values(array_filter($decoded, 'is_string')) : [];
         } catch (\Exception) {
-            return false;
+            return null;
         }
     }
 
