@@ -38,6 +38,7 @@ final class AgentProposalRepository
      * @param array<string, mixed> $arguments
      * @param list<string>         $scope
      * @param list<string>         $permissions
+     * @param array<string, mixed>|null $diff
      */
     public function create(
         int $tenantId,
@@ -49,12 +50,14 @@ final class AgentProposalRepository
         array $permissions,
         string $summary,
         ?int $undoWindowSeconds = null,
+        // WHIT-833: what the call would change, from the tool's preview.
+        ?array $diff = null,
     ): int {
         $stmt = $this->db->prepare(
             'INSERT INTO agent_proposals
-                 (tenant_id, agent_principal_id, on_behalf_of_profile_id, tool, arguments, scope, permissions,
+                 (tenant_id, agent_principal_id, on_behalf_of_profile_id, tool, arguments, diff, scope, permissions,
                   summary, undo_window_seconds, status, expires_at, created_at)
-             VALUES (:tenant_id, :agent, :profile, :tool, :arguments, :scope, :permissions,
+             VALUES (:tenant_id, :agent, :profile, :tool, :arguments, :diff, :scope, :permissions,
                   :summary, :undo, :status, :expires_at, NOW())'
         );
         $stmt->execute([
@@ -63,6 +66,7 @@ final class AgentProposalRepository
             ':profile'     => $onBehalfOfProfileId,
             ':tool'        => $tool,
             ':arguments'   => self::encode($arguments === [] ? new \stdClass() : $arguments),
+            ':diff'        => $diff !== null ? self::encode($diff) : null,
             ':scope'       => self::encode($scope),
             ':permissions' => self::encode($permissions),
             ':summary'     => $summary,

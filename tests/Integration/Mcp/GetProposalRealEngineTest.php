@@ -17,6 +17,7 @@ use Whity\Core\Tenant\TenantContext;
 use Whity\Mcp\Auth\AgentScopeGrant;
 use Whity\Mcp\Auth\McpPrincipal;
 use Whity\Mcp\Tools\Discovery\DiscoveryTools;
+use Whity\Mcp\Tools\ProposalDiffRegistry;
 use Whity\Mcp\Tools\ToolDeriver;
 use Whity\Mcp\Tools\ToolsCallHandler;
 use Whity\Mcp\Tools\ToolsListHandler;
@@ -40,6 +41,8 @@ final class GetProposalRealEngineTest extends TestCase
     private AgentProposalsApiHandler $inbox;
     private McpPrincipal $caller;
     private bool $mayManageForms = true;
+    /** @var \Closure(array<string, mixed>, int): ?array<string, mixed> */
+    private \Closure $preview;
 
     /** @var list<array<string, mixed>> */
     private array $created = [];
@@ -75,7 +78,10 @@ final class GetProposalRealEngineTest extends TestCase
 
         $this->caller    = self::agent(self::RANA, self::BUILDER);
         $this->proposals = new AgentProposalRepository($this->pdo);
-        $toolsCall       = new ToolsCallHandler($deriver, $router, $roles, $tokens, proposals: $this->proposals);
+        $this->preview   = static fn (array $arguments, int $tenantId): array => ['creates' => ['form' => $arguments['name'] ?? null], 'tenant' => $tenantId];
+        $diffs           = new ProposalDiffRegistry();
+        $diffs->register('post_api_forms', fn (array $arguments, int $tenantId): mixed => ($this->preview)($arguments, $tenantId));
+        $toolsCall       = new ToolsCallHandler($deriver, $router, $roles, $tokens, proposals: $this->proposals, proposalDiffs: $diffs);
         $this->inbox     = new AgentProposalsApiHandler($this->proposals, $toolsCall);
         $this->discovery = new DiscoveryTools(
             new ToolsListHandler($deriver, $roles, $tokens),
@@ -107,6 +113,26 @@ final class GetProposalRealEngineTest extends TestCase
         $approved = $this->get($id);
         self::assertSame('approved', $approved['status']);
         self::assertSame(['id' => 1], json_decode((string) $approved['result']['content'][0]['text'], true));
+    }
+
+    public function testAProposalCarriesTheToolsPreviewOfWhatItWouldChange(): void
+    {
+        $id = $this->ask();
+
+        $expected = ['creates' => ['form' => 'Leave request'], 'tenant' => self::TENANT];
+        self::assertSame($expected, $this->proposals->find($id, self::TENANT)['diff'] ?? null);
+        self::assertSame($expected, $this->get($id)['diff']);
+        self::assertSame([], $this->created, 'previewing ran nothing');
+    }
+
+    public function testAPreviewThatFailsNeverBlocksTheProposal(): void
+    {
+        $this->preview = static fn (): array => throw new \RuntimeException('impact plan unavailable');
+
+        $id = $this->ask();
+
+        self::assertSame('waiting', $this->get($id)['status']);
+        self::assertNull($this->get($id)['diff']);
     }
 
     public function testAnExpiredProposalSaysSo(): void
