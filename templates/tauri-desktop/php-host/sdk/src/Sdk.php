@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.48).
+ * SDK identity (v1.50).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -808,13 +808,24 @@ namespace Whity\Sdk;
  * which the TypeScript twin in `@whity-org/features/expressions` passes too
  * (WHIT-759).
  *
+ * Purely additive.) ->
+ * 1.50 (MANIFEST RECORDS: `plugin.json` gains `records`, record types a
+ * workspace plugin keeps in the host's shared record store — fields of twelve
+ * types (text, numbers, money in minor units, dates, choices, links to people,
+ * units and other record types), an optional lifecycle of states and named
+ * moves, and read/create/edit/delete gated by permissions the manifest
+ * declares. Checked with the rest of the manifest by
+ * {@see Manifest\RecordTypeValidator}; {@see Manifest\PluginManifest::records()}
+ * reads them. An installed {@see Manifest\ManifestPlugin} refuses `records`,
+ * since only workspace plugins use the store (WHIT-761).
+ *
  * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.48.0';
+    public const VERSION = '1.50.0';
 
     /**
      * Static identity only — never instantiated.
