@@ -322,6 +322,96 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/agent-presets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the presets a workspace agent can start from */
+        get: operations["get_api_v1_agent_presets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the workspace's agents */
+        get: operations["get_api_v1_agents"];
+        put?: never;
+        /**
+         * Create a workspace agent, from scratch or from a preset
+         * @description Send `presetKey` to start from a preset; any other field sent overrides the preset's. Without a `slug`, one is made from the name.
+         */
+        post: operations["post_api_v1_agents"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agents/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get one workspace agent */
+        get: operations["get_api_v1_agents_id"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Change a workspace agent's persona, toolsets or starting grant */
+        patch: operations["patch_api_v1_agents_id"];
+        trace?: never;
+    };
+    "/api/v1/agents/{id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Archive a workspace agent so it is no longer offered */
+        post: operations["post_api_v1_agents_id_archive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agents/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Offer an archived workspace agent again */
+        post: operations["post_api_v1_agents_id_restore"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/audit-logs": {
         parameters: {
             query?: never;
@@ -5926,6 +6016,123 @@ export interface components {
             promotion_id?: number | null;
             is_active?: boolean | null;
         };
+        Agent: {
+            id: number;
+            slug: string;
+            name: string;
+            nameAr: string;
+            role: string;
+            roleAr: string;
+            instructions: string;
+            instructionsAr: string;
+            /** @enum {string} */
+            tone: "plain" | "formal" | "brief";
+            /** @enum {string} */
+            language: "auto" | "en" | "ar";
+            toolsets: string[];
+            grant: {
+                [key: string]: "off" | "ask" | "allow";
+            };
+            /** @description The preset it was created from */
+            preset: {
+                key?: string;
+                version?: number;
+            } | null;
+            /** @enum {string} */
+            status: "active" | "archived";
+            createdAt: string;
+            updatedAt: string;
+        };
+        AgentCreateRequest: {
+            /** @description Lower-case letters, digits and dashes; unique in the workspace */
+            slug?: string;
+            /** @description Role name, for example "Finance clerk" (register 5.6b) */
+            name?: string;
+            /** @description The role name in Arabic */
+            nameAr?: string;
+            /** @description One sentence: what it does */
+            role?: string;
+            /** @description The role sentence in Arabic */
+            roleAr?: string;
+            /** @description The workspace's guidance for the model. Never changes access. */
+            instructions?: string;
+            /** @description The instructions in Arabic */
+            instructionsAr?: string;
+            /**
+             * @description plain (Whity's voice), formal or brief
+             * @enum {string}
+             */
+            tone?: "plain" | "formal" | "brief";
+            /**
+             * @description auto follows the person; en or ar fixes it
+             * @enum {string}
+             */
+            language?: "auto" | "en" | "ar";
+            /** @description Toolset ids or prefix.*; empty means every toolset */
+            toolsets?: string[];
+            /** @description Where a new assignment starts, per permission */
+            grant?: {
+                [key: string]: "off" | "ask" | "allow";
+            };
+            /** @description Start from this preset; fields sent override its own */
+            presetKey?: string;
+        };
+        AgentListResponse: {
+            data: components["schemas"]["Agent"][];
+        };
+        AgentPersonaFields: {
+            /** @description Lower-case letters, digits and dashes; unique in the workspace */
+            slug?: string;
+            /** @description Role name, for example "Finance clerk" (register 5.6b) */
+            name?: string;
+            /** @description The role name in Arabic */
+            nameAr?: string;
+            /** @description One sentence: what it does */
+            role?: string;
+            /** @description The role sentence in Arabic */
+            roleAr?: string;
+            /** @description The workspace's guidance for the model. Never changes access. */
+            instructions?: string;
+            /** @description The instructions in Arabic */
+            instructionsAr?: string;
+            /**
+             * @description plain (Whity's voice), formal or brief
+             * @enum {string}
+             */
+            tone?: "plain" | "formal" | "brief";
+            /**
+             * @description auto follows the person; en or ar fixes it
+             * @enum {string}
+             */
+            language?: "auto" | "en" | "ar";
+            /** @description Toolset ids or prefix.*; empty means every toolset */
+            toolsets?: string[];
+            /** @description Where a new assignment starts, per permission */
+            grant?: {
+                [key: string]: "off" | "ask" | "allow";
+            };
+        };
+        AgentPreset: {
+            key: string;
+            version: number;
+            name: string;
+            nameAr: string;
+            role: string;
+            roleAr: string;
+            instructions: string;
+            instructionsAr: string;
+            /** @enum {string} */
+            tone: "plain" | "formal" | "brief";
+            /** @enum {string} */
+            language: "auto" | "en" | "ar";
+            toolsets: string[];
+            grant: {
+                [key: string]: "off" | "ask" | "allow";
+            };
+        };
+        AgentPresetListResponse: {
+            data: components["schemas"]["AgentPreset"][];
+        };
         AgentProposal: {
             id: number;
             /** @enum {string} */
@@ -5950,6 +6157,9 @@ export interface components {
         };
         AgentProposalResponse: {
             data: components["schemas"]["AgentProposal"];
+        };
+        AgentResponse: {
+            data: components["schemas"]["Agent"];
         };
         ApprovalStatusResponse: {
             data: {
@@ -11593,6 +11803,538 @@ export interface operations {
             };
             /** @description meeting_id is required */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_agent_presets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Core presets, by key */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentPresetListResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_agents: {
+        parameters: {
+            query?: {
+                /** @description 1 to include archived agents */
+                archived?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The workspace's agents, by name */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentListResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_agents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description The new agent */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Another agent in this workspace already uses that slug */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Invalid fields (the errors list says which) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_agents_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ID of the agent. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The agent */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Agent not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    patch_api_v1_agents_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ID of the agent. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentPersonaFields"];
+            };
+        };
+        responses: {
+            /** @description The agent after the change */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Agent not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Another agent in this workspace already uses that slug */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Invalid fields (the errors list says which) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_agents_id_archive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ID of the agent. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The archived agent */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Agent not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_agents_id_restore: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ID of the agent. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The restored agent */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Agent not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
                 headers: {
                     [name: string]: unknown;
                 };

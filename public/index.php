@@ -4678,6 +4678,21 @@ $agentProposalsHandler = new \Whity\Api\AgentProposalsApiHandler($agentProposals
 $router->register('GET',  '/api/me/agent-proposals',                    [$agentProposalsHandler, 'list'],    null);
 $router->register('POST', '/api/me/agent-proposals/{id:\d+}/approve',  [$agentProposalsHandler, 'approve'], null);
 $router->register('POST', '/api/me/agent-proposals/{id:\d+}/decline',  [$agentProposalsHandler, 'decline'], null);
+// WHIT-815: workspace agents (persona, toolsets, starting grant) and the
+// presets they start from. Gated on agents:manage, which migration 180 grants
+// to every role holding mcp:tokens:manage. Writes are agentPolicy refuse.
+$agentsHandler = new \Whity\Api\AgentsApiHandler(
+    new \Whity\Core\Agent\AgentRepository($db->getPdo()),
+    new \Whity\Core\Agent\AgentPresetRegistry(),
+    $auditLogger,
+);
+$router->register('GET',   '/api/agents',                      [$agentsHandler, 'list'],    null, null, CorePermissions::AGENTS_MANAGE);
+$router->register('POST',  '/api/agents',                      [$agentsHandler, 'create'],  null, null, CorePermissions::AGENTS_MANAGE);
+$router->register('GET',   '/api/agents/{id:\d+}',             [$agentsHandler, 'get'],     null, null, CorePermissions::AGENTS_MANAGE);
+$router->register('PATCH', '/api/agents/{id:\d+}',             [$agentsHandler, 'update'],  null, null, CorePermissions::AGENTS_MANAGE);
+$router->register('POST',  '/api/agents/{id:\d+}/archive',     [$agentsHandler, 'archive'], null, null, CorePermissions::AGENTS_MANAGE);
+$router->register('POST',  '/api/agents/{id:\d+}/restore',     [$agentsHandler, 'restore'], null, null, CorePermissions::AGENTS_MANAGE);
+$router->register('GET',   '/api/agent-presets',               [$agentsHandler, 'presets'], null, null, CorePermissions::AGENTS_MANAGE);
 $mcpHandlers = [
     'initialize'              => new InitializeHandler(listChanged: true),
     // WHIT-708: required of every 2026-07-28 server.

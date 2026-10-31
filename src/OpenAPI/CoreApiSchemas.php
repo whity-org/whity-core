@@ -135,6 +135,7 @@ final class CoreApiSchemas
             self::meInboxRoutes(),
             self::searchRoutes(),
             self::agentProposalRoutes(),
+            self::agentRoutes(),
             self::userGroupRoutes(),
             self::documentRouteTemplateRoutes(),
             self::documentCollectionRoutes(),
@@ -5325,6 +5326,46 @@ final class CoreApiSchemas
             ], ['id', 'status', 'tool', 'summary', 'arguments', 'diff', 'permissions', 'undoWindowSeconds', 'result', 'decidedAt', 'expiresAt', 'createdAt']),
             'AgentProposalListResponse' => self::listEnvelope('AgentProposal'),
             'AgentProposalResponse' => self::dataEnvelope(SchemaBuilder::ref('AgentProposal')),
+            // ── Workspace agents and presets (WHIT-815) ──────────────────────
+            'AgentPersonaFields' => self::object(self::agentPersonaProperties(), []),
+            'AgentCreateRequest' => self::object(self::agentPersonaProperties() + [
+                'presetKey' => ['type' => 'string', 'description' => 'Start from this preset; fields sent override its own'],
+            ], []),
+            'Agent' => self::object([
+                'id' => self::int(),
+                'slug' => self::str(),
+                'name' => self::str(),
+                'nameAr' => self::str(),
+                'role' => self::str(),
+                'roleAr' => self::str(),
+                'instructions' => self::str(),
+                'instructionsAr' => self::str(),
+                'tone' => ['type' => 'string', 'enum' => ['plain', 'formal', 'brief']],
+                'language' => ['type' => 'string', 'enum' => ['auto', 'en', 'ar']],
+                'toolsets' => ['type' => 'array', 'items' => self::str()],
+                'grant' => ['type' => 'object', 'additionalProperties' => ['type' => 'string', 'enum' => ['off', 'ask', 'allow']]],
+                'preset' => ['nullable' => true, 'type' => 'object', 'properties' => ['key' => self::str(), 'version' => self::int()], 'description' => 'The preset it was created from'],
+                'status' => ['type' => 'string', 'enum' => ['active', 'archived']],
+                'createdAt' => self::str(),
+                'updatedAt' => self::str(),
+            ], ['id', 'slug', 'name', 'nameAr', 'role', 'roleAr', 'instructions', 'instructionsAr', 'tone', 'language', 'toolsets', 'grant', 'preset', 'status', 'createdAt', 'updatedAt']),
+            'AgentListResponse' => self::listEnvelope('Agent'),
+            'AgentResponse' => self::dataEnvelope(SchemaBuilder::ref('Agent')),
+            'AgentPreset' => self::object([
+                'key' => self::str(),
+                'version' => self::int(),
+                'name' => self::str(),
+                'nameAr' => self::str(),
+                'role' => self::str(),
+                'roleAr' => self::str(),
+                'instructions' => self::str(),
+                'instructionsAr' => self::str(),
+                'tone' => ['type' => 'string', 'enum' => ['plain', 'formal', 'brief']],
+                'language' => ['type' => 'string', 'enum' => ['auto', 'en', 'ar']],
+                'toolsets' => ['type' => 'array', 'items' => self::str()],
+                'grant' => ['type' => 'object', 'additionalProperties' => ['type' => 'string', 'enum' => ['off', 'ask', 'allow']]],
+            ], ['key', 'version', 'name', 'nameAr', 'role', 'roleAr', 'instructions', 'instructionsAr', 'tone', 'language', 'toolsets', 'grant']),
+            'AgentPresetListResponse' => self::listEnvelope('AgentPreset'),
             // ── The document organizer (#978, implementing #947 item 5) ───────
             // A "folder" is a NAMED QUERY, never a stored container: a document
             // raised centrally and needed by fifteen units has no single home,
@@ -10953,6 +10994,102 @@ final class CoreApiSchemas
                     ] + self::authErrors(),
                 ],
             ],
+        ];
+    }
+
+    /**
+     * The fields a workspace agent's create and update accept (WHIT-815).
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    private static function agentPersonaProperties(): array
+    {
+        return [
+            'slug' => ['type' => 'string', 'maxLength' => 48, 'description' => 'Lower-case letters, digits and dashes; unique in the workspace'],
+            'name' => ['type' => 'string', 'maxLength' => 60, 'description' => 'Role name, for example "Finance clerk" (register 5.6b)'],
+            'nameAr' => ['type' => 'string', 'maxLength' => 60, 'description' => 'The role name in Arabic'],
+            'role' => ['type' => 'string', 'maxLength' => 200, 'description' => 'One sentence: what it does'],
+            'roleAr' => ['type' => 'string', 'maxLength' => 200, 'description' => 'The role sentence in Arabic'],
+            'instructions' => ['type' => 'string', 'maxLength' => 4000, 'description' => 'The workspace\'s guidance for the model. Never changes access.'],
+            'instructionsAr' => ['type' => 'string', 'maxLength' => 4000, 'description' => 'The instructions in Arabic'],
+            'tone' => ['type' => 'string', 'enum' => ['plain', 'formal', 'brief'], 'description' => "plain (Whity's voice), formal or brief"],
+            'language' => ['type' => 'string', 'enum' => ['auto', 'en', 'ar'], 'description' => 'auto follows the person; en or ar fixes it'],
+            'toolsets' => ['type' => 'array', 'items' => self::str(), 'description' => 'Toolset ids or prefix.*; empty means every toolset'],
+            'grant' => ['type' => 'object', 'additionalProperties' => ['type' => 'string', 'enum' => ['off', 'ask', 'allow']], 'description' => 'Where a new assignment starts, per permission'],
+        ];
+    }
+
+    /**
+     * Workspace agents and the presets they start from (WHIT-815,
+     * docs/design/AGENT-PERSONAS-AND-WHITY-AGENT.md §4.2). Gated on
+     * `agents:manage`. Writes are `agentPolicy: refuse`: an agent never creates
+     * or edits agents, whatever its grant says.
+     *
+     * @return list<array{method: string, path: string, requiredRole: ?string, requiredPermission: ?string, schema: array<string, mixed>}>
+     */
+    private static function agentRoutes(): array
+    {
+        $id      = [['name' => 'id', 'in' => 'path', 'required' => true, 'description' => 'ID of the agent.', 'schema' => ['type' => 'integer']]];
+        $refuse  = ['agentPolicy' => 'refuse'];
+        $invalid = self::errorResponse('Invalid fields (the errors list says which)');
+
+        return [
+            self::permissionRoute('GET', '/api/agents', 'agents:manage', [
+                'summary' => 'List the workspace\'s agents',
+                'tags' => ['agents'],
+                'parameters' => [self::queryParam('archived', 'string', '1 to include archived agents')],
+                'responses' => [200 => self::jsonResponse('The workspace\'s agents, by name', 'AgentListResponse')] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/agents', 'agents:manage', [
+                'summary' => 'Create a workspace agent, from scratch or from a preset',
+                'description' => 'Send `presetKey` to start from a preset; any other field sent overrides the preset\'s. Without a `slug`, one is made from the name.',
+                'tags' => ['agents'],
+                'mcp' => $refuse,
+                'request' => 'AgentCreateRequest',
+                'responses' => [
+                    201 => self::jsonResponse('The new agent', 'AgentResponse'),
+                    409 => self::errorResponse('Another agent in this workspace already uses that slug'),
+                    422 => $invalid,
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/agents/{id:\d+}', 'agents:manage', [
+                'summary' => 'Get one workspace agent',
+                'tags' => ['agents'],
+                'parameters' => $id,
+                'responses' => [200 => self::jsonResponse('The agent', 'AgentResponse'), 404 => self::errorResponse('Agent not found')] + self::authErrors(),
+            ]),
+            self::permissionRoute('PATCH', '/api/agents/{id:\d+}', 'agents:manage', [
+                'summary' => 'Change a workspace agent\'s persona, toolsets or starting grant',
+                'tags' => ['agents'],
+                'mcp' => $refuse,
+                'parameters' => $id,
+                'request' => 'AgentPersonaFields',
+                'responses' => [
+                    200 => self::jsonResponse('The agent after the change', 'AgentResponse'),
+                    404 => self::errorResponse('Agent not found'),
+                    409 => self::errorResponse('Another agent in this workspace already uses that slug'),
+                    422 => $invalid,
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/agents/{id:\d+}/archive', 'agents:manage', [
+                'summary' => 'Archive a workspace agent so it is no longer offered',
+                'tags' => ['agents'],
+                'mcp' => $refuse,
+                'parameters' => $id,
+                'responses' => [200 => self::jsonResponse('The archived agent', 'AgentResponse'), 404 => self::errorResponse('Agent not found')] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/agents/{id:\d+}/restore', 'agents:manage', [
+                'summary' => 'Offer an archived workspace agent again',
+                'tags' => ['agents'],
+                'mcp' => $refuse,
+                'parameters' => $id,
+                'responses' => [200 => self::jsonResponse('The restored agent', 'AgentResponse'), 404 => self::errorResponse('Agent not found')] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/agent-presets', 'agents:manage', [
+                'summary' => 'List the presets a workspace agent can start from',
+                'tags' => ['agents'],
+                'responses' => [200 => self::jsonResponse('Core presets, by key', 'AgentPresetListResponse')] + self::authErrors(),
+            ]),
         ];
     }
 

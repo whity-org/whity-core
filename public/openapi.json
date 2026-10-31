@@ -2011,6 +2011,702 @@
                 ]
             }
         },
+        "/api/v1/agent-presets": {
+            "get": {
+                "operationId": "get_api_v1_agent_presets",
+                "summary": "List the presets a workspace agent can start from",
+                "tags": [
+                    "agents"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Core presets, by key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AgentPresetListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/agents": {
+            "get": {
+                "operationId": "get_api_v1_agents",
+                "summary": "List the workspace's agents",
+                "tags": [
+                    "agents"
+                ],
+                "parameters": [
+                    {
+                        "name": "archived",
+                        "in": "query",
+                        "required": false,
+                        "description": "1 to include archived agents",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The workspace's agents, by name",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AgentListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "operationId": "post_api_v1_agents",
+                "summary": "Create a workspace agent, from scratch or from a preset",
+                "tags": [
+                    "agents"
+                ],
+                "description": "Send `presetKey` to start from a preset; any other field sent overrides the preset's. Without a `slug`, one is made from the name.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AgentCreateRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The new agent",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AgentResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Another agent in this workspace already uses that slug",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid fields (the errors list says which)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/agents/{id}": {
+            "get": {
+                "operationId": "get_api_v1_agents_id",
+                "summary": "Get one workspace agent",
+                "tags": [
+                    "agents"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "description": "ID of the agent.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The agent",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AgentResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Agent not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "patch": {
+                "operationId": "patch_api_v1_agents_id",
+                "summary": "Change a workspace agent's persona, toolsets or starting grant",
+                "tags": [
+                    "agents"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "description": "ID of the agent.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AgentPersonaFields"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The agent after the change",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AgentResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Agent not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Another agent in this workspace already uses that slug",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid fields (the errors list says which)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/agents/{id}/archive": {
+            "post": {
+                "operationId": "post_api_v1_agents_id_archive",
+                "summary": "Archive a workspace agent so it is no longer offered",
+                "tags": [
+                    "agents"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "description": "ID of the agent.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The archived agent",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AgentResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Agent not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/agents/{id}/restore": {
+            "post": {
+                "operationId": "post_api_v1_agents_id_restore",
+                "summary": "Offer an archived workspace agent again",
+                "tags": [
+                    "agents"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "description": "ID of the agent.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The restored agent",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AgentResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Agent not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/audit-logs": {
             "get": {
                 "operationId": "get_api_v1_audit_logs",
@@ -41053,6 +41749,374 @@
                     }
                 }
             },
+            "Agent": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "slug": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "nameAr": {
+                        "type": "string"
+                    },
+                    "role": {
+                        "type": "string"
+                    },
+                    "roleAr": {
+                        "type": "string"
+                    },
+                    "instructions": {
+                        "type": "string"
+                    },
+                    "instructionsAr": {
+                        "type": "string"
+                    },
+                    "tone": {
+                        "type": "string",
+                        "enum": [
+                            "plain",
+                            "formal",
+                            "brief"
+                        ]
+                    },
+                    "language": {
+                        "type": "string",
+                        "enum": [
+                            "auto",
+                            "en",
+                            "ar"
+                        ]
+                    },
+                    "toolsets": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "grant": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "ask",
+                                "allow"
+                            ]
+                        }
+                    },
+                    "preset": {
+                        "nullable": true,
+                        "type": "object",
+                        "properties": {
+                            "key": {
+                                "type": "string"
+                            },
+                            "version": {
+                                "type": "integer"
+                            }
+                        },
+                        "description": "The preset it was created from"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "active",
+                            "archived"
+                        ]
+                    },
+                    "createdAt": {
+                        "type": "string"
+                    },
+                    "updatedAt": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "slug",
+                    "name",
+                    "nameAr",
+                    "role",
+                    "roleAr",
+                    "instructions",
+                    "instructionsAr",
+                    "tone",
+                    "language",
+                    "toolsets",
+                    "grant",
+                    "preset",
+                    "status",
+                    "createdAt",
+                    "updatedAt"
+                ]
+            },
+            "AgentCreateRequest": {
+                "type": "object",
+                "properties": {
+                    "slug": {
+                        "type": "string",
+                        "maxLength": 48,
+                        "description": "Lower-case letters, digits and dashes; unique in the workspace"
+                    },
+                    "name": {
+                        "type": "string",
+                        "maxLength": 60,
+                        "description": "Role name, for example \"Finance clerk\" (register 5.6b)"
+                    },
+                    "nameAr": {
+                        "type": "string",
+                        "maxLength": 60,
+                        "description": "The role name in Arabic"
+                    },
+                    "role": {
+                        "type": "string",
+                        "maxLength": 200,
+                        "description": "One sentence: what it does"
+                    },
+                    "roleAr": {
+                        "type": "string",
+                        "maxLength": 200,
+                        "description": "The role sentence in Arabic"
+                    },
+                    "instructions": {
+                        "type": "string",
+                        "maxLength": 4000,
+                        "description": "The workspace's guidance for the model. Never changes access."
+                    },
+                    "instructionsAr": {
+                        "type": "string",
+                        "maxLength": 4000,
+                        "description": "The instructions in Arabic"
+                    },
+                    "tone": {
+                        "type": "string",
+                        "enum": [
+                            "plain",
+                            "formal",
+                            "brief"
+                        ],
+                        "description": "plain (Whity's voice), formal or brief"
+                    },
+                    "language": {
+                        "type": "string",
+                        "enum": [
+                            "auto",
+                            "en",
+                            "ar"
+                        ],
+                        "description": "auto follows the person; en or ar fixes it"
+                    },
+                    "toolsets": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Toolset ids or prefix.*; empty means every toolset"
+                    },
+                    "grant": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "ask",
+                                "allow"
+                            ]
+                        },
+                        "description": "Where a new assignment starts, per permission"
+                    },
+                    "presetKey": {
+                        "type": "string",
+                        "description": "Start from this preset; fields sent override its own"
+                    }
+                }
+            },
+            "AgentListResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/Agent"
+                        }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "AgentPersonaFields": {
+                "type": "object",
+                "properties": {
+                    "slug": {
+                        "type": "string",
+                        "maxLength": 48,
+                        "description": "Lower-case letters, digits and dashes; unique in the workspace"
+                    },
+                    "name": {
+                        "type": "string",
+                        "maxLength": 60,
+                        "description": "Role name, for example \"Finance clerk\" (register 5.6b)"
+                    },
+                    "nameAr": {
+                        "type": "string",
+                        "maxLength": 60,
+                        "description": "The role name in Arabic"
+                    },
+                    "role": {
+                        "type": "string",
+                        "maxLength": 200,
+                        "description": "One sentence: what it does"
+                    },
+                    "roleAr": {
+                        "type": "string",
+                        "maxLength": 200,
+                        "description": "The role sentence in Arabic"
+                    },
+                    "instructions": {
+                        "type": "string",
+                        "maxLength": 4000,
+                        "description": "The workspace's guidance for the model. Never changes access."
+                    },
+                    "instructionsAr": {
+                        "type": "string",
+                        "maxLength": 4000,
+                        "description": "The instructions in Arabic"
+                    },
+                    "tone": {
+                        "type": "string",
+                        "enum": [
+                            "plain",
+                            "formal",
+                            "brief"
+                        ],
+                        "description": "plain (Whity's voice), formal or brief"
+                    },
+                    "language": {
+                        "type": "string",
+                        "enum": [
+                            "auto",
+                            "en",
+                            "ar"
+                        ],
+                        "description": "auto follows the person; en or ar fixes it"
+                    },
+                    "toolsets": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Toolset ids or prefix.*; empty means every toolset"
+                    },
+                    "grant": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "ask",
+                                "allow"
+                            ]
+                        },
+                        "description": "Where a new assignment starts, per permission"
+                    }
+                }
+            },
+            "AgentPreset": {
+                "type": "object",
+                "properties": {
+                    "key": {
+                        "type": "string"
+                    },
+                    "version": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "nameAr": {
+                        "type": "string"
+                    },
+                    "role": {
+                        "type": "string"
+                    },
+                    "roleAr": {
+                        "type": "string"
+                    },
+                    "instructions": {
+                        "type": "string"
+                    },
+                    "instructionsAr": {
+                        "type": "string"
+                    },
+                    "tone": {
+                        "type": "string",
+                        "enum": [
+                            "plain",
+                            "formal",
+                            "brief"
+                        ]
+                    },
+                    "language": {
+                        "type": "string",
+                        "enum": [
+                            "auto",
+                            "en",
+                            "ar"
+                        ]
+                    },
+                    "toolsets": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "grant": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "ask",
+                                "allow"
+                            ]
+                        }
+                    }
+                },
+                "required": [
+                    "key",
+                    "version",
+                    "name",
+                    "nameAr",
+                    "role",
+                    "roleAr",
+                    "instructions",
+                    "instructionsAr",
+                    "tone",
+                    "language",
+                    "toolsets",
+                    "grant"
+                ]
+            },
+            "AgentPresetListResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/AgentPreset"
+                        }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
             "AgentProposal": {
                 "type": "object",
                 "properties": {
@@ -41142,6 +42206,17 @@
                 "properties": {
                     "data": {
                         "$ref": "#/components/schemas/AgentProposal"
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "AgentResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/Agent"
                     }
                 },
                 "required": [
