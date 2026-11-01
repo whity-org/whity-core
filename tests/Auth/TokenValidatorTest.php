@@ -669,7 +669,7 @@ class TokenValidatorTest extends TestCase
     public function testValidateBearerForMcp_acceptsMcpTokenOnFirstPath(): void
     {
         // An MCP token must be accepted via the validateMcpToken path.
-        // revoked_tokens returns false (not revoked); mcp_tokens returns '1' (registered).
+        // revoked_tokens returns false (not revoked); mcp_tokens returns the stored row (registered).
         $notRevokedStmt = $this->createMock(PDOStatement::class);
         $notRevokedStmt->method('execute')->willReturn(true);
         $notRevokedStmt->method('fetchColumn')->willReturn(false);
@@ -677,6 +677,7 @@ class TokenValidatorTest extends TestCase
         $registeredStmt = $this->createMock(PDOStatement::class);
         $registeredStmt->method('execute')->willReturn(true);
         $registeredStmt->method('fetchColumn')->willReturn('1');
+        $registeredStmt->method('fetch')->willReturn(['scope' => '[]', 'name' => 'n8n prod']);
 
         $db = $this->createMock(PDO::class);
         $db->method('prepare')->willReturnCallback(
