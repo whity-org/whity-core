@@ -471,7 +471,7 @@ final class DiscoveryTools
         $proposal = $this->proposals->find($id, $principal->tenantId);
         if ($proposal === null
             || $proposal['on_behalf_of_profile_id'] !== $principal->userId
-            || $proposal['agent_principal_id'] !== $principal->jti) {
+            || $proposal['agent_principal_id'] !== $principal->agentPrincipalId()) {
             return self::error('No proposal of yours has that id.');
         }
 

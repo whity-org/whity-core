@@ -4730,7 +4730,9 @@ $mcpToolsCallHandler = new ToolsCallHandler($toolDeriver, $router, $roleChecker,
 // The approvals inbox: the person an agent acts for approves, edits or
 // declines what it asked to do. Session-gated and never on the MCP surface:
 // an agent must not be able to approve its own proposal.
-$agentProposalsHandler = new \Whity\Api\AgentProposalsApiHandler($agentProposals, $mcpToolsCallHandler, $auditLogger);
+// WHIT-816: a workspace agent's proposal runs under the person's assignment as it is now.
+$agentAssignments = new \Whity\Core\Agent\AgentAssignmentRepository($db->getPdo());
+$agentProposalsHandler = new \Whity\Api\AgentProposalsApiHandler($agentProposals, $mcpToolsCallHandler, $auditLogger, $agentAssignments);
 $router->register('GET',  '/api/me/agent-proposals',                    [$agentProposalsHandler, 'list'],    null);
 $router->register('POST', '/api/me/agent-proposals/{id:\d+}/approve',  [$agentProposalsHandler, 'approve'], null);
 $router->register('POST', '/api/me/agent-proposals/{id:\d+}/decline',  [$agentProposalsHandler, 'decline'], null);
@@ -4749,6 +4751,23 @@ $router->register('PATCH', '/api/agents/{id:\d+}',             [$agentsHandler, 
 $router->register('POST',  '/api/agents/{id:\d+}/archive',     [$agentsHandler, 'archive'], null, null, CorePermissions::AGENTS_MANAGE);
 $router->register('POST',  '/api/agents/{id:\d+}/restore',     [$agentsHandler, 'restore'], null, null, CorePermissions::AGENTS_MANAGE);
 $router->register('GET',   '/api/agent-presets',               [$agentsHandler, 'presets'], null, null, CorePermissions::AGENTS_MANAGE);
+// WHIT-816: a person's use of the workspace's agents. Session-only (every
+// member may use one; no `agents:use` permission) and never on the MCP
+// surface, so an agent can't widen its own grant.
+$myAgentsHandler = new \Whity\Api\MyAgentsApiHandler(
+    new \Whity\Core\Agent\AgentRepository($db->getPdo()),
+    $agentAssignments,
+    $mcpTokenService,
+    $roleChecker,
+    $mcpAgentOperations,
+    $auditLogger,
+);
+$router->register('GET',    '/api/me/agents',                              [$myAgentsHandler, 'list'],        null);
+$router->register('POST',   '/api/me/agents/{id:\d+}/assignment',          [$myAgentsHandler, 'assign'],      null);
+$router->register('DELETE', '/api/me/agents/{id:\d+}/assignment',          [$myAgentsHandler, 'unassign'],    null);
+$router->register('GET',    '/api/me/agents/{id:\d+}/assignment/grant',    [$myAgentsHandler, 'grant'],       null);
+$router->register('PATCH',  '/api/me/agents/{id:\d+}/assignment/grant',    [$myAgentsHandler, 'updateGrant'], null);
+$router->register('POST',   '/api/me/agents/{id:\d+}/credentials',         [$myAgentsHandler, 'credential'],  null);
 $mcpHandlers = [
     'initialize'              => new InitializeHandler(listChanged: true),
     // WHIT-708: required of every 2026-07-28 server.

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Whity\Api;
 
+use Whity\Core\Agent\AgentAssignmentRepository;
 use Whity\Core\Agent\AgentProposalRepository;
 use Whity\Core\Audit\AuditLoggerInterface;
 use Whity\Core\Request;
@@ -11,6 +12,7 @@ use Whity\Core\Response;
 use Whity\Core\Tenant\TenantContext;
 use Whity\Mcp\Auth\AgentScopeGrant;
 use Whity\Mcp\Auth\McpPrincipal;
+use Whity\Mcp\Auth\McpScope;
 use Whity\Mcp\JsonRpc\McpException;
 use Whity\Mcp\Tools\ToolsCallHandler;
 
@@ -41,6 +43,7 @@ final class AgentProposalsApiHandler
         private readonly AgentProposalRepository $proposals,
         private readonly ToolsCallHandler $toolsCall,
         private readonly ?AuditLoggerInterface $audit = null,
+        private readonly ?AgentAssignmentRepository $assignments = null,
     ) {
     }
 
@@ -86,6 +89,26 @@ final class AgentProposalsApiHandler
         if ($proposal === null || $proposal['on_behalf_of_profile_id'] !== $profileId) {
             return Response::error('Proposal not found', 404);
         }
+
+        // WHIT-816: a workspace agent's proposal runs under the person's
+        // assignment as it is NOW (its toolsets and grant), not as it was when
+        // the agent asked; a revoked assignment or an archived agent can't run.
+        $scope        = $proposal['scope'];
+        $assignmentId = AgentAssignmentRepository::idFromPrincipal($proposal['agent_principal_id']);
+        if ($assignmentId !== null) {
+            $active = $this->assignments?->activeScope($assignmentId, $tenantId, $profileId);
+            if ($active === null) {
+                return Response::error('This agent is no longer granted for you, so nothing can run', 409);
+            }
+            $scope = [
+                ...array_values(array_filter(
+                    $scope,
+                    static fn (string $e): bool => !str_starts_with($e, AgentScopeGrant::PREFIX) && !str_starts_with($e, McpScope::TOOLSET_PREFIX),
+                )),
+                ...$active['entries'],
+            ];
+        }
+
         // Atomic: only the caller that moves it from waiting runs it.
         if (!$this->proposals->decide($id, $tenantId, $profileId, AgentProposalRepository::APPROVED, $arguments)) {
             return Response::error('This proposal is no longer waiting', 409);
@@ -96,7 +119,7 @@ final class AgentProposalsApiHandler
             $profileId,
             $tenantId,
             AgentScopeGrant::AGENT_KIND,
-            $proposal['scope'],
+            $scope,
             $proposal['agent_principal_id'],
         );
         try {
