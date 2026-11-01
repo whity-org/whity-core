@@ -127,6 +127,7 @@ final class CoreApiSchemas
             self::subscriptionRoutes(),
             self::featureRoutes(),
             self::documentSourceRoutes(),
+            self::documentCollabRoutes(),
             self::documentThemeRoutes(),
             self::documentTemplateSlotRoutes(),
             self::workspacePluginRoutes(),
@@ -5788,6 +5789,8 @@ final class CoreApiSchemas
                 'legacy_template_id' => self::int(true) + ['description' => 'The old Document designer template this was converted from (migration 165), or null'],
                 'theme' => ['nullable' => true, 'allOf' => [SchemaBuilder::ref('DocumentThemeRef')], 'description' => 'The document\'s own theme choice: a ref and overrides of the print colour and letterhead. Null follows the workspace defaults.'],
                 'resolvedTheme' => SchemaBuilder::ref('ResolvedDocumentTheme'),
+                'suggestions' => ['type' => 'array', 'items' => SchemaBuilder::ref('DocumentSuggestion'), 'description' => 'GET /{id} only: the open suggestions (editor M5)'],
+                'comments' => ['type' => 'array', 'items' => SchemaBuilder::ref('DocumentCommentThread'), 'description' => 'GET /{id} only: every comment thread, resolved or not (editor M5)'],
                 'created_at' => self::str(),
                 'updated_at' => self::str(),
             ], ['id', 'tenant_id', 'kind', 'title', 'lang', 'default_view', 'full_width', 'draft_version', 'scope', 'created_at', 'updated_at']),
@@ -5957,6 +5960,122 @@ final class CoreApiSchemas
                     'description' => 'The document\'s theme (E.44): { ref?, overrides? }, or null to follow the workspace defaults.',
                 ],
             ], []),
+
+            // ── Comments and suggestions (editor M5; E.4, E.6, E.29) ─────────
+            // An actor as the contract's Actor: a person ({kind, id, name}), an
+            // agent acting for a person ({kind, id: its principal id, name, for}),
+            // or Whity ({kind: system, name}).
+            'DocumentActor' => self::object([
+                'kind' => ['type' => 'string', 'enum' => ['person', 'agent', 'system'], 'description' => 'A person, an agent acting for a person, or Whity'],
+                'id' => ['oneOf' => [['type' => 'integer'], ['type' => 'string']], 'description' => 'A person\'s profile id, or an agent\'s principal id; absent for the system'],
+                'name' => self::str(),
+                'for' => self::object(['id' => self::int(), 'name' => self::str()], ['id', 'name']) + ['description' => 'An agent only: the person it acts for'],
+            ], ['kind', 'name']),
+            'DocumentSuggestionPatch' => [
+                'type' => 'object',
+                'additionalProperties' => true,
+                'required' => ['op'],
+                'description' => 'One change, anchored to block ids and text, never offsets. Text is matched in a block\'s flattened inline text (its content, or a toggle\'s summary): text runs in order, each field, break or formula counting as the one character U+FFFC; the occurrence-th match (0-based) is the occurrence-th position, scanning one character at a time, where the text starts.',
+                'properties' => [
+                    'op' => ['type' => 'string', 'enum' => ['insert-blocks', 'replace-text', 'format', 'delete-blocks', 'move-block'], 'description' => 'What the patch does'],
+                    'afterBlockId' => self::str(true) + ['description' => 'insert-blocks and move-block: the block to go after; null for the start of the document'],
+                    'blocks' => ['type' => 'array', 'items' => ['type' => 'object', 'additionalProperties' => true], 'description' => 'insert-blocks: the contract Block[] to insert, with ids the draft doesn\'t use, and no suggestion attr or insertion/deletion marks'],
+                    'blockId' => self::str() + ['description' => 'replace-text, format and move-block: the block, at any depth'],
+                    'deleteText' => self::str() + ['description' => 'replace-text: the text to replace; "" for a pure insertion. format: always ""'],
+                    'insert' => ['type' => 'array', 'items' => ['type' => 'object', 'additionalProperties' => true], 'description' => 'replace-text: the contract Inline[] put in its place'],
+                    'occurrence' => self::int() + ['description' => 'replace-text and format: which match, from 0. For a pure insertion, which match of before'],
+                    'before' => self::str() + ['description' => 'replace-text with deleteText "": up to 40 characters of the block\'s text just before the insertion point; "" for the start of the block'],
+                    'text' => self::str() + ['description' => 'format: the text to format'],
+                    'mark' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'format: a contract mark, one of bold, italic, underline, strike, code, link ({type, href}) or highlight'],
+                    'add' => self::bool() + ['description' => 'format: true adds the mark, false removes it'],
+                    'blockIds' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'delete-blocks: the blocks to delete'],
+                ],
+            ],
+            'DocumentSuggestion' => self::object([
+                'id' => self::int(),
+                'kind' => ['type' => 'string', 'enum' => ['text', 'format', 'block']],
+                'summary' => self::str() + ['description' => 'What the rail card says, for example Replace 30 days with 14 days'],
+                'request' => self::str(true) + ['description' => 'For agents: what they were asked'],
+                'permission' => self::str() + ['description' => 'The one permission the change used: documents:suggest'],
+                'by' => SchemaBuilder::ref('DocumentActor'),
+                'at' => self::str() + ['description' => 'When it was made, ISO 8601 UTC'],
+                'status' => ['type' => 'string', 'enum' => ['open', 'accepted', 'rejected', 'stale']],
+                'patch' => SchemaBuilder::ref('DocumentSuggestionPatch'),
+                'base_version' => self::int() + ['description' => 'The draft version it was made against'],
+                'decided_by' => ['nullable' => true, 'allOf' => [SchemaBuilder::ref('DocumentActor')]],
+                'decided_at' => self::str(true),
+            ], ['id', 'kind', 'summary', 'request', 'permission', 'by', 'at', 'status', 'patch', 'base_version', 'decided_by', 'decided_at']),
+            'DocumentSuggestionResponse' => self::dataEnvelope(SchemaBuilder::ref('DocumentSuggestion')),
+            'DocumentSuggestionListResponse' => self::listEnvelope('DocumentSuggestion'),
+            'DocumentSuggestionCreateRequest' => self::object([
+                'kind' => ['type' => 'string', 'enum' => ['text', 'format', 'block'], 'description' => 'text for replace-text, format for format, block for insert-blocks, delete-blocks and move-block'],
+                'summary' => self::str() + ['description' => 'What the card says, at most 500 characters, for example Replace 30 days with 14 days'],
+                'patch' => SchemaBuilder::ref('DocumentSuggestionPatch') + ['description' => 'The change; it must apply to the current draft'],
+                'request' => self::str(true) + ['description' => 'For agents: what they were asked, at most 4000 characters'],
+            ], ['kind', 'summary', 'patch']),
+            'DocumentSuggestionDecisionRequest' => self::object([
+                'decision' => ['type' => 'string', 'enum' => ['accepted', 'rejected'], 'description' => 'accepted applies the patch to the draft; rejected leaves the draft as it is'],
+            ], ['decision']),
+            'DocumentSuggestionDecisionResponse' => self::dataEnvelope(self::object([
+                'suggestion' => SchemaBuilder::ref('DocumentSuggestion'),
+                'draft_version' => self::int() + ['description' => 'The draft version now (bumped when a suggestion was accepted)'],
+            ], ['suggestion', 'draft_version'])),
+            'DocumentSuggestionBulkDecisionRequest' => self::object([
+                'decision' => ['type' => 'string', 'enum' => ['accepted', 'rejected'], 'description' => 'accepted applies each patch to the draft, in id order; rejected leaves the draft as it is'],
+                'suggestion_ids' => ['type' => 'array', 'items' => ['type' => 'integer'], 'nullable' => true, 'description' => 'Only these suggestions; left out, every open one'],
+                'agent' => self::str(true) + ['description' => 'Only the suggestions this agent principal made (its id from by.id)'],
+            ], ['decision']),
+            'DocumentSuggestionBulkDecisionResponse' => self::dataEnvelope(self::object([
+                'decided' => ['type' => 'array', 'items' => ['type' => 'integer'], 'description' => 'The suggestions accepted or rejected'],
+                'stale' => ['type' => 'array', 'items' => ['type' => 'integer'], 'description' => 'The suggestions skipped because their text or block has gone; now stale'],
+                'draft_version' => self::int(),
+            ], ['decided', 'stale', 'draft_version'])),
+            'DocumentCommentMessage' => self::object([
+                'id' => self::int(),
+                'by' => SchemaBuilder::ref('DocumentActor'),
+                'at' => self::str() + ['description' => 'ISO 8601 UTC'],
+                'body' => ['type' => 'array', 'items' => ['type' => 'object', 'additionalProperties' => true], 'description' => 'The contract Inline[]'],
+                'mentions' => ['type' => 'array', 'items' => SchemaBuilder::ref('DocumentActor'), 'description' => 'The people @mentioned'],
+            ], ['id', 'by', 'at', 'body', 'mentions']),
+            'DocumentCommentThread' => self::object([
+                'id' => self::int(),
+                'anchor_block_id' => self::str(),
+                'quote' => self::str() + ['description' => 'The commented text; the editor highlights it by finding it in the anchor block'],
+                'messages' => ['type' => 'array', 'items' => SchemaBuilder::ref('DocumentCommentMessage')],
+                'resolved' => [
+                    'type' => 'object',
+                    'nullable' => true,
+                    'properties' => ['by' => SchemaBuilder::ref('DocumentActor'), 'at' => self::str()],
+                    'required' => ['by', 'at'],
+                    'description' => 'Who resolved it and when; null while it is open',
+                ],
+            ], ['id', 'anchor_block_id', 'quote', 'messages', 'resolved']),
+            'DocumentCommentThreadResponse' => self::dataEnvelope(SchemaBuilder::ref('DocumentCommentThread')),
+            'DocumentCommentThreadListResponse' => self::listEnvelope('DocumentCommentThread'),
+            'DocumentCommentMessageResponse' => self::dataEnvelope(SchemaBuilder::ref('DocumentCommentMessage')),
+            'DocumentCommentThreadCreateRequest' => self::object([
+                'anchor_block_id' => self::str() + ['description' => 'The id of the block the commented text is in'],
+                'quote' => self::str() + ['description' => 'The commented text, at most 2000 characters'],
+                'body' => ['type' => 'array', 'items' => ['type' => 'object', 'additionalProperties' => true], 'description' => 'The first message as the contract Inline[] (text, field, break, math), not empty'],
+                'mentions' => ['type' => 'array', 'items' => ['type' => 'integer'], 'description' => 'Profile ids @mentioned; members who can read the document are told in-app'],
+            ], ['anchor_block_id', 'quote', 'body']),
+            'DocumentCommentMessageCreateRequest' => self::object([
+                'body' => ['type' => 'array', 'items' => ['type' => 'object', 'additionalProperties' => true], 'description' => 'The reply as the contract Inline[] (text, field, break, math), not empty'],
+                'mentions' => ['type' => 'array', 'items' => ['type' => 'integer'], 'description' => 'Profile ids @mentioned; members who can read the document are told in-app'],
+            ], ['body']),
+            'DocumentMentionablePerson' => self::object([
+                'kind' => ['type' => 'string', 'enum' => ['person'], 'description' => 'Always person'],
+                'id' => self::int() + ['description' => 'The profile id, as sent in mentions'],
+                'name' => self::str() + ['description' => 'The display name'],
+                'email' => self::str() + ['description' => 'The primary email, when there is one'],
+            ], ['kind', 'id', 'name']),
+            'DocumentMentionableListResponse' => self::listEnvelope('DocumentMentionablePerson'),
+            'DocumentChangesResponse' => self::dataEnvelope(self::object([
+                'cursor' => self::str() + ['description' => 'Send it back as since on the next poll; opaque'],
+                'draft_version' => self::int(),
+                'suggestions' => ['type' => 'array', 'items' => SchemaBuilder::ref('DocumentSuggestion'), 'description' => 'Suggestions made or decided since the cursor, any status'],
+                'comments' => ['type' => 'array', 'items' => SchemaBuilder::ref('DocumentCommentThread'), 'description' => 'Threads started, replied to, resolved or reopened since the cursor, with all their messages'],
+            ], ['cursor', 'draft_version', 'suggestions', 'comments'])),
 
             // ── Document themes (editor M4d; E.44, DOCUMENT-THEMES.md 3, 5) ──
             // A theme is data, never CSS: a closed token set of enums and
@@ -12124,6 +12243,171 @@ final class CoreApiSchemas
                     409 => self::errorResponse('The bindings changed since the ETag was read (`stale`)'),
                     422 => self::errorResponse('The template doesn\'t fit the slot (`kind_mismatch`, `record_type_mismatch`, `personal_template`, `unpublished`), or the system tenant'),
                     428 => self::errorResponse('If-Match is required'),
+                ] + self::authErrors(),
+            ]),
+        ];
+    }
+
+    /**
+     * Comments and suggestions on an editor document (editor M5; E.4, E.6,
+     * E.10, E.29, E.37). Suggesting needs documents:suggest, commenting
+     * documents:comment, and accepting or rejecting documents:write. The two
+     * decision routes are `refuse` for agents: an agent's changes are always
+     * suggestions a person decides on.
+     *
+     * @return list<array{method: string, path: string, requiredRole: ?string, requiredPermission: ?string, schema: array<string, mixed>}>
+     */
+    private static function documentCollabRoutes(): array
+    {
+        $refuse = ['agentPolicy' => 'refuse'];
+        $hidden = self::errorResponse('Document not found or not visible to the caller');
+
+        return [
+            self::permissionRoute('GET', '/api/document-sources/{id:\d+}/suggestions', 'documents:read', [
+                'summary' => 'List the suggestions on an editor document',
+                'description' => 'Open ones by default, in id order, each with its patch, who made it and when.',
+                'tags' => ['documents'],
+                'parameters' => [
+                    self::queryParam('status', 'string', '`open` (the default) or `all`, which adds accepted, rejected and stale ones. Anything else is a 422.'),
+                ],
+                'responses' => [
+                    200 => self::jsonResponse('The suggestions', 'DocumentSuggestionListResponse'),
+                    404 => $hidden,
+                    422 => self::errorResponse('Unknown status'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/document-sources/{id:\d+}/suggestions', 'documents:suggest', [
+                'summary' => 'Suggest a change to an editor document',
+                'description' =>
+                    'The change is a patch anchored to block ids and text (E.4, E.10); the draft is not '
+                    . 'changed until someone who can edit accepts it. The patch must apply to the current '
+                    . 'draft (422 with details.code patch_does_not_apply otherwise); base_version records '
+                    . 'the draft version. An agent\'s suggestion records the agent and the person it acts for.',
+                'tags' => ['documents'],
+                'request' => 'DocumentSuggestionCreateRequest',
+                'responses' => [
+                    201 => self::jsonResponse('The suggestion', 'DocumentSuggestionResponse'),
+                    404 => $hidden,
+                    422 => self::errorResponse('Invalid patch, kind or summary, or the patch does not apply'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/document-sources/{id:\d+}/suggestions/{sid:\d+}/decision', 'documents:write', [
+                'summary' => 'Accept or reject a suggestion',
+                'description' =>
+                    'Accepting applies the patch to the draft in one transaction and bumps draft_version (the '
+                    . 'new one is the ETag). When its text or block has gone it becomes stale: 409 with '
+                    . 'details.code suggestion_stale. A suggestion decided already is 409 already_decided. '
+                    . 'Recorded in the audit log with who decided (E.29). People only: agents never decide.',
+                'tags' => ['documents'],
+                'mcp' => $refuse,
+                'request' => 'DocumentSuggestionDecisionRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The decided suggestion and the draft version', 'DocumentSuggestionDecisionResponse'),
+                    404 => self::errorResponse('Document or suggestion not found, or not visible to the caller'),
+                    409 => self::errorResponse('details.code: suggestion_stale, already_decided or draft_changed'),
+                    422 => self::errorResponse('decision must be accepted or rejected'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/document-sources/{id:\d+}/suggestions/decisions', 'documents:write', [
+                'summary' => 'Accept or reject many suggestions at once',
+                'description' =>
+                    'The rail\'s All menu (E.29): every open suggestion, those ids, or all from one agent. '
+                    . 'Accepted ones are applied in id order with one draft_version bump; stale ones are '
+                    . 'skipped, marked stale and listed. Each decision is audited. People only.',
+                'tags' => ['documents'],
+                'mcp' => $refuse,
+                'request' => 'DocumentSuggestionBulkDecisionRequest',
+                'responses' => [
+                    200 => self::jsonResponse('What was decided, what was stale, and the draft version', 'DocumentSuggestionBulkDecisionResponse'),
+                    404 => $hidden,
+                    409 => self::errorResponse('The document kept changing; details.code draft_changed'),
+                    422 => self::errorResponse('Invalid decision, suggestion_ids or agent'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/document-sources/{id:\d+}/comments', 'documents:read', [
+                'summary' => 'List the comment threads on an editor document',
+                'description' => 'Each thread with its anchor, quote and messages, and who resolved it.',
+                'tags' => ['documents'],
+                'parameters' => [
+                    self::queryParam('resolved', 'string', '`0` for open threads, `1` for resolved ones, `all` (the default) for both. Anything else is a 422.'),
+                ],
+                'responses' => [
+                    200 => self::jsonResponse('The threads', 'DocumentCommentThreadListResponse'),
+                    404 => $hidden,
+                    422 => self::errorResponse('Unknown resolved value'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/document-sources/{id:\d+}/comments', 'documents:comment', [
+                'summary' => 'Start a comment thread on an editor document',
+                'description' =>
+                    'Anchored to a block of the draft and the text it quotes; nothing is written into the '
+                    . 'draft. Each person @mentioned who can read the document is told in-app.',
+                'tags' => ['documents'],
+                'request' => 'DocumentCommentThreadCreateRequest',
+                'responses' => [
+                    201 => self::jsonResponse('The thread', 'DocumentCommentThreadResponse'),
+                    404 => $hidden,
+                    422 => self::errorResponse('Invalid anchor, quote, body or mentions'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/document-sources/{id:\d+}/comments/{tid:\d+}/messages', 'documents:comment', [
+                'summary' => 'Reply in a comment thread',
+                'description' => 'Each person @mentioned who can read the document is told in-app.',
+                'tags' => ['documents'],
+                'request' => 'DocumentCommentMessageCreateRequest',
+                'responses' => [
+                    201 => self::jsonResponse('The message', 'DocumentCommentMessageResponse'),
+                    404 => self::errorResponse('Document or thread not found, or not visible to the caller'),
+                    422 => self::errorResponse('Invalid body or mentions'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/document-sources/{id:\d+}/comments/{tid:\d+}/resolve', 'documents:comment', [
+                'summary' => 'Resolve a comment thread',
+                'description' => 'Recorded in the audit log. Resolving a resolved thread changes nothing.',
+                'tags' => ['documents'],
+                'responses' => [
+                    200 => self::jsonResponse('The thread', 'DocumentCommentThreadResponse'),
+                    404 => self::errorResponse('Document or thread not found, or not visible to the caller'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/document-sources/{id:\d+}/comments/{tid:\d+}/reopen', 'documents:comment', [
+                'summary' => 'Reopen a resolved comment thread',
+                'description' => 'Recorded in the audit log. Reopening an open thread changes nothing.',
+                'tags' => ['documents'],
+                'responses' => [
+                    200 => self::jsonResponse('The thread', 'DocumentCommentThreadResponse'),
+                    404 => self::errorResponse('Document or thread not found, or not visible to the caller'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/document-sources/{id:\d+}/changes', 'documents:read', [
+                'summary' => 'What changed on an editor document since a cursor',
+                'description' =>
+                    'Suggestions and comment threads changed since the cursor, and the draft version. The '
+                    . 'editor polls it every 10 seconds while open. An item may come back twice; keep the '
+                    . 'newest by id.',
+                'tags' => ['documents'],
+                'parameters' => [
+                    self::queryParam('since', 'string', 'The cursor from the previous response. Left out, everything. A value that is not a cursor is a 422.'),
+                ],
+                'responses' => [
+                    200 => self::jsonResponse('The changes and the next cursor', 'DocumentChangesResponse'),
+                    404 => $hidden,
+                    422 => self::errorResponse('since is not a cursor'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/document-sources/{id:\d+}/mentionable', 'documents:comment', [
+                'summary' => 'Find people to @mention in a comment',
+                'description' =>
+                    'Up to 20 active members of the workspace who can read this document, matching q on '
+                    . 'display name or email. Nobody outside the workspace or the document\'s audience is listed.',
+                'tags' => ['documents'],
+                'parameters' => [
+                    self::queryParam('q', 'string', 'Part of a display name or email, 1 to 100 characters; case-insensitive. Empty is a 422.', true),
+                ],
+                'responses' => [
+                    200 => self::jsonResponse('The people', 'DocumentMentionableListResponse'),
+                    404 => $hidden,
+                    422 => self::errorResponse('q is empty or longer than 100 characters'),
                 ] + self::authErrors(),
             ]),
         ];

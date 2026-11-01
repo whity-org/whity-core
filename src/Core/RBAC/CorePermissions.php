@@ -245,6 +245,14 @@ final class CorePermissions
     // (PermissionRegistry). Migration 172 grants it to every role that held
     // DOCUMENTS_PUBLISH.
     public const DOCUMENTS_THEMES = 'documents:themes';
+    // Comments and suggestions in the editor (editor M5; E.10, E.29). Suggest
+    // is the permission of people who read but don't edit, and of agents,
+    // whose every change is a suggestion (E.4); accepting and rejecting stays
+    // with DOCUMENTS_WRITE. Comment starts threads, replies, resolves and
+    // reopens. Two segments only (PermissionRegistry). Migration 186 grants
+    // both to every role that held DOCUMENTS_READ.
+    public const DOCUMENTS_SUGGEST = 'documents:suggest';
+    public const DOCUMENTS_COMMENT = 'documents:comment';
 
     // Issued DOCUMENTS, as opposed to the templates above (#947 item 1,
     // migration 109). The four permissions above are the designer's; a document
@@ -506,6 +514,8 @@ final class CorePermissions
             self::DOCUMENTS_RENDER,
             self::DOCUMENTS_ISSUE,
             self::DOCUMENTS_THEMES,
+            self::DOCUMENTS_SUGGEST,
+            self::DOCUMENTS_COMMENT,
             self::DOCUMENTS_READ_ALL,
             self::DOCUMENTS_ROUTE,
             self::SECURITY_MANAGE,

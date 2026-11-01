@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Whity\Api;
 
 use Whity\Auth\RoleChecker;
+use Whity\Core\Document\Collab\DocumentCollab;
 use Whity\Core\Document\DocumentIssuer;
 use Whity\Core\Document\DocumentPresenter;
 use Whity\Core\Document\DocumentSourceFileStore;
@@ -84,6 +85,8 @@ final class DocumentPublishingApiHandler
         ?DocumentIssuing $issuing = null,
         // The workspace's document themes (editor M4d).
         ?DocumentThemeRepository $themes = null,
+        // Open suggestions block publishing (editor M5, E.37).
+        private readonly ?DocumentCollab $collab = null,
     ) {
         $this->print = new SourceDocumentPrinter($fields, $embeds, $settings, $files, $printLabels, $logo, $themes);
         $this->issuing = $issuing ?? ($issuer !== null
@@ -551,6 +554,13 @@ final class DocumentPublishingApiHandler
             is_array($row['blocks'] ?? null) ? $row['blocks'] : [],
             $this->fields->paths($tenantId, $type) + self::ownPaths($row['own_fields'] ?? []),
         );
+
+        // E.37: a template isn't published while suggestions on it are open;
+        // someone who can edit accepts or rejects them first.
+        $open = $this->collab?->openCount($tenantId, (int) $row['id']) ?? 0;
+        if ($open > 0) {
+            array_unshift($blockers, ['kind' => 'open-suggestions', 'count' => $open]);
+        }
 
         // A theme the document names that the workspace doesn't have (deleted,
         // or a plugin's that is off) would publish in another look than the

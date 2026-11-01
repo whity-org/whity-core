@@ -12,6 +12,7 @@ import type {
 } from '@whity/features/document-editor';
 import { api } from '@/lib/api/client';
 import type { components } from '@/lib/api/schema';
+import { collabAdapter } from './collab';
 
 /**
  * Web's HTTP half of the block editor's documents (editor M2), on the typed
@@ -48,7 +49,7 @@ export function toDocument(row: Row): WhityDocument {
     ownFields: row.own_fields?.length ? row.own_fields : undefined,
     theme: row.theme ? (row.theme as WhityDocument['theme']) : undefined,
     blocks: (row.blocks ?? []) as unknown as Block[],
-    // Comments and suggestions have their own endpoints from M5.
+    // Comments and suggestions have their own endpoints (M5, collab.ts); the rail loads them.
     comments: [],
     suggestions: [],
     status: row.published_version != null ? 'published' : 'draft',
@@ -173,6 +174,8 @@ function download(blob: Blob, filename: string) {
 
 export const documentSourcesAdapter: DocumentEditorAdapter = {
   loadServices,
+  // M5: comments and suggestions.
+  ...collabAdapter,
 
   async loadTemplate(recordType): Promise<TemplateSetup> {
     const [{ data, response }, logos] = await Promise.all([

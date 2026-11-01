@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import type { Editor } from "@tiptap/core"
+import { TextSelection } from "@tiptap/pm/state"
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react"
 
 import { Badge } from "../badge"
@@ -35,6 +36,20 @@ import { FieldPicker, flatFields } from "./field-picker"
 import { DEFAULT_LABEL_GRID, LabelSetup, LabelSheetView, labelCells, type SheetSize } from "./label-sheet"
 import { PagePagination, PageView, fitZoom, themeStyle, type Letterhead } from "./page-view"
 import { PublishCheck } from "./publish-check"
+import type { EditorCollab, RailSuggestion } from "./collab"
+import { CollabDrawer, CollabRail, useWideRail, type RailActions, type RailItem } from "./collab-rail"
+import { collectPatches, hasSuggestionMarks, renderSuggestions, stripSuggestions, type LocalChange } from "./suggestions"
+import {
+  LOCAL_PREFIX,
+  findBlockNode,
+  pendingFormats,
+  renameSuggestion,
+  suggestingKey,
+  suggestionPos,
+  threadRange,
+  Suggesting,
+  type CollabThreadAnchor,
+} from "./suggesting"
 
 export type SaveState =
   | { state: "saved"; at: string }
@@ -119,8 +134,17 @@ export interface DocEditorProps {
   onExportPdf?: () => Promise<void> | void
   /** Label sheets: Print fills one label per record or CSV row (E.43); the screen asks which. */
   onPrintLabels?: () => void
+  /**
+   * Comments and suggestions (M5): the margin rail, Suggesting mode and
+   * Comment. Without it the editor offers Editing and Viewing only.
+   */
+  collab?: EditorCollab
   className?: string
 }
+
+/** How long Suggesting waits after the last edit before sending it (spec: about 1.5 s idle). */
+const FLUSH_DELAY_MS = 1500
+const NO_SUGGESTIONS: RailSuggestion[] = []
 
 const NO_SERVICES: EditorServices = {}
 
@@ -181,12 +205,38 @@ function DocEditor({
   publish,
   onExportPdf,
   onPrintLabels,
+  collab,
   className,
 }: DocEditorProps) {
   const labels = React.useMemo(() => ({ ...EDITOR_LABELS, ...labelProp }), [labelProp])
-  const mode: EditorMode = canEdit ? (modeProp === "viewing" ? "viewing" : "editing") : "viewing"
+  // E.10: Editing needs edit permission; without it Suggesting is the default, with Editing locked.
+  const canSuggest = !!collab?.onSuggest && collab.canSuggest !== false
+  const canComment = !!collab?.onComment && !!collab.canComment
+  const defaultMode: EditorMode = canEdit ? "editing" : canSuggest ? "suggesting" : "viewing"
+  const wanted = modeProp ?? defaultMode
+  const mode: EditorMode =
+    wanted === "viewing"
+      ? "viewing"
+      : wanted === "suggesting" && canSuggest
+        ? "suggesting"
+        : wanted === "editing" && canEdit
+          ? "editing"
+          : defaultMode
+  const suggesting = mode === "suggesting"
   // E.12: the pages are read-only while previewing with a record, except when issuing a letter (M4c).
-  const editable = mode === "editing" && (!preview || editWhilePreviewing)
+  // Previewing hides comments and suggestions, so Suggesting is read-only then too.
+  const editable = (mode === "editing" && (!preview || editWhilePreviewing)) || (suggesting && !preview)
+  const showCollab = !!collab && !preview
+  const allSuggestions = collab?.suggestions ?? NO_SUGGESTIONS
+  // Only open suggestions are drawn and carded; stale or decided ones have left the rail.
+  const suggestions = React.useMemo(() => allSuggestions.filter((s) => s.status === "open"), [allSuggestions])
+  const revision = collab?.revision
+  const rendered = React.useMemo(
+    () => renderSuggestions(doc.blocks, suggestions.map((s) => ({ id: s.id, patch: s.patch }))),
+    // Drawn from the draft as it is when the suggestions or the revision change, not on every keystroke.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [suggestions, revision]
+  )
   const [viewState, setViewState] = React.useState<EditorView>(doc.defaultView === "page" || doc.kind === "label" ? "page" : "continuous")
   const view: EditorView = doc.kind === "label" ? "page" : (viewProp ?? viewState)
   const setView = (v: EditorView) => {
@@ -219,6 +269,23 @@ function DocEditor({
   latest.current = doc
   const slashKeys = React.useRef<(e: KeyboardEvent) => boolean>(() => false)
   const cardTimer = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  // M5: Suggesting mode's local changes and their flush.
+  const suggestingRef = React.useRef(suggesting)
+  suggestingRef.current = suggesting
+  const inFlight = React.useRef(new Set<string>())
+  const isLocal = React.useCallback((id: string) => id.startsWith(LOCAL_PREFIX) && !inFlight.current.has(id), [])
+  const quiet = React.useRef(false)
+  const flushTimer = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const flushRef = React.useRef<() => Promise<void>>(async () => undefined)
+  const [active, setActive] = React.useState<string | null>(null)
+  const activeRef = React.useRef<(id: string | null) => void>(() => undefined)
+  const [composer, setComposer] = React.useState<{ blockId: string; quote: string } | null>(null)
+  const [railOpen, setRailOpen] = React.useState(true)
+  const [drawerOpen, setDrawerOpen] = React.useState(false)
+  const [pendingChanges, setPendingChanges] = React.useState<LocalChange[]>([])
+  const [collabError, setCollabError] = React.useState(false)
+  const [tick, setTick] = React.useState(0)
+  const wide = useWideRail()
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -232,10 +299,12 @@ function DocEditor({
           ? DocumentBehaviour.configure({ onBlockMenu: setMenuAt })
           : ext.name === "unknownBlock"
             ? UnknownBlock.configure({ label: (type) => fill(labels.laterBlock, { block: type }) })
-            : ext
+            : ext.name === "suggesting"
+              ? Suggesting.configure({ isLocal, onActivate: (id) => activeRef.current(id) })
+              : ext
       ),
     ],
-    content: toEditorContent(doc.blocks),
+    content: toEditorContent(collab ? rendered.blocks : doc.blocks),
     editorProps: {
       attributes: {
         class: "wy-doc",
@@ -245,13 +314,286 @@ function DocEditor({
       },
     },
     onUpdate: ({ editor: e }) => {
-      onChange({ ...latest.current, blocks: fromEditorContent(e.getJSON()) })
+      setTick((n) => n + 1)
+      if (quiet.current) return
+      if (suggestingRef.current) {
+        // Nothing is saved to the draft in Suggesting: the changes go out as suggestions.
+        clearTimeout(flushTimer.current)
+        flushTimer.current = setTimeout(() => void flushRef.current(), FLUSH_DELAY_MS)
+        return
+      }
+      const blocks = fromEditorContent(e.getJSON())
+      // Suggestions are drawn onto the draft as marks; they are never saved into it.
+      onChange({ ...latest.current, blocks: hasSuggestionMarks(blocks) ? stripSuggestions(blocks) : blocks })
+    },
+    onBlur: () => {
+      if (suggestingRef.current) void flushRef.current()
     },
   })
 
   React.useEffect(() => {
     editor?.setEditable(editable)
   }, [editor, editable])
+
+  /* ------------------------------------------- Comments and suggestions */
+
+  // The plugin's switches: Suggesting on or off, the threads to highlight, format suggestions, the active card.
+  React.useEffect(() => {
+    if (!editor) return
+    editor.view.dispatch(editor.state.tr.setMeta(suggestingKey, { enabled: suggesting && editable }).setMeta("addToHistory", false))
+  }, [editor, suggesting, editable])
+  const threads = collab?.threads
+  React.useEffect(() => {
+    if (!editor) return
+    const anchors: CollabThreadAnchor[] = showCollab
+      ? (threads ?? []).filter((t) => !t.resolved).map((t) => ({ id: t.id, blockId: t.anchorBlockId, quote: t.quote }))
+      : []
+    if (composer) anchors.push({ id: "composer", blockId: composer.blockId, quote: composer.quote })
+    editor.view.dispatch(editor.state.tr.setMeta(suggestingKey, { threads: anchors }).setMeta("addToHistory", false))
+  }, [editor, threads, composer, showCollab])
+  React.useEffect(() => {
+    if (!editor) return
+    editor.view.dispatch(
+      editor.state.tr.setMeta(suggestingKey, { serverFormats: showCollab ? rendered.formats : [] }).setMeta("addToHistory", false)
+    )
+  }, [editor, rendered, showCollab])
+  React.useEffect(() => {
+    if (!editor) return
+    editor.view.dispatch(editor.state.tr.setMeta(suggestingKey, { active }).setMeta("addToHistory", false))
+  }, [editor, active])
+  // Clicking a highlight or a suggestion makes its card active too (E.6).
+  activeRef.current = (id) => {
+    if (id === null) return
+    setActive(id)
+    if (wide) setRailOpen(true)
+  }
+
+  /** Has the document any change of yours not yet sent? */
+  const hasLocal = React.useCallback(() => {
+    if (!editor) return false
+    if (pendingFormats(editor.state).length) return true
+    return JSON.stringify(editor.getJSON()).includes(`"${LOCAL_PREFIX}`)
+  }, [editor])
+
+  // Draw the server's suggestions onto the draft again when they or the draft changed (a decision,
+  // someone else's suggestion), once nothing of yours is waiting to be sent.
+  const redraw = React.useCallback(() => {
+    if (!editor || !collab || hasLocal()) return
+    const current = fromEditorContent(editor.getJSON())
+    if (JSON.stringify(current) === JSON.stringify(rendered.blocks)) return
+    const { from, to } = editor.state.selection
+    const content = toEditorContent(rendered.blocks)
+    const nodes = (content.content ?? []).map((n) => editor.schema.nodeFromJSON(n))
+    const tr = editor.state.tr.replaceWith(0, editor.state.doc.content.size, nodes)
+    const size = tr.doc.content.size
+    try {
+      tr.setSelection(TextSelection.create(tr.doc, Math.min(from, size), Math.min(to, size)))
+    } catch {
+      // The old caret isn't a text position any more: keep the mapped one.
+    }
+    tr.setMeta(suggestingKey, { skip: true }).setMeta("addToHistory", false)
+    quiet.current = true
+    try {
+      editor.view.dispatch(tr)
+    } finally {
+      quiet.current = false
+    }
+  }, [editor, collab, rendered, hasLocal])
+  const [redrawAsk, setRedrawAsk] = React.useState(0)
+  React.useEffect(() => {
+    redraw()
+  }, [redraw, redrawAsk])
+
+  const flush = React.useCallback(async () => {
+    clearTimeout(flushTimer.current)
+    if (!editor || !collab?.onSuggest || inFlight.current.size) return
+    const changes = collectPatches(fromEditorContent(editor.getJSON()), pendingFormats(editor.state), isLocal)
+    if (!changes.length) return
+    const ids = changes.flatMap((c) => c.localIds)
+    ids.forEach((id) => inFlight.current.add(id))
+    let failed = false
+    try {
+      for (const change of changes) {
+        try {
+          const saved = await collab.onSuggest({ kind: change.kind, summary: change.summary, patch: change.patch })
+          if (change.kind === "format") {
+            // The server's format suggestion draws its own underline from now on.
+            editor.view.dispatch(editor.state.tr.setMeta(suggestingKey, { dropFormats: change.localIds }).setMeta("addToHistory", false))
+          } else {
+            for (const id of change.localIds) editor.view.dispatch(renameSuggestion(editor.state, id, saved.id))
+          }
+        } catch {
+          failed = true
+        }
+      }
+    } finally {
+      ids.forEach((id) => inFlight.current.delete(id))
+      setCollabError(failed)
+    }
+    if (failed) {
+      // Kept as local changes: the next edit, or this retry, sends them again.
+      clearTimeout(flushTimer.current)
+      flushTimer.current = setTimeout(() => void flushRef.current(), FLUSH_DELAY_MS * 4)
+    }
+    // Draw again on the next render, with the suggestions the server returned (they arrive as props).
+    else setRedrawAsk((n) => n + 1)
+  }, [editor, collab, isLocal])
+  flushRef.current = flush
+  React.useEffect(() => () => clearTimeout(flushTimer.current), [])
+  // Leaving Suggesting sends what's waiting.
+  React.useEffect(() => {
+    if (!suggesting) void flushRef.current()
+  }, [suggesting])
+
+  // Your changes not yet sent show as cards too.
+  React.useEffect(() => {
+    if (!editor || !suggesting) {
+      setPendingChanges((prev) => (prev.length ? [] : prev))
+      return
+    }
+    setPendingChanges(collectPatches(fromEditorContent(editor.getJSON()), pendingFormats(editor.state), (id) => id.startsWith(LOCAL_PREFIX)))
+  }, [editor, suggesting, tick])
+
+  const startComment = React.useCallback(() => {
+    if (!editor || !canComment) return
+    const { from, to, $from } = editor.state.selection
+    const blockId = $from.parent.attrs.id as string | null
+    if (from === to || !blockId || !$from.parent.isTextblock) return
+    // The quote is the selection's text within its first block (E.39 matches it there).
+    const end = Math.min(to, $from.end())
+    const quote = editor.state.doc.textBetween(from, end, undefined, "\uFFFC")
+    if (!quote.trim()) return
+    setComposer({ blockId, quote })
+    setActive("composer")
+    if (wide) setRailOpen(true)
+    else setDrawerOpen(true)
+  }, [editor, canComment, wide])
+
+  // ⌥⌘M (Ctrl+Alt+M): comment on the selection.
+  React.useEffect(() => {
+    if (!editor || !canComment) return
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || !e.altKey || e.code !== "KeyM") return
+      e.preventDefault()
+      startComment()
+    }
+    const dom = editor.view.dom
+    dom.addEventListener("keydown", onKey)
+    return () => dom.removeEventListener("keydown", onKey)
+  }, [editor, canComment, startComment])
+
+  const meId = collab?.me?.id
+  const railItems = React.useMemo<RailItem[]>(() => {
+    if (!collab) return []
+    const unplaced = new Set(rendered.unplaced)
+    const me = collab.me ?? { kind: "person" as const, id: "", name: labels.you }
+    const items: RailItem[] = [
+      ...suggestions.map((s) => ({ kind: "suggestion" as const, id: s.id, suggestion: s, unplaced: unplaced.has(s.id) })),
+      ...pendingChanges.map((c) => ({
+        kind: "suggestion" as const,
+        id: c.localIds[0],
+        pending: true,
+        suggestion: { id: c.localIds[0], by: me, at: "", summary: c.summary, kind: c.kind, patch: c.patch, status: "open" as const },
+      })),
+      ...collab.threads.filter((t) => !t.resolved).map((t) => ({ kind: "thread" as const, id: t.id, thread: t })),
+    ]
+    if (composer) items.push({ kind: "composer", id: "composer", quote: composer.quote })
+    return items
+  }, [collab, suggestions, rendered.unplaced, pendingChanges, composer, labels.you])
+  const resolvedItems = React.useMemo<RailItem[]>(
+    () => (collab?.threads ?? []).filter((t) => t.resolved).map((t) => ({ kind: "thread" as const, id: t.id, thread: t })),
+    [collab?.threads]
+  )
+
+  const anchorPos = React.useCallback(
+    (item: RailItem): number | null => {
+      if (!editor) return null
+      const pmDoc = editor.state.doc
+      let pos: number | null = null
+      if (item.kind === "suggestion") {
+        pos = suggestionPos(pmDoc, item.id, rendered.formats)
+        if (pos === null && item.pending) {
+          const f = suggestingKey.getState(editor.state)?.formats.find((x) => x.id === item.id)
+          pos = f ? f.from : null
+        }
+      } else if (item.kind === "thread") {
+        const anchor = { id: item.id, blockId: item.thread.anchorBlockId, quote: item.thread.quote }
+        // A thread whose text has gone stays beside its block.
+        pos = threadRange(pmDoc, anchor)?.from ?? findBlockNode(pmDoc, anchor.blockId)?.pos ?? null
+      } else if (composer) {
+        pos = threadRange(pmDoc, { id: "composer", blockId: composer.blockId, quote: composer.quote })?.from ?? null
+      }
+      return pos === null ? null : Math.min(pos, pmDoc.content.size)
+    },
+    [editor, rendered.formats, composer]
+  )
+  const anchorTop = React.useCallback(
+    (item: RailItem): number | null => {
+      const pos = anchorPos(item)
+      if (!editor || pos === null) return null
+      try {
+        return editor.view.coordsAtPos(pos).top
+      } catch {
+        return null
+      }
+    },
+    [editor, anchorPos]
+  )
+
+  const railActions = React.useMemo<RailActions>(
+    () => ({
+      canEdit,
+      canComment,
+      onDecide: collab?.onDecide
+        ? (id, decision) => {
+            setActive(null)
+            collab.onDecide!(id, decision).then(
+              () => setCollabError(false),
+              () => setCollabError(true)
+            )
+          }
+        : undefined,
+      onDecideAll: collab?.onDecideAll
+        ? (decision, filter) =>
+            void collab.onDecideAll!(decision, filter).then(
+              () => setCollabError(false),
+              () => setCollabError(true)
+            )
+        : undefined,
+      onReply: collab?.onReply,
+      onResolve: collab?.onResolve
+        ? (id) => {
+            setActive(null)
+            collab.onResolve!(id).catch(() => setCollabError(true))
+          }
+        : undefined,
+      onReopen: collab?.onReopen ? (id) => void collab.onReopen!(id).catch(() => setCollabError(true)) : undefined,
+      onComment: collab?.onComment
+        ? async (body, mentions) => {
+            if (!composer) return
+            const thread = await collab.onComment!({ anchorBlockId: composer.blockId, quote: composer.quote, body, mentions })
+            setComposer(null)
+            setActive(thread.id)
+          }
+        : undefined,
+      onCancelComment: () => {
+        setComposer(null)
+        setActive(null)
+      },
+      searchPeople: collab?.searchPeople,
+    }),
+    [canEdit, canComment, collab, composer]
+  )
+  const collabCount = railItems.filter((i) => i.kind !== "composer").length
+  const railShown = showCollab && wide && railOpen
+  const refused = useEditorState({ editor, selector: ({ editor: e }) => (e ? (suggestingKey.getState(e.state)?.refused ?? 0) : 0) })
+  const [refusedNote, setRefusedNote] = React.useState(false)
+  React.useEffect(() => {
+    if (!refused) return
+    setRefusedNote(true)
+    const timer = setTimeout(() => setRefusedNote(false), 4000)
+    return () => clearTimeout(timer)
+  }, [refused])
 
   const relative = React.useCallback((rect: { top: number; bottom: number; left: number }) => {
     const box = contentRef.current?.getBoundingClientRect()
@@ -416,6 +758,12 @@ function DocEditor({
   const fixBlocker = React.useCallback(
     (b: PublishBlocker) => {
       if (publish?.onFix) return publish.onFix(b)
+      // Review: the suggestions are in the rail, or the drawer under 1024px (E.37).
+      if (b.kind === "open-suggestions" && collab) {
+        if (wide) setRailOpen(true)
+        else setDrawerOpen(true)
+        return
+      }
       if (!editor) return
       // Show: select the first place the blocker is in the document.
       let at = -1
@@ -427,7 +775,7 @@ function DocEditor({
       })
       if (at >= 0) editor.chain().focus().setNodeSelection(at).scrollIntoView().run()
     },
-    [publish, editor]
+    [publish, editor, collab, wide]
   )
 
   const meta = useEditorState({
@@ -448,6 +796,7 @@ function DocEditor({
   })
 
   const lineDir = doc.lang === "ar" ? "rtl" : "ltr"
+  const modeLabel = mode === "editing" ? labels.modeEditing : suggesting ? labels.modeSuggesting : labels.modeViewing
   const saveText =
     !save
       ? null
@@ -477,7 +826,7 @@ function DocEditor({
             aria-label={labels.documentTitle}
             value={doc.title}
             placeholder={labels.untitled}
-            readOnly={!editable}
+            readOnly={!editable || suggesting}
             onChange={(e) => onChange({ ...latest.current, title: e.target.value })}
             size={Math.max(12, Math.min(48, doc.title.length + 2))}
             className="-ms-[7px] w-fit max-w-full rounded-[6px] border border-transparent bg-transparent px-1.5 py-px text-[0.9375rem] leading-[1.3] font-semibold text-foreground outline-none hover:border-border focus-visible:border-input"
@@ -509,31 +858,64 @@ function DocEditor({
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                aria-label={`${labels.modeMenu}: ${mode === "editing" ? labels.modeEditing : labels.modeViewing}`}
-                className="inline-flex h-7 items-center gap-1.5 rounded-control-sm border border-input bg-card ps-2.5 pe-2 text-[0.8125rem] font-medium text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                aria-label={`${labels.modeMenu}: ${modeLabel}`}
+                className={cn(
+                  "inline-flex h-7 items-center gap-1.5 rounded-control-sm border border-input bg-card ps-2.5 pe-2 text-[0.8125rem] font-medium text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+                  // While suggesting the button sits on the tint, so it's never forgotten (E.10).
+                  suggesting && "border-primary bg-primary-tint text-primary-tint-foreground"
+                )}
               >
-                <Icon name={mode === "editing" ? "edit" : "view"} size={14} />
-                {mode === "editing" ? labels.modeEditing : labels.modeViewing}
+                <Icon name={MODE_ICON[mode]} size={14} />
+                {modeLabel}
                 <Icon name="chevron-down" size={14} />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem disabled={!canEdit} onSelect={() => onModeChange?.("editing")}>
-                <Icon name="edit" />
-                <span className="grid gap-px">
-                  {labels.modeEditing}
-                  <span className="text-xs text-muted-foreground">{labels.modeEditingHint}</span>
-                </span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => onModeChange?.("viewing")}>
-                <Icon name="view" />
-                <span className="grid gap-px">
-                  {labels.modeViewing}
-                  <span className="text-xs text-muted-foreground">{labels.modeViewingHint}</span>
-                </span>
-              </DropdownMenuItem>
+            <DropdownMenuContent align="end" className="w-[300px] p-1">
+              <ModeItem
+                icon={canEdit ? "edit" : "lock"}
+                title={labels.modeEditing}
+                hint={canEdit ? labels.modeEditingHint : labels.modeEditingLocked}
+                on={mode === "editing"}
+                disabled={!canEdit}
+                onSelect={() => onModeChange?.("editing")}
+              />
+              {canSuggest && (
+                <ModeItem
+                  icon="suggest"
+                  title={labels.modeSuggesting}
+                  hint={canEdit ? labels.modeSuggestingHint : labels.modeSuggestingHintNoEdit}
+                  on={suggesting}
+                  onSelect={() => onModeChange?.("suggesting")}
+                />
+              )}
+              <ModeItem
+                icon="view"
+                title={labels.modeViewing}
+                hint={canComment ? labels.modeViewingCommentHint : labels.modeViewingHint}
+                on={mode === "viewing"}
+                onSelect={() => onModeChange?.("viewing")}
+              />
             </DropdownMenuContent>
           </DropdownMenu>
+          {showCollab && (
+            <span className="relative">
+              <IconButton
+                icon="comment"
+                label={labels.commentsAndSuggestions}
+                tooltip="bottom"
+                pressed={railShown || drawerOpen}
+                onClick={() => (wide ? setRailOpen((o) => !o) : setDrawerOpen(true))}
+              />
+              {collabCount > 0 && (
+                <b
+                  aria-hidden="true"
+                  className="pointer-events-none absolute -top-0.5 -end-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-primary px-1 text-2xs leading-none font-semibold text-primary-foreground"
+                >
+                  {collabCount}
+                </b>
+              )}
+            </span>
+          )}
           {onPreview && !preview && (
             <Button variant="outline" size="sm" icon="view" onClick={onPreview}>
               {labels.preview}
@@ -567,7 +949,8 @@ function DocEditor({
           onOutline={() => setOutlineOpen((o) => !o)}
           onLink={() => openLink()}
           fields={allFields}
-          onCreateField={fields && editable ? createField : undefined}
+          onCreateField={fields && editable && !suggesting ? createField : undefined}
+          onComment={showCollab && canComment ? startComment : undefined}
           view={view}
           onView={doc.kind === "label" ? undefined : setView}
           zoom={zoom}
@@ -591,7 +974,18 @@ function DocEditor({
       )}
 
       {/* Body: outline, canvas */}
-      <div className={cn("relative grid min-h-0 overflow-auto", outlineOpen ? "xl:grid-cols-[220px_minmax(0,1fr)]" : "grid-cols-[minmax(0,1fr)]")}>
+      <div
+        className={cn(
+          "relative grid min-h-0 overflow-auto",
+          railShown
+            ? outlineOpen
+              ? "grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[220px_minmax(0,1fr)_300px]"
+              : "grid-cols-[minmax(0,1fr)_300px]"
+            : outlineOpen
+              ? "xl:grid-cols-[220px_minmax(0,1fr)]"
+              : "grid-cols-[minmax(0,1fr)]"
+        )}
+      >
         {outlineOpen && (
           <nav aria-label={labels.outline} className="sticky top-0 hidden content-start gap-0.5 self-start py-6 ps-4 pe-3 text-[0.8125rem] xl:grid">
             <div className="px-2 pb-1.5 text-xs font-medium text-muted-foreground">{labels.outline}</div>
@@ -646,7 +1040,12 @@ function DocEditor({
                   <>
                     <BlockToolbar editor={editor} labels={labels} container={contentRef} />
                     <BlockGutter editor={editor} labels={labels} container={contentRef} menuAt={menuAt} onMenuAtChange={setMenuAt} blockUrl={blockUrl} />
-                    <SelectionBubble editor={editor} labels={labels} onLink={() => openLink()} />
+                    <SelectionBubble
+                      editor={editor}
+                      labels={labels}
+                      onLink={() => openLink()}
+                      onComment={showCollab && canComment ? startComment : undefined}
+                    />
                   </>
                 )}
                 {editor && slash.open && slash.rect && (
@@ -744,7 +1143,39 @@ function DocEditor({
             )
           })()}
         </div>
+        {railShown && (
+          <CollabRail
+            items={railItems}
+            resolved={resolvedItems}
+            labels={labels}
+            actions={railActions}
+            active={active}
+            onActive={setActive}
+            anchorTop={anchorTop}
+            meId={meId}
+            layoutKey={`${tick}:${view}:${zoomFactor}:${pages}`}
+          />
+        )}
       </div>
+      {showCollab && !wide && (
+        <CollabDrawer
+          open={drawerOpen}
+          onOpenChange={setDrawerOpen}
+          items={railItems}
+          resolved={resolvedItems}
+          labels={labels}
+          actions={railActions}
+          active={active}
+          onActive={(id) => {
+            setActive(id)
+            // The drawer has no margin to sit beside: show the card's text instead.
+            const item = railItems.find((i) => i.id === id)
+            const pos = item ? anchorPos(item) : null
+            if (pos !== null && editor) editor.chain().setTextSelection(pos).scrollIntoView().run()
+          }}
+          meId={meId}
+        />
+      )}
 
       {/* Status bar (28px) */}
       <footer className="flex h-7 items-center gap-4 overflow-hidden border-t border-border bg-card px-4 text-xs whitespace-nowrap text-muted-foreground">
@@ -767,6 +1198,11 @@ function DocEditor({
         )}
         <span>{labels[KIND_LABEL[doc.kind]]}</span>
         <span className="flex-1" />
+        {(refusedNote || collabError) && (
+          <span role="status" className="truncate text-warning-text">
+            {refusedNote ? labels.sugRefused : labels.collabFailed}
+          </span>
+        )}
         <span>
           {preview
             ? fill(editable ? labels.previewEditingStatus : labels.previewStatus, { record: preview.label })
@@ -788,6 +1224,41 @@ function DocEditor({
         />
       )}
     </div>
+  )
+}
+
+const MODE_ICON: Record<EditorMode, IconName> = { editing: "edit", suggesting: "suggest", viewing: "view" }
+
+/** One line of the mode menu (E.10, the EditorCollab card's `.wy-modemenu`). */
+function ModeItem({
+  icon,
+  title,
+  hint,
+  on,
+  disabled,
+  onSelect,
+}: {
+  icon: IconName
+  title: string
+  hint: string
+  on: boolean
+  disabled?: boolean
+  onSelect: () => void
+}) {
+  return (
+    <DropdownMenuItem
+      disabled={disabled}
+      onSelect={onSelect}
+      aria-current={on ? "true" : undefined}
+      className={cn("wy-modemenu__it p-2", on && "is-on", disabled && "opacity-50")}
+    >
+      <Icon name={icon} />
+      <span className="wy-modemenu__t">
+        {title}
+        <span>{hint}</span>
+      </span>
+      {on && <Icon name="check" />}
+    </DropdownMenuItem>
   )
 }
 

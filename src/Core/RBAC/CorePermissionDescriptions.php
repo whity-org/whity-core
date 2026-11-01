@@ -114,6 +114,8 @@ final class CorePermissionDescriptions
         CorePermissions::DOCUMENTS_RENDER             => 'Preview a template as a PDF through Whity Render, and print label sheets; nothing is stored',
         CorePermissions::DOCUMENTS_ISSUE              => 'Issue a document from a template: the record, its QR code and its PDF, and correct it',
         CorePermissions::DOCUMENTS_THEMES             => "Create, edit and archive the workspace's document themes, and choose its default theme",
+        CorePermissions::DOCUMENTS_SUGGEST            => 'Suggest changes to a document, which someone who can edit it accepts or rejects',
+        CorePermissions::DOCUMENTS_COMMENT            => 'Comment on a document: start threads, reply, resolve and reopen them',
         CorePermissions::DOCUMENTS_READ_ALL           => 'See every issued document in the tenant, not only the ones you raised',
         CorePermissions::DOCUMENTS_ROUTE              => 'Put an issued document into circulation and choose the steps it follows',
         CorePermissions::SECURITY_MANAGE              => 'Set the tenant two-factor policy — who must enrol, and by when',

@@ -2960,8 +2960,18 @@ $ouReachResolver = new \Whity\Core\Ou\OuReachResolver($db->getPdo(), $resourceRo
 // resolver the editor and printing share, so the page view and the PDF agree.
 $documentThemeRepository = new \Whity\Core\Document\Theme\DocumentThemeRepository($db->getPdo());
 $documentThemeResolver = new \Whity\Core\Document\Theme\DocumentThemeResolver($settingsService, $documentThemeRepository);
+// Comments and suggestions on those documents (editor M5, migrations 183-185):
+// served with GET /{id}, counted by the publish check (E.37), and routed below
+// beside the notifications they send.
+$documentSourceRepository = new \Whity\Core\Document\DocumentSourceRepository($db->getPdo());
+$documentCollab = new \Whity\Core\Document\Collab\DocumentCollab(
+    $db->getPdo(),
+    $documentSourceRepository,
+    new \Whity\Core\Document\Suggestion\DocumentSuggestionRepository($db->getPdo()),
+    new \Whity\Core\Document\Comment\DocumentCommentRepository($db->getPdo()),
+);
 $documentSourcesHandler = new \Whity\Api\DocumentSourcesApiHandler(
-    new \Whity\Core\Document\DocumentSourceRepository($db->getPdo()),
+    $documentSourceRepository,
     $documentAccessPolicy,
     $roleChecker,
     $ouReachResolver,
@@ -2970,6 +2980,7 @@ $documentSourcesHandler = new \Whity\Api\DocumentSourcesApiHandler(
     new \Whity\Core\Document\DocumentSourceFileStore($storageDriver, $db->getPdo()),
     new \Whity\Core\Document\DocumentSourceVersionRepository($db->getPdo()),
     $documentThemeResolver,
+    $documentCollab,
 );
 $router->register('GET',    '/api/document-sources',                [$documentSourcesHandler, 'list'],      null, null, CorePermissions::DOCUMENTS_READ);
 $router->register('POST',   '/api/document-sources',                [$documentSourcesHandler, 'create'],    null, null, CorePermissions::DOCUMENTS_WRITE);
@@ -3246,6 +3257,7 @@ $documentPublishingHandler = new \Whity\Api\DocumentPublishingApiHandler(
     $documentQrService,
     $documentIssuing,
     $documentThemeRepository,
+    $documentCollab,
 );
 $router->register('GET',  '/api/document-fields',                         [$documentPublishingHandler, 'fields'],       null, null, CorePermissions::DOCUMENTS_READ);
 $router->register('GET',  '/api/document-fields/records',                 [$documentPublishingHandler, 'records'],      null, null, CorePermissions::DOCUMENTS_READ);
@@ -4151,6 +4163,33 @@ $notificationDispatcher = new \Whity\Core\Notification\NotificationDispatcher(
     $auditLogger
 );
 $notificationDispatcher->subscribe($hookManager);
+
+// Comments and suggestions on editor documents (editor M5; E.4, E.6, E.10,
+// E.29, E.37). Registered here, after the notification dispatcher, because a
+// comment tells the people it @mentions in-app. Each route finds the document
+// through DocumentSourcesApiHandler::visibleRow, so a hidden one answers 404.
+// Suggesting needs documents:suggest, commenting documents:comment, and
+// accepting or rejecting documents:write; agents never decide (the decision
+// routes are agentPolicy refuse, and refused for agents in the handler).
+$documentCollabHandler = new \Whity\Api\DocumentCollabApiHandler(
+    $documentSourcesHandler,
+    $documentCollab,
+    $roleChecker,
+    $auditLogger,
+    $notificationDispatcher,
+);
+$router->register('GET',  '/api/document-sources/{id:\d+}/suggestions',                     [$documentCollabHandler, 'listSuggestions'], null, null, CorePermissions::DOCUMENTS_READ);
+$router->register('POST', '/api/document-sources/{id:\d+}/suggestions',                     [$documentCollabHandler, 'createSuggestion'], null, null, CorePermissions::DOCUMENTS_SUGGEST);
+$router->register('POST', '/api/document-sources/{id:\d+}/suggestions/{sid:\d+}/decision',  [$documentCollabHandler, 'decide'],           null, null, CorePermissions::DOCUMENTS_WRITE);
+$router->register('POST', '/api/document-sources/{id:\d+}/suggestions/decisions',           [$documentCollabHandler, 'decideMany'],       null, null, CorePermissions::DOCUMENTS_WRITE);
+$router->register('GET',  '/api/document-sources/{id:\d+}/comments',                        [$documentCollabHandler, 'listComments'],     null, null, CorePermissions::DOCUMENTS_READ);
+$router->register('POST', '/api/document-sources/{id:\d+}/comments',                        [$documentCollabHandler, 'createThread'],     null, null, CorePermissions::DOCUMENTS_COMMENT);
+$router->register('POST', '/api/document-sources/{id:\d+}/comments/{tid:\d+}/messages',     [$documentCollabHandler, 'addMessage'],       null, null, CorePermissions::DOCUMENTS_COMMENT);
+$router->register('POST', '/api/document-sources/{id:\d+}/comments/{tid:\d+}/resolve',      [$documentCollabHandler, 'resolve'],          null, null, CorePermissions::DOCUMENTS_COMMENT);
+$router->register('POST', '/api/document-sources/{id:\d+}/comments/{tid:\d+}/reopen',       [$documentCollabHandler, 'reopen'],           null, null, CorePermissions::DOCUMENTS_COMMENT);
+$router->register('GET',  '/api/document-sources/{id:\d+}/changes',                         [$documentCollabHandler, 'changes'],          null, null, CorePermissions::DOCUMENTS_READ);
+// The people a comment may @mention: members who can read the document.
+$router->register('GET',  '/api/document-sources/{id:\d+}/mentionable',                     [$documentCollabHandler, 'mentionable'],      null, null, CorePermissions::DOCUMENTS_COMMENT);
 
 // 13b-quinquies-bis. ROUTING NOTIFICATIONS (#1054) — the subscriber that turns a
 // routing broadcast into notifications.
