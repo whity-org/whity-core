@@ -92,7 +92,7 @@ final class CoreTables
         'tenant_plugin_permissions' => '164_create_tenant_plugin_manifests.php',
         'plugin_records' => '168_create_plugin_records.php',
         'agent_proposals' => '176_create_agent_proposals.php',
-        'plugin_secrets' => '187_create_plugin_secrets.php',
+        'plugin_secrets' => '174_create_plugin_secrets.php',
         'agents' => '180_create_agents.php',
         'agent_assignments' => '181_create_agent_assignments.php',
         'agent_actions' => '182_create_agent_actions.php',

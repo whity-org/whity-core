@@ -13,7 +13,7 @@ use Whity\Sdk\Secrets\PluginSecrets;
 use Whity\Sdk\Secrets\SecretStore;
 
 /**
- * The host's plugin secret store (SDK 1.60, WHIT-838; migration 187).
+ * The host's plugin secret store (SDK 1.60, WHIT-838; migration 174).
  *
  * Values are encrypted with the platform key through {@see EncryptedSecretStore}
  * (authenticated encryption, key-id prefixed) and kept in `plugin_secrets`,
