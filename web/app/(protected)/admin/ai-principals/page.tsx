@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/lib/toast-context';
@@ -81,6 +82,15 @@ export default function AiPrincipalsPage() {
       header: t('aiPrincipals.table.name', 'Name'),
       enableSorting: true,
       enableColumnFilter: true,
+      // WHIT-810: an agent credential opens what it may do; its issuer sets it there.
+      cell: (row: AiPrincipal) =>
+        row.principalKind === 'ai-agent' ? (
+          <Link href={`/admin/ai-principals/${encodeURIComponent(row.jti)}`} className="font-medium text-primary hover:underline">
+            {row.name}
+          </Link>
+        ) : (
+          row.name
+        ),
     },
     { accessorKey: 'principalKind', header: t('aiPrincipals.table.kind', 'Kind'), enableSorting: true },
     { accessorKey: 'userId', header: t('aiPrincipals.table.userId', 'User ID'), enableSorting: true },
