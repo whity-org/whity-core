@@ -15,7 +15,7 @@
  * decision that did not land.
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@whity/ui/tabs';
 import { Button } from '@whity/ui/button';
@@ -24,6 +24,7 @@ import { Icon } from '@whity/ui/icon';
 import { ActionProposal, type ActionProposalLabels } from '@whity/ui/action-proposal';
 import { ApprovalQueue, type ApprovalQueueItem } from '@whity/ui/approval-queue';
 import { AgentActivity } from '@whity/ui/agent-activity';
+import { UndoBar, type UndoBarLabels } from '@whity/ui/undo-bar';
 import { EmptyState } from '@whity/ui/empty-state';
 import { useFormattingLocale, useTranslation } from '@whity/features/i18n';
 import { useDateDisplay } from '@whity/features/datetime';
@@ -33,12 +34,16 @@ import { useAuth } from '@/lib/auth-context';
 import { useFetch } from '@/hooks/useFetch';
 import { useToast } from '@/lib/toast-context';
 import {
+  actionActivity,
   agentName,
   isToday,
+  newestFirst,
   oldestFirst,
   proposalActivity,
   proposalChanges,
+  undoSecondsLeft,
   undoWindowWords,
+  type AgentAction,
   type AgentProposal,
   type ProposalWords,
 } from '@/components/agents/proposals';
@@ -57,6 +62,14 @@ export default function ApprovalsPage() {
   const [currentId, setCurrentId] = useState<string | undefined>(undefined);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [editing, setEditing] = useState<AgentProposal | null>(null);
+  const [undoingId, setUndoingId] = useState<number | null>(null);
+
+  // The undo meters count down without a request: the window's end is known.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(timer);
+  }, []);
 
   const proposals = useFetch<AgentProposal[]>(async () => {
     const response = await apiClient('/api/v1/me/agent-proposals');
@@ -64,6 +77,15 @@ export default function ApprovalsPage() {
       throw new Error(t('approvals.error.list', 'Your approvals could not be loaded.'));
     }
     const body = (await response.json()) as { data?: AgentProposal[] };
+    return body.data ?? [];
+  }, [apiClient]);
+
+  // What agents did, Allowed calls included (WHIT-812). A failed read leaves the
+  // timeline to the proposals rather than failing the page.
+  const actions = useFetch<AgentAction[]>(async () => {
+    const response = await apiClient('/api/v1/me/agent-actions');
+    if (!response.ok) return [];
+    const body = (await response.json()) as { data?: AgentAction[] };
     return body.data ?? [];
   }, [apiClient]);
 
@@ -81,6 +103,7 @@ export default function ApprovalsPage() {
     hours: t('approvals.undo.hours', '{n} hours'),
     day: t('approvals.undo.day', '1 day'),
     days: t('approvals.undo.days', '{n} days'),
+    acted: t('approvals.activity.acted', '{summary}'),
     asked: t('approvals.activity.asked', 'Asked: {summary}'),
     approved: t('approvals.activity.approved', 'Approved: {summary}'),
     declined: t('approvals.activity.declined', 'Declined: {summary}'),
@@ -108,19 +131,60 @@ export default function ApprovalsPage() {
     showLess: t('approvals.showLess', 'Show less'),
   };
 
-  const cardProps = (proposal: AgentProposal) => ({
+  const undoBarLabels: UndoBarLabels = {
+    undo: t('approvals.undo', 'Undo'),
+    left: t('approvals.undoBar.left', '{time} left to undo'),
+    expired: t('approvals.undoBar.expired', 'Can no longer be undone'),
+    undone: t('approvals.status.undone', 'Undone'),
+    undoneBy: t('approvals.status.undoneBy', 'Undone by {name}'),
+  };
+
+  /** Undo runs on the server, re-checked; it can refuse, and says why. */
+  const undo = async (action: AgentAction) => {
+    setUndoingId(action.id);
+    try {
+      const response = await apiClient(`/api/v1/me/agent-actions/${action.id}/undo`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      });
+      const body = (await response.json().catch(() => null)) as { error?: string } | null;
+      if (!response.ok) {
+        addToast(body?.error ?? t('approvals.error.undo', 'That could not be undone.'), 'error', 8000);
+      } else {
+        addToast(t('approvals.toast.undone', 'Undone: {summary}').replace('{summary}', action.summary), 'info');
+      }
+      proposals.refetch();
+      actions.refetch();
+    } catch {
+      addToast(t('approvals.error.undo', 'That could not be undone.'), 'error', 8000);
+    } finally {
+      setUndoingId(null);
+    }
+  };
+
+  const cardProps = (proposal: AgentProposal) => {
+    const action = proposal.action ?? null;
+    const canUndo = action !== null && undoSecondsLeft(action, now) !== null;
+    return {
     agent: agentName(proposal, words),
     onBehalfOf: you,
     title: proposal.summary,
     changes: proposalChanges(proposal),
     scope: proposal.permissions,
-    // No undo window means the server will not undo it (WHIT-812): say so.
-    reversible: Boolean(proposal.undoWindowSeconds),
-    undoWindow: undoWindowWords(proposal.undoWindowSeconds, words),
+    // No undo window means the server will not undo it. Once run, only while
+    // its window is open: past that, the card says it can't be undone.
+    reversible: action === null ? Boolean(proposal.undoWindowSeconds) : canUndo || action.status === 'undone',
+    // The window means something only while it can still be used.
+    undoWindow: action === null || canUndo ? undoWindowWords(proposal.undoWindowSeconds, words) : undefined,
     status: proposal.status,
     decidedAt: proposal.decidedAt ? clock(proposal.decidedAt) : undefined,
+    undoneBy: action?.undoneBy?.name ?? undefined,
+    busy: action !== null && undoingId === action.id,
+    onUndo: canUndo && action !== null ? () => void undo(action) : undefined,
     labels,
-  });
+    };
+  };
 
   /** After a decision, show the next one in the queue, never jump back to the start. */
   const advanceFrom = (id: number) => {
@@ -156,6 +220,9 @@ export default function ApprovalsPage() {
           8000,
         );
       } else {
+        // 7.5c: ten seconds with Undo on the toast, then Undo stays on the card
+        // and the activity row for the rest of the window.
+        const ran = verdict === 'approve' ? (body?.data?.action ?? null) : null;
         addToast(
           (verdict === 'approve'
             ? t('approvals.toast.approved', 'Approved: {summary}')
@@ -163,11 +230,15 @@ export default function ApprovalsPage() {
           ).replace('{summary}', proposal.summary),
           verdict === 'approve' ? 'success' : 'info',
           10000,
+          ran !== null && ran.undoableUntil
+            ? { label: t('approvals.undo', 'Undo'), onClick: () => void undo(ran) }
+            : undefined,
         );
       }
       advanceFrom(proposal.id);
       setEditing(null);
       proposals.refetch();
+      actions.refetch();
       window.dispatchEvent(new Event(WAITING_CHANGED_EVENT));
     } catch {
       addToast(t('approvals.error.decide', 'That decision could not be saved. Try again.'), 'error', 6000);
@@ -186,7 +257,26 @@ export default function ApprovalsPage() {
   }));
 
   // Derived each render: a few dozen rows at most (the list is capped at 50).
-  const activity = proposalActivity(all, { words, you, time: clock });
+  const actionExtra = (action: AgentAction) => {
+    if (!action.undoWindowSeconds) return undefined;
+    const left = undoSecondsLeft(action, now);
+    return (
+      <UndoBar
+        state={action.status === 'undone' ? 'undone' : left !== null ? 'open' : 'expired'}
+        remainingLabel={undoWindowWords(left, words)}
+        remaining={left ?? 0}
+        total={action.undoWindowSeconds}
+        undoneBy={action.undoneBy?.name ?? undefined}
+        busy={undoingId === action.id}
+        onUndo={() => void undo(action)}
+        labels={undoBarLabels}
+      />
+    );
+  };
+  const activity = newestFirst([
+    ...proposalActivity(all, { words, you, time: clock }),
+    ...actionActivity(actions.data ?? [], { words, you, time: clock, extra: actionExtra }),
+  ]);
   const today = activity.filter((item) => item.dateTime !== undefined && isToday(item.dateTime));
 
   return (
