@@ -94,6 +94,9 @@ final class AgentResourceRealEngineTest extends TestCase
         self::assertSame(self::RANA, $principal->userId);
         self::assertSame('agent:' . $assignment, $principal->agentPrincipalId());
         self::assertSame('finance-clerk', $principal->agentSlug);
+        // WHIT-837: what a plugin tool is told about who is calling.
+        self::assertSame('Finance clerk', $principal->agentName);
+        self::assertSame('sub-rana', $principal->subject);
         self::assertSame('agents/finance-clerk', $principal->resourceSplit);
         self::assertContains('toolset:core.billing', $principal->scope);
         self::assertContains('grant:billing:view=allow', $principal->scope);
