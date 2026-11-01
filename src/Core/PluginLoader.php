@@ -3014,6 +3014,7 @@ class PluginLoader
         try {
             $providers = $plugin->getDocumentFieldProviders();
             $declaredSlots = $plugin->getTemplateSlots();
+            $background = $plugin->issuesInBackground();
         } catch (Throwable $e) {
             $this->handlePluginThrowable($pluginKey, $e, 'document declarations');
 
@@ -3059,6 +3060,7 @@ class PluginLoader
                 );
             }
             $slotRegistry->register($owner, $slots);
+            $slotRegistry->declareBackground($owner, $background);
         }
     }
 

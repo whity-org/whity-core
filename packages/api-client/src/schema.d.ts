@@ -1257,6 +1257,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/document-background-issuing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the plugins that would issue documents with no person, and whether each is allowed
+         * @description A plugin that declares issuesInBackground() may issue from its jobs with no person, but only where the workspace allows it, only from its own slots, and only with the permissions it declares. Each is listed with its slots.
+         */
+        get: operations["get_api_v1_document_background_issuing"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/document-background-issuing/{plugin}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Allow or stop a plugin issuing documents with no person
+         * @description Allowing it lets the plugin's jobs issue numbered, QR-verified documents from its own slots with nobody present, recorded with no person and the system as the actor.
+         */
+        put: operations["put_api_v1_document_background_issuing_plugin"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/document-collections": {
         parameters: {
             query?: never;
@@ -7177,6 +7217,24 @@ export interface components {
             rendered_by?: number | null;
             rendered_at: string;
             content_url: string;
+        };
+        DocumentBackgroundIssuer: {
+            /** @description A plugin that declares it issues documents from its jobs with no person */
+            plugin: string;
+            /** @description Whether this workspace allows it */
+            allowed: boolean;
+            /** @description Its slots here, the only ones it may issue from with no person */
+            slots: string[];
+        };
+        DocumentBackgroundIssuerListResponse: {
+            data: components["schemas"]["DocumentBackgroundIssuer"][];
+        };
+        DocumentBackgroundIssuerResponse: {
+            data: components["schemas"]["DocumentBackgroundIssuer"];
+        };
+        DocumentBackgroundIssuingRequest: {
+            /** @description true lets the plugin issue from its own slots with no person, with only the permissions it declares; false stops it */
+            allowed: boolean;
         };
         DocumentChangesResponse: {
             data: {
@@ -17574,6 +17632,169 @@ export interface operations {
                 };
             };
             /** @description Internal error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_document_background_issuing: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The plugins */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentBackgroundIssuerListResponse"];
+                };
+            };
+            /** @description Tenant context is required */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    put_api_v1_document_background_issuing_plugin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DocumentBackgroundIssuingRequest"];
+            };
+        };
+        responses: {
+            /** @description The plugin, allowed or not */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentBackgroundIssuerResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No plugin here declares that it issues with no person */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description allowed is not a boolean, or the system tenant */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
             500: {
                 headers: {
                     [name: string]: unknown;

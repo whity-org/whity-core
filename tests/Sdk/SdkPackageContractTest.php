@@ -242,9 +242,12 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsOneEightForInteractiveBlocks(): void
     {
         $this->assertSame(
-            '1.57.0',
+            '1.58.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.57 ADDS THE ISSUE_DOCUMENT AUTOMATION STEP: an automation may issue a document from one '
+            'SDK 1.58 ADDS BACKGROUND ISSUING: a job of a plugin that declares issuesInBackground() issues '
+            . 'with no person where the workspace allowed it, from its own slots only, refused otherwise with '
+            . 'BACKGROUND_NOT_ALLOWED (WHIT-742). Purely additive. '
+            . 'SDK 1.57 ADDS THE ISSUE_DOCUMENT AUTOMATION STEP: an automation may issue a document from one '
             . 'of its own documents.slots for the triggering record, with merge values as expressions; the '
             . 'host issues through the workspace binding under an origin key (WHIT-795). Purely additive. '
             . 'SDK 1.56 ADDS DOCUMENTS FOR CODE PLUGINS: PluginDocumentsInterface declares template slots and '

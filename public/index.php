@@ -3018,6 +3018,10 @@ $templateSlotRegistry = new \Whity\Core\Document\Slots\TemplateSlotRegistry(
 $documentTemplateSlotsHandler = new \Whity\Api\DocumentTemplateSlotsApiHandler($templateSlotRegistry, $settingsService, $documentSourcesHandler);
 $router->register('GET',    '/api/document-template-slots',             [$documentTemplateSlotsHandler, 'list'], null, null, CorePermissions::DOCUMENTS_READ);
 $router->register('PUT',    '/api/document-template-slots/{key:[A-Za-z][A-Za-z0-9_]{0,63}\.[a-z][a-z0-9_]{0,39}}', [$documentTemplateSlotsHandler, 'bind'], null, null, CorePermissions::DOCUMENTS_PUBLISH);
+// The background-issuing allow-list (WHIT-742 slice 3): which plugins may issue
+// documents from their jobs with no person.
+$router->register('GET',    '/api/document-background-issuing',         [$documentTemplateSlotsHandler, 'backgroundList'], null, null, CorePermissions::DOCUMENTS_READ);
+$router->register('PUT',    '/api/document-background-issuing/{plugin:[A-Za-z][A-Za-z0-9_]{0,63}}', [$documentTemplateSlotsHandler, 'backgroundSet'], null, null, CorePermissions::DOCUMENTS_PUBLISH);
 // Editor M4c (A31): who can see it, and "Use a copy". Sharing is checked again
 // in the handler (documents:publish), as on create.
 $router->register('PATCH',  '/api/document-sources/{id:\d+}',       [$documentSourcesHandler, 'updateAudience'], null, null, CorePermissions::DOCUMENTS_WRITE);

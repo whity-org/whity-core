@@ -99,6 +99,16 @@ final class JobRegistry implements HostWiredService
     }
 
     /**
+     * The plugin a job name belongs to, as the loader registered it; null for
+     * core's jobs and unknown names. The host's answer, never the job's: what
+     * background document issuing (WHIT-742) trusts to say which plugin runs.
+     */
+    public function sourceOf(string $name): ?string
+    {
+        return $this->sourceByName[$name] ?? null;
+    }
+
+    /**
      * Register the handlers declared by one plugin, under that plugin's namespace.
      *
      * NAMESPACING. A plugin's handlers are stored under its own prefix — a

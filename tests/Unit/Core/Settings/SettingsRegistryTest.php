@@ -68,7 +68,7 @@ final class SettingsRegistryTest extends TestCase
              'affiliate.clawback_on_refund', 'affiliate.withholding_bp',
              'dunning.retry_schedule_days', 'dunning.lock_after_days',
              'plugins.store_allowed_hosts', 'plugins.store_enabled',
-             'documents.render_enabled', 'documents.theme', 'documents.theme_by_kind', 'documents.slot_bindings', 'documents.render_max_rows',
+             'documents.render_enabled', 'documents.theme', 'documents.theme_by_kind', 'documents.slot_bindings', 'documents.background_issuing', 'documents.render_max_rows',
              'documents.render_max_pages', 'documents.render_max_template_bytes',
              'documents.flow_max_blocks', 'documents.flow_max_table_rows',
              'documents.flow_max_bytes',
@@ -273,7 +273,8 @@ final class SettingsRegistryTest extends TestCase
         // choice of plugin tools listed directly to MCP clients.
         // 38 since WHIT-742: documents.slot_bindings, each workspace's own.
         // 40 since WHIT-788: three billing.seller_* out, five company.* in.
-        self::assertCount(40, SettingsRegistry::tenantTextKeys());
+        // 41 since WHIT-742 slice 3: documents.background_issuing.
+        self::assertCount(41, SettingsRegistry::tenantTextKeys());
 
         // The desktop-login TTL is per-tenant overridable (NOT global-only) and a
         // plain numeric string key.
@@ -427,7 +428,8 @@ final class SettingsRegistryTest extends TestCase
         // 90 since WHIT-754's mcp.always_on_plugin_tools.
         // 91 since WHIT-742: documents.slot_bindings.
         // 93 since WHIT-788: three billing.seller_* out, five company.* in.
-        self::assertCount(93, $describe);
+        // 94 since WHIT-742 slice 3: documents.background_issuing.
+        self::assertCount(94, $describe);
         self::assertSame(
             ['key' => 'site_name', 'type' => 'string', 'default' => 'Whity'],
             $describe[0]

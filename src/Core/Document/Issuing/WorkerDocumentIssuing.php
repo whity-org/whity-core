@@ -98,6 +98,9 @@ final class WorkerDocumentIssuing
                 return $row;
             },
             $slots,
+            // A plugin's job issuing with no person (WHIT-742 slice 3): its slot's
+            // binding names the template, which is shared with the workspace.
+            static fn (int $id, int $tenantId): ?array => $sources->findById($id, $tenantId),
         );
     }
 

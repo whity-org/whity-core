@@ -25,9 +25,10 @@ interface PluginDocumentsInterface
     public function getDocumentFieldProviders(): array;
 
     /**
-     * Whether the plugin would issue documents with no person to act for (a
-     * job, a schedule). Off in every workspace until an admin allows it; the
-     * allow-list arrives in a later minor, and until then this only declares.
+     * Whether the plugin issues documents with no person to act for, from its
+     * jobs (SDK 1.58). Off in every workspace until a holder of
+     * documents:publish allows it; then only from the plugin's own slots,
+     * with only the permissions the plugin declares.
      */
     public function issuesInBackground(): bool;
 }

@@ -6,6 +6,7 @@ namespace Whity\Core\Settings;
 
 use DateTimeZone;
 use Whity\Core\Document\Routing\RouteQuorum;
+use Whity\Core\Document\Slots\BackgroundIssuing;
 use Whity\Core\Document\Slots\SlotBindings;
 use Whity\Core\Document\Theme\DocumentThemeRef;
 use Whity\Core\Identity\InvitationService;
@@ -377,6 +378,12 @@ final class SettingsRegistry
     // PUT /api/document-template-slots/{key} (documents:publish), which checks
     // the template fits the slot; the settings PATCH refuses it. Empty for none.
     public const DOCUMENTS_SLOT_BINDINGS = 'documents.slot_bindings';
+    // Which plugins may issue documents with no person (WHIT-742 slice 3,
+    // DOCUMENT-AUTOMATION 3.7): a JSON list of plugin names. Off for every
+    // plugin until a documents:publish holder allows it with
+    // PUT /api/document-background-issuing/{plugin}; the settings PATCH
+    // refuses it. Empty for none.
+    public const DOCUMENTS_BACKGROUND_ISSUING = 'documents.background_issuing';
 
     // Render batch limits (ADR 0012): per-tenant-overridable ceilings so an
     // operator can tune them without a code deploy, "no hardcoded values" per
@@ -1022,6 +1029,7 @@ final class SettingsRegistry
         self::DOCUMENTS_THEME => 'whity.standard',
         self::DOCUMENTS_THEME_BY_KIND => '',
         self::DOCUMENTS_SLOT_BINDINGS => '',
+        self::DOCUMENTS_BACKGROUND_ISSUING => '',
         self::DOCUMENTS_RENDER_MAX_ROWS => '500',
         self::DOCUMENTS_RENDER_MAX_PAGES => '2000',
         // 2 MiB.
@@ -1406,6 +1414,7 @@ final class SettingsRegistry
             self::DOCUMENTS_THEME => DocumentThemeRef::isValid($value) ? null : self::DOCUMENTS_THEME . ' must be a theme ref such as whity.standard or tenant.<key>.',
             self::DOCUMENTS_THEME_BY_KIND => $value === '' ? null : DocumentThemeRef::validateByKind($value),
             self::DOCUMENTS_SLOT_BINDINGS => SlotBindings::validate($value),
+            self::DOCUMENTS_BACKGROUND_ISSUING => BackgroundIssuing::validate($value),
             self::MAIL_SMTP_HOST,
             self::MAIL_SMTP_USERNAME,
             self::MAIL_FROM_NAME,

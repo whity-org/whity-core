@@ -6206,6 +6206,18 @@ final class CoreApiSchemas
                 'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('DocumentTemplateSlot')],
             ], ['data']),
             'DocumentTemplateSlotResponse' => self::dataEnvelope(SchemaBuilder::ref('DocumentTemplateSlot')),
+            'DocumentBackgroundIssuer' => self::object([
+                'plugin' => self::str() + ['description' => 'A plugin that declares it issues documents from its jobs with no person'],
+                'allowed' => ['type' => 'boolean', 'description' => 'Whether this workspace allows it'],
+                'slots' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'Its slots here, the only ones it may issue from with no person'],
+            ], ['plugin', 'allowed', 'slots']),
+            'DocumentBackgroundIssuerListResponse' => self::object([
+                'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('DocumentBackgroundIssuer')],
+            ], ['data']),
+            'DocumentBackgroundIssuerResponse' => self::dataEnvelope(SchemaBuilder::ref('DocumentBackgroundIssuer')),
+            'DocumentBackgroundIssuingRequest' => self::object([
+                'allowed' => ['type' => 'boolean', 'description' => 'true lets the plugin issue from its own slots with no person, with only the permissions it declares; false stops it'],
+            ], ['allowed']),
             'DocumentTemplateSlotBindRequest' => self::object([
                 'template_id' => self::int(true) + ['description' => 'The published, workspace-shared template to bind, of a kind the slot takes and for its record type; null unbinds the slot'],
             ], ['template_id']),
@@ -12244,6 +12256,35 @@ final class CoreApiSchemas
                     409 => self::errorResponse('The bindings changed since the ETag was read (`stale`)'),
                     422 => self::errorResponse('The template doesn\'t fit the slot (`kind_mismatch`, `record_type_mismatch`, `personal_template`, `unpublished`), or the system tenant'),
                     428 => self::errorResponse('If-Match is required'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/document-background-issuing', 'documents:read', [
+                'summary' => 'List the plugins that would issue documents with no person, and whether each is allowed',
+                'description' =>
+                    'A plugin that declares issuesInBackground() may issue from its jobs with no person, but only '
+                    . 'where the workspace allows it, only from its own slots, and only with the permissions it '
+                    . 'declares. Each is listed with its slots.',
+                'tags' => ['documents'],
+                'mcp' => ['toolset' => 'core.documents.automation'],
+                'responses' => [
+                    200 => self::jsonResponse('The plugins', 'DocumentBackgroundIssuerListResponse'),
+                    400 => self::errorResponse('Tenant context is required'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('PUT', '/api/document-background-issuing/{plugin:[A-Za-z][A-Za-z0-9_]{0,63}}', 'documents:publish', [
+                'summary' => 'Allow or stop a plugin issuing documents with no person',
+                'description' =>
+                    'Allowing it lets the plugin\'s jobs issue numbered, QR-verified documents from its own slots '
+                    . 'with nobody present, recorded with no person and the system as the actor.',
+                'tags' => ['documents'],
+                // Issuing can't be undone, so letting a plugin do it alone is
+                // a person's decision (DOCUMENT-AUTOMATION.md 3.7, 3.10).
+                'mcp' => ['toolset' => 'core.documents.automation', 'agentPolicy' => 'propose'],
+                'request' => 'DocumentBackgroundIssuingRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The plugin, allowed or not', 'DocumentBackgroundIssuerResponse'),
+                    404 => self::errorResponse('No plugin here declares that it issues with no person'),
+                    422 => self::errorResponse('allowed is not a boolean, or the system tenant'),
                 ] + self::authErrors(),
             ]),
         ];

@@ -78,6 +78,17 @@ final class DocumentIssuingEntryPointWiringTest extends TestCase
         );
     }
 
+    /**
+     * Background issuing trusts the worker, not the plugin, to say whose job is
+     * running (WHIT-742 slice 3): the job's plugin is the registry's answer.
+     */
+    public function testTheQueueWorkerNamesAJobsPluginFromItsOwnRegistry(): void
+    {
+        $worker = $this->read('src/Cli/Commands/QueueWorkCommand.php');
+        self::assertStringContainsString('$plugin = $registry->sourceOf($job);', $worker);
+        self::assertMatchesRegularExpression('/WorkerDocumentServices::register\([^;]*\$jobPlugin,\s*\);/s', $worker);
+    }
+
     public function testBothEntryPointsGiveTheLoaderTheDocumentRegistriesBeforeLoading(): void
     {
         foreach (self::ENTRY_POINTS as $relative) {

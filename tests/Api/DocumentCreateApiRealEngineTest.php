@@ -34,6 +34,10 @@ use Whity\Core\Audit\AuditContext;
 use Whity\Sdk\Documents\DocumentNotIssuedException;
 use Whity\Sdk\Documents\IssueRequest as SdkIssueRequest;
 use Whity\Sdk\Documents\TemplateRef;
+use Whity\Core\Document\Fields\DocumentFieldProvider;
+use Whity\Core\Document\Slots\BackgroundIssuing;
+use Whity\Core\Document\DocumentSourceRepository;
+use Whity\Core\Audit\Actor;
 use Whity\Core\Document\Organizer\CoreDocumentSubstrates;
 use Whity\Core\Document\Organizer\CoreDocumentViews;
 use Whity\Core\Document\Organizer\DocumentSubstrateRegistry;
@@ -1284,6 +1288,100 @@ final class DocumentCreateApiRealEngineTest extends TestCase
             }
         } finally {
             AuditContext::reset();
+        }
+    }
+
+    /**
+     * A plugin's job issuing with no person (WHIT-742 slice 3): only from the
+     * plugin's own slot, only once the workspace allowed it, only with the
+     * permissions the plugin declares, recorded with no person and the system
+     * as the audit actor, and the events say which plugin.
+     */
+    public function testAPluginsJobIssuesInTheBackgroundOnlyWhereAllowed(): void
+    {
+        $this->editor->fields->add(new class implements DocumentFieldProvider {
+            public function recordType(): string { return 'Courier.parcel'; }
+            public function recordLabel(): string { return 'Parcel'; }
+            public function groups(int $tenantId): array { return [['group' => 'Parcel', 'items' => [['path' => 'parcel.code', 'label' => 'Code']]]]; }
+            public function values(int $tenantId, int $callerId, callable $hasPermission, ?string $recordId): ?array
+            {
+                return $hasPermission('courier:read') ? ['label' => 'Parcel ' . $recordId, 'values' => ['parcel.code' => 'P-' . $recordId]] : null;
+            }
+            public function records(int $tenantId, int $callerId, callable $hasPermission, string $query, int $limit): array { return []; }
+        });
+        $this->slots->register('Courier', [new TemplateSlot('Courier.label', 'Courier', ['en' => 'Label', 'ar' => 'ملصق'], 'Courier.parcel')]);
+        $this->slots->register('Other', [new TemplateSlot('Other.note', 'Other', ['en' => 'Note', 'ar' => 'ملاحظة'], 'Courier.parcel')]);
+        $this->slots->declareBackground('Courier', true);
+        $templateId = $this->editor->published(self::TENANT, self::RAISER, 'Parcel label', [
+            $this->editor->para('Parcel ', $this->editor->field('parcel.code')),
+        ], ['record_type' => 'Courier.parcel', 'scope' => 'tenant']);
+        $this->settings->setTenant(self::TENANT, SettingsRegistry::DOCUMENTS_SLOT_BINDINGS, SlotBindings::encode(['Courier.label' => $templateId, 'Other.note' => $templateId]));
+
+        $roleChecker = new RoleChecker($this->wrapSqlite($this->pdo), new PermissionRegistry());
+        $actors = [];
+        $this->editor->hooks->listen(Events::DOCUMENT_ISSUED, static function (array $data) use (&$actors): array {
+            $actors[] = [AuditContext::getActor()->kind, $data['actor'], $data['origin'] ?? null];
+
+            return $data;
+        });
+        $documents = new SdkDocuments(
+            new TemplateIssuing(
+                $this->editor->issuing,
+                $this->editor->fields,
+                $this->settings,
+                fn (int $id, int $tenantId, int $callerId): ?array => $this->editor->sources->visibleRow($id, $tenantId, $callerId),
+                $this->slots,
+                fn (int $id, int $tenantId): ?array => (new DocumentSourceRepository($this->pdo))->findById($id, $tenantId),
+            ),
+            $roleChecker,
+            static fn (string $job): ?array => str_starts_with($job, 'courier:') ? ['plugin' => 'Courier', 'permissions' => ['courier:read']] : null,
+            $this->slots,
+        );
+        $label = new SdkIssueRequest(TemplateRef::slot('Courier.label'), record: 'Courier.parcel:77', originKey: 'parcel:77:label', render: false);
+        $reason = static function (callable $issue): ?string {
+            try {
+                $issue();
+            } catch (DocumentNotIssuedException $e) {
+                return $e->reason;
+            }
+
+            return null;
+        };
+
+        TenantContext::reset();
+        TenantContext::setTenantId(self::TENANT);
+        AuditContext::reset();
+        AuditContext::setJob('courier:send_labels');
+        try {
+            self::assertSame(DocumentNotIssuedException::BACKGROUND_NOT_ALLOWED, $reason(fn () => $documents->issue($label)), 'not allowed yet');
+
+            $this->settings->setTenant(self::TENANT, SettingsRegistry::DOCUMENTS_BACKGROUND_ISSUING, BackgroundIssuing::encode(['Courier']));
+            self::assertSame(
+                DocumentNotIssuedException::BACKGROUND_NOT_ALLOWED,
+                $reason(fn () => $documents->issue(new SdkIssueRequest(TemplateRef::slot('Other.note'), record: 'Courier.parcel:77', render: false))),
+                "another plugin's slot",
+            );
+            self::assertSame(
+                DocumentNotIssuedException::BACKGROUND_NOT_ALLOWED,
+                $reason(fn () => $documents->issue(new SdkIssueRequest(TemplateRef::source($templateId), record: 'Courier.parcel:77', render: false))),
+                'a template by id, not a slot',
+            );
+            self::assertSame(0, $this->countDocuments());
+
+            $issued = $documents->issue($label);
+            self::assertFalse($issued->replayed);
+            $row = $this->documents->findById($issued->documentId, self::TENANT);
+            self::assertNotNull($row);
+            self::assertNull($row['created_by'], 'no person issued it');
+            self::assertSame(['P-77'], array_values(array_intersect(['P-77'], $this->storedValues($issued->documentId))), 'read with the permission the plugin declares');
+            self::assertSame([[Actor::SYSTEM, null, 'plugin:Courier']], $actors);
+            self::assertSame(Actor::SYSTEM, AuditContext::getActor()->kind, 'and the job is still the system');
+
+            AuditContext::setJob('other:thing');
+            self::assertSame(DocumentNotIssuedException::NO_ACTOR, $reason(fn () => $documents->issue($label)), 'a plugin that declares nothing');
+        } finally {
+            AuditContext::reset();
+            TenantContext::reset();
         }
     }
 
