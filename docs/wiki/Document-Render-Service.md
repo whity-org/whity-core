@@ -259,6 +259,14 @@ head -c 5 /tmp/render-check.pdf   # %PDF-
 Arabic is in that payload on purpose: the Noto Naskh / Noto Sans Arabic fonts
 are baked into this image, and a build that lost them still renders — as tofu.
 
+Document titles print in **Readex Pro 600** and codes (barcode text, QR
+references) in **Geist Mono**: the app's own OFL-licensed files from
+`packages/tokens/fonts`, copied into the image at `/app/fonts`
+(`RENDER_FONT_DIR`) and embedded in every flowing page as data URIs by
+`src/flow/fonts.js`, so the PDF never fetches a font. Without the files
+the stacks fall back to Noto Sans and DejaVu Sans Mono, and the render-tier CI
+job fails ("Flowing render embeds Readex Pro and Geist Mono").
+
 The release pipeline runs the same shape of check against the published image
 (`smoke` job in `.github/workflows/release.yml`), and every PR that touches
 `render-service/` runs it against a locally built one (`render-service` job in
