@@ -9,6 +9,8 @@ use Whity\Core\Agent\AgentPresetRegistry;
 use Whity\Core\RBAC\CorePermissions;
 use Whity\Mcp\Tools\CoreToolsets;
 use Whity\OpenAPI\CoreApiSchemas;
+use Whity\Sdk\Manifest\ManifestValidator;
+use Whity\Sdk\Manifest\PluginManifest;
 
 /**
  * Core's agent presets (WHIT-815, database/agent-presets) are our own data, so
@@ -115,6 +117,84 @@ final class AgentPresetRegistryTest extends TestCase
         $this->expectException(\LogicException::class);
         $this->expectExceptionMessage("documents:issue can't start Allowed");
         new AgentPresetRegistry($this->dir);
+    }
+
+    public function testACodePluginsPresetsJoinUnderItsOwnRoot(): void
+    {
+        $registry = new AgentPresetRegistry();
+
+        $refused = $registry->registerPlugin('Plugins\HelloWorld\HelloWorldPlugin', [self::pluginPreset('greeter')], static fn (string $p): bool => true);
+
+        self::assertSame([], $refused);
+        $preset = $registry->find(1, 'hello-world.greeter');
+        self::assertSame('Greeter', $preset['name'] ?? null);
+        self::assertSame('مرحِّب', $preset['name_ar'] ?? null);
+        self::assertCount(6, $registry->forTenant(1));
+
+        $registry->unregisterPlugin('Plugins\HelloWorld\HelloWorldPlugin');
+        self::assertNull($registry->find(1, 'hello-world.greeter'));
+    }
+
+    /** @return iterable<string, array{array<string, mixed>, string}> */
+    public static function badPluginPresets(): iterable
+    {
+        yield 'a write starting Allowed' => [['grant' => ['documents:issue' => 'allow']], "can't start Allowed"];
+        yield "another plugin's toolset" => [['toolsets' => ['elmak.invoices']], "another plugin's"];
+        yield 'an unknown core toolset' => [['toolsets' => ['core.nowhere']], 'not a core toolset'];
+        yield 'an unknown permission' => [['grant' => ['nothing:read' => 'allow']], "doesn't exist"];
+    }
+
+    /**
+     * @dataProvider badPluginPresets
+     * @param array<string, mixed> $overrides
+     */
+    public function testABadPluginPresetIsDroppedWithAReason(array $overrides, string $reason): void
+    {
+        $registry = new AgentPresetRegistry();
+
+        $refused = $registry->registerPlugin(
+            'Plugins\HelloWorld\HelloWorldPlugin',
+            [self::pluginPreset('bad', $overrides), self::pluginPreset('good')],
+            static fn (string $p): bool => $p !== 'nothing:read',
+        );
+
+        self::assertStringContainsString($reason, implode("\n", $refused));
+        self::assertNull($registry->find(1, 'hello-world.bad'));
+        self::assertNotNull($registry->find(1, 'hello-world.good'), 'the rest of the plugin still loads');
+    }
+
+    public function testAWorkspacesPluginPresetsReachOnlyThatWorkspace(): void
+    {
+        $good = self::pluginPreset('order-desk', ['toolsets' => ['cake-orders.*', 'core.documents'], 'grant' => ['cake_orders:read' => 'allow']]);
+        unset($good['key']);
+        $manifest = PluginManifest::fromArray([
+            'manifest'     => ManifestValidator::FORMAT,
+            'plugin'       => ['name' => 'CakeOrders', 'version' => '1.0.0', 'label' => ['en' => 'Cake orders', 'ar' => 'طلبات الكعك']],
+            'requires'     => ['sdk' => '^1.61'],
+            'permissions'  => [['slug' => 'cake_orders:read', 'label' => ['en' => 'Read', 'ar' => 'قراءة']]],
+            'agentPresets' => ['order-desk' => $good],
+        ]);
+
+        $registry = new AgentPresetRegistry();
+        $registry->useManifests(static fn (int $tenant): array => $tenant === 1 ? [$manifest] : []);
+
+        self::assertNotNull($registry->find(1, 'cake-orders.order-desk'));
+        self::assertNull($registry->find(2, 'cake-orders.order-desk'), 'another workspace never sees it');
+        self::assertNull($registry->find(0, 'cake-orders.order-desk'));
+    }
+
+    /**
+     * @param array<string, mixed> $overrides
+     * @return array<string, mixed>
+     */
+    private static function pluginPreset(string $key, array $overrides = []): array
+    {
+        return $overrides + [
+            'key'          => $key,
+            'name'         => ['en' => 'Greeter', 'ar' => 'مرحِّب'],
+            'role'         => ['en' => 'Greets people.', 'ar' => 'يرحّب بالناس.'],
+            'instructions' => ['en' => 'Be brief.', 'ar' => 'كن موجزًا.'],
+        ];
     }
 
     public function testAPresetKeyMustMatchItsFile(): void

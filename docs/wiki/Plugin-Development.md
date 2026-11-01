@@ -1399,6 +1399,31 @@ there, render inside the request, or have the job enqueue the document's
 
 ---
 
+## Step 12a — Ship agent presets (SDK 1.61)
+
+A preset is a ready-made agent template, such as a Collections clerk. A workspace admin creates an agent from it at `POST /api/agents` with `presetKey`. The agent is a copy, so a later preset version never changes it. Implement `PluginAgentPresetsInterface`, or add `agentPresets` to `plugin.json` in the same shape, keyed by `key`:
+
+```php
+public function getAgentPresets(): array
+{
+    return [[
+        'key'          => 'collections-clerk',
+        'version'      => 1,
+        'name'         => ['en' => 'Collections clerk', 'ar' => 'موظف التحصيل'],
+        'role'         => ['en' => 'Follows up unpaid invoices.', 'ar' => 'يتابع الفواتير غير المدفوعة.'],
+        'instructions' => ['en' => 'Group reminders by customer.', 'ar' => 'اجمع التذكيرات حسب العميل.'],
+        'tone'         => 'formal',          // plain, formal or brief
+        'language'     => 'auto',            // auto, en or ar
+        'toolsets'     => ['acme', 'core.documents'],
+        'grant'        => ['acme_invoices:read' => 'allow', 'acme_invoices:send' => 'ask'],
+    ]];
+}
+```
+
+The host addresses it as `<plugin toolset root>.<key>` (`acme.collections-clerk`). Name a preset by role, never a person's name. Toolsets must be the plugin's own or core's, and permissions must exist. A bad preset is dropped with a logged reason, and the plugin keeps loading.
+
+**A preset may start a read at Allowed (a permission whose action is `read` or `view`) but never a write.** Only the person using the agent sets a write to Allowed. A preset grants nothing by itself: the agent acts for that person, never above their permissions, and its writes are Ask first.
+
 ## Step 12b — Issue from the workspace's templates (SDK 1.56)
 
 Step 12 prints content the plugin lays out itself. Most documents a plugin

@@ -97,9 +97,10 @@ final class AgentActionsApiHandler
         try {
             $result = $this->toolsCall->undo($person, $action);
         } catch (UndoConflictException $e) {
-            return Response::error($e->getMessage(), 409);
-        } catch (McpException $e) {
-            return Response::error('Undo failed: ' . $e->getMessage(), 422);
+            return Response::error($e->clientMessage, 409);
+        } catch (McpException) {
+            // A check refused it: the person may no longer make this change.
+            return Response::error('Undo failed: you can no longer make this change.', 422);
         }
         if (!is_array($result) || ($result['isError'] ?? false) === true) {
             $text = is_array($result) ? ($result['content'][0]['text'] ?? '') : '';

@@ -187,7 +187,8 @@ abstract class BaseCommand implements CliCommand, CommandHelp
         \Whity\register_service(\Whity\Core\Ou\OuTypeRegistry::class, $ouTypeRegistry);
 
         // Agent presets (WHIT-815), as public/index.php registers them.
-        \Whity\register_service(\Whity\Core\Agent\AgentPresetRegistry::class, new \Whity\Core\Agent\AgentPresetRegistry());
+        $agentPresetRegistry = new \Whity\Core\Agent\AgentPresetRegistry();
+        \Whity\register_service(\Whity\Core\Agent\AgentPresetRegistry::class, $agentPresetRegistry);
 
         // TIME-WINDOW TYPE catalogue (#1070), registered as a service for exactly
         // the same reason. A command is the natural home for period work — an
@@ -498,6 +499,7 @@ abstract class BaseCommand implements CliCommand, CommandHelp
             )
         );
         $templateSlotRegistry = new \Whity\Core\Document\Slots\TemplateSlotRegistry($liveManifests);
+        $agentPresetRegistry->useManifests($liveManifests);
         \Whity\register_service(\Whity\Core\Document\Slots\TemplateSlotRegistry::class, $templateSlotRegistry);
         \Whity\register_service(
             \Whity\Core\Document\Issuing\TemplateIssuing::class,
@@ -514,6 +516,14 @@ abstract class BaseCommand implements CliCommand, CommandHelp
                 getenv('STORAGE_ROOT') ?: ($baseDir . '/storage'),
             )
         );
+        // WHIT-838 (SDK 1.60): plugin secrets, as in public/index.php, so a
+        // plugin's job reaches the same store its routes write. The cipher is
+        // built on first use: a command that touches no secret needs no key.
+        \Whity\register_service(\Whity\Sdk\Secrets\PluginSecrets::class, new \Whity\Core\Plugin\HostPluginSecrets(
+            $db->getPdo(),
+            static fn (): \Whity\Core\Security\EncryptedSecretStore => \Whity\Core\Security\EncryptedSecretStore::fromEnv($_ENV),
+            $auditLogger,
+        ));
         \Whity\register_service(
             \Whity\Sdk\Documents\Documents::class,
             new \Whity\Core\Document\Issuing\SdkDocuments(
@@ -521,6 +531,7 @@ abstract class BaseCommand implements CliCommand, CommandHelp
                 $roleChecker
             )
         );
+        $pluginLoader->setAgentPresetRegistry($agentPresetRegistry);
         $pluginLoader->setDocumentRegistries($templateSlotRegistry, $documentFieldRegistry);
         $pluginLoader->load();
 

@@ -6,6 +6,7 @@ namespace Whity\Core\Agent;
 
 use Whity\Mcp\Tools\CoreToolsets;
 use Whity\Mcp\Tools\ToolSurface;
+use Whity\Sdk\Manifest\AgentPresetValidator;
 
 /**
  * The fields of an agent definition and their rules (WHIT-815;
@@ -143,12 +144,12 @@ final class AgentDefinition
      * Owner decision 2026-11-01 (Q6): a template, whether a core preset, a
      * plugin's or Whity Builder's preset, or a workspace agent, may start a
      * grant at Allowed for reads only. Writes start Ask first or Off, and only
-     * the person sets one to Allowed. Judged by name, deliberately strict: a
-     * read named otherwise simply starts Ask first.
+     * the person sets one to Allowed. The SDK holds the rule, so plugin authors
+     * get the same answer at their desk.
      */
     public static function isReadPermission(string $permission): bool
     {
-        return preg_match('/:(read|view)(:all)?$/', $permission) === 1;
+        return AgentPresetValidator::isReadPermission($permission);
     }
 
     public static function isSlug(string $slug): bool

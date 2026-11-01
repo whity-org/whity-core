@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.58).
+ * SDK identity (v1.61).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -903,13 +903,35 @@ namespace Whity\Sdk;
  * only the permissions it declares. Otherwise it is refused with the new
  * {@see Documents\DocumentNotIssuedException::BACKGROUND_NOT_ALLOWED} (WHIT-742).
  *
+ * Purely additive.) ->
+ * 1.59 (WHO IS CALLING: {@see Mcp\McpToolContext} gains `actorKind` (person,
+ * agent or system), `principalKind`, and for an AI agent a stable `agentId` and
+ * a display `agentName`, plus the person's Whity ID `subject` when the call
+ * came in with a Whity ID token, so a tool can record "agent X for person Y"
+ * (WHIT-837).
+ *
+ * Purely additive.) ->
+ * 1.60 (PLUGIN SECRETS: the host service {@see Secrets\PluginSecrets} gives a
+ * plugin its own {@see Secrets\SecretStore} (`for($this)`): `set`, `get` and
+ * `delete` a secret per workspace, encrypted with the host's key, kept apart
+ * by plugin, never read back by settings or the API, audited by key only.
+ * Resolvable in routes, MCP tools and jobs (WHIT-838).
+ *
+ * Purely additive.) ->
+ * 1.61 (AGENT PRESETS: the optional {@see PluginAgentPresetsInterface} and
+ * `agentPresets` in `plugin.json` ship ready-made agent templates: a persona in
+ * English and Arabic, toolsets and where a person's grant starts. Checked by
+ * {@see Manifest\AgentPresetValidator}, which refuses a preset that starts a
+ * write at Allowed; {@see Manifest\PluginManifest::agentPresets()} reads them
+ * (WHIT-818).
+ *
  * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.58.0';
+    public const VERSION = '1.61.0';
 
     /**
      * Static identity only — never instantiated.

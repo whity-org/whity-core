@@ -1463,6 +1463,13 @@ $router->register('POST', '/api/login', [$authHandler, 'handle'], null);
 // the encryption key so the mail-settings handler can read + decrypt the
 // out-of-registry encrypted SMTP password.
 $secretStore = \Whity\Core\Security\EncryptedSecretStore::fromEnv($_ENV);
+// WHIT-838 (SDK 1.60): where plugins keep secrets, per workspace, encrypted with
+// the platform key. Registered in BaseCommand::setupKernel() too, so jobs reach it.
+\Whity\register_service(\Whity\Sdk\Secrets\PluginSecrets::class, new \Whity\Core\Plugin\HostPluginSecrets(
+    $db->getPdo(),
+    static fn (): \Whity\Core\Security\EncryptedSecretStore => $secretStore,
+    $auditLogger,
+)); // @phpstan-ignore-line
 
 // WC-error-tracking: UPGRADE the boot-time error tracker now that settings, the
 // secret store and the queue exist.
@@ -3016,6 +3023,8 @@ $templateSlotRegistry = new \Whity\Core\Document\Slots\TemplateSlotRegistry(
     static fn (int $tenantId): array => $tenantManifestHost->manifestsFor($tenantId)
 );
 \Whity\register_service(\Whity\Core\Document\Slots\TemplateSlotRegistry::class, $templateSlotRegistry);
+// A workspace's own plugins' agent presets are read per call, like its slots (WHIT-818).
+$agentPresetRegistry->useManifests(static fn (int $tenantId): array => $tenantManifestHost->manifestsFor($tenantId));
 // Template slots and the workspace's bindings (WHIT-742, DOCUMENT-AUTOMATION
 // 3.2): listed with documents:read, bound with documents:publish.
 $documentTemplateSlotsHandler = new \Whity\Api\DocumentTemplateSlotsApiHandler($templateSlotRegistry, $settingsService, $documentSourcesHandler);
@@ -5030,6 +5039,8 @@ $router->register('POST', '/api/mcp/connect/preview', [$mcpConnectHandler, 'prev
 // Load plugins AFTER every core route (WC-169): the Router refuses duplicate
 // method+path registrations (first wins), so core routes can never be
 // shadowed by a plugin claiming the same path.
+// Code plugins' agent presets (SDK 1.61, WHIT-818).
+$pluginLoader->setAgentPresetRegistry($agentPresetRegistry);
 // Code plugins' template slots and record types as merge fields (SDK 1.56, WHIT-742).
 $pluginLoader->setDocumentRegistries($templateSlotRegistry, $documentFieldRegistry);
 $pluginLoader->load();

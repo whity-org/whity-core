@@ -2020,7 +2020,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Core presets, by key",
+                        "description": "Core's, code plugins' and this workspace's plugins' presets, by key",
                         "content": {
                             "application/json": {
                                 "schema": {

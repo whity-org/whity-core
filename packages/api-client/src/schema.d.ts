@@ -12917,7 +12917,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Core presets, by key */
+            /** @description Core's, code plugins' and this workspace's plugins' presets, by key */
             200: {
                 headers: {
                     [name: string]: unknown;

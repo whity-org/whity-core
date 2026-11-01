@@ -1,0 +1,1 @@
+- The MCP wiki pages (server, client connection, operator runbook) now cover search and call, toolsets, visibility, list budgets, splits, turning on plugin tools, and how agents propose and undo (WHIT-755).

@@ -297,6 +297,18 @@ final class PluginManifest
         return is_array($slots) ? $slots : [];
     }
 
+    /**
+     * Agent presets (SDK 1.61), as declared under `agentPresets`, keyed by local
+     * name. The host addresses each as `<plugin toolset root>.<key>`.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    public function agentPresets(): array
+    {
+        /** @var array<string, array<string, mixed>> */
+        return $this->map('agentPresets');
+    }
+
     /** @return array<string, mixed> */
     private function plugin(): array
     {

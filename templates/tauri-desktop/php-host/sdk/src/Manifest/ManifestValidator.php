@@ -43,7 +43,7 @@ final class ManifestValidator
     /** @var list<string> */
     public const TOP_LEVEL_KEYS = [
         'manifest', 'plugin', 'requires', 'permissions', 'roles', 'screens', 'tables', 'dataTypes', 'limits', 'records',
-        'automations', 'tests', 'documents',
+        'automations', 'tests', 'documents', 'agentPresets',
     ];
 
     private const NAME_PATTERN = '/^[A-Za-z][A-Za-z0-9_]{0,63}$/';
@@ -129,6 +129,8 @@ final class ManifestValidator
             },
             $errors,
         );
+
+        AgentPresetValidator::check($manifest['agentPresets'] ?? null, $errors);
 
         return ['ok' => $errors === [], 'errors' => $errors];
     }
@@ -463,7 +465,7 @@ final class ManifestValidator
      *
      * @param list<string> $errors
      */
-    private static function checkLabel(mixed $label, string $path, int $max, bool $required, array &$errors): void
+    public static function checkLabel(mixed $label, string $path, int $max, bool $required, array &$errors): void
     {
         if ($label === null) {
             if ($required) {
