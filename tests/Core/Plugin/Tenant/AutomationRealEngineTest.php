@@ -371,7 +371,7 @@ final class AutomationRealEngineTest extends TestCase
             'originKey' => 'automation:' . $run['id'] . ':0',
             'actor' => self::MANAGER,
         ]], $calls);
-        self::assertSame(['document_id' => 900, 'replayed' => false, 'rendered' => true], $this->runRow($run['id'])['trace'][0]['outcome']);
+        self::assertEquals(['document_id' => 900, 'replayed' => false, 'rendered' => true], $this->runRow($run['id'])['trace'][0]['outcome'], 'JSONB keeps no key order');
 
         // A worker that died after issuing but before its trace was saved:
         // the retry issues under the same origin key and gets the same document.
