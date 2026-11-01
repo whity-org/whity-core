@@ -10,6 +10,7 @@ import type { AgentActivityItem } from '@whity/ui/agent-activity';
  */
 
 export type AgentProposal = components['schemas']['AgentProposal'];
+export type AgentAction = components['schemas']['AgentAction'];
 
 /**
  * The words these helpers put on screen, translated by the caller. They take
@@ -28,6 +29,8 @@ export interface ProposalWords {
   hours: string;
   day: string;
   days: string;
+  /** `{summary}`: what an agent did by itself, or an approved proposal running. */
+  acted: string;
   /** `{summary}`. */
   asked: string;
   approved: string;
@@ -91,8 +94,8 @@ export function undoWindowWords(seconds: number | null | undefined, words: Propo
 }
 
 /** The agent's name, or a plain word when its credential is gone. */
-export function agentName(proposal: AgentProposal, words: ProposalWords): string {
-  return (words.arabic && proposal.agent?.nameAr) || proposal.agent?.name || words.unknownAgent;
+export function agentName(subject: Pick<AgentProposal, 'agent'>, words: ProposalWords): string {
+  return (words.arabic && subject.agent?.nameAr) || subject.agent?.name || words.unknownAgent;
 }
 
 /** Oldest first: the queue's order (register 7.5b). */
@@ -137,6 +140,49 @@ export function proposalActivity(
   }
   // Newest first, by the ISO time each row carries.
   return items.sort((a, b) => ((a.dateTime ?? '') < (b.dateTime ?? '') ? 1 : (a.dateTime ?? '') > (b.dateTime ?? '') ? -1 : 0));
+}
+
+/** Seconds left to undo an action, or null when it can't be undone now. */
+export function undoSecondsLeft(action: AgentAction, now: number): number | null {
+  if (action.status !== 'done' || !action.undoableUntil) return null;
+  const until = parseWireDate(action.undoableUntil);
+  if (until === null) return null;
+  const left = Math.floor((until.getTime() - now) / 1000);
+  return left > 0 ? left : null;
+}
+
+/**
+ * What agents did (`GET /api/me/agent-actions`), for the timeline: a filled
+ * row, undone rows as undo. `extra` puts the undo bar under a row that has an
+ * undo window.
+ */
+export function actionActivity(
+  actions: AgentAction[],
+  options: {
+    words: ProposalWords;
+    you: string;
+    time: (value: string) => string;
+    extra: (action: AgentAction) => AgentActivityItem['extra'];
+  },
+): AgentActivityItem[] {
+  const { words, you, time, extra } = options;
+  return actions.map((action) => ({
+    id: `action-${action.id}`,
+    kind: action.status === 'undone' ? 'undo' : 'act',
+    actor: agentName(action, words),
+    onBehalfOf: you,
+    text: words.acted.replace('{summary}', action.summary),
+    timeLabel: time(action.createdAt),
+    dateTime: action.createdAt,
+    tool: action.tool,
+    extra: extra(action),
+  }));
+}
+
+/** Newest first across rows from both lists, which stamp their times differently. */
+export function newestFirst(items: AgentActivityItem[]): AgentActivityItem[] {
+  const at = (item: AgentActivityItem) => parseWireDate(item.dateTime)?.getTime() ?? 0;
+  return [...items].sort((a, b) => at(b) - at(a));
 }
 
 /** Whether a server timestamp falls on the viewer's today (read as UTC, as stored). */
