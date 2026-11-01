@@ -36,8 +36,8 @@ until it is, and the resolution says so in `adjustments`.
 | `letterhead.logo` | `wide`, `square`, `none` | `wide` |
 | `letterhead.lines` | up to four of `address`, `taxId`, `phone`, `email`, in order | `address`, `taxId` |
 
-`phone` and `email` print nothing until the workspace's company details have
-them (WHIT-788). The title face and large print come with M8 (WHIT-786).
+`phone` and `email` come from the workspace's company details (Settings,
+General), and print nothing until it fills them in. The title face and large print come with M8 (WHIT-786).
 
 ## Published means frozen
 

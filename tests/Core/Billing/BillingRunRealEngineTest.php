@@ -146,6 +146,23 @@ final class BillingRunRealEngineTest extends TestCase
         self::assertSame('Acme Ltd', $invoices[0]['buyer_name']);
     }
 
+    /** WHIT-788: the seller on an invoice is the workspace's company. */
+    public function testTheInvoiceIsFromTheCompanyInTheSettings(): void
+    {
+        $this->settings->setTenant(self::TENANT, SettingsRegistry::COMPANY_NAME, 'Example Bakery');
+        $this->settings->setTenant(self::TENANT, SettingsRegistry::COMPANY_ADDRESS, '1 Bread St, Amman');
+        $this->settings->setTenant(self::TENANT, SettingsRegistry::COMPANY_TAX_ID, 'JO-123');
+        $this->priceThePlan(5000, 'JOD', 'month');
+        $this->subscribe(self::TENANT, '2026-10-01 00:00:00');
+
+        $this->billing->run($this->now);
+
+        $invoice = $this->invoices->listForTenant(self::TENANT)[0];
+        self::assertSame('Example Bakery', $invoice['seller_name']);
+        self::assertSame('1 Bread St, Amman', $invoice['seller_address']);
+        self::assertSame('JO-123', $invoice['seller_tax_id']);
+    }
+
     /**
      * THE TEST THAT MATTERS MOST. Clocks fire twice, and the guarantee is a
      * unique index rather than the run remembering anything — so the second run

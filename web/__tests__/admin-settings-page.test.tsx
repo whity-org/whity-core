@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/react';
 
 /**
  * Unit/behaviour tests for the settings pages under
@@ -111,10 +111,10 @@ const GLOBAL = {
   support_email: '',
 };
 
-function settingsResponse(overridden: string[] = ['site_name'], tenantOverridable = true) {
+function settingsResponse(overridden: string[] = ['site_name'], tenantOverridable = true, registry = REGISTRY) {
   return {
     data: {
-      data: { effective: EFFECTIVE, registry: REGISTRY, overridden, tenant_overridable: tenantOverridable },
+      data: { effective: EFFECTIVE, registry, overridden, tenant_overridable: tenantOverridable },
     },
     error: undefined,
   };
@@ -164,7 +164,7 @@ function routeGet(overridden: string[] = ['site_name'], tenantOverridable = true
     if (path === '/api/v1/settings/global') return Promise.resolve(globalResponse(registry, global));
     if (path === '/api/v1/branding') return Promise.resolve(brandingResponse());
     if (path === '/api/v1/settings/tabs') return Promise.resolve(settingsTabsResponse());
-    return Promise.resolve(settingsResponse(overridden, tenantOverridable));
+    return Promise.resolve(settingsResponse(overridden, tenantOverridable, registry));
   });
 }
 
@@ -756,6 +756,64 @@ describe('FeatureFlagsSettingsPage — registry-driven, isFlag-filtered form', (
 
     expect(await screen.findByText(/no feature flags are published/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /save feature flags/i })).toBeDisabled();
+  });
+});
+
+/**
+ * WHIT-788: the company details a workspace's documents and invoices print.
+ */
+describe('AdminSettingsPage - the company details', () => {
+  const COMPANY_REGISTRY = [
+    ...REGISTRY,
+    { key: 'company.name', type: 'string', default: '' },
+    { key: 'company.address', type: 'string', default: '' },
+    { key: 'company.tax_id', type: 'string', default: '' },
+    { key: 'company.phone', type: 'string', default: '' },
+    { key: 'company.email', type: 'string', default: '' },
+  ];
+
+  it('lists them on the tenant card, in their own group', async () => {
+    grant('settings:read');
+    setTenant(5);
+    routeGet(['site_name'], true, COMPANY_REGISTRY);
+    render(<AdminSettingsPage />);
+
+    const group = await screen.findByTestId('tenant-company-settings');
+    for (const label of ['Company name', 'Address', 'Tax number', 'Phone', 'Email']) {
+      expect(within(group).getByLabelText(new RegExp(`^${label}`))).toBeInTheDocument();
+    }
+  });
+
+  it('keeps numbers and codes left to right, and lets a name follow its text', async () => {
+    grant('settings:read');
+    setTenant(5);
+    routeGet(['site_name'], true, COMPANY_REGISTRY);
+    render(<AdminSettingsPage />);
+
+    const group = await screen.findByTestId('tenant-company-settings');
+    expect(within(group).getByLabelText(/^Phone/)).toHaveAttribute('dir', 'ltr');
+    expect(within(group).getByLabelText(/^Tax number/)).toHaveAttribute('dir', 'ltr');
+    expect(within(group).getByLabelText(/^Email/)).toHaveAttribute('type', 'email');
+    expect(within(group).getByLabelText(/^Company name/)).toHaveAttribute('dir', 'auto');
+  });
+
+  it('writes only the field the person changed', async () => {
+    grant('settings:read', 'settings:write');
+    setTenant(5);
+    routeGet(['site_name'], true, COMPANY_REGISTRY);
+    render(<AdminSettingsPage />);
+
+    const group = await screen.findByTestId('tenant-company-settings');
+    fireEvent.change(within(group).getByLabelText(/^Phone/), { target: { value: '+962 6 555 0100' } });
+    fireEvent.click(screen.getByRole('button', { name: /save tenant settings/i }));
+
+    await waitFor(() => expect(mockApiPatch).toHaveBeenCalled());
+    const call = mockApiPatch.mock.calls.find(
+      (args: unknown[]) => args[0] === '/api/v1/settings'
+    );
+    const body = (call as unknown[])[1] as { body: { settings: Record<string, unknown> } };
+    expect(body.body.settings['company.phone']).toBe('+962 6 555 0100');
+    expect(body.body.settings).not.toHaveProperty('company.name');
   });
 });
 

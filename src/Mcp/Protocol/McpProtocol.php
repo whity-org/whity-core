@@ -95,9 +95,9 @@ final class McpProtocol
     }
 
     /** @return array{name: string, version: string} */
-    public static function serverInfo(): array
+    public static function serverInfo(?string $split = null): array
     {
-        return ['name' => 'whity-core', 'version' => CoreVersion::VERSION];
+        return ['name' => $split === null ? 'whity-core' : 'whity-core/' . $split, 'version' => CoreVersion::VERSION];
     }
 
     /**

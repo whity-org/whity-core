@@ -146,8 +146,9 @@ final class SettingsApiRealEngineTest extends TestCase
         // 37 since WHIT-754: mcp.always_on_plugin_tools, each workspace's plugin
         // tools turned on as always-on for MCP clients.
         // 38 since WHIT-742: documents.slot_bindings (read here, written by the slots route).
-        // 39 since WHIT-742 slice 3: documents.background_issuing.
-        self::assertCount(39, $data['registry']);
+        // 40 since WHIT-788: three billing.seller_* out, five company.* in.
+        // 41 since WHIT-742 slice 3: documents.background_issuing.
+        self::assertCount(41, $data['registry']);
         self::assertArrayNotHasKey('auth.self_registration_enabled', $data['effective']);
         self::assertSame([], $data['overridden']);
     }

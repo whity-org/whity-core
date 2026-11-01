@@ -142,8 +142,8 @@ final class DocumentPublishingApiHandlerRealEngineTest extends TestCase
 
     public function testFieldsListTheRecordTypeOwnGroupFirstThenCompanyAndToday(): void
     {
-        $this->settings->setTenant(self::TENANT, SettingsRegistry::BILLING_SELLER_NAME, 'Example Bakery');
-        $this->settings->setTenant(self::TENANT, SettingsRegistry::BILLING_SELLER_TAX_ID, '0123456');
+        $this->settings->setTenant(self::TENANT, SettingsRegistry::COMPANY_NAME, 'Example Bakery');
+        $this->settings->setTenant(self::TENANT, SettingsRegistry::COMPANY_TAX_ID, '0123456');
 
         $res = $this->handler->fields($this->request('GET', '/api/document-fields?recordType=document', self::VIEWER));
         self::assertSame(200, $res->getStatusCode(), $res->getBody());
@@ -256,7 +256,7 @@ final class DocumentPublishingApiHandlerRealEngineTest extends TestCase
 
     public function testPreviewFillsTheFieldsForARecordTheCallerMaySee(): void
     {
-        $this->settings->setTenant(self::TENANT, SettingsRegistry::BILLING_SELLER_NAME, 'Example Bakery');
+        $this->settings->setTenant(self::TENANT, SettingsRegistry::COMPANY_NAME, 'Example Bakery');
         $id = $this->template(self::OWNER, [$this->para('Hi')], 'tenant');
         $doc = $this->issue(self::WRITER, 'Payment reminder');
 
@@ -296,8 +296,8 @@ final class DocumentPublishingApiHandlerRealEngineTest extends TestCase
 
     public function testRenderPrintsThePublishedVersionWithTheValuesFrozenIn(): void
     {
-        $this->settings->setTenant(self::TENANT, SettingsRegistry::BILLING_SELLER_NAME, 'Example Bakery');
-        $this->settings->setTenant(self::TENANT, SettingsRegistry::BILLING_SELLER_TAX_ID, '0123456');
+        $this->settings->setTenant(self::TENANT, SettingsRegistry::COMPANY_NAME, 'Example Bakery');
+        $this->settings->setTenant(self::TENANT, SettingsRegistry::COMPANY_TAX_ID, '0123456');
         $id = $this->template(self::OWNER, [
             $this->para('Dear ', $this->field('document.title'), ', from ', $this->field('company.name')),
             ['id' => 'b2', 'type' => 'barcode', 'symbology' => 'code128', 'value' => [$this->field('document.number')], 'showText' => true],
@@ -334,7 +334,7 @@ final class DocumentPublishingApiHandlerRealEngineTest extends TestCase
     public function testTheTenantLogoPrintsOnTheLetterhead(): void
     {
         // Stage 6 (6.2): the logo sits at the start side of the letterhead, in the PDF as in the page view.
-        $this->settings->setTenant(self::TENANT, SettingsRegistry::BILLING_SELLER_NAME, 'Example Bakery');
+        $this->settings->setTenant(self::TENANT, SettingsRegistry::COMPANY_NAME, 'Example Bakery');
         $svg = '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="10"/>';
         $key = StorageKey::build(self::TENANT, 'branding', 'logo_wide-0a1b2c3d.svg');
         (new LocalStorageDriver($this->storageRoot))->put($key, $svg);
@@ -366,7 +366,7 @@ final class DocumentPublishingApiHandlerRealEngineTest extends TestCase
 
     public function testPersistIssuesTheDocumentWithTheValuesItPrinted(): void
     {
-        $this->settings->setTenant(self::TENANT, SettingsRegistry::BILLING_SELLER_TAX_ID, '0123456');
+        $this->settings->setTenant(self::TENANT, SettingsRegistry::COMPANY_TAX_ID, '0123456');
         $id = $this->template(self::OWNER, [$this->para('For ', $this->field('document.title'))]);
         $this->publish(self::OWNER, $id, '"1"');
         $doc = $this->issue(self::OWNER, 'Payment reminder');
@@ -425,7 +425,7 @@ final class DocumentPublishingApiHandlerRealEngineTest extends TestCase
 
     public function testALabelSheetPrintsFromACsvItNeverStores(): void
     {
-        $this->settings->setTenant(self::TENANT, SettingsRegistry::BILLING_SELLER_NAME, 'Example Bakery');
+        $this->settings->setTenant(self::TENANT, SettingsRegistry::COMPANY_NAME, 'Example Bakery');
         $id = $this->labelSheet([$this->para($this->field('document.title'), ' · ', $this->field('company.name'))]);
         $this->publish(self::OWNER, $id, '"1"');
 
