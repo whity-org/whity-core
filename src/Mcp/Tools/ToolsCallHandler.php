@@ -491,7 +491,7 @@ final class ToolsCallHandler implements MethodHandler
         $plain       = function (mixed $result) use ($principal, $toolName, $arguments, $proposalId, $summary, $permissions): mixed {
             if (is_array($result) && ($result['isError'] ?? false) !== true) {
                 try {
-                    $this->actions?->record($principal->tenantId, $principal->jti, $principal->userId, $proposalId, $toolName, $arguments, $summary, $permissions, null, null);
+                    $this->actions?->record($principal->tenantId, $principal->agentPrincipalId(), $principal->userId, $proposalId, $toolName, $arguments, $summary, $permissions, null, null);
                 } catch (\Throwable $e) {
                     error_log("[mcp] recording {$toolName} failed (tenant {$principal->tenantId}): " . $e->getMessage());
                 }
@@ -554,7 +554,7 @@ final class ToolsCallHandler implements MethodHandler
 
             $id = $this->actions->record(
                 $principal->tenantId,
-                $principal->jti,
+                $principal->agentPrincipalId(),
                 $principal->userId,
                 $proposalId,
                 $toolName,

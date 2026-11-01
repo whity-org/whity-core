@@ -125,7 +125,7 @@ final class AgentUndoRealEngineTest extends TestCase
         $this->proposals = new AgentProposalRepository($this->pdo);
         $this->toolsCall = new ToolsCallHandler($this->deriver, $router, $roles, $tokens, proposals: $this->proposals, actions: $this->actions);
         $this->undoApi   = new AgentActionsApiHandler($this->actions, $this->toolsCall, $this->proposals);
-        $this->inbox     = new AgentProposalsApiHandler($this->proposals, $this->toolsCall, null, $this->actions);
+        $this->inbox     = new AgentProposalsApiHandler($this->proposals, $this->toolsCall, actions: $this->actions);
     }
 
     protected function tearDown(): void
