@@ -62,7 +62,10 @@ final class AgentActionsApiHandler
         ], true) ? $query['status'] : null;
         $since = is_string($query['since'] ?? null) && ($time = strtotime($query['since'])) !== false ? gmdate('Y-m-d H:i:s', $time) : null;
 
-        return Response::json(['data' => array_map(self::present(...), $this->actions->listFor($tenantId, $profileId, 100, $since, $status))], 200);
+        $rows  = $this->actions->listFor($tenantId, $profileId, 100, $since, $status);
+        $names = $this->names($tenantId, $rows);
+
+        return Response::json(['data' => array_map(static fn (array $row): array => self::present($row, $names), $rows)], 200);
     }
 
     /** @param array<string, string> $params */
@@ -120,17 +123,18 @@ final class AgentActionsApiHandler
         ]);
 
         $fresh = $this->actions->find($id, $tenantId);
-        return Response::json(['data' => $fresh !== null ? self::present($fresh) : null], 200);
+        return Response::json(['data' => $fresh !== null ? self::present($fresh, $this->names($tenantId, [$fresh])) : null], 200);
     }
 
     /**
      * What the activity item and the UndoBar show. Times are UTC (ISO 8601,
      * `Z`); the inverse stays server-side.
      *
-     * @param array<string, mixed> $action
+     * @param array<string, mixed>                                $action
+     * @param array<string, array{name: string, nameAr: ?string}> $agentNames by principal id
      * @return array<string, mixed>
      */
-    public static function present(array $action): array
+    public static function present(array $action, array $agentNames = []): array
     {
         $until  = $action['undoable_until'];
         $status = $action['status'] === AgentActionRepository::DONE && $until !== null && strtotime($until . ' UTC') <= time()
@@ -143,7 +147,8 @@ final class AgentActionsApiHandler
             'status'            => $status,
             'tool'              => $action['tool'],
             'summary'           => $action['summary'],
-            'agent'             => ['name' => $action['agent_name']],
+            // Named as proposals name it: see AgentProposalRepository::agentNames().
+            'agent'             => $agentNames[(string) $action['agent_principal_id']] ?? ['name' => null, 'nameAr' => null],
             'permissions'       => $action['permissions'],
             'arguments'         => $action['arguments'] === [] ? new \stdClass() : $action['arguments'],
             'proposalId'        => $action['proposal_id'],
@@ -156,6 +161,18 @@ final class AgentActionsApiHandler
             'undoneAt'          => $action['undone_at'] !== null ? self::utc((string) $action['undone_at']) : null,
             'createdAt'         => self::utc($action['created_at']),
         ];
+    }
+
+    /**
+     * @param list<array<string, mixed>> $actions
+     * @return array<string, array{name: string, nameAr: ?string}>
+     */
+    private function names(int $tenantId, array $actions): array
+    {
+        return $this->proposals?->agentNames($tenantId, array_map(
+            static fn (array $action): string => (string) $action['agent_principal_id'],
+            $actions,
+        )) ?? [];
     }
 
     /** A stored UTC timestamp as ISO 8601 with `Z`. */

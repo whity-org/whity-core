@@ -5362,7 +5362,7 @@ final class CoreApiSchemas
                 'status' => ['type' => 'string', 'enum' => ['done', 'undone', 'expired']],
                 'tool' => self::str(),
                 'summary' => self::str(),
-                'agent' => self::object(['name' => self::str(true)], ['name']),
+                'agent' => self::object(['name' => self::str(true), 'nameAr' => self::str(true)], ['name', 'nameAr']),
                 'permissions' => ['type' => 'array', 'items' => self::str()],
                 'arguments' => ['type' => 'object', 'additionalProperties' => true],
                 'proposalId' => self::int(true),

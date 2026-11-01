@@ -22,12 +22,10 @@ final class AgentActionRepository
 
     private const COLUMNS = 'a.id, a.tenant_id, a.agent_principal_id, a.on_behalf_of_profile_id, a.proposal_id, a.tool,
                              a.arguments, a.summary, a.permissions, a.inverse, a.undo_window_seconds, a.undoable_until, a.status,
-                             a.undone_by_profile_id, a.undone_at, a.undo_result, a.created_at, p.display_name AS undone_by_name,
-                             t.name AS agent_name';
+                             a.undone_by_profile_id, a.undone_at, a.undo_result, a.created_at, p.display_name AS undone_by_name';
 
-    /** Who undid it, and the agent credential's name (null once it is gone, or for a signed-in agent). */
-    private const JOINS = 'LEFT JOIN profiles p ON p.id = a.undone_by_profile_id
-                           LEFT JOIN mcp_tokens t ON t.jti = a.agent_principal_id';
+    /** Who undid it. */
+    private const JOINS = 'LEFT JOIN profiles p ON p.id = a.undone_by_profile_id';
 
     public function __construct(private readonly PDO $db)
     {
@@ -200,7 +198,6 @@ final class AgentActionRepository
             'undone_at'               => $row['undone_at'] === null ? null : (string) $row['undone_at'],
             'undo_result'             => $json($row['undo_result'], null),
             'created_at'              => (string) $row['created_at'],
-            'agent_name'              => $row['agent_name'] === null ? null : (string) $row['agent_name'],
         ];
     }
 

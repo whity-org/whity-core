@@ -303,7 +303,7 @@ final class AgentUndoRealEngineTest extends TestCase
 
         $this->call('post_api_notes', ['name' => 'Bread order']);
 
-        self::assertSame(['name' => 'Office assistant'], $this->list('')[0]['agent']);
+        self::assertSame(['name' => 'Office assistant', 'nameAr' => null], $this->list('')[0]['agent']);
     }
 
     /** @return list<array<string, mixed>> */

@@ -6606,6 +6606,7 @@ export interface components {
             summary: string;
             agent: {
                 name: string | null;
+                nameAr: string | null;
             };
             permissions: string[];
             arguments: {

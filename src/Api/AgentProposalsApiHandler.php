@@ -227,7 +227,7 @@ final class AgentProposalsApiHandler
             'expiresAt'         => $proposal['expires_at'],
             'createdAt'         => $proposal['created_at'],
             // WHIT-812: once approved and run, what can be undone and until when.
-            'action'            => $action !== null ? AgentActionsApiHandler::present($action) : null,
+            'action'            => $action !== null ? AgentActionsApiHandler::present($action, $agentNames) : null,
         ];
     }
 }
