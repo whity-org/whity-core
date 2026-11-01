@@ -1,1 +1,0 @@
-- Plugin MCP tools now learn who is calling (SDK 1.59). `McpToolContext` says whether a person or an AI agent made the call, and for an agent gives a stable id and a display name, such as "Whity Builder". It also gives the Whity ID subject when the call came in with a Whity ID token, so a tool can record "agent X for person Y" (WHIT-837).

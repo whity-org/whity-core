@@ -1,1 +1,0 @@
-- Settings is one place: a single Settings item at the foot of the sidebar opens a settings area with a grouped side menu (Workspace, Sign-in and security, Email, Data, Advanced) that also holds Tags, Tag groups, Languages and Translations. Pages keep their addresses and permissions. Your own account is the user row at the foot of the sidebar.

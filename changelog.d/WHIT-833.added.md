@@ -1,1 +1,0 @@
-- A proposal from an agent can now show what it would change before the person approves it. Operations register a preview, and the approvals card and `get_proposal` show it (WHIT-833).

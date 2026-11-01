@@ -1,1 +1,0 @@
-- The person who issued an agent credential can now read its grant permission by permission, with what the agent can actually do and why a mode is unavailable, and change it to Off, Ask first or Allowed without reissuing the credential. A grant never goes above the person, and every change is audit-logged (WHIT-832).
