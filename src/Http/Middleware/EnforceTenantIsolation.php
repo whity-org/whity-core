@@ -803,6 +803,11 @@ class EnforceTenantIsolation
         if (in_array($path, self::PUBLIC_ROUTES, true)) {
             return true;
         }
+        // WHIT-765: an MCP split and its metadata, as /mcp and its metadata above.
+        // One segment only, so nothing under a split is ever public by accident.
+        if (preg_match('#^(/\.well-known/oauth-protected-resource)?/mcp/[a-z0-9][a-z0-9_.-]*$#', $path) === 1) {
+            return true;
+        }
         foreach (self::PUBLIC_ROUTE_PREFIXES as $prefix) {
             if (str_starts_with($path, $prefix)) {
                 return true;

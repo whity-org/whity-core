@@ -112,10 +112,16 @@ final class OAuthAccessTokenVerifier
      */
     public function verify(string $token): ?McpPrincipal
     {
-        $claims = $this->jwt->verify($token, $this->resource);
+        // WHIT-765: a token is for /mcp, or for one split under it (RFC 8707).
+        // A split-bound token is valid here; the dispatcher lets it in only at
+        // its own split.
+        $claims = $this->jwt->verify($token, fn (array $audiences): bool => $this->splitOf($audiences) !== false);
         if ($claims === null) {
             return null;
         }
+        $aud   = $claims['aud'] ?? null;
+        $split = $this->splitOf(is_array($aud) ? $aud : [$aud]);
+        $split = $split === false ? null : $split;
 
         $subject = $claims['sub'] ?? null;
         if (!is_string($subject) || $subject === '') {
@@ -152,6 +158,7 @@ final class OAuthAccessTokenVerifier
                 tenantId: $tenantId,
                 principalKind: AgentScopeGrant::AGENT_KIND,
                 scope: $scope,
+                resourceSplit: $split,
                 jti: self::AGENT_ID_PREFIX . substr(hash('sha256', self::clientOf($claims) . "\n" . $profileId), 0, 40),
             );
         }
@@ -162,10 +169,33 @@ final class OAuthAccessTokenVerifier
             tenantId: $tenantId,
             principalKind: 'oauth',
             scope: $scope,
+            resourceSplit: $split,
             // A stable per-token handle for notification bookkeeping. Prefixed so
             // it can never collide with an MCP token's jti.
             jti: 'oauth:' . (is_string($jti) && $jti !== '' ? $jti : substr(hash('sha256', $token), 0, 32)),
         );
+    }
+
+    /**
+     * What a token's audiences give it: null for this server's own resource
+     * (`/mcp`, which works everywhere), a split's name for `/mcp/<split>`, and
+     * false for neither.
+     *
+     * @param array<mixed> $audiences
+     */
+    private function splitOf(array $audiences): string|null|false
+    {
+        if (in_array($this->resource, $audiences, true)) {
+            return null;
+        }
+        $prefix = $this->resource . '/';
+        foreach ($audiences as $audience) {
+            if (is_string($audience) && str_starts_with($audience, $prefix) && strlen($audience) > strlen($prefix)) {
+                return substr($audience, strlen($prefix));
+            }
+        }
+
+        return false;
     }
 
     /**

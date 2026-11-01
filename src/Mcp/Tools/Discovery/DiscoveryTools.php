@@ -305,11 +305,11 @@ final class DiscoveryTools
             self::INIT            => $this->initSession($arguments, $bearerToken, $surface),
             self::GET_PROPOSAL    => $this->getProposal($arguments, $bearerToken),
             self::SEARCH          => $this->search($arguments, $bearerToken, $surface),
-            self::CALL            => $this->callThrough(self::str($arguments, 'operationId'), $arguments, $bearerToken),
+            self::CALL            => $this->callThrough(self::str($arguments, 'operationId'), $arguments, $bearerToken, $surface),
             // WHIT-707 names, for clients that remember them.
             self::LEGACY_SEARCH   => $this->search(['query' => $arguments['query'] ?? '', 'limit' => $arguments['limit'] ?? null], $bearerToken, $surface),
             self::LEGACY_DESCRIBE => $this->search(['operationId' => self::str($arguments, 'name')], $bearerToken, $surface),
-            self::LEGACY_CALL     => $this->callThrough(self::str($arguments, 'name'), $arguments, $bearerToken),
+            self::LEGACY_CALL     => $this->callThrough(self::str($arguments, 'name'), $arguments, $bearerToken, $surface),
             // A real operation called by its own name: the real handler decides.
             default               => ($this->toolsCall)($params, $bearerToken),
         };
@@ -400,7 +400,7 @@ final class DiscoveryTools
     }
 
     /** @param array<string, mixed> $arguments */
-    private function callThrough(string $operationId, array $arguments, ?string $bearerToken): mixed
+    private function callThrough(string $operationId, array $arguments, ?string $bearerToken, ToolSurfaceRequest $surface): mixed
     {
         if ($operationId === '') {
             return self::error('call_operation needs the operationId to call; find one with search_operations.');
@@ -411,7 +411,12 @@ final class DiscoveryTools
         $toolArguments = is_array($arguments['arguments'] ?? null) ? $arguments['arguments'] : [];
 
         try {
-            return ($this->toolsCall)(['name' => $operationId, 'arguments' => $toolArguments], $bearerToken);
+            // The surface goes with it: on a split, the operation must be inside it.
+            return ($this->toolsCall)([
+                'name'      => $operationId,
+                'arguments' => $toolArguments,
+                '_meta'     => [ToolSurfaceRequest::META_KEY => $surface->toArray()],
+            ], $bearerToken);
         } catch (McpException $e) {
             // At the top level these are protocol errors. Here the operation is
             // an argument the model chose, so it is the model's to fix, and the

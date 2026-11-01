@@ -28,6 +28,9 @@ final readonly class McpPrincipal
      *                                jti: `agent:<assignmentId>` for a credential bound to
      *                                a workspace agent (WHIT-816), so the agent stays one
      *                                principal across all its credentials.
+     * @param ?string  $resourceSplit The split an OAuth token was issued for (its `aud` is
+     *                                `/mcp/<split>`): it works only there. Null works on
+     *                                `/mcp` and every split (WHIT-765).
      */
     public function __construct(
         public int $profileId,
@@ -37,6 +40,7 @@ final readonly class McpPrincipal
         public array $scope,
         public string $jti,
         public ?string $agentId = null,
+        public ?string $resourceSplit = null,
     ) {}
 
     /** The principal kind of an agent credential (ADR-0006 §3, WHIT-753). */

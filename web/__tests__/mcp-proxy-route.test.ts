@@ -102,3 +102,37 @@ describe('/mcp proxy', () => {
     spy.mockRestore();
   });
 });
+
+describe('/mcp/<split> (WHIT-765)', () => {
+  it('forwards a split to the backend with the same narrow rules', async () => {
+    const { POST: POST_SPLIT } = await import('@/app/mcp/[...path]/route');
+    const calls = capture(new Response('{}', { status: 200 }));
+
+    const response = await POST_SPLIT(
+      new Request('https://app.example.test/mcp/forms?tools=full', {
+        method: 'POST',
+        headers: { authorization: 'Bearer t', cookie: 'access_token=secret', 'content-type': 'application/json' },
+        body: '{}',
+      }),
+      { params: Promise.resolve({ path: ['forms'] }) },
+    );
+
+    expect(response.status).toBe(200);
+    expect(calls[0].url).toBe(`${BACKEND}/mcp/forms?tools=full`);
+    const headers = new Headers(calls[0].init.headers);
+    expect(headers.get('authorization')).toBe('Bearer t');
+    expect(headers.get('cookie')).toBeNull();
+  });
+
+  it.each([[['..', 'api']], [['forms', 'x', 'y']], [['FORMS']], [['a/b']], [[]]])('refuses %j', async (path) => {
+    const { POST: POST_SPLIT } = await import('@/app/mcp/[...path]/route');
+    const calls = capture(new Response('{}', { status: 200 }));
+
+    const response = await POST_SPLIT(new Request('https://app.example.test/mcp/x', { method: 'POST' }), {
+      params: Promise.resolve({ path }),
+    });
+
+    expect(response.status).toBe(404);
+    expect(calls).toHaveLength(0);
+  });
+});

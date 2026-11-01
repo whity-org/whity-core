@@ -264,14 +264,26 @@ final class ToolsCallHandler implements MethodHandler
             throw new McpException(ErrorCode::UNAUTHENTICATED, 'Unauthenticated');
         }
 
-        return $this->run($principal, $toolName, $arguments, false);
+        // WHIT-765: on a split, what is outside it doesn't exist. Unknown, not
+        // forbidden, and before anything else looks at the tool.
+        $surface = ToolSurfaceRequest::fromParams($params);
+        if ($surface->split !== null) {
+            $toolset = $this->toolDeriver->findDeclarationByName($toolName) !== null
+                ? $this->toolDeriver->toolsetOf($toolName)
+                : $this->authoredTools?->toolsetOf($toolName);
+            if (!$surface->selects($toolset)) {
+                throw new McpException(ErrorCode::METHOD_NOT_FOUND, "Unknown tool: {$toolName}");
+            }
+        }
+
+        return $this->run($principal, $toolName, $arguments, false, $surface->split);
     }
 
     /**
      * @param array<string, mixed> $arguments
      * @throws McpException
      */
-    private function run(McpPrincipal $principal, string $toolName, array $arguments, bool $approved): mixed
+    private function run(McpPrincipal $principal, string $toolName, array $arguments, bool $approved, ?string $split = null): mixed
     {
         // Route the AI principal into AuditContext so that any hook-fired audit
         // entries (e.g. user.created by a mutation tool) also capture the MCP
@@ -312,6 +324,8 @@ final class ToolsCallHandler implements MethodHandler
                             'tool'   => $toolName,
                             // ADR-0006 §6: which kind of principal called.
                             'principal_kind' => $principal->principalKind,
+                            // WHIT-765: which split it came in on, if any.
+                            'split' => $split,
                             // Named so an authored tool is distinguishable in
                             // the trail: it ran plugin code directly rather
                             // than dispatching through the router, so "which
@@ -343,7 +357,7 @@ final class ToolsCallHandler implements MethodHandler
                 // Pre-strip at the call site (defense-in-depth). AuditLogger
                 // also sanitizes metadata before the INSERT, but future
                 // AuditLoggerInterface implementations may not.
-                'metadata'     => ['tool' => $toolName, 'principal_kind' => $principal->principalKind, 'args' => $this->redactArgs($arguments)],
+                'metadata'     => ['tool' => $toolName, 'principal_kind' => $principal->principalKind, 'args' => $this->redactArgs($arguments)] + ($split !== null ? ['split' => $split] : []),
             ]);
         }
     }

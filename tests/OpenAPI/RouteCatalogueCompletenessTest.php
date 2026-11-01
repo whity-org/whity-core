@@ -32,6 +32,12 @@ final class RouteCatalogueCompletenessTest extends TestCase
      * @var list<string>
      */
     private const KNOWN_UNDOCUMENTED = [
+        // WHIT-765: MCP splits and their metadata, protocol endpoints like /mcp;
+        // the splits a caller can reach are documented with the MCP wiki pages.
+        'GET /.well-known/oauth-protected-resource/mcp/{split}',
+        'POST /mcp/{split}',
+        'GET /mcp/{split}',
+        'GET /api/mcp/splits',
         // WHIT-761: workspace-plugin record routes. Their shape is each
         // workspace's own manifest, so they get a per-workspace OpenAPI view
         // and MCP operations in a follow-up, not entries in core's spec.
