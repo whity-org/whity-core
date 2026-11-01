@@ -225,6 +225,24 @@ final class McpOAuthAccessTokenRealEngineTest extends TestCase
         self::assertLessThanOrEqual(64, strlen($first->jti));
     }
 
+    public function testAnAgentIsNamedByItsClientAndCarriesTheWhityIdSubject(): void
+    {
+        $this->member($this->linkedProfile('sub-1'), 7);
+
+        $named   = $this->verifier()->verify($this->token(['sub' => 'sub-1', 'whity_agent' => true, 'client_id' => 'wb-1', 'client_name' => 'Whity Builder']));
+        $unnamed = $this->verifier()->verify($this->token(['sub' => 'sub-1', 'whity_agent' => true, 'client_id' => 'wb-1']));
+        $person  = $this->verifier()->verify($this->token(['sub' => 'sub-1', 'client_id' => 'claude', 'client_name' => 'Claude']));
+
+        self::assertNotNull($named);
+        self::assertNotNull($unnamed);
+        self::assertNotNull($person);
+        self::assertSame('Whity Builder', $named->agentName);
+        self::assertSame('sub-1', $named->subject);
+        self::assertSame('wb-1', $unnamed->agentName, 'falls back to the client id');
+        self::assertNull($person->agentName, 'not an agent: a person uses their own client');
+        self::assertSame('sub-1', $person->subject);
+    }
+
     public function testTwoAgentClientsAreTwoAgents(): void
     {
         $this->member($this->linkedProfile('sub-1'), 7);

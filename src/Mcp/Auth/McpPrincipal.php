@@ -44,6 +44,11 @@ final readonly class McpPrincipal
         public ?string $agentId = null,
         public ?string $resourceSplit = null,
         public ?string $agentSlug = null,
+        // WHIT-837: for an agent, the name to show (its credential's name, or
+        // the Whity ID client's name); and the Whity ID `sub` the token came
+        // with. Null when not known.
+        public ?string $agentName = null,
+        public ?string $subject = null,
     ) {}
 
     /** The principal kind of an agent credential (ADR-0006 §3, WHIT-753). */

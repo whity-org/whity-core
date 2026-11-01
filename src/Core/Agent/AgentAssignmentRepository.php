@@ -68,12 +68,12 @@ final class AgentAssignmentRepository
      * toolsets and the person's grant, or null when the assignment is revoked,
      * the agent archived, or either is not the token's person and tenant.
      *
-     * @return array{principalId: string, agentId: int, slug: string, entries: list<string>}|null
+     * @return array{principalId: string, agentId: int, slug: string, name: string, entries: list<string>}|null
      */
     public function activeScope(int $assignmentId, int $tenantId, int $profileId): ?array
     {
         $stmt = $this->db->prepare(
-            'SELECT a.id, a.agent_id, a.grant_modes, g.toolsets, g.slug
+            'SELECT a.id, a.agent_id, a.grant_modes, g.toolsets, g.slug, g.name
                FROM agent_assignments a
                JOIN agents g ON g.id = a.agent_id AND g.tenant_id = a.tenant_id
               WHERE a.id = :id AND a.tenant_id = :tenant_id AND a.profile_id = :profile
@@ -89,12 +89,12 @@ final class AgentAssignmentRepository
      * The same, found by the agent's slug: what an OAuth token issued for
      * `/mcp/agents/<slug>` acts as (WHIT-819).
      *
-     * @return array{principalId: string, agentId: int, slug: string, entries: list<string>}|null
+     * @return array{principalId: string, agentId: int, slug: string, name: string, entries: list<string>}|null
      */
     public function activeScopeBySlug(string $slug, int $tenantId, int $profileId): ?array
     {
         $stmt = $this->db->prepare(
-            'SELECT a.id, a.agent_id, a.grant_modes, g.toolsets, g.slug
+            'SELECT a.id, a.agent_id, a.grant_modes, g.toolsets, g.slug, g.name
                FROM agents g
                JOIN agent_assignments a ON a.agent_id = g.id AND a.tenant_id = g.tenant_id
               WHERE g.slug = :slug AND g.tenant_id = :tenant_id AND a.profile_id = :profile
@@ -108,7 +108,7 @@ final class AgentAssignmentRepository
 
     /**
      * @param array<string, mixed> $row
-     * @return array{principalId: string, agentId: int, slug: string, entries: list<string>}
+     * @return array{principalId: string, agentId: int, slug: string, name: string, entries: list<string>}
      */
     private static function activeFrom(array $row): array
     {
@@ -116,6 +116,7 @@ final class AgentAssignmentRepository
             'principalId' => self::principalId((int) $row['id']),
             'agentId'     => (int) $row['agent_id'],
             'slug'        => (string) $row['slug'],
+            'name'        => (string) $row['name'],
             'entries'     => self::scopeEntries(self::stringList($row['toolsets']), self::grantMap($row['grant_modes'])),
         ];
     }

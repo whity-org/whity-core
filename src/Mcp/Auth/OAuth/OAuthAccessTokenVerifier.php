@@ -174,6 +174,9 @@ final class OAuthAccessTokenVerifier
                 agentId: $active['principalId'],
                 resourceSplit: $split,
                 agentSlug: $active['slug'],
+                // WHIT-837: a workspace agent goes by its definition's name.
+                agentName: $active['name'],
+                subject: $subject,
             );
         }
 
@@ -186,6 +189,10 @@ final class OAuthAccessTokenVerifier
                 scope: $scope,
                 resourceSplit: $split,
                 jti: self::AGENT_ID_PREFIX . substr(hash('sha256', self::clientOf($claims) . "\n" . $profileId), 0, 40),
+                // WHIT-837: the name the operator registered (Whity ID sends
+                // `client_name` for agent clients), else the client id.
+                agentName: is_string($claims['client_name'] ?? null) && $claims['client_name'] !== '' ? $claims['client_name'] : self::clientOf($claims),
+                subject: $subject,
             );
         }
 
@@ -194,6 +201,7 @@ final class OAuthAccessTokenVerifier
             userId: $profileId,
             tenantId: $tenantId,
             principalKind: 'oauth',
+            subject: $subject,
             scope: $scope,
             resourceSplit: $split,
             // A stable per-token handle for notification bookkeeping. Prefixed so

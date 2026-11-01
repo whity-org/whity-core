@@ -242,9 +242,12 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsOneEightForInteractiveBlocks(): void
     {
         $this->assertSame(
-            '1.58.0',
+            '1.59.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.58 ADDS BACKGROUND ISSUING: a job of a plugin that declares issuesInBackground() issues '
+            'SDK 1.59 SAYS WHO IS CALLING: McpToolContext gains actorKind, principalKind, and for an AI agent '
+            . 'a stable agentId and a display agentName, plus the Whity ID subject, so a tool can record '
+            . '"agent X for person Y" (WHIT-837). Purely additive. '
+            . 'SDK 1.58 ADDS BACKGROUND ISSUING: a job of a plugin that declares issuesInBackground() issues '
             . 'with no person where the workspace allowed it, from its own slots only, refused otherwise with '
             . 'BACKGROUND_NOT_ALLOWED (WHIT-742). Purely additive. '
             . 'SDK 1.57 ADDS THE ISSUE_DOCUMENT AUTOMATION STEP: an automation may issue a document from one '
