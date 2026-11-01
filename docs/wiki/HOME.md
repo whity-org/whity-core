@@ -5,6 +5,7 @@ Welcome to the Whity Core documentation.
 ## Quick Links
 
 - **[Installation](Installation.md)** — Run it locally with Docker Compose, or deploy the published images
+- **[Whity CLI](Whity-CLI.md)** — Install and update a self-hosted Whity with one command
 - **[Architecture](Architecture.md)** — How a request flows through the worker, the plugin loader and the tenant context
 - **[Plugin Development](Plugin-Development.md)** — Build plugins
 
