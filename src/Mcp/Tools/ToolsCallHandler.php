@@ -139,7 +139,17 @@ final class ToolsCallHandler implements MethodHandler
         // could only scope its queries by reaching into TenantContext, a core
         // internal. A handler written for 1.43-1.45 takes one parameter and
         // PHP ignores the extra argument.
-        $context = new McpToolContext($tenantId, $principal->profileId);
+        // SDK 1.59 (WHIT-837): and who is calling, so a tool can record
+        // "agent X for person Y".
+        $context = new McpToolContext(
+            $tenantId,
+            $principal->profileId,
+            $principal->isAgent() ? McpToolContext::ACTOR_AGENT : McpToolContext::ACTOR_PERSON,
+            $principal->principalKind,
+            $principal->isAgent() ? $principal->agentPrincipalId() : null,
+            $principal->isAgent() ? $principal->agentName : null,
+            $principal->subject,
+        );
 
         try {
             $result = ($tool['handler'])($arguments, $context);
