@@ -113,6 +113,8 @@ final class AgentsApiRealEngineTest extends TestCase
         $errors = json_decode((string) $response->getBody(), true)['errors'];
         self::assertCount(4, $errors);
         self::assertSame(422, $this->api->create($this->request(['presetKey' => 'core.nothing']))->getStatusCode());
+        // Owner decision Q6: a workspace agent can't start a write Allowed either.
+        self::assertSame(422, $this->api->create($this->request(['name' => 'Sender', 'grant' => ['documents:issue' => 'allow']]))->getStatusCode());
     }
 
     public function testEditingChangesOnlyWhatWasSent(): void

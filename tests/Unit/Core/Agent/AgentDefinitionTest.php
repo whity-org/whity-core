@@ -46,6 +46,8 @@ final class AgentDefinitionTest extends TestCase
         yield 'grant mode' => [['name' => 'x', 'grant' => ['documents:issue' => 'always']]];
         yield 'grant key' => [['name' => 'x', 'grant' => ['issue documents' => 'ask']]];
         yield 'grant as list' => [['name' => 'x', 'grant' => ['ask']]];
+        yield 'a write starting Allowed' => [['name' => 'x', 'grant' => ['documents:issue' => 'allow']]];
+        yield 'a plugin write starting Allowed' => [['name' => 'x', 'grant' => ['elmak_invoices:send' => 'allow']]];
     }
 
     /**
@@ -55,6 +57,19 @@ final class AgentDefinitionTest extends TestCase
     public function testInvalidInputIsRefused(array $input): void
     {
         self::assertNotSame([], AgentDefinition::validate($input)[1]);
+    }
+
+    public function testOnlyReadsMayStartAllowed(): void
+    {
+        self::assertTrue(AgentDefinition::isReadPermission('documents:read'));
+        self::assertTrue(AgentDefinition::isReadPermission('billing:view'));
+        self::assertTrue(AgentDefinition::isReadPermission('documents:read:all'));
+        self::assertFalse(AgentDefinition::isReadPermission('documents:issue'));
+        self::assertFalse(AgentDefinition::isReadPermission('readers:manage'));
+        self::assertFalse(AgentDefinition::isReadPermission('review:read_write'));
+
+        // Writes may still start Off or Ask first.
+        self::assertSame([], AgentDefinition::validate(['name' => 'x', 'grant' => ['documents:issue' => 'ask', 'users:write' => 'off', 'forms:read' => 'allow']])[1]);
     }
 
     public function testCoreWildcardsAreAccepted(): void

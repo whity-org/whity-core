@@ -103,6 +103,20 @@ final class AgentPresetRegistryTest extends TestCase
         new AgentPresetRegistry($this->dir);
     }
 
+    public function testAPresetThatStartsAWriteAllowedIsABuildError(): void
+    {
+        $this->dir = sys_get_temp_dir() . '/agent-presets-' . bin2hex(random_bytes(4));
+        mkdir($this->dir);
+        file_put_contents($this->dir . '/clerk.json', (string) json_encode([
+            'key' => 'core.clerk', 'version' => 1, 'name' => 'Clerk', 'name_ar' => 'كاتب', 'role' => 'r', 'role_ar' => 'r',
+            'instructions' => 'i', 'instructions_ar' => 'i', 'grant' => ['documents:issue' => 'allow'],
+        ]));
+
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage("documents:issue can't start Allowed");
+        new AgentPresetRegistry($this->dir);
+    }
+
     public function testAPresetKeyMustMatchItsFile(): void
     {
         $this->dir = sys_get_temp_dir() . '/agent-presets-' . bin2hex(random_bytes(4));

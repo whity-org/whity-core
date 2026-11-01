@@ -122,6 +122,10 @@ final class AgentDefinition
                         $errors[] = "grant for {$permission} must be off, ask or allow";
                         continue;
                     }
+                    if ($mode === 'allow' && !self::isReadPermission($permission)) {
+                        $errors[] = "grant for {$permission} can't start Allowed: only reads can; the person sets a write to Allowed themselves";
+                        continue;
+                    }
                     $clean[$permission] = $mode;
                 }
                 ksort($clean);
@@ -130,6 +134,21 @@ final class AgentDefinition
         }
 
         return [$out, $errors];
+    }
+
+    /**
+     * Whether a permission only reads: its action is `read` or `view`
+     * (`documents:read`, `billing:view`, `documents:read:all`).
+     *
+     * Owner decision 2026-11-01 (Q6): a template, whether a core preset, a
+     * plugin's or Whity Builder's preset, or a workspace agent, may start a
+     * grant at Allowed for reads only. Writes start Ask first or Off, and only
+     * the person sets one to Allowed. Judged by name, deliberately strict: a
+     * read named otherwise simply starts Ask first.
+     */
+    public static function isReadPermission(string $permission): bool
+    {
+        return preg_match('/:(read|view)(:all)?$/', $permission) === 1;
     }
 
     public static function isSlug(string $slug): bool
