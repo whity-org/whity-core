@@ -6,6 +6,7 @@ namespace Whity\Core\Settings;
 
 use DateTimeZone;
 use Whity\Core\Document\Routing\RouteQuorum;
+use Whity\Core\Document\Slots\SlotBindings;
 use Whity\Core\Document\Theme\DocumentThemeRef;
 use Whity\Core\Identity\InvitationService;
 
@@ -51,6 +52,12 @@ final class SettingsRegistry
     // MCP feature flag (WC-149b2fc9). Value is the literal string 'true' or
     // 'false'; an admin sets it per-tenant to enable the MCP endpoint.
     public const MCP_ENABLED = 'mcp.enabled';
+
+    // WHIT-754: the plugin MCP tools this workspace's admin turned on as
+    // always-on (listed directly next to search and call). Comma-separated tool
+    // names; empty by default, so a plugin's request alone lists nothing
+    // (owner decision 5). Edited from the MCP admin page.
+    public const MCP_ALWAYS_ON_PLUGIN_TOOLS = 'mcp.always_on_plugin_tools';
 
     // Instance-governance flags (WC-696206d8). Global/operator-level: control
     // self-service signup for the whole instance. Literal 'true'/'false'.
@@ -358,6 +365,11 @@ final class SettingsRegistry
     // Per-kind defaults over DOCUMENTS_THEME: a JSON object of document kind
     // => theme ref, e.g. {"label":"tenant.labels"}. Empty for none.
     public const DOCUMENTS_THEME_BY_KIND = 'documents.theme_by_kind';
+    // The workspace's template slot bindings (WHIT-742, DOCUMENT-AUTOMATION
+    // 3.2): a JSON object of slot key => template id. Written only through
+    // PUT /api/document-template-slots/{key} (documents:publish), which checks
+    // the template fits the slot; the settings PATCH refuses it. Empty for none.
+    public const DOCUMENTS_SLOT_BINDINGS = 'documents.slot_bindings';
 
     // Render batch limits (ADR 0012): per-tenant-overridable ceilings so an
     // operator can tune them without a code deploy, "no hardcoded values" per
@@ -903,6 +915,7 @@ final class SettingsRegistry
         self::BRANDING_FAVICON => '',
         self::BRANDING_MAIN_COLOR => '',
         self::MCP_ENABLED => 'false',
+        self::MCP_ALWAYS_ON_PLUGIN_TOOLS => '',
         // Secure-by-default: signup CLOSED, approval REQUIRED when opened.
         self::SELF_REGISTRATION_ENABLED => 'false',
         self::REGISTRATION_APPROVAL_REQUIRED => 'true',
@@ -999,6 +1012,7 @@ final class SettingsRegistry
         self::DOCUMENTS_RENDER_ENABLED => 'false',
         self::DOCUMENTS_THEME => 'whity.standard',
         self::DOCUMENTS_THEME_BY_KIND => '',
+        self::DOCUMENTS_SLOT_BINDINGS => '',
         self::DOCUMENTS_RENDER_MAX_ROWS => '500',
         self::DOCUMENTS_RENDER_MAX_PAGES => '2000',
         // 2 MiB.
@@ -1335,6 +1349,7 @@ final class SettingsRegistry
             self::SUPPORT_EMAIL => self::validateSupportEmail($value),
             self::BRANDING_MAIN_COLOR => $value === '' ? null : self::validateHexColor($value, self::BRANDING_MAIN_COLOR),
             self::MCP_ENABLED => self::validateMcpEnabled($value),
+            self::MCP_ALWAYS_ON_PLUGIN_TOOLS => self::validateToolNameList($value, self::MCP_ALWAYS_ON_PLUGIN_TOOLS),
             self::SELF_REGISTRATION_ENABLED => self::validateBoolean($value, self::SELF_REGISTRATION_ENABLED),
             self::REGISTRATION_APPROVAL_REQUIRED => self::validateBoolean($value, self::REGISTRATION_APPROVAL_REQUIRED),
             self::REGISTRATION_PAYMENT_REQUIRED => self::validateBoolean($value, self::REGISTRATION_PAYMENT_REQUIRED),
@@ -1381,6 +1396,7 @@ final class SettingsRegistry
             self::MAIL_BRAND_COLOR => self::validateHexColor($value),
             self::DOCUMENTS_THEME => DocumentThemeRef::isValid($value) ? null : self::DOCUMENTS_THEME . ' must be a theme ref such as whity.standard or tenant.<key>.',
             self::DOCUMENTS_THEME_BY_KIND => $value === '' ? null : DocumentThemeRef::validateByKind($value),
+            self::DOCUMENTS_SLOT_BINDINGS => SlotBindings::validate($value),
             self::MAIL_SMTP_HOST,
             self::MAIL_SMTP_USERNAME,
             self::MAIL_FROM_NAME,
@@ -1771,6 +1787,20 @@ final class SettingsRegistry
             return 'support_email must be a valid email address (or empty).';
         }
 
+        return null;
+    }
+
+    /** Comma-separated MCP tool names, each `[A-Za-z0-9_-]{1,64}`; empty is fine. */
+    private static function validateToolNameList(string $value, string $key): ?string
+    {
+        if (trim($value) === '') {
+            return null;
+        }
+        foreach (explode(',', $value) as $name) {
+            if (preg_match('/^[A-Za-z0-9_-]{1,64}$/', trim($name)) !== 1) {
+                return "{$key} must be a comma-separated list of tool names.";
+            }
+        }
         return null;
     }
 

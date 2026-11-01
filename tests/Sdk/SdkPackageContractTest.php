@@ -242,9 +242,30 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsOneEightForInteractiveBlocks(): void
     {
         $this->assertSame(
-            '1.49.0',
+            '1.55.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.49 ADDS THE DOCUMENT EVENTS (document.issuing, which a listener may veto, '
+            'SDK 1.55 ADDS TEMPLATE SLOTS: plugin.json gains documents.slots, the named places a workspace '
+            . 'plugin needs a document template, each for one of its record types; a workspace binds a '
+            . 'published template to it and issuing names the slot (WHIT-742). Purely additive. '
+            . 'SDK 1.54 ADDS MANIFEST TESTS: plugin.json gains tests, examples a record type rules must keep '
+            . '(create, or update or move a given record, acting with named roles, expecting a refusal or '
+            . 'the fields and state left), run by the host before a version is published (WHIT-764). '
+            . 'Purely additive. '
+            . 'SDK 1.53 ADDS AUTOMATIONS: plugin.json gains automations, a trigger on a record type event, '
+            . 'an optional when expression and steps from a closed catalogue (set fields, create a record, '
+            . 'move, notify); designed steps the host does not run yet are refused by name (WHIT-763). '
+            . 'Purely additive. '
+            . 'SDK 1.52 ADDS THE MCP TOOL SURFACE: authored tool descriptors take toolset, visibility, '
+            . 'agentPolicy and undo, with name and description budgets, and PluginMcpToolsetsInterface '
+            . 'titles and describes each plugin toolset (WHIT-752). Additive. '
+            . 'SDK 1.51 ADDS RECORD RULES: record types may declare rules (require, when, an English and '
+            . 'Arabic message) and fields may declare default, computed and lockedWhen, all as manifest '
+            . 'expressions over the record type own fields (WHIT-762). Purely additive. '
+            . 'SDK 1.50 ADDS MANIFEST RECORDS: plugin.json gains records, record types a workspace plugin '
+            . 'keeps in the shared record store, with typed fields, an optional lifecycle and declared '
+            . 'read/create/edit/delete permissions; an installed ManifestPlugin refuses them (WHIT-761). '
+            . 'Purely additive. '
+            . 'SDK 1.49 ADDS THE DOCUMENT EVENTS (document.issuing, which a listener may veto, '
             . 'document.issued and document.rendered) and deprecates DocumentRenderer::issue(), '
             . 'which now goes through the one issuing service. Purely additive. '
             . 'SDK 1.48 ADDS MANIFEST EXPRESSIONS: Expression\Expression validates and evaluates the '

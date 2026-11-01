@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.49).
+ * SDK identity (v1.55).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -821,13 +821,70 @@ namespace Whity\Sdk;
  * and is removed in SDK 2.0.0.
  *
  * Purely additive. On an older host the constants name events nobody
- * dispatches.)
+ * dispatches.) ->
+ * 1.50 (MANIFEST RECORDS: `plugin.json` gains `records`, record types a
+ * workspace plugin keeps in the host's shared record store — fields of twelve
+ * types (text, numbers, money in minor units, dates, choices, links to people,
+ * units and other record types), an optional lifecycle of states and named
+ * moves, and read/create/edit/delete gated by permissions the manifest
+ * declares. Checked with the rest of the manifest by
+ * {@see Manifest\RecordTypeValidator}; {@see Manifest\PluginManifest::records()}
+ * reads them. An installed {@see Manifest\ManifestPlugin} refuses `records`,
+ * since only workspace plugins use the store (WHIT-761).
+ *
+ * Purely additive.) ->
+ * 1.51 (RECORD RULES: a record type may declare `rules` (`require`, an
+ * expression that must hold over the record as it will be, `when` it applies,
+ * and an English and Arabic `message`), and a field may declare `default`,
+ * `computed` and `lockedWhen`, all in the manifest expression language. Every
+ * expression is validated, and every `field` it names must be one of the
+ * record type's fields (WHIT-762).
+ *
+ * Purely additive.) ->
+ * 1.52 (MCP TOOL SURFACE: {@see PluginMcpToolsInterface} descriptors take
+ * `toolset`, `visibility` (`always-on` | `discoverable`), `agentPolicy`
+ * (`allow` | `propose` | `suggest-only` | `refuse`) and `undo`; names must
+ * fit `[A-Za-z0-9_-]{1,64}` and descriptions 500 characters, a plugin gets one
+ * read-only always-on tool, and unprefixed names are deprecated. The new
+ * optional {@see PluginMcpToolsetsInterface} titles and describes a plugin's
+ * toolsets (WHIT-752, docs/design/MCP-TOOL-SURFACE.md §5.7).
+ *
+ * Additive. A descriptor that already broke a budget (a name with a dot or
+ * over 64 characters, a description over 500 characters) is now refused at
+ * load; no plugin in this repository does.) ->
+ * 1.53 (AUTOMATIONS: `plugin.json` gains `automations`, what a workspace
+ * plugin does by itself when its records change. A trigger names a record
+ * type and an event (created, changed, a field changed, moved, moved into a
+ * state); an optional `when` expression; and steps from a closed catalogue
+ * (set fields, create a record, move, notify a role or a person field).
+ * Checked by {@see Manifest\AutomationValidator}, which refuses the designed
+ * steps this host doesn't run yet by name; {@see Manifest\PluginManifest::automations()}
+ * reads them (WHIT-763).
+ *
+ * Purely additive.) ->
+ * 1.54 (MANIFEST TESTS: `plugin.json` gains `tests`, examples a record type's
+ * rules must keep: create a record, or from a given one update fields or make
+ * a move, acting with the roles `as` names, and expect it refused (on which
+ * fields) or the fields and state it leaves. Values are literals. Checked by
+ * {@see Manifest\ManifestTestValidator}; {@see Manifest\PluginManifest::tests()}
+ * reads them; the host runs them before a version can be published (WHIT-764).
+ *
+ * Purely additive.) ->
+ * 1.55 (TEMPLATE SLOTS: `plugin.json` gains `documents.slots`, the named
+ * places a workspace plugin needs a document template. Each has a label, a
+ * record type of the manifest's own and the document kinds that can fill
+ * it. The host addresses it as `<plugin>.<slot>`, a
+ * workspace binds one of its published templates to it, and issuing names
+ * the slot. Checked by {@see Manifest\DocumentSlotValidator};
+ * {@see Manifest\PluginManifest::documentSlots()} reads them (WHIT-742).
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.49.0';
+    public const VERSION = '1.55.0';
 
     /**
      * Static identity only — never instantiated.

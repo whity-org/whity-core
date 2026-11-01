@@ -246,6 +246,57 @@ final class PluginManifest
         return $out;
     }
 
+    /**
+     * Record types kept in the host's record store (SDK 1.50), as declared.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    public function records(): array
+    {
+        /** @var array<string, array<string, mixed>> */
+        return $this->map('records');
+    }
+
+    /**
+     * Automations (SDK 1.53), as declared: what the plugin does by itself
+     * when its records change. The host runs them in the background.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    public function automations(): array
+    {
+        /** @var array<string, array<string, mixed>> */
+        return $this->map('automations');
+    }
+
+    /**
+     * Examples the record types' rules must keep (SDK 1.54), as declared. The
+     * host runs them before a version can be published.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function tests(): array
+    {
+        /** @var list<array<string, mixed>> */
+        return array_values($this->data['tests'] ?? []);
+    }
+
+    /**
+     * Template slots (SDK 1.55), as declared under `documents.slots`: the
+     * named places this plugin needs a document template, keyed by local name.
+     * The host addresses each as `<plugin name>.<key>`.
+     *
+     * @return array<string, array{label: array{en: string, ar: string}, record: string, kinds?: list<string>}>
+     */
+    public function documentSlots(): array
+    {
+        $documents = $this->map('documents');
+        $slots = $documents['slots'] ?? [];
+
+        /** @var array<string, array{label: array{en: string, ar: string}, record: string, kinds?: list<string>}> */
+        return is_array($slots) ? $slots : [];
+    }
+
     /** @return array<string, mixed> */
     private function plugin(): array
     {

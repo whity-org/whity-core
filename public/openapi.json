@@ -2,7 +2,7 @@
     "openapi": "3.0.0",
     "info": {
         "title": "Whity Core API",
-        "version": "0.2.20",
+        "version": "0.2.21",
         "description": "Request bodies are declared, not implied: where an operation accepts one, it is described here. An operation with no `requestBody` accepts none \u2014 a reviewed contract, not a gap in this document. The exception is an operation marked `x-whity-undocumented: true`: that one carries no authored contract at all, its summary and responses are generated defaults, and it may well take a body. Every CORE operation in the published `public/openapi.json` is authored, so the marker appears there only on plugin routes that declare no schema of their own; a document served live by a running instance may mark core routes too."
     },
     "servers": [
@@ -10923,6 +10923,230 @@
                 ]
             }
         },
+        "/api/v1/document-template-slots": {
+            "get": {
+                "operationId": "get_api_v1_document_template_slots",
+                "summary": "List the template slots of the workspace's plugins, with what is bound to each",
+                "tags": [
+                    "documents"
+                ],
+                "description": "A slot is a named place a plugin needs a template, such as its invoice. Only switched-on plugins' slots are listed. The ETag names the whole binding set; send it as If-Match when binding.",
+                "responses": {
+                    "200": {
+                        "description": "The slots",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DocumentTemplateSlotListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Tenant context is required",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/document-template-slots/{key}": {
+            "put": {
+                "operationId": "put_api_v1_document_template_slots_key",
+                "summary": "Bind a template to a slot, or unbind it",
+                "tags": [
+                    "documents"
+                ],
+                "description": "The template must be published, shared with the workspace, of a kind the slot takes and for the slot's record type; otherwise 422 with a `code` saying which. If-Match with the ETag from the list is required: 428 without it, 409 `stale` when the bindings changed.",
+                "parameters": [
+                    {
+                        "name": "key",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DocumentTemplateSlotBindRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The slot with its binding; the ETag names the new binding set",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DocumentTemplateSlotResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No such slot (or its plugin is off), or no such template visible to the caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The bindings changed since the ETag was read (`stale`)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "The template doesn't fit the slot (`kind_mismatch`, `record_type_mismatch`, `personal_template`, `unpublished`), or the system tenant",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "428": {
+                        "description": "If-Match is required",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/document-themes": {
             "get": {
                 "operationId": "get_api_v1_document_themes",
@@ -12416,7 +12640,7 @@
                         }
                     },
                     "409": {
-                        "description": "The template has no published version yet, `origin_key` names a document from another template (`origin_key_conflict`), or a plugin refused it (`vetoed`)",
+                        "description": "The template has no published version yet, `origin_key` names a document from another template (`origin_key_conflict`), a plugin refused it (`vetoed`), or the slot can't be issued from (`slot_unavailable`, `slot_unbound`, `slot_misfit`)",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -20328,6 +20552,317 @@
                 }
             }
         },
+        "/api/v1/me/agent-proposals": {
+            "get": {
+                "operationId": "get_api_v1_me_agent_proposals",
+                "summary": "What agents acting for you are waiting for you to approve, and what you decided",
+                "tags": [
+                    "me"
+                ],
+                "parameters": [
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "required": false,
+                        "description": "waiting, approved, declined, expired or undone; all when omitted",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Your proposals, newest first",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AgentProposalListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/me/agent-proposals/{id}/approve": {
+            "post": {
+                "operationId": "post_api_v1_me_agent_proposals_id_approve",
+                "summary": "Approve an agent's proposal and run it for you",
+                "tags": [
+                    "me"
+                ],
+                "description": "Runs the operation as your delegate, after checking again that you and the agent may. Edit the arguments by sending them. Runs once, however many times it is approved.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "description": "ID of the proposal.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "arguments": {
+                                        "type": "object",
+                                        "additionalProperties": true,
+                                        "description": "Edited arguments to run with instead of the agent's (optional)."
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The proposal after the decision",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AgentProposalResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No such proposal made on your behalf",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The proposal is no longer waiting (decided or expired)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/me/agent-proposals/{id}/decline": {
+            "post": {
+                "operationId": "post_api_v1_me_agent_proposals_id_decline",
+                "summary": "Decline an agent's proposal",
+                "tags": [
+                    "me"
+                ],
+                "description": "Nothing runs. The agent can ask again.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "description": "ID of the proposal.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The proposal after the decision",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AgentProposalResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No such proposal made on your behalf",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The proposal is no longer waiting (decided or expired)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/me/audit-logs": {
             "get": {
                 "operationId": "get_api_v1_me_audit_logs",
@@ -24279,6 +24814,78 @@
                         "bearerAuth": []
                     }
                 ]
+            }
+        },
+        "/api/v1/oauth/workspaces": {
+            "get": {
+                "operationId": "get_api_v1_oauth_workspaces",
+                "summary": "List the workspaces of a person, for the consent screen of the OAuth authorization server",
+                "tags": [
+                    "auth"
+                ],
+                "description": "Called by the authorization server configured as MCP_OAUTH_ISSUER, with `Authorization: Bearer <assertion>`: a JWT signed with a key from the JWKS of the issuer (asymmetric only), header `typ` `whity-workspaces+jwt`, `iss` the issuer, `aud` exactly APP_URL + /api/v1/oauth/workspaces, `exp` at most 120 seconds after `iat`, and `sub` the person at the issuer. The person is found through their global single sign-on link. Only active memberships are listed, never the system workspace, in workspace id order. An unlinked subject is `linked: false` with no workspaces. 404 while OAuth is off.",
+                "responses": {
+                    "200": {
+                        "description": "Whether the subject is linked, and its active workspaces",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OAuthWorkspacesResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing, invalid or expired assertion",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "OAuth is not configured on this instance",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
             }
         },
         "/api/v1/ou-types": {
@@ -40446,6 +41053,101 @@
                     }
                 }
             },
+            "AgentProposal": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "waiting",
+                            "approved",
+                            "declined",
+                            "expired",
+                            "undone"
+                        ]
+                    },
+                    "tool": {
+                        "type": "string"
+                    },
+                    "summary": {
+                        "type": "string"
+                    },
+                    "arguments": {
+                        "type": "object",
+                        "additionalProperties": true
+                    },
+                    "diff": {
+                        "nullable": true,
+                        "description": "What would change, when the operation can preview it"
+                    },
+                    "permissions": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "undoWindowSeconds": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "result": {
+                        "nullable": true,
+                        "description": "What the operation answered when it ran"
+                    },
+                    "decidedAt": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "expiresAt": {
+                        "type": "string"
+                    },
+                    "createdAt": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "status",
+                    "tool",
+                    "summary",
+                    "arguments",
+                    "diff",
+                    "permissions",
+                    "undoWindowSeconds",
+                    "result",
+                    "decidedAt",
+                    "expiresAt",
+                    "createdAt"
+                ]
+            },
+            "AgentProposalListResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/AgentProposal"
+                        }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "AgentProposalResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/AgentProposal"
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
             "ApprovalStatusResponse": {
                 "type": "object",
                 "properties": {
@@ -42264,7 +42966,11 @@
                 "properties": {
                     "document_source_id": {
                         "type": "integer",
-                        "description": "The template to issue the document from (see GET /api/document-sources?kind=template): its published version is issued. A letter or report (a copy made to edit before issuing) is issued as it is now, frozen as a version."
+                        "description": "The template to issue the document from (see GET /api/document-sources?kind=template): its published version is issued. A letter or report (a copy made to edit before issuing) is issued as it is now, frozen as a version. Send this or `slot`."
+                    },
+                    "slot": {
+                        "type": "string",
+                        "description": "A template slot key such as `bakery.order_confirmation` (GET /api/document-template-slots): the template the workspace bound to it is issued, so a plugin needn't know which one. Send this or `document_source_id`. 409 `slot_unavailable` when its plugin is off, `slot_unbound` when nothing is bound, `slot_misfit` when the bound template no longer fits."
                     },
                     "record": {
                         "type": "string",
@@ -42292,10 +42998,7 @@
                         "nullable": true,
                         "description": "Omit to render when this server can; true to require a rendered file (503 if rendering is unavailable); false to record without rendering."
                     }
-                },
-                "required": [
-                    "document_source_id"
-                ]
+                }
             },
             "DocumentCreateResponse": {
                 "type": "object",
@@ -43846,6 +44549,136 @@
                 "required": [
                     "key",
                     "description"
+                ]
+            },
+            "DocumentTemplateSlot": {
+                "type": "object",
+                "properties": {
+                    "key": {
+                        "type": "string",
+                        "description": "`<plugin>.<slot>`, as a plugin names it when it issues"
+                    },
+                    "plugin": {
+                        "type": "string",
+                        "description": "The plugin that declares the slot"
+                    },
+                    "label": {
+                        "type": "string"
+                    },
+                    "labelAr": {
+                        "type": "string"
+                    },
+                    "recordType": {
+                        "type": "string",
+                        "description": "The field record type the slot's documents are for; a bound template must have the same one"
+                    },
+                    "kinds": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "enum": [
+                                "template",
+                                "label"
+                            ]
+                        },
+                        "description": "Which document kinds can fill it"
+                    },
+                    "starter": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "The plugin's starter for the slot, once starters are seeded (WHIT-687)"
+                    },
+                    "binding": {
+                        "type": "object",
+                        "properties": {
+                            "template_id": {
+                                "type": "integer"
+                            },
+                            "title": {
+                                "type": "string",
+                                "nullable": true,
+                                "description": "Null when the template is gone or hidden from the caller"
+                            },
+                            "published_version": {
+                                "type": "integer",
+                                "nullable": true
+                            },
+                            "problem": {
+                                "type": "object",
+                                "properties": {
+                                    "code": {
+                                        "type": "string",
+                                        "description": "`kind_mismatch`, `record_type_mismatch`, `personal_template`, `unpublished` or `template_missing`"
+                                    },
+                                    "message": {
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "code",
+                                    "message"
+                                ],
+                                "nullable": true,
+                                "description": "Why the bound template can't be issued from now; null when it fits"
+                            }
+                        },
+                        "required": [
+                            "template_id",
+                            "title",
+                            "published_version",
+                            "problem"
+                        ],
+                        "nullable": true,
+                        "description": "The template bound to the slot, or null"
+                    }
+                },
+                "required": [
+                    "key",
+                    "plugin",
+                    "label",
+                    "labelAr",
+                    "recordType",
+                    "kinds",
+                    "starter",
+                    "binding"
+                ]
+            },
+            "DocumentTemplateSlotBindRequest": {
+                "type": "object",
+                "properties": {
+                    "template_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "The published, workspace-shared template to bind, of a kind the slot takes and for its record type; null unbinds the slot"
+                    }
+                },
+                "required": [
+                    "template_id"
+                ]
+            },
+            "DocumentTemplateSlotListResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/DocumentTemplateSlot"
+                        }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "DocumentTemplateSlotResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/DocumentTemplateSlot"
+                    }
+                },
+                "required": [
+                    "data"
                 ]
             },
             "DocumentTheme": {
@@ -48759,6 +49592,44 @@
                 },
                 "required": [
                     "preferences"
+                ]
+            },
+            "OAuthWorkspace": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "slug": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "id",
+                    "name",
+                    "slug"
+                ]
+            },
+            "OAuthWorkspacesResponse": {
+                "type": "object",
+                "properties": {
+                    "linked": {
+                        "type": "boolean"
+                    },
+                    "workspaces": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/OAuthWorkspace"
+                        }
+                    }
+                },
+                "required": [
+                    "linked",
+                    "workspaces"
                 ]
             },
             "OpenApiDocumentResponse": {

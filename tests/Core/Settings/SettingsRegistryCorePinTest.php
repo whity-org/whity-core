@@ -52,6 +52,7 @@ final class SettingsRegistryCorePinTest extends TestCase
             'branding_favicon',
             'branding_main_color',
             'mcp.enabled',
+            'mcp.always_on_plugin_tools',
             'auth.self_registration_enabled',
             'auth.registration_approval_required',
             'auth.registration_payment_required',
@@ -126,6 +127,7 @@ final class SettingsRegistryCorePinTest extends TestCase
             'documents.render_enabled',
             'documents.theme',
             'documents.theme_by_kind',
+            'documents.slot_bindings',
             'documents.render_max_rows',
             'documents.render_max_pages',
             'documents.render_max_template_bytes',
@@ -221,6 +223,7 @@ final class SettingsRegistryCorePinTest extends TestCase
             // Empty: Whity Blue until a workspace sets its own main colour (2.8).
             'branding_main_color' => '',
             'mcp.enabled' => 'false',
+            'mcp.always_on_plugin_tools' => '',
             'auth.self_registration_enabled' => 'false',
             'auth.registration_approval_required' => 'true',
             'auth.registration_payment_required' => 'false',
@@ -292,6 +295,7 @@ final class SettingsRegistryCorePinTest extends TestCase
             // Whity's standard theme until a workspace chooses its own (editor M4d).
             'documents.theme' => 'whity.standard',
             'documents.theme_by_kind' => '',
+            'documents.slot_bindings' => '',
             'documents.render_max_rows' => '500',
             'documents.render_max_pages' => '2000',
             'documents.render_max_template_bytes' => '2000000',
@@ -391,6 +395,9 @@ final class SettingsRegistryCorePinTest extends TestCase
             ['branding_main_color', 'b74c05', false],
             ['mcp.enabled', 'true', true],
             ['mcp.enabled', '1', false],
+            ['mcp.always_on_plugin_tools', '', true],
+            ['mcp.always_on_plugin_tools', 'period_close_status,acme_summary', true],
+            ['mcp.always_on_plugin_tools', 'has.dot', false],
             // #1036. The boolean arm and the enum arm, each with a value the
             // registry must refuse — a key with no validate() arm falls through
             // to "Unknown setting key" and 422s on a key the registry knows,
@@ -424,6 +431,10 @@ final class SettingsRegistryCorePinTest extends TestCase
             ['documents.theme_by_kind', '{"label":"tenant.labels"}', true],
             ['documents.theme_by_kind', '{"poster":"tenant.labels"}', false],
             ['documents.theme_by_kind', '["tenant.labels"]', false],
+            ['documents.slot_bindings', '', true],
+            ['documents.slot_bindings', '{"CakeOrders.order_confirmation":42}', true],
+            ['documents.slot_bindings', '{"CakeOrders.order_confirmation":"42"}', false],
+            ['documents.slot_bindings', '{"order_confirmation":42}', false],
             ['billing.enforcement_default', 'block_all', true],
             ['billing.enforcement_default', 'block', false],
             ['billing.grace_days', '0', true],

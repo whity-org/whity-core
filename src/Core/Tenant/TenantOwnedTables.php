@@ -185,6 +185,11 @@ final class TenantOwnedTables
         'plugin_manifest_versions' => '164_create_tenant_plugin_manifests.php',
         'tenant_plugins' => '164_create_tenant_plugin_manifests.php',
         'tenant_plugin_permissions' => '164_create_tenant_plugin_manifests.php',
+        'plugin_records' => '168_create_plugin_records.php',
+        // WHIT-784: an agent's Ask-first calls, waiting for the person who
+        // granted it (migration 176).
+        'agent_proposals' => '176_create_agent_proposals.php',
+        'plugin_automation_runs' => '175_create_plugin_automation_runs.php',
 
         // #947 item 1 — issued documents and their stored render output
         // (migration 108). `documents` is the record; `document_artifacts` is

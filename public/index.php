@@ -1999,6 +1999,82 @@ $frontendFeaturesHandler = new FrontendFeaturesApiHandler(
 );
 $router->register('GET', '/api/frontend/features', [$frontendFeaturesHandler, 'list'], null);
 
+// Record routes of workspace plugins (Whity Builder, WHIT-761): one fixed
+// family, registered once. The plugin, its record type and the permission that
+// gates each action are read from the workspace's live manifest per request, so
+// the routes carry no route-level permission; the handler checks the declared
+// one through RoleChecker and answers 404 for anything not this workspace's.
+//
+// Every write goes through the RecordWriter, which also starts the plugin's
+// automations (WHIT-763): it records a queued run and enqueues the job in the
+// write's transaction; the steps run in the queue worker, never here.
+$tenantRecordRepository = new \Whity\Core\Plugin\Tenant\TenantRecordRepository($db->getPdo());
+$automationRunRepository = new \Whity\Core\Plugin\Tenant\Automation\AutomationRunRepository($db->getPdo());
+$tenantRecordsHandler = new \Whity\Api\TenantRecordsApiHandler(
+    $tenantManifestHost,
+    $tenantRecordRepository,
+    $roleChecker,
+    new \Whity\Core\Plugin\Tenant\RecordWriter(
+        $db->getPdo(),
+        $tenantRecordRepository,
+        $roleChecker,
+        $auditLogger,
+        new \Whity\Core\Plugin\Tenant\Automation\AutomationTriggers($automationRunRepository, $tenantPluginRepository, $queueService)
+    )
+);
+$router->register('GET', '/api/x/{plugin:[a-z][a-z0-9_]*}/{type:[a-z][a-z0-9_]*}', [$tenantRecordsHandler, 'list'], null);
+$router->register('POST', '/api/x/{plugin:[a-z][a-z0-9_]*}/{type:[a-z][a-z0-9_]*}', [$tenantRecordsHandler, 'create'], null);
+$router->register('GET', '/api/x/{plugin:[a-z][a-z0-9_]*}/{type:[a-z][a-z0-9_]*}/{id:\d+}', [$tenantRecordsHandler, 'get'], null);
+$router->register('PATCH', '/api/x/{plugin:[a-z][a-z0-9_]*}/{type:[a-z][a-z0-9_]*}/{id:\d+}', [$tenantRecordsHandler, 'update'], null);
+$router->register('DELETE', '/api/x/{plugin:[a-z][a-z0-9_]*}/{type:[a-z][a-z0-9_]*}/{id:\d+}', [$tenantRecordsHandler, 'delete'], null);
+$router->register('POST', '/api/x/{plugin:[a-z][a-z0-9_]*}/{type:[a-z][a-z0-9_]*}/{id:\d+}/moves/{move:[a-z][a-z0-9_]*}', [$tenantRecordsHandler, 'move'], null);
+
+// A workspace plugin's automation run traces and its automations switch
+// (WHIT-763). Reading traces is plugins:read; the switch checks plugins:enable
+// or plugins:disable in the handler, by direction.
+$tenantAutomationsHandler = new \Whity\Api\TenantAutomationsApiHandler(
+    $tenantManifestHost,
+    $tenantPluginRepository,
+    $automationRunRepository,
+    $roleChecker,
+    $auditLogger
+);
+$router->register('GET', '/api/workspace-plugins/{plugin:[a-z][a-z0-9_]*}/automation-runs', [$tenantAutomationsHandler, 'runs'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_READ);
+$router->register('GET', '/api/workspace-plugins/{plugin:[a-z][a-z0-9_]*}/automation-runs/{id:\d+}', [$tenantAutomationsHandler, 'run'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_READ);
+$router->register('PUT', '/api/workspace-plugins/{plugin:[a-z][a-z0-9_]*}/automations', [$tenantAutomationsHandler, 'switch'], null);
+
+// A workspace's own plugins and their versions (WHIT-764): validate a draft,
+// see what publishing it would change, publish, list history, and activate a
+// version (rollback). Drafting is plugins:build; putting a version live is
+// plugins:publish. Install-wide plugin names are reserved.
+$tenantPluginVersionsHandler = new \Whity\Api\TenantPluginVersionsApiHandler(
+    $tenantPluginRepository,
+    new \Whity\Core\Plugin\Tenant\TenantManifestPublisher(
+        $db->getPdo(),
+        $tenantPluginRepository,
+        new PluginRoleSeeder($db->getPdo(), $logger),
+        array_values(array_map(static fn ($plugin): string => $plugin->getName(), $pluginLoader->getPlugins())),
+        $auditLogger
+    ),
+    new \Whity\Core\Plugin\Tenant\ManifestImpact($tenantRecordRepository),
+    // The publish check: a version's own tests, through a writer with no
+    // audit and no automations, in a transaction that is always rolled back.
+    new \Whity\Core\Plugin\Tenant\ManifestTestRunner(
+        $db->getPdo(),
+        $tenantRecordRepository,
+        new \Whity\Core\Plugin\Tenant\RecordWriter($db->getPdo(), $tenantRecordRepository, $roleChecker)
+    ),
+    $auditLogger
+);
+$router->register('GET', '/api/workspace-plugins', [$tenantPluginVersionsHandler, 'list'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_READ);
+$router->register('POST', '/api/workspace-plugins', [$tenantPluginVersionsHandler, 'publish'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_PUBLISH);
+$router->register('POST', '/api/workspace-plugins/validate', [$tenantPluginVersionsHandler, 'validate'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_BUILD);
+$router->register('POST', '/api/workspace-plugins/impact', [$tenantPluginVersionsHandler, 'impact'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_BUILD);
+$router->register('POST', '/api/workspace-plugins/test', [$tenantPluginVersionsHandler, 'test'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_BUILD);
+$router->register('GET', '/api/workspace-plugins/{plugin:[a-z][a-z0-9_]*}/versions', [$tenantPluginVersionsHandler, 'versions'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_READ);
+$router->register('GET', '/api/workspace-plugins/{plugin:[a-z][a-z0-9_]*}/versions/{id:\d+}', [$tenantPluginVersionsHandler, 'version'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_READ);
+$router->register('POST', '/api/workspace-plugins/{plugin:[a-z][a-z0-9_]*}/versions/{id:\d+}/activate', [$tenantPluginVersionsHandler, 'activate'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_PUBLISH);
+
 // Health monitoring endpoint (WC-4). Registered UNVERSIONED so load-balancer
 // probes that target GET /api/health never break regardless of the API version.
 // No required role/permission (fail-open); listed as a PUBLIC route in
@@ -2901,6 +2977,19 @@ $router->register('DELETE', '/api/document-themes/{ref:[a-z0-9_]{1,40}\.[a-z0-9_
 $router->register('GET',    '/api/document-themes/{ref:[a-z0-9_]{1,40}\.[a-z0-9_]{1,40}}/usage',   [$documentThemesHandler, 'usage'],   null, null, CorePermissions::DOCUMENTS_READ);
 $router->register('POST',   '/api/document-themes/{ref:[a-z0-9_]{1,40}\.[a-z0-9_]{1,40}}/archive', [$documentThemesHandler, 'archive'], null, null, CorePermissions::DOCUMENTS_THEMES);
 $router->register('POST',   '/api/document-themes/{ref:[a-z0-9_]{1,40}\.[a-z0-9_]{1,40}}/restore', [$documentThemesHandler, 'restore'], null, null, CorePermissions::DOCUMENTS_THEMES);
+// Template slots (WHIT-742): the named places plugins need a template, from
+// each workspace's switched-on plugins (`documents.slots` in plugin.json).
+// A workspace binds its published templates to them, and a plugin issues by
+// slot (POST /api/documents with `slot`).
+$templateSlotRegistry = new \Whity\Core\Document\Slots\TemplateSlotRegistry(
+    static fn (int $tenantId): array => $tenantManifestHost->manifestsFor($tenantId)
+);
+\Whity\register_service(\Whity\Core\Document\Slots\TemplateSlotRegistry::class, $templateSlotRegistry);
+// Template slots and the workspace's bindings (WHIT-742, DOCUMENT-AUTOMATION
+// 3.2): listed with documents:read, bound with documents:publish.
+$documentTemplateSlotsHandler = new \Whity\Api\DocumentTemplateSlotsApiHandler($templateSlotRegistry, $settingsService, $documentSourcesHandler);
+$router->register('GET',    '/api/document-template-slots',             [$documentTemplateSlotsHandler, 'list'], null, null, CorePermissions::DOCUMENTS_READ);
+$router->register('PUT',    '/api/document-template-slots/{key:[A-Za-z][A-Za-z0-9_]{0,63}\.[a-z][a-z0-9_]{0,39}}', [$documentTemplateSlotsHandler, 'bind'], null, null, CorePermissions::DOCUMENTS_PUBLISH);
 // Editor M4c (A31): who can see it, and "Use a copy". Sharing is checked again
 // in the handler (documents:publish), as on create.
 $router->register('PATCH',  '/api/document-sources/{id:\d+}',       [$documentSourcesHandler, 'updateAudience'], null, null, CorePermissions::DOCUMENTS_WRITE);
@@ -3055,6 +3144,18 @@ $documentFieldLabels = new \Whity\Core\Document\Fields\FieldLabels($serverLabels
 $documentFieldRegistry->add(new \Whity\Core\Document\Fields\IssuedDocumentFieldProvider($documentRepository, $documentVisibilityPolicy, $documentFieldLabels));
 $documentFieldRegistry->add(new \Whity\Core\Document\Fields\CompanyFieldProvider($settingsService, $documentFieldLabels));
 $documentFieldRegistry->add(new \Whity\Core\Document\Fields\TodayFieldProvider($documentFieldLabels));
+// WHIT-742: each workspace plugin's record types, in the workspaces where
+// the plugin is published and on (`CakeOrders.order`), so a template can be
+// written for them and a slot can be issued from them.
+$documentFieldRegistry->addTenantSource(
+    static fn (int $tenantId): array => \Whity\Core\Document\Fields\TenantRecordFieldProvider::forManifests(
+        $tenantManifestHost->manifestsFor($tenantId),
+        $tenantRecordRepository,
+        $documentFieldLabels,
+        static fn (): string => $languageRegistry->getCurrentLanguageCode(),
+        static fn (int $tenant, int $profileId): ?string => $tenantRecordRepository->memberName($tenant, $profileId),
+    )
+);
 \Whity\register_service(\Whity\Core\Document\Fields\DocumentFieldRegistry::class, $documentFieldRegistry);
 // 13a-nonies-quinquies. QR VERIFICATION ON DOCUMENTS (#1036). A code printed on
 // a document that anybody can scan to confirm it is genuine, and that a
@@ -3299,7 +3400,9 @@ $documentsHandler = new \Whity\Api\DocumentsApiHandler(
     // #1036: minting the verification code at CREATE time, before the render, so
     // the first artifact can carry it — which is only possible because create()
     // commits the record first. Also the `qr` record-page region's predicate.
-    $documentQrService
+    $documentQrService,
+    // WHIT-742: `slot` in the body names the template through the workspace's bindings.
+    $templateSlotRegistry
 );
 $documentQrHandler = new \Whity\Api\DocumentQrApiHandler(
     $documentRepository,
@@ -4508,8 +4611,6 @@ $toolDeriver = new ToolDeriver(
 // requirements. Uses the same ToolDeriver instance as the MCP transport so
 // the admin sees exactly what an MCP client would receive from tools/list,
 // without per-caller RBAC filtering (the page is for audit/planning).
-$mcpToolsAdminHandler = new McpToolsAdminHandler($toolDeriver, $roleChecker);
-$router->register('GET', '/api/admin/mcp/tools', [$mcpToolsAdminHandler, 'list'], null, null, CorePermissions::MCP_TOKENS_MANAGE);
 
 // WC-c10b292e: MCP Streamable-HTTP endpoint. Registered UNVERSIONED so the
 // path is exactly /mcp (not /api/v1/mcp). No requiredRole/requiredPermission —
@@ -4556,9 +4657,27 @@ $mcpListChangedNotifier = new ListChangedNotifier(
 // ONE registry — a second instance would answer tools/list from a different set
 // than tools/call dispatches from.
 $authoredMcpTools = new AuthoredToolRegistry();
+// WHIT-754: the plugin MCP tools a workspace turned on as always-on.
+$mcpEnabledPluginAlwaysOn = static function (int $tenantId) use ($settingsService): array {
+    $raw = (string) ($settingsService->effective($tenantId)[\Whity\Core\Settings\SettingsRegistry::MCP_ALWAYS_ON_PLUGIN_TOOLS] ?? '');
+    return array_values(array_filter(array_map('trim', explode(',', $raw)), static fn (string $n): bool => $n !== ''));
+};
+// WC-0208ce4d: admin read-only view of the MCP tools and their access
+// requirements, plugin-authored tools included (WHIT-754).
+$mcpToolsAdminHandler = new McpToolsAdminHandler($toolDeriver, $roleChecker, $authoredMcpTools, $mcpEnabledPluginAlwaysOn);
+$router->register('GET', '/api/admin/mcp/tools', [$mcpToolsAdminHandler, 'list'], null, null, CorePermissions::MCP_TOKENS_MANAGE);
 $mcpToolsListHandler = new ToolsListHandler($toolDeriver, $roleChecker, $tokenValidator, $authoredMcpTools);
 $mcpServerEnabled = (bool) filter_var($_ENV['MCP_ENABLED'] ?? 'false', FILTER_VALIDATE_BOOLEAN);
-$mcpToolsCallHandler = new ToolsCallHandler($toolDeriver, $router, $roleChecker, $tokenValidator, auditLogger: $auditLogger, authoredTools: $authoredMcpTools);
+// WHIT-784: an agent's Ask-first call is stored for its person to approve.
+$agentProposals = new \Whity\Core\Agent\AgentProposalRepository($db->getPdo());
+$mcpToolsCallHandler = new ToolsCallHandler($toolDeriver, $router, $roleChecker, $tokenValidator, auditLogger: $auditLogger, authoredTools: $authoredMcpTools, proposals: $agentProposals);
+// The approvals inbox: the person an agent acts for approves, edits or
+// declines what it asked to do. Session-gated and never on the MCP surface:
+// an agent must not be able to approve its own proposal.
+$agentProposalsHandler = new \Whity\Api\AgentProposalsApiHandler($agentProposals, $mcpToolsCallHandler, $auditLogger);
+$router->register('GET',  '/api/me/agent-proposals',                    [$agentProposalsHandler, 'list'],    null);
+$router->register('POST', '/api/me/agent-proposals/{id:\d+}/approve',  [$agentProposalsHandler, 'approve'], null);
+$router->register('POST', '/api/me/agent-proposals/{id:\d+}/decline',  [$agentProposalsHandler, 'decline'], null);
 $mcpHandlers = [
     'initialize'              => new InitializeHandler(listChanged: true),
     // WHIT-708: required of every 2026-07-28 server.
@@ -4585,15 +4704,27 @@ $mcpRecordTokenUse = static function (\Whity\Mcp\Auth\McpPrincipal $principal) u
 $mcpProtectedResource = ProtectedResource::fromEnv(McpConnectHandler::endpointFor((string) ($_ENV['APP_URL'] ?? getenv('APP_URL') ?: '')));
 // ...and accept the access tokens it issues, mapped to a profile through the
 // SSO links (external_identities) and checked against a live membership.
+$mcpOAuthJwks = new \Whity\Auth\Oidc\JwksProvider(
+    static fn(string $uri): array => (new \Whity\Core\Http\HttpFetcher())->getJson($uri) ?? [],
+    minRefreshSeconds: 60,
+);
 $mcpOAuthVerifier = \Whity\Mcp\Auth\OAuth\OAuthAccessTokenVerifier::fromEnv(
     $mcpProtectedResource,
     new \Whity\Core\Http\HttpFetcher(),
-    new \Whity\Auth\Oidc\JwksProvider(
-        static fn(string $uri): array => (new \Whity\Core\Http\HttpFetcher())->getJson($uri) ?? [],
-        minRefreshSeconds: 60,
-    ),
+    $mcpOAuthJwks,
     $db->getPdo(),
 );
+// WHIT-802: the authorization server asks which workspaces a person belongs to,
+// for its consent screen, with an assertion signed by the same key. No RBAC:
+// the issuer's key is the authorisation. 404 while OAuth is off.
+$mcpOAuthWorkspacesHandler = \Whity\Mcp\Auth\OAuth\OAuthWorkspacesHandler::fromEnv(
+    $mcpProtectedResource,
+    (string) ($_ENV['APP_URL'] ?? getenv('APP_URL') ?: ''),
+    new \Whity\Core\Http\HttpFetcher(),
+    $mcpOAuthJwks,
+    $db->getPdo(),
+);
+$router->register('GET', '/api/oauth/workspaces', [$mcpOAuthWorkspacesHandler, 'list']);
 if ($mcpOAuthVerifier !== null) {
     $tokenValidator->acceptOAuthAccessTokens($mcpOAuthVerifier);
 }
@@ -4615,6 +4746,9 @@ $mcpDiscovery = new DiscoveryTools(
         },
         $mcpRateLimiter->limits(),
     ),
+    // WHIT-754: a plugin's always-on tool is listed only once this workspace's
+    // admin turned it on (the mcp.always_on_plugin_tools setting).
+    $mcpEnabledPluginAlwaysOn,
 );
 $mcpTransportHandler = new McpTransportHandler(
     new Dispatcher($mcpHandlers, $tokenValidator, $mcpRateLimiter, $tenantMcpEnabled, $mcpListChangedNotifier, $mcpRecordTokenUse),
@@ -4753,7 +4887,7 @@ if ($isWorker) {
         // are gated behind development/DEBUG. Decision is computed once per
         // iteration and captured by the request closure below.
         $logLifecycle = WorkerRuntime::shouldLogLifecycle($_ENV);
-        $keepRunning = \frankenphp_handle_request(static function () use ($kernel, $hookManager, $pluginLoader, $db, $logLifecycle, $securityHeaders, $errorTracker, $tenantManifestHost) {
+        $keepRunning = \frankenphp_handle_request(static function () use ($kernel, $hookManager, $pluginLoader, $db, $logLifecycle, $securityHeaders, $errorTracker, $tenantManifestHost, $documentFieldRegistry) {
             try {
                 // Dispatch request start hook
                 if ($logLifecycle) {
@@ -4852,6 +4986,8 @@ if ($isWorker) {
                 RoleChecker::clearCache();
                 // WHIT-760: the workspace-plugin reads are per request too.
                 $tenantManifestHost->resetRequest();
+                // WHIT-742: and the workspace record types the field registry read from them.
+                $documentFieldRegistry->resetRequest();
                 // DB session hygiene (WC-21/PR #84): after the response is sent,
                 // roll back any dangling transaction and DISCARD ALL session-local
                 // state on the shared worker connection so nothing request-specific
@@ -4969,6 +5105,7 @@ if ($isWorker) {
         // cache must not outlive the request that filled it.
         RoleChecker::clearCache();
         $tenantManifestHost->resetRequest();
+        $documentFieldRegistry->resetRequest();
     }
 }
 

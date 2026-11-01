@@ -128,11 +128,13 @@ final class CoreApiSchemas
             self::featureRoutes(),
             self::documentSourceRoutes(),
             self::documentThemeRoutes(),
+            self::documentTemplateSlotRoutes(),
             self::documentRecordRoutes(),
             self::documentRoutingRoutes(),
             self::documentQrRoutes(),
             self::meInboxRoutes(),
             self::searchRoutes(),
+            self::agentProposalRoutes(),
             self::userGroupRoutes(),
             self::documentRouteTemplateRoutes(),
             self::documentCollectionRoutes(),
@@ -552,6 +554,37 @@ final class CoreApiSchemas
             ],
         ];
 
+        // GET /api/oauth/workspaces  — OAuthWorkspacesHandler::list() (WHIT-802)
+        // Machine to machine: the OAuth authorization server (MCP_OAUTH_ISSUER)
+        // asks which workspaces a person belongs to, for its consent screen.
+        // Authorised by an assertion signed with the issuer's published key, not
+        // by a session or RBAC, so it carries no bearerAuth marker. Kept off the
+        // MCP surface explicitly: an agent has no use for it.
+        $oauthWorkspacesRoute = [
+            'method' => 'GET',
+            'path' => '/api/oauth/workspaces',
+            'requiredRole' => null,
+            'requiredPermission' => null,
+            'schema' => [
+                'summary' => 'List the workspaces of a person, for the consent screen of the OAuth authorization server',
+                'description' => 'Called by the authorization server configured as MCP_OAUTH_ISSUER, with '
+                    . '`Authorization: Bearer <assertion>`: a JWT signed with a key from the JWKS of the issuer '
+                    . '(asymmetric only), header `typ` `whity-workspaces+jwt`, `iss` the issuer, `aud` exactly '
+                    . 'APP_URL + /api/v1/oauth/workspaces, `exp` at most 120 seconds after `iat`, and `sub` the '
+                    . 'person at the issuer. The person is found through their global single sign-on link. Only '
+                    . 'active memberships are listed, never the system workspace, in workspace id order. An '
+                    . 'unlinked subject is `linked: false` with no workspaces. 404 while OAuth is off.',
+                'tags' => ['auth'],
+                'mcp' => ['expose' => false],
+                'responses' => [
+                    200 => self::jsonResponse('Whether the subject is linked, and its active workspaces', 'OAuthWorkspacesResponse'),
+                    401 => self::errorResponse('Missing, invalid or expired assertion'),
+                    404 => self::errorResponse('OAuth is not configured on this instance'),
+                    429 => self::errorResponse('Too many requests'),
+                ],
+            ],
+        ];
+
         return [
             $loginRoute,
             $login2faRoute,
@@ -567,6 +600,7 @@ final class CoreApiSchemas
             $disableRoute,
             $regenerateCodesRoute,
             $statusRoute,
+            $oauthWorkspacesRoute,
         ];
     }
 
@@ -3828,6 +3862,17 @@ final class CoreApiSchemas
                 'status' => self::str(),
             ], ['status']),
 
+            // GET /api/oauth/workspaces — 200 response (OAuthWorkspacesHandler::list, WHIT-802)
+            'OAuthWorkspace' => self::object([
+                'id' => self::int(),
+                'name' => self::str(),
+                'slug' => self::str(true),
+            ], ['id', 'name', 'slug']),
+            'OAuthWorkspacesResponse' => self::object([
+                'linked' => self::bool(),
+                'workspaces' => ['type' => 'array', 'items' => SchemaBuilder::ref('OAuthWorkspace')],
+            ], ['linked', 'workspaces']),
+
             // POST /api/auth/2fa/setup — 200 response (TwoFactorHandler::setup)
             'TwoFaSetupResponse' => self::object([
                 'secret' => self::str(),
@@ -4915,13 +4960,14 @@ final class CoreApiSchemas
             // artifact" (503 when it cannot), false = "record only". Omitting it
             // is what a client that does not care should do.
             'DocumentCreateRequest' => self::object([
-                'document_source_id' => self::int() + ['description' => 'The template to issue the document from (see GET /api/document-sources?kind=template): its published version is issued. A letter or report (a copy made to edit before issuing) is issued as it is now, frozen as a version.'],
+                'document_source_id' => self::int() + ['description' => 'The template to issue the document from (see GET /api/document-sources?kind=template): its published version is issued. A letter or report (a copy made to edit before issuing) is issued as it is now, frozen as a version. Send this or `slot`.'],
+                'slot' => self::str() + ['description' => 'A template slot key such as `bakery.order_confirmation` (GET /api/document-template-slots): the template the workspace bound to it is issued, so a plugin needn\'t know which one. Send this or `document_source_id`. 409 `slot_unavailable` when its plugin is off, `slot_unbound` when nothing is bound, `slot_misfit` when the bound template no longer fits.'],
                 'record' => self::str() + ['description' => 'The record the document is for, as `type:id`. Required when the template has a record type.'],
                 'values' => ['type' => 'object', 'additionalProperties' => ['type' => 'string'], 'description' => 'Values by field path: the template\'s own fields (for example {"template.reference": "REF-1042"}) and any field the record left empty. At most 1000 characters each. A field the template does not offer is refused, and a value for a field the record resolved is 422 `field_conflict`: merge data can\'t overwrite what the record says.'],
                 'title' => self::str(true) + ['description' => 'Document title; defaults to the template\'s title and the record\'s name.'],
                 'origin_key' => self::str(true) + ['description' => 'Your own name for what this document is, for example `order:4812:invoice` (1 to 160 letters, digits or : . _ / -). Issuing again with the same key returns the first document (200, `replayed: true`) instead of a second one; the same key for another template is 409 `origin_key_conflict`.'],
                 'render' => ['type' => 'boolean', 'nullable' => true, 'description' => 'Omit to render when this server can; true to require a rendered file (503 if rendering is unavailable); false to record without rendering.'],
-            ], ['document_source_id']),
+            ], []),
 
             // Why the render outcome is a SIBLING of `data` rather than a status
             // code, and why `reason` is a closed vocabulary: a 201 means the
@@ -5261,6 +5307,24 @@ final class CoreApiSchemas
                 'label' => SchemaBuilder::ref('SearchLabel'),
             ], ['type', 'label']),
             'SearchTypeListResponse' => self::listEnvelope('SearchType'),
+            // ── Agent proposals (WHIT-784) ────────────────────────────────────
+            'AgentProposal' => self::object([
+                'id' => self::int(),
+                // waiting · approved · declined · expired · undone
+                'status' => ['type' => 'string', 'enum' => ['waiting', 'approved', 'declined', 'expired', 'undone']],
+                'tool' => self::str(),
+                'summary' => self::str(),
+                'arguments' => ['type' => 'object', 'additionalProperties' => true],
+                'diff' => ['nullable' => true, 'description' => 'What would change, when the operation can preview it'],
+                'permissions' => ['type' => 'array', 'items' => self::str()],
+                'undoWindowSeconds' => self::int(true),
+                'result' => ['nullable' => true, 'description' => 'What the operation answered when it ran'],
+                'decidedAt' => self::str(true),
+                'expiresAt' => self::str(),
+                'createdAt' => self::str(),
+            ], ['id', 'status', 'tool', 'summary', 'arguments', 'diff', 'permissions', 'undoWindowSeconds', 'result', 'decidedAt', 'expiresAt', 'createdAt']),
+            'AgentProposalListResponse' => self::listEnvelope('AgentProposal'),
+            'AgentProposalResponse' => self::dataEnvelope(SchemaBuilder::ref('AgentProposal')),
             // ── The document organizer (#978, implementing #947 item 5) ───────
             // A "folder" is a NAMED QUERY, never a stored container: a document
             // raised centrally and needed by fifteen units has no single home,
@@ -5914,6 +5978,32 @@ final class CoreApiSchemas
                 'usage' => SchemaBuilder::ref('DocumentThemeUsage'),
             ], ['data']),
             'DocumentThemeSchemaResponse' => self::dataEnvelope(SchemaBuilder::ref('DocumentThemeSchema')),
+            // Template slots (WHIT-742, DOCUMENT-AUTOMATION.md 3.2).
+            'DocumentTemplateSlot' => self::object([
+                'key' => self::str() + ['description' => '`<plugin>.<slot>`, as a plugin names it when it issues'],
+                'plugin' => self::str() + ['description' => 'The plugin that declares the slot'],
+                'label' => self::str(),
+                'labelAr' => self::str(),
+                'recordType' => self::str() + ['description' => 'The field record type the slot\'s documents are for; a bound template must have the same one'],
+                'kinds' => ['type' => 'array', 'items' => ['type' => 'string', 'enum' => ['template', 'label']], 'description' => 'Which document kinds can fill it'],
+                'starter' => self::str(true) + ['description' => 'The plugin\'s starter for the slot, once starters are seeded (WHIT-687)'],
+                'binding' => self::object([
+                    'template_id' => self::int(),
+                    'title' => self::str(true) + ['description' => 'Null when the template is gone or hidden from the caller'],
+                    'published_version' => self::int(true),
+                    'problem' => self::object([
+                        'code' => self::str() + ['description' => '`kind_mismatch`, `record_type_mismatch`, `personal_template`, `unpublished` or `template_missing`'],
+                        'message' => self::str(),
+                    ], ['code', 'message']) + ['nullable' => true, 'description' => 'Why the bound template can\'t be issued from now; null when it fits'],
+                ], ['template_id', 'title', 'published_version', 'problem']) + ['nullable' => true, 'description' => 'The template bound to the slot, or null'],
+            ], ['key', 'plugin', 'label', 'labelAr', 'recordType', 'kinds', 'starter', 'binding']),
+            'DocumentTemplateSlotListResponse' => self::object([
+                'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('DocumentTemplateSlot')],
+            ], ['data']),
+            'DocumentTemplateSlotResponse' => self::dataEnvelope(SchemaBuilder::ref('DocumentTemplateSlot')),
+            'DocumentTemplateSlotBindRequest' => self::object([
+                'template_id' => self::int(true) + ['description' => 'The published, workspace-shared template to bind, of a kind the slot takes and for its record type; null unbinds the slot'],
+            ], ['template_id']),
             'DocumentThemeUsageResponse' => self::dataEnvelope(SchemaBuilder::ref('DocumentThemeUsage')),
             'ResolvedDocumentThemeResponse' => self::dataEnvelope(SchemaBuilder::ref('ResolvedDocumentTheme')),
             // The FEATURE catalogue (#feature-flags). Three booleans per row on
@@ -10255,7 +10345,7 @@ final class CoreApiSchemas
                     ),
                     200 => self::jsonResponse('The document `origin_key` already names; nothing new was issued', 'DocumentCreateResponse'),
                     404 => self::errorResponse('No such template or record, or it is not visible to the caller'),
-                    409 => self::errorResponse('The template has no published version yet, `origin_key` names a document from another template (`origin_key_conflict`), or a plugin refused it (`vetoed`)'),
+                    409 => self::errorResponse('The template has no published version yet, `origin_key` names a document from another template (`origin_key_conflict`), a plugin refused it (`vetoed`), or the slot can\'t be issued from (`slot_unavailable`, `slot_unbound`, `slot_misfit`)'),
                     422 => self::errorResponse(
                         'No template named, not a template, a bad record, a value for a field the '
                         . 'template does not declare, or a required field with no value (details.missing)'
@@ -10862,6 +10952,68 @@ final class CoreApiSchemas
                         200 => self::jsonResponse('Each searchable type and its label', 'SearchTypeListResponse'),
                     ] + self::authErrors(),
                 ],
+            ],
+        ];
+    }
+
+    /**
+     * The approvals inbox for agent proposals (WHIT-784, register 7.5a/7.5b).
+     *
+     * No route gate: each route answers only for proposals made on the
+     * caller's own behalf. NOT agent-callable, on purpose: an agent must never
+     * be able to approve its own proposal, so these stay off the MCP surface.
+     *
+     * @return list<array{method: string, path: string, requiredRole: ?string, requiredPermission: ?string, schema: array<string, mixed>}>
+     */
+    private static function agentProposalRoutes(): array
+    {
+        $decision = static fn (string $summary, string $description, bool $editable): array => [
+            'summary' => $summary,
+            'description' => $description,
+            'tags' => ['me'],
+            'parameters' => [['name' => 'id', 'in' => 'path', 'required' => true, 'description' => 'ID of the proposal.', 'schema' => ['type' => 'integer']]],
+            'request' => $editable ? self::object(['arguments' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'Edited arguments to run with instead of the agent\'s (optional).']], []) : null,
+            'responses' => [
+                200 => self::jsonResponse('The proposal after the decision', 'AgentProposalResponse'),
+                404 => self::errorResponse('No such proposal made on your behalf'),
+                409 => self::errorResponse('The proposal is no longer waiting (decided or expired)'),
+            ] + self::authErrors(),
+        ];
+
+        return [
+            [
+                'method' => 'GET',
+                'path' => '/api/me/agent-proposals',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'What agents acting for you are waiting for you to approve, and what you decided',
+                    'tags' => ['me'],
+                    'parameters' => [self::queryParam('status', 'string', 'waiting, approved, declined, expired or undone; all when omitted')],
+                    'responses' => [200 => self::jsonResponse('Your proposals, newest first', 'AgentProposalListResponse')] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'POST',
+                'path' => '/api/me/agent-proposals/{id:\d+}/approve',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => array_filter($decision(
+                    'Approve an agent\'s proposal and run it for you',
+                    'Runs the operation as your delegate, after checking again that you and the agent may. Edit the arguments by sending them. Runs once, however many times it is approved.',
+                    true,
+                ), static fn (mixed $v): bool => $v !== null),
+            ],
+            [
+                'method' => 'POST',
+                'path' => '/api/me/agent-proposals/{id:\d+}/decline',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => array_filter($decision(
+                    'Decline an agent\'s proposal',
+                    'Nothing runs. The agent can ask again.',
+                    false,
+                ), static fn (mixed $v): bool => $v !== null),
             ],
         ];
     }
@@ -11669,6 +11821,53 @@ final class CoreApiSchemas
                     422 => self::errorResponse('A required field has no value, the CSV or its columns are not usable, or the render was refused'),
                     429 => self::errorResponse('The document render limit has been reached'),
                     503 => self::errorResponse('Rendering is not enabled or temporarily unavailable'),
+                ] + self::authErrors(),
+            ]),
+        ];
+    }
+
+    /**
+     * Template slots and the workspace's bindings (WHIT-742,
+     * DOCUMENT-AUTOMATION.md 3.2 and 3.4). The list is a read; binding needs
+     * documents:publish, and an agent only proposes it.
+     *
+     * @return list<array{method: string, path: string, requiredRole: ?string, requiredPermission: ?string, schema: array<string, mixed>}>
+     */
+    private static function documentTemplateSlotRoutes(): array
+    {
+        $key = '/api/document-template-slots/{key:[A-Za-z][A-Za-z0-9_]{0,63}\.[a-z][a-z0-9_]{0,39}}';
+
+        return [
+            self::permissionRoute('GET', '/api/document-template-slots', 'documents:read', [
+                'summary' => 'List the template slots of the workspace\'s plugins, with what is bound to each',
+                'mcp' => ['toolset' => 'core.documents.automation'],
+                'description' =>
+                    'A slot is a named place a plugin needs a template, such as its invoice. Only switched-on '
+                    . 'plugins\' slots are listed. The ETag names the whole binding set; send it as If-Match '
+                    . 'when binding.',
+                'tags' => ['documents'],
+                'responses' => [
+                    200 => self::jsonResponse('The slots', 'DocumentTemplateSlotListResponse'),
+                    400 => self::errorResponse('Tenant context is required'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('PUT', $key, 'documents:publish', [
+                'summary' => 'Bind a template to a slot, or unbind it',
+                'description' =>
+                    'The template must be published, shared with the workspace, of a kind the slot takes and '
+                    . 'for the slot\'s record type; otherwise 422 with a `code` saying which. If-Match with the '
+                    . 'ETag from the list is required: 428 without it, 409 `stale` when the bindings changed.',
+                'tags' => ['documents'],
+                // Binding decides which template a plugin issues from, so an
+                // agent only proposes it (DOCUMENT-AUTOMATION.md 3.10).
+                'mcp' => ['toolset' => 'core.documents.automation', 'agentPolicy' => 'propose'],
+                'request' => 'DocumentTemplateSlotBindRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The slot with its binding; the ETag names the new binding set', 'DocumentTemplateSlotResponse'),
+                    404 => self::errorResponse('No such slot (or its plugin is off), or no such template visible to the caller'),
+                    409 => self::errorResponse('The bindings changed since the ETag was read (`stale`)'),
+                    422 => self::errorResponse('The template doesn\'t fit the slot (`kind_mismatch`, `record_type_mismatch`, `personal_template`, `unpublished`), or the system tenant'),
+                    428 => self::errorResponse('If-Match is required'),
                 ] + self::authErrors(),
             ]),
         ];

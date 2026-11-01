@@ -1661,6 +1661,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/document-template-slots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the template slots of the workspace's plugins, with what is bound to each
+         * @description A slot is a named place a plugin needs a template, such as its invoice. Only switched-on plugins' slots are listed. The ETag names the whole binding set; send it as If-Match when binding.
+         */
+        get: operations["get_api_v1_document_template_slots"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/document-template-slots/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Bind a template to a slot, or unbind it
+         * @description The template must be published, shared with the workspace, of a kind the slot takes and for the slot's record type; otherwise 422 with a `code` saying which. If-Match with the ETag from the list is required: 428 without it, 409 `stale` when the bindings changed.
+         */
+        put: operations["put_api_v1_document_template_slots_key"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/document-themes": {
         parameters: {
             query?: never;
@@ -2948,6 +2988,63 @@ export interface paths {
         patch: operations["patch_api_v1_me"];
         trace?: never;
     };
+    "/api/v1/me/agent-proposals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What agents acting for you are waiting for you to approve, and what you decided */
+        get: operations["get_api_v1_me_agent_proposals"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/agent-proposals/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve an agent's proposal and run it for you
+         * @description Runs the operation as your delegate, after checking again that you and the agent may. Edit the arguments by sending them. Runs once, however many times it is approved.
+         */
+        post: operations["post_api_v1_me_agent_proposals_id_approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/agent-proposals/{id}/decline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Decline an agent's proposal
+         * @description Nothing runs. The agent can ask again.
+         */
+        post: operations["post_api_v1_me_agent_proposals_id_decline"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/audit-logs": {
         parameters: {
             query?: never;
@@ -3636,6 +3733,26 @@ export interface paths {
         get?: never;
         /** Set or clear a channel's provider credentials (write-only, encrypted at rest) */
         put: operations["put_api_v1_notification_settings_channel_credentials"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/oauth/workspaces": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the workspaces of a person, for the consent screen of the OAuth authorization server
+         * @description Called by the authorization server configured as MCP_OAUTH_ISSUER, with `Authorization: Bearer <assertion>`: a JWT signed with a key from the JWKS of the issuer (asymmetric only), header `typ` `whity-workspaces+jwt`, `iss` the issuer, `aud` exactly APP_URL + /api/v1/oauth/workspaces, `exp` at most 120 seconds after `iat`, and `sub` the person at the issuer. The person is found through their global single sign-on link. Only active memberships are listed, never the system workspace, in workspace id order. An unlinked subject is `linked: false` with no workspaces. 404 while OAuth is off.
+         */
+        get: operations["get_api_v1_oauth_workspaces"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -5809,6 +5926,31 @@ export interface components {
             promotion_id?: number | null;
             is_active?: boolean | null;
         };
+        AgentProposal: {
+            id: number;
+            /** @enum {string} */
+            status: "waiting" | "approved" | "declined" | "expired" | "undone";
+            tool: string;
+            summary: string;
+            arguments: {
+                [key: string]: unknown;
+            };
+            /** @description What would change, when the operation can preview it */
+            diff: unknown;
+            permissions: string[];
+            undoWindowSeconds: number | null;
+            /** @description What the operation answered when it ran */
+            result: unknown;
+            decidedAt: string | null;
+            expiresAt: string;
+            createdAt: string;
+        };
+        AgentProposalListResponse: {
+            data: components["schemas"]["AgentProposal"][];
+        };
+        AgentProposalResponse: {
+            data: components["schemas"]["AgentProposal"];
+        };
         ApprovalStatusResponse: {
             data: {
                 id: number;
@@ -6262,8 +6404,10 @@ export interface components {
             data: components["schemas"]["DocumentConveningEntry"][];
         };
         DocumentCreateRequest: {
-            /** @description The template to issue the document from (see GET /api/document-sources?kind=template): its published version is issued. A letter or report (a copy made to edit before issuing) is issued as it is now, frozen as a version. */
-            document_source_id: number;
+            /** @description The template to issue the document from (see GET /api/document-sources?kind=template): its published version is issued. A letter or report (a copy made to edit before issuing) is issued as it is now, frozen as a version. Send this or `slot`. */
+            document_source_id?: number;
+            /** @description A template slot key such as `bakery.order_confirmation` (GET /api/document-template-slots): the template the workspace bound to it is issued, so a plugin needn't know which one. Send this or `document_source_id`. 409 `slot_unavailable` when its plugin is off, `slot_unbound` when nothing is bound, `slot_misfit` when the bound template no longer fits. */
+            slot?: string;
             /** @description The record the document is for, as `type:id`. Required when the template has a record type. */
             record?: string;
             /** @description Values by field path: the template's own fields (for example {"template.reference": "REF-1042"}) and any field the record left empty. At most 1000 characters each. A field the template does not offer is refused, and a value for a field the record resolved is 422 `field_conflict`: merge data can't overwrite what the record says. */
@@ -6741,6 +6885,43 @@ export interface components {
             key: string;
             description: string;
             provenance?: string | null;
+        };
+        DocumentTemplateSlot: {
+            /** @description `<plugin>.<slot>`, as a plugin names it when it issues */
+            key: string;
+            /** @description The plugin that declares the slot */
+            plugin: string;
+            label: string;
+            labelAr: string;
+            /** @description The field record type the slot's documents are for; a bound template must have the same one */
+            recordType: string;
+            /** @description Which document kinds can fill it */
+            kinds: ("template" | "label")[];
+            /** @description The plugin's starter for the slot, once starters are seeded (WHIT-687) */
+            starter: string | null;
+            /** @description The template bound to the slot, or null */
+            binding: {
+                template_id: number;
+                /** @description Null when the template is gone or hidden from the caller */
+                title: string | null;
+                published_version: number | null;
+                /** @description Why the bound template can't be issued from now; null when it fits */
+                problem: {
+                    /** @description `kind_mismatch`, `record_type_mismatch`, `personal_template`, `unpublished` or `template_missing` */
+                    code: string;
+                    message: string;
+                } | null;
+            } | null;
+        };
+        DocumentTemplateSlotBindRequest: {
+            /** @description The published, workspace-shared template to bind, of a kind the slot takes and for its record type; null unbinds the slot */
+            template_id: number | null;
+        };
+        DocumentTemplateSlotListResponse: {
+            data: components["schemas"]["DocumentTemplateSlot"][];
+        };
+        DocumentTemplateSlotResponse: {
+            data: components["schemas"]["DocumentTemplateSlot"];
         };
         DocumentTheme: {
             /** @description How documents name it: whity.standard or tenant.<key> */
@@ -8079,6 +8260,15 @@ export interface components {
         NotificationPreferencesUpdateRequest: {
             /** @description Entries of `{type, channel, enabled}` to set for the signed-in user. Transactional notification types cannot be turned off. */
             preferences: components["schemas"]["NotificationPreferenceEntry"][];
+        };
+        OAuthWorkspace: {
+            id: number;
+            name: string;
+            slug: string | null;
+        };
+        OAuthWorkspacesResponse: {
+            linked: boolean;
+            workspaces: components["schemas"]["OAuthWorkspace"][];
         };
         OpenApiDocumentResponse: {
             [key: string]: unknown;
@@ -18466,6 +18656,187 @@ export interface operations {
             };
         };
     };
+    get_api_v1_document_template_slots: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The slots */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentTemplateSlotListResponse"];
+                };
+            };
+            /** @description Tenant context is required */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    put_api_v1_document_template_slots_key: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DocumentTemplateSlotBindRequest"];
+            };
+        };
+        responses: {
+            /** @description The slot with its binding; the ETag names the new binding set */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentTemplateSlotResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No such slot (or its plugin is off), or no such template visible to the caller */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The bindings changed since the ETag was read (`stale`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The template doesn't fit the slot (`kind_mismatch`, `record_type_mismatch`, `personal_template`, `unpublished`), or the system tenant */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description If-Match is required */
+            428: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     get_api_v1_document_themes: {
         parameters: {
             query?: {
@@ -19617,7 +19988,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description The template has no published version yet, `origin_key` names a document from another template (`origin_key_conflict`), or a plugin refused it (`vetoed`) */
+            /** @description The template has no published version yet, `origin_key` names a document from another template (`origin_key_conflict`), a plugin refused it (`vetoed`), or the slot can't be issued from (`slot_unavailable`, `slot_unbound`, `slot_misfit`) */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -25882,6 +26253,246 @@ export interface operations {
             };
         };
     };
+    get_api_v1_me_agent_proposals: {
+        parameters: {
+            query?: {
+                /** @description waiting, approved, declined, expired or undone; all when omitted */
+                status?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Your proposals, newest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentProposalListResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_me_agent_proposals_id_approve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ID of the proposal. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Edited arguments to run with instead of the agent's (optional). */
+                    arguments?: {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description The proposal after the decision */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentProposalResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No such proposal made on your behalf */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The proposal is no longer waiting (decided or expired) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_me_agent_proposals_id_decline: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ID of the proposal. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The proposal after the decision */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentProposalResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No such proposal made on your behalf */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The proposal is no longer waiting (decided or expired) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     get_api_v1_me_audit_logs: {
         parameters: {
             query?: {
@@ -29027,6 +29638,71 @@ export interface operations {
             };
             /** @description Validation failed */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_oauth_workspaces: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Whether the subject is linked, and its active workspaces */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OAuthWorkspacesResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired assertion */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description OAuth is not configured on this instance */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too many requests */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };

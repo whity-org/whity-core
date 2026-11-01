@@ -2,33 +2,63 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://whity.dev/schemas/plugin-manifest/1.json",
   "title": "Whity plugin manifest (plugin.json)",
-  "description": "Format whity.plugin/1, SDK 1.47. Whity\\Sdk\\Manifest\\ManifestValidator is authoritative: it also checks references (a role grants only declared permissions, a screen is gated by one, a data type lives in a declared tenant table) and runs each screen's blocks through the block contract.",
+  "description": "Format whity.plugin/1, SDK 1.47 (records: 1.50). Whity\\Sdk\\Manifest\\ManifestValidator is authoritative: it also checks references (a role grants only declared permissions, a screen is gated by one, a data type lives in a declared tenant table) and runs each screen's blocks through the block contract.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["manifest", "plugin"],
+  "required": [
+    "manifest",
+    "plugin"
+  ],
   "properties": {
-    "manifest": { "const": "whity.plugin/1" },
+    "manifest": {
+      "const": "whity.plugin/1"
+    },
     "plugin": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "version", "label"],
+      "required": [
+        "name",
+        "version",
+        "label"
+      ],
       "properties": {
-        "name": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]{0,63}$" },
-        "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?$" },
-        "label": { "$ref": "#/$defs/label" },
-        "description": { "$ref": "#/$defs/description" }
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_]{0,63}$"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?$"
+        },
+        "label": {
+          "$ref": "#/$defs/label"
+        },
+        "description": {
+          "$ref": "#/$defs/description"
+        }
       }
     },
     "requires": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "sdk": { "type": "string", "minLength": 1 },
-        "core": { "type": "string", "minLength": 1 },
+        "sdk": {
+          "type": "string",
+          "minLength": 1
+        },
+        "core": {
+          "type": "string",
+          "minLength": 1
+        },
         "plugins": {
           "type": "object",
-          "propertyNames": { "pattern": "^[A-Za-z][A-Za-z0-9_]{0,63}$" },
-          "additionalProperties": { "type": "string", "minLength": 1 }
+          "propertyNames": {
+            "pattern": "^[A-Za-z][A-Za-z0-9_]{0,63}$"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1
+          }
         }
       }
     },
@@ -38,25 +68,47 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["slug", "label"],
+        "required": [
+          "slug",
+          "label"
+        ],
         "properties": {
-          "slug": { "type": "string", "pattern": "^[a-z][a-z0-9_]*:[a-z][a-z0-9_]*$" },
-          "label": { "$ref": "#/$defs/label" }
+          "slug": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*:[a-z][a-z0-9_]*$"
+          },
+          "label": {
+            "$ref": "#/$defs/label"
+          }
         }
       }
     },
     "roles": {
       "type": "object",
       "maxProperties": 50,
-      "propertyNames": { "pattern": "^[a-z][a-z0-9_]{0,63}$" },
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9_]{0,63}$"
+      },
       "additionalProperties": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["label"],
+        "required": [
+          "label"
+        ],
         "properties": {
-          "label": { "$ref": "#/$defs/label" },
-          "parent": { "type": "string", "minLength": 1 },
-          "permissions": { "type": "array", "items": { "type": "string" } }
+          "label": {
+            "$ref": "#/$defs/label"
+          },
+          "parent": {
+            "type": "string",
+            "minLength": 1
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
         }
       }
     },
@@ -66,32 +118,76 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "label", "permission", "blocks"],
+        "required": [
+          "id",
+          "label",
+          "permission",
+          "blocks"
+        ],
         "properties": {
-          "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
-          "label": { "$ref": "#/$defs/label" },
-          "permission": { "type": "string" },
-          "group": { "type": "string", "minLength": 1 },
-          "order": { "type": "number" },
-          "icon": { "type": "string", "pattern": "^[a-z0-9-]{1,64}$" },
-          "blocks": { "type": "array", "minItems": 1, "items": { "type": "object", "required": ["type"] } }
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "label": {
+            "$ref": "#/$defs/label"
+          },
+          "permission": {
+            "type": "string"
+          },
+          "group": {
+            "type": "string",
+            "minLength": 1
+          },
+          "order": {
+            "type": "number"
+          },
+          "icon": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]{1,64}$"
+          },
+          "blocks": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": [
+                "type"
+              ]
+            }
+          }
         }
       }
     },
     "tables": {
       "type": "object",
-      "propertyNames": { "pattern": "^[a-z][a-z0-9_]{0,62}$" },
-      "additionalProperties": { "enum": ["tenant", "global"] }
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9_]{0,62}$"
+      },
+      "additionalProperties": {
+        "enum": [
+          "tenant",
+          "global"
+        ]
+      }
     },
     "dataTypes": {
       "type": "object",
-      "propertyNames": { "pattern": "^[a-z][a-z0-9_]{0,63}$" },
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9_]{0,63}$"
+      },
       "additionalProperties": {
         "type": "object",
-        "required": ["table"],
+        "required": [
+          "table"
+        ],
         "properties": {
-          "table": { "type": "string" },
-          "label": { "$ref": "#/$defs/label" }
+          "table": {
+            "type": "string"
+          },
+          "label": {
+            "$ref": "#/$defs/label"
+          }
         }
       }
     },
@@ -100,13 +196,472 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["key", "type", "default", "description"],
+        "required": [
+          "key",
+          "type",
+          "default",
+          "description"
+        ],
         "properties": {
-          "key": { "type": "string", "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$" },
-          "type": { "enum": ["bool", "int"] },
-          "default": { "type": ["boolean", "integer"] },
-          "description": { "$ref": "#/$defs/description" },
-          "period": { "enum": ["day", "week", "month"] }
+          "key": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$"
+          },
+          "type": {
+            "enum": [
+              "bool",
+              "int"
+            ]
+          },
+          "default": {
+            "type": [
+              "boolean",
+              "integer"
+            ]
+          },
+          "description": {
+            "$ref": "#/$defs/description"
+          },
+          "period": {
+            "enum": [
+              "day",
+              "week",
+              "month"
+            ]
+          }
+        }
+      }
+    },
+    "records": {
+      "description": "Record types kept in the host's shared record store (SDK 1.50). Fields, an optional lifecycle, and read/create/edit/delete permissions that the manifest declares.",
+      "type": "object",
+      "maxProperties": 50,
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9_]{0,63}$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "label",
+          "fields",
+          "permissions"
+        ],
+        "properties": {
+          "label": {
+            "$ref": "#/$defs/label"
+          },
+          "titleField": {
+            "type": "string"
+          },
+          "fields": {
+            "type": "object",
+            "maxProperties": 100,
+            "propertyNames": {
+              "pattern": "^[a-z][a-z0-9_]{0,63}$"
+            },
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "type",
+                "label"
+              ],
+              "properties": {
+                "type": {
+                  "enum": [
+                    "text",
+                    "long_text",
+                    "number",
+                    "money",
+                    "date",
+                    "datetime",
+                    "boolean",
+                    "choice",
+                    "multi_choice",
+                    "person",
+                    "ou",
+                    "record"
+                  ]
+                },
+                "label": {
+                  "$ref": "#/$defs/label"
+                },
+                "required": {
+                  "type": "boolean"
+                },
+                "min": {
+                  "type": "number"
+                },
+                "max": {
+                  "type": "number"
+                },
+                "maxLength": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "currency": {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$"
+                },
+                "record": {
+                  "type": "string"
+                },
+                "options": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "value",
+                      "label"
+                    ],
+                    "properties": {
+                      "value": {
+                        "type": "string"
+                      },
+                      "label": {
+                        "$ref": "#/$defs/label"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "lifecycle": {
+            "type": "object",
+            "required": [
+              "states",
+              "initial"
+            ],
+            "properties": {
+              "states": {
+                "type": "array"
+              },
+              "initial": {
+                "type": "string"
+              },
+              "moves": {
+                "type": "object"
+              }
+            }
+          },
+          "permissions": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "read",
+              "create",
+              "edit",
+              "delete"
+            ],
+            "properties": {
+              "read": {
+                "type": "string"
+              },
+              "create": {
+                "type": "string"
+              },
+              "edit": {
+                "type": "string"
+              },
+              "delete": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "automations": {
+      "description": "What a workspace plugin does by itself when its records change (SDK 1.53). Runs in the background, as the plugin acting for the person who caused the change.",
+      "type": "object",
+      "maxProperties": 50,
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9_]{0,63}$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "label",
+          "on",
+          "steps"
+        ],
+        "properties": {
+          "label": {
+            "$ref": "#/$defs/label"
+          },
+          "on": {
+            "type": "string",
+            "description": "<record type>.created, .changed, .changed.<field>, .moved or .moved.<state>.",
+            "pattern": "^[a-z][a-z0-9_]{0,63}\\.(created|changed|moved)(\\.[a-z][a-z0-9_]{0,63})?$"
+          },
+          "when": {
+            "description": "An expression over the triggering record; the automation runs only when it holds."
+          },
+          "steps": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 20,
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "set_fields"
+                  ],
+                  "description": "Set fields on the triggering record, through its rules.",
+                  "properties": {
+                    "set_fields": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "values"
+                      ],
+                      "properties": {
+                        "values": {
+                          "type": "object",
+                          "description": "Field name to an expression over the triggering record.",
+                          "propertyNames": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$"
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "create_record"
+                  ],
+                  "description": "Create a record of this plugin.",
+                  "properties": {
+                    "create_record": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "type"
+                      ],
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "values": {
+                          "type": "object",
+                          "description": "Field name to an expression over the triggering record.",
+                          "propertyNames": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$"
+                          }
+                        },
+                        "link": {
+                          "type": "string",
+                          "description": "A field of the new record that links back to the triggering one."
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "move"
+                  ],
+                  "description": "Move the triggering record.",
+                  "properties": {
+                    "move": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "move"
+                      ],
+                      "properties": {
+                        "move": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "notify"
+                  ],
+                  "description": "Notify a role the manifest declares, or the person in a person field.",
+                  "properties": {
+                    "notify": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "message"
+                      ],
+                      "properties": {
+                        "role": {
+                          "type": "string"
+                        },
+                        "person": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "$ref": "#/$defs/label"
+                        }
+                      },
+                      "oneOf": [
+                        {
+                          "required": [
+                            "role"
+                          ]
+                        },
+                        {
+                          "required": [
+                            "person"
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "tests": {
+      "description": "Examples a record type's rules must keep (SDK 1.54), run before a version is published.",
+      "type": "array",
+      "maxItems": 100,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "label",
+          "record",
+          "expect"
+        ],
+        "properties": {
+          "label": {
+            "$ref": "#/$defs/label"
+          },
+          "record": {
+            "type": "string"
+          },
+          "as": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "given": {
+            "type": "object",
+            "description": "Field name to a literal value."
+          },
+          "state": {
+            "type": "string"
+          },
+          "create": {
+            "type": "object",
+            "description": "Field name to a literal value."
+          },
+          "update": {
+            "type": "object",
+            "description": "Field name to a literal value."
+          },
+          "move": {
+            "type": "string"
+          },
+          "expect": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "refused"
+            ],
+            "properties": {
+              "refused": {
+                "type": "boolean"
+              },
+              "issues": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "fields": {
+                "type": "object",
+                "description": "Field name to a literal value."
+              },
+              "state": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "oneOf": [
+          {
+            "required": [
+              "create"
+            ]
+          },
+          {
+            "required": [
+              "update"
+            ]
+          },
+          {
+            "required": [
+              "move"
+            ]
+          }
+        ]
+      }
+    },
+    "documents": {
+      "description": "Template slots (SDK 1.55): the named places this plugin needs a document template. The host addresses each as <plugin name>.<slot>, and a workspace binds a published template to it.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "slots": {
+          "type": "object",
+          "maxProperties": 50,
+          "propertyNames": {
+            "pattern": "^[a-z][a-z0-9_]{0,39}$"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "label",
+              "record"
+            ],
+            "properties": {
+              "label": {
+                "$ref": "#/$defs/label"
+              },
+              "record": {
+                "type": "string",
+                "description": "One of this manifest's record types; the slot's documents are filled from it.",
+                "pattern": "^[a-z][a-z0-9_]{0,63}$"
+              },
+              "kinds": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": {
+                  "enum": [
+                    "template",
+                    "label"
+                  ]
+                },
+                "description": "Which document kinds can fill the slot. Default: template."
+              }
+            }
+          }
         }
       }
     }
@@ -115,19 +670,41 @@
     "label": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["en", "ar"],
+      "required": [
+        "en",
+        "ar"
+      ],
       "properties": {
-        "en": { "type": "string", "minLength": 1, "maxLength": 200 },
-        "ar": { "type": "string", "minLength": 1, "maxLength": 200 }
+        "en": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "ar": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        }
       }
     },
     "description": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["en", "ar"],
+      "required": [
+        "en",
+        "ar"
+      ],
       "properties": {
-        "en": { "type": "string", "minLength": 1, "maxLength": 500 },
-        "ar": { "type": "string", "minLength": 1, "maxLength": 500 }
+        "en": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "ar": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        }
       }
     }
   }
