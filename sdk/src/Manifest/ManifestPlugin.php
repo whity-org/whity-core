@@ -6,6 +6,7 @@ namespace Whity\Sdk\Manifest;
 
 use ReflectionClass;
 use Whity\Sdk\DataType\PluginDataTypesInterface;
+use Whity\Sdk\PluginAgentPresetsInterface;
 use Whity\Sdk\PluginEntitlementsInterface;
 use Whity\Sdk\PluginFrontendInterface;
 use Whity\Sdk\PluginInterface;
@@ -58,7 +59,8 @@ abstract class ManifestPlugin implements
     PluginFrontendInterface,
     PluginTablesInterface,
     PluginDataTypesInterface,
-    PluginEntitlementsInterface
+    PluginEntitlementsInterface,
+    PluginAgentPresetsInterface
 {
     /** The file name the manifest is read from, next to the subclass. */
     public const FILE_NAME = 'plugin.json';
@@ -175,5 +177,21 @@ abstract class ManifestPlugin implements
     public function getEntitlements(): array
     {
         return $this->manifest->entitlements();
+    }
+
+    /**
+     * The manifest's `agentPresets`, in the interface's list shape (SDK 1.61).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function getAgentPresets(): array
+    {
+        $presets = [];
+        foreach ($this->manifest->agentPresets() as $key => $preset) {
+            $presets[] = ['key' => (string) $key] + $preset;
+        }
+
+        /** @var list<array<string, mixed>> */
+        return $presets;
     }
 }

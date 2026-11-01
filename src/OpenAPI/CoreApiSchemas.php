@@ -11325,7 +11325,7 @@ final class CoreApiSchemas
             self::permissionRoute('GET', '/api/agent-presets', 'agents:manage', [
                 'summary' => 'List the presets a workspace agent can start from',
                 'tags' => ['agents'],
-                'responses' => [200 => self::jsonResponse('Core presets, by key', 'AgentPresetListResponse')] + self::authErrors(),
+                'responses' => [200 => self::jsonResponse('Core\'s, code plugins\' and this workspace\'s plugins\' presets, by key', 'AgentPresetListResponse')] + self::authErrors(),
             ]),
         ];
     }

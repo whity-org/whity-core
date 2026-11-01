@@ -242,9 +242,12 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsOneEightForInteractiveBlocks(): void
     {
         $this->assertSame(
-            '1.60.0',
+            '1.61.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.60 ADDS PLUGIN SECRETS: the host service PluginSecrets gives a plugin its own SecretStore, '
+            'SDK 1.61 ADDS AGENT PRESETS: PluginAgentPresetsInterface and agentPresets in plugin.json ship '
+            . 'ready-made agent templates (persona in English and Arabic, toolsets, where a grant starts); a preset '
+            . 'may start a read at Allowed but never a write (WHIT-818). Purely additive. '
+            . 'SDK 1.60 ADDS PLUGIN SECRETS: the host service PluginSecrets gives a plugin its own SecretStore, '
             . 'set, get and delete per workspace, encrypted with the host key, kept apart by plugin, never read '
             . 'back by settings or the API, audited by key only (WHIT-838). Purely additive. '
             . 'SDK 1.59 SAYS WHO IS CALLING: McpToolContext gains actorKind, principalKind, and for an AI agent '
