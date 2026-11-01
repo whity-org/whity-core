@@ -7,6 +7,7 @@ namespace Whity\Mcp\Auth\OAuth;
 use PDO;
 use Whity\Auth\ActiveTenantMembershipGuard;
 use Whity\Auth\Oidc\JwksProvider;
+use Whity\Core\Agent\AgentAssignmentRepository;
 use Whity\Core\Http\HttpClient;
 use Whity\Core\Identity\ExternalIdentityRepository;
 use Whity\Mcp\Auth\AgentScopeGrant;
@@ -70,6 +71,9 @@ final class OAuthAccessTokenVerifier
      * token's jti. Fits agent_principal_id (64).
      */
     public const AGENT_ID_PREFIX = 'oauth-agent:';
+
+    /** The resource path under `/mcp` of a workspace agent: `agents/<slug>` (WHIT-819). */
+    public const AGENT_RESOURCE_PREFIX = 'agents/';
 
     private readonly IssuerJwtVerifier $jwt;
 
@@ -150,6 +154,28 @@ final class OAuthAccessTokenVerifier
         }
 
         $jti = $claims['jti'] ?? null;
+
+        // WHIT-819: a token for /mcp/agents/<slug> acts as that workspace agent
+        // for the person, under their grant, whichever client holds it. No
+        // assignment is a 403 with what to do: signing in again wouldn't help.
+        if ($split !== null && str_starts_with($split, self::AGENT_RESOURCE_PREFIX)) {
+            $active = (new AgentAssignmentRepository($this->db))->activeScopeBySlug(substr($split, strlen(self::AGENT_RESOURCE_PREFIX)), $tenantId, $profileId);
+            if ($active === null) {
+                throw new OAuthTokenRefusedException("You don't use this agent in this workspace. Start using it in Whity, then connect again.");
+            }
+
+            return new McpPrincipal(
+                profileId: $profileId,
+                userId: $profileId,
+                tenantId: $tenantId,
+                principalKind: AgentScopeGrant::AGENT_KIND,
+                scope: [...$scope, ...$active['entries']],
+                jti: self::AGENT_ID_PREFIX . substr(hash('sha256', self::clientOf($claims) . "\n" . $profileId), 0, 40),
+                agentId: $active['principalId'],
+                resourceSplit: $split,
+                agentSlug: $active['slug'],
+            );
+        }
 
         if (self::isAgentClient($claims)) {
             return new McpPrincipal(

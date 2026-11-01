@@ -4982,6 +4982,13 @@ $router->registerUnversioned('GET', '/.well-known/oauth-protected-resource/mcp/{
         ? \Whity\Core\Response::error('Not found', 404)
         : $mcpProtectedResource->forSplit($split)->metadata($request, $params);
 });
+// WHIT-819: a workspace agent as its own OAuth resource. Before the splits only
+// by reading order: `agents` is a reserved name, and a split has one segment.
+$router->registerUnversioned('GET', '/.well-known/oauth-protected-resource/mcp/agents/{agent:[a-z0-9][a-z0-9-]*}', static function (\Whity\Core\Request $request, array $params = []) use ($mcpProtectedResource): \Whity\Core\Response {
+    return $mcpProtectedResource->forAgent((string) ($params['agent'] ?? ''))->metadata($request, $params);
+});
+$router->registerUnversioned('POST', '/mcp/agents/{agent:[a-z0-9][a-z0-9-]*}', [$mcpTransportHandler, 'handlePost']);
+$router->registerUnversioned('GET',  '/mcp/agents/{agent:[a-z0-9][a-z0-9-]*}', [$mcpTransportHandler, 'handleGet']);
 $router->registerUnversioned('POST', '/mcp/{split:[a-z0-9][a-z0-9_.-]*}', [$mcpTransportHandler, 'handlePost']);
 $router->registerUnversioned('GET',  '/mcp/{split:[a-z0-9][a-z0-9_.-]*}', [$mcpTransportHandler, 'handleGet']);
 

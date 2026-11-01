@@ -31,6 +31,8 @@ final readonly class McpPrincipal
      * @param ?string  $resourceSplit The split an OAuth token was issued for (its `aud` is
      *                                `/mcp/<split>`): it works only there. Null works on
      *                                `/mcp` and every split (WHIT-765).
+     * @param ?string  $agentSlug     The workspace agent this acts as, for the check at
+     *                                `/mcp/agents/<slug>` (WHIT-819).
      */
     public function __construct(
         public int $profileId,
@@ -41,6 +43,7 @@ final readonly class McpPrincipal
         public string $jti,
         public ?string $agentId = null,
         public ?string $resourceSplit = null,
+        public ?string $agentSlug = null,
     ) {}
 
     /** The principal kind of an agent credential (ADR-0006 §3, WHIT-753). */
