@@ -17,16 +17,16 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@whity-org/ui/tabs';
-import { Button } from '@whity-org/ui/button';
-import { Card } from '@whity-org/ui/card';
-import { Icon } from '@whity-org/ui/icon';
-import { ActionProposal, type ActionProposalLabels } from '@whity-org/ui/action-proposal';
-import { ApprovalQueue, type ApprovalQueueItem } from '@whity-org/ui/approval-queue';
-import { AgentActivity } from '@whity-org/ui/agent-activity';
-import { EmptyState } from '@whity-org/ui/empty-state';
-import { useTranslation } from '@whity-org/features/i18n';
-import { useDateDisplay } from '@whity-org/features/datetime';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@whity/ui/tabs';
+import { Button } from '@whity/ui/button';
+import { Card } from '@whity/ui/card';
+import { Icon } from '@whity/ui/icon';
+import { ActionProposal, type ActionProposalLabels } from '@whity/ui/action-proposal';
+import { ApprovalQueue, type ApprovalQueueItem } from '@whity/ui/approval-queue';
+import { AgentActivity } from '@whity/ui/agent-activity';
+import { EmptyState } from '@whity/ui/empty-state';
+import { useTranslation } from '@whity/features/i18n';
+import { useDateDisplay } from '@whity/features/datetime';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { WAITING_CHANGED_EVENT } from '@/lib/waiting-changed';
 import { useAuth } from '@/lib/auth-context';

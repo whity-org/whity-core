@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useTranslation } from '@whity-org/features/i18n';
+import { useTranslation } from '@whity/features/i18n';
 
 /**
  * Translated names for core navigation items, by item id: the sidebar and the

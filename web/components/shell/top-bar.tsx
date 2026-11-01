@@ -8,8 +8,8 @@
  */
 
 import { useSyncExternalStore } from 'react';
-import { Icon } from '@whity-org/ui/icon';
-import { useTranslation } from '@whity-org/features/i18n';
+import { Icon } from '@whity/ui/icon';
+import { useTranslation } from '@whity/features/i18n';
 import { OPEN_COMMAND_PALETTE_EVENT } from './app-command-palette';
 
 /** The platform never changes while the page is open. */

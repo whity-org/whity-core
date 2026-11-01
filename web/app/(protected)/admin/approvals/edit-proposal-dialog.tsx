@@ -16,12 +16,12 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@whity-org/ui/dialog';
-import { Button } from '@whity-org/ui/button';
-import { Input } from '@whity-org/ui/input';
-import { Textarea } from '@whity-org/ui/textarea';
-import { Icon } from '@whity-org/ui/icon';
-import { useTranslation } from '@whity-org/features/i18n';
+} from '@whity/ui/dialog';
+import { Button } from '@whity/ui/button';
+import { Input } from '@whity/ui/input';
+import { Textarea } from '@whity/ui/textarea';
+import { Icon } from '@whity/ui/icon';
+import { useTranslation } from '@whity/features/i18n';
 import { humanizeKey, type AgentProposal } from '@/components/agents/proposals';
 
 type Draft = Record<string, string>;

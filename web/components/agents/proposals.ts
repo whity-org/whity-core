@@ -1,7 +1,7 @@
-import { parseWireDate } from '@whity-org/features/datetime';
+import { parseWireDate } from '@whity/features/datetime';
 import type { components } from '@/lib/api/schema';
-import type { ActionProposalChange, ActionProposalStatus } from '@whity-org/ui/action-proposal';
-import type { AgentActivityItem } from '@whity-org/ui/agent-activity';
+import type { ActionProposalChange, ActionProposalStatus } from '@whity/ui/action-proposal';
+import type { AgentActivityItem } from '@whity/ui/agent-activity';
 
 /**
  * Wire helpers for agent proposals (`GET /api/me/agent-proposals`, WHIT-784):

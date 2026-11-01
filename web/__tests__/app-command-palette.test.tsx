@@ -17,7 +17,7 @@ jest.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
 let mockNav: { id: string; href: string; label: string; icon?: string }[] = [];
 jest.mock('@/lib/navigation-context', () => ({ useNavigation: () => ({ items: mockNav }) }));
 jest.mock('@/lib/theme-mode-context', () => ({ useThemeMode: () => ({ resolved: 'light', toggle: jest.fn() }) }));
-jest.mock('@whity-org/features/i18n', () => ({
+jest.mock('@whity/features/i18n', () => ({
   useTranslation: () => (_key: string, fallback: string) => fallback,
   useCurrentLanguage: () => ({ currentLanguage: 'en' }),
 }));

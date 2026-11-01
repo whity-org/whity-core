@@ -15,11 +15,11 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { ScopeGrant, type ScopeGrantMode } from '@whity-org/ui/scope-grant';
-import { Button } from '@whity-org/ui/button';
-import { EmptyState } from '@whity-org/ui/empty-state';
-import { Icon } from '@whity-org/ui/icon';
-import { useTranslation } from '@whity-org/features/i18n';
+import { ScopeGrant, type ScopeGrantMode } from '@whity/ui/scope-grant';
+import { Button } from '@whity/ui/button';
+import { EmptyState } from '@whity/ui/empty-state';
+import { Icon } from '@whity/ui/icon';
+import { useTranslation } from '@whity/features/i18n';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { useAuth } from '@/lib/auth-context';
 import { useFetch } from '@/hooks/useFetch';

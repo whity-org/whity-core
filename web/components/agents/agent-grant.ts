@@ -1,4 +1,4 @@
-import type { ScopeGrantGroup, ScopeGrantMode } from '@whity-org/ui/scope-grant';
+import type { ScopeGrantGroup, ScopeGrantMode } from '@whity/ui/scope-grant';
 
 /**
  * The agent grant, per permission (WHIT-810 over WHIT-832's
