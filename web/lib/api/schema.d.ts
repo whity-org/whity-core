@@ -6343,6 +6343,9 @@ export interface components {
         };
         AgentProposal: {
             id: number;
+            agent: {
+                name: string | null;
+            };
             /** @enum {string} */
             status: "waiting" | "approved" | "declined" | "expired" | "undone";
             tool: string;
