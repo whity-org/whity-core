@@ -49,8 +49,8 @@ final class SettingsRegistryTest extends TestCase
              'billing.default_currency', 'billing.tax_rate_bp',
              'billing.tax_label', 'billing.tax_inclusive',
              'billing.payment_terms_days',
-             'billing.seller_name', 'billing.seller_address',
-             'billing.seller_tax_id',
+             'company.name', 'company.address',
+             'company.tax_id', 'company.phone', 'company.email',
              // Numbering is GLOBAL-ONLY: a per-tenant override would make the
              // (series, number) uniqueness index mean something a tenant admin
              // can change, which is how a sequence starts issuing duplicates.
@@ -272,7 +272,8 @@ final class SettingsRegistryTest extends TestCase
         // 37 since WHIT-754: mcp.always_on_plugin_tools, each workspace's own
         // choice of plugin tools listed directly to MCP clients.
         // 38 since WHIT-742: documents.slot_bindings, each workspace's own.
-        self::assertCount(38, SettingsRegistry::tenantTextKeys());
+        // 40 since WHIT-788: three billing.seller_* out, five company.* in.
+        self::assertCount(40, SettingsRegistry::tenantTextKeys());
 
         // The desktop-login TTL is per-tenant overridable (NOT global-only) and a
         // plain numeric string key.
@@ -425,7 +426,8 @@ final class SettingsRegistryTest extends TestCase
         // 89 since editor M4d: print_color out, documents.theme and theme_by_kind in.
         // 90 since WHIT-754's mcp.always_on_plugin_tools.
         // 91 since WHIT-742: documents.slot_bindings.
-        self::assertCount(91, $describe);
+        // 93 since WHIT-788: three billing.seller_* out, five company.* in.
+        self::assertCount(93, $describe);
         self::assertSame(
             ['key' => 'site_name', 'type' => 'string', 'default' => 'Whity'],
             $describe[0]

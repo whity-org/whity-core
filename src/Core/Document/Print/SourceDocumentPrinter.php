@@ -123,27 +123,28 @@ final class SourceDocumentPrinter
 
     /**
      * The tenant's letterhead lines as it invoices (stage 6), each by its
-     * theme name: `address` and `taxId` from the seller settings. `phone` and
-     * `email` have no source yet (WHIT-788 adds the company's own keys), so a
-     * theme that lists them prints nothing for them.
+     * theme name, from the company settings (WHIT-788). A theme that lists a
+     * line the company hasn't filled in prints nothing for it.
      *
      * @return array{name: string, parts: array{address: ?string, taxId: ?string, phone: ?string, email: ?string}}
      */
     public function letterheadParts(int $tenantId): array
     {
         $effective = $this->settings->effective($tenantId);
-        $name = trim((string) ($effective[SettingsRegistry::BILLING_SELLER_NAME] ?? ''));
+        $name = trim((string) ($effective[SettingsRegistry::COMPANY_NAME] ?? ''));
         if ($name === '') {
             $name = trim((string) ($effective[SettingsRegistry::SITE_NAME] ?? ''));
         }
-        $address = trim((string) ($effective[SettingsRegistry::BILLING_SELLER_ADDRESS] ?? ''));
-        $tax = trim((string) ($effective[SettingsRegistry::BILLING_SELLER_TAX_ID] ?? ''));
+        $address = trim((string) ($effective[SettingsRegistry::COMPANY_ADDRESS] ?? ''));
+        $tax = trim((string) ($effective[SettingsRegistry::COMPANY_TAX_ID] ?? ''));
+        $phone = trim((string) ($effective[SettingsRegistry::COMPANY_PHONE] ?? ''));
+        $email = trim((string) ($effective[SettingsRegistry::COMPANY_EMAIL] ?? ''));
 
         return ['name' => $name, 'parts' => [
             'address' => $address !== '' ? (preg_replace('/\s*\R\s*/', ', ', $address) ?? $address) : null,
             'taxId' => $tax !== '' ? $tax : null,
-            'phone' => null,
-            'email' => null,
+            'phone' => $phone !== '' ? $phone : null,
+            'email' => $email !== '' ? $email : null,
         ]];
     }
 

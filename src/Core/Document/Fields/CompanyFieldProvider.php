@@ -9,7 +9,7 @@ use Whity\Core\Settings\SettingsService;
 
 /**
  * The Company group every template has: the tenant's name, address and tax
- * number as it invoices (the billing.seller_* settings). The tax number is a
+ * number as it invoices (the company.* settings). The tax number is a
  * fiscal field, so it is required (E.27): a document that would print without
  * it is refused rather than issued.
  */
@@ -75,9 +75,9 @@ final class CompanyFieldProvider implements DocumentFieldProvider
         };
 
         return [
-            'company.name' => $value(SettingsRegistry::BILLING_SELLER_NAME),
-            'company.address' => $value(SettingsRegistry::BILLING_SELLER_ADDRESS),
-            'company.tax_number' => $value(SettingsRegistry::BILLING_SELLER_TAX_ID),
+            'company.name' => $value(SettingsRegistry::COMPANY_NAME),
+            'company.address' => $value(SettingsRegistry::COMPANY_ADDRESS),
+            'company.tax_number' => $value(SettingsRegistry::COMPANY_TAX_ID),
         ];
     }
 }

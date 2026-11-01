@@ -484,9 +484,9 @@ final class SubscriptionBillingRun
     private function sellerFor(int $tenantId): array
     {
         return array_filter([
-            'name' => $this->setting($tenantId, SettingsRegistry::BILLING_SELLER_NAME, ''),
-            'address' => $this->setting($tenantId, SettingsRegistry::BILLING_SELLER_ADDRESS, ''),
-            'tax_id' => $this->setting($tenantId, SettingsRegistry::BILLING_SELLER_TAX_ID, ''),
+            'name' => $this->setting($tenantId, SettingsRegistry::COMPANY_NAME, ''),
+            'address' => $this->setting($tenantId, SettingsRegistry::COMPANY_ADDRESS, ''),
+            'tax_id' => $this->setting($tenantId, SettingsRegistry::COMPANY_TAX_ID, ''),
         ], static fn (string $v): bool => $v !== '');
     }
 
