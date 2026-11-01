@@ -277,7 +277,7 @@ final class DocumentCreateApiRealEngineTest extends TestCase
      */
     public function testTheStoredValuesAreWhatPrintedIncludingBlanks(): void
     {
-        $this->settings->setTenant(self::TENANT, SettingsRegistry::BILLING_SELLER_NAME, 'Example Bakery');
+        $this->settings->setTenant(self::TENANT, SettingsRegistry::COMPANY_NAME, 'Example Bakery');
         $templateId = $this->editor->published(self::TENANT, self::RAISER, 'Delivery note', [
             $this->editor->para('From ', $this->editor->field('company.name'), ', ', $this->editor->field('template.reference')),
         ], ['own_fields' => self::OWN_FIELDS]);
@@ -899,7 +899,7 @@ final class DocumentCreateApiRealEngineTest extends TestCase
         self::assertSame(201, $filled->getStatusCode(), $filled->getBody());
         self::assertSame('0123456', $this->storedValues((int) self::decode($filled)['data']['id'])['company.tax_number']);
 
-        $this->settings->setTenant(self::TENANT, SettingsRegistry::BILLING_SELLER_TAX_ID, '7654321');
+        $this->settings->setTenant(self::TENANT, SettingsRegistry::COMPANY_TAX_ID, '7654321');
         $before = $this->countDocuments();
         $res = $this->create(self::RAISER, [
             'document_source_id' => $templateId,
@@ -945,7 +945,7 @@ final class DocumentCreateApiRealEngineTest extends TestCase
         self::assertSame([], $this->fakeRender->calls);
 
         // And with the value set, the same request issues it.
-        $this->settings->setTenant(self::TENANT, SettingsRegistry::BILLING_SELLER_TAX_ID, '0123456');
+        $this->settings->setTenant(self::TENANT, SettingsRegistry::COMPANY_TAX_ID, '0123456');
         self::assertSame(201, $this->create(self::RAISER, ['document_source_id' => $templateId])->getStatusCode());
     }
 
