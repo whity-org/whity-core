@@ -25,7 +25,7 @@ import { ActionProposal, type ActionProposalLabels } from '@whity/ui/action-prop
 import { ApprovalQueue, type ApprovalQueueItem } from '@whity/ui/approval-queue';
 import { AgentActivity } from '@whity/ui/agent-activity';
 import { EmptyState } from '@whity/ui/empty-state';
-import { useTranslation } from '@whity/features/i18n';
+import { useFormattingLocale, useTranslation } from '@whity/features/i18n';
 import { useDateDisplay } from '@whity/features/datetime';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { WAITING_CHANGED_EVENT } from '@/lib/waiting-changed';
@@ -46,6 +46,7 @@ import { EditProposalDialog } from './edit-proposal-dialog';
 
 export default function ApprovalsPage() {
   const t = useTranslation('admin');
+  const language = useFormattingLocale();
   const dates = useDateDisplay();
   // Times through the shared date display: local, and nothing at all when the
   // workspace hides dates.
@@ -72,6 +73,7 @@ export default function ApprovalsPage() {
 
   const you = t('approvals.you', 'you');
   const words: ProposalWords = {
+    arabic: language === 'ar',
     unknownAgent: t('approvals.agent.unknown', 'An agent'),
     minute: t('approvals.undo.minute', '1 minute'),
     minutes: t('approvals.undo.minutes', '{n} minutes'),

@@ -187,18 +187,18 @@ final class AgentProposalsApiHandler
      * stay server-side; the card needs what will happen, not how the token
      * is built.
      *
-     * The agent is named by what its credential was called ("Billing
-     * assistant"), never by its id (15-agents.md, Words).
+     * The agent goes by a name ("Billing assistant"), never by its id
+     * (15-agents.md, Words).
      *
-     * @param array<string, mixed>  $proposal
-     * @param array<string, string> $agentNames principal id => credential name
+     * @param array<string, mixed>                                $proposal
+     * @param array<string, array{name: string, nameAr: ?string}> $agentNames by principal id
      * @return array<string, mixed>
      */
     private static function present(array $proposal, array $agentNames = []): array
     {
         return [
             'id'                => $proposal['id'],
-            'agent'             => ['name' => $agentNames[(string) $proposal['agent_principal_id']] ?? null],
+            'agent'             => $agentNames[(string) $proposal['agent_principal_id']] ?? ['name' => null, 'nameAr' => null],
             'status'            => $proposal['status'],
             'tool'              => $proposal['tool'],
             'summary'           => $proposal['summary'],
