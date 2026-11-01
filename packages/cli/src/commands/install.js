@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { CliError } from '../errors.js';
+import { m } from '../messages.js';
 import { newEnvFile, parseEnv } from '../envfile.js';
 import { assertSupported, composeFor, latestVersion, normalizeVersion } from '../release.js';
 import { smoke } from '../smoke.js';
@@ -17,7 +18,7 @@ function projectName(dir) {
 function parsePort(value, fallback, flag) {
   if (value === undefined) return fallback;
   const port = Number(value);
-  if (!Number.isInteger(port) || port < 1 || port > 65535) throw new CliError(`${flag} must be a port number.`, 2);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) throw new CliError(m.badPort(flag), 2);
   return port;
 }
 
@@ -31,15 +32,11 @@ function assertUsableUrl(url) {
   try {
     parsed = new URL(url);
   } catch {
-    throw new CliError(`--url "${url}" is not a valid address.`, 2);
+    throw new CliError(m.badUrl(url), 2);
   }
   const local = ['localhost', '127.0.0.1'].includes(parsed.hostname);
   if (parsed.protocol !== 'https:' && !local) {
-    throw new CliError(
-      `Signing in needs HTTPS on any address other than localhost, so ${url} wouldn't work.\n`
-      + 'Put a reverse proxy with a certificate in front of Whity and pass --url https://your-address.',
-      2,
-    );
+    throw new CliError(m.httpsNeeded(url), 2);
   }
 }
 
@@ -49,10 +46,10 @@ export async function install(options, deps) {
   const envPath = join(dir, '.env');
   const resuming = existsSync(join(dir, MARKER));
   if (existsSync(envPath) && !resuming) {
-    throw new CliError(`${dir} already holds an install. To move it to a newer release, run: whity update`);
+    throw new CliError(m.alreadyInstalled(dir));
   }
 
-  deps.log('[1/6] Checking Docker');
+  deps.log(m.installStep1());
   await checkDocker(deps);
 
   let envText;
@@ -61,7 +58,7 @@ export async function install(options, deps) {
     // The database may already use these secrets, so an earlier attempt's stay.
     envText = readFileSync(envPath, 'utf8');
     version = parseEnv(envText).WHITY_VERSION;
-    deps.log(`  Continuing the unfinished install of ${version}`);
+    deps.log(m.installContinuing(version));
   } else {
     version = options.version ? normalizeVersion(options.version) : await latestVersion(deps);
     assertSupported(version);
@@ -70,7 +67,7 @@ export async function install(options, deps) {
     const bind = options.bind ?? '127.0.0.1';
     for (const port of [webPort, apiPort]) {
       if (!(await deps.portIsFree(port, bind))) {
-        throw new CliError(`Port ${port} is in use. Choose another with --web-port or --api-port.`);
+        throw new CliError(m.portInUse(port));
       }
     }
     envText = newEnvFile({
@@ -84,7 +81,7 @@ export async function install(options, deps) {
     });
   }
 
-  deps.log(`[2/6] Writing ${dir}`);
+  deps.log(m.installStep2(dir));
   const composeText = await composeFor(version, deps);
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, MARKER), '');
@@ -98,41 +95,28 @@ export async function install(options, deps) {
   const run = stack(dir, envText, deps);
   const step = async (label, result) => {
     if (result.code === 0) return;
-    throw new CliError(
-      `${label} failed.\n${outputOf(result)}\n`
-      + `Fix the cause, then run the same "whity install" again to continue: it keeps ${envPath}.`,
-    );
+    throw new CliError(m.installStepFailed(label, outputOf(result), envPath));
   };
 
-  deps.log(`[3/6] Pulling ${version}`);
+  deps.log(m.installStep3(version));
   await run.pullImages(version);
-  await step('Pulling the other images', await run.compose(['pull', '--quiet', 'postgres']));
+  await step(m.labelPullOthers(), await run.compose(['pull', '--quiet', 'postgres']));
 
-  deps.log('[4/6] Starting the database');
-  await step('Starting the database', await run.compose(['up', '-d', '--wait', 'postgres']));
+  deps.log(m.installStep4());
+  await step(m.labelStartDatabase(), await run.compose(['up', '-d', '--wait', 'postgres']));
 
-  deps.log('[5/6] Running migrations and seed');
-  await step('Migrations', await run.cli(['migrate', 'run']));
-  await step('Seed', await run.cli(['seed']));
+  deps.log(m.installStep5());
+  await step(m.labelMigrations(), await run.cli(['migrate', 'run']));
+  await step(m.labelSeed(), await run.cli(['seed']));
 
-  deps.log('[6/6] Starting Whity and checking it');
-  await step('Starting Whity', await run.compose(['up', '-d', '--wait', '--wait-timeout', '180']));
+  deps.log(m.installStep6());
+  await step(m.labelStartWhity(), await run.compose(['up', '-d', '--wait', '--wait-timeout', '180']));
   try {
     await smoke({ run, env, version, deps });
   } catch (error) {
-    throw new CliError(
-      `${error.message}\nSee what happened with: docker compose logs (in ${dir}).\n`
-      + 'Then run the same "whity install" again to continue.',
-    );
+    throw new CliError(m.installChecksFailed(error.message, dir));
   }
   rmSync(join(dir, MARKER));
 
-  deps.log('');
-  deps.log(`Whity ${version} is running.`);
-  deps.log(`  Sign in at: ${env.APP_URL}/login`);
-  deps.log(`  Email:      ${env.INITIAL_SYSTEM_ADMIN_EMAIL}`);
-  deps.log(`  Password:   the INITIAL_SYSTEM_ADMIN_PASSWORD value in ${envPath}`);
-  deps.log('');
-  deps.log('Change that password after you sign in, and back up the .env file.');
-  deps.log('It holds the keys your data is encrypted with.');
+  deps.log(m.installed({ version, url: env.APP_URL, email: env.INITIAL_SYSTEM_ADMIN_EMAIL, envPath }));
 }

@@ -21,4 +21,9 @@ release, runs migrations, restarts and checks the result. If a step fails, it st
 exact commands to go back.
 
 Run `whity --help` for the options. The full guide is in
-[docs/wiki/Whity-CLI.md](https://github.com/whity-org/whity-core/blob/main/docs/wiki/Whity-CLI.md).
+[English](https://github.com/whity-org/whity-core/blob/main/docs/wiki/Whity-CLI.md) and
+[العربية](https://github.com/whity-org/whity-core/blob/main/docs/wiki/Whity-CLI-ar.md).
+
+The tool's own messages are English only, a deliberate exception to Whity's rule that every
+user-facing string has English and Arabic: Windows PowerShell 5.1's console garbles Arabic and
+doesn't lay it out right to left. All messages live in `src/messages.js`, so Arabic can be added later.

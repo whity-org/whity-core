@@ -1,5 +1,7 @@
 # Whity CLI
 
+[العربية](Whity-CLI-ar.md)
+
 `whity` installs and updates a self-hosted Whity on Docker. It comes from the npm package
 `@whity/cli` and runs on Windows (PowerShell 5.1 and newer), Linux and macOS.
 
@@ -125,6 +127,13 @@ rm .whity-update-in-progress.json
 
 Running `whity update` again prints them again and changes nothing. If you fixed the cause and want
 to carry on without restoring, add `--force`.
+
+## Language
+
+The tool's own messages are English only. This is a deliberate exception to the rule that every
+user-facing string has English and Arabic: Windows PowerShell 5.1's console garbles Arabic and doesn't
+lay it out right to left. The install and update guide is in both languages instead. All messages live
+in `packages/cli/src/messages.js`, so Arabic can be added there later (WHIT-840).
 
 ## Troubleshooting
 

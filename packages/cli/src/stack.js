@@ -1,5 +1,6 @@
 import { CliError } from './errors.js';
 import { parseEnv } from './envfile.js';
+import { m } from './messages.js';
 import { IMAGES } from './release.js';
 
 const COMPOSE_VARS = ['COMPOSE_FILE', 'COMPOSE_PROJECT_NAME', 'COMPOSE_PROFILES', 'COMPOSE_ENV_FILES'];
@@ -28,7 +29,7 @@ export function stack(dir, envText, deps) {
     cli: (args) => compose(['run', '--rm', '-T', 'frankenphp', 'php', 'bin/whity-cli', ...args]),
     pullImages: async (version) => {
       for (const image of IMAGES) {
-        deps.log(`  ${image}:${version}`);
+        deps.log(m.pullingImage(`${image}:${version}`));
         const result = await docker(['pull', `${image}:${version}`]);
         if (result.code !== 0) throw pullError(`${image}:${version}`, result);
       }
@@ -37,25 +38,22 @@ export function stack(dir, envText, deps) {
 }
 
 function pullError(image, result) {
-  const hint = /denied/i.test(result.stderr)
-    ? '\nThe images are public, so this usually means an old ghcr.io login. Run: docker logout ghcr.io'
-    : '';
-  return new CliError(`Could not pull ${image}.\n${result.stderr.trim()}${hint}`);
+  const hint = /denied/i.test(result.stderr) ? m.pullDeniedHint() : '';
+  return new CliError(m.pullFailed(image, result.stderr.trim()) + hint);
 }
 
 export async function checkDocker(deps) {
-  const missing = 'Docker was not found. Install Docker (Docker Desktop on Windows and macOS), then run this again.';
   const server = await deps.exec(['version', '--format', '{{.Server.Version}}'], { env: deps.processEnv });
-  if (server.code === 127) throw new CliError(missing);
+  if (server.code === 127) throw new CliError(m.dockerMissing());
   if (server.code !== 0) {
-    throw new CliError(`Docker is installed but not running. Start it, then run this again.\n${server.stderr.trim()}`);
+    throw new CliError(m.dockerStopped(server.stderr.trim()));
   }
   const compose = await deps.exec(['compose', 'version', '--short'], { env: deps.processEnv });
   if (compose.code !== 0) {
-    throw new CliError('Docker Compose v2 was not found. Install the docker compose plugin, then run this again.');
+    throw new CliError(m.composeMissing());
   }
   const major = Number.parseInt(compose.stdout.trim().replace(/^v/, ''), 10);
-  if (!(major >= 2)) throw new CliError(`Docker Compose v2 or newer is needed. Found ${compose.stdout.trim()}.`);
+  if (!(major >= 2)) throw new CliError(m.composeTooOld(compose.stdout.trim()));
 }
 
 /** A command's own output for an error message: stdout, without the PHP tool's colour codes or Compose's progress lines. */

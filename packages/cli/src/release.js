@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { CliError } from './errors.js';
+import { m } from './messages.js';
 
 const REPO = 'https://github.com/whity-org/whity-core';
 const TIMEOUT_MS = 30_000;
@@ -15,7 +16,7 @@ export const OLDEST_SUPPORTED = 'v0.2.21';
 
 export function normalizeVersion(input) {
   const match = /^v?(\d+\.\d+\.\d+)$/.exec(input ?? '');
-  if (!match) throw new CliError(`"${input}" is not a release version. Use a form like v0.2.22.`, 2);
+  if (!match) throw new CliError(m.badVersion(input), 2);
   return `v${match[1]}`;
 }
 
@@ -31,13 +32,13 @@ export function compareVersions(a, b) {
 
 export function assertSupported(version) {
   if (compareVersions(version, OLDEST_SUPPORTED) < 0) {
-    throw new CliError(`This tool supports ${OLDEST_SUPPORTED} and newer, not ${version}.`, 2);
+    throw new CliError(m.unsupportedVersion(OLDEST_SUPPORTED, version), 2);
   }
 }
 
 /** Reads the redirect of /releases/latest: unlike the API, it has no 60-an-hour limit per address. */
 export async function latestVersion(deps) {
-  const failure = `Could not find the latest release at ${REPO}/releases. Check the connection, or name a version.`;
+  const unknown = () => new CliError(m.latestUnknown(`${REPO}/releases`));
   let response;
   try {
     response = await deps.fetch(`${REPO}/releases/latest`, {
@@ -45,10 +46,10 @@ export async function latestVersion(deps) {
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
   } catch {
-    throw new CliError(failure);
+    throw unknown();
   }
   const tag = /\/releases\/tag\/(v\d+\.\d+\.\d+)$/.exec(response.headers.get('location') ?? '');
-  if (!tag) throw new CliError(failure);
+  if (!tag) throw unknown();
   return tag[1];
 }
 
@@ -63,13 +64,13 @@ export async function composeFor(version, deps) {
   try {
     response = await deps.fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
   } catch (error) {
-    throw new CliError(`Could not download ${url}: ${error.message}`);
+    throw new CliError(m.downloadFailed(url, error.message));
   }
   if (response.status === 404) {
     return readFileSync(new URL('../templates/docker-compose.yml', import.meta.url), 'utf8');
   }
   if (!response.ok) {
-    throw new CliError(`Could not download ${url}: HTTP ${response.status}`);
+    throw new CliError(m.downloadFailed(url, `HTTP ${response.status}`));
   }
   return response.text();
 }
