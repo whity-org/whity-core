@@ -169,6 +169,18 @@ final class McpOAuthAccessTokenRealEngineTest extends TestCase
         self::assertNull($this->verifier()->verify($this->token(['sub' => 'sub-1'] + $claims)));
     }
 
+    public function testATokenForOneSplitIsBoundToItAndOneForMcpIsNot(): void
+    {
+        $this->member($this->linkedProfile('sub-1'), 7);
+        $verify = fn (mixed $aud) => $this->verifier()->verify($this->token(['sub' => 'sub-1', 'aud' => $aud]));
+
+        self::assertNull($verify(self::RESOURCE)?->resourceSplit, '/mcp works everywhere');
+        self::assertSame('forms', $verify(self::RESOURCE . '/forms')?->resourceSplit);
+        self::assertNull($verify([self::RESOURCE . '/forms', self::RESOURCE])?->resourceSplit, 'also for /mcp: not bound');
+        self::assertNull($verify(self::RESOURCE . '-other/forms'), 'not under this resource');
+        self::assertNull($verify(self::RESOURCE . '/'), 'no split named');
+    }
+
     public function testASignatureFromAnotherKeyIsRejected(): void
     {
         $this->member($this->linkedProfile('sub-1'), 7);

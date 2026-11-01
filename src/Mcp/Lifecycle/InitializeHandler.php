@@ -6,6 +6,7 @@ namespace Whity\Mcp\Lifecycle;
 
 use Whity\Mcp\JsonRpc\MethodHandler;
 use Whity\Mcp\Protocol\McpProtocol;
+use Whity\Mcp\Tools\ToolSurfaceRequest;
 
 /**
  * MCP initialize method handler: the handshake of the legacy protocol versions
@@ -48,7 +49,7 @@ final class InitializeHandler implements MethodHandler
                 'resources' => ['subscribe' => false, 'listChanged' => $this->listChanged],
                 'prompts'   => ['listChanged' => $this->listChanged],
             ],
-            'serverInfo' => McpProtocol::serverInfo(),
+            'serverInfo' => McpProtocol::serverInfo(ToolSurfaceRequest::fromParams($params)->split),
         ];
         if ($this->instructions !== null) {
             $result['instructions'] = $this->instructions;

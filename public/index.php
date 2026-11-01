@@ -4891,6 +4891,49 @@ $mcpDiscovery = new DiscoveryTools(
     // WHIT-825: get_proposal reads an agent's own proposals.
     $agentProposals,
 );
+// WHIT-765: /mcp/<split>, one slice of the server at its own URL. Plugins load
+// later, so their toolsets are read when asked for.
+$mcpSplits = new \Whity\Mcp\Tools\McpSplits(
+    static function () use ($toolDeriver, $authoredMcpTools): array {
+        $ids = [];
+        foreach ($authoredMcpTools->toolsets() as $toolset) {
+            if ($toolset['split']) {
+                $ids[] = $toolset['id'];
+            }
+        }
+        foreach ($toolDeriver->deriveTools() as $tool) {
+            $toolset = $tool['_meta'][\Whity\Mcp\Tools\ToolSurface::META_TOOLSET] ?? null;
+            if (is_string($toolset) && $toolset !== '' && !str_starts_with($toolset, 'core.')) {
+                $ids[] = explode('.', $toolset)[0];
+            }
+        }
+        return array_values(array_unique($ids));
+    },
+    is_string($_ENV['MCP_SPLITS'] ?? getenv('MCP_SPLITS')) ? (string) ($_ENV['MCP_SPLITS'] ?? getenv('MCP_SPLITS')) : null,
+);
+$mcpSplitsHandler = new \Whity\Mcp\Connect\McpSplitsHandler(
+    $mcpSplits,
+    $roleChecker,
+    static function () use ($toolDeriver, $authoredMcpTools): array {
+        $operations = [];
+        foreach ([$toolDeriver->deriveTools(), $authoredMcpTools->toolObjects()] as $tools) {
+            foreach ($tools as $tool) {
+                $name = (string) ($tool['name'] ?? '');
+                if ($toolDeriver->findDeclarationByName($name) !== null && !$toolDeriver->isExposed($name)) {
+                    continue;
+                }
+                $access = $toolDeriver->buildAccessMap()[$name] ?? $authoredMcpTools->accessMap()[$name] ?? [];
+                $operations[] = [
+                    'toolset'    => (string) ($tool['_meta'][\Whity\Mcp\Tools\ToolSurface::META_TOOLSET] ?? ''),
+                    'permission' => is_string($access['requiredPermission'] ?? null) ? $access['requiredPermission'] : null,
+                ];
+            }
+        }
+        return $operations;
+    },
+    McpConnectHandler::endpointFor((string) ($_ENV['APP_URL'] ?? getenv('APP_URL') ?: '')),
+);
+$router->register('GET', '/api/mcp/splits', [$mcpSplitsHandler, 'list'], null);
 $mcpTransportHandler = new McpTransportHandler(
     new Dispatcher($mcpHandlers, $tokenValidator, $mcpRateLimiter, $tenantMcpEnabled, $mcpListChangedNotifier, $mcpRecordTokenUse),
     enabled: $mcpServerEnabled,
@@ -4909,6 +4952,7 @@ $mcpTransportHandler = new McpTransportHandler(
         recordTokenUse: $mcpRecordTokenUse,
     ),
     protectedResource: $mcpProtectedResource,
+    splits: $mcpSplits,
     // WHIT-748: /mcp?tools=default lists the always-on tools, then the same
     // discovery tools, which reach everything else. Its list changes only when
     // the always-on set does, so it announces no list_changed either.
@@ -4931,6 +4975,15 @@ $router->registerUnversioned('GET', '/.well-known/oauth-protected-resource', [$m
 $router->registerUnversioned('GET', '/.well-known/oauth-protected-resource/mcp', [$mcpProtectedResource, 'metadata']);
 $router->registerUnversioned('POST', '/mcp', [$mcpTransportHandler, 'handlePost']);
 $router->registerUnversioned('GET',  '/mcp', [$mcpTransportHandler, 'handleGet']);
+// WHIT-765: a split is its own OAuth resource, so its own metadata too.
+$router->registerUnversioned('GET', '/.well-known/oauth-protected-resource/mcp/{split:[a-z0-9][a-z0-9_.-]*}', static function (\Whity\Core\Request $request, array $params = []) use ($mcpSplits, $mcpProtectedResource): \Whity\Core\Response {
+    $split = (string) ($params['split'] ?? '');
+    return $mcpSplits->toolsetsOf($split) === null
+        ? \Whity\Core\Response::error('Not found', 404)
+        : $mcpProtectedResource->forSplit($split)->metadata($request, $params);
+});
+$router->registerUnversioned('POST', '/mcp/{split:[a-z0-9][a-z0-9_.-]*}', [$mcpTransportHandler, 'handlePost']);
+$router->registerUnversioned('GET',  '/mcp/{split:[a-z0-9][a-z0-9_.-]*}', [$mcpTransportHandler, 'handleGet']);
 
 // WHIT-697: the "Connect an AI app" wizard. Gated like token issuance, which
 // is where the wizard ends. The preview runs the tools/list filter itself.

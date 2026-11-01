@@ -33,7 +33,17 @@ final class ProtectedResource
     public function __construct(
         private readonly ?string $issuer,
         private readonly ?string $resource,
+        private readonly string $resourceName = 'Whity',
     ) {}
+
+    /**
+     * The same server as one split's own resource (WHIT-765): tokens can be
+     * issued for it alone, with its own metadata under the well-known path.
+     */
+    public function forSplit(string $split): self
+    {
+        return new self($this->issuer, $this->resource === null ? null : $this->resource . '/' . $split, $this->resourceName . ' · ' . $split);
+    }
 
     /** From MCP_OAUTH_ISSUER and the MCP endpoint (APP_URL + /mcp). */
     public static function fromEnv(?string $resource): self
@@ -109,7 +119,7 @@ final class ProtectedResource
             'authorization_servers'    => [$this->issuer],
             'scopes_supported'         => McpScope::CAPABILITIES,
             'bearer_methods_supported' => ['header'],
-            'resource_name'            => 'Whity',
+            'resource_name'            => $this->resourceName,
         ], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR), [
             'Content-Type'  => 'application/json',
             // Public, and the same for everyone: the whole point is that a

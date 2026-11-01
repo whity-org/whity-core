@@ -110,6 +110,15 @@ final class Dispatcher implements McpRequestHandlerInterface, McpNotificationSou
         private readonly ?\Closure $recordTokenUse          = null,
     ) {}
 
+    /** The split this request came in on, as the transport read it; null on `/mcp`. */
+    private function requestSplit(): ?string
+    {
+        $surface = $this->headers[self::TOOL_SURFACE_HEADER] ?? null;
+        $decoded = is_string($surface) ? json_decode($surface, true) : null;
+
+        return is_array($decoded) && is_string($decoded['split'] ?? null) ? $decoded['split'] : null;
+    }
+
     public function handle(string $rawBody, ?string $bearerToken, array $headers = []): string
     {
         // Cleared first, before any path that can throw or return early: these
@@ -134,6 +143,10 @@ final class Dispatcher implements McpRequestHandlerInterface, McpNotificationSou
                 // the client to sign in again, which cannot fix it (WHIT-709).
                 $this->httpStatus = 403;
                 return $this->encode($this->makeError(null, ErrorCode::FORBIDDEN, $refused->getMessage()));
+            }
+            // WHIT-765: a token issued for one split works only at that split.
+            if ($principal !== null && $principal->resourceSplit !== null && $principal->resourceSplit !== $this->requestSplit()) {
+                $principal = null;
             }
             if ($principal === null) {
                 // HTTP 401, as every MCP authorization revision requires: it is
