@@ -25,7 +25,11 @@ function exec(args, { cwd, env, stream = false, stdoutFile } = {}) {
     let err = '';
     child.stdout?.on('data', (chunk) => { out += chunk; });
     child.stderr?.on('data', (chunk) => { err += chunk; });
+    // A process that can't start emits both `error` and `close`.
+    let finished = false;
     const finish = (result) => {
+      if (finished) return;
+      finished = true;
       if (fd !== null) closeSync(fd);
       done(result);
     };

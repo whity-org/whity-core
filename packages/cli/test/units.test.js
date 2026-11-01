@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { main } from '../src/cli.js';
+import { realDeps } from '../src/deps.js';
 import { parseEnv, setEnvValue } from '../src/envfile.js';
 import { compareVersions, composeFor, latestVersion, normalizeVersion } from '../src/release.js';
 import { childEnv, outputOf } from '../src/stack.js';
@@ -66,6 +67,21 @@ test('shell variables cannot override the install', () => {
 test('outputOf removes colour codes and prefers stdout', () => {
   assert.equal(outputOf({ stdout: '\x1b[1;33mhi\x1b[0m\n', stderr: 'noise' }), 'hi');
   assert.equal(outputOf({ stdout: '', stderr: 'only this\n' }), 'only this');
+});
+
+test('docker that cannot start is reported as 127, also while writing a dump', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'whity-exec-'));
+  try {
+    const { exec } = realDeps();
+    const env = { PATH: dir };
+    assert.equal((await exec(['version'], { env })).code, 127);
+    const result = await exec(['version'], { env, stdoutFile: join(dir, 'd.dump') });
+    assert.equal(result.code, 127);
+    // Node's own 'close' follows 'error' a tick later; a second close of the file would throw here.
+    await new Promise((done) => setTimeout(done, 50));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('the command line routes, refuses and reports', async () => {
