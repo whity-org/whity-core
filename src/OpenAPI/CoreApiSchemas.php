@@ -5312,6 +5312,8 @@ final class CoreApiSchemas
             // ── Agent proposals (WHIT-784) ────────────────────────────────────
             'AgentProposal' => self::object([
                 'id' => self::int(),
+                // The agent, named by its credential ("Billing assistant"); null once that credential is gone.
+                'agent' => self::object(['name' => self::str(true)], ['name']),
                 // waiting · approved · declined · expired · undone
                 'status' => ['type' => 'string', 'enum' => ['waiting', 'approved', 'declined', 'expired', 'undone']],
                 'tool' => self::str(),
@@ -5324,7 +5326,7 @@ final class CoreApiSchemas
                 'decidedAt' => self::str(true),
                 'expiresAt' => self::str(),
                 'createdAt' => self::str(),
-            ], ['id', 'status', 'tool', 'summary', 'arguments', 'diff', 'permissions', 'undoWindowSeconds', 'result', 'decidedAt', 'expiresAt', 'createdAt']),
+            ], ['id', 'agent', 'status', 'tool', 'summary', 'arguments', 'diff', 'permissions', 'undoWindowSeconds', 'result', 'decidedAt', 'expiresAt', 'createdAt']),
             'AgentProposalListResponse' => self::listEnvelope('AgentProposal'),
             'AgentProposalResponse' => self::dataEnvelope(SchemaBuilder::ref('AgentProposal')),
             // ── Workspace agents and presets (WHIT-815) ──────────────────────

@@ -46,6 +46,18 @@ export interface CommandPaletteItem {
    * something that was never going to be available.
    */
   disabled?: boolean
+  /**
+   * Secondary words after the label, never matched against ("JOD 301.600 ·
+   * overdue"): what tells two records with similar names apart.
+   */
+  hint?: string
+  /**
+   * Shown whatever the query, and not filtered by it: the "Ask an agent" row,
+   * which takes the words as they are (register 2.1c).
+   */
+  always?: boolean
+  /** An agent row: dashed, because nothing has happened until a person approves. */
+  agent?: boolean
   onSelect: () => void
 }
 
@@ -57,11 +69,19 @@ export interface CommandPaletteProps {
   emptyLabel?: string
   /** Accessible name for the dialog. */
   label?: string
+  /**
+   * Called as the query changes, so the caller can fetch results (records
+   * from search) and pass them back in `items`. Items the caller supplies
+   * this way are still filtered here, so return what the server matched.
+   */
+  onQueryChange?: (query: string) => void
+  /** The keys row at the foot. Omit to hide it. */
+  footer?: { move: string; open: string; close: string }
 }
 
 /** Case-insensitive subsequence-free substring match over label + keywords. */
 function matches(item: CommandPaletteItem, query: string): boolean {
-  if (query === "") return true
+  if (query === "" || item.always === true) return true
   const q = query.toLowerCase()
   return (
     item.label.toLowerCase().includes(q) ||
@@ -77,6 +97,8 @@ export function CommandPalette({
   placeholder = "Type a command…",
   emptyLabel = "No matching command",
   label = "Command palette",
+  onQueryChange,
+  footer,
 }: CommandPaletteProps) {
   const [query, setQuery] = React.useState("")
   const [cursor, setCursor] = React.useState(0)
@@ -183,7 +205,7 @@ export function CommandPalette({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 pt-[12vh]"
+      className="fixed inset-0 z-50 flex items-start justify-center bg-foreground/30 px-4 pt-[12vh]"
       // A backdrop click closes, matching every other dismissible surface. The
       // dialog itself stops propagation below.
       onMouseDown={() => onOpenChange(false)}
@@ -193,7 +215,7 @@ export function CommandPalette({
         role="dialog"
         aria-modal="true"
         aria-label={label}
-        className="w-full max-w-xl overflow-hidden rounded-lg border border-border bg-popover shadow-lg"
+        className="w-full max-w-xl overflow-hidden rounded-2xl border border-border bg-popover text-popover-foreground shadow-float"
         onMouseDown={(e) => e.stopPropagation()}
         onKeyDown={onKeyDown}
         data-testid="command-palette"
@@ -201,14 +223,17 @@ export function CommandPalette({
         <input
           ref={inputRef}
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => {
+            setQuery(e.target.value)
+            onQueryChange?.(e.target.value)
+          }}
           placeholder={placeholder}
           aria-label={label}
           role="combobox"
           aria-expanded
           aria-controls="command-palette-list"
           aria-activedescendant={shown[cursor] ? `command-item-${shown[cursor].id}` : undefined}
-          className="w-full border-b border-border bg-transparent px-4 py-3 text-sm outline-none placeholder:text-muted-foreground"
+          className="w-full border-b border-border bg-transparent px-4 py-3.5 text-base outline-none placeholder:text-muted-foreground"
           data-testid="command-palette-input"
         />
 
@@ -232,7 +257,7 @@ export function CommandPalette({
             return (
               <React.Fragment key={item.id}>
                 {header !== null && (
-                  <div className="px-3 pb-1 pt-3 text-[0.625rem] font-medium uppercase tracking-wide text-muted-foreground/70">
+                  <div className="px-3 pt-3 pb-1 text-[0.8125rem] font-medium text-muted-foreground">
                     {header}
                   </div>
                 )}
@@ -247,12 +272,19 @@ export function CommandPalette({
                   onClick={() => run(item)}
                   className={cn(
                     "flex cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm",
-                    index === cursor && item.disabled !== true && "bg-accent text-accent-foreground",
+                    // The selected row is the tint with text in the main colour (7.3).
+                    index === cursor && item.disabled !== true && "bg-primary-tint text-primary-tint-foreground",
+                    item.agent === true && "border border-dashed border-input",
                     item.disabled === true && "cursor-not-allowed opacity-45"
                   )}
                 >
                   {item.icon !== undefined && <span className="shrink-0 text-muted-foreground">{item.icon}</span>}
-                  <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                  <span className="min-w-0 flex-1 truncate">
+                    {item.label}
+                    {item.hint !== undefined && (
+                      <span className="ms-2 text-[0.8125rem] text-muted-foreground">{item.hint}</span>
+                    )}
+                  </span>
                   {item.shortcut !== undefined && (
                     <span className="shrink-0 text-xs text-muted-foreground">{item.shortcut}</span>
                   )}
@@ -261,6 +293,13 @@ export function CommandPalette({
             )
           })}
         </div>
+        {footer !== undefined && (
+          <div className="flex gap-4 border-t border-border px-4 py-2 text-[0.8125rem] text-muted-foreground">
+            <span><kbd className="me-1 rounded border border-border px-1 font-mono text-[0.6875rem]">↑↓</kbd>{footer.move}</span>
+            <span><kbd className="me-1 rounded border border-border px-1 font-mono text-[0.6875rem]">Enter</kbd>{footer.open}</span>
+            <span><kbd className="me-1 rounded border border-border px-1 font-mono text-[0.6875rem]">Esc</kbd>{footer.close}</span>
+          </div>
+        )}
       </div>
     </div>
   )

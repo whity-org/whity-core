@@ -24,6 +24,8 @@ import {
   IconMoon,
 } from '@tabler/icons-react';
 import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useNavItemLabels } from '@/lib/nav-item-labels';
+import { WAITING_CHANGED_EVENT } from '@/lib/waiting-changed';
 import { SETTINGS_AREA_NAV_IDS, SETTINGS_AREA_PREFIXES } from '@/components/settings/settings-area';
 import type { Icon } from '@tabler/icons-react';
 
@@ -184,12 +186,21 @@ function TenantSwitcher({ memberships, activeTenantId, collapsed }: TenantSwitch
 /**
  * How many things wait for the person, by nav item id: the Inbox's open items,
  * summed over its sources (`GET /api/me/inbox/sources` carries each source's
- * open count for exactly this badge). Re-read on every page change, so acting
+ * open count for exactly this badge), and the agent proposals waiting for
+ * their approval (`GET /api/me/agent-proposals?status=waiting`). Re-read on every page change, so acting
  * on an item and moving on updates the count. A failed read shows no count
  * rather than a wrong one.
  */
 function useWaitingCounts(pathname: string | null): Record<string, number> {
   const [counts, setCounts] = useState<Record<string, number>>({});
+  // A page that just changed what waits (Approvals after a decision) says so
+  // with WAITING_CHANGED_EVENT, so the count follows without a navigation.
+  const [nudge, setNudge] = useState(0);
+  useEffect(() => {
+    const onChanged = () => setNudge((n) => n + 1);
+    window.addEventListener(WAITING_CHANGED_EVENT, onChanged);
+    return () => window.removeEventListener(WAITING_CHANGED_EVENT, onChanged);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -204,12 +215,22 @@ function useWaitingCounts(pathname: string | null): Record<string, number> {
       } catch {
         inbox = 0;
       }
-      if (!cancelled) setCounts((prev) => ({ ...prev, inbox }));
+      let approvals = 0;
+      try {
+        const response = await fetch('/api/v1/me/agent-proposals?status=waiting', { credentials: 'include' });
+        if (response.ok) {
+          const body = (await response.json()) as { data?: unknown[] };
+          approvals = body.data?.length ?? 0;
+        }
+      } catch {
+        approvals = 0;
+      }
+      if (!cancelled) setCounts((prev) => ({ ...prev, inbox, approvals }));
     })();
     return () => {
       cancelled = true;
     };
-  }, [pathname]);
+  }, [pathname, nudge]);
 
   return counts;
 }
@@ -281,35 +302,7 @@ export function Sidebar() {
   // rewording a label upstream is a translation edit and not a key rename. An
   // id this map does not know keeps the server's label: that is the case for
   // every plugin-contributed entry, whose name is a plugin's to give.
-  const itemLabels = useMemo<Record<string, string>>(
-    () => ({
-      dashboard: t('sidebar.item.dashboard', 'Dashboard'),
-      inbox: t('sidebar.item.inbox', 'Inbox'),
-      users: t('sidebar.item.users', 'Users'),
-      roles: t('sidebar.item.roles', 'Roles'),
-      ous: t('sidebar.item.ous', 'Organizational Units'),
-      delegations: t('sidebar.item.delegations', 'Delegations'),
-      relations: t('sidebar.item.relations', 'Family Relations'),
-      'tag-groups': t('sidebar.item.tagGroups', 'Tag Groups'),
-      tags: t('sidebar.item.tags', 'Tags'),
-      tenants: t('sidebar.item.tenants', 'Tenants'),
-      'audit-logs': t('sidebar.item.auditLogs', 'Audit Logs'),
-      errors: t('sidebar.item.errors', 'Errors'),
-      plugins: t('sidebar.item.plugins', 'Plugins'),
-      'plugin-store': t('sidebar.item.pluginStore', 'Plugin Store'),
-      'website-settings': t('sidebar.item.websiteSettings', 'Website Settings'),
-      'document-library': t('sidebar.item.documentLibrary', 'Documents'),
-      'document-templates': t('sidebar.item.documentTemplates', 'Document templates'),
-      'document-sources': t('sidebar.item.documentSources', 'Notes and wiki'),
-      'approval-gating': t('sidebar.item.approvalGating', 'Approval Gating'),
-      'ai-principals': t('sidebar.item.aiPrincipals', 'AI Principals'),
-      'mcp-tools': t('sidebar.item.mcpTools', 'MCP Tools'),
-      languages: t('sidebar.item.languages', 'Languages'),
-      translations: t('sidebar.item.translations', 'Translations'),
-      settings: t('sidebar.item.settings', 'Settings'),
-    }),
-    [t],
-  );
+  const itemLabels = useNavItemLabels();
 
   const groups = useMemo(() => {
     // The Settings area (WHIT-806, owner decision D1): every settings page,
