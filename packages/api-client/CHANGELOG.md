@@ -1,4 +1,4 @@
-# @whity-org/api-client
+# @whity/api-client
 
 ## 0.2.0
 

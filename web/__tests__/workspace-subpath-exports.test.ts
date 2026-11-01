@@ -1,8 +1,8 @@
 /**
- * CI gate: every `@whity-org/*` subpath we import must be one the package
+ * CI gate: every `@whity/*` subpath we import must be one the package
  * actually publishes.
  *
- * jest.config.mjs maps `@whity-org/ui/*` straight at `../packages/ui/src/*`,
+ * jest.config.mjs maps `@whity/ui/*` straight at `../packages/ui/src/*`,
  * mirroring web/tsconfig.json's `paths` so that a `jest.mock()` specifier and
  * the component under test resolve to one file (#840). That mapping is a
  * deliberate trade: it resolves by PATH and therefore never consults the
@@ -58,7 +58,7 @@ function exportsOf(pkg: string): Set<string> {
   return new Set(Object.keys(manifest.exports ?? {}));
 }
 
-const SPECIFIER = new RegExp(`['"]@whity-org/(${ALIASED_PACKAGES.join('|')})(/[^'"]*)?['"]`, 'g');
+const SPECIFIER = new RegExp(`['"]@whity/(${ALIASED_PACKAGES.join('|')})(/[^'"]*)?['"]`, 'g');
 
 /** Every distinct subpath imported under the scanned roots, with one example importer. */
 function importedSubpaths(): Map<string, string> {
@@ -77,7 +77,7 @@ function importedSubpaths(): Map<string, string> {
   return seen;
 }
 
-describe('@whity-org workspace subpaths', () => {
+describe('@whity workspace subpaths', () => {
   const imported = importedSubpaths();
 
   it('imports at least one subpath from each aliased package', () => {
@@ -98,7 +98,7 @@ describe('@whity-org workspace subpaths', () => {
     });
 
     expect(
-      undeclared.map(([key, importer]) => `@whity-org/${key} (imported by ${importer})`)
+      undeclared.map(([key, importer]) => `@whity/${key} (imported by ${importer})`)
     ).toEqual([]);
   });
 });

@@ -36,7 +36,7 @@ import { apiClient } from '@/lib/api-client';
 import { api } from '@/lib/api/client';
 import type { components } from '@/lib/api/schema';
 import { fetchAllPages } from '@/lib/api/fetch-all-pages';
-import { useTranslation } from '@whity-org/features/i18n';
+import { useTranslation } from '@whity/features/i18n';
 import {
   RecordCollectionPanel,
   RecordList,
@@ -48,10 +48,10 @@ import {
   useRecordResource,
   type RecordFactsFn,
   type RecordResource,
-} from '@whity-org/features/record';
-import { useDateDisplay } from '@whity-org/features/datetime';
-import { Button } from '@whity-org/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity-org/ui/card';
+} from '@whity/features/record';
+import { useDateDisplay } from '@whity/features/datetime';
+import { Button } from '@whity/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
 import { Input } from '@/components/ui/input';
 import { IconBuildingCommunity } from '@tabler/icons-react';
 

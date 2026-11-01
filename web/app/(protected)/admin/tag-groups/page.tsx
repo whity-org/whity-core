@@ -9,9 +9,9 @@ import { useCapabilities } from '@/hooks/useCapabilities';
 import { TAGS_MANAGE } from '@/lib/capabilities';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
-import { Button } from '@whity-org/ui/button';
+import { Button } from '@whity/ui/button';
 import { Input } from '@/components/ui/input';
-import { BilingualInput, type BilingualValue } from '@whity-org/ui/bilingual-input';
+import { BilingualInput, type BilingualValue } from '@whity/ui/bilingual-input';
 import {
   Dialog,
   DialogContent,
@@ -25,9 +25,9 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@whity-org/ui/dropdown-menu';
+} from '@whity/ui/dropdown-menu';
 import { IconMenu2, IconPlus } from '@tabler/icons-react';
-import { useTranslation } from '@whity-org/features/i18n';
+import { useTranslation } from '@whity/features/i18n';
 
 /** A tag group as returned by GET /api/v1/tag-groups. */
 interface TagGroup {

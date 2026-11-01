@@ -1,8 +1,8 @@
 import * as React from "react"
 
-import { Alert, AlertDescription } from "@whity-org/ui/alert"
-import { Button } from "@whity-org/ui/button"
-import { Spinner } from "@whity-org/ui/spinner"
+import { Alert, AlertDescription } from "@whity/ui/alert"
+import { Button } from "@whity/ui/button"
+import { Spinner } from "@whity/ui/spinner"
 
 import { identityTranslate, type NavTranslate } from "../nav/types"
 import type { SyncStatus } from "./types"

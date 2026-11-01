@@ -1,8 +1,8 @@
 'use client';
 
-import { useTranslation, type TranslateFn } from '@whity-org/features/i18n';
-import { Badge } from '@whity-org/ui/badge';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@whity-org/ui/tooltip';
+import { useTranslation, type TranslateFn } from '@whity/features/i18n';
+import { Badge } from '@whity/ui/badge';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@whity/ui/tooltip';
 import type { DocumentScope, GovernedRow } from './types';
 
 /**

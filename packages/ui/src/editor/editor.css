@@ -434,3 +434,103 @@
  * ------------------------------------------------------------------ */
 .wy-sheet__title { color: var(--foreground); }
 .dark .wy-sheet__title { color: var(--doc-accent-on-dark, var(--foreground)); }
+
+/*
+ * Comments and suggestions (editor M5, EditorCollab, E.4, E.6, E.10, E.39).
+ * Suggested text is dashed because it hasn't happened yet (4.3): an insertion
+ * in the main colour with a dashed underline; a deletion struck through in the
+ * error colour, dashed, still visible. The comment highlight is the warning
+ * tint with a warning underline, a decoration on screen only, never printed,
+ * and not the highlight colour (E.25).
+ */
+.wy-doc ins[data-suggestion],
+.wy-sug-ins {
+  color: var(--primary-tint-foreground);
+  text-decoration: underline dashed var(--primary);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+}
+.wy-doc del[data-suggestion],
+.wy-sug-del {
+  color: var(--muted-foreground);
+  text-decoration: line-through dashed var(--error-text);
+  text-decoration-thickness: 1.5px;
+}
+.wy-sug-fmt {
+  text-decoration: underline dashed var(--primary);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+}
+/* Suggested blocks: inserted ones dashed at the start edge, deleted ones struck. */
+.wy-doc .wy-sug-block.is-insert {
+  border-inline-start: 2px dashed var(--primary);
+  padding-inline-start: 10px;
+  color: var(--primary-tint-foreground);
+}
+.wy-doc .wy-sug-block.is-delete {
+  border-inline-start: 2px dashed var(--error-text);
+  padding-inline-start: 10px;
+  color: var(--muted-foreground);
+  text-decoration: line-through dashed var(--error-text);
+}
+.wy-doc .wy-sug-block.is-move { border-inline-start: 2px dashed var(--input); padding-inline-start: 10px; }
+.wy-doc ins[data-suggestion].is-active,
+.wy-doc .wy-sug-block.is-active { background: var(--primary-tint); }
+
+.wy-cmt { background: var(--warning-tint); color: inherit; border-bottom: 2px solid var(--warning); padding-block: 1px; }
+.wy-cmt.is-active { background: color-mix(in oklab, var(--warning) 45%, var(--card)); }
+
+@media print {
+  /* E.39: comments never print. Suggestions aren't in what prints either; this is the screen's print only. */
+  .wy-cmt { background: none; border-bottom: 0; padding: 0; }
+  .wy-edx__rail { display: none; }
+}
+
+/* The rail and its cards (E.6). */
+.wy-edx__rail { position: relative; padding-block: 32px; padding-inline: 0 16px; min-width: 0; }
+.wy-edx__railhead { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; font-size: 0.75rem; color: var(--muted-foreground); }
+.wy-edx__railnote { margin: 0; padding: 12px; border: 1px dashed var(--input); border-radius: var(--radius-control-lg); color: var(--muted-foreground); font-size: 0.8125rem; line-height: 1.45; }
+.wy-rc {
+  --wy-lift: -8px;
+  position: absolute;
+  inset-inline: 0 16px;
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control-lg);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  box-sizing: border-box;
+  transition: top 150ms ease, translate 150ms ease;
+}
+[dir="rtl"] .wy-rc { --wy-lift: 8px; }
+.wy-rc.is-active { box-shadow: var(--shadow-float); border-color: var(--input); translate: var(--wy-lift) 0; z-index: 1; }
+.wy-rc.is-agent, .wy-rc.is-pending { border-style: dashed; border-color: var(--input); }
+.wy-rc--static { position: relative; inset: auto; }
+.wy-rc--static.is-active { translate: none; }
+.wy-rc__who { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.wy-drawerlist .wy-rc__who { flex-wrap: wrap; }
+.wy-rc__name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wy-rc__time { color: var(--muted-foreground); font-size: 0.75rem; white-space: nowrap; }
+.wy-rc__acts { margin-inline-start: auto; display: flex; gap: 2px; }
+.wy-rc__what { color: var(--muted-foreground); overflow-wrap: anywhere; }
+.wy-rc__what b { color: var(--foreground); font-weight: 500; }
+.wy-rc__reply { display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; border: 1px solid var(--input); border-radius: var(--radius-control-sm); background: none; color: var(--muted-foreground); font: inherit; cursor: text; }
+.wy-rc__box { border: 1px solid var(--input); border-radius: var(--radius-control); padding: 8px 10px; min-height: 56px; color: var(--foreground); font: inherit; font-size: 0.8125rem; box-sizing: border-box; width: 100%; }
+.wy-mention { color: var(--primary-tint-foreground); background: var(--primary-tint); border-radius: 4px; padding: 0 3px; font-weight: 500; }
+.wy-rc__foot { display: flex; justify-content: flex-end; gap: 6px; }
+.wy-rc__replies { display: grid; gap: 10px; padding-top: 8px; border-top: 1px solid var(--border); }
+.wy-rc__q { color: var(--muted-foreground); border-inline-start: 2px solid var(--warning); padding-inline-start: 8px; font-size: 0.75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wy-rc.is-resolved { opacity: .7; }
+.wy-rc__resolved { display: flex; align-items: center; gap: 6px; font-size: 0.75rem; color: var(--success-text); }
+.wy-drawerlist { display: grid; gap: 10px; }
+.wy-mentionpop { padding: 4px; }
+
+/* The mode menu (E.10). */
+.wy-modemenu__it { display: flex; gap: 10px; align-items: flex-start; }
+.wy-modemenu__it .wy-modemenu__t { display: grid; gap: 1px; flex: 1; }
+.wy-modemenu__it .wy-modemenu__t span { font-size: 0.75rem; color: var(--muted-foreground); }
+.wy-modemenu__it.is-on { background: var(--primary-tint); color: var(--primary-tint-foreground); }
+.wy-modemenu__it.is-on .wy-modemenu__t span { color: inherit; opacity: .8; }

@@ -5,8 +5,8 @@
  */
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
-import { PrintLabelsDialog, csvHeader, guessField } from '@whity-org/features/document-editor';
-import type { FieldGroup } from '@whity-org/ui/editor/fields';
+import { PrintLabelsDialog, csvHeader, guessField } from '@whity/features/document-editor';
+import type { FieldGroup } from '@whity/ui/editor/fields';
 
 // jsdom has no Blob#text(); browsers do.
 if (!Blob.prototype.text) {

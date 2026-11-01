@@ -4,18 +4,18 @@ import { useCallback, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { IconMenu2, IconShieldLock } from '@tabler/icons-react';
-import { useTranslation } from '@whity-org/features/i18n';
-import { useDateDisplay } from '@whity-org/features/datetime';
-import { Badge } from '@whity-org/ui/badge';
-import { Button } from '@whity-org/ui/button';
-import { ErrorState } from '@whity-org/ui/empty-state';
+import { useTranslation } from '@whity/features/i18n';
+import { useDateDisplay } from '@whity/features/datetime';
+import { Badge } from '@whity/ui/badge';
+import { Button } from '@whity/ui/button';
+import { ErrorState } from '@whity/ui/empty-state';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@whity-org/ui/dropdown-menu';
+} from '@whity/ui/dropdown-menu';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { useAuth } from '@/lib/auth-context';

@@ -5,16 +5,16 @@
  */
 import { act, fireEvent, render, screen } from '@testing-library/react';
 
-import { DocumentEditorScreen, type DocumentEditorAdapter, type SaveResult } from '@whity-org/features/document-editor';
-import { SAMPLE_DOCUMENT } from '@whity-org/ui/editor/sample';
-import type { ResolvedDocumentTheme, WhityDocument } from '@whity-org/ui/editor/contract';
+import { DocumentEditorScreen, type DocumentEditorAdapter, type SaveResult } from '@whity/features/document-editor';
+import { SAMPLE_DOCUMENT } from '@whity/ui/editor/sample';
+import type { ResolvedDocumentTheme, WhityDocument } from '@whity/ui/editor/contract';
 
 let lastOnChange: ((doc: WhityDocument) => void) | null = null;
 let lastServices: unknown = 'not rendered';
 let lastProps: Record<string, unknown> = {};
 
 // The editor itself is covered by editor-*.test.ts; here only its onChange matters.
-jest.mock('@whity-org/ui/editor/doc-editor', () => ({
+jest.mock('@whity/ui/editor/doc-editor', () => ({
   DocEditor: (props: { document: WhityDocument; onChange: (d: WhityDocument) => void; save?: { state: string }; services?: unknown }) => {
     lastOnChange = props.onChange;
     lastServices = props.services;
@@ -437,5 +437,49 @@ describe('issuing mode (M4c)', () => {
     });
     expect(calls).toEqual([{ title: 'Example Bakery invoice, kitchen', version: 4 }]);
     expect(a.issue).toHaveBeenCalledWith('7', { record: 'invoice:31', values: {} });
+  });
+});
+
+describe('comments and suggestions (M5)', () => {
+  const open = (id: string, status = 'open') => ({
+    id,
+    by: { kind: 'person' as const, id: '11', name: 'Rana' },
+    at: '2026-10-29T13:52:00Z',
+    kind: 'text' as const,
+    summary: 'Delete',
+    status: status as 'open',
+    patch: { op: 'delete-blocks' as const, blockIds: ['b1'] },
+  });
+
+  it('a stale decision refreshes the rail and the draft instead of failing', async () => {
+    const { a } = adapter([]);
+    a.loadCollab = jest
+      .fn()
+      .mockResolvedValueOnce({ suggestions: [open('41'), open('42')], threads: [], cursor: 'c1' })
+      .mockResolvedValueOnce({ suggestions: [open('42')], threads: [], cursor: 'c2' });
+    a.decide = jest.fn(async () => ({ ok: false as const, reason: 'stale' as const }));
+    render(<DocumentEditorScreen id="7" adapter={a} canEdit />);
+    await act(async () => {});
+    const collab = () => lastProps.collab as { suggestions: { id: string }[]; onDecide: (id: string, d: string) => Promise<void> };
+    expect(collab().suggestions.map((s) => s.id)).toEqual(['41', '42']);
+    await act(async () => {
+      await collab().onDecide('41', 'accepted');
+    });
+    expect(a.loadCollab).toHaveBeenCalledTimes(2);
+    expect(a.load).toHaveBeenCalledTimes(2);
+    expect(collab().suggestions.map((s) => s.id)).toEqual(['42']);
+  });
+
+  it('a suggestion that turned stale or was decided elsewhere leaves the rail when polled', async () => {
+    const { a } = adapter([]);
+    a.loadCollab = jest.fn(async () => ({ suggestions: [open('41'), open('42')], threads: [], cursor: 'c1' }));
+    a.collabChanges = jest.fn(async () => ({ cursor: 'c2', draftVersion: 4, suggestions: [open('41', 'stale'), open('43')], threads: [] }));
+    render(<DocumentEditorScreen id="7" adapter={a} canEdit />);
+    await act(async () => {});
+    await act(async () => {
+      jest.advanceTimersByTime(10000);
+    });
+    const ids = (lastProps.collab as { suggestions: { id: string }[] }).suggestions.map((s) => s.id);
+    expect(ids).toEqual(['42', '43']);
   });
 });

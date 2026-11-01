@@ -1,21 +1,21 @@
 'use client';
 
-import { CopyBlock } from '@whity-org/ui/copy-block';
-import { Button } from '@whity-org/ui/button';
-import { Alert, AlertDescription } from '@whity-org/ui/alert';
+import { CopyBlock } from '@whity/ui/copy-block';
+import { Button } from '@whity/ui/button';
+import { Alert, AlertDescription } from '@whity/ui/alert';
 import { IconAlertCircle, IconExternalLink } from '@tabler/icons-react';
-import { useTranslation, type TranslateFn } from '@whity-org/features/i18n';
+import { useTranslation, type TranslateFn } from '@whity/features/i18n';
 import {
   mcpClient,
   type McpClientId,
   type McpConnection,
   type McpFormField,
-} from '@whity-org/features/mcp';
+} from '@whity/features/mcp';
 import { useToast } from '@/lib/toast-context';
 
 /**
  * Step 3 of the connect wizard (WHIT-697): the setup for one app, built by
- * `@whity-org/features/mcp` and explained here in the user's language.
+ * `@whity/features/mcp` and explained here in the user's language.
  *
  * The order is easiest first. A one-click link comes first when the app has
  * one, but the copy-paste setup is always shown under it: the link schemes are

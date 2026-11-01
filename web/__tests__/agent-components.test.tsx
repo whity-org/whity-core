@@ -1,11 +1,11 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { ActionProposal } from '@whity-org/ui/action-proposal';
-import { ApprovalQueue, type ApprovalQueueItem } from '@whity-org/ui/approval-queue';
-import { ScopeGrant } from '@whity-org/ui/scope-grant';
-import { UndoBar } from '@whity-org/ui/undo-bar';
-import { AgentActivity } from '@whity-org/ui/agent-activity';
+import { ActionProposal } from '@whity/ui/action-proposal';
+import { ApprovalQueue, type ApprovalQueueItem } from '@whity/ui/approval-queue';
+import { ScopeGrant } from '@whity/ui/scope-grant';
+import { UndoBar } from '@whity/ui/undo-bar';
+import { AgentActivity } from '@whity/ui/agent-activity';
 
 /**
  * The agent collaboration components (WHIT-808): the register's rules that a

@@ -187,6 +187,7 @@ function EditorToolbar({
   onZoom,
   sheet,
   onCreateField,
+  onComment,
 }: {
   editor: Editor
   labels: EditorLabels
@@ -205,6 +206,8 @@ function EditorToolbar({
   sheet?: React.ReactNode
   /** A template's own field, made from Field ▾. */
   onCreateField?: (label: string) => FieldDef
+  /** M5: comment on the selection (⌥⌘M); offered with comment permission, editable or not. */
+  onComment?: () => void
 }) {
   const s = useEditorState({
     editor,
@@ -218,6 +221,7 @@ function EditorToolbar({
       canUndo: e.can().undo(),
       canRedo: e.can().redo(),
       item: currentItem(e)?.id ?? "text",
+      empty: e.state.selection.empty,
     }),
   })
   const mark = (name: string) => () => editor.chain().focus().toggleMark(name).run()
@@ -300,6 +304,18 @@ function EditorToolbar({
       </DropdownMenu>
       {fields && (fields.length > 0 || onCreateField) && (
         <FieldMenu editor={editor} groups={fields} labels={labels} disabled={!editable} onCreate={onCreateField} />
+      )}
+      {onComment && (
+        <IconButton
+          icon="comment-add"
+          label={labels.comment}
+          size="sm"
+          tooltip="bottom"
+          shortcut="⌥⌘M"
+          disabled={s.empty}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={onComment}
+        />
       )}
       <span className="min-w-2 flex-1" />
       {sheet}

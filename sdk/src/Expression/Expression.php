@@ -15,7 +15,7 @@ namespace Whity\Sdk\Expression;
  * WHY A TREE AND NOT A STRING: no string is ever parsed or evaluated as code,
  * so there is no injection to defend against, a person or a model writes it as
  * ordinary JSON, a diff between two versions is a tree diff, and the TypeScript
- * evaluator in `@whity-org/features/expressions` runs the same tree in a form
+ * evaluator in `@whity/features/expressions` runs the same tree in a form
  * as somebody types. Both evaluators are held to one fixture set
  * (`sdk/resources/expression-fixtures.json`).
  *

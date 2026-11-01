@@ -2,12 +2,12 @@ import * as React from "react"
 import { invoke } from "@tauri-apps/api/core"
 import { listen } from "@tauri-apps/api/event"
 
-import { Alert, AlertDescription } from "@whity-org/ui/alert"
-import { Badge } from "@whity-org/ui/badge"
-import { Button } from "@whity-org/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@whity-org/ui/card"
-import { EmptyState } from "@whity-org/ui/empty-state"
-import { Skeleton } from "@whity-org/ui/skeleton"
+import { Alert, AlertDescription } from "@whity/ui/alert"
+import { Badge } from "@whity/ui/badge"
+import { Button } from "@whity/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@whity/ui/card"
+import { EmptyState } from "@whity/ui/empty-state"
+import { Skeleton } from "@whity/ui/skeleton"
 
 import { remoteRequest } from "./remote-client"
 

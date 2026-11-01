@@ -10,16 +10,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Button } from '@whity-org/ui/button';
-import { Alert, AlertDescription } from '@whity-org/ui/alert';
+import { Button } from '@whity/ui/button';
+import { Alert, AlertDescription } from '@whity/ui/alert';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@whity-org/ui/select';
-import { useRichTranslation, useTranslation } from '@whity-org/features/i18n';
+} from '@whity/ui/select';
+import { useRichTranslation, useTranslation } from '@whity/features/i18n';
 import type { Person, RelationshipType } from './types';
 
 /**

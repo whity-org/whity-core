@@ -6,9 +6,9 @@ import { useToast } from '@/lib/toast-context';
 import { useFetch } from '@/hooks/useFetch';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { BILLING_PAY } from '@/lib/capabilities';
-import { Button } from '@whity-org/ui/button';
-import { useTranslation } from '@whity-org/features/i18n';
-import { formatMoney } from '@whity-org/ui/money/currency';
+import { Button } from '@whity/ui/button';
+import { useTranslation } from '@whity/features/i18n';
+import { formatMoney } from '@whity/ui/money/currency';
 import { navigateExternal } from '@/lib/external-navigate';
 
 /**

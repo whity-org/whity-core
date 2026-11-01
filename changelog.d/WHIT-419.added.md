@@ -1,0 +1,1 @@
+- Press Ctrl K (⌘K on a Mac) anywhere, or use the new search field in the top bar, to find records, go to any page you can open, or run an action such as switching the theme. The last row connects an agent; asking one directly arrives when agents have a channel to receive requests.

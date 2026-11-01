@@ -1,8 +1,13 @@
 {
-  "name": "@whity-org/api-client",
+  "name": "@whity/api-client",
   "version": "0.2.0",
   "description": "Typed client for the Whity API, generated from its OpenAPI spec.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/whity-org/whity-core.git",
+    "directory": "packages/api-client"
+  },
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
@@ -26,6 +31,7 @@
     "typescript": "^5"
   },
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
   }
 }

@@ -1,8 +1,13 @@
 {
-  "name": "@whity-org/tokens",
+  "name": "@whity/tokens",
   "version": "0.2.0",
   "description": "Design tokens (colors, typography, spacing, radius) for Whity products — generated from src/design/tokens/base.json. No React/Next dependency: a plain JSON bundle plus standalone importable Tailwind v4 theme CSS, a shadcn/Tailwind base-reset layer, and self-hosted @font-face CSS.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/whity-org/whity-core.git",
+    "directory": "packages/tokens"
+  },
   "exports": {
     ".": "./generated/tokens.json",
     "./css": "./generated/theme.css",
@@ -15,6 +20,7 @@
     "fonts"
   ],
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
   }
 }

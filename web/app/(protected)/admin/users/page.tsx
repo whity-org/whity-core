@@ -16,17 +16,17 @@ import {
   useDataTableQuery,
   type DataTableColumn,
 } from '@/components/ui/data-table';
-import { Button } from '@whity-org/ui/button';
-import { Badge } from '@whity-org/ui/badge';
+import { Button } from '@whity/ui/button';
+import { Badge } from '@whity/ui/badge';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@whity-org/ui/dropdown-menu';
+} from '@whity/ui/dropdown-menu';
 import { IconMenu2, IconPlus } from '@tabler/icons-react';
-import { useTranslation } from '@whity-org/features/i18n';
-import { useDateDisplay } from '@whity-org/features/datetime';
+import { useTranslation } from '@whity/features/i18n';
+import { useDateDisplay } from '@whity/features/datetime';
 import { CreateUserModal } from './create-modal';
 import { EditUserModal } from './edit-modal';
 import { DeleteUserModal } from './delete-modal';

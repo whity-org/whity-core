@@ -9,16 +9,16 @@ import { useCapabilities } from '@/hooks/useCapabilities';
 import { TENANTS_WRITE, TENANTS_DELETE } from '@/lib/capabilities';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
-import { Button } from '@whity-org/ui/button';
+import { Button } from '@whity/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@whity-org/ui/dropdown-menu';
+} from '@whity/ui/dropdown-menu';
 import { IconMenu2, IconPlus } from '@tabler/icons-react';
-import { useTranslation } from '@whity-org/features/i18n';
-import { useDateDisplay } from '@whity-org/features/datetime';
+import { useTranslation } from '@whity/features/i18n';
+import { useDateDisplay } from '@whity/features/datetime';
 import { CreateTenantModal } from './create-modal';
 import { DeleteTenantModal } from './delete-modal';
 

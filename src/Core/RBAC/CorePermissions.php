@@ -130,6 +130,11 @@ final class CorePermissions
     // authenticate AI clients to the MCP endpoint.
     public const MCP_TOKENS_MANAGE = 'mcp:tokens:manage';
 
+    // Workspace agents (WHIT-815). Creates, edits and archives the workspace's
+    // agent definitions: persona, toolsets and grant template. Migration 180
+    // grants it to every role holding mcp:tokens:manage.
+    public const AGENTS_MANAGE = 'agents:manage';
+
     // Self-service registration approval (WC-235). Gates the system-tenant-only
     // review of pending registrations: list, approve (invited → active) and
     // reject (invited → suspended). Necessary but not sufficient — the handler
@@ -240,6 +245,14 @@ final class CorePermissions
     // (PermissionRegistry). Migration 172 grants it to every role that held
     // DOCUMENTS_PUBLISH.
     public const DOCUMENTS_THEMES = 'documents:themes';
+    // Comments and suggestions in the editor (editor M5; E.10, E.29). Suggest
+    // is the permission of people who read but don't edit, and of agents,
+    // whose every change is a suggestion (E.4); accepting and rejecting stays
+    // with DOCUMENTS_WRITE. Comment starts threads, replies, resolves and
+    // reopens. Two segments only (PermissionRegistry). Migration 186 grants
+    // both to every role that held DOCUMENTS_READ.
+    public const DOCUMENTS_SUGGEST = 'documents:suggest';
+    public const DOCUMENTS_COMMENT = 'documents:comment';
 
     // Issued DOCUMENTS, as opposed to the templates above (#947 item 1,
     // migration 109). The four permissions above are the designer's; a document
@@ -482,6 +495,7 @@ final class CorePermissions
             self::SETTINGS_WRITE,
             self::SETTINGS_MANAGE,
             self::MCP_TOKENS_MANAGE,
+            self::AGENTS_MANAGE,
             self::REGISTRATIONS_APPROVE,
             self::AUTH_PROVIDERS_MANAGE,
             self::EMAIL_DOMAINS_MANAGE,
@@ -500,6 +514,8 @@ final class CorePermissions
             self::DOCUMENTS_RENDER,
             self::DOCUMENTS_ISSUE,
             self::DOCUMENTS_THEMES,
+            self::DOCUMENTS_SUGGEST,
+            self::DOCUMENTS_COMMENT,
             self::DOCUMENTS_READ_ALL,
             self::DOCUMENTS_ROUTE,
             self::SECURITY_MANAGE,

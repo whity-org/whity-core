@@ -2,14 +2,14 @@
 
 import * as React from 'react';
 
-import { Button } from '@whity-org/ui/button';
-import { Checkbox } from '@whity-org/ui/checkbox';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@whity-org/ui/dialog';
-import type { LabelPrintSource } from '@whity-org/ui/editor/contract';
-import type { FieldGroup } from '@whity-org/ui/editor/fields';
-import { Icon } from '@whity-org/ui/icon';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@whity-org/ui/select';
-import { ToggleGroup } from '@whity-org/ui/toggle-group';
+import { Button } from '@whity/ui/button';
+import { Checkbox } from '@whity/ui/checkbox';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@whity/ui/dialog';
+import type { LabelPrintSource } from '@whity/ui/editor/contract';
+import type { FieldGroup } from '@whity/ui/editor/fields';
+import { Icon } from '@whity/ui/icon';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@whity/ui/select';
+import { ToggleGroup } from '@whity/ui/toggle-group';
 import { useTranslation } from '../i18n';
 import type { LabelPrintResult, RecordChoice } from './types';
 

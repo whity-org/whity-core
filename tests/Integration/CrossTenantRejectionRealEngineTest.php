@@ -2579,6 +2579,60 @@ final class CrossTenantRejectionRealEngineTest extends TestCase
         self::assertNull($a['archived_at'], "Tenant A's theme is untouched");
     }
 
+    // ============ document suggestions and comments (editor M5) ============
+    //
+    // document_suggestions, document_comment_threads and document_comments
+    // (migrations 183-185). Every read and write binds tenant_id (and its
+    // document), so another workspace's ids reach nothing.
+
+    private function documentSourceIn(int $tenantId): int
+    {
+        return (new \Whity\Core\Document\DocumentSourceRepository($this->pdo))->create($tenantId, [
+            'kind' => 'note', 'title' => 'T', 'lang' => 'en', 'default_view' => 'continuous',
+            'blocks' => [['id' => 'b1', 'type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'Hello']]]],
+            'created_by' => null,
+        ]);
+    }
+
+    public function testDocumentSuggestionsAreTenantScoped(): void
+    {
+        $repo = new \Whity\Core\Document\Suggestion\DocumentSuggestionRepository($this->pdo);
+        $docA = $this->documentSourceIn(self::TENANT_A);
+        $rec = [
+            'kind' => 'block', 'summary' => 'Delete', 'request' => null, 'permission' => 'documents:suggest',
+            'created_by_profile_id' => 101, 'actor_kind' => 'person', 'agent_principal_id' => null,
+            'on_behalf_of_profile_id' => null, 'base_version' => 1, 'patch' => ['op' => 'delete-blocks', 'blockIds' => ['b1']],
+        ];
+        $id = $repo->create(self::TENANT_A, $docA, $rec);
+
+        self::assertNull($repo->find($id, self::TENANT_B, $docA), "Tenant A's suggestion must be absent to Tenant B");
+        self::assertSame([], $repo->listForSource(self::TENANT_B, $docA, null));
+        self::assertSame(0, $repo->countOpen(self::TENANT_B, $docA));
+        self::assertSame([], $repo->changedSince(self::TENANT_B, $docA, '2000-01-01 00:00:00'));
+        self::assertFalse($repo->decide($id, self::TENANT_B, 'accepted', 102), 'a cross-tenant decision touches zero rows');
+        self::assertFalse($repo->markStale($id, self::TENANT_B));
+        self::assertSame('open', $repo->find($id, self::TENANT_A, $docA)['status'] ?? null, "Tenant A's suggestion is untouched");
+    }
+
+    public function testDocumentCommentThreadsAreTenantScoped(): void
+    {
+        $repo = new \Whity\Core\Document\Comment\DocumentCommentRepository($this->pdo);
+        $docA = $this->documentSourceIn(self::TENANT_A);
+        $threadId = $repo->createThread(self::TENANT_A, $docA, 'b1', 'Hello', 101);
+        $repo->addComment(self::TENANT_A, $threadId, [
+            'created_by_profile_id' => 101, 'actor_kind' => 'person', 'agent_principal_id' => null,
+            'on_behalf_of_profile_id' => null, 'body' => [['type' => 'text', 'text' => 'Hi']], 'mentions' => [],
+        ]);
+
+        self::assertNull($repo->findThread($threadId, self::TENANT_B, $docA), "Tenant A's thread must be absent to Tenant B");
+        self::assertSame([], $repo->threadsForSource(self::TENANT_B, $docA));
+        self::assertSame([], $repo->commentsFor(self::TENANT_B, [$threadId]), "Tenant A's messages must be absent to Tenant B");
+
+        $repo->setResolved($threadId, self::TENANT_B, 102);
+        self::assertNull($repo->findThread($threadId, self::TENANT_A, $docA)['resolved_at'] ?? null, 'a cross-tenant resolve touches zero rows');
+        self::assertCount(1, $repo->commentsFor(self::TENANT_A, [$threadId])[$threadId] ?? []);
+    }
+
     // ==================== invitations (WHIT-417) ====================
     //
     // An invitation belongs to the tenant that issued it and carries that

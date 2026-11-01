@@ -322,6 +322,96 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/agent-presets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the presets a workspace agent can start from */
+        get: operations["get_api_v1_agent_presets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the workspace's agents */
+        get: operations["get_api_v1_agents"];
+        put?: never;
+        /**
+         * Create a workspace agent, from scratch or from a preset
+         * @description Send `presetKey` to start from a preset; any other field sent overrides the preset's. Without a `slug`, one is made from the name.
+         */
+        post: operations["post_api_v1_agents"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agents/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get one workspace agent */
+        get: operations["get_api_v1_agents_id"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Change a workspace agent's persona, toolsets or starting grant */
+        patch: operations["patch_api_v1_agents_id"];
+        trace?: never;
+    };
+    "/api/v1/agents/{id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Archive a workspace agent so it is no longer offered */
+        post: operations["post_api_v1_agents_id_archive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agents/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Offer an archived workspace agent again */
+        post: operations["post_api_v1_agents_id_restore"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/audit-logs": {
         parameters: {
             query?: never;
@@ -1464,6 +1554,110 @@ export interface paths {
         patch: operations["patch_api_v1_document_sources_id"];
         trace?: never;
     };
+    "/api/v1/document-sources/{id}/changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What changed on an editor document since a cursor
+         * @description Suggestions and comment threads changed since the cursor, and the draft version. The editor polls it every 10 seconds while open. An item may come back twice; keep the newest by id.
+         */
+        get: operations["get_api_v1_document_sources_id_changes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/document-sources/{id}/comments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the comment threads on an editor document
+         * @description Each thread with its anchor, quote and messages, and who resolved it.
+         */
+        get: operations["get_api_v1_document_sources_id_comments"];
+        put?: never;
+        /**
+         * Start a comment thread on an editor document
+         * @description Anchored to a block of the draft and the text it quotes; nothing is written into the draft. Each person @mentioned who can read the document is told in-app.
+         */
+        post: operations["post_api_v1_document_sources_id_comments"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/document-sources/{id}/comments/{tid}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reply in a comment thread
+         * @description Each person @mentioned who can read the document is told in-app.
+         */
+        post: operations["post_api_v1_document_sources_id_comments_tid_messages"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/document-sources/{id}/comments/{tid}/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reopen a resolved comment thread
+         * @description Recorded in the audit log. Reopening an open thread changes nothing.
+         */
+        post: operations["post_api_v1_document_sources_id_comments_tid_reopen"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/document-sources/{id}/comments/{tid}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resolve a comment thread
+         * @description Recorded in the audit log. Resolving a resolved thread changes nothing.
+         */
+        post: operations["post_api_v1_document_sources_id_comments_tid_resolve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/document-sources/{id}/copy": {
         parameters: {
             query?: never;
@@ -1556,6 +1750,26 @@ export interface paths {
          * @description Readable exactly when the document is. The file id is bound to the document and the tenant. Images are served inline, anything else as an attachment, with nosniff and a private immutable cache.
          */
         get: operations["get_api_v1_document_sources_id_files_fileid_content"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/document-sources/{id}/mentionable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Find people to @mention in a comment
+         * @description Up to 20 active members of the workspace who can read this document, matching q on display name or email. Nobody outside the workspace or the document's audience is listed.
+         */
+        get: operations["get_api_v1_document_sources_id_mentionable"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1658,6 +1872,70 @@ export interface paths {
          * @description The published version (or the draft, as a preview) filled for one record. Field values, Record and Chart blocks are read now, for the caller, and frozen into the PDF (E.16). A required field with no value refuses the render with 422 and the paths in details.missing (E.27). With persist, the PDF is issued as a document.
          */
         post: operations["post_api_v1_document_sources_id_render"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/document-sources/{id}/suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the suggestions on an editor document
+         * @description Open ones by default, in id order, each with its patch, who made it and when.
+         */
+        get: operations["get_api_v1_document_sources_id_suggestions"];
+        put?: never;
+        /**
+         * Suggest a change to an editor document
+         * @description The change is a patch anchored to block ids and text (E.4, E.10); the draft is not changed until someone who can edit accepts it. The patch must apply to the current draft (422 with details.code patch_does_not_apply otherwise); base_version records the draft version. An agent's suggestion records the agent and the person it acts for.
+         */
+        post: operations["post_api_v1_document_sources_id_suggestions"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/document-sources/{id}/suggestions/decisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept or reject many suggestions at once
+         * @description The rail's All menu (E.29): every open suggestion, those ids, or all from one agent. Accepted ones are applied in id order with one draft_version bump; stale ones are skipped, marked stale and listed. Each decision is audited. People only.
+         */
+        post: operations["post_api_v1_document_sources_id_suggestions_decisions"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/document-sources/{id}/suggestions/{sid}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept or reject a suggestion
+         * @description Accepting applies the patch to the draft in one transaction and bumps draft_version (the new one is the ETag). When its text or block has gone it becomes stale: 409 with details.code suggestion_stale. A suggestion decided already is 409 already_decided. Recorded in the audit log with who decided (E.29). People only: agents never decide.
+         */
+        post: operations["post_api_v1_document_sources_id_suggestions_sid_decision"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3079,6 +3357,88 @@ export interface paths {
          * @description Nothing runs. The agent can ask again.
          */
         post: operations["post_api_v1_me_agent_proposals_id_decline"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/agents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The workspace's agents, and which you use */
+        get: operations["get_api_v1_me_agents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/agents/{id}/assignment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Use an agent for yourself
+         * @description Your grant starts from the agent's template, limited to what you hold: reads at most Allowed, writes at most Ask first.
+         */
+        post: operations["post_api_v1_me_agents_id_assignment"];
+        /**
+         * Stop using an agent
+         * @description Its credentials are revoked, and its waiting proposals can no longer run.
+         */
+        delete: operations["delete_api_v1_me_agents_id_assignment"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/agents/{id}/assignment/grant": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Your grant for an agent, permission by permission */
+        get: operations["get_api_v1_me_agents_id_assignment_grant"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Change your grant for an agent
+         * @description Send permission => off, ask, allow or default. Each mode must be one the grant offers; it applies to every credential of the agent from its next call.
+         */
+        patch: operations["patch_api_v1_me_agents_id_assignment_grant"];
+        trace?: never;
+    };
+    "/api/v1/me/agents/{id}/credentials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * A credential that acts as this agent for you
+         * @description An ai-agent token for MCP clients. Its toolsets and grant are read from your use of the agent on every call. The token is shown once.
+         */
+        post: operations["post_api_v1_me_agents_id_credentials"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6174,8 +6534,170 @@ export interface components {
             promotion_id?: number | null;
             is_active?: boolean | null;
         };
+        Agent: {
+            id: number;
+            slug: string;
+            name: string;
+            nameAr: string;
+            role: string;
+            roleAr: string;
+            instructions: string;
+            instructionsAr: string;
+            /** @enum {string} */
+            tone: "plain" | "formal" | "brief";
+            /** @enum {string} */
+            language: "auto" | "en" | "ar";
+            toolsets: string[];
+            grant: {
+                [key: string]: "off" | "ask" | "allow";
+            };
+            /** @description The preset it was created from */
+            preset: {
+                key?: string;
+                version?: number;
+            } | null;
+            /** @enum {string} */
+            status: "active" | "archived";
+            createdAt: string;
+            updatedAt: string;
+        };
+        AgentAssignmentGrant: {
+            assignmentId: number;
+            principalId: string;
+            agent: {
+                id: number;
+                name: string;
+                nameAr: string;
+            };
+            permissions: components["schemas"]["AgentGrantRow"][];
+        };
+        AgentAssignmentGrantResponse: {
+            data: components["schemas"]["AgentAssignmentGrant"];
+        };
+        AgentCreateRequest: {
+            /** @description Lower-case letters, digits and dashes; unique in the workspace */
+            slug?: string;
+            /** @description Role name, for example "Finance clerk" (register 5.6b) */
+            name?: string;
+            /** @description The role name in Arabic */
+            nameAr?: string;
+            /** @description One sentence: what it does */
+            role?: string;
+            /** @description The role sentence in Arabic */
+            roleAr?: string;
+            /** @description The workspace's guidance for the model. Never changes access. */
+            instructions?: string;
+            /** @description The instructions in Arabic */
+            instructionsAr?: string;
+            /**
+             * @description plain (Whity's voice), formal or brief
+             * @enum {string}
+             */
+            tone?: "plain" | "formal" | "brief";
+            /**
+             * @description auto follows the person; en or ar fixes it
+             * @enum {string}
+             */
+            language?: "auto" | "en" | "ar";
+            /** @description Toolset ids or prefix.*; empty means every toolset */
+            toolsets?: string[];
+            /** @description Where a new assignment starts, per permission */
+            grant?: {
+                [key: string]: "off" | "ask" | "allow";
+            };
+            /** @description Start from this preset; fields sent override its own */
+            presetKey?: string;
+        };
+        AgentCredentialResponse: {
+            data: {
+                jti: string;
+                /** @description Shown once */
+                token: string;
+                name: string;
+                principalId: string;
+            };
+        };
+        AgentGrantRow: {
+            permission: string;
+            /**
+             * @description The mode set; null for the default
+             * @enum {string|null}
+             */
+            mode: "off" | "ask" | "allow" | null;
+            /** @description The modes you may set */
+            modes: ("off" | "ask" | "allow")[];
+            withheld: {
+                [key: string]: {
+                    reason: string;
+                    message: string;
+                };
+            };
+            effective: {
+                read?: string | null;
+                write?: string | null;
+            };
+        };
+        AgentListResponse: {
+            data: components["schemas"]["Agent"][];
+        };
+        AgentPersonaFields: {
+            /** @description Lower-case letters, digits and dashes; unique in the workspace */
+            slug?: string;
+            /** @description Role name, for example "Finance clerk" (register 5.6b) */
+            name?: string;
+            /** @description The role name in Arabic */
+            nameAr?: string;
+            /** @description One sentence: what it does */
+            role?: string;
+            /** @description The role sentence in Arabic */
+            roleAr?: string;
+            /** @description The workspace's guidance for the model. Never changes access. */
+            instructions?: string;
+            /** @description The instructions in Arabic */
+            instructionsAr?: string;
+            /**
+             * @description plain (Whity's voice), formal or brief
+             * @enum {string}
+             */
+            tone?: "plain" | "formal" | "brief";
+            /**
+             * @description auto follows the person; en or ar fixes it
+             * @enum {string}
+             */
+            language?: "auto" | "en" | "ar";
+            /** @description Toolset ids or prefix.*; empty means every toolset */
+            toolsets?: string[];
+            /** @description Where a new assignment starts, per permission */
+            grant?: {
+                [key: string]: "off" | "ask" | "allow";
+            };
+        };
+        AgentPreset: {
+            key: string;
+            version: number;
+            name: string;
+            nameAr: string;
+            role: string;
+            roleAr: string;
+            instructions: string;
+            instructionsAr: string;
+            /** @enum {string} */
+            tone: "plain" | "formal" | "brief";
+            /** @enum {string} */
+            language: "auto" | "en" | "ar";
+            toolsets: string[];
+            grant: {
+                [key: string]: "off" | "ask" | "allow";
+            };
+        };
+        AgentPresetListResponse: {
+            data: components["schemas"]["AgentPreset"][];
+        };
         AgentProposal: {
             id: number;
+            agent: {
+                name: string | null;
+            };
             /** @enum {string} */
             status: "waiting" | "approved" | "declined" | "expired" | "undone";
             tool: string;
@@ -6198,6 +6720,14 @@ export interface components {
         };
         AgentProposalResponse: {
             data: components["schemas"]["AgentProposal"];
+        };
+        AgentResponse: {
+            data: components["schemas"]["Agent"];
+        };
+        AgentUnassignResponse: {
+            data: {
+                revokedCredentials: number;
+            };
         };
         ApprovalStatusResponse: {
             data: {
@@ -6662,6 +7192,21 @@ export interface components {
                 [key: string]: components["schemas"]["RecordSectionVerdict"];
             };
         };
+        DocumentActor: {
+            /**
+             * @description A person, an agent acting for a person, or Whity
+             * @enum {string}
+             */
+            kind: "person" | "agent" | "system";
+            /** @description A person's profile id, or an agent's principal id; absent for the system */
+            id?: number | string;
+            name: string;
+            /** @description An agent only: the person it acts for */
+            for?: {
+                id: number;
+                name: string;
+            };
+        };
         DocumentArtifact: {
             id: number;
             document_id: number;
@@ -6690,6 +7235,17 @@ export interface components {
             /** @description true lets the plugin issue from its own slots with no person, with only the permissions it declares; false stops it */
             allowed: boolean;
         };
+        DocumentChangesResponse: {
+            data: {
+                /** @description Send it back as since on the next poll; opaque */
+                cursor: string;
+                draft_version: number;
+                /** @description Suggestions made or decided since the cursor, any status */
+                suggestions: components["schemas"]["DocumentSuggestion"][];
+                /** @description Threads started, replied to, resolved or reopened since the cursor, with all their messages */
+                comments: components["schemas"]["DocumentCommentThread"][];
+            };
+        };
         DocumentCollection: {
             id: number;
             tenant_id: number;
@@ -6717,6 +7273,59 @@ export interface components {
         };
         DocumentCollectionUpdateRequest: {
             name: string;
+        };
+        DocumentCommentMessage: {
+            id: number;
+            by: components["schemas"]["DocumentActor"];
+            /** @description ISO 8601 UTC */
+            at: string;
+            /** @description The contract Inline[] */
+            body: {
+                [key: string]: unknown;
+            }[];
+            /** @description The people @mentioned */
+            mentions: components["schemas"]["DocumentActor"][];
+        };
+        DocumentCommentMessageCreateRequest: {
+            /** @description The reply as the contract Inline[] (text, field, break, math), not empty */
+            body: {
+                [key: string]: unknown;
+            }[];
+            /** @description Profile ids @mentioned; members who can read the document are told in-app */
+            mentions?: number[];
+        };
+        DocumentCommentMessageResponse: {
+            data: components["schemas"]["DocumentCommentMessage"];
+        };
+        DocumentCommentThread: {
+            id: number;
+            anchor_block_id: string;
+            /** @description The commented text; the editor highlights it by finding it in the anchor block */
+            quote: string;
+            messages: components["schemas"]["DocumentCommentMessage"][];
+            /** @description Who resolved it and when; null while it is open */
+            resolved: {
+                by: components["schemas"]["DocumentActor"];
+                at: string;
+            } | null;
+        };
+        DocumentCommentThreadCreateRequest: {
+            /** @description The id of the block the commented text is in */
+            anchor_block_id: string;
+            /** @description The commented text, at most 2000 characters */
+            quote: string;
+            /** @description The first message as the contract Inline[] (text, field, break, math), not empty */
+            body: {
+                [key: string]: unknown;
+            }[];
+            /** @description Profile ids @mentioned; members who can read the document are told in-app */
+            mentions?: number[];
+        };
+        DocumentCommentThreadListResponse: {
+            data: components["schemas"]["DocumentCommentThread"][];
+        };
+        DocumentCommentThreadResponse: {
+            data: components["schemas"]["DocumentCommentThread"];
         };
         DocumentConveningEntry: {
             agenda_item: components["schemas"]["MeetingAgendaItem"];
@@ -6850,6 +7459,22 @@ export interface components {
                 /** @enum {string} */
                 direction: "asc" | "desc";
             };
+        };
+        DocumentMentionableListResponse: {
+            data: components["schemas"]["DocumentMentionablePerson"][];
+        };
+        DocumentMentionablePerson: {
+            /**
+             * @description Always person
+             * @enum {string}
+             */
+            kind: "person";
+            /** @description The profile id, as sent in mentions */
+            id: number;
+            /** @description The display name */
+            name: string;
+            /** @description The primary email, when there is one */
+            email?: string;
         };
         DocumentOwnField: {
             /** @description Lowercase letters, digits and underscores, at most 40; the field is `template.<key>`. */
@@ -7033,6 +7658,10 @@ export interface components {
             /** @description The document's own theme choice: a ref and overrides of the print colour and letterhead. Null follows the workspace defaults. */
             theme?: components["schemas"]["DocumentThemeRef"] | null;
             resolvedTheme?: components["schemas"]["ResolvedDocumentTheme"];
+            /** @description GET /{id} only: the open suggestions (editor M5) */
+            suggestions?: components["schemas"]["DocumentSuggestion"][];
+            /** @description GET /{id} only: every comment thread, resolved or not (editor M5) */
+            comments?: components["schemas"]["DocumentCommentThread"][];
             created_at: string;
             updated_at: string;
         };
@@ -7209,6 +7838,118 @@ export interface components {
             key: string;
             description: string;
             provenance?: string | null;
+        };
+        DocumentSuggestion: {
+            id: number;
+            /** @enum {string} */
+            kind: "text" | "format" | "block";
+            /** @description What the rail card says, for example Replace 30 days with 14 days */
+            summary: string;
+            /** @description For agents: what they were asked */
+            request: string | null;
+            /** @description The one permission the change used: documents:suggest */
+            permission: string;
+            by: components["schemas"]["DocumentActor"];
+            /** @description When it was made, ISO 8601 UTC */
+            at: string;
+            /** @enum {string} */
+            status: "open" | "accepted" | "rejected" | "stale";
+            patch: components["schemas"]["DocumentSuggestionPatch"];
+            /** @description The draft version it was made against */
+            base_version: number;
+            decided_by: components["schemas"]["DocumentActor"] | null;
+            decided_at: string | null;
+        };
+        DocumentSuggestionBulkDecisionRequest: {
+            /**
+             * @description accepted applies each patch to the draft, in id order; rejected leaves the draft as it is
+             * @enum {string}
+             */
+            decision: "accepted" | "rejected";
+            /** @description Only these suggestions; left out, every open one */
+            suggestion_ids?: number[] | null;
+            /** @description Only the suggestions this agent principal made (its id from by.id) */
+            agent?: string | null;
+        };
+        DocumentSuggestionBulkDecisionResponse: {
+            data: {
+                /** @description The suggestions accepted or rejected */
+                decided: number[];
+                /** @description The suggestions skipped because their text or block has gone; now stale */
+                stale: number[];
+                draft_version: number;
+            };
+        };
+        DocumentSuggestionCreateRequest: {
+            /**
+             * @description text for replace-text, format for format, block for insert-blocks, delete-blocks and move-block
+             * @enum {string}
+             */
+            kind: "text" | "format" | "block";
+            /** @description What the card says, at most 500 characters, for example Replace 30 days with 14 days */
+            summary: string;
+            /** @description The change; it must apply to the current draft */
+            patch: components["schemas"]["DocumentSuggestionPatch"];
+            /** @description For agents: what they were asked, at most 4000 characters */
+            request?: string | null;
+        };
+        DocumentSuggestionDecisionRequest: {
+            /**
+             * @description accepted applies the patch to the draft; rejected leaves the draft as it is
+             * @enum {string}
+             */
+            decision: "accepted" | "rejected";
+        };
+        DocumentSuggestionDecisionResponse: {
+            data: {
+                suggestion: components["schemas"]["DocumentSuggestion"];
+                /** @description The draft version now (bumped when a suggestion was accepted) */
+                draft_version: number;
+            };
+        };
+        DocumentSuggestionListResponse: {
+            data: components["schemas"]["DocumentSuggestion"][];
+        };
+        /** @description One change, anchored to block ids and text, never offsets. Text is matched in a block's flattened inline text (its content, or a toggle's summary): text runs in order, each field, break or formula counting as the one character U+FFFC; the occurrence-th match (0-based) is the occurrence-th position, scanning one character at a time, where the text starts. */
+        DocumentSuggestionPatch: {
+            /**
+             * @description What the patch does
+             * @enum {string}
+             */
+            op: "insert-blocks" | "replace-text" | "format" | "delete-blocks" | "move-block";
+            /** @description insert-blocks and move-block: the block to go after; null for the start of the document */
+            afterBlockId?: string | null;
+            /** @description insert-blocks: the contract Block[] to insert, with ids the draft doesn't use, and no suggestion attr or insertion/deletion marks */
+            blocks?: {
+                [key: string]: unknown;
+            }[];
+            /** @description replace-text, format and move-block: the block, at any depth */
+            blockId?: string;
+            /** @description replace-text: the text to replace; "" for a pure insertion. format: always "" */
+            deleteText?: string;
+            /** @description replace-text: the contract Inline[] put in its place */
+            insert?: {
+                [key: string]: unknown;
+            }[];
+            /** @description replace-text and format: which match, from 0. For a pure insertion, which match of before */
+            occurrence?: number;
+            /** @description replace-text with deleteText "": up to 40 characters of the block's text just before the insertion point; "" for the start of the block */
+            before?: string;
+            /** @description format: the text to format */
+            text?: string;
+            /** @description format: a contract mark, one of bold, italic, underline, strike, code, link ({type, href}) or highlight */
+            mark?: {
+                [key: string]: unknown;
+            };
+            /** @description format: true adds the mark, false removes it */
+            add?: boolean;
+            /** @description delete-blocks: the blocks to delete */
+            blockIds?: string[];
+        } & {
+            [key: string]: unknown;
+        };
+        DocumentSuggestionResponse: {
+            data: components["schemas"]["DocumentSuggestion"];
         };
         DocumentTemplateSlot: {
             /** @description `<plugin>.<slot>`, as a plugin names it when it issues */
@@ -8593,6 +9334,31 @@ export interface components {
                 id: number;
                 message: string;
             };
+        };
+        MyAgent: {
+            id: number;
+            slug: string;
+            name: string;
+            nameAr: string;
+            role: string;
+            roleAr: string;
+            /** @enum {string} */
+            tone: "plain" | "formal" | "brief";
+            /** @enum {string} */
+            language: "auto" | "en" | "ar";
+            preset: {
+                key?: string;
+                version?: number;
+            } | null;
+            /** @description Your use of this agent; null when you don't use it */
+            assignment: {
+                id?: number;
+                principalId?: string;
+                createdAt?: string;
+            } | null;
+        };
+        MyAgentListResponse: {
+            data: components["schemas"]["MyAgent"][];
         };
         NavigationItem: {
             id: string;
@@ -12054,6 +12820,538 @@ export interface operations {
             };
             /** @description meeting_id is required */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_agent_presets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Core presets, by key */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentPresetListResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_agents: {
+        parameters: {
+            query?: {
+                /** @description 1 to include archived agents */
+                archived?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The workspace's agents, by name */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentListResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_agents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description The new agent */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Another agent in this workspace already uses that slug */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Invalid fields (the errors list says which) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_agents_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ID of the agent. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The agent */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Agent not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    patch_api_v1_agents_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ID of the agent. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentPersonaFields"];
+            };
+        };
+        responses: {
+            /** @description The agent after the change */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Agent not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Another agent in this workspace already uses that slug */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Invalid fields (the errors list says which) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_agents_id_archive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ID of the agent. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The archived agent */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Agent not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_agents_id_restore: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ID of the agent. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The restored agent */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Agent not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -18187,6 +19485,479 @@ export interface operations {
             };
         };
     };
+    get_api_v1_document_sources_id_changes: {
+        parameters: {
+            query?: {
+                /** @description The cursor from the previous response. Left out, everything. A value that is not a cursor is a 422. */
+                since?: string;
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The changes and the next cursor */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentChangesResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Document not found or not visible to the caller */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description since is not a cursor */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_document_sources_id_comments: {
+        parameters: {
+            query?: {
+                /** @description `0` for open threads, `1` for resolved ones, `all` (the default) for both. Anything else is a 422. */
+                resolved?: string;
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The threads */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentCommentThreadListResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Document not found or not visible to the caller */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unknown resolved value */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_document_sources_id_comments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DocumentCommentThreadCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description The thread */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentCommentThreadResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Document not found or not visible to the caller */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Invalid anchor, quote, body or mentions */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_document_sources_id_comments_tid_messages: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+                tid: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DocumentCommentMessageCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description The message */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentCommentMessageResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Document or thread not found, or not visible to the caller */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Invalid body or mentions */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_document_sources_id_comments_tid_reopen: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+                tid: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The thread */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentCommentThreadResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Document or thread not found, or not visible to the caller */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_document_sources_id_comments_tid_resolve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+                tid: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The thread */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentCommentThreadResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Document or thread not found, or not visible to the caller */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     post_api_v1_document_sources_id_copy: {
         parameters: {
             query?: never;
@@ -18655,6 +20426,85 @@ export interface operations {
             };
             /** @description The stored file could not be read from storage */
             503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_document_sources_id_mentionable: {
+        parameters: {
+            query: {
+                /** @description Part of a display name or email, 1 to 100 characters; case-insensitive. Empty is a 422. */
+                q: string;
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The people */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentMentionableListResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Document not found or not visible to the caller */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description q is empty or longer than 100 characters */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -19136,6 +20986,371 @@ export interface operations {
             };
             /** @description Rendering is not enabled or temporarily unavailable */
             503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_document_sources_id_suggestions: {
+        parameters: {
+            query?: {
+                /** @description `open` (the default) or `all`, which adds accepted, rejected and stale ones. Anything else is a 422. */
+                status?: string;
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The suggestions */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentSuggestionListResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Document not found or not visible to the caller */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unknown status */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_document_sources_id_suggestions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DocumentSuggestionCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description The suggestion */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentSuggestionResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Document not found or not visible to the caller */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Invalid patch, kind or summary, or the patch does not apply */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_document_sources_id_suggestions_decisions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DocumentSuggestionBulkDecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description What was decided, what was stale, and the draft version */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentSuggestionBulkDecisionResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Document not found or not visible to the caller */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The document kept changing; details.code draft_changed */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Invalid decision, suggestion_ids or agent */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_document_sources_id_suggestions_sid_decision: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+                sid: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DocumentSuggestionDecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description The decided suggestion and the draft version */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentSuggestionDecisionResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Document or suggestion not found, or not visible to the caller */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description details.code: suggestion_stale, already_decided or draft_changed */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description decision must be accepted or rejected */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -27099,6 +29314,469 @@ export interface operations {
             };
             /** @description The proposal is no longer waiting (decided or expired) */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_me_agents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Active agents, by name */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyAgentListResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_me_agents_id_assignment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ID of the agent. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Your grant for the agent */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentAssignmentGrantResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Agent not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description You already use this agent */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    delete_api_v1_me_agents_id_assignment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ID of the agent. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description How many credentials were revoked */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentUnassignResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No such agent, or you don't use it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_me_agents_id_assignment_grant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ID of the agent. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Each permission's mode, the modes you may set, and what the agent can do */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentAssignmentGrantResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No such agent, or you don't use it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    patch_api_v1_me_agents_id_assignment_grant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ID of the agent. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: "off" | "ask" | "allow" | "default";
+                };
+            };
+        };
+        responses: {
+            /** @description Your grant after the change */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentAssignmentGrantResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No such agent, or you don't use it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A mode that isn't possible for that permission */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_me_agents_id_credentials: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ID of the agent. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description What to call the credential; the agent's name by default */
+                    name?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The new credential */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentCredentialResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No such agent, or you don't use it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description name is too long */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

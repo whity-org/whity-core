@@ -7,12 +7,12 @@ import { useAuth } from '@/lib/auth-context';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { useFetch } from '@/hooks/useFetch';
 import { AdminHeader } from '@/components/admin/admin-header';
-import { Button } from '@whity-org/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity-org/ui/card';
+import { Button } from '@whity/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
 import { IconDeviceFloppy } from '@tabler/icons-react';
-import { AccessDenied } from '@whity-org/ui/access-denied';
+import { AccessDenied } from '@whity/ui/access-denied';
 import { BrandingSettings } from '@/components/branding-settings';
-import { useTranslation } from '@whity-org/features/i18n';
+import { useTranslation } from '@whity/features/i18n';
 import {
   SETTINGS_READ,
   SETTINGS_WRITE,

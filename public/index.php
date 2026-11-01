@@ -493,6 +493,11 @@ $resourceTypeRegistry = new \Whity\Core\RBAC\ResourceTypeRegistry($hookManager);
 $resourceTypeRegistry->registerCoreResourceTypes();
 \Whity\register_service(\Whity\Core\RBAC\ResourceTypeRegistry::class, $resourceTypeRegistry); // @phpstan-ignore-line
 
+// Agent presets (WHIT-815): core's from database/agent-presets; plugin and
+// Whity Builder presets join at boot (WHIT-818).
+$agentPresetRegistry = new \Whity\Core\Agent\AgentPresetRegistry();
+\Whity\register_service(\Whity\Core\Agent\AgentPresetRegistry::class, $agentPresetRegistry); // @phpstan-ignore-line
+
 // 4c-ante. Organizational-unit TYPE catalogue (#822): which KINDS of unit a
 // plugin may contribute to a tenant's tree (campus, faculty, clinic, ward).
 // Constructed after the hook manager so a registration is announced on the
@@ -862,7 +867,7 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         // `records`: this is a surface a person opens about THEIR OWN work, like
         // the inbox above it, where the entries in `records` are things somebody
         // administers on behalf of the tenant.
-        'order' => 3,
+        'order' => 4,
         // Mirrors GET /api/v1/me/form-submissions, gated forms:submit rather than
         // forms:read — the rows already name exactly one person, so requiring the
         // tenant-wide read permission would hide this from precisely the people
@@ -1057,6 +1062,18 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         // awaiting you": routing is one registered source of possibly several,
         // and #947 refused it a surface of its own precisely so this entry never
         // has to become one entry per source.
+    ];
+    $items[] = [
+        'id' => 'approvals',
+        'label' => 'Approvals',
+        'href' => '/admin/approvals',
+        'icon' => 'rubber-stamp',
+        'group' => 'overview',
+        'order' => 3,
+        // WHIT-809. Ungated like the Inbox: it lists the proposals agents made
+        // on the CALLER's behalf (GET /api/me/agent-proposals), and only the
+        // granting person may decide them, so there is nobody a permission
+        // could usefully keep out.
     ];
     $items[] = [
         'id' => 'document-library',
@@ -2943,8 +2960,18 @@ $ouReachResolver = new \Whity\Core\Ou\OuReachResolver($db->getPdo(), $resourceRo
 // resolver the editor and printing share, so the page view and the PDF agree.
 $documentThemeRepository = new \Whity\Core\Document\Theme\DocumentThemeRepository($db->getPdo());
 $documentThemeResolver = new \Whity\Core\Document\Theme\DocumentThemeResolver($settingsService, $documentThemeRepository);
+// Comments and suggestions on those documents (editor M5, migrations 183-185):
+// served with GET /{id}, counted by the publish check (E.37), and routed below
+// beside the notifications they send.
+$documentSourceRepository = new \Whity\Core\Document\DocumentSourceRepository($db->getPdo());
+$documentCollab = new \Whity\Core\Document\Collab\DocumentCollab(
+    $db->getPdo(),
+    $documentSourceRepository,
+    new \Whity\Core\Document\Suggestion\DocumentSuggestionRepository($db->getPdo()),
+    new \Whity\Core\Document\Comment\DocumentCommentRepository($db->getPdo()),
+);
 $documentSourcesHandler = new \Whity\Api\DocumentSourcesApiHandler(
-    new \Whity\Core\Document\DocumentSourceRepository($db->getPdo()),
+    $documentSourceRepository,
     $documentAccessPolicy,
     $roleChecker,
     $ouReachResolver,
@@ -2953,6 +2980,7 @@ $documentSourcesHandler = new \Whity\Api\DocumentSourcesApiHandler(
     new \Whity\Core\Document\DocumentSourceFileStore($storageDriver, $db->getPdo()),
     new \Whity\Core\Document\DocumentSourceVersionRepository($db->getPdo()),
     $documentThemeResolver,
+    $documentCollab,
 );
 $router->register('GET',    '/api/document-sources',                [$documentSourcesHandler, 'list'],      null, null, CorePermissions::DOCUMENTS_READ);
 $router->register('POST',   '/api/document-sources',                [$documentSourcesHandler, 'create'],    null, null, CorePermissions::DOCUMENTS_WRITE);
@@ -3233,6 +3261,7 @@ $documentPublishingHandler = new \Whity\Api\DocumentPublishingApiHandler(
     $documentQrService,
     $documentIssuing,
     $documentThemeRepository,
+    $documentCollab,
 );
 $router->register('GET',  '/api/document-fields',                         [$documentPublishingHandler, 'fields'],       null, null, CorePermissions::DOCUMENTS_READ);
 $router->register('GET',  '/api/document-fields/records',                 [$documentPublishingHandler, 'records'],      null, null, CorePermissions::DOCUMENTS_READ);
@@ -3474,7 +3503,7 @@ $router->register('POST', '/api/documents/{id:\d+}/render',                     
 // gets the same 404 the id route gives them. Holding the paper is not reach.
 $router->register('GET',    '/api/documents/by-verification/{token}',                  [$documentQrHandler, 'resolveToken'], null, null, CorePermissions::DOCUMENTS_READ);
 // The record page's panel: the live code, its URL (so the client draws the
-// symbol with the barcode renderer already in @whity-org/ui) and the scan
+// symbol with the barcode renderer already in @whity/ui) and the scan
 // trail. Read gate matches the region's declaration in
 // DocumentsApiHandler::recordSections() — #975's rule that a region's dedicated
 // route carries the same gate as the region.
@@ -4139,6 +4168,33 @@ $notificationDispatcher = new \Whity\Core\Notification\NotificationDispatcher(
 );
 $notificationDispatcher->subscribe($hookManager);
 
+// Comments and suggestions on editor documents (editor M5; E.4, E.6, E.10,
+// E.29, E.37). Registered here, after the notification dispatcher, because a
+// comment tells the people it @mentions in-app. Each route finds the document
+// through DocumentSourcesApiHandler::visibleRow, so a hidden one answers 404.
+// Suggesting needs documents:suggest, commenting documents:comment, and
+// accepting or rejecting documents:write; agents never decide (the decision
+// routes are agentPolicy refuse, and refused for agents in the handler).
+$documentCollabHandler = new \Whity\Api\DocumentCollabApiHandler(
+    $documentSourcesHandler,
+    $documentCollab,
+    $roleChecker,
+    $auditLogger,
+    $notificationDispatcher,
+);
+$router->register('GET',  '/api/document-sources/{id:\d+}/suggestions',                     [$documentCollabHandler, 'listSuggestions'], null, null, CorePermissions::DOCUMENTS_READ);
+$router->register('POST', '/api/document-sources/{id:\d+}/suggestions',                     [$documentCollabHandler, 'createSuggestion'], null, null, CorePermissions::DOCUMENTS_SUGGEST);
+$router->register('POST', '/api/document-sources/{id:\d+}/suggestions/{sid:\d+}/decision',  [$documentCollabHandler, 'decide'],           null, null, CorePermissions::DOCUMENTS_WRITE);
+$router->register('POST', '/api/document-sources/{id:\d+}/suggestions/decisions',           [$documentCollabHandler, 'decideMany'],       null, null, CorePermissions::DOCUMENTS_WRITE);
+$router->register('GET',  '/api/document-sources/{id:\d+}/comments',                        [$documentCollabHandler, 'listComments'],     null, null, CorePermissions::DOCUMENTS_READ);
+$router->register('POST', '/api/document-sources/{id:\d+}/comments',                        [$documentCollabHandler, 'createThread'],     null, null, CorePermissions::DOCUMENTS_COMMENT);
+$router->register('POST', '/api/document-sources/{id:\d+}/comments/{tid:\d+}/messages',     [$documentCollabHandler, 'addMessage'],       null, null, CorePermissions::DOCUMENTS_COMMENT);
+$router->register('POST', '/api/document-sources/{id:\d+}/comments/{tid:\d+}/resolve',      [$documentCollabHandler, 'resolve'],          null, null, CorePermissions::DOCUMENTS_COMMENT);
+$router->register('POST', '/api/document-sources/{id:\d+}/comments/{tid:\d+}/reopen',       [$documentCollabHandler, 'reopen'],           null, null, CorePermissions::DOCUMENTS_COMMENT);
+$router->register('GET',  '/api/document-sources/{id:\d+}/changes',                         [$documentCollabHandler, 'changes'],          null, null, CorePermissions::DOCUMENTS_READ);
+// The people a comment may @mention: members who can read the document.
+$router->register('GET',  '/api/document-sources/{id:\d+}/mentionable',                     [$documentCollabHandler, 'mentionable'],      null, null, CorePermissions::DOCUMENTS_COMMENT);
+
 // 13b-quinquies-bis. ROUTING NOTIFICATIONS (#1054) — the subscriber that turns a
 // routing broadcast into notifications.
 //
@@ -4717,10 +4773,44 @@ $mcpToolsCallHandler = new ToolsCallHandler($toolDeriver, $router, $roleChecker,
 // The approvals inbox: the person an agent acts for approves, edits or
 // declines what it asked to do. Session-gated and never on the MCP surface:
 // an agent must not be able to approve its own proposal.
-$agentProposalsHandler = new \Whity\Api\AgentProposalsApiHandler($agentProposals, $mcpToolsCallHandler, $auditLogger);
+// WHIT-816: a workspace agent's proposal runs under the person's assignment as it is now.
+$agentAssignments = new \Whity\Core\Agent\AgentAssignmentRepository($db->getPdo());
+$agentProposalsHandler = new \Whity\Api\AgentProposalsApiHandler($agentProposals, $mcpToolsCallHandler, $auditLogger, $agentAssignments);
 $router->register('GET',  '/api/me/agent-proposals',                    [$agentProposalsHandler, 'list'],    null);
 $router->register('POST', '/api/me/agent-proposals/{id:\d+}/approve',  [$agentProposalsHandler, 'approve'], null);
 $router->register('POST', '/api/me/agent-proposals/{id:\d+}/decline',  [$agentProposalsHandler, 'decline'], null);
+// WHIT-815: workspace agents (persona, toolsets, starting grant) and the
+// presets they start from. Gated on agents:manage, which migration 180 grants
+// to every role holding mcp:tokens:manage. Writes are agentPolicy refuse.
+$agentsHandler = new \Whity\Api\AgentsApiHandler(
+    new \Whity\Core\Agent\AgentRepository($db->getPdo()),
+    $agentPresetRegistry,
+    $auditLogger,
+);
+$router->register('GET',   '/api/agents',                      [$agentsHandler, 'list'],    null, null, CorePermissions::AGENTS_MANAGE);
+$router->register('POST',  '/api/agents',                      [$agentsHandler, 'create'],  null, null, CorePermissions::AGENTS_MANAGE);
+$router->register('GET',   '/api/agents/{id:\d+}',             [$agentsHandler, 'get'],     null, null, CorePermissions::AGENTS_MANAGE);
+$router->register('PATCH', '/api/agents/{id:\d+}',             [$agentsHandler, 'update'],  null, null, CorePermissions::AGENTS_MANAGE);
+$router->register('POST',  '/api/agents/{id:\d+}/archive',     [$agentsHandler, 'archive'], null, null, CorePermissions::AGENTS_MANAGE);
+$router->register('POST',  '/api/agents/{id:\d+}/restore',     [$agentsHandler, 'restore'], null, null, CorePermissions::AGENTS_MANAGE);
+$router->register('GET',   '/api/agent-presets',               [$agentsHandler, 'presets'], null, null, CorePermissions::AGENTS_MANAGE);
+// WHIT-816: a person's use of the workspace's agents. Session-only (every
+// member may use one; no `agents:use` permission) and never on the MCP
+// surface, so an agent can't widen its own grant.
+$myAgentsHandler = new \Whity\Api\MyAgentsApiHandler(
+    new \Whity\Core\Agent\AgentRepository($db->getPdo()),
+    $agentAssignments,
+    $mcpTokenService,
+    $roleChecker,
+    $mcpAgentOperations,
+    $auditLogger,
+);
+$router->register('GET',    '/api/me/agents',                              [$myAgentsHandler, 'list'],        null);
+$router->register('POST',   '/api/me/agents/{id:\d+}/assignment',          [$myAgentsHandler, 'assign'],      null);
+$router->register('DELETE', '/api/me/agents/{id:\d+}/assignment',          [$myAgentsHandler, 'unassign'],    null);
+$router->register('GET',    '/api/me/agents/{id:\d+}/assignment/grant',    [$myAgentsHandler, 'grant'],       null);
+$router->register('PATCH',  '/api/me/agents/{id:\d+}/assignment/grant',    [$myAgentsHandler, 'updateGrant'], null);
+$router->register('POST',   '/api/me/agents/{id:\d+}/credentials',         [$myAgentsHandler, 'credential'],  null);
 $mcpHandlers = [
     'initialize'              => new InitializeHandler(listChanged: true),
     // WHIT-708: required of every 2026-07-28 server.

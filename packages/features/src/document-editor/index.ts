@@ -3,6 +3,10 @@ export { IssueBar } from './issue-bar';
 export { useEditorLabels } from './editor-labels';
 export { PrintLabelsDialog, csvHeader, guessField } from './print-labels-dialog';
 export type {
+  BulkDecisionResult,
+  CollabChanges,
+  CollabSnapshot,
+  DecisionResult,
   DocumentEditorAdapter,
   DraftPatch,
   IssueRequest,

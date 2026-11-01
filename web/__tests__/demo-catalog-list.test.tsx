@@ -1,13 +1,13 @@
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { DemoCatalogList } from '@whity-org/features/demo-catalog';
-import { LanguageProvider } from '@whity-org/features/i18n';
-import type { DemoCatalogAdapter, DemoCatalogItem } from '@whity-org/features/demo-catalog';
+import { DemoCatalogList } from '@whity/features/demo-catalog';
+import { LanguageProvider } from '@whity/features/i18n';
+import type { DemoCatalogAdapter, DemoCatalogItem } from '@whity/features/demo-catalog';
 
 /**
  * Component tests for the multi-client extraction pilot's DemoCatalogList
- * (@whity-org/features/demo-catalog). Verifies the component's loading/
+ * (@whity/features/demo-catalog). Verifies the component's loading/
  * empty/error/populated states and that it never fetches directly — every
  * assertion here drives a hand-rolled fake `DemoCatalogAdapter`, proving the
  * component's data-source-agnostic contract from the consumer's side.

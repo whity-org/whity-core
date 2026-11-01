@@ -195,3 +195,52 @@ describe('tool search (WHIT-707)', () => {
     expect(mcpEndpoint('https://api.acme.test/mcp?x=1', { allTools: true })).toBe('https://api.acme.test/mcp?x=1&tools=full')
   })
 })
+
+describe('local support (whity-agent, WHIT-823)', () => {
+  const ENDPOINT = { name: 'Example Bakery', url: 'https://app.whity.dev/mcp' }
+
+  it('never carries a token, a header or a secret', () => {
+    for (const client of MCP_CLIENTS) {
+      if (client.local === undefined) continue
+      const { addCommand, ...data } = client.local
+      const text = JSON.stringify(data) + JSON.stringify(addCommand?.(ENDPOINT) ?? [])
+      expect(text).not.toMatch(/bearer|authorization|token|header/i)
+    }
+  })
+
+  it('adds the server with the app\'s own command, URL only', () => {
+    expect(mcpClient('claude-code').local?.addCommand?.(ENDPOINT)).toEqual([
+      'claude', 'mcp', 'add', '--scope', 'user', '--transport', 'http', 'example-bakery', 'https://app.whity.dev/mcp',
+    ])
+    expect(mcpClient('codex').local?.addCommand?.(ENDPOINT)).toEqual([
+      'codex', 'mcp', 'add', 'example-bakery', '--url', 'https://app.whity.dev/mcp',
+    ])
+    const vscode = mcpClient('vscode').local?.addCommand?.(ENDPOINT) ?? []
+    expect(vscode.slice(0, 2)).toEqual(['code', '--add-mcp'])
+    expect(JSON.parse(vscode[2])).toEqual({ name: 'example-bakery', type: 'http', url: 'https://app.whity.dev/mcp' })
+  })
+
+  it('says how each app is connected: its own sign-in, or the bridge', () => {
+    const local = Object.fromEntries(MCP_CLIENTS.filter((c) => c.local !== undefined).map((c) => [c.id, c.local!.signsInItself]))
+    expect(local).toEqual({
+      'claude-code': true,
+      cursor: true,
+      vscode: true,
+      windsurf: false,
+      codex: true,
+      'gemini-cli': true,
+      claude: false,
+    })
+    for (const client of MCP_CLIENTS) {
+      if (client.local !== undefined && !client.local.signsInItself) expect(client.local.stdio).toBe(true)
+    }
+  })
+
+  it('names config files per OS, and is marked unverified until whity-agent checks it', () => {
+    expect(mcpClient('claude').local?.configPaths?.linux).toBeUndefined()
+    expect(mcpClient('vscode').local?.configPaths?.win32).toEqual(['%APPDATA%\\Code\\User\\mcp.json'])
+    for (const client of MCP_CLIENTS) {
+      if (client.local !== undefined) expect(client.local.verified).toBe(false)
+    }
+  })
+})

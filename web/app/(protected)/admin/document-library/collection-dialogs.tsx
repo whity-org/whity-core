@@ -1,8 +1,8 @@
 'use client';
 
-import { useTranslation } from '@whity-org/features/i18n';
-import { Button } from '@whity-org/ui/button';
-import { Checkbox } from '@whity-org/ui/checkbox';
+import { useTranslation } from '@whity/features/i18n';
+import { Button } from '@whity/ui/button';
+import { Checkbox } from '@whity/ui/checkbox';
 import {
   Dialog,
   DialogContent,
