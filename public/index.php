@@ -4915,6 +4915,14 @@ $mcpDiscovery = new DiscoveryTools(
             $tenantId,
             new \Whity\Core\Agent\AgentRepository($mcpBriefingPdo),
         ),
+        // WHIT-824: a person's own connection names the agents they granted.
+        static function (int $profileId, int $tenantId) use ($agentAssignments, $mcpBriefingPdo): array {
+            $mine = $agentAssignments->activeForPerson($profileId, $tenantId);
+            return $mine === [] ? [] : array_values(array_filter(
+                (new \Whity\Core\Agent\AgentRepository($mcpBriefingPdo))->list($tenantId),
+                static fn (array $agent): bool => isset($mine[$agent['id']]),
+            ));
+        },
     ),
     // WHIT-754: a plugin's always-on tool is listed only once this workspace's
     // admin turned it on (the mcp.always_on_plugin_tools setting).
