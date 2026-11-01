@@ -58,6 +58,9 @@ final class ToolsCallHandler implements MethodHandler
         // WHIT-784: where an agent's Ask-first call is stored for its person
         // to approve. Null: Ask first is refused, as before proposals existed.
         private readonly ?AgentProposalRepository $proposals = null,
+        // WHIT-833: previews of what a proposed call would change, stored as
+        // the proposal's diff for the approvals card. Null: no previews.
+        private readonly ?ProposalDiffRegistry $proposalDiffs = null,
     ) {}
 
     /**
@@ -454,6 +457,7 @@ final class ToolsCallHandler implements MethodHandler
             array_values(array_filter($principal->scope, 'is_string')),
             $permission !== null ? [$permission] : [],
             $summary,
+            diff: $this->proposalDiffs?->diffFor($toolName, $arguments, $principal->tenantId),
         );
 
         return [
