@@ -40,6 +40,9 @@ const PAGINATE_JS = fs.readFileSync(path.join(ASSET_DIR, 'paginate.js'), 'utf8')
  * into the page so the paginator's generated front matter and running heads
  * apply an identical rule. See src/flow/bidi.js. */
 const BIDI_JS = fs.readFileSync(require.resolve('../flow/bidi.js'), 'utf8');
+/* Readex Pro for titles and Geist Mono for codes (WHIT-733 part 2), embedded
+ * so --flow-display and --flow-mono resolve to the real faces. */
+const { FONT_FACES } = require('./fonts');
 
 /** The default stack: Noto Sans, with Noto Sans Arabic for Arabic (3.2, 3.3),
  * both in the image (Dockerfile: fonts-noto-core), so Arabic shapes rather
@@ -551,6 +554,7 @@ function buildFlowHtml(doc) {
 ${theme}}
 @page { size: ${mm(doc.page.widthMm)} ${mm(doc.page.heightMm)}; margin: 0; }
 </style>
+<style>${FONT_FACES}</style>
 <style>${FLOW_CSS}</style>
 </head>
 <body${bodyClasses ? ` class="${bodyClasses}"` : ''}>

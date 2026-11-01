@@ -31,3 +31,16 @@ src/*
 !src/Core
 src/Core/*
 !src/Core/CoreVersion.php
+
+# The document faces the image doesn't get from Debian (WHIT-733 part 2):
+# Readex Pro and Geist Mono, the app's own OFL-licensed files and licences.
+!packages
+packages/*
+!packages/tokens
+packages/tokens/*
+!packages/tokens/fonts
+packages/tokens/fonts/*
+!packages/tokens/fonts/readex-pro-*.woff2
+!packages/tokens/fonts/geist-mono-*.woff2
+!packages/tokens/fonts/LICENSE-readex-pro.txt
+!packages/tokens/fonts/LICENSE-geist-mono.txt
