@@ -8,7 +8,8 @@ namespace Whity\Core\Document\Print;
  * What blocks publishing a template (E.37; contract `PublishBlocker`):
  * a field the record type doesn't have, and a block without a print view
  * (E.18), which covers plugin blocks until M7 adds their print views and the
- * plugin-off state (E.19). Open suggestions join with M5, when they are stored.
+ * plugin-off state (E.19). Open suggestions (M5) are stored in their own rows,
+ * so DocumentPublishingApiHandler adds that blocker from DocumentCollab.
  *
  * The same check runs when the editor opens the dialog and again inside
  * Publish, so a template can't be published past it.

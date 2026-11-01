@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace Whity\Api;
 
 use Whity\Auth\RoleChecker;
+use Whity\Core\Document\Collab\DocumentCollab;
 use Whity\Core\Document\DocumentAccessPolicy;
 use Whity\Core\Document\DocumentSourceFileStore;
 use Whity\Core\Document\DocumentSourceRepository;
 use Whity\Core\Document\DocumentSourceVersionRepository;
+use Whity\Core\Document\Suggestion\SuggestionPatch;
 use Whity\Core\Document\Theme\DocumentThemeRef;
 use Whity\Core\Document\Theme\DocumentThemeResolver;
 use Whity\Core\Document\Theme\DocumentThemeTokens;
@@ -52,7 +54,10 @@ use Whity\Storage\StorageException;
  * (docs/design/handoff/editor/whity-document.ts). The server checks its shape
  * (a list of objects, each with a unique string id and a string type) and
  * stores it as JSON; later milestones add per-block validation (plugin data
- * against its schema, M7). Comments and suggestions are not part of it.
+ * against its schema, M7). Comments and suggestions are not part of it (M5):
+ * a draft carrying `insertion` / `deletion` marks or a block `suggestion`
+ * attr is refused with 422, so a suggestion can never be smuggled into the
+ * draft. GET /{id} adds the open suggestions and every comment thread.
  * Error bodies are generic (WC-186).
  */
 final class DocumentSourcesApiHandler
@@ -79,6 +84,8 @@ final class DocumentSourcesApiHandler
         private readonly ?DocumentSourceVersionRepository $versions = null,
         // The theme a document shows with (editor M4d), served as resolvedTheme.
         private readonly ?DocumentThemeResolver $themes = null,
+        // Its open suggestions and comment threads (editor M5), served with it.
+        private readonly ?DocumentCollab $collab = null,
     ) {
         $this->repo = $repo;
         $this->policy = $policy;
@@ -125,7 +132,12 @@ final class DocumentSourcesApiHandler
             return Response::error('Document not found', 404);
         }
 
-        return Response::json(['data' => $this->withResolvedTheme($tenantId, $row)])
+        $data = $this->withResolvedTheme($tenantId, $row);
+        if ($this->collab !== null) {
+            $data += $this->collab->projection($tenantId, (int) $row['id']);
+        }
+
+        return Response::json(['data' => $data])
             ->withHeaders(['ETag' => self::etag($row['draft_version'])]);
     }
 
@@ -263,6 +275,12 @@ final class DocumentSourcesApiHandler
                 409,
                 ['draft_version' => $current['draft_version']],
             )->withHeaders(['ETag' => self::etag($current['draft_version'])]);
+        }
+
+        // M5: a suggestion whose text or block this save removed goes stale
+        // now, so it no longer blocks publishing (E.37).
+        if ($this->collab !== null && array_key_exists('blocks', $fields)) {
+            $this->collab->markStaleAgainst($tenantId, $id, $fields['blocks']);
         }
 
         $saved = $this->repo->findById($id, $tenantId);
@@ -534,6 +552,12 @@ final class DocumentSourcesApiHandler
                     'blocks must be a list of at most ' . self::MAX_BLOCKS . ' blocks, each an object with a unique string id and a string type',
                     422,
                 );
+            }
+            // Suggestions live in their own rows (M5): what the editor draws
+            // them with is never saved as content.
+            $smuggled = SuggestionPatch::suggestionArtifactProblem($blocks);
+            if ($smuggled !== null) {
+                return Response::error($smuggled, 422, ['code' => 'suggestion_in_draft']);
             }
             $fields['blocks'] = $blocks;
         }

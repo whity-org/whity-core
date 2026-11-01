@@ -247,8 +247,11 @@ export const CommentMark = Mark.create({
   parseHTML: () => [{ tag: "span[data-comment]" }],
   renderHTML: ({ mark }) => ["span", { "data-comment": mark.attrs.threadId }, 0],
 })
+// Neither suggestion mark carries on into what is typed next to it: Suggesting
+// mode marks new text itself, and Editing must not hide typing inside a mark the draft strips.
 export const Insertion = Mark.create({
   name: "insertion",
+  inclusive: false,
   excludes: "deletion",
   addAttributes: () => ({ suggestionId: { default: "" } }),
   parseHTML: () => [{ tag: "ins" }],
@@ -256,6 +259,7 @@ export const Insertion = Mark.create({
 })
 export const Deletion = Mark.create({
   name: "deletion",
+  inclusive: false,
   excludes: "insertion",
   addAttributes: () => ({ suggestionId: { default: "" } }),
   parseHTML: () => [{ tag: "del" }],

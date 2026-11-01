@@ -179,6 +179,12 @@ final class TenantOwnedTables
         'document_source_versions' => '162_create_document_source_versions.php',
         // Editor M4d: the workspace's own document themes (migration 170, E.44).
         'document_themes' => '170_create_document_themes.php',
+        // Editor M5: suggestions and comment threads on those documents
+        // (migrations 183-185, E.4, E.6, E.29). document_comments carries the
+        // tenant denormalised from its thread, so a read binds it directly.
+        'document_suggestions' => '183_create_document_suggestions.php',
+        'document_comment_threads' => '184_create_document_comment_threads.php',
+        'document_comments' => '185_create_document_comments.php',
         // Whity Builder (WHIT-760): a workspace's own plugins as published
         // manifest versions, the live pointer, and the permission slugs they
         // declare (migration 164).

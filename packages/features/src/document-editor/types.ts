@@ -1,4 +1,13 @@
-import type { LabelPrintSource, PublishBlocker, ResolvedDocumentTheme, WhityDocument } from '@whity-org/ui/editor/contract';
+import type {
+  DecideAllFilter,
+  Decision,
+  MentionPerson,
+  NewComment,
+  NewSuggestion,
+  RailSuggestion,
+  RailThread,
+} from '@whity-org/ui/editor/collab';
+import type { Inline, LabelPrintSource, PublishBlocker, ResolvedDocumentTheme, WhityDocument } from '@whity-org/ui/editor/contract';
 import type { FieldGroup } from '@whity-org/ui/editor/fields';
 import type { BrandLogos, Letterhead, LetterheadParts } from '@whity-org/ui/editor/page-view';
 import type { EditorServices, FieldPreview } from '@whity-org/ui/editor/services';
@@ -69,6 +78,51 @@ export interface DocumentEditorAdapter {
    * published version) resolves as a result; anything else throws.
    */
   issue?(id: string, request: IssueRequest): Promise<IssueResult>;
+
+  /* M5: comments and suggestions (E.4, E.6, E.10, E.29). Without them the editor has no rail. */
+
+  /** The open suggestions and every thread, with the cursor `collabChanges` continues from. */
+  loadCollab?(id: string): Promise<CollabSnapshot>;
+  /** What changed since `cursor` (polled every 10 s while the editor is open). */
+  collabChanges?(id: string, cursor: string | null): Promise<CollabChanges>;
+  /** POST /suggestions: one local change from Suggesting mode. */
+  suggest?(id: string, change: NewSuggestion): Promise<RailSuggestion>;
+  /** Accept or reject one suggestion (documents:write). A stale or already-decided one resolves as such. */
+  decide?(id: string, suggestionId: string, decision: Decision): Promise<DecisionResult>;
+  /** Accept or reject all open suggestions, some ids, or all from one agent. */
+  decideAll?(id: string, decision: Decision, filter?: DecideAllFilter): Promise<BulkDecisionResult>;
+  comment?(id: string, comment: NewComment): Promise<RailThread>;
+  reply?(id: string, threadId: string, body: Inline[], mentions: string[]): Promise<RailThread['messages'][number]>;
+  resolveThread?(id: string, threadId: string): Promise<RailThread>;
+  reopenThread?(id: string, threadId: string): Promise<RailThread>;
+  /** People to @mention: workspace members who can read the document. Never called with an empty query. */
+  searchPeople?(id: string, query: string): Promise<MentionPerson[]>;
+}
+
+export interface CollabSnapshot {
+  suggestions: RailSuggestion[];
+  threads: RailThread[];
+  cursor: string | null;
+}
+
+export interface CollabChanges {
+  cursor: string | null;
+  draftVersion: number;
+  /** Suggestions changed since the cursor, any status (decided ones leave the rail). */
+  suggestions: RailSuggestion[];
+  /** Threads changed since the cursor, whole. */
+  threads: RailThread[];
+}
+
+export type DecisionResult =
+  | { ok: true; draftVersion: number }
+  /** 409: the anchor text has gone (`suggestion_stale`) or someone decided first (`already_decided`). */
+  | { ok: false; reason: 'stale' | 'already_decided' };
+
+export interface BulkDecisionResult {
+  decided: string[];
+  stale: string[];
+  draftVersion: number;
 }
 
 /** What one published version holds: what a document issued from it prints. */

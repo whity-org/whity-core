@@ -7,3 +7,16 @@ export { EditorServicesProvider, type EditorServices, type RecordView, type Char
 export { type FieldDef, type FieldGroup } from "./fields"
 export { type Letterhead } from "./page-view"
 export { type FieldPreview } from "./services"
+export * from "./collab"
+export {
+  collectPatches,
+  renderSuggestions,
+  stripSuggestions,
+  suggestEdit,
+  summarize,
+  type FormatEdit,
+  type LocalChange,
+  type PatchedSuggestion,
+  type SuggestionKind,
+  type SuggestionPatch,
+} from "./suggestions"
