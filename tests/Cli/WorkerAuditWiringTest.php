@@ -58,7 +58,7 @@ final class WorkerAuditWiringTest extends TestCase
     public function testThePluginLoaderIsGivenTheWiredHookManagerAndWriter(): void
     {
         self::assertMatchesRegularExpression(
-            '/PluginJobs::register\(\s*\$registry,\s*null,\s*\$this->logger,\s*\$hookManager,\s*\$auditLogger\s*\)/',
+            '/PluginJobs::register\(\s*\$registry,\s*null,\s*\$this->logger,\s*\$hookManager,\s*\$auditLogger(,\s*\$documentRegistries)?\s*\)/',
             $this->queueWorkCommand(),
             'PluginJobs::register() must receive the worker\'s hook manager and audit writer, '
             . 'or a plugin dispatching its declared event from inside a job produces no trail '

@@ -29,6 +29,11 @@ use Whity\Core\Document\Issuing\WorkerDocumentServices;
 use Whity\Core\Document\Fields\DocumentFieldRegistry;
 use Whity\Core\Hooks\HookManager;
 use Whity\Sdk\Documents\Documents;
+use Whity\Core\Document\Issuing\SdkDocuments;
+use Whity\Core\Audit\AuditContext;
+use Whity\Sdk\Documents\DocumentNotIssuedException;
+use Whity\Sdk\Documents\IssueRequest as SdkIssueRequest;
+use Whity\Sdk\Documents\TemplateRef;
 use Whity\Core\Document\Organizer\CoreDocumentSubstrates;
 use Whity\Core\Document\Organizer\CoreDocumentViews;
 use Whity\Core\Document\Organizer\DocumentSubstrateRegistry;
@@ -1228,6 +1233,57 @@ final class DocumentCreateApiRealEngineTest extends TestCase
             self::assertSame(1, $this->countDocuments());
         } finally {
             $GLOBALS['whity_services'] = $saved;
+        }
+    }
+
+    /**
+     * The SDK's Documents (1.56): a plugin issues as the person whose request
+     * it is, through the same service, and gets the SDK's own refusal. With
+     * no person (a job, the relay) it refuses with no_actor.
+     */
+    public function testThePluginFacadeIssuesAsThePersonInTheRequest(): void
+    {
+        $roleChecker = new RoleChecker($this->wrapSqlite($this->pdo), new PermissionRegistry());
+        $documents = new SdkDocuments(new TemplateIssuing(
+            $this->editor->issuing,
+            $this->editor->fields,
+            $this->settings,
+            fn (int $id, int $tenantId, int $callerId): ?array => $this->editor->sources->visibleRow($id, $tenantId, $callerId),
+            $this->slots,
+        ), $roleChecker);
+        $about = $this->seedDocument(self::RAISER, 'Order 4812');
+        $templateId = $this->slotTemplate();
+        $this->bindSlot($templateId);
+        $request = new SdkIssueRequest(TemplateRef::slot('Courier.receipt'), record: 'document:' . $about, originKey: 'order:4812:receipt', render: false);
+
+        TenantContext::reset();
+        AuditContext::reset();
+        self::assertFalse($documents->canIssue());
+        try {
+            $documents->issue($request);
+            self::fail('issued with nobody to act for');
+        } catch (DocumentNotIssuedException $e) {
+            self::assertSame(DocumentNotIssuedException::NO_ACTOR, $e->reason);
+        }
+
+        TenantContext::setTenantId(self::TENANT);
+        AuditContext::set(self::RAISER, null);
+        try {
+            self::assertTrue($documents->canIssue());
+            $issued = $documents->issue($request);
+            self::assertFalse($issued->replayed);
+            self::assertSame('Receipt · #' . $about . ' · Order 4812', $issued->title);
+            self::assertNull($issued->contentUrl, 'recorded without a rendered file');
+            self::assertTrue($documents->issue($request)->replayed);
+
+            try {
+                $documents->issue(new SdkIssueRequest(TemplateRef::source(99999)));
+                self::fail('issued from a missing template');
+            } catch (DocumentNotIssuedException $e) {
+                self::assertSame(DocumentNotIssuedException::TEMPLATE_NOT_FOUND, $e->reason);
+            }
+        } finally {
+            AuditContext::reset();
         }
     }
 

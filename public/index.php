@@ -3405,14 +3405,20 @@ $documentsHandler = new \Whity\Api\DocumentsApiHandler(
     $templateSlotRegistry
 );
 // The one issuing path (WHIT-742), registered for plugin code and automations
-// running in a request; BaseCommand registers the same for queue:work and
-// events:relay (WorkerDocumentIssuing). POST /api/documents uses the same class.
+// running in a request. BaseCommand registers the same for CLI commands, and
+// queue:work through WorkerDocumentServices. POST /api/documents uses it too.
 \Whity\register_service(\Whity\Core\Document\Issuing\TemplateIssuing::class, new \Whity\Core\Document\Issuing\TemplateIssuing(
     $documentIssuing,
     $documentFieldRegistry,
     $settingsService,
     static fn (int $id, int $tenantId, int $profileId): ?array => $documentSourcesHandler->visibleRow($id, $tenantId, $profileId),
     $templateSlotRegistry,
+));
+// The SDK's Documents (1.56): plugins issue through the same service, as the
+// person whose request it is.
+\Whity\register_service(\Whity\Sdk\Documents\Documents::class, new \Whity\Core\Document\Issuing\SdkDocuments(
+    \Whity\app(\Whity\Core\Document\Issuing\TemplateIssuing::class),
+    $roleChecker,
 ));
 $documentQrHandler = new \Whity\Api\DocumentQrApiHandler(
     $documentRepository,
@@ -4817,6 +4823,8 @@ $router->register('POST', '/api/mcp/connect/preview', [$mcpConnectHandler, 'prev
 // Load plugins AFTER every core route (WC-169): the Router refuses duplicate
 // method+path registrations (first wins), so core routes can never be
 // shadowed by a plugin claiming the same path.
+// Code plugins' template slots and record types as merge fields (SDK 1.56, WHIT-742).
+$pluginLoader->setDocumentRegistries($templateSlotRegistry, $documentFieldRegistry);
 $pluginLoader->load();
 $pluginLoader->collectMcpPrompts($promptRegistry);
 // SDK 1.43. Collect FIRST, then hand the deriver the suppressions: a plugin
