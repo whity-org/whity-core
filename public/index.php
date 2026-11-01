@@ -1177,6 +1177,25 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'requiredRole' => 'admin',
     ];
     $items[] = [
+        // WHIT-820: every member may use an agent for themselves, so this is
+        // ungated, like the routes behind it (GET /api/me/agents).
+        'id' => 'my-agents',
+        'label' => 'My agents',
+        'href' => '/admin/my-agents',
+        'icon' => 'robot',
+        'group' => 'ai',
+        'order' => -2,
+    ];
+    $items[] = [
+        'id' => 'agents',
+        'label' => 'Agents',
+        'href' => '/admin/agents',
+        'icon' => 'robot',
+        'group' => 'ai',
+        'order' => -1,
+        'requiredPermission' => \Whity\Core\RBAC\CorePermissions::AGENTS_MANAGE,
+    ];
+    $items[] = [
         'id' => 'ai-principals',
         'label' => 'AI Principals',
         'href' => '/admin/ai-principals',
