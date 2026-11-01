@@ -13,7 +13,6 @@ import { IconDeviceFloppy } from '@tabler/icons-react';
 import { AccessDenied } from '@whity-org/ui/access-denied';
 import { BrandingSettings } from '@/components/branding-settings';
 import { useTranslation } from '@whity-org/features/i18n';
-import { SettingsTabs } from '../settings-tabs';
 import {
   SETTINGS_READ,
   SETTINGS_WRITE,
@@ -82,7 +81,6 @@ export default function BrandingSettingsPage() {
           'Language, logos, favicon, and colors for this tenant.'
         )}
       />
-      <SettingsTabs active="branding" />
       <LocaleSection canWrite={canWrite} tenantOverridable={tenantOverridable} addToast={addToast} />
       <BrandingSettings variant="tenant" tenantOverridable={tenantOverridable} />
       {isSystemTenant && <BrandingSettings variant="global" />}

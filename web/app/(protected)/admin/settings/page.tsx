@@ -12,7 +12,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whit
 import { AccessDenied } from '@whity-org/ui/access-denied';
 import { IconDeviceFloppy } from '@tabler/icons-react';
 import { useTranslation } from '@whity-org/features/i18n';
-import { SettingsTabs } from './settings-tabs';
 import {
   SETTINGS_READ,
   SETTINGS_WRITE,
@@ -83,7 +82,6 @@ export default function AdminSettingsPage() {
           "Your tenant's instance identity. Cleared fields fall back to the platform-wide global default. Editing requires the settings:write permission."
         )}
       />
-      <SettingsTabs active="general" />
       <TenantSettingsSection canWrite={canWrite} addToast={addToast} />
       {isSystemTenant && canManageGlobal && <PlatformDefaultsSection addToast={addToast} />}
     </div>

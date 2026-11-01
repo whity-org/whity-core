@@ -13,7 +13,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whit
 import { AccessDenied } from '@whity-org/ui/access-denied';
 import { IconDeviceFloppy } from '@tabler/icons-react';
 import { useTranslation } from '@whity-org/features/i18n';
-import { SettingsTabs } from '../settings-tabs';
 import {
   SETTINGS_MANAGE,
   SYSTEM_TENANT_ID,
@@ -85,7 +84,6 @@ export default function StorageSettingsPage() {
           'Where uploaded files and assets are kept for this instance.'
         )}
       />
-      <SettingsTabs active="storage" />
       <StorageSettingsForm addToast={addToast} />
     </div>
   );

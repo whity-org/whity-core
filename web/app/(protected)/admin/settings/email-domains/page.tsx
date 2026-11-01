@@ -21,7 +21,6 @@ import {
   IconWorld,
 } from '@tabler/icons-react';
 import { useTranslation } from '@whity-org/features/i18n';
-import { SettingsTabs } from '../settings-tabs';
 
 const NATIVE_SELECT_CLASS =
   'h-7 w-full min-w-0 rounded-md border border-input bg-input/20 px-2 text-sm transition-colors outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-50';
@@ -181,7 +180,6 @@ export default function EmailDomainsPage() {
           ) : undefined
         }
       />
-      <SettingsTabs active="email-domains" />
 
       {addingOpen && (
         <AddDomainCard

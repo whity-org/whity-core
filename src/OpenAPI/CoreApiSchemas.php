@@ -129,12 +129,14 @@ final class CoreApiSchemas
             self::documentSourceRoutes(),
             self::documentThemeRoutes(),
             self::documentTemplateSlotRoutes(),
+            self::workspacePluginRoutes(),
             self::documentRecordRoutes(),
             self::documentRoutingRoutes(),
             self::documentQrRoutes(),
             self::meInboxRoutes(),
             self::searchRoutes(),
             self::agentProposalRoutes(),
+            self::agentRoutes(),
             self::userGroupRoutes(),
             self::documentRouteTemplateRoutes(),
             self::documentCollectionRoutes(),
@@ -5327,6 +5329,46 @@ final class CoreApiSchemas
             ], ['id', 'agent', 'status', 'tool', 'summary', 'arguments', 'diff', 'permissions', 'undoWindowSeconds', 'result', 'decidedAt', 'expiresAt', 'createdAt']),
             'AgentProposalListResponse' => self::listEnvelope('AgentProposal'),
             'AgentProposalResponse' => self::dataEnvelope(SchemaBuilder::ref('AgentProposal')),
+            // ── Workspace agents and presets (WHIT-815) ──────────────────────
+            'AgentPersonaFields' => self::object(self::agentPersonaProperties(), []),
+            'AgentCreateRequest' => self::object(self::agentPersonaProperties() + [
+                'presetKey' => ['type' => 'string', 'description' => 'Start from this preset; fields sent override its own'],
+            ], []),
+            'Agent' => self::object([
+                'id' => self::int(),
+                'slug' => self::str(),
+                'name' => self::str(),
+                'nameAr' => self::str(),
+                'role' => self::str(),
+                'roleAr' => self::str(),
+                'instructions' => self::str(),
+                'instructionsAr' => self::str(),
+                'tone' => ['type' => 'string', 'enum' => ['plain', 'formal', 'brief']],
+                'language' => ['type' => 'string', 'enum' => ['auto', 'en', 'ar']],
+                'toolsets' => ['type' => 'array', 'items' => self::str()],
+                'grant' => ['type' => 'object', 'additionalProperties' => ['type' => 'string', 'enum' => ['off', 'ask', 'allow']]],
+                'preset' => ['nullable' => true, 'type' => 'object', 'properties' => ['key' => self::str(), 'version' => self::int()], 'description' => 'The preset it was created from'],
+                'status' => ['type' => 'string', 'enum' => ['active', 'archived']],
+                'createdAt' => self::str(),
+                'updatedAt' => self::str(),
+            ], ['id', 'slug', 'name', 'nameAr', 'role', 'roleAr', 'instructions', 'instructionsAr', 'tone', 'language', 'toolsets', 'grant', 'preset', 'status', 'createdAt', 'updatedAt']),
+            'AgentListResponse' => self::listEnvelope('Agent'),
+            'AgentResponse' => self::dataEnvelope(SchemaBuilder::ref('Agent')),
+            'AgentPreset' => self::object([
+                'key' => self::str(),
+                'version' => self::int(),
+                'name' => self::str(),
+                'nameAr' => self::str(),
+                'role' => self::str(),
+                'roleAr' => self::str(),
+                'instructions' => self::str(),
+                'instructionsAr' => self::str(),
+                'tone' => ['type' => 'string', 'enum' => ['plain', 'formal', 'brief']],
+                'language' => ['type' => 'string', 'enum' => ['auto', 'en', 'ar']],
+                'toolsets' => ['type' => 'array', 'items' => self::str()],
+                'grant' => ['type' => 'object', 'additionalProperties' => ['type' => 'string', 'enum' => ['off', 'ask', 'allow']]],
+            ], ['key', 'version', 'name', 'nameAr', 'role', 'roleAr', 'instructions', 'instructionsAr', 'tone', 'language', 'toolsets', 'grant']),
+            'AgentPresetListResponse' => self::listEnvelope('AgentPreset'),
             // ── The document organizer (#978, implementing #947 item 5) ───────
             // A "folder" is a NAMED QUERY, never a stored container: a document
             // raised centrally and needed by fifteen units has no single home,
@@ -8426,7 +8468,7 @@ final class CoreApiSchemas
                 'counts' => SchemaBuilder::ref('DataTypeBulkCounts'),
                 'results' => ['type' => 'array', 'items' => SchemaBuilder::ref('DataTypeBulkResult')],
             ], ['key', 'action', 'counts', 'results'])),
-        ];
+        ] + self::workspacePluginComponents();
     }
 
     /**
@@ -10959,6 +11001,102 @@ final class CoreApiSchemas
     }
 
     /**
+     * The fields a workspace agent's create and update accept (WHIT-815).
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    private static function agentPersonaProperties(): array
+    {
+        return [
+            'slug' => ['type' => 'string', 'maxLength' => 48, 'description' => 'Lower-case letters, digits and dashes; unique in the workspace'],
+            'name' => ['type' => 'string', 'maxLength' => 60, 'description' => 'Role name, for example "Finance clerk" (register 5.6b)'],
+            'nameAr' => ['type' => 'string', 'maxLength' => 60, 'description' => 'The role name in Arabic'],
+            'role' => ['type' => 'string', 'maxLength' => 200, 'description' => 'One sentence: what it does'],
+            'roleAr' => ['type' => 'string', 'maxLength' => 200, 'description' => 'The role sentence in Arabic'],
+            'instructions' => ['type' => 'string', 'maxLength' => 4000, 'description' => 'The workspace\'s guidance for the model. Never changes access.'],
+            'instructionsAr' => ['type' => 'string', 'maxLength' => 4000, 'description' => 'The instructions in Arabic'],
+            'tone' => ['type' => 'string', 'enum' => ['plain', 'formal', 'brief'], 'description' => "plain (Whity's voice), formal or brief"],
+            'language' => ['type' => 'string', 'enum' => ['auto', 'en', 'ar'], 'description' => 'auto follows the person; en or ar fixes it'],
+            'toolsets' => ['type' => 'array', 'items' => self::str(), 'description' => 'Toolset ids or prefix.*; empty means every toolset'],
+            'grant' => ['type' => 'object', 'additionalProperties' => ['type' => 'string', 'enum' => ['off', 'ask', 'allow']], 'description' => 'Where a new assignment starts, per permission'],
+        ];
+    }
+
+    /**
+     * Workspace agents and the presets they start from (WHIT-815,
+     * docs/design/AGENT-PERSONAS-AND-WHITY-AGENT.md §4.2). Gated on
+     * `agents:manage`. Writes are `agentPolicy: refuse`: an agent never creates
+     * or edits agents, whatever its grant says.
+     *
+     * @return list<array{method: string, path: string, requiredRole: ?string, requiredPermission: ?string, schema: array<string, mixed>}>
+     */
+    private static function agentRoutes(): array
+    {
+        $id      = [['name' => 'id', 'in' => 'path', 'required' => true, 'description' => 'ID of the agent.', 'schema' => ['type' => 'integer']]];
+        $refuse  = ['agentPolicy' => 'refuse'];
+        $invalid = self::errorResponse('Invalid fields (the errors list says which)');
+
+        return [
+            self::permissionRoute('GET', '/api/agents', 'agents:manage', [
+                'summary' => 'List the workspace\'s agents',
+                'tags' => ['agents'],
+                'parameters' => [self::queryParam('archived', 'string', '1 to include archived agents')],
+                'responses' => [200 => self::jsonResponse('The workspace\'s agents, by name', 'AgentListResponse')] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/agents', 'agents:manage', [
+                'summary' => 'Create a workspace agent, from scratch or from a preset',
+                'description' => 'Send `presetKey` to start from a preset; any other field sent overrides the preset\'s. Without a `slug`, one is made from the name.',
+                'tags' => ['agents'],
+                'mcp' => $refuse,
+                'request' => 'AgentCreateRequest',
+                'responses' => [
+                    201 => self::jsonResponse('The new agent', 'AgentResponse'),
+                    409 => self::errorResponse('Another agent in this workspace already uses that slug'),
+                    422 => $invalid,
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/agents/{id:\d+}', 'agents:manage', [
+                'summary' => 'Get one workspace agent',
+                'tags' => ['agents'],
+                'parameters' => $id,
+                'responses' => [200 => self::jsonResponse('The agent', 'AgentResponse'), 404 => self::errorResponse('Agent not found')] + self::authErrors(),
+            ]),
+            self::permissionRoute('PATCH', '/api/agents/{id:\d+}', 'agents:manage', [
+                'summary' => 'Change a workspace agent\'s persona, toolsets or starting grant',
+                'tags' => ['agents'],
+                'mcp' => $refuse,
+                'parameters' => $id,
+                'request' => 'AgentPersonaFields',
+                'responses' => [
+                    200 => self::jsonResponse('The agent after the change', 'AgentResponse'),
+                    404 => self::errorResponse('Agent not found'),
+                    409 => self::errorResponse('Another agent in this workspace already uses that slug'),
+                    422 => $invalid,
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/agents/{id:\d+}/archive', 'agents:manage', [
+                'summary' => 'Archive a workspace agent so it is no longer offered',
+                'tags' => ['agents'],
+                'mcp' => $refuse,
+                'parameters' => $id,
+                'responses' => [200 => self::jsonResponse('The archived agent', 'AgentResponse'), 404 => self::errorResponse('Agent not found')] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/agents/{id:\d+}/restore', 'agents:manage', [
+                'summary' => 'Offer an archived workspace agent again',
+                'tags' => ['agents'],
+                'mcp' => $refuse,
+                'parameters' => $id,
+                'responses' => [200 => self::jsonResponse('The restored agent', 'AgentResponse'), 404 => self::errorResponse('Agent not found')] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/agent-presets', 'agents:manage', [
+                'summary' => 'List the presets a workspace agent can start from',
+                'tags' => ['agents'],
+                'responses' => [200 => self::jsonResponse('Core presets, by key', 'AgentPresetListResponse')] + self::authErrors(),
+            ]),
+        ];
+    }
+
+    /**
      * The approvals inbox for agent proposals (WHIT-784, register 7.5a/7.5b).
      *
      * No route gate: each route answers only for proposals made on the
@@ -12258,6 +12396,285 @@ final class CoreApiSchemas
             'required' => $required,
             'description' => $description,
             'schema' => ['type' => $type],
+        ];
+    }
+
+    /**
+     * A workspace's own plugins (Whity Builder, WHIT-760 to WHIT-764): their
+     * versions, the publish check and automation traces.
+     *
+     * In the `core.plugins` toolset (by their `plugins:*` permissions),
+     * discoverable. Validate, impact and test are POSTs that only read, so
+     * they say so. Publishing, activating a version and switching automations
+     * are `propose` for agents: each changes what the workspace runs, and only
+     * a person puts it live (WHITY-BUILDER.md 2.6). The record routes
+     * (`/api/x/...`) reach MCP per workspace with WHIT-792.
+     *
+     * @return list<array{method: string, path: string, requiredRole: ?string, requiredPermission: ?string, schema: array<string, mixed>}>
+     */
+    private static function workspacePluginRoutes(): array
+    {
+        $readOnly = ['readOnlyHint' => true, 'idempotentHint' => true];
+        $propose = ['agentPolicy' => 'propose'];
+        $plugin = ['name' => 'plugin', 'in' => 'path', 'required' => true, 'description' => 'The workspace plugin\'s slug: its name in lower case, as its permissions start with.', 'schema' => ['type' => 'string']];
+        $id = static fn (string $what): array => ['name' => 'id', 'in' => 'path', 'required' => true, 'description' => $what, 'schema' => ['type' => 'integer']];
+
+        return [
+            self::permissionRoute('GET', '/api/workspace-plugins', 'plugins:read', [
+                'summary' => 'List the workspace\'s own plugins',
+                'description' => 'Plugins this workspace published (not those installed for every workspace), with the live version and whether the plugin and its automations are switched on.',
+                'tags' => ['platform-ops'],
+                'responses' => [200 => self::jsonResponse('The workspace\'s plugins', 'WorkspacePluginListResponse')] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/workspace-plugins/validate', 'plugins:build', [
+                'summary' => 'Validate a workspace plugin manifest',
+                'description' => 'Checks a plugin.json as a whole and against what a workspace plugin may declare. Publishes nothing. Answers ok with every error by path.',
+                'tags' => ['platform-ops'],
+                'request' => 'WorkspacePluginManifestRequest',
+                'mcp_annotations' => $readOnly,
+                'responses' => [
+                    200 => self::jsonResponse('Whether it is valid, and every error', 'ManifestValidationResponse'),
+                    422 => self::errorResponse('No manifest was sent'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/workspace-plugins/impact', 'plugins:build', [
+                'summary' => 'See what publishing a manifest would change',
+                'description' => 'Compares it with the live version and counts the records each change touches: safe, data (records need attention) or destructive (values stop being served). Publishes nothing.',
+                'tags' => ['platform-ops'],
+                'request' => 'WorkspacePluginManifestRequest',
+                'mcp_annotations' => $readOnly,
+                'responses' => [
+                    200 => self::jsonResponse('The plan', 'ManifestImpactResponse'),
+                    422 => self::errorResponse('The manifest isn\'t valid; details.errors lists why'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/workspace-plugins/test', 'plugins:build', [
+                'summary' => 'Run a manifest\'s own tests',
+                'description' => 'Runs the examples under tests against the real record store in a transaction that is always rolled back, so nothing stays. Each failure says why and what the write gave.',
+                'tags' => ['platform-ops'],
+                'request' => 'WorkspacePluginManifestRequest',
+                'mcp_annotations' => $readOnly,
+                'responses' => [
+                    200 => self::jsonResponse('The results', 'ManifestTestResultsResponse'),
+                    422 => self::errorResponse('The manifest isn\'t valid; details.errors lists why'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/workspace-plugins', 'plugins:publish', [
+                'summary' => 'Publish a version of a workspace plugin',
+                'description' => 'Runs its tests, then compares it with the live version; a destructive change needs confirmDestructive. Makes it live for the whole workspace on the next request.',
+                'tags' => ['platform-ops'],
+                'request' => 'PublishWorkspacePluginRequest',
+                'mcp' => $propose,
+                'responses' => [
+                    201 => self::jsonResponse('The published version, with its plan and test results', 'PublishedWorkspacePluginResponse'),
+                    409 => self::errorResponse('Destructive and not confirmed; details.impact is the plan'),
+                    422 => self::errorResponse('Invalid (details.errors) or its tests failed (details.tests)'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/workspace-plugins/{plugin:[a-z][a-z0-9_]*}/versions', 'plugins:read', [
+                'summary' => 'List a workspace plugin\'s versions',
+                'description' => 'Every published version, newest first, with who published it and which one is live. Versions are never deleted.',
+                'tags' => ['platform-ops'],
+                'parameters' => [$plugin],
+                'responses' => [
+                    200 => self::jsonResponse('The versions', 'WorkspacePluginVersionListResponse'),
+                    404 => self::errorResponse('Not one of this workspace\'s plugins'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/workspace-plugins/{plugin:[a-z][a-z0-9_]*}/versions/{id:\d+}', 'plugins:read', [
+                'summary' => 'Get one version of a workspace plugin',
+                'description' => 'The version with its full manifest.',
+                'tags' => ['platform-ops'],
+                'parameters' => [$plugin, $id('The version\'s id.')],
+                'responses' => [
+                    200 => self::jsonResponse('The version', 'WorkspacePluginVersionResponse'),
+                    404 => self::errorResponse('Not one of this workspace\'s versions'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/workspace-plugins/{plugin:[a-z][a-z0-9_]*}/versions/{id:\d+}/activate', 'plugins:publish', [
+                'summary' => 'Make a version of a workspace plugin live (roll back)',
+                'description' => 'Checks the version as if it were being published, compares it with the live one, and makes it live. A destructive change needs confirmDestructive.',
+                'tags' => ['platform-ops'],
+                'parameters' => [$plugin, $id('The version to make live.')],
+                'request' => 'ActivateWorkspacePluginRequest',
+                'mcp' => $propose,
+                'responses' => [
+                    200 => self::jsonResponse('The version now live, with its plan', 'PublishedWorkspacePluginResponse'),
+                    404 => self::errorResponse('Not one of this workspace\'s versions'),
+                    409 => self::errorResponse('Destructive and not confirmed; details.impact is the plan'),
+                    422 => self::errorResponse('The version no longer passes the checks; details.errors lists why'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/workspace-plugins/{plugin:[a-z][a-z0-9_]*}/automation-runs', 'plugins:read', [
+                'summary' => 'List a workspace plugin\'s automation runs',
+                'description' => 'Newest first, each with its trigger, status, reason and trace. Only runs whose record types the caller can read are listed: traces carry record values.',
+                'tags' => ['platform-ops'],
+                'parameters' => [
+                    $plugin,
+                    self::queryParam('before', 'integer', 'Only runs older than this run id, for the next page.'),
+                    self::queryParam('limit', 'integer', 'How many runs, 1 to 100 (50 if left out).'),
+                ],
+                'responses' => [
+                    200 => self::jsonResponse('The runs', 'AutomationRunListResponse'),
+                    404 => self::errorResponse('Not one of this workspace\'s live plugins'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/workspace-plugins/{plugin:[a-z][a-z0-9_]*}/automation-runs/{id:\d+}', 'plugins:read', [
+                'summary' => 'Get one automation run with its trace',
+                'description' => 'What triggered it, who it acted for, how far it got and why it stopped. Needs read access to the record types its trace shows.',
+                'tags' => ['platform-ops'],
+                'parameters' => [$plugin, $id('The run\'s id.')],
+                'responses' => [
+                    200 => self::jsonResponse('The run', 'AutomationRunResponse'),
+                    404 => self::errorResponse('Not found, or not readable by the caller'),
+                ] + self::authErrors(),
+            ]),
+            [
+                'method' => 'PUT',
+                'path' => '/api/workspace-plugins/{plugin:[a-z][a-z0-9_]*}/automations',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Switch a workspace plugin\'s automations on or off',
+                    'description' => 'The plugin keeps serving its screens and records either way. Switching on needs plugins:enable and off plugins:disable, checked by the handler. Queued runs stop while off.',
+                    'tags' => ['platform-ops'],
+                    'parameters' => [$plugin],
+                    'request' => 'AutomationsSwitchRequest',
+                    'mcp' => $propose,
+                    'responses' => [
+                        200 => self::jsonResponse('The switch as it now stands', 'AutomationsSwitchResponse'),
+                        404 => self::errorResponse('Not one of this workspace\'s live plugins'),
+                        422 => self::errorResponse('enabled must be true or false'),
+                    ] + self::authErrors(),
+                ],
+            ],
+        ];
+    }
+
+    /**
+     * Components of the workspace plugin routes ({@see self::workspacePluginRoutes()}).
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    private static function workspacePluginComponents(): array
+    {
+        $label = self::object([
+            'en' => self::str() + ['description' => 'English'],
+            'ar' => self::str() + ['description' => 'Arabic'],
+        ], ['en', 'ar']);
+        $manifest = ['type' => 'object', 'additionalProperties' => true, 'description' => 'The plugin.json object (format whity.plugin/1). See sdk/resources/plugin-manifest.schema.json.'];
+        $confirm = self::bool() + ['description' => 'Go ahead although the change is destructive (existing values stop being served). Nothing is deleted, so a rollback serves them again.'];
+
+        return [
+            'WorkspacePlugin' => self::object([
+                'slug' => self::str() + ['description' => 'The name in lower case, used in routes'],
+                'plugin' => self::str() + ['description' => 'The plugin\'s name'],
+                'version_id' => self::int() + ['description' => 'The live version\'s id'],
+                'version' => self::str() + ['description' => 'The live version'],
+                'enabled' => self::bool() + ['description' => 'Whether the plugin is switched on'],
+                'automations_enabled' => self::bool() + ['description' => 'Whether its automations are switched on'],
+                'updated_at' => self::str(),
+            ], ['slug', 'plugin', 'version_id', 'version', 'enabled', 'automations_enabled']),
+            'WorkspacePluginListResponse' => self::listEnvelope('WorkspacePlugin'),
+            'WorkspacePluginManifestRequest' => self::object(['manifest' => $manifest], ['manifest']),
+            'PublishWorkspacePluginRequest' => self::object([
+                'manifest' => $manifest,
+                'notes' => self::str() + ['maxLength' => 2000, 'description' => 'What changed, kept with the version'],
+                'confirmDestructive' => $confirm,
+            ], ['manifest']),
+            'ActivateWorkspacePluginRequest' => self::object(['confirmDestructive' => $confirm], []),
+            'ManifestValidationResponse' => self::dataEnvelope(self::object([
+                'ok' => self::bool(),
+                'errors' => ['type' => 'array', 'items' => self::str(), 'description' => 'Each names its path, such as records.order.fields.price.currency'],
+                'plugin' => self::str() + ['description' => 'The plugin\'s name, when valid'],
+                'version' => self::str() + ['description' => 'The version, when valid'],
+            ], ['ok', 'errors'])),
+            'ManifestImpactChange' => self::object([
+                'effect' => ['type' => 'string', 'enum' => ['safe', 'data', 'destructive'], 'description' => 'What it does to existing data'],
+                'change' => self::str() + ['description' => 'The kind of change, such as field_removed or automation_added'],
+                'path' => self::str() + ['description' => 'Where in the manifest, such as records.order.fields.paid'],
+                'records' => self::int() + ['description' => 'How many existing records it touches, when it counts them'],
+                'message' => self::str(),
+                'messageAr' => self::str(),
+            ], ['effect', 'change', 'path', 'message', 'messageAr']),
+            'ManifestImpact' => self::object([
+                'plugin' => self::str(),
+                'from' => self::str(true) + ['description' => 'The live version, or null for a new plugin'],
+                'to' => self::str(),
+                'level' => ['type' => 'string', 'enum' => ['safe', 'data', 'destructive'], 'description' => 'The worst change'],
+                'changes' => ['type' => 'array', 'items' => SchemaBuilder::ref('ManifestImpactChange')],
+            ], ['plugin', 'from', 'to', 'level', 'changes']),
+            'ManifestImpactResponse' => self::dataEnvelope(SchemaBuilder::ref('ManifestImpact')),
+            'ManifestTestResult' => self::object([
+                'test' => self::int() + ['description' => 'Its position in tests'],
+                'label' => $label,
+                'passed' => self::bool(),
+                'reason' => ['type' => 'string', 'enum' => ['refused', 'not_refused', 'issues_differ', 'field_differs', 'state_differs', 'error'], 'description' => 'Why it failed'],
+                'got' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'What the write gave: refused, and the issues, or the fields and state (field names the one that differed)'],
+            ], ['test', 'label', 'passed']),
+            'ManifestTestResults' => self::object([
+                'passed' => self::int(),
+                'failed' => self::int(),
+                'results' => ['type' => 'array', 'items' => SchemaBuilder::ref('ManifestTestResult')],
+            ], ['passed', 'failed', 'results']),
+            'ManifestTestResultsResponse' => self::dataEnvelope(SchemaBuilder::ref('ManifestTestResults')),
+            'PublishedWorkspacePluginResponse' => self::dataEnvelope(self::object([
+                'version_id' => self::int(),
+                'plugin' => self::str(),
+                'version' => self::str(),
+                'hash' => self::str() + ['description' => 'SHA-256 of the manifest as stored'],
+                'impact' => SchemaBuilder::ref('ManifestImpact'),
+                'tests' => SchemaBuilder::ref('ManifestTestResults'),
+            ], ['version_id', 'plugin', 'version', 'hash', 'impact'])),
+            'WorkspacePluginVersion' => self::object([
+                'id' => self::int(),
+                'version' => self::str(),
+                'hash' => self::str(),
+                'notes' => self::str(true),
+                'published_by' => self::int(true),
+                'acting_for' => self::int(true) + ['description' => 'The person an agent published it for'],
+                'approved_by' => self::int(true) + ['description' => 'The person who approved an agent\'s proposal'],
+                'published_at' => self::str(),
+                'live' => self::bool(),
+                'manifest' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'The manifest, on the single-version route only'],
+            ], ['id', 'version', 'hash', 'published_at']),
+            'WorkspacePluginVersionListResponse' => self::listEnvelope('WorkspacePluginVersion'),
+            'WorkspacePluginVersionResponse' => self::dataEnvelope(SchemaBuilder::ref('WorkspacePluginVersion')),
+            'AutomationRunStep' => self::object([
+                'step' => self::int() + ['description' => 'Its position in the automation\'s steps'],
+                'kind' => self::str() + ['description' => 'set_fields, create_record, move or notify'],
+                'status' => ['type' => 'string', 'enum' => ['done', 'failed']],
+                'reason' => self::str() + ['description' => 'Why it failed, such as not_permitted or issues'],
+                'input' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'The values it worked with'],
+                'outcome' => ['type' => 'object', 'additionalProperties' => true, 'nullable' => true, 'description' => 'What it did, such as the record it created or the people notified'],
+                'at' => self::str(),
+            ], ['step', 'kind', 'status', 'at']),
+            'AutomationRun' => self::object([
+                'id' => self::int(),
+                'plugin' => self::str(),
+                'automation' => self::str(),
+                'event' => self::str() + ['description' => 'What triggered it, such as order.moved.confirmed'],
+                'record_type' => self::str(),
+                'record_id' => self::int(),
+                'depth' => self::int() + ['description' => 'How many automation hops produced the event; 1 when a person caused it'],
+                'actor_profile_id' => self::int(true) + ['description' => 'The person it acts for'],
+                'root_run_id' => self::int(true) + ['description' => 'The first run of its chain, when another run started it'],
+                'automation_hash' => self::str(),
+                'status' => ['type' => 'string', 'enum' => ['queued', 'running', 'done', 'failed', 'stopped']],
+                'reason' => self::str(true) + ['description' => 'Why it failed or was stopped, such as depth_limit or automations_off'],
+                'trace' => ['type' => 'array', 'items' => SchemaBuilder::ref('AutomationRunStep')],
+                'created_at' => self::str(),
+                'finished_at' => self::str(true),
+            ], ['id', 'plugin', 'automation', 'event', 'record_type', 'record_id', 'depth', 'status', 'trace', 'created_at']),
+            'AutomationRunListResponse' => self::listEnvelope('AutomationRun'),
+            'AutomationRunResponse' => self::dataEnvelope(SchemaBuilder::ref('AutomationRun')),
+            'AutomationsSwitchRequest' => self::object([
+                'enabled' => self::bool() + ['description' => 'true to switch the plugin\'s automations on, false to switch them off'],
+            ], ['enabled']),
+            'AutomationsSwitchResponse' => self::dataEnvelope(self::object([
+                'plugin' => self::str(),
+                'automationsEnabled' => self::bool(),
+            ], ['plugin', 'automationsEnabled'])),
         ];
     }
 

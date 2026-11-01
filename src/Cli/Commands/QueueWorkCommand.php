@@ -106,7 +106,18 @@ final class QueueWorkCommand implements CliCommand
             // a plugin's are namespaced under its own plugin name, so the order is
             // not load-bearing for correctness — but it does mean a plugin that
             // fails to load never delays or displaces core's own work.
-            PluginJobs::register($registry, null, $this->logger, $hookManager, $auditLogger);
+            // WHIT-742: automations and plugin jobs issue documents, so the
+            // worker gets the same issuing service a request does. It is built
+            // on the first issue: a worker that never issues needs neither the
+            // render service nor storage.
+            $documentRegistries = \Whity\Core\Document\Issuing\WorkerDocumentServices::register(
+                $pdo,
+                $hookManager,
+                $_ENV,
+                getenv('STORAGE_ROOT') ?: (dirname(__DIR__, 3) . '/storage'),
+                $this->logger,
+            );
+            PluginJobs::register($registry, null, $this->logger, $hookManager, $auditLogger, $documentRegistries);
             $runner ??= new JobRunner($repo, $registry, $this->logger);
         }
         $this->repo = $repo;
