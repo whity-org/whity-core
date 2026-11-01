@@ -1,6 +1,7 @@
 import { copyFileSync, mkdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { CliError } from './errors.js';
+import { m } from './messages.js';
 
 const SCRATCH_DB = 'whity_backup_check';
 const CONTAINER_DUMP = '/tmp/whity-backup-check.dump';
@@ -8,14 +9,14 @@ const CONTAINER_DUMP = '/tmp/whity-backup-check.dump';
 const PROOF_TABLES = ['tenants', 'profiles'];
 
 function fail(step, result) {
-  return new CliError(`The backup failed at "${step}".\n${result.stderr.trim()}`);
+  return new CliError(m.backupStepFailed(step, result.stderr.trim()));
 }
 
 async function psqlCount(run, env, db, table) {
   const result = await run.compose([
     'exec', '-T', 'postgres', 'psql', '-U', env.DB_USER, '-d', db, '-At', '-c', `SELECT count(*) FROM ${table}`,
   ]);
-  if (result.code !== 0) throw fail(`count ${table} in ${db}`, result);
+  if (result.code !== 0) throw fail(m.backupStepCount(table, db), result);
   return Number(result.stdout.trim());
 }
 
@@ -30,30 +31,30 @@ async function prove(run, env, relativeDump) {
   const dropScratch = () => exec(['dropdb', '-U', env.DB_USER, '--if-exists', '--force', SCRATCH_DB]);
 
   const copied = await run.compose(['cp', relativeDump, `postgres:${CONTAINER_DUMP}`]);
-  if (copied.code !== 0) throw fail('copy the dump into postgres', copied);
+  if (copied.code !== 0) throw fail(m.backupStepCopy(), copied);
 
   try {
     const listed = await exec(['pg_restore', '--list', CONTAINER_DUMP]);
-    if (listed.code !== 0) throw fail('read the dump', listed);
+    if (listed.code !== 0) throw fail(m.backupStepRead(), listed);
     const tables = listed.stdout.split(/\r?\n/).filter((line) => line.includes('TABLE DATA')).length;
-    if (tables === 0) throw new CliError('The backup failed: the dump holds no table data.');
+    if (tables === 0) throw new CliError(m.backupNoTableData());
 
     await dropScratch();
     const created = await exec(['createdb', '-U', env.DB_USER, SCRATCH_DB]);
-    if (created.code !== 0) throw fail('create a scratch database', created);
+    if (created.code !== 0) throw fail(m.backupStepCreate(), created);
     const restored = await exec([
       'pg_restore', '-U', env.DB_USER, '-d', SCRATCH_DB, '--no-owner', '--exit-on-error', CONTAINER_DUMP,
     ]);
-    if (restored.code !== 0) throw fail('restore into the scratch database', restored);
+    if (restored.code !== 0) throw fail(m.backupStepRestore(), restored);
 
     const counts = [];
     for (const table of PROOF_TABLES) {
       const live = await psqlCount(run, env, env.DB_NAME, table);
       const copy = await psqlCount(run, env, SCRATCH_DB, table);
       if (live !== copy) {
-        throw new CliError(`The backup failed: ${table} has ${live} rows live but ${copy} in the backup.`);
+        throw new CliError(m.backupRowsDiffer(table, live, copy));
       }
-      if (copy === 0) throw new CliError(`The backup failed: ${table} has no rows.`);
+      if (copy === 0) throw new CliError(m.backupNoRows(table));
       counts.push(`${table}: ${copy}`);
     }
     return { tables, counts };
@@ -75,12 +76,12 @@ export async function backup({ dir, run, env, id, deps }) {
     ['exec', '-T', 'postgres', 'pg_dump', '-U', env.DB_USER, '-Fc', env.DB_NAME],
     { stdoutFile: join(dir, relativeDump) },
   );
-  if (dump.code !== 0) throw fail('pg_dump', dump);
+  if (dump.code !== 0) throw fail(m.backupStepDump(), dump);
   const bytes = statSync(join(dir, relativeDump)).size;
-  if (bytes === 0) throw new CliError('The backup failed: pg_dump wrote an empty file.');
+  if (bytes === 0) throw new CliError(m.backupEmptyFile());
 
   const proof = await prove(run, env, relativeDump);
-  deps.log(`  ${relativeDump}: ${bytes} bytes, ${proof.tables} tables restored, ${proof.counts.join(', ')}`);
+  deps.log(m.backupProved(relativeDump, bytes, proof.tables, proof.counts));
   return relativeDir;
 }
 
