@@ -45,8 +45,8 @@ use Whity\Storage\TenantStorageResolver;
 
 /**
  * The issuing service outside a request (WHIT-742, DOCUMENT-AUTOMATION.md
- * 3.5): `queue:work` and `events:relay` run automations and plugin jobs that
- * issue documents, so they need the same {@see TemplateIssuing} the REST route
+ * 3.5): `queue:work` runs automations and plugin jobs that issue documents,
+ * and CLI commands may too, so they need the same {@see TemplateIssuing} the REST route
  * uses, built from the same parts `public/index.php` wires: the render
  * service, per-tenant storage, the meters, the QR code, the letterhead and
  * the workspace's themes.
