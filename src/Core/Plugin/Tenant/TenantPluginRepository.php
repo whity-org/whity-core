@@ -7,6 +7,9 @@ namespace Whity\Core\Plugin\Tenant;
 use PDO;
 use Throwable;
 use Whity\Core\Db\DbBool;
+use Whity\Sdk\Manifest\InvalidManifestException;
+use Whity\Sdk\Manifest\PluginManifest;
+use Whity\Sdk\PluginNamespace;
 
 /**
  * Data access for a workspace's own plugins (Whity Builder, WHIT-760;
@@ -163,6 +166,37 @@ final class TenantPluginRepository
         }
 
         return $out;
+    }
+
+    /**
+     * The live manifest of a workspace's plugin, switched on or not; null when there is none, or
+     * when it no longer validates (the format may have tightened since it was published: compare
+     * against nothing rather than refuse to plan).
+     */
+    public function liveManifest(int $tenantId, string $plugin): ?PluginManifest
+    {
+        $versionId = $this->liveVersionId($tenantId, $plugin);
+        $data = $versionId === null ? null : $this->manifest($tenantId, $versionId);
+        if ($data === null) {
+            return null;
+        }
+        try {
+            return PluginManifest::fromArray($data, 'live workspace plugin');
+        } catch (InvalidManifestException) {
+            return null;
+        }
+    }
+
+    /** A plugin's name from the slug in its routes, when it is this workspace's. */
+    public function pluginKey(int $tenantId, string $slug): ?string
+    {
+        foreach ($this->plugins($tenantId) as $p) {
+            if (PluginNamespace::slug($p['plugin']) === $slug) {
+                return $p['plugin'];
+            }
+        }
+
+        return null;
     }
 
     /** The live version's id of a workspace's plugin, switched on or not. */
