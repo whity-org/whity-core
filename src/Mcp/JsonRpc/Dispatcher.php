@@ -145,7 +145,15 @@ final class Dispatcher implements McpRequestHandlerInterface, McpNotificationSou
                 return $this->encode($this->makeError(null, ErrorCode::FORBIDDEN, $refused->getMessage()));
             }
             // WHIT-765: a token issued for one split works only at that split.
-            if ($principal !== null && $principal->resourceSplit !== null && $principal->resourceSplit !== $this->requestSplit()) {
+            $requestSplit = $this->requestSplit();
+            if ($principal !== null && $principal->resourceSplit !== null && $principal->resourceSplit !== $requestSplit) {
+                $principal = null;
+            }
+            // WHIT-819: at /mcp/agents/<slug> the caller must BE that agent. A
+            // person's own token would otherwise run writes directly at a URL that
+            // says they are an agent's, skipping Ask first.
+            if ($principal !== null && $requestSplit !== null && str_starts_with($requestSplit, OAuthAccessTokenVerifier::AGENT_RESOURCE_PREFIX)
+                && $principal->agentSlug !== substr($requestSplit, strlen(OAuthAccessTokenVerifier::AGENT_RESOURCE_PREFIX))) {
                 $principal = null;
             }
             if ($principal === null) {

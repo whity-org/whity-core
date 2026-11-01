@@ -45,6 +45,20 @@ final class ProtectedResource
         return new self($this->issuer, $this->resource === null ? null : $this->resource . '/' . $split, $this->resourceName . ' · ' . $split);
     }
 
+    /**
+     * The same server as one workspace agent's resource (WHIT-819). The name is
+     * made from the slug: this document is public and names no workspace, and
+     * it is what the sign-in screen shows ("act as Finance clerk").
+     */
+    public function forAgent(string $slug): self
+    {
+        return new self(
+            $this->issuer,
+            $this->resource === null ? null : $this->resource . '/agents/' . $slug,
+            ucfirst(str_replace('-', ' ', $slug)),
+        );
+    }
+
     /** From MCP_OAUTH_ISSUER and the MCP endpoint (APP_URL + /mcp). */
     public static function fromEnv(?string $resource): self
     {

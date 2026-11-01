@@ -303,6 +303,7 @@ class TokenValidator
                 scope: [...$kept, ...$active['entries']],
                 jti: $jti,
                 agentId: $active['principalId'],
+                agentSlug: $active['slug'],
             );
         }
 
