@@ -1,0 +1,2 @@
+# Published from any machine, including Windows: keep the shebang free of CR.
+* text eol=lf

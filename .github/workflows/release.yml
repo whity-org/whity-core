@@ -978,7 +978,12 @@ jobs:
             printf '\n\n</details>\n'
           } >> "$NOTES"
 
-          gh release create "${RELEASE_TAG}" \
+          # The compose file of this version, which `whity install` and
+          # `whity update` (@whity/cli) download by this name.
+          COMPOSE_ASSET="${RUNNER_TEMP}/whity-compose.yml"
+          cp docker/production/docker-compose.yml "$COMPOSE_ASSET"
+
+          gh release create "${RELEASE_TAG}" "$COMPOSE_ASSET" \
             --title "${RELEASE_TAG}" \
             --notes-file "$NOTES" \
             --verify-tag

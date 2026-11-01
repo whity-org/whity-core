@@ -1,0 +1,51 @@
+name: Publish @whity/cli
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "packages/cli/**"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    # Trusted publishing (WHIT-834): npm exchanges this job's GitHub OIDC
+    # token for a short-lived publish credential, so there is no npm token
+    # secret anywhere. id-token: write is what lets the job request it.
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+
+      # Trusted publishing needs npm 11.5.1 or newer; the npm bundled with
+      # Node may be older.
+      - name: Use a current npm
+        run: npm install -g npm@latest
+
+      # The package has no dependencies, so there is nothing to install.
+      - name: Test
+        working-directory: packages/cli
+        run: npm test
+
+      # Idempotent publish: this workflow runs on any push touching packages/cli,
+      # but a change without a version bump must NOT fail (npm returns 409
+      # "cannot publish over existing version"). Publish only when the current
+      # version isn't already in the registry; otherwise skip with a notice.
+      - name: Publish if the version is new
+        working-directory: packages/cli
+        run: |
+          NAME=$(node -p "require('./package.json').name")
+          VERSION=$(node -p "require('./package.json').version")
+          if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
+            echo "::notice::$NAME@$VERSION is already published — skipping. Bump the version in packages/cli/package.json to publish a new release."
+          else
+            echo "Publishing $NAME@$VERSION"
+            npm publish --provenance --access public
+          fi

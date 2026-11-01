@@ -1,5 +1,9 @@
 # Installation
 
+**To run Whity on your own server, use the `whity` command:** see [Whity CLI](Whity-CLI.md).
+It needs only Node and Docker. The rest of this page is for working on Whity from a
+source checkout.
+
 ## Requirements
 
 - PHP 8.4 (the platform target — see `Dockerfile`, pinned to `dunglas/frankenphp:1-php8.4`)

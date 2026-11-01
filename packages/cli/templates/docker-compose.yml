@@ -1,0 +1,142 @@
+# Production stack for a self-hosted Whity install (WHIT-840).
+#
+# `whity install` and `whity update` (@whity/cli) write this file. It ships with
+# each release as the `whity-compose.yml` asset, so an install always runs the
+# compose file of its own version. `whity update` replaces it: put your own
+# changes in docker-compose.override.yml beside it, which Compose merges in and
+# the CLI never touches.
+#
+# Settings live in .env beside this file. Every setting there reaches the app and
+# the workers through `env_file`, so a setting needs no change here.
+
+x-app: &app
+  image: ghcr.io/whity-org/whity-core:${WHITY_VERSION:?WHITY_VERSION must be set}
+  restart: unless-stopped
+  env_file: .env
+  environment: &app-env
+    DB_HOST: postgres
+    DB_PORT: 5432
+    # Everything people upload. The default path is inside the container, so
+    # without this volume uploads are lost whenever the container is recreated.
+    STORAGE_ROOT: /app/storage
+    RENDER_SERVICE_URL: ${RENDER_SERVICE_URL:-http://render:8130}
+  volumes:
+    - storage:/app/storage
+  depends_on:
+    postgres:
+      condition: service_healthy
+
+x-worker: &worker
+  <<: *app
+  # The image's inherited check curls the FrankenPHP admin port, which a CLI
+  # loop does not have, so it would report unhealthy while working.
+  healthcheck:
+    disable: true
+
+services:
+  # pgvector/pgvector:pg15: stock Postgres 15 plus the `vector` extension. Not
+  # published to the host; only the services on this network can reach it.
+  postgres:
+    image: pgvector/pgvector:pg15
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:?DB_USER must be set}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set}
+      POSTGRES_DB: ${DB_NAME:?DB_NAME must be set}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  frankenphp:
+    <<: *app
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${APP_PORT_HOST:-8100}:80"
+    environment:
+      <<: *app-env
+      # The image's base Caddyfile, on plain HTTP. Terminate TLS at your reverse
+      # proxy. FRANKENPHP_CONFIG turns on persistent worker mode.
+      CADDY_GLOBAL_OPTIONS: "auto_https off"
+      SERVER_NAME: ":80"
+      SERVER_ROOT: "public/"
+      FRANKENPHP_CONFIG: ${FRANKENPHP_CONFIG:-worker /app/public/index.php 8}
+    healthcheck:
+      test: ["CMD", "php", "-r", "exit(@file_get_contents('http://127.0.0.1/api/health') === false ? 1 : 0);"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  web:
+    image: ghcr.io/whity-org/whity-core/web:${WHITY_VERSION}
+    restart: unless-stopped
+    # `next start` is PID 1 here; an init reaps it properly on `compose down`.
+    init: true
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${WEB_PORT_HOST:-3100}:3000"
+    environment:
+      # Where the Next server-side proxy sends /api/*. This hop stays on the
+      # compose network.
+      WHITY_BACKEND_URL: http://frankenphp
+      # Reverse proxies in front of this service, so the API sees each client's
+      # real address. Set it in .env when you add one (docs/wiki/DEPLOYMENT_GUIDE.md).
+      TRUSTED_PROXY_HOPS: ${TRUSTED_PROXY_HOPS:-0}
+    depends_on:
+      - frankenphp
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:3000/login',(r)=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+
+  # Document and label PDFs (ADR 0012). Turn it off by removing `render` from
+  # COMPOSE_PROFILES in .env; it holds a live Chromium.
+  render:
+    image: ghcr.io/whity-org/whity-core/render:${WHITY_VERSION}
+    restart: unless-stopped
+    profiles:
+      - render
+    init: true
+    environment:
+      RENDER_SHARED_SECRET: ${RENDER_SHARED_SECRET:-}
+    expose:
+      - "8130"
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:8130/health',(r)=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  # Durable background jobs.
+  queue-worker:
+    <<: *worker
+    command: php bin/whity-cli queue:work --max-runtime=3600
+
+  # Delivers what HookManager::dispatchAsync() records in event_outbox. Without
+  # it those events are never delivered and the table grows without bound.
+  events-relay:
+    <<: *worker
+    command: php bin/whity-cli events:relay --max-runtime=3600
+
+  # Enqueues due scheduled jobs once a minute.
+  scheduler:
+    <<: *worker
+    command: php bin/whity-cli schedule:run --max-runtime=3600
+
+  # Samples service health for the public /status page.
+  health-watch:
+    <<: *worker
+    environment:
+      <<: *app-env
+      WHITY_PUBLIC_URL: http://frankenphp
+      WHITY_RENDER_URL: ${RENDER_SERVICE_URL:-http://render:8130}
+    command: php bin/whity-cli health:watch --interval=60
+
+volumes:
+  postgres_data:
+  storage:

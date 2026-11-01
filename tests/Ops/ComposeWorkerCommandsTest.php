@@ -15,7 +15,7 @@ use PHPUnit\Framework\TestCase;
  */
 final class ComposeWorkerCommandsTest extends TestCase
 {
-    private const COMPOSE_FILES = ['docker-compose.yml', 'docker-compose.staging.yml'];
+    private const COMPOSE_FILES = ['docker-compose.yml', 'docker-compose.staging.yml', 'docker/production/docker-compose.yml'];
 
     private static function read(string $relative): string
     {

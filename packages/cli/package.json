@@ -1,0 +1,30 @@
+{
+  "name": "@whity/cli",
+  "version": "0.1.0",
+  "description": "The whity command: install and update a self-hosted Whity on Docker.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/whity-org/whity-core.git",
+    "directory": "packages/cli"
+  },
+  "type": "module",
+  "bin": {
+    "whity": "bin/whity.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "templates"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
+  }
+}
