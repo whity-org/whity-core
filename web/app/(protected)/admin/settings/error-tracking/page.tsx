@@ -17,7 +17,6 @@ import { AccessDenied } from '@whity-org/ui/access-denied';
 import { Alert, AlertDescription } from '@whity-org/ui/alert';
 import { IconAlertTriangle, IconBug, IconDeviceFloppy, IconInbox } from '@tabler/icons-react';
 import { useTranslation, type TranslateFn } from '@whity-org/features/i18n';
-import { SettingsTabs } from '../settings-tabs';
 import {
   SETTINGS_MANAGE,
   SYSTEM_TENANT_ID,
@@ -266,7 +265,6 @@ function ErrorTrackingSettingsForm({
           "Where this instance's unhandled errors go. Managed by the system tenant."
         )}
       />
-      <SettingsTabs active="error-tracking" />
 
       {/* Collection + destination */}
       <Card className="border border-border bg-card shadow-sm" data-testid="error-tracking-provider-card">

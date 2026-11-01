@@ -23,7 +23,6 @@ import {
 import { IconPlus, IconShieldLock, IconTrash } from '@tabler/icons-react';
 import { useTranslation, type TranslateFn } from '@whity-org/features/i18n';
 import { useDateDisplay } from '@whity-org/features/datetime';
-import { SettingsTabs } from '../settings-tabs';
 import { SECURITY_MANAGE, errorMessage, type AddToast } from '../settings-shared';
 import type { components } from '@/lib/api/schema';
 
@@ -88,7 +87,6 @@ export default function SecurityPolicySettingsPage() {
           'Require two-factor authentication tenant-wide, for an organizational unit, or for a specific person.'
         )}
       />
-      <SettingsTabs active="security" />
       <TwoFactorPoliciesSection addToast={addToast} onPoliciesChanged={() => setStatusRefreshKey((k) => k + 1)} />
       <EnrollmentStatusSection refreshKey={statusRefreshKey} />
     </div>

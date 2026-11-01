@@ -13,7 +13,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whit
 import { AccessDenied } from '@whity-org/ui/access-denied';
 import { IconDeviceFloppy } from '@tabler/icons-react';
 import { useTranslation } from '@whity-org/features/i18n';
-import { SettingsTabs } from '../settings-tabs';
 import {
   SETTINGS_MANAGE,
   SYSTEM_TENANT_ID,
@@ -91,7 +90,6 @@ export default function SignupSettingsPage() {
           'Control whether and how new people can create accounts on this instance.'
         )}
       />
-      <SettingsTabs active="signup" />
       <SignupSettingsForm addToast={addToast} />
     </div>
   );
