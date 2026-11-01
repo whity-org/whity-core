@@ -22,7 +22,6 @@ import {
   IconTrash,
 } from '@tabler/icons-react';
 import { useTranslation } from '@whity-org/features/i18n';
-import { SettingsTabs } from '../settings-tabs';
 import { api } from '@/lib/api/client';
 import {
   RegistrySettingControl,
@@ -253,7 +252,6 @@ export default function SsoProvidersPage() {
           ) : undefined
         }
       />
-      <SettingsTabs active="sso" />
 
       {isSystemTenant && <SsoMasterToggle addToast={addToast} />}
 

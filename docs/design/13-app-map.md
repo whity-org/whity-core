@@ -6,6 +6,8 @@ The screens of whity-core's web app as they exist in `web/app`, grouped as the s
 
 Sidebar groups: (top) Dashboard · Inbox · Approvals — People — AI — Documents — Platform — Settings. The tenant switcher sits under the logo; the user and account menu at the foot. The system tenant (id 0) sees Platform; tenants see their own items. Plugin items arrive from `GET /api/navigation`.
 
+**Settings (owner decision D1, 31 Oct 2026).** Settings is one item at the foot of the sidebar. It opens a settings area with its own grouped sub-nav: Workspace (General, Branding) · Sign-in and security (Security, SSO, Sign-up) · Email (Email, Email domains) · Data (Storage, Tags, Languages, Translations) · Advanced (Feature flags, Error tracking). Every page keeps its route and permission. The personal account (U04) stays in the user menu, not the sidebar. The area has no card yet (design ask WHIT-826, `DESIGN-ASKS.md`).
+
 ## Screens
 
 | ID | Screen | Route | Template | Needs |

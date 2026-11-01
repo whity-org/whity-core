@@ -44,8 +44,10 @@ test.describe('Regular user (non-admin)', () => {
       await expect(userPage.shell.navLink(label)).toHaveCount(0);
     }
 
-    // Settings is ungated and always present, alongside the shell chrome.
-    await expect(userPage.shell.navLink('Settings')).toBeVisible();
+    // The workspace Settings area is gated, so a plain user has no Settings
+    // entry; their own account is always reachable from the user row.
+    await expect(userPage.shell.navLink('Settings')).toHaveCount(0);
+    await expect(userPage.shell.accountLink).toBeVisible();
     await expect(userPage.shell.logoutButton).toBeVisible();
     await expect(userPage.shell.sidebar.getByText('Logged in as')).toBeVisible();
   });
@@ -81,7 +83,7 @@ test.describe('Regular user (non-admin)', () => {
   });
 
   test('settings page is accessible and shows the user role', async ({ userPage, page }) => {
-    await userPage.shell.clickNav('Settings');
+    await userPage.shell.openAccountSettings();
     await page.waitForURL('**/settings');
     await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
     await expect(page.getByText(REGULAR_USER.email).first()).toBeVisible();
@@ -95,7 +97,7 @@ test.describe('Regular user (non-admin)', () => {
     // regular user can open the setup wizard from their Settings page. We open
     // and cancel it (no confirm) so the user's account is never actually
     // enrolled, keeping user@example.com a plain-login account for other specs.
-    await userPage.shell.clickNav('Settings');
+    await userPage.shell.openAccountSettings();
     await page.waitForURL('**/settings');
 
     const enable = page.getByRole('button', { name: 'Enable 2FA' });

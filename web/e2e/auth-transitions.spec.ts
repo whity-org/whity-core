@@ -54,9 +54,9 @@ test.describe('Auth transitions', () => {
     // The sidebar must re-filter to the NEW session immediately (WC-175 #191:
     // /api/navigation is now RBAC-filtered per caller). The plain user lacks
     // delegation:manage, so the gated Delegations link is hidden outright —
-    // only the ungated Settings link survives the identity swap.
+    // the account link in the user row survives the identity swap.
     await expect(shell.navLink('Delegations')).toHaveCount(0);
-    await expect(shell.navLink('Settings')).toBeVisible();
+    await expect(shell.accountLink).toBeVisible();
   });
 
   test('the sidebar re-filters on identity switch: Delegations link hidden for user, restored for admin', async ({

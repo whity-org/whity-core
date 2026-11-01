@@ -20,7 +20,6 @@ import {
   IconSend,
 } from '@tabler/icons-react';
 import { useTranslation, type TranslateFn } from '@whity-org/features/i18n';
-import { SettingsTabs } from '../settings-tabs';
 import {
   SETTINGS_MANAGE,
   SYSTEM_TENANT_ID,
@@ -311,7 +310,6 @@ function EmailSettingsForm({
           'Outgoing email (SMTP) for this instance. Managed by the system tenant.'
         )}
       />
-      <SettingsTabs active="email" />
 
       {/* Transport */}
       <Card className="border border-border bg-card shadow-sm" data-testid="email-transport-card">
