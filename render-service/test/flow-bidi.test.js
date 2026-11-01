@@ -42,6 +42,28 @@ describe('isolateForeignRuns in an RTL document', () => {
     expect(html).toBe('جدول <bdi>34</bdi> — <bdi>TBL-034</bdi> وصف');
   });
 
+  // WHIT-843: an amount is one value. Split at its comma, "1,000.000" prints
+  // as "000.000,1" in an Arabic sentence.
+  test('keeps a thousands separator inside the isolate', () => {
+    expect(isolateForeignRuns('راتبًا مقداره JOD 1,000.000 شهريًا', 'rtl')).toContain('<bdi>JOD 1,000.000</bdi>');
+  });
+
+  test('keeps a range together across its en dash', () => {
+    expect(isolateForeignRuns('الفترة 1–31 Oct 2026 هنا', 'rtl')).toContain('<bdi>1–31 Oct 2026</bdi>');
+  });
+
+  test('leaves a comma that ends a clause outside the isolate', () => {
+    expect(isolateForeignRuns('الفاتورة INV-1042, ثم', 'rtl')).toBe('الفاتورة <bdi>INV-1042</bdi>, ثم');
+  });
+
+  test('leaves a closing bracket it never opened outside the isolate', () => {
+    expect(isolateForeignRuns('حوالة (CliQ) بنكية', 'rtl')).toBe('حوالة (<bdi>CliQ</bdi>) بنكية');
+  });
+
+  test('keeps a bracket pair the run opened itself', () => {
+    expect(isolateForeignRuns('الصنف Tray (large) هنا', 'rtl')).toContain('<bdi>Tray (large)</bdi>');
+  });
+
   // An identifier is one run, punctuation included: isolating "A" and "7"
   // separately would let the hyphen between them reorder.
   test('keeps identifier punctuation inside the isolate', () => {

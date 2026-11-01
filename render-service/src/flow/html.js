@@ -199,15 +199,18 @@ function renderTable(block, direction) {
   }
   parts.push('<table><thead><tr>');
   const columns = Array.isArray(block.columns) ? block.columns : [];
-  for (const column of columns) {
-    parts.push(`<th scope="col">${isolateForeignRuns(column, direction)}</th>`);
-  }
+  // 6.6: numbers are end-aligned; each column says so.
+  const alignments = Array.isArray(block.align) ? block.align : [];
+  const alignAttr = (i) => (alignments[i] === 'end' ? ' class="flow-cell-end"' : '');
+  columns.forEach((column, i) => {
+    parts.push(`<th scope="col"${alignAttr(i)}>${isolateForeignRuns(column, direction)}</th>`);
+  });
   parts.push('</tr></thead><tbody>');
   for (const row of block.rows) {
     parts.push('<tr>');
-    for (const cell of row) {
-      parts.push(`<td>${isolateForeignRuns(cell, direction)}</td>`);
-    }
+    row.forEach((cell, i) => {
+      parts.push(`<td${alignAttr(i)}>${isolateForeignRuns(cell, direction)}</td>`);
+    });
     parts.push('</tr>');
   }
   parts.push('</tbody></table></figure>');

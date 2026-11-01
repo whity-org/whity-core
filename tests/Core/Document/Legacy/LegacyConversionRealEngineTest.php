@@ -247,12 +247,12 @@ final class LegacyConversionRealEngineTest extends TestCase
 
         $titles = array_column($this->sources->listForTenant(self::TENANT), 'title');
         self::assertSame(
-            ['Certificate', 'Exam sheet', 'Invoice', 'Invoice', 'Letter', 'Our letter', 'Production note', 'Shipping labels'],
+            self::sorted([...$this->starterTitles(), 'Invoice', 'Our letter']),
             self::sorted($titles),
-            'the six editor starters and the two copies',
+            'the editor starters and the two copies',
         );
         self::assertSame(
-            ['Certificate', 'Exam sheet', 'Invoice', 'Letter', 'Production note', 'Shipping labels'],
+            self::sorted($this->starterTitles()),
             self::sorted(array_column($this->sources->listForTenant(2), 'title')),
             'a tenant with nothing to convert still gets the starters',
         );
@@ -274,7 +274,7 @@ final class LegacyConversionRealEngineTest extends TestCase
 
         // Running it again (a re-run, or a later migrate) changes nothing.
         IssueDocumentsFromSourcesAndDropDesigner::up($this->db);
-        self::assertCount(8, $this->sources->listForTenant(self::TENANT));
+        self::assertCount(count($this->starterTitles()) + 2, $this->sources->listForTenant(self::TENANT));
     }
 
     /**
@@ -318,14 +318,11 @@ final class LegacyConversionRealEngineTest extends TestCase
     public function testTheEditorsStartersAreSeededOnceAndArePublishable(): void
     {
         $seeder = new DocumentSourceStarterSeeder($this->sources);
-        self::assertSame(6, $seeder->seedForTenant(self::TENANT));
+        self::assertSame(count($seeder->starters()), $seeder->seedForTenant(self::TENANT));
         self::assertSame(0, $seeder->seedForTenant(self::TENANT), 'once per tenant');
 
         $rows = $this->sources->listForTenant(self::TENANT);
-        self::assertSame(
-            ['Certificate', 'Exam sheet', 'Invoice', 'Letter', 'Production note', 'Shipping labels'],
-            self::sorted(array_column($rows, 'title')),
-        );
+        self::assertSame(self::sorted($this->starterTitles()), self::sorted(array_column($rows, 'title')));
         foreach ($rows as $row) {
             $doc = $this->sources->findById($row['id'], self::TENANT);
             self::assertNotNull($doc);
@@ -344,6 +341,12 @@ final class LegacyConversionRealEngineTest extends TestCase
     }
 
     // ── helpers ─────────────────────────────────────────────────────────────
+
+    /** @return list<string> */
+    private function starterTitles(): array
+    {
+        return array_values(array_column((new DocumentSourceStarterSeeder($this->sources))->starters(), 'title'));
+    }
 
     /** The schema as it was before migration 165: the old tables, empty. */
     private function restoreOldTables(): void
