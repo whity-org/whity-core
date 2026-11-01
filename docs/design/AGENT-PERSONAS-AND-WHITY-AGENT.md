@@ -1,6 +1,6 @@
 # Agent personas, presets and whity-agent
 
-Status: **draft, Q1 decided (2026-10-31), Q2 to Q6 open in §9**. Part A's backend has started with WHIT-815 (migration 180).
+Status: **draft, Q1 and Q2 decided (2026-10-31, 2026-11-01), Q3 to Q6 open in §9**. Part A's backend has started with WHIT-815 (migration 180).
 Related: `MCP-TOOL-SURFACE.md` (§5.4 token toolsets, §5.11 agent model, §5.12 splits), `00-decision-register.md` (Scope grant, 5.6a and 5.6b agent words, 7.5a to 7.5c), `15-agents.md`, `12-engineering-handoff.md` items 10 and 11, ADR-0006 (MCP server), ADR-0014 (AGPL with plugin exception), ADR-0015 (OAuth resource server, Whity ID), `WHITY-BUILDER.md` (manifests), `templates/tauri-desktop`.
 
 The owner's words: "agents will need personalities and tools and presets from whity POV to be created... we will also need whity-agent a local desktop app that auto connects your local claude-code codex etc... to whity seemlessly to help you work and chat with whity".
@@ -220,7 +220,7 @@ Per tool, in order of preference:
 2. **The bridge**, for tools that can't sign in to remote MCP, or for workspaces without Whity ID: whity-agent writes a stdio entry, `{command: "<path>/whity-agent", args: ["mcp", "--connection", "<id>"]}`. The bridge is the same binary in a headless mode. It reads the token from the keychain, refreshes it, and relays MCP between stdio and `<instance>/mcp`. The file holds only a connection id.
 3. **Never:** `Authorization: Bearer …` in a file. The web wizard's copy-paste setups keep doing that, because a person chooses it there. whity-agent doesn't.
 
-**As yourself or as an agent.** For each tool, the person picks "Me" (the default, with today's behaviour) or one of the agents they've granted (`/mcp/agents/<slug>`, with Ask first and proposals). The server name in the tool's config shows which: `whity-example-bakery` or `whity-example-bakery-finance-clerk`.
+**As yourself or as an agent (decided, Q2).** For each tool, the person picks "Me" (the default, with today's behaviour) or one of the agents they've granted (`/mcp/agents/<slug>`, with Ask first and proposals). The server name in the tool's config shows which: `whity-example-bakery` or `whity-example-bakery-finance-clerk`.
 
 ### 5.5 Editing configs safely
 
@@ -293,7 +293,7 @@ No card exists for these, so they are not to be invented. Built from existing co
 ## 9. Open questions (for the owner, one at a time through the orchestrator)
 
 1. **Who defines agents. Decided 2026-10-31: workspace agents only.** People with `agents:manage` (admins by default) create them from presets or from scratch. Every member can grant one for themselves (`agents:use`), with their own Off, Ask first or Allowed grant. Personal agents come later. **WHIT-667: confirmed** that agents, personas and presets extend the decided AI-principal, grant and proposal model and are not a new subsystem.
-2. **Connecting as yourself or as an agent.** Recommend: whity-agent and the wizard connect as **yourself** by default (as today), and offer an agent as a choice per tool. The alternative, agent by default, makes every write in a coding tool a proposal.
+2. **Connecting as yourself or as an agent. Decided 2026-11-01: as yourself by default.** A connected AI tool acts under the person's own RBAC with no proposals, as today. On the same screen the person can pick one of their granted agents per tool instead ("Claude Code as Finance clerk"), and then its writes are Ask first.
 3. **Chat model in whity-agent.** Recommend: A (use the person's Claude Code or Codex headless) first, B (own API key) next, C (Whity-hosted, paid) later.
 4. **whity-agent repo and licence.** Recommend: new public repo `whity-org/whity-agent`, MIT (like the client packages), free. Paid value stays in the services it connects to.
 5. **Code signing.** Recommend: buy Windows signing (Azure Trusted Signing is the cheapest current path) and an Apple Developer account before the first public release. Ship unsigned betas to testers until then.
