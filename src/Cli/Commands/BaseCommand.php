@@ -514,6 +514,14 @@ abstract class BaseCommand implements CliCommand, CommandHelp
                 getenv('STORAGE_ROOT') ?: ($baseDir . '/storage'),
             )
         );
+        // WHIT-838 (SDK 1.60): plugin secrets, as in public/index.php, so a
+        // plugin's job reaches the same store its routes write. The cipher is
+        // built on first use: a command that touches no secret needs no key.
+        \Whity\register_service(\Whity\Sdk\Secrets\PluginSecrets::class, new \Whity\Core\Plugin\HostPluginSecrets(
+            $db->getPdo(),
+            static fn (): \Whity\Core\Security\EncryptedSecretStore => \Whity\Core\Security\EncryptedSecretStore::fromEnv($_ENV),
+            $auditLogger,
+        ));
         \Whity\register_service(
             \Whity\Sdk\Documents\Documents::class,
             new \Whity\Core\Document\Issuing\SdkDocuments(

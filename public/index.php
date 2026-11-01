@@ -1463,6 +1463,13 @@ $router->register('POST', '/api/login', [$authHandler, 'handle'], null);
 // the encryption key so the mail-settings handler can read + decrypt the
 // out-of-registry encrypted SMTP password.
 $secretStore = \Whity\Core\Security\EncryptedSecretStore::fromEnv($_ENV);
+// WHIT-838 (SDK 1.60): where plugins keep secrets, per workspace, encrypted with
+// the platform key. Registered in BaseCommand::setupKernel() too, so jobs reach it.
+\Whity\register_service(\Whity\Sdk\Secrets\PluginSecrets::class, new \Whity\Core\Plugin\HostPluginSecrets(
+    $db->getPdo(),
+    static fn (): \Whity\Core\Security\EncryptedSecretStore => $secretStore,
+    $auditLogger,
+)); // @phpstan-ignore-line
 
 // WC-error-tracking: UPGRADE the boot-time error tracker now that settings, the
 // secret store and the queue exist.
