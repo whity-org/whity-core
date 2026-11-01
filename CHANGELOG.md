@@ -6,6 +6,17 @@ uses tag-based releases (see the `v*` tags in the repository).
 
 ## [Unreleased]
 
+## [0.2.23] - 2026-11-01
+
+### Added
+
+- Undo for what agents do: approving a proposal that can be undone offers Undo on the toast for ten seconds, then on its card and its activity row with how long is left. Actions an agent took by itself with Allowed show in Approvals with the same Undo. If something changed since, Undo says so instead of overwriting it.
+
+### Fixed
+
+- Row menus in tables no longer close or lose their items while the page updates. Every cell in a table was being rebuilt whenever the page re-rendered, which could interrupt a click on a menu item; cells now stay in place.
+- Background events are delivered again on Docker installs. The staging relay called a command that entry point doesn't have and kept restarting, and the default `docker-compose.yml` had no relay at all. If you run the `queue` profile, the new `events-relay` service starts with it and delivers any events still waiting.
+
 ## [0.2.22] - 2026-11-01
 
 ### Added

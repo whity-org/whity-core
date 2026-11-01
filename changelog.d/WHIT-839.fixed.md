@@ -1,1 +1,0 @@
-- Background events are delivered again on Docker installs. The staging relay called a command that entry point doesn't have and kept restarting, and the default `docker-compose.yml` had no relay at all. If you run the `queue` profile, the new `events-relay` service starts with it and delivers any events still waiting.
