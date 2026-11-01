@@ -185,13 +185,13 @@ final class ToolsListHandler implements MethodHandler
         $permission  = is_string($access['requiredPermission'] ?? null) ? $access['requiredPermission'] : null;
         $policy      = is_string($meta[ToolSurface::META_AGENT_POLICY] ?? null) ? $meta[ToolSurface::META_AGENT_POLICY] : ToolSurface::AGENT_ALLOW;
 
-        // No operation declares an undo yet (WHIT-784 adds them), so every
-        // write is Ask first for agents for now (owner decision 11).
+        // A write with no undo is always Ask first for agents (owner decision
+        // 11); one that declares an undo window may be Allowed (WHIT-812).
         return AgentScopeGrant::of($principal)->effectiveMode(
             $permission,
             ($annotations['readOnlyHint'] ?? false) === true,
             $policy,
-            false,
+            is_int($meta[ToolSurface::META_UNDO_WINDOW] ?? null) && $meta[ToolSurface::META_UNDO_WINDOW] > 0,
         );
     }
 

@@ -94,6 +94,7 @@ final class CoreTables
         'agent_proposals' => '176_create_agent_proposals.php',
         'agents' => '180_create_agents.php',
         'agent_assignments' => '181_create_agent_assignments.php',
+        'agent_actions' => '182_create_agent_actions.php',
         'plugin_automation_runs' => '175_create_plugin_automation_runs.php',
         'document_sources' => '160_create_document_sources.php',
         'documents' => '108_create_documents.php',

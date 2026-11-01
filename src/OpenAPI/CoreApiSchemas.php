@@ -42,6 +42,13 @@ use Whity\Http\InputLimits;
 final class CoreApiSchemas
 {
     /**
+     * How long an agent's change to tags, tag groups and forms can be undone
+     * (WHIT-812, register 7.5c): 30 minutes, long enough to notice, short
+     * enough that undoing it rarely overwrites someone else's later work.
+     */
+    private const UNDO_WINDOW_SECONDS = 1800;
+
+    /**
      * Static catalogue only — never instantiated.
      */
     private function __construct()
@@ -139,6 +146,7 @@ final class CoreApiSchemas
             self::agentProposalRoutes(),
             self::agentRoutes(),
             self::myAgentRoutes(),
+            self::agentActionRoutes(),
             self::userGroupRoutes(),
             self::documentRouteTemplateRoutes(),
             self::documentCollectionRoutes(),
@@ -1264,6 +1272,8 @@ final class CoreApiSchemas
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('POST', '/api/forms', 'forms:manage', [
+                // WHIT-812: an agent's new form (always a draft) is undone by archiving it.
+                'mcp' => ['undo' => ['windowSeconds' => self::UNDO_WINDOW_SECONDS, 'operation' => 'post_api_forms_id_archive', 'arguments' => ['id' => '/result/data/id']]],
                 'summary' => 'Author a new form',
                 'description' => 'Always created as a `draft`: a form is never born live, because one '
                     . 'with no fields yet that accepted submissions would collect empty ones. '
@@ -1292,6 +1302,18 @@ final class CoreApiSchemas
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('PATCH', '/api/forms/{id:\d+}', 'forms:manage', [
+                // WHIT-812: undone by restoring its name, description and route, unless they changed again since.
+                'mcp' => ['undo' => [
+                    'windowSeconds' => self::UNDO_WINDOW_SECONDS,
+                    'read' => ['operation' => 'get_api_forms_id', 'arguments' => ['id' => '/arguments/id']],
+                    'operation' => 'patch_api_forms_id',
+                    'arguments' => [
+                        'id' => '/arguments/id',
+                        'name' => '/before/data/name',
+                        'description' => '/before/data/description',
+                        'route_template_id' => '/before/data/route_template_id',
+                    ],
+                ]],
                 'summary' => 'Rename a form, retitle it, or change where its submissions go',
                 'description' => '`form_key` is immutable and a body carrying one is REFUSED, not '
                     . 'ignored: code and links bind to the key, so editing it in place would silently '
@@ -5329,8 +5351,29 @@ final class CoreApiSchemas
                 'decidedAt' => self::str(true),
                 'expiresAt' => self::str(),
                 'createdAt' => self::str(),
-            ], ['id', 'agent', 'status', 'tool', 'summary', 'arguments', 'diff', 'permissions', 'undoWindowSeconds', 'result', 'decidedAt', 'expiresAt', 'createdAt']),
+                            // WHIT-812: once approved and run, what can be undone and until when.
+                'action' => ['allOf' => [SchemaBuilder::ref('AgentAction')], 'nullable' => true],
+            ], ['id', 'agent', 'status', 'tool', 'summary', 'arguments', 'diff', 'permissions', 'undoWindowSeconds', 'result', 'decidedAt', 'expiresAt', 'createdAt', 'action']),
             'AgentProposalListResponse' => self::listEnvelope('AgentProposal'),
+            // ── Agent actions and undo (WHIT-812) ─────────────────────────────
+            'AgentAction' => self::object([
+                'id' => self::int(),
+                // done · undone · expired (done, and its undo window has closed)
+                'status' => ['type' => 'string', 'enum' => ['done', 'undone', 'expired']],
+                'tool' => self::str(),
+                'summary' => self::str(),
+                'agent' => self::object(['name' => self::str(true), 'nameAr' => self::str(true)], ['name', 'nameAr']),
+                'permissions' => ['type' => 'array', 'items' => self::str()],
+                'arguments' => ['type' => 'object', 'additionalProperties' => true],
+                'proposalId' => self::int(true),
+                'undoWindowSeconds' => self::int(true),
+                'undoableUntil' => self::str(true) + ['description' => 'UTC, ISO 8601: Undo is offered until then; null when it cannot be undone'],
+                'undoneBy' => self::object(['id' => self::int(), 'name' => self::str(true)], ['id', 'name']) + ['nullable' => true],
+                'undoneAt' => self::str(true),
+                'createdAt' => self::str(),
+            ], ['id', 'status', 'tool', 'summary', 'agent', 'permissions', 'arguments', 'proposalId', 'undoWindowSeconds', 'undoableUntil', 'undoneBy', 'undoneAt', 'createdAt']),
+            'AgentActionListResponse' => self::listEnvelope('AgentAction'),
+            'AgentActionResponse' => self::dataEnvelope(SchemaBuilder::ref('AgentAction')),
             'AgentProposalResponse' => self::dataEnvelope(SchemaBuilder::ref('AgentProposal')),
             // ── Workspace agents and presets (WHIT-815) ──────────────────────
             'AgentPersonaFields' => self::object(self::agentPersonaProperties(), []),
@@ -9550,6 +9593,8 @@ final class CoreApiSchemas
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('POST', '/api/tag-groups', 'tags:manage', [
+                // WHIT-812: an agent's new tag group can be undone by deleting it.
+                'mcp' => ['undo' => ['windowSeconds' => self::UNDO_WINDOW_SECONDS, 'operation' => 'delete_api_tag_groups_id', 'arguments' => ['id' => '/result/data/id']]],
                 'summary' => 'Create a tag group',
                 'tags' => ['taxonomy'],
                 'request' => 'TagGroupCreateRequest',
@@ -9568,6 +9613,13 @@ final class CoreApiSchemas
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('PATCH', '/api/tag-groups/{id:\d+}', 'tags:manage', [
+                // WHIT-812: undone by restoring its key and name, unless they changed again since.
+                'mcp' => ['undo' => [
+                    'windowSeconds' => self::UNDO_WINDOW_SECONDS,
+                    'read' => ['operation' => 'get_api_tag_groups_id', 'arguments' => ['id' => '/arguments/id']],
+                    'operation' => 'patch_api_tag_groups_id',
+                    'arguments' => ['id' => '/arguments/id', 'key' => '/before/data/key', 'display_name' => '/before/data/display_name'],
+                ]],
                 'summary' => 'Update a tag group',
                 'tags' => ['taxonomy'],
                 'request' => 'TagGroupUpdateRequest',
@@ -9617,6 +9669,8 @@ final class CoreApiSchemas
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('POST', '/api/tags', 'tags:manage', [
+                // WHIT-812: an agent's new tag can be undone by deleting it.
+                'mcp' => ['undo' => ['windowSeconds' => self::UNDO_WINDOW_SECONDS, 'operation' => 'delete_api_tags_id', 'arguments' => ['id' => '/result/data/id']]],
                 'summary' => 'Create a tag in a group',
                 'tags' => ['taxonomy'],
                 'request' => 'TagCreateRequest',
@@ -9635,6 +9689,13 @@ final class CoreApiSchemas
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('PATCH', '/api/tags/{id:\d+}', 'tags:manage', [
+                // WHIT-812: undone by restoring the name it had, unless it changed again since.
+                'mcp' => ['undo' => [
+                    'windowSeconds' => self::UNDO_WINDOW_SECONDS,
+                    'read' => ['operation' => 'get_api_tags_id', 'arguments' => ['id' => '/arguments/id']],
+                    'operation' => 'patch_api_tags_id',
+                    'arguments' => ['id' => '/arguments/id', 'name' => '/before/data/name'],
+                ]],
                 'summary' => 'Rename a tag',
                 'tags' => ['taxonomy'],
                 'request' => 'TagUpdateRequest',
@@ -11341,6 +11402,54 @@ final class CoreApiSchemas
                 'request' => self::object(['name' => ['type' => 'string', 'maxLength' => 100, 'description' => 'What to call the credential; the agent\'s name by default']], []),
                 'responses' => [201 => self::jsonResponse('The new credential', 'AgentCredentialResponse'), 404 => $notYours, 422 => self::errorResponse('name is too long')] + self::authErrors(),
             ]),
+        ];
+    }
+
+    /**
+     * What agents did for you, and undoing it (WHIT-812, register 7.5c).
+     *
+     * No route gate: each route answers only for actions taken on the caller's
+     * own behalf. NOT agent-callable, on purpose: an agent must not undo, or
+     * hide, what it did.
+     *
+     * @return list<array{method: string, path: string, requiredRole: ?string, requiredPermission: ?string, schema: array<string, mixed>}>
+     */
+    private static function agentActionRoutes(): array
+    {
+        return [
+            [
+                'method' => 'GET',
+                'path' => '/api/me/agent-actions',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'What agents did for you, and what can still be undone',
+                    'tags' => ['me'],
+                    'parameters' => [
+                        self::queryParam('since', 'string', 'Only actions from this time on (UTC, ISO 8601)'),
+                        self::queryParam('status', 'string', 'done, undone or expired; all when omitted'),
+                    ],
+                    'responses' => [200 => self::jsonResponse('Your agents\' actions, newest first', 'AgentActionListResponse')] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'POST',
+                'path' => '/api/me/agent-actions/{id:\d+}/undo',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Undo what an agent did for you',
+                    'description' => 'Runs the operation\'s inverse as you, after checking again that you may, while its undo window is open.',
+                    'tags' => ['me'],
+                    'parameters' => [['name' => 'id', 'in' => 'path', 'required' => true, 'description' => 'ID of the action.', 'schema' => ['type' => 'integer']]],
+                    'responses' => [
+                        200 => self::jsonResponse('The action, now undone', 'AgentActionResponse'),
+                        404 => self::errorResponse('No such action taken on your behalf'),
+                        409 => self::errorResponse('Already undone, it cannot be undone, its undo window has closed, or what it changed has changed since'),
+                        422 => self::errorResponse('The undo itself failed; the action stays done'),
+                    ] + self::authErrors(),
+                ],
+            ],
         ];
     }
 

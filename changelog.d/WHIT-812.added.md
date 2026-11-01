@@ -1,0 +1,1 @@
+- What an agent does can now be undone. Operations declare an undo window and how they are reversed. When an agent creates or edits a tag, tag group or form, the person it acted for can undo it for 30 minutes from their activity, unless it was changed again since. Because these operations can be undone, a person can now let an agent do them without asking first (WHIT-812).

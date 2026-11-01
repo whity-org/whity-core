@@ -324,6 +324,17 @@ The effective mode is the stricter of the grant and the ceiling. People's own cl
 - An operation may declare an undo window and an inverse with the `undo` key: `windowSeconds`, plus `operation` (the operationId that reverses it) or, for authored tools, `handler` (a callable that reverses it from the stored result). Example: send email, 30 minutes. The same key is used on route schemas, authored descriptors and Whity-Builder manifests.
 - After an agent's Allowed call, or an approved proposal, the result carries `undo: {token, until}`. The activity item shows Undo until then. Undo runs the inverse with actor "person" (the one who clicked) and marks the proposal `undone`.
 - **No undo means Ask first (decided).** An operation with no undo window is always Ask first for agents, even when the grant says Allowed. The register keeps confirmation for what can't be undone.
+- **Built in WHIT-812.**
+   - **Declaring.** `undo` also takes `arguments`: the inverse's arguments, where a string starting with `/` is a JSON Pointer into `{arguments, result, before}` (what the agent sent, what the operation answered, and the read before it ran). An optional `read: {operation, arguments}` is a read of what the call changes. It runs before and after the call, so undo is refused (409) when the values it restores have changed since. The tool's `_meta` carries `dev.whity/undoWindowSeconds`.
+   - **Recording.** Every write an agent runs is recorded in `agent_actions` (migration 182): an Allowed call of an operation with an undo, or any approved proposal. When the operation has an undo, the row also stores the resolved inverse, and the tool result gains `_meta["dev.whity/undo"] = {actionId, until, windowSeconds}`. Otherwise `undoableUntil` is null. A person's own client is not recorded.
+   - **Undoing.** `GET /api/me/agent-actions?since=&status=done|undone|expired` lists them, each with `agent {name}` and `permissions`; `expired` means done with its window closed. Grant rows show each permission's `undoWindowSeconds`. Then `POST /api/me/agent-actions/{id}/undo` runs the inverse as the person, re-checked.
+     - Only the person the agent acted for may undo (404 for anyone else).
+     - 409 when it was already undone, its window has closed, or what it changed has changed since.
+     - 422 when the inverse fails; the action then stays done.
+     - It records `undone_by` and `undone_at`, and an approved proposal it ran from becomes `undone`.
+     - A proposal carries `action` once it has run.
+   - Neither route is on the MCP surface: an agent must not undo, or hide, what it did.
+   - **Where it applies first:** creating and editing tags, tag groups and forms, with a 30-minute window. Creating is undone by deleting (by archiving the draft, for a form); editing is undone by restoring what was replaced. Deletes declare no undo and stay Ask first.
 
 **Rollout (decided).** No `ai-agent` credentials are issued until proposals exist (WHIT-784). People's own clients keep connecting as themselves, so nothing can skip Ask first in the meantime.
 

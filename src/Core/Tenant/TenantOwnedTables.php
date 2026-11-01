@@ -199,6 +199,8 @@ final class TenantOwnedTables
         'agents' => '180_create_agents.php',
         // WHIT-816: a person's use of a workspace agent, with their grant (migration 181).
         'agent_assignments' => '181_create_agent_assignments.php',
+        // WHIT-812: what an agent did that can still be undone (migration 182).
+        'agent_actions' => '182_create_agent_actions.php',
         'plugin_automation_runs' => '175_create_plugin_automation_runs.php',
 
         // #947 item 1 — issued documents and their stored render output

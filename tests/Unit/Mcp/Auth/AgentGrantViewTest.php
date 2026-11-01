@@ -87,6 +87,21 @@ final class AgentGrantViewTest extends TestCase
         self::assertSame(['read' => 'off', 'write' => 'off'], $rows['forms:manage']['effective']);
     }
 
+    public function testAWriteThatCanBeUndoneCanBeAllowedAndSaysForHowLong(): void
+    {
+        $view = new AgentGrantView([
+            ['permission' => 'tags:manage', 'readOnly' => false, 'agentPolicy' => 'allow', 'undoWindowSeconds' => 1800],
+            ['permission' => 'tags:manage', 'readOnly' => false, 'agentPolicy' => 'allow', 'undoWindowSeconds' => null],
+        ]);
+
+        $row = $view->rows(['tools:call', 'grant:tags:manage=allow'], ['tags:manage'])[0];
+
+        self::assertSame(['off', 'ask', 'allow'], $row['modes']);
+        self::assertSame(['read' => null, 'write' => 'allow'], $row['effective']);
+        self::assertSame(1800, $row['undoWindowSeconds']);
+        self::assertNull($this->rows(['tools:call'])['invoices:send']['undoWindowSeconds']);
+    }
+
     public function testWithModeReplacesOnlyThatPermissionsEntry(): void
     {
         $scope = ['tools:call', 'forms:*', 'grant:forms:read=off', 'grant:forms:manage=ask'];

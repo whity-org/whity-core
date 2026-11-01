@@ -3306,6 +3306,43 @@ export interface paths {
         patch: operations["patch_api_v1_me"];
         trace?: never;
     };
+    "/api/v1/me/agent-actions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What agents did for you, and what can still be undone */
+        get: operations["get_api_v1_me_agent_actions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/agent-actions/{id}/undo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Undo what an agent did for you
+         * @description Runs the operation's inverse as you, after checking again that you may, while its undo window is open.
+         */
+        post: operations["post_api_v1_me_agent_actions_id_undo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/agent-proposals": {
         parameters: {
             query?: never;
@@ -6561,6 +6598,37 @@ export interface components {
             createdAt: string;
             updatedAt: string;
         };
+        AgentAction: {
+            id: number;
+            /** @enum {string} */
+            status: "done" | "undone" | "expired";
+            tool: string;
+            summary: string;
+            agent: {
+                name: string | null;
+                nameAr: string | null;
+            };
+            permissions: string[];
+            arguments: {
+                [key: string]: unknown;
+            };
+            proposalId: number | null;
+            undoWindowSeconds: number | null;
+            /** @description UTC, ISO 8601: Undo is offered until then; null when it cannot be undone */
+            undoableUntil: string | null;
+            undoneBy: {
+                id: number;
+                name: string | null;
+            } | null;
+            undoneAt: string | null;
+            createdAt: string;
+        };
+        AgentActionListResponse: {
+            data: components["schemas"]["AgentAction"][];
+        };
+        AgentActionResponse: {
+            data: components["schemas"]["AgentAction"];
+        };
         AgentAssignmentGrant: {
             assignmentId: number;
             principalId: string;
@@ -6715,6 +6783,7 @@ export interface components {
             decidedAt: string | null;
             expiresAt: string;
             createdAt: string;
+            action: components["schemas"]["AgentAction"] | null;
         };
         AgentProposalListResponse: {
             data: components["schemas"]["AgentProposal"][];
@@ -29075,6 +29144,162 @@ export interface operations {
             };
             /** @description Email already exists in the tenant, or this account signs in through an identity provider and has no local password */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_me_agent_actions: {
+        parameters: {
+            query?: {
+                /** @description Only actions from this time on (UTC, ISO 8601) */
+                since?: string;
+                /** @description done, undone or expired; all when omitted */
+                status?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Your agents' actions, newest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentActionListResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_me_agent_actions_id_undo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ID of the action. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The action, now undone */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentActionResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No such action taken on your behalf */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Already undone, it cannot be undone, its undo window has closed, or what it changed has changed since */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The undo itself failed; the action stays done */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
