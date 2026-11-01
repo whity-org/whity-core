@@ -279,6 +279,13 @@ final class ToolDeriver
             : $this->operationId((string) ($decl['method'] ?? ''), $cleanPath);
     }
 
+    /** How the tool's route is undone (WHIT-812), or null when it can't be. */
+    public function undoFor(string $toolName): ?\Whity\Mcp\Tools\Undo\UndoSpec
+    {
+        $schema = $this->findDeclarationByName($toolName)['schema'] ?? null;
+        return is_array($schema) ? \Whity\Mcp\Tools\Undo\UndoSpec::fromRouteSchema($schema) : null;
+    }
+
     /**
      * Find the route declaration whose derived tool name matches $toolName.
      *
@@ -394,7 +401,7 @@ final class ToolDeriver
      * first tag maps to ({@see CoreToolsets}).
      *
      * @param array<string, mixed> $route
-     * @return array<string, string>
+     * @return array<string, string|int>
      */
     private function surfaceMeta(array $route, string $name): array
     {
@@ -415,7 +422,12 @@ final class ToolDeriver
                 ?? (CoreToolsets::isAlwaysOn($name) ? ToolSurface::VISIBILITY_ALWAYS_ON : ToolSurface::VISIBILITY_DISCOVERABLE);
         }
 
-        return ToolSurface::meta($toolset, $visibility, $options['agentPolicy'] ?? ToolSurface::AGENT_ALLOW);
+        return ToolSurface::meta(
+            $toolset,
+            $visibility,
+            $options['agentPolicy'] ?? ToolSurface::AGENT_ALLOW,
+            \Whity\Mcp\Tools\Undo\UndoSpec::fromRouteSchema($schema)?->windowSeconds,
+        );
     }
 
     /** A core toolset, or a sub-toolset of one (`core.documents.themes`). */

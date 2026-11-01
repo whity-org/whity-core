@@ -4784,13 +4784,15 @@ $proposalDiffs = new \Whity\Mcp\Tools\ProposalDiffRegistry();
     $manifestImpact,
     $manifestTestRunner
 ))->registerOn($proposalDiffs);
-$mcpToolsCallHandler = new ToolsCallHandler($toolDeriver, $router, $roleChecker, $tokenValidator, auditLogger: $auditLogger, authoredTools: $authoredMcpTools, proposals: $agentProposals, proposalDiffs: $proposalDiffs);
+// WHIT-812: what an agent did that its person can still undo.
+$agentActions = new \Whity\Core\Agent\AgentActionRepository($db->getPdo());
+$mcpToolsCallHandler = new ToolsCallHandler($toolDeriver, $router, $roleChecker, $tokenValidator, auditLogger: $auditLogger, authoredTools: $authoredMcpTools, proposals: $agentProposals, proposalDiffs: $proposalDiffs, actions: $agentActions);
 // The approvals inbox: the person an agent acts for approves, edits or
 // declines what it asked to do. Session-gated and never on the MCP surface:
 // an agent must not be able to approve its own proposal.
 // WHIT-816: a workspace agent's proposal runs under the person's assignment as it is now.
 $agentAssignments = new \Whity\Core\Agent\AgentAssignmentRepository($db->getPdo());
-$agentProposalsHandler = new \Whity\Api\AgentProposalsApiHandler($agentProposals, $mcpToolsCallHandler, $auditLogger, $agentAssignments);
+$agentProposalsHandler = new \Whity\Api\AgentProposalsApiHandler($agentProposals, $mcpToolsCallHandler, $auditLogger, $agentAssignments, $agentActions);
 $router->register('GET',  '/api/me/agent-proposals',                    [$agentProposalsHandler, 'list'],    null);
 $router->register('POST', '/api/me/agent-proposals/{id:\d+}/approve',  [$agentProposalsHandler, 'approve'], null);
 $router->register('POST', '/api/me/agent-proposals/{id:\d+}/decline',  [$agentProposalsHandler, 'decline'], null);
@@ -4826,6 +4828,11 @@ $router->register('DELETE', '/api/me/agents/{id:\d+}/assignment',          [$myA
 $router->register('GET',    '/api/me/agents/{id:\d+}/assignment/grant',    [$myAgentsHandler, 'grant'],       null);
 $router->register('PATCH',  '/api/me/agents/{id:\d+}/assignment/grant',    [$myAgentsHandler, 'updateGrant'], null);
 $router->register('POST',   '/api/me/agents/{id:\d+}/credentials',         [$myAgentsHandler, 'credential'],  null);
+// WHIT-812: what agents did for you, and undoing it inside its window. Same
+// rule as the inbox: never on the MCP surface.
+$agentActionsHandler = new \Whity\Api\AgentActionsApiHandler($agentActions, $mcpToolsCallHandler, $agentProposals, $auditLogger);
+$router->register('GET',  '/api/me/agent-actions',                      [$agentActionsHandler, 'list'], null);
+$router->register('POST', '/api/me/agent-actions/{id:\d+}/undo',        [$agentActionsHandler, 'undo'], null);
 $mcpHandlers = [
     'initialize'              => new InitializeHandler(listChanged: true),
     // WHIT-708: required of every 2026-07-28 server.

@@ -18,6 +18,9 @@ use Whity\Mcp\JsonRpc\McpException;
 use Whity\Mcp\JsonRpc\MethodHandler;
 use Whity\Core\Request;
 use Whity\Core\Agent\AgentProposalRepository;
+use Whity\Mcp\Tools\Undo\UndoSpec;
+use Whity\Mcp\Tools\Undo\UndoConflictException;
+use Whity\Core\Agent\AgentActionRepository;
 use Whity\Mcp\Auth\AgentScopeGrant;
 use Whity\Mcp\Auth\McpScope;
 
@@ -61,7 +64,14 @@ final class ToolsCallHandler implements MethodHandler
         // WHIT-833: previews of what a proposed call would change, stored as
         // the proposal's diff for the approvals card. Null: no previews.
         private readonly ?ProposalDiffRegistry $proposalDiffs = null,
+        // WHIT-812: the undo log. When an agent runs an operation that
+        // declares an undo, what its inverse needs is recorded here for the
+        // person to undo it. Null: nothing is recorded and nothing undone.
+        private readonly ?AgentActionRepository $actions = null,
     ) {}
+
+    /** WHIT-812: on an agent's result, the action to undo and until when. */
+    public const META_UNDO = 'dev.whity/undo';
 
     /**
      * Run a call a person approved (WHIT-784). Every check runs again for the
@@ -72,9 +82,57 @@ final class ToolsCallHandler implements MethodHandler
      * @param array<string, mixed> $arguments
      * @throws McpException
      */
-    public function runApproved(McpPrincipal $principal, string $toolName, array $arguments): mixed
+    public function runApproved(McpPrincipal $principal, string $toolName, array $arguments, ?int $proposalId = null): mixed
     {
-        return $this->run($principal, $toolName, $arguments, true);
+        return $this->run($principal, $toolName, $arguments, true, proposalId: $proposalId);
+    }
+
+    /**
+     * Undo an agent's action as the person it acted for (WHIT-812). Every check
+     * runs again for them: exposure, RBAC, the inverse's own gate. When the
+     * operation declared a read, undo is refused if what it would restore
+     * changed since the agent's call.
+     *
+     * @param McpPrincipal         $person a person principal (not an agent)
+     * @param array<string, mixed> $action the agent_actions row
+     * @throws McpException
+     * @throws UndoConflictException
+     */
+    public function undo(McpPrincipal $person, array $action): mixed
+    {
+        $inverse = is_array($action['inverse'] ?? null) ? $action['inverse'] : [];
+
+        $read = $inverse['read'] ?? null;
+        if (is_array($read) && is_array($inverse['watch'] ?? null)) {
+            $current = $this->readJson($person, (string) $read['operation'], is_array($read['arguments'] ?? null) ? $read['arguments'] : []);
+            if ($current === null) {
+                throw new UndoConflictException('What this changed can no longer be read, so it is not undone.');
+            }
+            foreach ($inverse['watch'] as $path => $value) {
+                [$found, $now] = UndoSpec::pointer($current, (string) $path);
+                if (!$found || $now != $value) {
+                    throw new UndoConflictException('It has changed since, so undoing it would overwrite a later change.');
+                }
+            }
+        }
+
+        if (is_string($inverse['operation'] ?? null)) {
+            return $this->run($person, $inverse['operation'], is_array($inverse['arguments'] ?? null) ? $inverse['arguments'] : [], false);
+        }
+
+        if (($inverse['handler'] ?? false) === true) {
+            $tool    = (string) ($action['tool'] ?? '');
+            $handler = $this->authoredTools?->get($tool)['undo']['handler'] ?? null;
+            if (!is_callable($handler)) {
+                throw new McpException(ErrorCode::METHOD_NOT_FOUND, "Unknown tool: {$tool}");
+            }
+            $this->assertPersonMay($person, $this->authoredTools?->get($tool) ?? []);
+            AuditContext::setActor($person->actor());
+            $out = $handler($inverse['result'] ?? null, $action['arguments'] ?? [], $person->tenantId);
+            return ['content' => [['type' => 'text', 'text' => is_string($out) ? $out : (string) json_encode($out, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)]]];
+        }
+
+        throw new McpException(ErrorCode::INVALID_PARAMS, 'This action has no inverse.');
     }
 
     /**
@@ -286,7 +344,7 @@ final class ToolsCallHandler implements MethodHandler
      * @param array<string, mixed> $arguments
      * @throws McpException
      */
-    private function run(McpPrincipal $principal, string $toolName, array $arguments, bool $approved, ?string $split = null): mixed
+    private function run(McpPrincipal $principal, string $toolName, array $arguments, bool $approved, ?string $split = null, ?int $proposalId = null): mixed
     {
         // Route the AI principal into AuditContext so that any hook-fired audit
         // entries (e.g. user.created by a mutation tool) also capture the MCP
@@ -317,7 +375,15 @@ final class ToolsCallHandler implements MethodHandler
                     if ($proposal !== null) {
                         return $proposal;
                     }
-                    return $this->executeAuthored($toolName, $arguments, $authored, $principal);
+                    return $this->withUndo(
+                        $principal,
+                        $toolName,
+                        $arguments,
+                        $proposalId,
+                        UndoSpec::fromAuthored($authored['undo'] ?? null),
+                        $authored['description'] !== '' ? $authored['description'] : $toolName,
+                        fn (): mixed => $this->executeAuthored($toolName, $arguments, $authored, $principal),
+                    );
                 } finally {
                     $this->auditLogger?->record('mcp.tools.call', [
                         'tenant_id'     => $principal->tenantId,
@@ -351,7 +417,15 @@ final class ToolsCallHandler implements MethodHandler
             if ($proposal !== null) {
                 return $proposal;
             }
-            return $this->executeResolved($toolName, $arguments, $declaration, $principal);
+            return $this->withUndo(
+                $principal,
+                $toolName,
+                $arguments,
+                $proposalId,
+                $this->toolDeriver->undoFor($toolName),
+                (string) ($this->toolDeriver->toolFor($toolName)['description'] ?? $toolName),
+                fn (): mixed => $this->executeResolved($toolName, $arguments, $declaration, $principal),
+            );
         } finally {
             $this->auditLogger?->record('mcp.tools.call', [
                 'tenant_id'    => $principal->tenantId,
@@ -391,6 +465,120 @@ final class ToolsCallHandler implements MethodHandler
         } elseif ($role !== null && !$this->roleChecker->hasRoleForProfile($principal->userId, $role, $tenantId)) {
             throw new McpException(ErrorCode::FORBIDDEN, 'Forbidden');
         }
+    }
+
+    /**
+     * Run $execute, and when an agent ran an operation that declares an undo,
+     * record what its inverse needs (WHIT-812). The result gains
+     * `_meta['dev.whity/undo'] = {actionId, until, windowSeconds}`.
+     *
+     * Undo is offered only when it can be built: a read that fails before the
+     * call, or an inverse argument that points at nothing, leaves the action
+     * done and not undoable, and never fails the call itself.
+     *
+     * @param array<string, mixed> $arguments
+     * @param \Closure(): mixed   $execute
+     */
+    private function withUndo(McpPrincipal $principal, string $toolName, array $arguments, ?int $proposalId, ?UndoSpec $spec, string $summary, \Closure $execute): mixed
+    {
+        if ($spec === null || $this->actions === null || !AgentScopeGrant::appliesTo($principal)) {
+            return $execute();
+        }
+
+        $readArguments = null;
+        $before        = null;
+        if ($spec->readOperation !== null) {
+            $readArguments = UndoSpec::resolve($spec->readArguments, ['arguments' => $arguments]);
+            $before        = $readArguments !== null ? $this->readJson($principal, $spec->readOperation, $readArguments) : null;
+            if ($before === null) {
+                return $execute();
+            }
+        }
+
+        $result = $execute();
+        if (!is_array($result) || ($result['isError'] ?? false) === true) {
+            return $result;
+        }
+
+        try {
+            $text      = $result['content'][0]['text'] ?? null;
+            $decoded   = is_string($text) ? json_decode($text, true) : null;
+            $answer    = is_array($decoded) ? $decoded : [];
+            $document  = ['arguments' => $arguments, 'result' => $answer, 'before' => $before ?? []];
+            $inverse   = ['operation' => $spec->operation];
+
+            if ($spec->operation !== null) {
+                // An authored tool's `operation` without `arguments` takes
+                // what the tool answered as the inverse's arguments.
+                $inverseArguments = $spec->arguments === [] && $spec->hasHandler === false && $this->toolDeriver->findDeclarationByName($toolName) === null
+                    ? $answer
+                    : UndoSpec::resolve($spec->arguments, $document);
+                if ($inverseArguments === null) {
+                    error_log("[mcp] undo for {$toolName} not offered: an inverse argument points at nothing");
+                    return $result;
+                }
+                $inverse['arguments'] = $inverseArguments;
+            } else {
+                $inverse['handler'] = true;
+                $inverse['result']  = $answer;
+            }
+
+            if ($spec->readOperation !== null && $readArguments !== null) {
+                $after = $this->readJson($principal, $spec->readOperation, $readArguments);
+                if ($after !== null) {
+                    $watch = [];
+                    foreach ($spec->watchedPaths() as $path) {
+                        $watch[$path] = UndoSpec::pointer($after, $path)[1];
+                    }
+                    $inverse['read']  = ['operation' => $spec->readOperation, 'arguments' => $readArguments];
+                    $inverse['watch'] = $watch;
+                }
+            }
+
+            $id = $this->actions->record(
+                $principal->tenantId,
+                $principal->jti,
+                $principal->userId,
+                $proposalId,
+                $toolName,
+                $arguments,
+                $summary,
+                $inverse,
+                $spec->windowSeconds,
+            );
+        } catch (\Throwable $e) {
+            error_log("[mcp] recording undo for {$toolName} failed (tenant {$principal->tenantId}): " . $e->getMessage());
+            return $result;
+        }
+
+        $result['_meta'] = (is_array($result['_meta'] ?? null) ? $result['_meta'] : []) + [self::META_UNDO => [
+            'actionId'      => $id,
+            'until'         => gmdate('Y-m-d\TH:i:s\Z', time() + $spec->windowSeconds),
+            'windowSeconds' => $spec->windowSeconds,
+        ]];
+        return $result;
+    }
+
+    /**
+     * Run a read as $principal and return its JSON body, or null when it
+     * failed or answered something that is not a JSON object.
+     *
+     * @param array<string, mixed> $arguments
+     * @return array<string, mixed>|null
+     */
+    private function readJson(McpPrincipal $principal, string $operation, array $arguments): ?array
+    {
+        try {
+            $result = $this->run($principal, $operation, $arguments, false);
+        } catch (McpException) {
+            return null;
+        }
+        if (!is_array($result) || ($result['isError'] ?? false) === true) {
+            return null;
+        }
+        $text    = $result['content'][0]['text'] ?? null;
+        $decoded = is_string($text) ? json_decode($text, true) : null;
+        return is_array($decoded) ? $decoded : null;
     }
 
     /**
@@ -472,6 +660,8 @@ final class ToolsCallHandler implements MethodHandler
             $permission !== null ? [$permission] : [],
             $summary,
             diff: $this->proposalDiffs?->diffFor($toolName, $arguments, $principal->tenantId),
+            // WHIT-812: the card says how long it can be undone once it runs.
+            undoWindowSeconds: is_int($tool['_meta'][ToolSurface::META_UNDO_WINDOW] ?? null) ? $tool['_meta'][ToolSurface::META_UNDO_WINDOW] : null,
         );
 
         return [

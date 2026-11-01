@@ -218,6 +218,13 @@ final class AgentProposalRepository
         $stmt->execute([':result' => self::encode($result), ':id' => $id, ':tenant_id' => $tenantId]);
     }
 
+    /** An approved proposal whose action the person undid (WHIT-812). */
+    public function markUndone(int $id, int $tenantId): void
+    {
+        $stmt = $this->db->prepare('UPDATE agent_proposals SET status = :undone WHERE id = :id AND tenant_id = :tenant_id AND status = :approved');
+        $stmt->execute([':undone' => self::UNDONE, ':id' => $id, ':tenant_id' => $tenantId, ':approved' => self::APPROVED]);
+    }
+
     /** Mark the tenant's waiting proposals past their expiry as expired ("Ask again"). */
     public function expireDue(int $tenantId): void
     {

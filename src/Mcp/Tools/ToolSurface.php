@@ -31,6 +31,8 @@ final class ToolSurface
     public const META_TOOLSET      = 'dev.whity/toolset';
     public const META_VISIBILITY   = 'dev.whity/visibility';
     public const META_AGENT_POLICY = 'dev.whity/agentPolicy';
+    /** WHIT-812: how long an agent's run of it can be undone; absent when it can't. */
+    public const META_UNDO_WINDOW  = 'dev.whity/undoWindowSeconds';
 
     /**
      * What a route schema's `mcp` key declares. `'mcp' => true` is the original
@@ -75,13 +77,17 @@ final class ToolSurface
         return $id === $root || str_starts_with($id, $root . '.');
     }
 
-    /** @return array<string, string> */
-    public static function meta(string $toolset, string $visibility, string $agentPolicy): array
+    /** @return array<string, string|int> */
+    public static function meta(string $toolset, string $visibility, string $agentPolicy, ?int $undoWindowSeconds = null): array
     {
-        return [
+        $meta = [
             self::META_TOOLSET      => $toolset,
             self::META_VISIBILITY   => $visibility,
             self::META_AGENT_POLICY => $agentPolicy,
         ];
+        if ($undoWindowSeconds !== null && $undoWindowSeconds > 0) {
+            $meta[self::META_UNDO_WINDOW] = $undoWindowSeconds;
+        }
+        return $meta;
     }
 }
