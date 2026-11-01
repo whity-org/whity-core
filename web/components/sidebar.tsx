@@ -18,12 +18,14 @@ import {
   IconLogout,
   IconDashboard,
   IconUserCog,
+  IconSettings,
   IconWorld,
   IconSun,
   IconMoon,
 } from '@tabler/icons-react';
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useNavItemLabels } from '@/lib/nav-item-labels';
+import { SETTINGS_AREA_NAV_IDS, SETTINGS_AREA_PREFIXES } from '@/components/settings/settings-area';
 import type { Icon } from '@tabler/icons-react';
 
 /**
@@ -91,6 +93,9 @@ const LEGACY_NAV_GROUPS: Readonly<Record<string, string>> = {
   extend: 'platform',
   system: 'platform',
 };
+
+/** The personal account page's nav item; the footer's user row opens it instead. */
+const ACCOUNT_SETTINGS_ITEM_ID = 'settings';
 
 /** The system tenant: the only one that runs the platform itself. */
 const SYSTEM_TENANT_ID = 0;
@@ -280,11 +285,20 @@ export function Sidebar() {
   const itemLabels = useNavItemLabels();
 
   const groups = useMemo(() => {
-    const regrouped = navItems.map((item) =>
-      item.group && LEGACY_NAV_GROUPS[item.group]
-        ? { ...item, group: LEGACY_NAV_GROUPS[item.group] }
-        : item,
-    );
+    // The Settings area (WHIT-806, owner decision D1): every settings page,
+    // the data pages it holds and the server's `settings` group become ONE
+    // entry at the foot, opening the area's own sub-nav. The personal account
+    // page leaves the nav too: it is the user row in the footer.
+    const inSettingsArea = (item: { id: string; group?: string }) =>
+      item.group === 'settings' || (SETTINGS_AREA_NAV_IDS as readonly string[]).includes(item.id);
+    const settingsEntry = navItems.find((item) => item.id === 'website-settings') ?? navItems.find(inSettingsArea);
+    const regrouped = navItems
+      .filter((item) => !inSettingsArea(item) && item.id !== ACCOUNT_SETTINGS_ITEM_ID)
+      .map((item) =>
+        item.group && LEGACY_NAV_GROUPS[item.group]
+          ? { ...item, group: LEGACY_NAV_GROUPS[item.group] }
+          : item,
+      );
     const built = navGroupsFromServerItems(regrouped, {
       currentPath: pathname,
       groupOrder: NAV_GROUP_ORDER,
@@ -298,12 +312,30 @@ export function Sidebar() {
     });
     const countLabel = (count: number) =>
       t('sidebar.count.waiting', '{count} waiting').replace('{count}', String(count));
-    return built.map((group) => ({
+    const withCounts = built.map((group) => ({
       ...group,
       items: group.items.map((item) =>
         counts[item.id] ? { ...item, count: counts[item.id], countLabel: countLabel(counts[item.id]) } : item,
       ),
     }));
+    if (!settingsEntry) return withCounts;
+    return [
+      ...withCounts,
+      {
+        id: 'settings',
+        items: [
+          {
+            id: 'settings-area',
+            label: t('sidebar.item.settings', 'Settings'),
+            href: settingsEntry.href,
+            icon: <IconSettings size={20} />,
+            active: SETTINGS_AREA_PREFIXES.some(
+              (prefix) => pathname === prefix || (pathname ?? '').startsWith(`${prefix}/`),
+            ),
+          },
+        ],
+      },
+    ];
   }, [navItems, pathname, groupLabels, itemLabels, counts, t]);
 
   const handleLogout = () => {

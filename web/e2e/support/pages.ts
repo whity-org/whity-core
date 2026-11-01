@@ -209,6 +209,19 @@ export class AppShell {
     );
   }
 
+  /**
+   * The personal account page's link: the user row in the sidebar footer
+   * (WHIT-806 took it out of the nav; owner decision D1 keeps the account in
+   * the user menu).
+   */
+  get accountLink(): Locator {
+    return this.sidebar.getByRole('link', { name: 'Account settings' });
+  }
+
+  async openAccountSettings(): Promise<void> {
+    await this.accountLink.click();
+  }
+
   /** The desktop collapse/expand toggle in the sidebar header (title attr). */
   get collapseToggle(): Locator {
     return this.sidebar.getByRole('button', {

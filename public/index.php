@@ -493,6 +493,11 @@ $resourceTypeRegistry = new \Whity\Core\RBAC\ResourceTypeRegistry($hookManager);
 $resourceTypeRegistry->registerCoreResourceTypes();
 \Whity\register_service(\Whity\Core\RBAC\ResourceTypeRegistry::class, $resourceTypeRegistry); // @phpstan-ignore-line
 
+// Agent presets (WHIT-815): core's from database/agent-presets; plugin and
+// Whity Builder presets join at boot (WHIT-818).
+$agentPresetRegistry = new \Whity\Core\Agent\AgentPresetRegistry();
+\Whity\register_service(\Whity\Core\Agent\AgentPresetRegistry::class, $agentPresetRegistry); // @phpstan-ignore-line
+
 // 4c-ante. Organizational-unit TYPE catalogue (#822): which KINDS of unit a
 // plugin may contribute to a tenant's tree (campus, faculty, clinic, ward).
 // Constructed after the hook manager so a registration is announced on the
@@ -795,8 +800,8 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'label' => 'Tag Groups',
         'href' => '/admin/tag-groups',
         'icon' => 'tags',
-        'group' => 'platform',
-        'order' => 12,
+        'group' => 'settings',
+        'order' => 3,
         // WC-621: the taxonomy admin. The nav item carries tags:read so a
         // permission-aware client hides it; the schema-driven CrudScreen also
         // fails closed (a 403 on the list renders the access-denied state).
@@ -807,8 +812,8 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'label' => 'Tags',
         'href' => '/admin/tags',
         'icon' => 'tag',
-        'group' => 'platform',
-        'order' => 13,
+        'group' => 'settings',
+        'order' => 2,
         'requiredPermission' => \Whity\Core\RBAC\CorePermissions::TAGS_READ,
     ];
     // FORMS (migrations 127/128). Three entries because they are three jobs done
@@ -1188,8 +1193,8 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'label' => 'Languages',
         'href' => '/admin/languages',
         'icon' => 'language',
-        'group' => 'platform',
-        'order' => 10,
+        'group' => 'settings',
+        'order' => 4,
         // WC-583: languages are a GLOBAL catalogue (no tenant_id column at
         // all) — create/update/enable/disable is a SYSTEM-TENANT-ONLY
         // PLATFORM capability (mirrors the Feature Flags/Email/Storage
@@ -1203,8 +1208,8 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'label' => 'Translations',
         'href' => '/admin/translations',
         'icon' => 'world',
-        'group' => 'platform',
-        'order' => 11,
+        'group' => 'settings',
+        'order' => 5,
         // WC-583: translation rows ARE tenant-scoped (system default vs a
         // tenant's own override) — unlike Languages above, every tenant
         // holding translations:manage may reach this page to edit its own
@@ -3405,14 +3410,20 @@ $documentsHandler = new \Whity\Api\DocumentsApiHandler(
     $templateSlotRegistry
 );
 // The one issuing path (WHIT-742), registered for plugin code and automations
-// running in a request; BaseCommand registers the same for queue:work and
-// events:relay (WorkerDocumentIssuing). POST /api/documents uses the same class.
+// running in a request. BaseCommand registers the same for CLI commands, and
+// queue:work through WorkerDocumentServices. POST /api/documents uses it too.
 \Whity\register_service(\Whity\Core\Document\Issuing\TemplateIssuing::class, new \Whity\Core\Document\Issuing\TemplateIssuing(
     $documentIssuing,
     $documentFieldRegistry,
     $settingsService,
     static fn (int $id, int $tenantId, int $profileId): ?array => $documentSourcesHandler->visibleRow($id, $tenantId, $profileId),
     $templateSlotRegistry,
+));
+// The SDK's Documents (1.56): plugins issue through the same service, as the
+// person whose request it is.
+\Whity\register_service(\Whity\Sdk\Documents\Documents::class, new \Whity\Core\Document\Issuing\SdkDocuments(
+    \Whity\app(\Whity\Core\Document\Issuing\TemplateIssuing::class),
+    $roleChecker,
 ));
 $documentQrHandler = new \Whity\Api\DocumentQrApiHandler(
     $documentRepository,
@@ -4592,10 +4603,24 @@ $router->register('DELETE', '/api/relations/{id:\d+}', [$relationsHandler, 'dele
 // WC-149b2fc9: create and revoke are gated by mcp:tokens:manage so an admin
 // controls who may mint AI credentials. List is read-only and ungated.
 $mcpTokenService = new McpTokenService($db->getPdo(), $jwtParser);
-$mcpTokenHandler = new McpTokenHandler($tokenValidator, $mcpTokenService, $permissionRegistry);
+// WHIT-832: the grant screen needs the operations an agent could be offered,
+// with their gates; derived once per worker from the same catalogue as tools/list.
+$mcpAgentOperations = null;
+$mcpTokenHandler = new McpTokenHandler(
+    $tokenValidator,
+    $mcpTokenService,
+    $permissionRegistry,
+    $roleChecker,
+    static function () use (&$mcpAgentOperations): array {
+        return $mcpAgentOperations !== null ? ($mcpAgentOperations)() : [];
+    },
+    $auditLogger,
+);
 $router->register('POST',   '/api/mcp/tokens',       [$mcpTokenHandler, 'create'], null, null, CorePermissions::MCP_TOKENS_MANAGE);
 $router->register('GET',    '/api/mcp/tokens',       [$mcpTokenHandler, 'list']);
 $router->register('DELETE', '/api/mcp/tokens/{jti}', [$mcpTokenHandler, 'revoke'], null, null, CorePermissions::MCP_TOKENS_MANAGE);
+$router->register('GET',    '/api/mcp/tokens/{jti}/grant', [$mcpTokenHandler, 'grant']);
+$router->register('PATCH',  '/api/mcp/tokens/{jti}/grant', [$mcpTokenHandler, 'updateGrant'], null, null, CorePermissions::MCP_TOKENS_MANAGE);
 
 // WC-0208ce4d: AI-principal admin endpoints (tenant-scoped, admin surface).
 // Gated by mcp:tokens:manage so only admins who hold the credential-management
@@ -4672,6 +4697,15 @@ $mcpEnabledPluginAlwaysOn = static function (int $tenantId) use ($settingsServic
     $raw = (string) ($settingsService->effective($tenantId)[\Whity\Core\Settings\SettingsRegistry::MCP_ALWAYS_ON_PLUGIN_TOOLS] ?? '');
     return array_values(array_filter(array_map('trim', explode(',', $raw)), static fn (string $n): bool => $n !== ''));
 };
+// WHIT-832: what an agent could be offered, core and plugin, for the grant
+// screen (wired into $mcpTokenHandler above). Both sources cache their catalogue.
+$mcpAgentOperations = static function () use ($toolDeriver, $authoredMcpTools): array {
+    $exposed = array_filter($toolDeriver->deriveTools(), static fn (array $tool): bool => $toolDeriver->isExposed((string) ($tool['name'] ?? '')));
+    return [
+        ...\Whity\Mcp\Auth\AgentGrantView::operationsFrom($exposed, $toolDeriver->buildAccessMap()),
+        ...\Whity\Mcp\Auth\AgentGrantView::operationsFrom($authoredMcpTools->toolObjects(), $authoredMcpTools->accessMap()),
+    ];
+};
 // WC-0208ce4d: admin read-only view of the MCP tools and their access
 // requirements, plugin-authored tools included (WHIT-754).
 $mcpToolsAdminHandler = new McpToolsAdminHandler($toolDeriver, $roleChecker, $authoredMcpTools, $mcpEnabledPluginAlwaysOn);
@@ -4688,6 +4722,21 @@ $agentProposalsHandler = new \Whity\Api\AgentProposalsApiHandler($agentProposals
 $router->register('GET',  '/api/me/agent-proposals',                    [$agentProposalsHandler, 'list'],    null);
 $router->register('POST', '/api/me/agent-proposals/{id:\d+}/approve',  [$agentProposalsHandler, 'approve'], null);
 $router->register('POST', '/api/me/agent-proposals/{id:\d+}/decline',  [$agentProposalsHandler, 'decline'], null);
+// WHIT-815: workspace agents (persona, toolsets, starting grant) and the
+// presets they start from. Gated on agents:manage, which migration 180 grants
+// to every role holding mcp:tokens:manage. Writes are agentPolicy refuse.
+$agentsHandler = new \Whity\Api\AgentsApiHandler(
+    new \Whity\Core\Agent\AgentRepository($db->getPdo()),
+    $agentPresetRegistry,
+    $auditLogger,
+);
+$router->register('GET',   '/api/agents',                      [$agentsHandler, 'list'],    null, null, CorePermissions::AGENTS_MANAGE);
+$router->register('POST',  '/api/agents',                      [$agentsHandler, 'create'],  null, null, CorePermissions::AGENTS_MANAGE);
+$router->register('GET',   '/api/agents/{id:\d+}',             [$agentsHandler, 'get'],     null, null, CorePermissions::AGENTS_MANAGE);
+$router->register('PATCH', '/api/agents/{id:\d+}',             [$agentsHandler, 'update'],  null, null, CorePermissions::AGENTS_MANAGE);
+$router->register('POST',  '/api/agents/{id:\d+}/archive',     [$agentsHandler, 'archive'], null, null, CorePermissions::AGENTS_MANAGE);
+$router->register('POST',  '/api/agents/{id:\d+}/restore',     [$agentsHandler, 'restore'], null, null, CorePermissions::AGENTS_MANAGE);
+$router->register('GET',   '/api/agent-presets',               [$agentsHandler, 'presets'], null, null, CorePermissions::AGENTS_MANAGE);
 $mcpHandlers = [
     'initialize'              => new InitializeHandler(listChanged: true),
     // WHIT-708: required of every 2026-07-28 server.
@@ -4759,6 +4808,8 @@ $mcpDiscovery = new DiscoveryTools(
     // WHIT-754: a plugin's always-on tool is listed only once this workspace's
     // admin turned it on (the mcp.always_on_plugin_tools setting).
     $mcpEnabledPluginAlwaysOn,
+    // WHIT-825: get_proposal reads an agent's own proposals.
+    $agentProposals,
 );
 $mcpTransportHandler = new McpTransportHandler(
     new Dispatcher($mcpHandlers, $tokenValidator, $mcpRateLimiter, $tenantMcpEnabled, $mcpListChangedNotifier, $mcpRecordTokenUse),
@@ -4817,6 +4868,8 @@ $router->register('POST', '/api/mcp/connect/preview', [$mcpConnectHandler, 'prev
 // Load plugins AFTER every core route (WC-169): the Router refuses duplicate
 // method+path registrations (first wins), so core routes can never be
 // shadowed by a plugin claiming the same path.
+// Code plugins' template slots and record types as merge fields (SDK 1.56, WHIT-742).
+$pluginLoader->setDocumentRegistries($templateSlotRegistry, $documentFieldRegistry);
 $pluginLoader->load();
 $pluginLoader->collectMcpPrompts($promptRegistry);
 // SDK 1.43. Collect FIRST, then hand the deriver the suppressions: a plugin
