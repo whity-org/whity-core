@@ -186,6 +186,10 @@ abstract class BaseCommand implements CliCommand, CommandHelp
         $ouTypeRegistry->registerCoreOuTypes();
         \Whity\register_service(\Whity\Core\Ou\OuTypeRegistry::class, $ouTypeRegistry);
 
+        // Agent presets (WHIT-815), as public/index.php registers them.
+        $agentPresetRegistry = new \Whity\Core\Agent\AgentPresetRegistry();
+        \Whity\register_service(\Whity\Core\Agent\AgentPresetRegistry::class, $agentPresetRegistry);
+
         // TIME-WINDOW TYPE catalogue (#1070), registered as a service for exactly
         // the same reason. A command is the natural home for period work — an
         // import that files records against a period, a scheduled close — and a
@@ -402,6 +406,11 @@ abstract class BaseCommand implements CliCommand, CommandHelp
         \Whity\register_service(\Whity\Sdk\Sql\SequenceAllocator::class, $sequenceCounters);
         \Whity\register_service(\Whity\Database\SequenceCounters::class, $sequenceCounters);
 
+        // WHIT-833: previews of what an agent's proposed call would change. The
+        // CLI serves no MCP, so nothing files a proposal here, but the registry is
+        // host-wired: registered so \Whity\app() never improvises an empty one.
+        \Whity\register_service(\Whity\Mcp\Tools\ProposalDiffRegistry::class, new \Whity\Mcp\Tools\ProposalDiffRegistry());
+
         $baseDir = dirname(__DIR__, 3);
         // The registries are passed HERE, not just constructed above: this loader
         // previously received neither, so plugin-declared permissions were never
@@ -462,7 +471,70 @@ abstract class BaseCommand implements CliCommand, CommandHelp
             // resolvable when a command files something against it.
             $windowTypeRegistry
         );
+        // Issuing documents outside a request (WHIT-742, DOCUMENT-AUTOMATION
+        // 3.5), for the commands this kernel runs. `queue:work` isn't one of
+        // them: it registers the same through WorkerDocumentServices. The loader fills
+        // these registries with code plugins' slots and record types (SDK
+        // 1.56), and the issuing graph is built on the first issue, after the
+        // plugins and their `document.issuing` listeners are in place.
+        // A worker lives for many jobs, so each read of a workspace's plugins
+        // starts fresh rather than from the last job's.
+        $tenantManifestHost = new \Whity\Core\Plugin\Tenant\TenantManifestHost(
+            new \Whity\Core\Plugin\Tenant\TenantPluginRepository($db->getPdo()),
+            $permissionRegistry
+        );
+        $liveManifests = static function (int $tenantId) use ($tenantManifestHost): array {
+            $tenantManifestHost->resetRequest();
+
+            return $tenantManifestHost->manifestsFor($tenantId);
+        };
+        $tenantRecordRepository = new \Whity\Core\Plugin\Tenant\TenantRecordRepository($db->getPdo());
+        $documentFieldRegistry->addTenantSource(
+            static fn (int $tenantId): array => \Whity\Core\Document\Fields\TenantRecordFieldProvider::forManifests(
+                $liveManifests($tenantId),
+                $tenantRecordRepository,
+                null,
+                null,
+                static fn (int $tenant, int $profileId): ?string => $tenantRecordRepository->memberName($tenant, $profileId),
+            )
+        );
+        $templateSlotRegistry = new \Whity\Core\Document\Slots\TemplateSlotRegistry($liveManifests);
+        $agentPresetRegistry->useManifests($liveManifests);
+        \Whity\register_service(\Whity\Core\Document\Slots\TemplateSlotRegistry::class, $templateSlotRegistry);
+        \Whity\register_service(
+            \Whity\Core\Document\Issuing\TemplateIssuing::class,
+            \Whity\Core\Document\Issuing\WorkerDocumentIssuing::build(
+                $db->getPdo(),
+                $settingsService,
+                $hookManager,
+                $roleChecker,
+                $resourceTypeRegistry,
+                $documentFieldRegistry,
+                $documentEmbedRegistry,
+                $templateSlotRegistry,
+                $_ENV,
+                getenv('STORAGE_ROOT') ?: ($baseDir . '/storage'),
+            )
+        );
+        // WHIT-838 (SDK 1.60): plugin secrets, as in public/index.php, so a
+        // plugin's job reaches the same store its routes write. The cipher is
+        // built on first use: a command that touches no secret needs no key.
+        \Whity\register_service(\Whity\Sdk\Secrets\PluginSecrets::class, new \Whity\Core\Plugin\HostPluginSecrets(
+            $db->getPdo(),
+            static fn (): \Whity\Core\Security\EncryptedSecretStore => \Whity\Core\Security\EncryptedSecretStore::fromEnv($_ENV),
+            $auditLogger,
+        ));
+        \Whity\register_service(
+            \Whity\Sdk\Documents\Documents::class,
+            new \Whity\Core\Document\Issuing\SdkDocuments(
+                static fn (): \Whity\Core\Document\Issuing\TemplateIssuing => \Whity\app(\Whity\Core\Document\Issuing\TemplateIssuing::class),
+                $roleChecker
+            )
+        );
+        $pluginLoader->setAgentPresetRegistry($agentPresetRegistry);
+        $pluginLoader->setDocumentRegistries($templateSlotRegistry, $documentFieldRegistry);
         $pluginLoader->load();
+
 
         // Register API handlers (copied from public/index.php)
         // WC-203: permission-gated, mirroring public/index.php.

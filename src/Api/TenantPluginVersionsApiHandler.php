@@ -94,7 +94,7 @@ final class TenantPluginVersionsApiHandler
                 return self::invalid($e->getErrors());
             }
 
-            return Response::json(['data' => $this->impact->plan($tenantId, $this->live($tenantId, $draft->name()), $draft)]);
+            return Response::json(['data' => $this->impact->plan($tenantId, $this->plugins->liveManifest($tenantId, $draft->name()), $draft)]);
         });
     }
 
@@ -144,7 +144,7 @@ final class TenantPluginVersionsApiHandler
                 ], 422);
             }
 
-            $plan = $this->impact->plan($tenantId, $this->live($tenantId, $draft->name()), $draft);
+            $plan = $this->impact->plan($tenantId, $this->plugins->liveManifest($tenantId, $draft->name()), $draft);
             if ($plan['level'] === ManifestImpact::DESTRUCTIVE && ($body['confirmDestructive'] ?? false) !== true) {
                 $this->refused($tenantId, $actor, $draft->name(), 'destructive_unconfirmed', ['version' => $draft->version()]);
 
@@ -163,7 +163,7 @@ final class TenantPluginVersionsApiHandler
     public function versions(Request $request, array $params = []): Response
     {
         return $this->guarded(function (int $tenantId) use ($params): Response {
-            $plugin = $this->pluginKey($tenantId, (string) ($params['plugin'] ?? ''));
+            $plugin = $this->plugins->pluginKey($tenantId, (string) ($params['plugin'] ?? ''));
             if ($plugin === null) {
                 return self::notFound();
             }
@@ -182,7 +182,7 @@ final class TenantPluginVersionsApiHandler
     public function version(Request $request, array $params = []): Response
     {
         return $this->guarded(function (int $tenantId) use ($params): Response {
-            $plugin = $this->pluginKey($tenantId, (string) ($params['plugin'] ?? ''));
+            $plugin = $this->plugins->pluginKey($tenantId, (string) ($params['plugin'] ?? ''));
             $id = (int) ($params['id'] ?? 0);
             $entry = null;
             foreach ($plugin === null ? [] : $this->plugins->history($tenantId, $plugin) as $v) {
@@ -205,7 +205,7 @@ final class TenantPluginVersionsApiHandler
     public function activate(Request $request, array $params = []): Response
     {
         return $this->guarded(function (int $tenantId) use ($request, $params): Response {
-            $plugin = $this->pluginKey($tenantId, (string) ($params['plugin'] ?? ''));
+            $plugin = $this->plugins->pluginKey($tenantId, (string) ($params['plugin'] ?? ''));
             $id = (int) ($params['id'] ?? 0);
             $data = $plugin === null ? null : $this->plugins->manifest($tenantId, $id);
             if ($plugin === null || $data === null) {
@@ -223,7 +223,7 @@ final class TenantPluginVersionsApiHandler
                 return self::notFound();
             }
 
-            $plan = $this->impact->plan($tenantId, $this->live($tenantId, $plugin), $target);
+            $plan = $this->impact->plan($tenantId, $this->plugins->liveManifest($tenantId, $plugin), $target);
             if ($plan['level'] === ManifestImpact::DESTRUCTIVE && (JsonBody::parsed($request)['confirmDestructive'] ?? false) !== true) {
                 $this->refused($tenantId, $actor, $plugin, 'destructive_unconfirmed', ['version_id' => $id]);
 
@@ -236,35 +236,6 @@ final class TenantPluginVersionsApiHandler
                 ? self::notFound()
                 : Response::json(['data' => $activated + ['impact' => $plan]]);
         });
-    }
-
-    /** The live manifest of a workspace's plugin, switched on or not. */
-    private function live(int $tenantId, string $plugin): ?PluginManifest
-    {
-        $versionId = $this->plugins->liveVersionId($tenantId, $plugin);
-        $data = $versionId === null ? null : $this->plugins->manifest($tenantId, $versionId);
-        if ($data === null) {
-            return null;
-        }
-        try {
-            return PluginManifest::fromArray($data, 'live workspace plugin');
-        } catch (InvalidManifestException) {
-            // Validated when published; the format may have tightened since.
-            // Compare against nothing rather than refuse to plan.
-            return null;
-        }
-    }
-
-    /** A plugin's name from the slug in its routes, when it is this workspace's. */
-    private function pluginKey(int $tenantId, string $slug): ?string
-    {
-        foreach ($this->plugins->plugins($tenantId) as $p) {
-            if (PluginNamespace::slug($p['plugin']) === $slug) {
-                return $p['plugin'];
-            }
-        }
-
-        return null;
     }
 
     /**

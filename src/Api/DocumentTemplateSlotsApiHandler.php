@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Whity\Api;
 
+use Whity\Core\Document\Slots\BackgroundIssuing;
 use Whity\Core\Document\Slots\SlotBindings;
 use Whity\Core\Document\Slots\TemplateSlot;
 use Whity\Core\Document\Slots\TemplateSlotRegistry;
@@ -29,6 +30,13 @@ use Whity\Http\JsonBody;
  * kind the slot takes and for the slot's record type; anything else is a 422
  * with a `code` saying which. The bindings are the tenant setting
  * `documents.slot_bindings`, which the settings PATCH refuses.
+ *
+ * The background-issuing allow-list (slice 3, DOCUMENT-AUTOMATION.md 3.7):
+ * GET /api/document-background-issuing (documents:read) lists the plugins
+ * that declare they issue with no person, each with its slots and whether
+ * this workspace allows it. PUT /api/document-background-issuing/{plugin}
+ * (documents:publish) allows or stops one. The tenant setting
+ * `documents.background_issuing` holds it; the settings PATCH refuses it.
  */
 final class DocumentTemplateSlotsApiHandler
 {
@@ -104,7 +112,7 @@ final class DocumentTemplateSlotsApiHandler
             if ($template === null) {
                 return Response::error('Template not found', 404);
             }
-            $problem = self::misfit($slot, $template);
+            $problem = $slot->misfit($template);
             if ($problem !== null) {
                 return Response::error($problem['message'], 422, ['code' => $problem['code']]);
             }
@@ -118,32 +126,71 @@ final class DocumentTemplateSlotsApiHandler
             ->withHeaders(['ETag' => SlotBindings::etag($saved)]);
     }
 
-    /**
-     * Why a template can't fill a slot, or null when it fits. Checked when it
-     * is bound and again when a document is issued from the slot, since the
-     * template can change in between.
-     *
-     * @param array<string, mixed> $template a document_sources row
-     * @return array{code: string, message: string}|null
-     */
-    public static function misfit(TemplateSlot $slot, array $template): ?array
+    public function backgroundList(Request $request): Response
     {
-        $kind = (string) ($template['kind'] ?? '');
-        if (!in_array($kind, $slot->kinds, true)) {
-            return ['code' => 'kind_mismatch', 'message' => "This slot takes a " . implode(' or ', $slot->kinds) . ", not a {$kind}"];
+        $ctx = $this->context($request);
+        if ($ctx instanceof Response) {
+            return $ctx;
         }
-        if (($template['record_type'] ?? null) !== $slot->recordType) {
-            return ['code' => 'record_type_mismatch', 'message' => "This slot's documents are for {$slot->recordType}; the template is for "
-                . (is_string($template['record_type'] ?? null) ? $template['record_type'] : 'no record')];
-        }
-        if (($template['scope'] ?? null) === 'personal') {
-            return ['code' => 'personal_template', 'message' => 'A personal template can\'t fill a slot; share it with the workspace first'];
-        }
-        if (($template['published_version'] ?? null) === null) {
-            return ['code' => 'unpublished', 'message' => 'The template has no published version yet'];
+        [$tenantId] = $ctx;
+
+        $allowed = $this->allowed($tenantId);
+        $data = [];
+        foreach ($this->slots->backgroundPlugins() as $plugin) {
+            $data[] = $this->presentBackground($tenantId, $plugin, $allowed);
         }
 
-        return null;
+        return Response::json(['data' => $data]);
+    }
+
+    /** @param array<string, string> $params */
+    public function backgroundSet(Request $request, array $params): Response
+    {
+        $ctx = $this->context($request);
+        if ($ctx instanceof Response) {
+            return $ctx;
+        }
+        [$tenantId] = $ctx;
+        if ($tenantId === 0) {
+            return Response::error('The system tenant runs no plugins of its own; sign in to a workspace', 422);
+        }
+        $plugin = (string) ($params['plugin'] ?? '');
+        if (!$this->slots->declaresBackground($plugin)) {
+            return Response::error("No plugin here declares that it issues documents with no person", 404);
+        }
+        $body = JsonBody::parsed($request);
+        if (!is_bool($body['allowed'] ?? null)) {
+            return Response::error("'allowed' is required: true or false", 422);
+        }
+
+        $allowed = array_values(array_diff($this->allowed($tenantId), [$plugin]));
+        if ($body['allowed']) {
+            $allowed[] = $plugin;
+        }
+        $this->settings->setTenant($tenantId, SettingsRegistry::DOCUMENTS_BACKGROUND_ISSUING, BackgroundIssuing::encode($allowed));
+
+        return Response::json(['data' => $this->presentBackground($tenantId, $plugin, $this->allowed($tenantId))]);
+    }
+
+    /**
+     * @param list<string> $allowed
+     * @return array{plugin: string, allowed: bool, slots: list<string>}
+     */
+    private function presentBackground(int $tenantId, string $plugin, array $allowed): array
+    {
+        return [
+            'plugin' => $plugin,
+            'allowed' => in_array($plugin, $allowed, true),
+            'slots' => array_map(static fn (TemplateSlot $slot): string => $slot->key, $this->slots->slotsOf($tenantId, $plugin)),
+        ];
+    }
+
+    /** @return list<string> */
+    private function allowed(int $tenantId): array
+    {
+        $effective = $this->settings->effective($tenantId);
+
+        return BackgroundIssuing::parse((string) ($effective[SettingsRegistry::DOCUMENTS_BACKGROUND_ISSUING] ?? ''));
     }
 
     /**
@@ -154,7 +201,7 @@ final class DocumentTemplateSlotsApiHandler
         $binding = null;
         if ($templateId !== null) {
             $template = $this->sources->visibleRow($templateId, $tenantId, $callerId);
-            $problem = $template !== null ? self::misfit($slot, $template) : ['code' => 'template_missing', 'message' => 'The bound template is gone or hidden from you'];
+            $problem = $template !== null ? $slot->misfit($template) : ['code' => 'template_missing', 'message' => 'The bound template is gone or hidden from you'];
             $binding = [
                 'template_id' => $templateId,
                 'title' => $template !== null ? (string) $template['title'] : null,

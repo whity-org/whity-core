@@ -3,7 +3,7 @@
 /**
  * The node-based route-flow editor screen (#1027).
  *
- * The CANVAS is `@whity-org/ui/route-flow/editor` — a kit component, because a
+ * The CANVAS is `@whity/ui/route-flow/editor` — a kit component, because a
  * graph editor is precisely what a second client wants and anything in
  * `web/components/` ships to one of three. This file is the HOST: it fetches,
  * it resolves audiences, it renders the inspector whose pickers are bound to
@@ -57,19 +57,19 @@ import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/lib/toast-context';
 import { useFetch } from '@/hooks/useFetch';
 import { useDirection } from '@/lib/direction-context';
-import { useTranslation } from '@whity-org/features/i18n';
-import { Button } from '@whity-org/ui/button';
+import { useTranslation } from '@whity/features/i18n';
+import { Button } from '@whity/ui/button';
 import { Input } from '@/components/ui/input';
-import { Alert, AlertDescription } from '@whity-org/ui/alert';
+import { Alert, AlertDescription } from '@whity/ui/alert';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@whity-org/ui/select';
-import { Switch } from '@whity-org/ui/switch';
-import { RouteFlowEditor, appendStep } from '@whity-org/ui/route-flow/editor';
+} from '@whity/ui/select';
+import { Switch } from '@whity/ui/switch';
+import { RouteFlowEditor, appendStep } from '@whity/ui/route-flow/editor';
 import {
   effectiveQuorum,
   resolveTransitions,
@@ -78,10 +78,10 @@ import {
   type RouteFlowOrientation,
   type RouteFlowQuorum,
   type RouteFlowStep,
-} from '@whity-org/ui/route-flow/model';
+} from '@whity/ui/route-flow/model';
 import { IconDeviceFloppy, IconPlus } from '@tabler/icons-react';
 import type { RoutingRule } from '@/components/documents/routing-wire';
-import { AudienceGroupPicker, type AudienceGroupPreview } from '@whity-org/ui/audience-group-picker';
+import { AudienceGroupPicker, type AudienceGroupPreview } from '@whity/ui/audience-group-picker';
 import {
   audiencePreviewRequest,
   toAudienceGroupPreview,

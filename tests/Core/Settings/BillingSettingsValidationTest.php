@@ -175,13 +175,22 @@ final class BillingSettingsValidationTest extends TestCase
             SettingsRegistry::BILLING_TAX_INCLUSIVE,
             SettingsRegistry::BILLING_DEFAULT_CURRENCY,
             SettingsRegistry::BILLING_PAYMENT_TERMS_DAYS,
-            SettingsRegistry::BILLING_SELLER_NAME,
-            SettingsRegistry::BILLING_SELLER_ADDRESS,
-            SettingsRegistry::BILLING_SELLER_TAX_ID,
+            SettingsRegistry::COMPANY_NAME,
+            SettingsRegistry::COMPANY_ADDRESS,
+            SettingsRegistry::COMPANY_TAX_ID,
+            SettingsRegistry::COMPANY_PHONE,
+            SettingsRegistry::COMPANY_EMAIL,
         ] as $key) {
             self::assertFalse(SettingsRegistry::isGlobalOnly($key), $key);
             self::assertContains($key, SettingsRegistry::tenantTextKeys(), $key);
         }
+    }
+
+    public function testTheCompanyEmailMustBeAnEmailOrEmpty(): void
+    {
+        self::assertNull(SettingsRegistry::validate(SettingsRegistry::COMPANY_EMAIL, ''));
+        self::assertNull(SettingsRegistry::validate(SettingsRegistry::COMPANY_EMAIL, 'hello@bakery.example'));
+        self::assertNotNull(SettingsRegistry::validate(SettingsRegistry::COMPANY_EMAIL, 'not an email'));
     }
 
     public function testTheTaxInclusiveFlagIsATypedBoolean(): void

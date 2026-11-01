@@ -7,17 +7,17 @@ import { useAuth } from '@/lib/auth-context';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { useFetch } from '@/hooks/useFetch';
 import { AdminHeader } from '@/components/admin/admin-header';
-import { Button } from '@whity-org/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity-org/ui/card';
-import { AccessDenied } from '@whity-org/ui/access-denied';
+import { Button } from '@whity/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
+import { AccessDenied } from '@whity/ui/access-denied';
 import { IconDeviceFloppy } from '@tabler/icons-react';
-import { useTranslation } from '@whity-org/features/i18n';
-import { SettingsTabs } from './settings-tabs';
+import { useTranslation } from '@whity/features/i18n';
 import {
   SETTINGS_READ,
   SETTINGS_WRITE,
   SETTINGS_MANAGE,
   SYSTEM_TENANT_ID,
+  COMPANY_SETTING_KEYS,
   DISPLAY_SETTING_KEYS,
   GENERAL_SETTING_KEYS,
   generalFieldLabels,
@@ -83,7 +83,6 @@ export default function AdminSettingsPage() {
           "Your tenant's instance identity. Cleared fields fall back to the platform-wide global default. Editing requires the settings:write permission."
         )}
       />
-      <SettingsTabs active="general" />
       <TenantSettingsSection canWrite={canWrite} addToast={addToast} />
       {isSystemTenant && canManageGlobal && <PlatformDefaultsSection addToast={addToast} />}
     </div>
@@ -140,6 +139,13 @@ function TenantSettingsSection({
     [data]
   );
 
+  // WHIT-788: in the order the list gives, not the registry's.
+  const companyEntries = useMemo(
+    () =>
+      COMPANY_SETTING_KEYS.flatMap((key) => (data?.registry ?? []).filter((entry) => entry.key === key)),
+    [data]
+  );
+
   const setField = (key: SettingKey, value: string) => {
     setDraft((prev) => ({ ...prev, [key]: value }));
   };
@@ -170,7 +176,7 @@ function TenantSettingsSection({
     // of an untouched toggle would write a per-tenant override for something
     // nobody chose, and the difference between "inherited" and "overridden" is
     // the whole of what the badge beside it reports.
-    for (const entry of displayEntries) {
+    for (const entry of [...displayEntries, ...companyEntries]) {
       const edited = draft[entry.key as keyof typeof draft];
       if (edited !== undefined) {
         settings[entry.key] = edited;
@@ -271,6 +277,27 @@ function TenantSettingsSection({
                 status={overridden.has(entry.key) ? 'overridden' : 'inherited'}
               />
             ))}
+            {companyEntries.length > 0 && (
+              <div className="space-y-6 border-t border-border pt-6" data-testid="tenant-company-settings">
+                <div>
+                  <h3 className="text-sm font-medium text-foreground">{t('settings.company.title', 'Company')}</h3>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {t('settings.company.description', 'What your documents, letterheads and invoices print.')}
+                  </p>
+                </div>
+                {companyEntries.map((entry) => (
+                  <RegistrySettingControl
+                    key={entry.key}
+                    entry={entry}
+                    idPrefix="tenant"
+                    value={valueOf(entry.key as SettingKey)}
+                    disabled={!canWrite}
+                    onChange={(value) => setField(entry.key as SettingKey, value)}
+                    status={overridden.has(entry.key) ? 'overridden' : 'inherited'}
+                  />
+                ))}
+              </div>
+            )}
             {canWrite && (
               <div className="flex justify-end pt-2">
                 <Button onClick={handleSave} disabled={saving} className="gap-2">

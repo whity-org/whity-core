@@ -43,16 +43,16 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@whity-org/ui/dialog';
-import { Button } from '@whity-org/ui/button';
-import { Input } from '@whity-org/ui/input';
+} from '@whity/ui/dialog';
+import { Button } from '@whity/ui/button';
+import { Input } from '@whity/ui/input';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@whity-org/ui/select';
+} from '@whity/ui/select';
 import {
   Form,
   FormField,
@@ -60,7 +60,7 @@ import {
   FormLabel,
   FormControl,
   FormMessage,
-} from '@whity-org/ui/form';
+} from '@whity/ui/form';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';

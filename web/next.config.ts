@@ -118,7 +118,7 @@ const nextConfig: NextConfig = {
   // `table-core` is listed because that is where the row models and
   // features actually live; react-table only re-exports them.
   transpilePackages: [
-    "@whity-org/ui",
+    "@whity/ui",
     "@tanstack/react-table",
     "@tanstack/table-core",
   ],

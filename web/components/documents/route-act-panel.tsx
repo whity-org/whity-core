@@ -111,12 +111,12 @@
  */
 
 import { useMemo, useState } from 'react';
-import { Button } from '@whity-org/ui/button';
-import { Alert, AlertDescription } from '@whity-org/ui/alert';
-import { Badge } from '@whity-org/ui/badge';
-import { Textarea } from '@whity-org/ui/textarea';
+import { Button } from '@whity/ui/button';
+import { Alert, AlertDescription } from '@whity/ui/alert';
+import { Badge } from '@whity/ui/badge';
+import { Textarea } from '@whity/ui/textarea';
 import { IconCheck, IconX } from '@tabler/icons-react';
-import { useTranslation } from '@whity-org/features/i18n';
+import { useTranslation } from '@whity/features/i18n';
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/lib/toast-context';
 import {

@@ -8,7 +8,7 @@
  * one of these, and the per-client differences collapse to which transport gets
  * passed in.
  *
- * `@whity-org/features/roles` still exports both names, unchanged, so nothing
+ * `@whity/features/roles` still exports both names, unchanged, so nothing
  * that already imports them from there has to move.
  */
 

@@ -23,7 +23,7 @@ import { useCallback, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { api } from '@/lib/api/client';
 import type { components } from '@/lib/api/schema';
-import { useTranslation } from '@whity-org/features/i18n';
+import { useTranslation } from '@whity/features/i18n';
 import {
   RecordCollectionPanel,
   RecordList,
@@ -35,11 +35,11 @@ import {
   useRecordResource,
   type RecordFactsFn,
   type RecordResource,
-} from '@whity-org/features/record';
-import { Button } from '@whity-org/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity-org/ui/card';
+} from '@whity/features/record';
+import { Button } from '@whity/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
 import { Input } from '@/components/ui/input';
-import { BilingualInput, type BilingualValue } from '@whity-org/ui/bilingual-input';
+import { BilingualInput, type BilingualValue } from '@whity/ui/bilingual-input';
 import { IconTags } from '@tabler/icons-react';
 
 /**

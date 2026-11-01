@@ -8,11 +8,11 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { render, screen } from '@testing-library/react';
 
-import type { ResolvedThemeTokens } from '@whity-org/ui/editor/contract';
-import { EDITOR_LABELS } from '@whity-org/ui/editor/labels';
-import { PageView, themedLetterhead, themeStyle, type Letterhead } from '@whity-org/ui/editor/page-view';
-import { LabelSheetView } from '@whity-org/ui/editor/label-sheet';
-import { PublishCheck } from '@whity-org/ui/editor/publish-check';
+import type { ResolvedThemeTokens } from '@whity/ui/editor/contract';
+import { EDITOR_LABELS } from '@whity/ui/editor/labels';
+import { PageView, themedLetterhead, themeStyle, type Letterhead } from '@whity/ui/editor/page-view';
+import { LabelSheetView } from '@whity/ui/editor/label-sheet';
+import { PublishCheck } from '@whity/ui/editor/publish-check';
 
 const TOKENS: ResolvedThemeTokens = {
   accent: '#B74C05',

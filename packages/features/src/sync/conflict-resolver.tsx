@@ -1,8 +1,8 @@
 import * as React from "react"
 
-import { Button } from "@whity-org/ui/button"
-import { Input } from "@whity-org/ui/input"
-import { RadioGroup, RadioGroupItem } from "@whity-org/ui/radio-group"
+import { Button } from "@whity/ui/button"
+import { Input } from "@whity/ui/input"
+import { RadioGroup, RadioGroupItem } from "@whity/ui/radio-group"
 
 import { identityTranslate, type NavTranslate } from "../nav/types"
 import type { Conflict, FieldChoice, FieldConflict, Resolution } from "./types"

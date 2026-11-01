@@ -8,10 +8,10 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { Editor } from '@tiptap/core';
 
-import type { Block } from '@whity-org/ui/editor/contract';
-import { fromEditorContent, normalizeBlocks, toEditorContent } from '@whity-org/ui/editor/convert';
-import { schemaExtensions } from '@whity-org/ui/editor/schema';
-import { BlockIds } from '@whity-org/ui/editor/block-ids';
+import type { Block } from '@whity/ui/editor/contract';
+import { fromEditorContent, normalizeBlocks, toEditorContent } from '@whity/ui/editor/convert';
+import { schemaExtensions } from '@whity/ui/editor/schema';
+import { BlockIds } from '@whity/ui/editor/block-ids';
 
 function throughEditor(blocks: Block[]): Block[] {
   const editor = new Editor({ extensions: [...schemaExtensions, BlockIds], content: toEditorContent(blocks) });

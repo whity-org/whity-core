@@ -49,6 +49,28 @@ final class McpTokenService
         array $scope,
         string $principalKind = 'user',
     ): string {
+        return $this->mint($profileId, $tenantId, $name, $scope, $principalKind, null)['token'];
+    }
+
+    /**
+     * Issue an `ai-agent` credential bound to a workspace agent's assignment
+     * (WHIT-816): its toolsets and grant are read from the assignment on
+     * every call, and revoking the assignment revokes it.
+     *
+     * @param string[] $scope
+     * @return array{token: string, jti: string}
+     */
+    public function issueForAssignment(int $profileId, int $tenantId, string $name, array $scope, int $assignmentId): array
+    {
+        return $this->mint($profileId, $tenantId, $name, $scope, 'ai-agent', $assignmentId);
+    }
+
+    /**
+     * @param string[] $scope
+     * @return array{token: string, jti: string}
+     */
+    private function mint(int $profileId, int $tenantId, string $name, array $scope, string $principalKind, ?int $assignmentId): array
+    {
         // Post-cutover: emit only {profile_id, active_tenant_id} — no legacy tenant_id.
         $token = $this->jwtParser->create([
             'profile_id'       => $profileId,
@@ -76,8 +98,12 @@ final class McpTokenService
             (string) json_encode($scope, JSON_THROW_ON_ERROR),
             date('Y-m-d H:i:s', (int) $claims['exp']),
         ]);
+        if ($assignmentId !== null) {
+            $bind = $this->db->prepare('UPDATE mcp_tokens SET agent_assignment_id = ? WHERE jti = ? AND tenant_id = ?');
+            $bind->execute([$assignmentId, $claims['jti'], $tenantId]);
+        }
 
-        return $token;
+        return ['token' => $token, 'jti' => (string) $claims['jti']];
     }
 
     /**
@@ -110,6 +136,48 @@ final class McpTokenService
             $row['scope'] = is_array($decoded) ? $decoded : [];
             return $row;
         }, $rows));
+    }
+
+    /**
+     * One of the caller's active tokens, or null (WHIT-832).
+     *
+     * @return array<string, mixed>|null
+     */
+    public function findActive(string $jti, int $profileId, int $tenantId): ?array
+    {
+        $stmt = $this->db->prepare("
+            SELECT t.jti, t.name, t.principal_kind, t.scope, t.expires_at, t.created_at, t.last_used_at
+            FROM   mcp_tokens t
+            WHERE  t.jti = ?
+              AND  t.profile_id = ?
+              AND  t.tenant_id = ?
+              AND  t.expires_at > NOW()
+              AND  NOT EXISTS (
+                       SELECT 1 FROM revoked_tokens r WHERE r.jti = t.jti
+                   )
+            LIMIT 1
+        ");
+        $stmt->execute([$jti, $profileId, $tenantId]);
+        $row = $stmt->fetch();
+        if (!is_array($row)) {
+            return null;
+        }
+        $decoded      = json_decode((string) $row['scope'], true);
+        $row['scope'] = is_array($decoded) ? array_values(array_filter($decoded, 'is_string')) : [];
+        return $row;
+    }
+
+    /**
+     * Store a token's scope (WHIT-832: its grant changed). The validator reads
+     * grant entries from here on every call, so the change applies to the
+     * token the client already holds.
+     *
+     * @param list<string> $scope
+     */
+    public function updateScope(string $jti, int $profileId, int $tenantId, array $scope): void
+    {
+        $stmt = $this->db->prepare('UPDATE mcp_tokens SET scope = ? WHERE jti = ? AND profile_id = ? AND tenant_id = ?');
+        $stmt->execute([json_encode(array_values($scope), JSON_THROW_ON_ERROR), $jti, $profileId, $tenantId]);
     }
 
     /**

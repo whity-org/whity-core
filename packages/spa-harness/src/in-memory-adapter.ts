@@ -2,7 +2,7 @@ import type {
   DemoCatalogAdapter,
   DemoCatalogItem,
   DemoCatalogItemInput,
-} from "@whity-org/features/demo-catalog"
+} from "@whity/features/demo-catalog"
 
 /**
  * In-memory `DemoCatalogAdapter` implementation for the SPA harness — the

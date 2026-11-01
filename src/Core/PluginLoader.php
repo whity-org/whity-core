@@ -50,6 +50,8 @@ use Whity\Sdk\Http\Response;
 use Whity\Mcp\Prompts\Prompt;
 use Whity\Mcp\Prompts\PromptRegistry;
 use Whity\Mcp\Tools\AuthoredToolRegistry;
+use Whity\Sdk\PluginAgentPresetsInterface;
+use Whity\Sdk\PluginDocumentsInterface;
 use Whity\Sdk\PluginFrontendInterface;
 use Whity\Sdk\PluginInterface;
 use Whity\Sdk\PluginJobsInterface;
@@ -166,6 +168,12 @@ class PluginLoader
      * names must be one this plugin owns.
      */
     private ?DataTypeRegistry $dataTypeRegistry = null;
+
+    // Where code plugins' template slots and merge-field record types go
+    // (SDK 1.56, WHIT-742). Set by both entry points before load().
+    private ?\Whity\Core\Document\Slots\TemplateSlotRegistry $templateSlotRegistry = null;
+    private ?\Whity\Core\Agent\AgentPresetRegistry $agentPresetRegistry = null;
+    private ?\Whity\Core\Document\Fields\DocumentFieldRegistry $documentFieldRegistry = null;
 
     /**
      * Optional catalogue of plugin-declared SETTINGS (#713 item 1).
@@ -832,10 +840,36 @@ class PluginLoader
      *
      * @return void
      */
+    /**
+     * Where plugins' document declarations go (SDK 1.56, WHIT-742): template
+     * slots and record types as merge fields. Both entry points call this
+     * before load(); a host without it registers neither.
+     */
+    public function setDocumentRegistries(
+        \Whity\Core\Document\Slots\TemplateSlotRegistry $slots,
+        \Whity\Core\Document\Fields\DocumentFieldRegistry $fields,
+    ): void {
+        $this->templateSlotRegistry = $slots;
+        $this->documentFieldRegistry = $fields;
+    }
+
+    /**
+     * Where plugins' agent presets go (SDK 1.61, WHIT-818). Both entry points
+     * call this before load(); a host without it registers none.
+     */
+    public function setAgentPresetRegistry(\Whity\Core\Agent\AgentPresetRegistry $presets): void
+    {
+        $this->agentPresetRegistry = $presets;
+    }
+
     private function unregisterAll(): void
     {
-        foreach ($this->registeredPlugins as $info) {
+        foreach ($this->registeredPlugins as $pluginKey => $info) {
+            $this->agentPresetRegistry?->unregisterPlugin((string) $pluginKey);
             $this->router->unregisterByNamespace($info['namespacePrefix']);
+            // A reload re-declares them from the plugin as it is now.
+            $this->templateSlotRegistry?->unregister($info['plugin']->getName());
+            $this->documentFieldRegistry?->removeOwner($info['plugin']->getName());
             // A reload must not leave a removed plugin's webhook public (WHIT-671).
             \Whity\Core\Plugin\PluginPublicRoutes::removeOwner($info['namespacePrefix']);
 
@@ -2981,6 +3015,68 @@ class PluginLoader
     }
 
     /**
+     * A plugin's document declarations (SDK 1.56, WHIT-742): record types
+     * first, so its slots can name them.
+     */
+    private function registerDocuments(PluginInterface&PluginDocumentsInterface $plugin, string $pluginKey): void
+    {
+        $owner = $plugin->getName();
+        $fields = $this->documentFieldRegistry;
+        $slotRegistry = $this->templateSlotRegistry;
+        try {
+            $providers = $plugin->getDocumentFieldProviders();
+            $declaredSlots = $plugin->getTemplateSlots();
+            $background = $plugin->issuesInBackground();
+        } catch (Throwable $e) {
+            $this->handlePluginThrowable($pluginKey, $e, 'document declarations');
+
+            return;
+        }
+
+        if ($fields !== null) {
+            foreach ($providers as $provider) {
+                if (!$provider instanceof \Whity\Sdk\Documents\DocumentFieldProvider) {
+                    $this->logWarning("Plugin {$pluginKey} declares a document field provider that is not a DocumentFieldProvider");
+                    continue;
+                }
+                $type = $provider->recordType();
+                if (!str_starts_with($type, $owner . '.') || preg_match('/^[A-Za-z][A-Za-z0-9_]{0,63}\.[a-z][a-z0-9_]{0,63}$/', $type) !== 1) {
+                    $this->logWarning("Plugin {$pluginKey} declares document record type '{$type}', which must be {$owner}.<type>");
+                    continue;
+                }
+                try {
+                    $fields->addOwned($owner, new \Whity\Core\Document\Fields\PluginFieldProvider($provider));
+                } catch (\LogicException $e) {
+                    $this->logWarning("Plugin {$pluginKey} declares document record type '{$type}', which is taken: " . $e->getMessage());
+                }
+            }
+        }
+
+        if ($slotRegistry !== null) {
+            $slots = [];
+            foreach ($declaredSlots as $slot) {
+                if (!$slot instanceof \Whity\Sdk\Documents\TemplateSlot) {
+                    $this->logWarning("Plugin {$pluginKey} declares a template slot that is not a TemplateSlot");
+                    continue;
+                }
+                if ($fields !== null && !$fields->has($slot->recordType)) {
+                    $this->logWarning("Plugin {$pluginKey} declares template slot '{$slot->name}' for record type '{$slot->recordType}', which nothing serves");
+                    continue;
+                }
+                $slots[] = new \Whity\Core\Document\Slots\TemplateSlot(
+                    key: $owner . '.' . $slot->name,
+                    plugin: $owner,
+                    label: $slot->label,
+                    recordType: $slot->recordType,
+                    kinds: $slot->kinds,
+                );
+            }
+            $slotRegistry->register($owner, $slots);
+            $slotRegistry->declareBackground($owner, $background);
+        }
+    }
+
+    /**
      * Register a plugin's routes, permissions, and hooks with the core services.
      *
      * Shared by initial registration and by re-enable, so a plugin that was
@@ -3359,6 +3455,30 @@ class PluginLoader
                 $this->dataTypeRegistry->register($plugin->getName(), $plugin->getDataTypes());
             } catch (InvalidDataTypeException $e) {
                 $this->logWarning("Plugin {$pluginKey} declares an invalid data type: " . $e->getMessage());
+            }
+        }
+
+        // 2a-sexies. DOCUMENTS (SDK 1.56, WHIT-742): the plugin's record types
+        //     as merge fields, then its template slots. Same shape as the
+        //     declarations above: optional, owned under $plugin->getName(), and
+        //     a bad one is dropped with a logged reason while the plugin keeps
+        //     loading. A record type must be `<plugin name>.<type>`, so a plugin
+        //     can't take over core's or another plugin's; a slot must name a
+        //     record type the host serves once the plugin's own are in.
+        if ($plugin instanceof PluginDocumentsInterface) {
+            $this->registerDocuments($plugin, $pluginKey);
+        }
+
+        // 2a-quater-bis. Agent presets (SDK 1.61, WHIT-818). Same shape: optional,
+        //     and a bad one is dropped with a logged reason while the plugin keeps
+        //     loading. A preset may start a read at Allowed but never a write.
+        if ($plugin instanceof PluginAgentPresetsInterface && $this->agentPresetRegistry !== null && $this->permissionRegistry !== null) {
+            try {
+                foreach ($this->agentPresetRegistry->registerPlugin($pluginKey, $plugin->getAgentPresets(), $this->permissionRegistry->exists(...)) as $reason) {
+                    $this->logWarning("[Plugin:{$pluginKey}] getAgentPresets(): {$reason}.");
+                }
+            } catch (Throwable $e) {
+                $this->handlePluginThrowable($pluginKey, $e, 'getAgentPresets');
             }
         }
 

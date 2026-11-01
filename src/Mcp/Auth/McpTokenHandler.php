@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Whity\Mcp\Auth;
 
+use Whity\Auth\RoleChecker;
 use Whity\Auth\TokenValidator;
+use Whity\Core\Audit\AuditLoggerInterface;
 use Whity\Core\Request;
 use Whity\Core\Response;
 use Whity\Core\RBAC\PermissionRegistry;
@@ -15,6 +17,8 @@ use Whity\Core\RBAC\PermissionRegistry;
  *   POST   /api/mcp/tokens          — issue a new MCP token
  *   GET    /api/mcp/tokens          — list active tokens for the current profile
  *   DELETE /api/mcp/tokens/{jti}    — revoke a token
+ *   GET    /api/mcp/tokens/{jti}/grant — an agent credential's grant, explained (WHIT-832)
+ *   PATCH  /api/mcp/tokens/{jti}/grant — change it: Off, Ask first or Allowed per permission
  *
  * All endpoints require a valid access token cookie (human user performing
  * the action). The issued MCP tokens are then used as Bearer tokens on
@@ -31,6 +35,13 @@ final class McpTokenHandler
         // Validates permission entries in a requested scope (WHIT-695). Without
         // it no permission name is known, so only capability scopes are issued.
         private readonly ?PermissionRegistry $permissionRegistry = null,
+        // WHIT-832: the grant screen. Whether the person holds a permission,
+        // the operations an agent could be offered (for each permission's
+        // effective modes), and the audit trail of every change.
+        private readonly ?RoleChecker $roleChecker = null,
+        /** @var (\Closure(): list<array{permission: string, readOnly: bool, agentPolicy: string}>)|null */
+        private readonly ?\Closure $agentOperations = null,
+        private readonly ?AuditLoggerInterface $audit = null,
     ) {}
 
     /**
@@ -167,6 +178,161 @@ final class McpTokenHandler
         }
 
         return new Response(204, '', ['Content-Type' => 'application/json']);
+    }
+
+    /**
+     * GET /api/mcp/tokens/{jti}/grant (WHIT-832)
+     *
+     * One of the caller's agent credentials, permission by permission: the
+     * mode they set (null: the default), the modes they may set and why any is
+     * withheld, and what the agent can do now with that permission's reads and
+     * writes. 404 for a token that is not the caller's or not an agent's.
+     *
+     * @param array<string, mixed> $params
+     */
+    public function grant(Request $request, array $params = []): Response
+    {
+        $found = $this->agentCredential($params);
+        if ($found instanceof Response) {
+            return $found;
+        }
+        [$token, $profileId, $tenantId] = $found;
+
+        return Response::json(['data' => $this->presentGrant($token, $profileId, $tenantId)], 200);
+    }
+
+    /**
+     * PATCH /api/mcp/tokens/{jti}/grant (WHIT-832)
+     *
+     * Body: {"<permission>": "off" | "ask" | "allow" | "default", ...}. Each
+     * mode must be one the grant screen offers for that permission, so the
+     * agent never gets above the person. Applies to the token the client
+     * already holds, from its next call. Every change is audit-logged.
+     *
+     * @param array<string, mixed> $params
+     */
+    public function updateGrant(Request $request, array $params = []): Response
+    {
+        $found = $this->agentCredential($params);
+        if ($found instanceof Response) {
+            return $found;
+        }
+        [$token, $profileId, $tenantId] = $found;
+
+        $body = json_decode($request->getBody(), true);
+        if (!is_array($body) || $body === [] || array_is_list($body)) {
+            return Response::error('Send an object of permission => off, ask, allow or default', 422);
+        }
+
+        /** @var list<string> $scope */
+        $scope  = $token['scope'];
+        $before = AgentScopeGrant::fromScope($scope)->entries();
+        $view   = new AgentGrantView($this->operations());
+        $errors = [];
+        foreach ($body as $permission => $mode) {
+            $permission = (string) $permission;
+            if (!is_string($mode) || !in_array($mode, [...AgentScopeGrant::MODES, 'default'], true)) {
+                $errors[] = "{$permission}: the mode must be off, ask, allow or default";
+                continue;
+            }
+            if ($mode === 'default') {
+                $scope = AgentScopeGrant::withMode($scope, $permission, null);
+                continue;
+            }
+            $choices = $view->choices($permission, $scope, $this->held([$permission], $profileId, $tenantId));
+            if (!in_array($mode, $choices['modes'], true)) {
+                $errors[] = "{$permission}: " . ($choices['withheld'][$mode]['message'] ?? 'not possible');
+                continue;
+            }
+            $scope = AgentScopeGrant::withMode($scope, $permission, $mode);
+        }
+        if ($errors !== []) {
+            return Response::error(implode('; ', $errors), 422);
+        }
+
+        $this->mcpTokenService->updateScope((string) $token['jti'], $profileId, $tenantId, $scope);
+        $after = AgentScopeGrant::fromScope($scope)->entries();
+        $this->audit?->record('mcp.token.grant_changed', [
+            'tenant_id'     => $tenantId,
+            'actor_user_id' => $profileId,
+            'target_type'   => 'mcp_token',
+            'metadata'      => ['jti' => $token['jti'], 'name' => $token['name'], 'before' => $before, 'after' => $after],
+        ]);
+
+        $token['scope'] = $scope;
+        return Response::json(['data' => $this->presentGrant($token, $profileId, $tenantId)], 200);
+    }
+
+    /**
+     * The caller's active agent credential named by the route, with who they are.
+     *
+     * @param array<string, mixed> $params
+     * @return array{0: array<string, mixed>, 1: int, 2: int}|Response
+     */
+    private function agentCredential(array $params): array|Response
+    {
+        $claims = $this->tokenValidator->validateAccessToken();
+        if ($claims === null) {
+            return Response::error('Unauthenticated', 401);
+        }
+        $identity = $this->requireProfileIdentity($claims);
+        if ($identity === null) {
+            return Response::error('Unauthenticated', 401);
+        }
+        [$profileId, $tenantId] = $identity;
+
+        $jti   = isset($params['jti']) && is_string($params['jti']) ? trim($params['jti']) : '';
+        $token = $jti !== '' ? $this->mcpTokenService->findActive($jti, $profileId, $tenantId) : null;
+        // Only the granting person sees or changes a grant; anyone else, and a
+        // person's own client (no grant), reads as not found.
+        if ($token === null || $token['principal_kind'] !== AgentScopeGrant::AGENT_KIND) {
+            return Response::error('Agent credential not found', 404);
+        }
+        return [$token, $profileId, $tenantId];
+    }
+
+    /**
+     * @param array<string, mixed> $token
+     * @return array<string, mixed>
+     */
+    private function presentGrant(array $token, int $profileId, int $tenantId): array
+    {
+        /** @var list<string> $scope */
+        $scope      = $token['scope'];
+        $operations = $this->operations();
+        $candidates = array_values(array_unique([
+            ...array_column($operations, 'permission'),
+            ...array_keys(AgentScopeGrant::fromScope($scope)->entries()),
+        ]));
+
+        return [
+            'jti'         => $token['jti'],
+            'name'        => $token['name'],
+            'permissions' => (new AgentGrantView($operations))->rows($scope, $this->held($candidates, $profileId, $tenantId)),
+        ];
+    }
+
+    /**
+     * Which of $permissions the person holds in this workspace.
+     *
+     * @param list<string> $permissions
+     * @return list<string>
+     */
+    private function held(array $permissions, int $profileId, int $tenantId): array
+    {
+        if ($this->roleChecker === null) {
+            return [];
+        }
+        return array_values(array_filter(
+            $permissions,
+            fn (string $permission): bool => $this->roleChecker->hasPermissionForProfile($profileId, $permission, $tenantId),
+        ));
+    }
+
+    /** @return list<array{permission: string, readOnly: bool, agentPolicy: string}> */
+    private function operations(): array
+    {
+        return $this->agentOperations !== null ? ($this->agentOperations)() : [];
     }
 
     /**

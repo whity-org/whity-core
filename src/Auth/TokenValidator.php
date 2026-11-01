@@ -4,7 +4,10 @@ namespace Whity\Auth;
 
 use PDO;
 use Whity\Auth\Exception\InvalidMembershipException;
+use Whity\Core\Agent\AgentAssignmentRepository;
+use Whity\Mcp\Auth\AgentScopeGrant;
 use Whity\Mcp\Auth\McpPrincipal;
+use Whity\Mcp\Auth\McpScope;
 use Whity\Mcp\Auth\OAuth\OAuthAccessTokenVerifier;
 use Whity\Mcp\Auth\OAuth\OAuthTokenRefusedException;
 
@@ -248,7 +251,8 @@ class TokenValidator
             return null;
         }
 
-        if (!$this->isMcpTokenRegistered($jti)) {
+        $registered = $this->registeredMcpScope($jti);
+        if ($registered === null) {
             return null;
         }
 
@@ -273,6 +277,46 @@ class TokenValidator
             return null;
         }
 
+        // WHIT-816: a credential bound to a workspace agent takes its toolsets
+        // and grant from the person's assignment on every call, so a change
+        // there applies at once to every credential. A revoked assignment or an
+        // archived agent refuses the call. The agent is one principal,
+        // `agent:<assignmentId>`, however many credentials it has.
+        $assignmentId = $principalKind === AgentScopeGrant::AGENT_KIND ? $this->assignmentOf($jti) : null;
+        if ($assignmentId !== null) {
+            $active = (new AgentAssignmentRepository($this->db))->activeScope($assignmentId, $tenantId, $resolvedId);
+            if ($active === null) {
+                return null;
+            }
+            $kept = array_values(array_filter(
+                $scope,
+                static fn (mixed $e): bool => is_string($e)
+                    && !str_starts_with($e, AgentScopeGrant::PREFIX)
+                    && !str_starts_with($e, McpScope::TOOLSET_PREFIX),
+            ));
+
+            return new McpPrincipal(
+                profileId: $resolvedId,
+                userId: $resolvedId,
+                tenantId: $tenantId,
+                principalKind: $principalKind,
+                scope: [...$kept, ...$active['entries']],
+                jti: $jti,
+                agentId: $active['principalId'],
+                agentSlug: $active['slug'],
+                // WHIT-837: a workspace agent goes by its definition's name.
+                agentName: $active['name'],
+            );
+        }
+
+        // WHIT-832: an agent's grant can change after issue, so its grant
+        // entries come from the stored row, never from the token. Everything
+        // else in the scope is as issued.
+        $scope = [
+            ...array_values(array_filter($scope, static fn (mixed $e): bool => is_string($e) && !str_starts_with($e, AgentScopeGrant::PREFIX))),
+            ...array_values(array_filter($registered['scope'], static fn (string $e): bool => str_starts_with($e, AgentScopeGrant::PREFIX))),
+        ];
+
         /** @var string[] $scope */
         return new McpPrincipal(
             profileId: $resolvedId,
@@ -281,6 +325,8 @@ class TokenValidator
             principalKind: $principalKind,
             scope: $scope,
             jti: $jti,
+            // WHIT-837: an agent credential is shown by the name it was issued with.
+            agentName: $principalKind === AgentScopeGrant::AGENT_KIND ? $registered['name'] : null,
         );
     }
 
@@ -512,16 +558,49 @@ class TokenValidator
      *
      * Guards against hand-crafted tokens with valid signatures.
      */
-    private function isMcpTokenRegistered(string $jti): bool
+    /**
+     * The stored scope and name of a registered MCP token, or null when the jti
+     * was never issued (WHIT-832: its grant entries are the authority; WHIT-837:
+     * its name is how an agent is shown).
+     *
+     * @return array{scope: list<string>, name: ?string}|null
+     */
+    private function registeredMcpScope(string $jti): ?array
     {
         try {
             // @tenant-guard-ignore: jti is a platform-wide unique handle (like revoked_tokens.jti);
             // querying by jti alone cannot pull a different tenant's row.
-            $stmt = $this->db->prepare('SELECT 1 FROM mcp_tokens WHERE jti = ? LIMIT 1');
+            $stmt = $this->db->prepare('SELECT scope, name FROM mcp_tokens WHERE jti = ? LIMIT 1');
             $stmt->execute([$jti]);
-            return (bool) $stmt->fetchColumn();
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if (!is_array($row)) {
+                return null;
+            }
+            $decoded = is_string($row['scope'] ?? null) ? json_decode($row['scope'], true) : null;
+            return [
+                'scope' => is_array($decoded) ? array_values(array_filter($decoded, 'is_string')) : [],
+                'name'  => is_string($row['name'] ?? null) && $row['name'] !== '' ? $row['name'] : null,
+            ];
         } catch (\Exception) {
-            return false;
+            return null;
+        }
+    }
+
+    /**
+     * The agent assignment a registered MCP token is bound to (WHIT-816), or
+     * null for any other token.
+     */
+    private function assignmentOf(string $jti): ?int
+    {
+        try {
+            // @tenant-guard-ignore: jti is a platform-wide unique handle (like revoked_tokens.jti);
+            // the assignment it names is then read scoped to the token's own tenant and person.
+            $stmt = $this->db->prepare('SELECT agent_assignment_id FROM mcp_tokens WHERE jti = ? LIMIT 1');
+            $stmt->execute([$jti]);
+            $raw = $stmt->fetchColumn();
+            return $raw === false || $raw === null ? null : (int) $raw;
+        } catch (\Exception) {
+            return null;
         }
     }
 

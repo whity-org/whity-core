@@ -21,6 +21,9 @@ final class TemplateSlotRegistry implements HostWiredService
     /** @var array<string, list<TemplateSlot>> code plugin name => its slots */
     private array $code = [];
 
+    /** @var array<string, true> code plugins that declare they issue in the background */
+    private array $background = [];
+
     /**
      * @param (callable(int): list<PluginManifest>)|null $manifests the
      *        workspace's live, switched-on manifests (TenantManifestHost)
@@ -40,7 +43,48 @@ final class TemplateSlotRegistry implements HostWiredService
 
     public function unregister(string $plugin): void
     {
-        unset($this->code[$plugin]);
+        unset($this->code[$plugin], $this->background[$plugin]);
+    }
+
+    /**
+     * What a code plugin declares with `issuesInBackground()` (SDK 1.56). It
+     * only makes the plugin eligible: each workspace still has to allow it.
+     */
+    public function declareBackground(string $plugin, bool $issues): void
+    {
+        if ($issues) {
+            $this->background[$plugin] = true;
+        } else {
+            unset($this->background[$plugin]);
+        }
+    }
+
+    public function declaresBackground(string $plugin): bool
+    {
+        return isset($this->background[$plugin]);
+    }
+
+    /**
+     * The code plugins that would issue in the background, sorted.
+     *
+     * @return list<string>
+     */
+    public function backgroundPlugins(): array
+    {
+        $plugins = array_keys($this->background);
+        sort($plugins);
+
+        return $plugins;
+    }
+
+    /**
+     * A plugin's own slots in a workspace.
+     *
+     * @return list<TemplateSlot>
+     */
+    public function slotsOf(int $tenantId, string $plugin): array
+    {
+        return array_values(array_filter($this->forTenant($tenantId), static fn (TemplateSlot $slot): bool => $slot->plugin === $plugin));
     }
 
     /**

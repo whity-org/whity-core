@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Whity\Api;
 
+use Whity\Core\Agent\AgentAssignmentRepository;
+use Whity\Core\Agent\AgentActionRepository;
 use Whity\Core\Agent\AgentProposalRepository;
 use Whity\Core\Audit\AuditLoggerInterface;
 use Whity\Core\Request;
@@ -11,6 +13,7 @@ use Whity\Core\Response;
 use Whity\Core\Tenant\TenantContext;
 use Whity\Mcp\Auth\AgentScopeGrant;
 use Whity\Mcp\Auth\McpPrincipal;
+use Whity\Mcp\Auth\McpScope;
 use Whity\Mcp\JsonRpc\McpException;
 use Whity\Mcp\Tools\ToolsCallHandler;
 
@@ -41,6 +44,9 @@ final class AgentProposalsApiHandler
         private readonly AgentProposalRepository $proposals,
         private readonly ToolsCallHandler $toolsCall,
         private readonly ?AuditLoggerInterface $audit = null,
+        private readonly ?AgentAssignmentRepository $assignments = null,
+        // WHIT-812: the action an approved proposal ran, for its undo.
+        private readonly ?AgentActionRepository $actions = null,
     ) {
     }
 
@@ -60,7 +66,14 @@ final class AgentProposalsApiHandler
             AgentProposalRepository::EXPIRED, AgentProposalRepository::UNDONE,
         ], true) ? $status : null;
 
-        return Response::json(['data' => array_map(self::present(...), $this->proposals->listFor($tenantId, $profileId, $status))], 200);
+        $rows    = $this->proposals->listFor($tenantId, $profileId, $status);
+        $names   = $this->proposals->agentNames($tenantId, array_map(static fn (array $row): string => (string) $row['agent_principal_id'], $rows));
+        $actions = $this->actions?->forProposals($tenantId, array_map(static fn (array $row): int => (int) $row['id'], $rows)) ?? [];
+
+        return Response::json(['data' => array_map(
+            static fn (array $row): array => self::present($row, $names, $actions[(int) $row['id']] ?? null),
+            $rows,
+        )], 200);
     }
 
     /** @param array<string, string> $params */
@@ -83,6 +96,26 @@ final class AgentProposalsApiHandler
         if ($proposal === null || $proposal['on_behalf_of_profile_id'] !== $profileId) {
             return Response::error('Proposal not found', 404);
         }
+
+        // WHIT-816: a workspace agent's proposal runs under the person's
+        // assignment as it is NOW (its toolsets and grant), not as it was when
+        // the agent asked; a revoked assignment or an archived agent can't run.
+        $scope        = $proposal['scope'];
+        $assignmentId = AgentAssignmentRepository::idFromPrincipal($proposal['agent_principal_id']);
+        if ($assignmentId !== null) {
+            $active = $this->assignments?->activeScope($assignmentId, $tenantId, $profileId);
+            if ($active === null) {
+                return Response::error('This agent is no longer granted for you, so nothing can run', 409);
+            }
+            $scope = [
+                ...array_values(array_filter(
+                    $scope,
+                    static fn (string $e): bool => !str_starts_with($e, AgentScopeGrant::PREFIX) && !str_starts_with($e, McpScope::TOOLSET_PREFIX),
+                )),
+                ...$active['entries'],
+            ];
+        }
+
         // Atomic: only the caller that moves it from waiting runs it.
         if (!$this->proposals->decide($id, $tenantId, $profileId, AgentProposalRepository::APPROVED, $arguments)) {
             return Response::error('This proposal is no longer waiting', 409);
@@ -93,11 +126,11 @@ final class AgentProposalsApiHandler
             $profileId,
             $tenantId,
             AgentScopeGrant::AGENT_KIND,
-            $proposal['scope'],
+            $scope,
             $proposal['agent_principal_id'],
         );
         try {
-            $result = $this->toolsCall->runApproved($agent, $proposal['tool'], $arguments ?? $proposal['arguments']);
+            $result = $this->toolsCall->runApproved($agent, $proposal['tool'], $arguments ?? $proposal['arguments'], $id);
         } catch (McpException $e) {
             // A check that passed when the agent asked and fails now (the grant
             // was turned Off, a permission was removed): recorded as the run's
@@ -113,7 +146,11 @@ final class AgentProposalsApiHandler
         ]);
 
         $fresh = $this->proposals->find($id, $tenantId);
-        return Response::json(['data' => $fresh !== null ? self::present($fresh) : null], 200);
+        return Response::json(['data' => $fresh !== null ? self::present(
+            $fresh,
+            $this->proposals->agentNames($tenantId, [(string) $fresh['agent_principal_id']]),
+            $this->actions?->forProposals($tenantId, [$id])[$id] ?? null,
+        ) : null], 200);
     }
 
     /** @param array<string, string> $params */
@@ -141,7 +178,11 @@ final class AgentProposalsApiHandler
         ]);
 
         $fresh = $this->proposals->find($id, $tenantId);
-        return Response::json(['data' => $fresh !== null ? self::present($fresh) : null], 200);
+        return Response::json(['data' => $fresh !== null ? self::present(
+            $fresh,
+            $this->proposals->agentNames($tenantId, [(string) $fresh['agent_principal_id']]),
+            $this->actions?->forProposals($tenantId, [$id])[$id] ?? null,
+        ) : null], 200);
     }
 
     /** @return array{0: int, 1: int}|Response */
@@ -161,13 +202,19 @@ final class AgentProposalsApiHandler
      * stay server-side; the card needs what will happen, not how the token
      * is built.
      *
-     * @param array<string, mixed> $proposal
+     * The agent goes by a name ("Billing assistant"), never by its id
+     * (15-agents.md, Words).
+     *
+     * @param array<string, mixed>                                $proposal
+     * @param array<string, array{name: string, nameAr: ?string}> $agentNames by principal id
+     * @param array<string, mixed>|null                           $action     the action it ran, when it has run (WHIT-812)
      * @return array<string, mixed>
      */
-    private static function present(array $proposal): array
+    private static function present(array $proposal, array $agentNames = [], ?array $action = null): array
     {
         return [
             'id'                => $proposal['id'],
+            'agent'             => $agentNames[(string) $proposal['agent_principal_id']] ?? ['name' => null, 'nameAr' => null],
             'status'            => $proposal['status'],
             'tool'              => $proposal['tool'],
             'summary'           => $proposal['summary'],
@@ -179,6 +226,8 @@ final class AgentProposalsApiHandler
             'decidedAt'         => $proposal['decided_at'],
             'expiresAt'         => $proposal['expires_at'],
             'createdAt'         => $proposal['created_at'],
+            // WHIT-812: once approved and run, what can be undone and until when.
+            'action'            => $action !== null ? AgentActionsApiHandler::present($action, $agentNames) : null,
         ];
     }
 }

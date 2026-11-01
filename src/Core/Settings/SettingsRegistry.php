@@ -6,6 +6,7 @@ namespace Whity\Core\Settings;
 
 use DateTimeZone;
 use Whity\Core\Document\Routing\RouteQuorum;
+use Whity\Core\Document\Slots\BackgroundIssuing;
 use Whity\Core\Document\Slots\SlotBindings;
 use Whity\Core\Document\Theme\DocumentThemeRef;
 use Whity\Core\Identity\InvitationService;
@@ -234,16 +235,23 @@ final class SettingsRegistry
     // Either way the invoice stores its subtotal NET, so the arithmetic
     // invariant holds; this only decides how a price is decomposed.
     //
-    // The SELLER is whoever the invoice is from. Per-tenant overridable, for
-    // white-label deployments where each tenant invoices as itself.
+    // The seller an invoice is from is the workspace's company (COMPANY_*).
     public const BILLING_DEFAULT_CURRENCY = 'billing.default_currency';
     public const BILLING_TAX_RATE_BP = 'billing.tax_rate_bp';
     public const BILLING_TAX_LABEL = 'billing.tax_label';
     public const BILLING_TAX_INCLUSIVE = 'billing.tax_inclusive';
     public const BILLING_PAYMENT_TERMS_DAYS = 'billing.payment_terms_days';
-    public const BILLING_SELLER_NAME = 'billing.seller_name';
-    public const BILLING_SELLER_ADDRESS = 'billing.seller_address';
-    public const BILLING_SELLER_TAX_ID = 'billing.seller_tax_id';
+
+    // THE COMPANY (WHIT-788, #1439): the workspace's own facts, which documents,
+    // letterheads and invoices all read. Per-tenant overridable, so in a
+    // white-label deployment each tenant prints and invoices as itself. Moved
+    // from billing.seller_*, which said billing about something that isn't.
+    // The logo is branding's (BRANDING_LOGO_*). Arabic names come with WHIT-780.
+    public const COMPANY_NAME = 'company.name';
+    public const COMPANY_ADDRESS = 'company.address';
+    public const COMPANY_TAX_ID = 'company.tax_id';
+    public const COMPANY_PHONE = 'company.phone';
+    public const COMPANY_EMAIL = 'company.email';
 
     // NUMBERING is GLOBAL-ONLY, unlike everything above. A per-tenant
     // override would make the meaning of the (series, number) uniqueness
@@ -370,6 +378,12 @@ final class SettingsRegistry
     // PUT /api/document-template-slots/{key} (documents:publish), which checks
     // the template fits the slot; the settings PATCH refuses it. Empty for none.
     public const DOCUMENTS_SLOT_BINDINGS = 'documents.slot_bindings';
+    // Which plugins may issue documents with no person (WHIT-742 slice 3,
+    // DOCUMENT-AUTOMATION 3.7): a JSON list of plugin names. Off for every
+    // plugin until a documents:publish holder allows it with
+    // PUT /api/document-background-issuing/{plugin}; the settings PATCH
+    // refuses it. Empty for none.
+    public const DOCUMENTS_BACKGROUND_ISSUING = 'documents.background_issuing';
 
     // Render batch limits (ADR 0012): per-tenant-overridable ceilings so an
     // operator can tune them without a code deploy, "no hardcoded values" per
@@ -981,9 +995,11 @@ final class SettingsRegistry
         self::BILLING_TAX_INCLUSIVE => 'false',
         // Two weeks, the commonest commercial term. Zero means due on issue.
         self::BILLING_PAYMENT_TERMS_DAYS => '14',
-        self::BILLING_SELLER_NAME => '',
-        self::BILLING_SELLER_ADDRESS => '',
-        self::BILLING_SELLER_TAX_ID => '',
+        self::COMPANY_NAME => '',
+        self::COMPANY_ADDRESS => '',
+        self::COMPANY_TAX_ID => '',
+        self::COMPANY_PHONE => '',
+        self::COMPANY_EMAIL => '',
         self::BILLING_INVOICE_NUMBER_FORMAT => 'INV-{YYYY}-{SEQ:5}',
         self::BILLING_INVOICE_NUMBER_SCOPE => 'shared',
         self::BILLING_INVOICE_NUMBER_RESET => 'yearly',
@@ -1013,6 +1029,7 @@ final class SettingsRegistry
         self::DOCUMENTS_THEME => 'whity.standard',
         self::DOCUMENTS_THEME_BY_KIND => '',
         self::DOCUMENTS_SLOT_BINDINGS => '',
+        self::DOCUMENTS_BACKGROUND_ISSUING => '',
         self::DOCUMENTS_RENDER_MAX_ROWS => '500',
         self::DOCUMENTS_RENDER_MAX_PAGES => '2000',
         // 2 MiB.
@@ -1397,6 +1414,7 @@ final class SettingsRegistry
             self::DOCUMENTS_THEME => DocumentThemeRef::isValid($value) ? null : self::DOCUMENTS_THEME . ' must be a theme ref such as whity.standard or tenant.<key>.',
             self::DOCUMENTS_THEME_BY_KIND => $value === '' ? null : DocumentThemeRef::validateByKind($value),
             self::DOCUMENTS_SLOT_BINDINGS => SlotBindings::validate($value),
+            self::DOCUMENTS_BACKGROUND_ISSUING => BackgroundIssuing::validate($value),
             self::MAIL_SMTP_HOST,
             self::MAIL_SMTP_USERNAME,
             self::MAIL_FROM_NAME,
@@ -1453,9 +1471,13 @@ final class SettingsRegistry
             // address and a tax registration are all free-form by nature, and the
             // only thing worth refusing would be a length the column cannot hold.
             self::BILLING_TAX_LABEL,
-            self::BILLING_SELLER_NAME,
-            self::BILLING_SELLER_ADDRESS,
-            self::BILLING_SELLER_TAX_ID => null,
+            self::COMPANY_NAME,
+            self::COMPANY_ADDRESS,
+            self::COMPANY_TAX_ID,
+            self::COMPANY_PHONE => null,
+            self::COMPANY_EMAIL => $value === '' || filter_var($value, FILTER_VALIDATE_EMAIL) !== false
+                ? null
+                : self::COMPANY_EMAIL . ' must be an email address.',
             default => "Unknown setting key: {$key}",
         };
     }

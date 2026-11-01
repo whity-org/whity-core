@@ -211,7 +211,7 @@ Embedding an n8n workflow engine was **deferred, not adopted** — [ADR 0008](do
 
 **[AGPL-3.0-only with the Whity Plugin Exception](LICENSE)** — genuine free software. Run it, modify it, deploy it, sell services around it. If you modify Whity Core and offer it to users over a network, you owe those users your source; that is the whole of the bargain.
 
-**Plugins are exempt.** The plugin boundary — `whity/plugin-sdk` on the PHP side, `@whity-org/ui` and friends on the client side — is MIT. A plugin that depends only on those is not a derivative work of the core, and you may license and sell it on any terms you choose. See the [Whity Plugin Exception](LICENSE) and [NOTICE](NOTICE).
+**Plugins are exempt.** The plugin boundary — `whity/plugin-sdk` on the PHP side, `@whity/ui` and friends on the client side — is MIT. A plugin that depends only on those is not a derivative work of the core, and you may license and sell it on any terms you choose. See the [Whity Plugin Exception](LICENSE) and [NOTICE](NOTICE).
 
 The **Whity name** is protected even though the code is free — fork freely, rename when you do. See [TRADEMARK.md](TRADEMARK.md).
 

@@ -161,7 +161,7 @@ final class DocumentIssuing
      */
     public function issue(IssueRequest $request, ActingAs $actor): array
     {
-        [$tenantId, $callerId] = [$actor->tenantId, $actor->profileId];
+        [$tenantId, $callerId] = [$actor->tenantId, $actor->issuerId()];
         [$source, $version, $values, $originKey] = [$request->source, $request->version, $request->values, $request->originKey];
         if ($originKey !== null) {
             $existing = $this->documents?->findByOriginKey($originKey, $tenantId);
@@ -178,6 +178,10 @@ final class DocumentIssuing
             'origin_key' => $originKey,
             'actor' => $callerId,
         ];
+        if ($actor->plugin !== null) {
+            // A plugin in the background: no person, and which plugin it was.
+            $event['origin'] = 'plugin:' . $actor->plugin;
+        }
         $this->veto(Events::DOCUMENT_ISSUING, $event);
 
         try {
@@ -378,7 +382,7 @@ final class DocumentIssuing
         ?string $recordLabel,
         array $document,
     ): array {
-        [$tenantId, $callerId] = [$actor->tenantId, $actor->profileId];
+        [$tenantId, $callerId] = [$actor->tenantId, $actor->issuerId()];
         $effective = $this->settings->effective($tenantId);
         if ($this->renderer === null || !$this->renderer->isEnabled($tenantId)) {
             return [['attempted' => false, 'stored' => false, 'reason' => 'disabled'], null];
@@ -460,7 +464,7 @@ final class DocumentIssuing
      *
      * @param array<string, string> $effective
      */
-    private function stamp(int $tenantId, int $callerId, int $documentId, array $effective): ?DocumentQrStamp
+    private function stamp(int $tenantId, ?int $callerId, int $documentId, array $effective): ?DocumentQrStamp
     {
         if ($this->qr === null || !DocumentQrPolicy::enabledForTenant($effective)) {
             return null;

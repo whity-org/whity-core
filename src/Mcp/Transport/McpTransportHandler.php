@@ -8,6 +8,8 @@ use Whity\Core\Request;
 use Whity\Core\Response;
 use Whity\Mcp\Auth\OAuth\ProtectedResource;
 use Whity\Mcp\JsonRpc\Dispatcher;
+use Whity\Mcp\Auth\OAuth\OAuthAccessTokenVerifier;
+use Whity\Mcp\Tools\McpSplits;
 use Whity\Mcp\Tools\ToolSurfaceRequest;
 use Whity\Mcp\McpFeatureDisabledException;
 use Whity\Mcp\RateLimit\McpRateLimitException;
@@ -51,18 +53,31 @@ final class McpTransportHandler
         // WHIT-748: serves `/mcp?tools=default`, the always-on tools plus the
         // discovery tools. Null: that mode falls back to the full list.
         private readonly ?McpRequestHandlerInterface $defaultDispatcher = null,
+        // WHIT-765: the splits served at /mcp/<split>. Null: none.
+        private readonly ?McpSplits $splits = null,
     ) {}
 
     /**
      * Handle POST /mcp — JSON-RPC requests, notifications, and batch arrays.
      *
-     * @param array<string, mixed> $params Route path params (always empty for /mcp).
+     * @param array<string, mixed> $params Route path params: `split` on /mcp/<split>, empty on /mcp.
      */
     public function handlePost(Request $request, array $params = []): Response
     {
         if (!$this->enabled) {
             return new Response(503, '', []);
         }
+
+        // WHIT-765: an unknown split doesn't exist, before anything else is read.
+        $split    = is_string($params['split'] ?? null) ? $params['split'] : null;
+        $toolsets = $split !== null ? $this->splits?->toolsetsOf($split) : null;
+        if ($split !== null && $toolsets === null) {
+            return Response::error('No such MCP endpoint', 404);
+        }
+        // WHIT-819: a workspace agent. Which agent, and its toolsets, are known
+        // only once the caller's workspace is: the dispatcher checks the caller
+        // is that agent, and its credential carries the agent's toolsets.
+        $agent = is_string($params['agent'] ?? null) ? $params['agent'] : null;
 
         $contentType = $request->getHeader('Content-Type') ?? '';
         if (!str_contains($contentType, 'application/json')) {
@@ -71,7 +86,11 @@ final class McpTransportHandler
 
         $bearer     = $this->extractBearer($request);
         $rawBody    = $request->getBody();
-        $surface    = ToolSurfaceRequest::fromQuery(self::query($request));
+        $surface    = match (true) {
+            $agent !== null                       => ToolSurfaceRequest::forSplit(self::query($request), OAuthAccessTokenVerifier::AGENT_RESOURCE_PREFIX . $agent, []),
+            $split !== null && $toolsets !== null => ToolSurfaceRequest::forSplit(self::query($request), $split, $toolsets),
+            default                               => ToolSurfaceRequest::fromQuery(self::query($request)),
+        };
         $dispatcher = $this->dispatcherFor($surface);
 
         // WHIT-708: the headers 2026-07-28 mirrors from the body, for the
@@ -124,7 +143,12 @@ final class McpTransportHandler
         $status  = $dispatcher instanceof McpHttpStatusSource ? $dispatcher->httpStatus() : 200;
         $headers = ['Content-Type' => 'application/json'];
         if ($status === 401) {
-            $headers['WWW-Authenticate'] = $this->protectedResource?->challenge() ?? 'Bearer';
+            $resource = match (true) {
+                $agent !== null => $this->protectedResource?->forAgent($agent),
+                $split !== null => $this->protectedResource?->forSplit($split),
+                default         => $this->protectedResource,
+            };
+            $headers['WWW-Authenticate'] = $resource?->challenge() ?? 'Bearer';
         }
 
         // When the client signals it can consume an SSE stream (long-running

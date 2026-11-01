@@ -21,10 +21,10 @@
 import * as React from 'react';
 import type { components } from '@/lib/api/schema';
 import type { useToast } from '@/lib/toast-context';
-import { Badge } from '@whity-org/ui/badge';
+import { Badge } from '@whity/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Switch } from '@whity-org/ui/switch';
-import { useTranslation, type TranslateFn } from '@whity-org/features/i18n';
+import { Switch } from '@whity/ui/switch';
+import { useTranslation, type TranslateFn } from '@whity/features/i18n';
 
 // Granular RBAC for the Website Settings console (mirrors the backend catalogue):
 //   read   → may view the effective/editable set (else Access Denied)
@@ -106,6 +106,32 @@ export const GENERAL_SETTING_KEYS: readonly GeneralSettingKey[] = ['site_name', 
 export const DISPLAY_SETTING_KEYS: readonly string[] = ['ui.hide_dates'];
 
 /**
+ * The workspace's company details (WHIT-788): what its documents, letterheads
+ * and invoices print. Plain text from the registry, so they need no bespoke
+ * controls.
+ */
+export const COMPANY_SETTING_KEYS: readonly string[] = [
+  'company.name',
+  'company.address',
+  'company.tax_id',
+  'company.phone',
+  'company.email',
+];
+
+/**
+ * Numbers and codes stay left to right in Arabic (3.7): a phone
+ * number must not read backwards. A name or an address can be in either
+ * language, so it follows its own text.
+ */
+const COMPANY_INPUT_DIR: Readonly<Record<string, 'ltr' | 'auto'>> = {
+  'company.name': 'auto',
+  'company.address': 'auto',
+  'company.tax_id': 'ltr',
+  'company.phone': 'ltr',
+  'company.email': 'ltr',
+};
+
+/**
  * Short labels for the fixed per-tenant key set, as rendered on the General and
  * Branding tabs.
  *
@@ -179,6 +205,26 @@ export function fieldMeta(t: TranslateFn): Record<string, FieldMeta> {
         'settings.meta.error_tracking.retention_days.help',
         'How long resolved groups and their occurrences are kept before pruning.'
       ),
+    },
+    'company.name': {
+      label: t('settings.meta.company.name.label', 'Company name'),
+      help: t('settings.meta.company.name.help', 'Printed on letterheads and invoices. Leave blank to use the site name.'),
+    },
+    'company.address': {
+      label: t('settings.meta.company.address.label', 'Address'),
+      help: t('settings.meta.company.address.help', 'Printed on letterheads and invoices.'),
+    },
+    'company.tax_id': {
+      label: t('settings.meta.company.tax_id.label', 'Tax number'),
+      help: t('settings.meta.company.tax_id.help', 'Printed on invoices. A template that uses it can\'t be issued without it.'),
+    },
+    'company.phone': {
+      label: t('settings.meta.company.phone.label', 'Phone'),
+      help: t('settings.meta.company.phone.help', 'Printed on the letterhead when the document theme lists it.'),
+    },
+    'company.email': {
+      label: t('settings.meta.company.email.label', 'Email'),
+      help: t('settings.meta.company.email.help', 'Printed on the letterhead when the document theme lists it.'),
     },
     site_name: {
       label: t('settings.meta.site_name.label', 'Site name'),
@@ -362,6 +408,15 @@ export function settingsSections(t: TranslateFn): readonly SectionDef[] {
         'Instance identity and defaults inherited by every tenant.'
       ),
       keys: ['site_name', 'support_email', 'timezone', 'locale'],
+    },
+    {
+      id: 'company',
+      title: t('settings.section.company.title', 'Company'),
+      description: t(
+        'settings.section.company.description',
+        'What documents and invoices print for a workspace that has not filled in its own.'
+      ),
+      keys: COMPANY_SETTING_KEYS,
     },
     {
       id: 'signup',
@@ -972,7 +1027,8 @@ export function RegistrySettingControl({
       ) : (
         <Input
           id={id}
-          type={key === 'support_email' ? 'email' : 'text'}
+          type={key === 'support_email' || key === 'company.email' ? 'email' : 'text'}
+          dir={COMPANY_INPUT_DIR[key]}
           value={value}
           disabled={disabled}
           aria-invalid={error ? true : undefined}

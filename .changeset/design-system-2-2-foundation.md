@@ -1,6 +1,6 @@
 ---
-"@whity-org/tokens": major
-"@whity-org/ui": major
+"@whity/tokens": major
+"@whity/ui": major
 ---
 
 Design system 2.2 foundation (document editor milestone M1).

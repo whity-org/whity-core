@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Whity\Mcp\Tools\Discovery;
 
 use Whity\Auth\TokenValidator;
+use Whity\Core\Agent\AgentProposalRepository;
 use Whity\Core\Tenant\TenantContext;
 use Whity\Core\Text\SearchText;
 use Whity\Mcp\JsonRpc\ErrorCode;
@@ -49,6 +50,8 @@ final class DiscoveryTools
 
     /** WHIT-794: the briefing a model reads first. Always-on in the search-and-call list. */
     public const INIT   = 'init_session';
+    /** WHIT-825: an agent reads back one of its own proposals. */
+    public const GET_PROPOSAL = 'get_proposal';
 
     /** WHIT-707 names, callable but unlisted for one minor release. */
     public const LEGACY_SEARCH   = 'search_tools';
@@ -79,6 +82,9 @@ final class DiscoveryTools
         // always-on (setting mcp.always_on_plugin_tools), by tenant. Null:
         // none, which is also every workspace's default (owner decision 5).
         private readonly ?\Closure $enabledPluginAlwaysOn = null,
+        // WHIT-825: where an agent's proposals are kept, for get_proposal.
+        // Null: the tool is neither listed nor callable.
+        private readonly ?AgentProposalRepository $proposals = null,
     ) {}
 
     /** The most a bare list may hold, always-on tools included (design §5.6). */
@@ -155,6 +161,10 @@ final class DiscoveryTools
         // The list budget (design §5.6): core's picks always fit; plugin tools
         // are added in order until the next one would break it, and the rest
         // stay reachable through search.
+        // An agent also gets get_proposal, to follow what it asked for
+        // (WHIT-825); a person's own client has no proposals.
+        $agentTools = $principal->isAgent() && $this->proposals !== null ? [self::proposalDefinition()] : [];
+        $core   = [...$agentTools, ...$core];
         $listed = $core;
         $room   = self::LIST_MAX_TOOLS - 3 - count($core); // init_session, search, call
         $bytes  = strlen((string) json_encode([self::initDefinition(), ...$core, ...self::definitions()]));
@@ -205,6 +215,29 @@ final class DiscoveryTools
                 'additionalProperties' => false,
             ],
             'annotations' => ['title' => 'Start a session', 'readOnlyHint' => true, 'openWorldHint' => false],
+        ];
+    }
+
+    /**
+     * `get_proposal` (WHIT-825): listed for agents only, read-only.
+     *
+     * @return array<string, mixed>
+     */
+    public static function proposalDefinition(): array
+    {
+        return [
+            'name'        => self::GET_PROPOSAL,
+            'description' => 'Check on something you asked to do that needs approval: pass the proposal id a call returned. '
+                . 'Says whether it is still waiting, was approved (with the result), declined or expired. Read-only.',
+            'inputSchema' => [
+                'type'       => 'object',
+                'properties' => [
+                    'id' => ['type' => 'integer', 'minimum' => 1, 'description' => 'The proposal id from the call that created it.'],
+                ],
+                'required'             => ['id'],
+                'additionalProperties' => false,
+            ],
+            'annotations' => ['title' => 'Check a proposal', 'readOnlyHint' => true, 'openWorldHint' => false],
         ];
     }
 
@@ -270,12 +303,13 @@ final class DiscoveryTools
 
         return match ($name) {
             self::INIT            => $this->initSession($arguments, $bearerToken, $surface),
+            self::GET_PROPOSAL    => $this->getProposal($arguments, $bearerToken),
             self::SEARCH          => $this->search($arguments, $bearerToken, $surface),
-            self::CALL            => $this->callThrough(self::str($arguments, 'operationId'), $arguments, $bearerToken),
+            self::CALL            => $this->callThrough(self::str($arguments, 'operationId'), $arguments, $bearerToken, $surface),
             // WHIT-707 names, for clients that remember them.
             self::LEGACY_SEARCH   => $this->search(['query' => $arguments['query'] ?? '', 'limit' => $arguments['limit'] ?? null], $bearerToken, $surface),
             self::LEGACY_DESCRIBE => $this->search(['operationId' => self::str($arguments, 'name')], $bearerToken, $surface),
-            self::LEGACY_CALL     => $this->callThrough(self::str($arguments, 'name'), $arguments, $bearerToken),
+            self::LEGACY_CALL     => $this->callThrough(self::str($arguments, 'name'), $arguments, $bearerToken, $surface),
             // A real operation called by its own name: the real handler decides.
             default               => ($this->toolsCall)($params, $bearerToken),
         };
@@ -366,7 +400,7 @@ final class DiscoveryTools
     }
 
     /** @param array<string, mixed> $arguments */
-    private function callThrough(string $operationId, array $arguments, ?string $bearerToken): mixed
+    private function callThrough(string $operationId, array $arguments, ?string $bearerToken, ToolSurfaceRequest $surface): mixed
     {
         if ($operationId === '') {
             return self::error('call_operation needs the operationId to call; find one with search_operations.');
@@ -377,7 +411,12 @@ final class DiscoveryTools
         $toolArguments = is_array($arguments['arguments'] ?? null) ? $arguments['arguments'] : [];
 
         try {
-            return ($this->toolsCall)(['name' => $operationId, 'arguments' => $toolArguments], $bearerToken);
+            // The surface goes with it: on a split, the operation must be inside it.
+            return ($this->toolsCall)([
+                'name'      => $operationId,
+                'arguments' => $toolArguments,
+                '_meta'     => [ToolSurfaceRequest::META_KEY => $surface->toArray()],
+            ], $bearerToken);
         } catch (McpException $e) {
             // At the top level these are protocol errors. Here the operation is
             // an argument the model chose, so it is the model's to fix, and the
@@ -408,6 +447,51 @@ final class DiscoveryTools
         $language = self::str($arguments, 'language') === 'ar' ? 'ar' : 'en';
 
         return self::result($this->briefing->brief($principal, $this->visibleTools($bearerToken, $surface), $language));
+    }
+
+    /**
+     * One of the calling agent's own proposals: same workspace, same person,
+     * same agent. Anything else reads as not found, so an id never reveals
+     * whether someone else's proposal exists.
+     *
+     * @param array<string, mixed> $arguments
+     * @return array<string, mixed>
+     * @throws McpException
+     */
+    private function getProposal(array $arguments, ?string $bearerToken): array
+    {
+        $principal = $bearerToken !== null ? $this->tokenValidator->validateBearerForMcp($bearerToken) : null;
+        if ($principal === null) {
+            throw new McpException(ErrorCode::UNAUTHENTICATED, 'Unauthenticated');
+        }
+        if ($this->proposals === null || !$principal->isAgent()) {
+            return self::error('Only an agent has proposals. Calls from your own app run as you, without approval.');
+        }
+        $id = $arguments['id'] ?? null;
+        if (!is_int($id) || $id < 1) {
+            return self::error('id must be the proposal id a call returned.');
+        }
+
+        $this->proposals->expireDue($principal->tenantId);
+        $proposal = $this->proposals->find($id, $principal->tenantId);
+        if ($proposal === null
+            || $proposal['on_behalf_of_profile_id'] !== $principal->userId
+            || $proposal['agent_principal_id'] !== $principal->agentPrincipalId()) {
+            return self::error('No proposal of yours has that id.');
+        }
+
+        return self::result(['proposal' => [
+            'id'          => $proposal['id'],
+            'status'      => $proposal['status'],
+            'tool'        => $proposal['tool'],
+            'summary'     => $proposal['summary'],
+            'diff'        => $proposal['diff'],
+            'permissions' => $proposal['permissions'],
+            'result'      => $proposal['result'],
+            'decidedAt'   => $proposal['decided_at'],
+            'expiresAt'   => $proposal['expires_at'],
+            'createdAt'   => $proposal['created_at'],
+        ]]);
     }
 
     /** @return list<array<string, mixed>> */

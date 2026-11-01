@@ -168,7 +168,57 @@ Search folds Arabic spellings and matches area titles in Arabic. Its ranking is 
 
 The transport picks a separate `Dispatcher` per mode, so the mode never sits in worker-global state. Resources, prompts, auth, the tenant switch and rate limits are identical. The search-and-call lists change only when the always-on set does, so those dispatchers announce no `list_changed`.
 
-The connect wizard turns tool search on when the access chosen exposes more tools than the app is reported to handle (40 for Cursor), or more than about 60 for any app, and lets the user override it.
+### Toolsets and visibility
+
+Every operation belongs to one toolset: `core.<area>` for core (`core.forms`, `core.documents`), `<pluginKey>[.<sub>]` for a plugin. Toolsets organise search results, token scope and splits. They never grant access: that stays with each operation's permission or role.
+
+A tool's `_meta` says where it sits: `dev.whity/toolset`, `dev.whity/visibility`, `dev.whity/agentPolicy` and, when it can be undone, `dev.whity/undoWindowSeconds`. Clients ignore keys they don't know.
+
+| Visibility | Means |
+|---|---|
+| `always-on` | Listed directly at `/mcp`. Core picks its own; a plugin's tool is listed only once a workspace's administrator turns it on. |
+| `discoverable` | The default. Found through `search_operations`. |
+| `off` | Not offered. |
+
+Plugins declare these on a tool descriptor (`toolset`, `visibility`, `agentPolicy`, `undo`) and name their toolsets with `PluginMcpToolsetsInterface` (SDK 1.52).
+
+### Budgets
+
+| What | Limit | Enforced |
+|---|---|---|
+| Operation name | `[A-Za-z0-9_-]{1,64}` | Authored tools are refused at registration; derived names by CI |
+| Description | 500 characters | Authored tools are refused; derived core by CI; derived plugin tools warn at load |
+| `inputSchema` | 8 KB encoded | A warning at load; CI for core |
+| Plugin always-on tools | 1 per plugin, read-only, turned on by an administrator | Extras are demoted with a warning at load |
+| The list at `/mcp` | 12 tools and 10 KB encoded | At runtime, per workspace. Past the cap, plugin tools drop out of the list and stay searchable. |
+| `?tools=full` | None | Opt-in |
+
+### Splits
+
+A split serves one slice of the server at its own URL, with the same auth, RBAC, audit and rate limits. It is for narrow clients and hard boundaries; `/mcp` stays the recommended connection. A split runs search and call too, and what is outside it doesn't exist there: search can't find it and calling it answers "unknown tool". `?toolsets=` narrows a list; a split is a boundary.
+
+| Source | URL |
+|---|---|
+| Core areas | `/mcp/documents`, `forms`, `convening`, `people`, `inbox`, `admin`, `billing`, `security`, `platform` |
+| A plugin's toolset | `/mcp/<toolset id>`, or `/mcp/x-<id>` when the id collides with a reserved name |
+| Composite, named by the operator | `MCP_SPLITS=sales=core.forms,acme.*;ops=core.time` |
+| A workspace agent | `/mcp/agents/<slug>` |
+
+`GET /api/mcp/splits` lists the splits the signed-in person can reach, with their URLs. Each split is its own OAuth resource, with Protected Resource Metadata at `/.well-known/oauth-protected-resource/mcp/<split>`. A token whose `aud` names a split works only there; a token for `/mcp` works on every split.
+
+### Agents
+
+A person's own client acts as that person. An **agent** (principal kind `ai-agent`) acts for a person under a grant: a core agent credential, a workspace agent, or a Whity ID client an operator marked as an agent (`whity_agent: true` on its token).
+
+For each permission a grant says Off, Ask first or Allowed. New grants start with reads Allowed and writes Ask first, and an agent can never do more than its person.
+
+- **Ask first** files a proposal instead of running: `tools/call` returns `{proposal: {id, status: "waiting", ...}}`. The person approves, edits or declines it at `/api/me/agent-proposals`; only they can, and it expires after 7 days. The agent follows it with `get_proposal`.
+- **A write with no undo is always Ask first**, whatever the grant says. An operation that declares an undo may be Allowed.
+- **Undo.** An operation declares `undo` (`windowSeconds`, the reversing `operation`, its `arguments` as JSON Pointers into `{arguments, result, before}`, and optionally a `read`). What the agent runs is recorded, and its person can undo it inside the window with `POST /api/me/agent-actions/{id}/undo`, as themselves. It is refused if what it changed has changed since. So far: creating and editing tags, tag groups and forms, for 30 minutes.
+
+The approval and undo routes are never on the MCP surface: an agent can't approve its own proposal or undo what it did. See `docs/design/MCP-TOOL-SURFACE.md` §5.11.
+
+The connect wizard hands out the plain `/mcp`. Loading every action at once (`?tools=full`) is an opt-in, and it warns when the access chosen exposes more tools than the app is reported to handle (40 for Cursor) or more than about 60 for any app.
 
 ## Authentication
 

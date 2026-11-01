@@ -7,8 +7,10 @@ namespace Whity\Mcp\Auth\OAuth;
 use PDO;
 use Whity\Auth\ActiveTenantMembershipGuard;
 use Whity\Auth\Oidc\JwksProvider;
+use Whity\Core\Agent\AgentAssignmentRepository;
 use Whity\Core\Http\HttpClient;
 use Whity\Core\Identity\ExternalIdentityRepository;
+use Whity\Mcp\Auth\AgentScopeGrant;
 use Whity\Mcp\Auth\McpPrincipal;
 use Whity\Mcp\Auth\McpScope;
 
@@ -39,6 +41,16 @@ use Whity\Mcp\Auth\McpScope;
  * authority needs no membership row, so an outside server naming it would
  * otherwise grant cross-tenant power to any linked account.
  *
+ * Who acts (WHIT-825): a token whose client the authorization server marks
+ * as an agent (`whity_agent: true`) is an `ai-agent` principal acting for the
+ * token's person, under the agent model of MCP-TOOL-SURFACE §5.11. The token
+ * carries no grant entries, so the default grant applies: reads Allowed,
+ * writes Ask first (a proposal the person approves). Any other token, the claim
+ * absent or not exactly `true`, is the person's own client (`oauth`), as
+ * before. The claim is believed only because the signature, issuer and
+ * audience checks above passed: it is the trusted issuer's statement, and an
+ * agent principal can only ever do less than the person.
+ *
  * Returns null for a token that is not valid (the 401 that sends a client to
  * sign in) and throws {@see OAuthTokenRefusedException} for one that is valid
  * but unusable (a 403 with a message, since signing in again would not help).
@@ -49,6 +61,19 @@ use Whity\Mcp\Auth\McpScope;
 final class OAuthAccessTokenVerifier
 {
     public const DEFAULT_TENANT_CLAIM = 'tenant_id';
+
+    /** The claim the authorization server sets on an agent client's tokens. */
+    public const AGENT_CLAIM = 'whity_agent';
+
+    /**
+     * An agent's principal id: stable across its access tokens, so its
+     * proposals stay its own after a refresh, and never equal to an MCP
+     * token's jti. Fits agent_principal_id (64).
+     */
+    public const AGENT_ID_PREFIX = 'oauth-agent:';
+
+    /** The resource path under `/mcp` of a workspace agent: `agents/<slug>` (WHIT-819). */
+    public const AGENT_RESOURCE_PREFIX = 'agents/';
 
     private readonly IssuerJwtVerifier $jwt;
 
@@ -91,10 +116,16 @@ final class OAuthAccessTokenVerifier
      */
     public function verify(string $token): ?McpPrincipal
     {
-        $claims = $this->jwt->verify($token, $this->resource);
+        // WHIT-765: a token is for /mcp, or for one split under it (RFC 8707).
+        // A split-bound token is valid here; the dispatcher lets it in only at
+        // its own split.
+        $claims = $this->jwt->verify($token, fn (array $audiences): bool => $this->splitOf($audiences) !== false);
         if ($claims === null) {
             return null;
         }
+        $aud   = $claims['aud'] ?? null;
+        $split = $this->splitOf(is_array($aud) ? $aud : [$aud]);
+        $split = $split === false ? null : $split;
 
         $subject = $claims['sub'] ?? null;
         if (!is_string($subject) || $subject === '') {
@@ -124,16 +155,109 @@ final class OAuthAccessTokenVerifier
 
         $jti = $claims['jti'] ?? null;
 
+        // WHIT-819: a token for /mcp/agents/<slug> acts as that workspace agent
+        // for the person, under their grant, whichever client holds it. No
+        // assignment is a 403 with what to do: signing in again wouldn't help.
+        if ($split !== null && str_starts_with($split, self::AGENT_RESOURCE_PREFIX)) {
+            $active = (new AgentAssignmentRepository($this->db))->activeScopeBySlug(substr($split, strlen(self::AGENT_RESOURCE_PREFIX)), $tenantId, $profileId);
+            if ($active === null) {
+                throw new OAuthTokenRefusedException("You don't use this agent in this workspace. Start using it in Whity, then connect again.");
+            }
+
+            return new McpPrincipal(
+                profileId: $profileId,
+                userId: $profileId,
+                tenantId: $tenantId,
+                principalKind: AgentScopeGrant::AGENT_KIND,
+                scope: [...$scope, ...$active['entries']],
+                jti: self::AGENT_ID_PREFIX . substr(hash('sha256', self::clientOf($claims) . "\n" . $profileId), 0, 40),
+                agentId: $active['principalId'],
+                resourceSplit: $split,
+                agentSlug: $active['slug'],
+                // WHIT-837: a workspace agent goes by its definition's name.
+                agentName: $active['name'],
+                subject: $subject,
+            );
+        }
+
+        if (self::isAgentClient($claims)) {
+            return new McpPrincipal(
+                profileId: $profileId,
+                userId: $profileId,
+                tenantId: $tenantId,
+                principalKind: AgentScopeGrant::AGENT_KIND,
+                scope: $scope,
+                resourceSplit: $split,
+                jti: self::AGENT_ID_PREFIX . substr(hash('sha256', self::clientOf($claims) . "\n" . $profileId), 0, 40),
+                // WHIT-837: the name the operator registered (Whity ID sends
+                // `client_name` for agent clients), else the client id.
+                agentName: is_string($claims['client_name'] ?? null) && $claims['client_name'] !== '' ? $claims['client_name'] : self::clientOf($claims),
+                subject: $subject,
+            );
+        }
+
         return new McpPrincipal(
             profileId: $profileId,
             userId: $profileId,
             tenantId: $tenantId,
             principalKind: 'oauth',
+            subject: $subject,
             scope: $scope,
+            resourceSplit: $split,
             // A stable per-token handle for notification bookkeeping. Prefixed so
             // it can never collide with an MCP token's jti.
             jti: 'oauth:' . (is_string($jti) && $jti !== '' ? $jti : substr(hash('sha256', $token), 0, 32)),
         );
+    }
+
+    /**
+     * What a token's audiences give it: null for this server's own resource
+     * (`/mcp`, which works everywhere), a split's name for `/mcp/<split>`, and
+     * false for neither.
+     *
+     * @param array<mixed> $audiences
+     */
+    private function splitOf(array $audiences): string|null|false
+    {
+        if (in_array($this->resource, $audiences, true)) {
+            return null;
+        }
+        $prefix = $this->resource . '/';
+        foreach ($audiences as $audience) {
+            if (is_string($audience) && str_starts_with($audience, $prefix) && strlen($audience) > strlen($prefix)) {
+                return substr($audience, strlen($prefix));
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Whether the token's client is an agent: the claim is exactly `true`.
+     * Anything else (absent, "true", 1) is a person's own client.
+     *
+     * @param array<string, mixed> $claims
+     */
+    private static function isAgentClient(array $claims): bool
+    {
+        return ($claims[self::AGENT_CLAIM] ?? null) === true;
+    }
+
+    /**
+     * The OAuth client an agent token was issued to (RFC 9068 `client_id`, or
+     * `azp`). An agent must say which client it is, or its proposals could not
+     * be told apart from another agent's.
+     *
+     * @param array<string, mixed> $claims
+     * @throws OAuthTokenRefusedException
+     */
+    private static function clientOf(array $claims): string
+    {
+        $client = $claims['client_id'] ?? $claims['azp'] ?? null;
+        if (!is_string($client) || $client === '') {
+            throw new OAuthTokenRefusedException('An agent token must name its client (client_id). Ask the sign-in server to add it.');
+        }
+        return $client;
     }
 
     /**

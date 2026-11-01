@@ -38,7 +38,12 @@ final class AuthoredToolSurfaceKeysTest extends TestCase
         self::assertSame('period-close.locks', $meta['period_close_lock']['dev.whity/toolset']);
         self::assertSame('propose', $meta['period_close_lock']['dev.whity/agentPolicy']);
         self::assertSame('period-close.locks', $meta['period_close_unlock']['dev.whity/toolset']);
-        self::assertSame(['windowSeconds' => 1800, 'operation' => 'period_close_unlock', 'handler' => null], $registry->get('period_close_lock')['undo'] ?? null);
+        self::assertSame(
+            ['windowSeconds' => 1800, 'operation' => 'period_close_unlock', 'handler' => null, 'arguments' => [], 'read' => null],
+            $registry->get('period_close_lock')['undo'] ?? null,
+        );
+        // WHIT-812: an operation with an undo window says so to clients.
+        self::assertSame(1800, $meta['period_close_lock']['dev.whity/undoWindowSeconds'] ?? null);
     }
 
     public function testRefusals(): void

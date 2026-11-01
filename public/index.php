@@ -493,6 +493,11 @@ $resourceTypeRegistry = new \Whity\Core\RBAC\ResourceTypeRegistry($hookManager);
 $resourceTypeRegistry->registerCoreResourceTypes();
 \Whity\register_service(\Whity\Core\RBAC\ResourceTypeRegistry::class, $resourceTypeRegistry); // @phpstan-ignore-line
 
+// Agent presets (WHIT-815): core's from database/agent-presets; plugin and
+// Whity Builder presets join at boot (WHIT-818).
+$agentPresetRegistry = new \Whity\Core\Agent\AgentPresetRegistry();
+\Whity\register_service(\Whity\Core\Agent\AgentPresetRegistry::class, $agentPresetRegistry); // @phpstan-ignore-line
+
 // 4c-ante. Organizational-unit TYPE catalogue (#822): which KINDS of unit a
 // plugin may contribute to a tenant's tree (campus, faculty, clinic, ward).
 // Constructed after the hook manager so a registration is announced on the
@@ -727,7 +732,7 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'label' => 'Users',
         'href' => '/admin/users',
         'icon' => 'users',
-        'group' => 'access',
+        'group' => 'people',
         'order' => 1,
         // WC-203: mirrors GET /api/users, now gated on users:read permission
         // (migration 022 grants this to admin). requiredRole is cleared so the
@@ -740,8 +745,8 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'label' => 'Roles',
         'href' => '/admin/roles',
         'icon' => 'lock',
-        'group' => 'access',
-        'order' => 2,
+        'group' => 'people',
+        'order' => 3,
         // Mirrors GET /api/roles, which #988 moved from the 'admin' ROLE NAME to
         // the `roles:read` SLUG. This item was left behind and kept asserting the
         // role, so an instance whose administrative role has been renamed — the
@@ -755,8 +760,8 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'label' => 'Organizational Units',
         'href' => '/admin/ous',
         'icon' => 'building-community',
-        'group' => 'access',
-        'order' => 3,
+        'group' => 'people',
+        'order' => 4,
         // Mirrors GET /api/ous, now gated on ous:read. requiredRole is cleared so
         // the item follows the route it mirrors rather than drifting from it —
         // that drift is what left the ous:* grants vestigial in the first place.
@@ -769,8 +774,8 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'label' => 'Delegations',
         'href' => '/admin/delegations',
         'icon' => 'share',
-        'group' => 'access',
-        'order' => 4,
+        'group' => 'people',
+        'order' => 5,
         // WC-34: the delegations admin area is gated on the delegation:manage
         // permission. The nav item carries the requirement so a
         // permission-aware client/consumer can hide it; the page also enforces
@@ -782,8 +787,8 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'label' => 'Family Relations',
         'href' => '/admin/relations',
         'icon' => 'users-group',
-        'group' => 'records',
-        'order' => 1,
+        'group' => 'people',
+        'order' => 6,
         // WC-65: the relations admin area is gated on relations:read. The nav
         // item carries the requirement so a permission-aware client can hide it;
         // the page also enforces it server-side via the RBAC-protected API (a 403
@@ -795,8 +800,8 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'label' => 'Tag Groups',
         'href' => '/admin/tag-groups',
         'icon' => 'tags',
-        'group' => 'records',
-        'order' => 2,
+        'group' => 'settings',
+        'order' => 3,
         // WC-621: the taxonomy admin. The nav item carries tags:read so a
         // permission-aware client hides it; the schema-driven CrudScreen also
         // fails closed (a 403 on the list renders the access-denied state).
@@ -807,8 +812,8 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'label' => 'Tags',
         'href' => '/admin/tags',
         'icon' => 'tag',
-        'group' => 'records',
-        'order' => 3,
+        'group' => 'settings',
+        'order' => 2,
         'requiredPermission' => \Whity\Core\RBAC\CorePermissions::TAGS_READ,
     ];
     // FORMS (migrations 127/128). Three entries because they are three jobs done
@@ -829,12 +834,12 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'label' => 'Form Builder',
         'icon' => 'forms',
         'href' => '/admin/x/' . \Whity\Core\Form\FormFrontendFeatures::BUILDER_ID,
-        'group' => 'records',
+        'group' => 'documents',
         // Group-local, a unique positive integer (#1007/#1010 — a fractional
         // order is silently skipped by a regroup that matches integers, and a
         // test now enforces the invariant). 1 = Family Relations, 2 = Tag Groups,
         // 3 = Tags, so this is 4 and the catalogue below it is 5.
-        'order' => 4,
+        'order' => 5,
         // Mirrors POST /api/v1/forms, gated forms:manage. Authoring a form is
         // organisational policy — deciding what everyone must declare — so this
         // entry is deliberately NOT visible to the far larger audience that only
@@ -846,8 +851,8 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'label' => 'Forms',
         'icon' => 'clipboard-list',
         'href' => '/admin/x/' . \Whity\Core\Form\FormFrontendFeatures::CATALOG_ID,
-        'group' => 'records',
-        'order' => 5,
+        'group' => 'documents',
+        'order' => 6,
         // Mirrors GET /api/v1/forms and /api/v1/form-submissions, both gated
         // forms:read — the approver's permission, not the author's.
         'requiredPermission' => \Whity\Core\RBAC\CorePermissions::FORMS_READ,
@@ -862,7 +867,7 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         // `records`: this is a surface a person opens about THEIR OWN work, like
         // the inbox above it, where the entries in `records` are things somebody
         // administers on behalf of the tenant.
-        'order' => 3,
+        'order' => 4,
         // Mirrors GET /api/v1/me/form-submissions, gated forms:submit rather than
         // forms:read — the rows already name exactly one person, so requiring the
         // tenant-wide read permission would hide this from precisely the people
@@ -874,8 +879,8 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'label' => 'Tenants',
         'href' => '/admin/tenants',
         'icon' => 'building',
-        'group' => 'access',
-        'order' => 5,
+        'group' => 'platform',
+        'order' => 1,
         // #990: mirrors GET /api/tenants, now gated on tenants:read (migration
         // 138 grants it to every role that may write or delete a tenant).
         // requiredRole is cleared so the item follows the route it mirrors rather
@@ -894,9 +899,9 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         // administering its own account. It is NOT `access` — that group holds
         // the OPERATOR's plan catalogue and promotions, which decide what
         // somebody else is charged.
-        'group' => 'system',
+        'group' => 'platform',
         // 6 — orders are unique within a group, and 1-5 are taken.
-        'order' => 6,
+        'order' => 5,
         // Gated on the same slug as the route behind it. A nav entry that gated
         // on a role name while the route gates on a slug is how a deployment
         // with a renamed administrative role ends up holding the permission and
@@ -908,9 +913,9 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'label' => 'Promotions',
         'href' => '/admin/promotions',
         'icon' => 'discount',
-        'group' => 'access',
+        'group' => 'platform',
         // 8 — orders are unique within a group, and 7 is billing.
-        'order' => 8,
+        'order' => 6,
         'requiredPermission' => \Whity\Core\RBAC\CorePermissions::PLANS_MANAGE,
     ];
     $items[] = [
@@ -918,13 +923,13 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'label' => 'Plans & pricing',
         'href' => '/admin/billing',
         'icon' => 'receipt',
-        'group' => 'access',
+        'group' => 'platform',
         // 7, not 6: `user-groups` holds 6 and orders must be unique within a
         // group — CoreNavigationRegistrationTest fails a collision, because two
         // items sharing an order sit in whatever sequence the array happened to
         // be built in, and that is a menu whose shape changes when an unrelated
         // item is added.
-        'order' => 7,
+        'order' => 4,
         // Mirrors GET /api/plans, which gates on plans:manage. The ROUTE
         // additionally requires the system tenant, and the screen shows
         // read-only without that — a nav item cannot express "and the system
@@ -938,8 +943,8 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'label' => 'User Groups',
         'href' => '/admin/user-groups',
         'icon' => 'users-group',
-        'group' => 'access',
-        'order' => 6,
+        'group' => 'people',
+        'order' => 2,
         // #1015: mirrors GET /api/user-groups, which is where the page's primary
         // fetch goes, so the link and the screen behind it cannot disagree about
         // who belongs here.
@@ -956,8 +961,8 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'label' => 'Audit Logs',
         'href' => '/admin/audit-logs',
         'icon' => 'history',
-        'group' => 'system',
-        'order' => 4,
+        'group' => 'platform',
+        'order' => 7,
         // WC-175 (#191): mirrors GET /api/audit-logs, gated on the audit:read
         // permission — so the nav item gates on the same permission.
         'requiredPermission' => \Whity\Core\RBAC\CorePermissions::AUDIT_READ,
@@ -967,8 +972,8 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'label' => 'Errors',
         'href' => '/admin/errors',
         'icon' => 'alert-triangle',
-        'group' => 'system',
-        'order' => 5,
+        'group' => 'platform',
+        'order' => 8,
         // WC-error-tracking: mirrors GET /api/errors, which is operator-only
         // (settings:manage + system tenant, enforced in the handler) — so the
         // nav item gates on the same permission. A tenant admin never sees it.
@@ -979,8 +984,8 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'label' => 'Notification Delivery',
         'href' => '/admin/notifications',
         'icon' => 'bell-cog',
-        'group' => 'system',
-        'order' => 7,
+        'group' => 'platform',
+        'order' => 9,
         // WC-notifications: mirrors GET /api/notification-metrics, which is
         // gated on notifications:manage in the handler — so the nav item gates
         // on the same permission and the link cannot disagree with the screen
@@ -996,8 +1001,8 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'label' => 'Plugins',
         'href' => '/admin/plugins',
         'icon' => 'plug',
-        'group' => 'extend',
-        'order' => 1,
+        'group' => 'platform',
+        'order' => 2,
         // WC-218: mirrors GET /api/plugins, gated on the plugins:read
         // permission. The nav item carries the requirement so a permission-aware
         // client can hide it; the page also enforces it server-side via the
@@ -1009,8 +1014,8 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'label' => 'Plugin Store',
         'href' => '/admin/plugins/store',
         'icon' => 'building-store',
-        'group' => 'extend',
-        'order' => 2,
+        'group' => 'platform',
+        'order' => 3,
         // Browse + install from a trusted store. Mirrors GET
         // /api/plugins/store/catalog (gated plugins:read); the install action on
         // the page is separately gated plugins:upload server-side.
@@ -1021,7 +1026,7 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'label' => 'Website Settings',
         'href' => '/admin/settings',
         'icon' => 'settings',
-        'group' => 'system',
+        'group' => 'settings',
         'order' => 1,
         // Website Settings: mirrors GET /api/v1/settings, gated on the
         // settings:read permission (migration grants all three settings perms to
@@ -1059,6 +1064,18 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         // has to become one entry per source.
     ];
     $items[] = [
+        'id' => 'approvals',
+        'label' => 'Approvals',
+        'href' => '/admin/approvals',
+        'icon' => 'rubber-stamp',
+        'group' => 'overview',
+        'order' => 3,
+        // WHIT-809. Ungated like the Inbox: it lists the proposals agents made
+        // on the CALLER's behalf (GET /api/me/agent-proposals), and only the
+        // granting person may decide them, so there is nobody a permission
+        // could usefully keep out.
+    ];
+    $items[] = [
         'id' => 'document-library',
         'label' => 'Documents',
         'href' => '/admin/document-library',
@@ -1084,7 +1101,7 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'href' => '/admin/document-sources',
         'icon' => 'notes',
         'group' => 'documents',
-        'order' => 6,
+        'order' => 4,
         // Editor M2: notes and wiki pages written in the block editor. Mirrors
         // GET /api/document-sources (DocumentSourcesApiHandler), gated on
         // documents:read; rows are filtered by DocumentAccessPolicy on top.
@@ -1101,7 +1118,7 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         // test now enforces the invariant). 1 = Documents, 3 = Approval
         // Gating, so this is 4 (2 was the old Document Designer, removed in
         // editor M4c).
-        'order' => 4,
+        'order' => 2,
         // A31: the editor's templates and label sheets — who can see each and
         // why, Whity's starters to use a copy of, and the editor to open them
         // in. The editor is a full-screen screen in the `(editor)` route
@@ -1123,7 +1140,7 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         // order is silently skipped by a regroup that matches integers, and a
         // test now enforces the invariant). 1 = Document Library, 2 = Documents,
         // 3 = Approval Gating, 4 = Templates & Blocks, so this is 5.
-        'order' => 5,
+        'order' => 3,
         // The node-based flow editor (#1027): the reusable, branching designs a
         // document travels. A sibling of "Templates & Blocks" rather than a tab
         // on it, because the two answer different questions about different
@@ -1144,8 +1161,8 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'label' => 'Approval Gating',
         'href' => '/admin/registrations',
         'icon' => 'user-check',
-        'group' => 'documents',
-        'order' => 3,
+        'group' => 'people',
+        'order' => 7,
         // WC-password-reset-2fa-recovery: unified admin page (tabs: Signup /
         // Password reset / 2FA auth reset — see web/app/(protected)/admin/
         // approval-gating/). The first tab, at this href, is the WC-235
@@ -1164,8 +1181,8 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'label' => 'AI Principals',
         'href' => '/admin/ai-principals',
         'icon' => 'robot',
-        'group' => 'extend',
-        'order' => 3,
+        'group' => 'ai',
+        'order' => 1,
         // WC-0208ce4d: mirrors GET /api/v1/admin/mcp/tokens, gated on the
         // mcp:tokens:manage permission. Nav item carries the same requirement so
         // permission-aware clients can hide it; the page enforces it server-side.
@@ -1176,8 +1193,8 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'label' => 'MCP Tools',
         'href' => '/admin/mcp-tools',
         'icon' => 'tools',
-        'group' => 'extend',
-        'order' => 4,
+        'group' => 'ai',
+        'order' => 2,
         // WC-0208ce4d: read-only view of MCP tools available in this tenant.
         // Gated on mcp:tokens:manage so only admins who manage AI credentials
         // can see which tools those credentials expose.
@@ -1188,8 +1205,8 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'label' => 'Languages',
         'href' => '/admin/languages',
         'icon' => 'language',
-        'group' => 'system',
-        'order' => 2,
+        'group' => 'settings',
+        'order' => 4,
         // WC-583: languages are a GLOBAL catalogue (no tenant_id column at
         // all) — create/update/enable/disable is a SYSTEM-TENANT-ONLY
         // PLATFORM capability (mirrors the Feature Flags/Email/Storage
@@ -1203,8 +1220,8 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'label' => 'Translations',
         'href' => '/admin/translations',
         'icon' => 'world',
-        'group' => 'system',
-        'order' => 3,
+        'group' => 'settings',
+        'order' => 5,
         // WC-583: translation rows ARE tenant-scoped (system default vs a
         // tenant's own override) — unlike Languages above, every tenant
         // holding translations:manage may reach this page to edit its own
@@ -1446,6 +1463,13 @@ $router->register('POST', '/api/login', [$authHandler, 'handle'], null);
 // the encryption key so the mail-settings handler can read + decrypt the
 // out-of-registry encrypted SMTP password.
 $secretStore = \Whity\Core\Security\EncryptedSecretStore::fromEnv($_ENV);
+// WHIT-838 (SDK 1.60): where plugins keep secrets, per workspace, encrypted with
+// the platform key. Registered in BaseCommand::setupKernel() too, so jobs reach it.
+\Whity\register_service(\Whity\Sdk\Secrets\PluginSecrets::class, new \Whity\Core\Plugin\HostPluginSecrets(
+    $db->getPdo(),
+    static fn (): \Whity\Core\Security\EncryptedSecretStore => $secretStore,
+    $auditLogger,
+)); // @phpstan-ignore-line
 
 // WC-error-tracking: UPGRADE the boot-time error tracker now that settings, the
 // secret store and the queue exist.
@@ -2047,23 +2071,26 @@ $router->register('PUT', '/api/workspace-plugins/{plugin:[a-z][a-z0-9_]*}/automa
 // see what publishing it would change, publish, list history, and activate a
 // version (rollback). Drafting is plugins:build; putting a version live is
 // plugins:publish. Install-wide plugin names are reserved.
+$tenantManifestPublisher = new \Whity\Core\Plugin\Tenant\TenantManifestPublisher(
+    $db->getPdo(),
+    $tenantPluginRepository,
+    new PluginRoleSeeder($db->getPdo(), $logger),
+    array_values(array_map(static fn ($plugin): string => $plugin->getName(), $pluginLoader->getPlugins())),
+    $auditLogger
+);
+$manifestImpact = new \Whity\Core\Plugin\Tenant\ManifestImpact($tenantRecordRepository);
+// The publish check: a version's own tests, through a writer with no audit
+// and no automations, in a transaction that is always rolled back.
+$manifestTestRunner = new \Whity\Core\Plugin\Tenant\ManifestTestRunner(
+    $db->getPdo(),
+    $tenantRecordRepository,
+    new \Whity\Core\Plugin\Tenant\RecordWriter($db->getPdo(), $tenantRecordRepository, $roleChecker)
+);
 $tenantPluginVersionsHandler = new \Whity\Api\TenantPluginVersionsApiHandler(
     $tenantPluginRepository,
-    new \Whity\Core\Plugin\Tenant\TenantManifestPublisher(
-        $db->getPdo(),
-        $tenantPluginRepository,
-        new PluginRoleSeeder($db->getPdo(), $logger),
-        array_values(array_map(static fn ($plugin): string => $plugin->getName(), $pluginLoader->getPlugins())),
-        $auditLogger
-    ),
-    new \Whity\Core\Plugin\Tenant\ManifestImpact($tenantRecordRepository),
-    // The publish check: a version's own tests, through a writer with no
-    // audit and no automations, in a transaction that is always rolled back.
-    new \Whity\Core\Plugin\Tenant\ManifestTestRunner(
-        $db->getPdo(),
-        $tenantRecordRepository,
-        new \Whity\Core\Plugin\Tenant\RecordWriter($db->getPdo(), $tenantRecordRepository, $roleChecker)
-    ),
+    $tenantManifestPublisher,
+    $manifestImpact,
+    $manifestTestRunner,
     $auditLogger
 );
 $router->register('GET', '/api/workspace-plugins', [$tenantPluginVersionsHandler, 'list'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_READ);
@@ -2943,8 +2970,18 @@ $ouReachResolver = new \Whity\Core\Ou\OuReachResolver($db->getPdo(), $resourceRo
 // resolver the editor and printing share, so the page view and the PDF agree.
 $documentThemeRepository = new \Whity\Core\Document\Theme\DocumentThemeRepository($db->getPdo());
 $documentThemeResolver = new \Whity\Core\Document\Theme\DocumentThemeResolver($settingsService, $documentThemeRepository);
+// Comments and suggestions on those documents (editor M5, migrations 183-185):
+// served with GET /{id}, counted by the publish check (E.37), and routed below
+// beside the notifications they send.
+$documentSourceRepository = new \Whity\Core\Document\DocumentSourceRepository($db->getPdo());
+$documentCollab = new \Whity\Core\Document\Collab\DocumentCollab(
+    $db->getPdo(),
+    $documentSourceRepository,
+    new \Whity\Core\Document\Suggestion\DocumentSuggestionRepository($db->getPdo()),
+    new \Whity\Core\Document\Comment\DocumentCommentRepository($db->getPdo()),
+);
 $documentSourcesHandler = new \Whity\Api\DocumentSourcesApiHandler(
-    new \Whity\Core\Document\DocumentSourceRepository($db->getPdo()),
+    $documentSourceRepository,
     $documentAccessPolicy,
     $roleChecker,
     $ouReachResolver,
@@ -2953,6 +2990,7 @@ $documentSourcesHandler = new \Whity\Api\DocumentSourcesApiHandler(
     new \Whity\Core\Document\DocumentSourceFileStore($storageDriver, $db->getPdo()),
     new \Whity\Core\Document\DocumentSourceVersionRepository($db->getPdo()),
     $documentThemeResolver,
+    $documentCollab,
 );
 $router->register('GET',    '/api/document-sources',                [$documentSourcesHandler, 'list'],      null, null, CorePermissions::DOCUMENTS_READ);
 $router->register('POST',   '/api/document-sources',                [$documentSourcesHandler, 'create'],    null, null, CorePermissions::DOCUMENTS_WRITE);
@@ -2985,11 +3023,17 @@ $templateSlotRegistry = new \Whity\Core\Document\Slots\TemplateSlotRegistry(
     static fn (int $tenantId): array => $tenantManifestHost->manifestsFor($tenantId)
 );
 \Whity\register_service(\Whity\Core\Document\Slots\TemplateSlotRegistry::class, $templateSlotRegistry);
+// A workspace's own plugins' agent presets are read per call, like its slots (WHIT-818).
+$agentPresetRegistry->useManifests(static fn (int $tenantId): array => $tenantManifestHost->manifestsFor($tenantId));
 // Template slots and the workspace's bindings (WHIT-742, DOCUMENT-AUTOMATION
 // 3.2): listed with documents:read, bound with documents:publish.
 $documentTemplateSlotsHandler = new \Whity\Api\DocumentTemplateSlotsApiHandler($templateSlotRegistry, $settingsService, $documentSourcesHandler);
 $router->register('GET',    '/api/document-template-slots',             [$documentTemplateSlotsHandler, 'list'], null, null, CorePermissions::DOCUMENTS_READ);
 $router->register('PUT',    '/api/document-template-slots/{key:[A-Za-z][A-Za-z0-9_]{0,63}\.[a-z][a-z0-9_]{0,39}}', [$documentTemplateSlotsHandler, 'bind'], null, null, CorePermissions::DOCUMENTS_PUBLISH);
+// The background-issuing allow-list (WHIT-742 slice 3): which plugins may issue
+// documents from their jobs with no person.
+$router->register('GET',    '/api/document-background-issuing',         [$documentTemplateSlotsHandler, 'backgroundList'], null, null, CorePermissions::DOCUMENTS_READ);
+$router->register('PUT',    '/api/document-background-issuing/{plugin:[A-Za-z][A-Za-z0-9_]{0,63}}', [$documentTemplateSlotsHandler, 'backgroundSet'], null, null, CorePermissions::DOCUMENTS_PUBLISH);
 // Editor M4c (A31): who can see it, and "Use a copy". Sharing is checked again
 // in the handler (documents:publish), as on create.
 $router->register('PATCH',  '/api/document-sources/{id:\d+}',       [$documentSourcesHandler, 'updateAudience'], null, null, CorePermissions::DOCUMENTS_WRITE);
@@ -3229,6 +3273,7 @@ $documentPublishingHandler = new \Whity\Api\DocumentPublishingApiHandler(
     $documentQrService,
     $documentIssuing,
     $documentThemeRepository,
+    $documentCollab,
 );
 $router->register('GET',  '/api/document-fields',                         [$documentPublishingHandler, 'fields'],       null, null, CorePermissions::DOCUMENTS_READ);
 $router->register('GET',  '/api/document-fields/records',                 [$documentPublishingHandler, 'records'],      null, null, CorePermissions::DOCUMENTS_READ);
@@ -3404,6 +3449,22 @@ $documentsHandler = new \Whity\Api\DocumentsApiHandler(
     // WHIT-742: `slot` in the body names the template through the workspace's bindings.
     $templateSlotRegistry
 );
+// The one issuing path (WHIT-742), registered for plugin code and automations
+// running in a request. BaseCommand registers the same for CLI commands, and
+// queue:work through WorkerDocumentServices. POST /api/documents uses it too.
+\Whity\register_service(\Whity\Core\Document\Issuing\TemplateIssuing::class, new \Whity\Core\Document\Issuing\TemplateIssuing(
+    $documentIssuing,
+    $documentFieldRegistry,
+    $settingsService,
+    static fn (int $id, int $tenantId, int $profileId): ?array => $documentSourcesHandler->visibleRow($id, $tenantId, $profileId),
+    $templateSlotRegistry,
+));
+// The SDK's Documents (1.56): plugins issue through the same service, as the
+// person whose request it is.
+\Whity\register_service(\Whity\Sdk\Documents\Documents::class, new \Whity\Core\Document\Issuing\SdkDocuments(
+    \Whity\app(\Whity\Core\Document\Issuing\TemplateIssuing::class),
+    $roleChecker,
+));
 $documentQrHandler = new \Whity\Api\DocumentQrApiHandler(
     $documentRepository,
     $documentVisibilityPolicy,
@@ -3454,7 +3515,7 @@ $router->register('POST', '/api/documents/{id:\d+}/render',                     
 // gets the same 404 the id route gives them. Holding the paper is not reach.
 $router->register('GET',    '/api/documents/by-verification/{token}',                  [$documentQrHandler, 'resolveToken'], null, null, CorePermissions::DOCUMENTS_READ);
 // The record page's panel: the live code, its URL (so the client draws the
-// symbol with the barcode renderer already in @whity-org/ui) and the scan
+// symbol with the barcode renderer already in @whity/ui) and the scan
 // trail. Read gate matches the region's declaration in
 // DocumentsApiHandler::recordSections() — #975's rule that a region's dedicated
 // route carries the same gate as the region.
@@ -4119,6 +4180,33 @@ $notificationDispatcher = new \Whity\Core\Notification\NotificationDispatcher(
 );
 $notificationDispatcher->subscribe($hookManager);
 
+// Comments and suggestions on editor documents (editor M5; E.4, E.6, E.10,
+// E.29, E.37). Registered here, after the notification dispatcher, because a
+// comment tells the people it @mentions in-app. Each route finds the document
+// through DocumentSourcesApiHandler::visibleRow, so a hidden one answers 404.
+// Suggesting needs documents:suggest, commenting documents:comment, and
+// accepting or rejecting documents:write; agents never decide (the decision
+// routes are agentPolicy refuse, and refused for agents in the handler).
+$documentCollabHandler = new \Whity\Api\DocumentCollabApiHandler(
+    $documentSourcesHandler,
+    $documentCollab,
+    $roleChecker,
+    $auditLogger,
+    $notificationDispatcher,
+);
+$router->register('GET',  '/api/document-sources/{id:\d+}/suggestions',                     [$documentCollabHandler, 'listSuggestions'], null, null, CorePermissions::DOCUMENTS_READ);
+$router->register('POST', '/api/document-sources/{id:\d+}/suggestions',                     [$documentCollabHandler, 'createSuggestion'], null, null, CorePermissions::DOCUMENTS_SUGGEST);
+$router->register('POST', '/api/document-sources/{id:\d+}/suggestions/{sid:\d+}/decision',  [$documentCollabHandler, 'decide'],           null, null, CorePermissions::DOCUMENTS_WRITE);
+$router->register('POST', '/api/document-sources/{id:\d+}/suggestions/decisions',           [$documentCollabHandler, 'decideMany'],       null, null, CorePermissions::DOCUMENTS_WRITE);
+$router->register('GET',  '/api/document-sources/{id:\d+}/comments',                        [$documentCollabHandler, 'listComments'],     null, null, CorePermissions::DOCUMENTS_READ);
+$router->register('POST', '/api/document-sources/{id:\d+}/comments',                        [$documentCollabHandler, 'createThread'],     null, null, CorePermissions::DOCUMENTS_COMMENT);
+$router->register('POST', '/api/document-sources/{id:\d+}/comments/{tid:\d+}/messages',     [$documentCollabHandler, 'addMessage'],       null, null, CorePermissions::DOCUMENTS_COMMENT);
+$router->register('POST', '/api/document-sources/{id:\d+}/comments/{tid:\d+}/resolve',      [$documentCollabHandler, 'resolve'],          null, null, CorePermissions::DOCUMENTS_COMMENT);
+$router->register('POST', '/api/document-sources/{id:\d+}/comments/{tid:\d+}/reopen',       [$documentCollabHandler, 'reopen'],           null, null, CorePermissions::DOCUMENTS_COMMENT);
+$router->register('GET',  '/api/document-sources/{id:\d+}/changes',                         [$documentCollabHandler, 'changes'],          null, null, CorePermissions::DOCUMENTS_READ);
+// The people a comment may @mention: members who can read the document.
+$router->register('GET',  '/api/document-sources/{id:\d+}/mentionable',                     [$documentCollabHandler, 'mentionable'],      null, null, CorePermissions::DOCUMENTS_COMMENT);
+
 // 13b-quinquies-bis. ROUTING NOTIFICATIONS (#1054) — the subscriber that turns a
 // routing broadcast into notifications.
 //
@@ -4582,10 +4670,24 @@ $router->register('DELETE', '/api/relations/{id:\d+}', [$relationsHandler, 'dele
 // WC-149b2fc9: create and revoke are gated by mcp:tokens:manage so an admin
 // controls who may mint AI credentials. List is read-only and ungated.
 $mcpTokenService = new McpTokenService($db->getPdo(), $jwtParser);
-$mcpTokenHandler = new McpTokenHandler($tokenValidator, $mcpTokenService, $permissionRegistry);
+// WHIT-832: the grant screen needs the operations an agent could be offered,
+// with their gates; derived once per worker from the same catalogue as tools/list.
+$mcpAgentOperations = null;
+$mcpTokenHandler = new McpTokenHandler(
+    $tokenValidator,
+    $mcpTokenService,
+    $permissionRegistry,
+    $roleChecker,
+    static function () use (&$mcpAgentOperations): array {
+        return $mcpAgentOperations !== null ? ($mcpAgentOperations)() : [];
+    },
+    $auditLogger,
+);
 $router->register('POST',   '/api/mcp/tokens',       [$mcpTokenHandler, 'create'], null, null, CorePermissions::MCP_TOKENS_MANAGE);
 $router->register('GET',    '/api/mcp/tokens',       [$mcpTokenHandler, 'list']);
 $router->register('DELETE', '/api/mcp/tokens/{jti}', [$mcpTokenHandler, 'revoke'], null, null, CorePermissions::MCP_TOKENS_MANAGE);
+$router->register('GET',    '/api/mcp/tokens/{jti}/grant', [$mcpTokenHandler, 'grant']);
+$router->register('PATCH',  '/api/mcp/tokens/{jti}/grant', [$mcpTokenHandler, 'updateGrant'], null, null, CorePermissions::MCP_TOKENS_MANAGE);
 
 // WC-0208ce4d: AI-principal admin endpoints (tenant-scoped, admin surface).
 // Gated by mcp:tokens:manage so only admins who hold the credential-management
@@ -4662,6 +4764,15 @@ $mcpEnabledPluginAlwaysOn = static function (int $tenantId) use ($settingsServic
     $raw = (string) ($settingsService->effective($tenantId)[\Whity\Core\Settings\SettingsRegistry::MCP_ALWAYS_ON_PLUGIN_TOOLS] ?? '');
     return array_values(array_filter(array_map('trim', explode(',', $raw)), static fn (string $n): bool => $n !== ''));
 };
+// WHIT-832: what an agent could be offered, core and plugin, for the grant
+// screen (wired into $mcpTokenHandler above). Both sources cache their catalogue.
+$mcpAgentOperations = static function () use ($toolDeriver, $authoredMcpTools): array {
+    $exposed = array_filter($toolDeriver->deriveTools(), static fn (array $tool): bool => $toolDeriver->isExposed((string) ($tool['name'] ?? '')));
+    return [
+        ...\Whity\Mcp\Auth\AgentGrantView::operationsFrom($exposed, $toolDeriver->buildAccessMap()),
+        ...\Whity\Mcp\Auth\AgentGrantView::operationsFrom($authoredMcpTools->toolObjects(), $authoredMcpTools->accessMap()),
+    ];
+};
 // WC-0208ce4d: admin read-only view of the MCP tools and their access
 // requirements, plugin-authored tools included (WHIT-754).
 $mcpToolsAdminHandler = new McpToolsAdminHandler($toolDeriver, $roleChecker, $authoredMcpTools, $mcpEnabledPluginAlwaysOn);
@@ -4670,14 +4781,67 @@ $mcpToolsListHandler = new ToolsListHandler($toolDeriver, $roleChecker, $tokenVa
 $mcpServerEnabled = (bool) filter_var($_ENV['MCP_ENABLED'] ?? 'false', FILTER_VALIDATE_BOOLEAN);
 // WHIT-784: an agent's Ask-first call is stored for its person to approve.
 $agentProposals = new \Whity\Core\Agent\AgentProposalRepository($db->getPdo());
-$mcpToolsCallHandler = new ToolsCallHandler($toolDeriver, $router, $roleChecker, $tokenValidator, auditLogger: $auditLogger, authoredTools: $authoredMcpTools, proposals: $agentProposals);
+// WHIT-833: previews of what a proposed call would change. Register one with
+// $proposalDiffs->register('<tool name>', fn (array $arguments, int $tenantId): ?array => ...).
+$proposalDiffs = new \Whity\Mcp\Tools\ProposalDiffRegistry();
+\Whity\register_service(\Whity\Mcp\Tools\ProposalDiffRegistry::class, $proposalDiffs); // @phpstan-ignore-line
+// An agent's proposal to publish or roll back a workspace plugin (Whity
+// Builder) shows the person its impact plan, and for a publish its tests.
+(new \Whity\Core\Plugin\Tenant\WorkspacePluginProposalDiffs(
+    $tenantPluginRepository,
+    $tenantManifestPublisher,
+    $manifestImpact,
+    $manifestTestRunner
+))->registerOn($proposalDiffs);
+// WHIT-812: what an agent did that its person can still undo.
+$agentActions = new \Whity\Core\Agent\AgentActionRepository($db->getPdo());
+$mcpToolsCallHandler = new ToolsCallHandler($toolDeriver, $router, $roleChecker, $tokenValidator, auditLogger: $auditLogger, authoredTools: $authoredMcpTools, proposals: $agentProposals, proposalDiffs: $proposalDiffs, actions: $agentActions);
 // The approvals inbox: the person an agent acts for approves, edits or
 // declines what it asked to do. Session-gated and never on the MCP surface:
 // an agent must not be able to approve its own proposal.
-$agentProposalsHandler = new \Whity\Api\AgentProposalsApiHandler($agentProposals, $mcpToolsCallHandler, $auditLogger);
+// WHIT-816: a workspace agent's proposal runs under the person's assignment as it is now.
+$agentAssignments = new \Whity\Core\Agent\AgentAssignmentRepository($db->getPdo());
+$agentProposalsHandler = new \Whity\Api\AgentProposalsApiHandler($agentProposals, $mcpToolsCallHandler, $auditLogger, $agentAssignments, $agentActions);
 $router->register('GET',  '/api/me/agent-proposals',                    [$agentProposalsHandler, 'list'],    null);
 $router->register('POST', '/api/me/agent-proposals/{id:\d+}/approve',  [$agentProposalsHandler, 'approve'], null);
 $router->register('POST', '/api/me/agent-proposals/{id:\d+}/decline',  [$agentProposalsHandler, 'decline'], null);
+// WHIT-815: workspace agents (persona, toolsets, starting grant) and the
+// presets they start from. Gated on agents:manage, which migration 180 grants
+// to every role holding mcp:tokens:manage. Writes are agentPolicy refuse.
+$agentsHandler = new \Whity\Api\AgentsApiHandler(
+    new \Whity\Core\Agent\AgentRepository($db->getPdo()),
+    $agentPresetRegistry,
+    $auditLogger,
+);
+$router->register('GET',   '/api/agents',                      [$agentsHandler, 'list'],    null, null, CorePermissions::AGENTS_MANAGE);
+$router->register('POST',  '/api/agents',                      [$agentsHandler, 'create'],  null, null, CorePermissions::AGENTS_MANAGE);
+$router->register('GET',   '/api/agents/{id:\d+}',             [$agentsHandler, 'get'],     null, null, CorePermissions::AGENTS_MANAGE);
+$router->register('PATCH', '/api/agents/{id:\d+}',             [$agentsHandler, 'update'],  null, null, CorePermissions::AGENTS_MANAGE);
+$router->register('POST',  '/api/agents/{id:\d+}/archive',     [$agentsHandler, 'archive'], null, null, CorePermissions::AGENTS_MANAGE);
+$router->register('POST',  '/api/agents/{id:\d+}/restore',     [$agentsHandler, 'restore'], null, null, CorePermissions::AGENTS_MANAGE);
+$router->register('GET',   '/api/agent-presets',               [$agentsHandler, 'presets'], null, null, CorePermissions::AGENTS_MANAGE);
+// WHIT-816: a person's use of the workspace's agents. Session-only (every
+// member may use one; no `agents:use` permission) and never on the MCP
+// surface, so an agent can't widen its own grant.
+$myAgentsHandler = new \Whity\Api\MyAgentsApiHandler(
+    new \Whity\Core\Agent\AgentRepository($db->getPdo()),
+    $agentAssignments,
+    $mcpTokenService,
+    $roleChecker,
+    $mcpAgentOperations,
+    $auditLogger,
+);
+$router->register('GET',    '/api/me/agents',                              [$myAgentsHandler, 'list'],        null);
+$router->register('POST',   '/api/me/agents/{id:\d+}/assignment',          [$myAgentsHandler, 'assign'],      null);
+$router->register('DELETE', '/api/me/agents/{id:\d+}/assignment',          [$myAgentsHandler, 'unassign'],    null);
+$router->register('GET',    '/api/me/agents/{id:\d+}/assignment/grant',    [$myAgentsHandler, 'grant'],       null);
+$router->register('PATCH',  '/api/me/agents/{id:\d+}/assignment/grant',    [$myAgentsHandler, 'updateGrant'], null);
+$router->register('POST',   '/api/me/agents/{id:\d+}/credentials',         [$myAgentsHandler, 'credential'],  null);
+// WHIT-812: what agents did for you, and undoing it inside its window. Same
+// rule as the inbox: never on the MCP surface.
+$agentActionsHandler = new \Whity\Api\AgentActionsApiHandler($agentActions, $mcpToolsCallHandler, $agentProposals, $auditLogger);
+$router->register('GET',  '/api/me/agent-actions',                      [$agentActionsHandler, 'list'], null);
+$router->register('POST', '/api/me/agent-actions/{id:\d+}/undo',        [$agentActionsHandler, 'undo'], null);
 $mcpHandlers = [
     'initialize'              => new InitializeHandler(listChanged: true),
     // WHIT-708: required of every 2026-07-28 server.
@@ -4745,11 +4909,62 @@ $mcpDiscovery = new DiscoveryTools(
             return ['name' => $display !== '' ? $display : null, 'workspace' => $tenant !== '' ? $tenant : null];
         },
         $mcpRateLimiter->limits(),
+        // WHIT-817: a workspace agent is briefed with its persona.
+        static fn (string $principalId, int $tenantId): ?array => $agentAssignments->personaFor(
+            $principalId,
+            $tenantId,
+            new \Whity\Core\Agent\AgentRepository($mcpBriefingPdo),
+        ),
     ),
     // WHIT-754: a plugin's always-on tool is listed only once this workspace's
     // admin turned it on (the mcp.always_on_plugin_tools setting).
     $mcpEnabledPluginAlwaysOn,
+    // WHIT-825: get_proposal reads an agent's own proposals.
+    $agentProposals,
 );
+// WHIT-765: /mcp/<split>, one slice of the server at its own URL. Plugins load
+// later, so their toolsets are read when asked for.
+$mcpSplits = new \Whity\Mcp\Tools\McpSplits(
+    static function () use ($toolDeriver, $authoredMcpTools): array {
+        $ids = [];
+        foreach ($authoredMcpTools->toolsets() as $toolset) {
+            if ($toolset['split']) {
+                $ids[] = $toolset['id'];
+            }
+        }
+        foreach ($toolDeriver->deriveTools() as $tool) {
+            $toolset = $tool['_meta'][\Whity\Mcp\Tools\ToolSurface::META_TOOLSET] ?? null;
+            if (is_string($toolset) && $toolset !== '' && !str_starts_with($toolset, 'core.')) {
+                $ids[] = explode('.', $toolset)[0];
+            }
+        }
+        return array_values(array_unique($ids));
+    },
+    is_string($_ENV['MCP_SPLITS'] ?? getenv('MCP_SPLITS')) ? (string) ($_ENV['MCP_SPLITS'] ?? getenv('MCP_SPLITS')) : null,
+);
+$mcpSplitsHandler = new \Whity\Mcp\Connect\McpSplitsHandler(
+    $mcpSplits,
+    $roleChecker,
+    static function () use ($toolDeriver, $authoredMcpTools): array {
+        $operations = [];
+        foreach ([$toolDeriver->deriveTools(), $authoredMcpTools->toolObjects()] as $tools) {
+            foreach ($tools as $tool) {
+                $name = (string) ($tool['name'] ?? '');
+                if ($toolDeriver->findDeclarationByName($name) !== null && !$toolDeriver->isExposed($name)) {
+                    continue;
+                }
+                $access = $toolDeriver->buildAccessMap()[$name] ?? $authoredMcpTools->accessMap()[$name] ?? [];
+                $operations[] = [
+                    'toolset'    => (string) ($tool['_meta'][\Whity\Mcp\Tools\ToolSurface::META_TOOLSET] ?? ''),
+                    'permission' => is_string($access['requiredPermission'] ?? null) ? $access['requiredPermission'] : null,
+                ];
+            }
+        }
+        return $operations;
+    },
+    McpConnectHandler::endpointFor((string) ($_ENV['APP_URL'] ?? getenv('APP_URL') ?: '')),
+);
+$router->register('GET', '/api/mcp/splits', [$mcpSplitsHandler, 'list'], null);
 $mcpTransportHandler = new McpTransportHandler(
     new Dispatcher($mcpHandlers, $tokenValidator, $mcpRateLimiter, $tenantMcpEnabled, $mcpListChangedNotifier, $mcpRecordTokenUse),
     enabled: $mcpServerEnabled,
@@ -4768,6 +4983,7 @@ $mcpTransportHandler = new McpTransportHandler(
         recordTokenUse: $mcpRecordTokenUse,
     ),
     protectedResource: $mcpProtectedResource,
+    splits: $mcpSplits,
     // WHIT-748: /mcp?tools=default lists the always-on tools, then the same
     // discovery tools, which reach everything else. Its list changes only when
     // the always-on set does, so it announces no list_changed either.
@@ -4790,6 +5006,22 @@ $router->registerUnversioned('GET', '/.well-known/oauth-protected-resource', [$m
 $router->registerUnversioned('GET', '/.well-known/oauth-protected-resource/mcp', [$mcpProtectedResource, 'metadata']);
 $router->registerUnversioned('POST', '/mcp', [$mcpTransportHandler, 'handlePost']);
 $router->registerUnversioned('GET',  '/mcp', [$mcpTransportHandler, 'handleGet']);
+// WHIT-765: a split is its own OAuth resource, so its own metadata too.
+$router->registerUnversioned('GET', '/.well-known/oauth-protected-resource/mcp/{split:[a-z0-9][a-z0-9_.-]*}', static function (\Whity\Core\Request $request, array $params = []) use ($mcpSplits, $mcpProtectedResource): \Whity\Core\Response {
+    $split = (string) ($params['split'] ?? '');
+    return $mcpSplits->toolsetsOf($split) === null
+        ? \Whity\Core\Response::error('Not found', 404)
+        : $mcpProtectedResource->forSplit($split)->metadata($request, $params);
+});
+// WHIT-819: a workspace agent as its own OAuth resource. Before the splits only
+// by reading order: `agents` is a reserved name, and a split has one segment.
+$router->registerUnversioned('GET', '/.well-known/oauth-protected-resource/mcp/agents/{agent:[a-z0-9][a-z0-9-]*}', static function (\Whity\Core\Request $request, array $params = []) use ($mcpProtectedResource): \Whity\Core\Response {
+    return $mcpProtectedResource->forAgent((string) ($params['agent'] ?? ''))->metadata($request, $params);
+});
+$router->registerUnversioned('POST', '/mcp/agents/{agent:[a-z0-9][a-z0-9-]*}', [$mcpTransportHandler, 'handlePost']);
+$router->registerUnversioned('GET',  '/mcp/agents/{agent:[a-z0-9][a-z0-9-]*}', [$mcpTransportHandler, 'handleGet']);
+$router->registerUnversioned('POST', '/mcp/{split:[a-z0-9][a-z0-9_.-]*}', [$mcpTransportHandler, 'handlePost']);
+$router->registerUnversioned('GET',  '/mcp/{split:[a-z0-9][a-z0-9_.-]*}', [$mcpTransportHandler, 'handleGet']);
 
 // WHIT-697: the "Connect an AI app" wizard. Gated like token issuance, which
 // is where the wizard ends. The preview runs the tools/list filter itself.
@@ -4807,6 +5039,10 @@ $router->register('POST', '/api/mcp/connect/preview', [$mcpConnectHandler, 'prev
 // Load plugins AFTER every core route (WC-169): the Router refuses duplicate
 // method+path registrations (first wins), so core routes can never be
 // shadowed by a plugin claiming the same path.
+// Code plugins' agent presets (SDK 1.61, WHIT-818).
+$pluginLoader->setAgentPresetRegistry($agentPresetRegistry);
+// Code plugins' template slots and record types as merge fields (SDK 1.56, WHIT-742).
+$pluginLoader->setDocumentRegistries($templateSlotRegistry, $documentFieldRegistry);
 $pluginLoader->load();
 $pluginLoader->collectMcpPrompts($promptRegistry);
 // SDK 1.43. Collect FIRST, then hand the deriver the suppressions: a plugin

@@ -22,6 +22,10 @@ namespace Whity\Mcp\Tools;
  * search and call since WHIT-750 (owner decision 2). `?tools=full` keeps the
  * old full list.
  *
+ * On a split (`/mcp/<split>`, WHIT-765) the toolsets are the split's and the
+ * selection is a hard boundary: what is outside it doesn't exist there, so
+ * search can't find it and calling it is an unknown tool.
+ *
  * The transport passes it to the handlers in `params._meta` under
  * {@see self::META_KEY}, written by the server and never taken from the client.
  */
@@ -45,7 +49,19 @@ final class ToolSurfaceRequest
     public function __construct(
         public readonly string $mode = self::BARE_MODE,
         public readonly array $toolsets = [],
+        public readonly ?string $split = null,
     ) {
+    }
+
+    /**
+     * On a split: the mode from the query, the toolsets from the split.
+     *
+     * @param array<string, mixed> $query
+     * @param list<string>         $toolsets
+     */
+    public static function forSplit(array $query, string $split, array $toolsets): self
+    {
+        return new self(self::fromQuery($query)->mode, $toolsets, $split);
     }
 
     /**
@@ -91,13 +107,18 @@ final class ToolSurfaceRequest
         $mode     = is_string($surface['mode'] ?? null) && in_array($surface['mode'], self::MODES, true) ? $surface['mode'] : self::BARE_MODE;
         $toolsets = array_values(array_filter((array) ($surface['toolsets'] ?? []), 'is_string'));
 
-        return new self($mode, $toolsets);
+        return new self($mode, $toolsets, is_string($surface['split'] ?? null) ? $surface['split'] : null);
     }
 
-    /** @return array{mode: string, toolsets: list<string>} */
+    /** @return array{mode: string, toolsets: list<string>, split?: string} */
     public function toArray(): array
     {
-        return ['mode' => $this->mode, 'toolsets' => $this->toolsets];
+        $array = ['mode' => $this->mode, 'toolsets' => $this->toolsets];
+        if ($this->split !== null) {
+            $array['split'] = $this->split;
+        }
+
+        return $array;
     }
 
     /** Whether a tool in $toolset is in the selection (`acme.*` is acme and below). An empty selection selects everything. */

@@ -1,10 +1,10 @@
 'use client';
 
-import { useTranslation } from '@whity-org/features/i18n';
-import { useDateDisplay } from '@whity-org/features/datetime';
-import { Button } from '@whity-org/ui/button';
-import { EmptyState } from '@whity-org/ui/empty-state';
-import { Skeleton } from '@whity-org/ui/skeleton';
+import { useTranslation } from '@whity/features/i18n';
+import { useDateDisplay } from '@whity/features/datetime';
+import { Button } from '@whity/ui/button';
+import { EmptyState } from '@whity/ui/empty-state';
+import { Skeleton } from '@whity/ui/skeleton';
 import { IconFileText } from '@tabler/icons-react';
 import { Pagination } from '@/components/ui/pagination';
 import { DocumentActions, DocumentTitle, StarButton, type DocumentItemHandlers } from './document-item';

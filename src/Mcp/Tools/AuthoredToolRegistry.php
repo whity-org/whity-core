@@ -55,7 +55,7 @@ final class AuthoredToolRegistry implements HostWiredService
      *     toolset: string,
      *     visibility: string,
      *     agentPolicy: string,
-     *     undo: array{windowSeconds: int, operation: ?string, handler: ?callable}|null
+     *     undo: array{windowSeconds: int, operation: ?string, handler: ?callable, arguments: array<string, mixed>, read: ?array<string, mixed>}|null
      * }>
      */
     private array $tools = [];
@@ -297,7 +297,7 @@ final class AuthoredToolRegistry implements HostWiredService
      * A descriptor's undo (WHIT-752, design §5.11): null when there is none,
      * false when it is malformed.
      *
-     * @return array{windowSeconds: int, operation: ?string, handler: ?callable}|null|false
+     * @return array{windowSeconds: int, operation: ?string, handler: ?callable, arguments: array<string, mixed>, read: ?array<string, mixed>}|null|false
      */
     private static function undo(mixed $raw): array|null|false
     {
@@ -312,10 +312,19 @@ final class AuthoredToolRegistry implements HostWiredService
         if (!(is_string($operation) && $operation !== '') && !is_callable($handler)) {
             return false;
         }
+        // WHIT-812: how the inverse's arguments are built, and the optional
+        // read that guards it; see UndoSpec.
+        $arguments = $raw['arguments'] ?? [];
+        $read      = $raw['read'] ?? null;
+        if (!is_array($arguments) || ($read !== null && (!is_array($read) || !is_string($read['operation'] ?? null)))) {
+            return false;
+        }
         return [
             'windowSeconds' => $raw['windowSeconds'],
             'operation'     => is_string($operation) && $operation !== '' ? $operation : null,
             'handler'       => is_callable($handler) ? $handler : null,
+            'arguments'     => $arguments,
+            'read'          => $read,
         ];
     }
 
@@ -395,7 +404,7 @@ final class AuthoredToolRegistry implements HostWiredService
             }
             // WHIT-747, WHIT-752: the toolset, visibility and agent policy the
             // descriptor declared, as the registry accepted them.
-            $object['_meta'] = ToolSurface::meta($tool['toolset'], $tool['visibility'], $tool['agentPolicy']);
+            $object['_meta'] = ToolSurface::meta($tool['toolset'], $tool['visibility'], $tool['agentPolicy'], $tool['undo']['windowSeconds'] ?? null);
             $out[] = $object;
         }
 
@@ -446,7 +455,7 @@ final class AuthoredToolRegistry implements HostWiredService
      *     toolset: string,
      *     visibility: string,
      *     agentPolicy: string,
-     *     undo: array{windowSeconds: int, operation: ?string, handler: ?callable}|null
+     *     undo: array{windowSeconds: int, operation: ?string, handler: ?callable, arguments: array<string, mixed>, read: ?array<string, mixed>}|null
      * }|null
      */
     public function get(string $name): ?array

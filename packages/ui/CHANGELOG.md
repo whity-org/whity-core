@@ -1,4 +1,4 @@
-# @whity-org/ui
+# @whity/ui
 
 ## 0.5.0
 

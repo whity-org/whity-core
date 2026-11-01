@@ -2,8 +2,8 @@
 
 /** The design system's Pagination with this app's translations. See ./dialog.tsx. */
 
-import { useTranslation } from '@whity-org/features/i18n';
-import { Pagination as BasePagination } from '@whity-org/ui/pagination';
+import { useTranslation } from '@whity/features/i18n';
+import { Pagination as BasePagination } from '@whity/ui/pagination';
 
 export function Pagination(props: React.ComponentProps<typeof BasePagination>) {
   const t = useTranslation('common');

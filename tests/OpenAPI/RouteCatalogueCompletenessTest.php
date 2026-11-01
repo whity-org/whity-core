@@ -32,6 +32,16 @@ final class RouteCatalogueCompletenessTest extends TestCase
      * @var list<string>
      */
     private const KNOWN_UNDOCUMENTED = [
+        // WHIT-765: MCP splits and their metadata, protocol endpoints like /mcp;
+        // the splits a caller can reach are documented with the MCP wiki pages.
+        'GET /.well-known/oauth-protected-resource/mcp/{split}',
+        'POST /mcp/{split}',
+        'GET /mcp/{split}',
+        'GET /api/mcp/splits',
+        // WHIT-819: a workspace agent as its own OAuth resource, the same way.
+        'GET /.well-known/oauth-protected-resource/mcp/agents/{agent}',
+        'POST /mcp/agents/{agent}',
+        'GET /mcp/agents/{agent}',
         // WHIT-761: workspace-plugin record routes. Their shape is each
         // workspace's own manifest, so they get a per-workspace OpenAPI view
         // and MCP operations in a follow-up, not entries in core's spec.
@@ -41,23 +51,9 @@ final class RouteCatalogueCompletenessTest extends TestCase
         'PATCH /api/x/{plugin}/{type}/{id}',
         'DELETE /api/x/{plugin}/{type}/{id}',
         'POST /api/x/{plugin}/{type}/{id}/moves/{move}',
-        // WHIT-763: a workspace plugin's automation run traces and its
-        // automations switch. Schemas follow with the builder API (WHIT-764),
-        // and traces reach MCP with WHIT-792.
-        'GET /api/workspace-plugins/{plugin}/automation-runs',
-        'GET /api/workspace-plugins/{plugin}/automation-runs/{id}',
-        'PUT /api/workspace-plugins/{plugin}/automations',
-        // WHIT-764: a workspace's own plugins and their versions. Schemas,
-        // and the MCP tools derived from them, follow with the next slice
-        // (preview, tests and agent proposals).
-        'GET /api/workspace-plugins',
-        'POST /api/workspace-plugins',
-        'POST /api/workspace-plugins/validate',
-        'POST /api/workspace-plugins/impact',
-        'POST /api/workspace-plugins/test',
-        'GET /api/workspace-plugins/{plugin}/versions',
-        'GET /api/workspace-plugins/{plugin}/versions/{id}',
-        'POST /api/workspace-plugins/{plugin}/versions/{id}/activate',
+        // WHIT-764: the workspace plugin routes are declared in
+        // CoreApiSchemas::workspacePluginRoutes(); the record routes above wait
+        // for WHIT-792 (records over MCP, per workspace).
         // WC-235: public self-service registration — OpenAPI schema to follow in
         // a dedicated documentation task (mirrors the auth-routes rollout).
         'POST /api/register',
@@ -110,6 +106,10 @@ final class RouteCatalogueCompletenessTest extends TestCase
         'DELETE /api/mcp/tokens/{jti}',
         'GET /api/mcp/tokens',
         'POST /api/mcp/tokens',
+        // WHIT-832: an agent credential's grant. Never declared: a declared
+        // route becomes an MCP tool, and an agent must not reach its own grant.
+        'GET /api/mcp/tokens/{jti}/grant',
+        'PATCH /api/mcp/tokens/{jti}/grant',
         // WC-0208ce4d: MCP admin endpoints — OpenAPI schema to follow once
         // the generate:openapi snapshot is regenerated in a dedicated task.
         'DELETE /api/admin/mcp/tokens/{jti}',

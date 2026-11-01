@@ -1,8 +1,13 @@
 {
-  "name": "@whity-org/ui",
+  "name": "@whity/ui",
   "version": "0.5.0",
   "description": "Shared UI primitives for Whity products",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/whity-org/whity-core.git",
+    "directory": "packages/ui"
+  },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
     "storybook": "storybook dev -p 6006",
@@ -15,6 +20,11 @@
     "./agent-run-status": "./src/agent-run-status.tsx",
     "./alert": "./src/alert.tsx",
     "./alert-dialog": "./src/alert-dialog.tsx",
+    "./action-proposal": "./src/action-proposal.tsx",
+    "./agent-activity": "./src/agent-activity.tsx",
+    "./approval-queue": "./src/approval-queue.tsx",
+    "./scope-grant": "./src/scope-grant.tsx",
+    "./undo-bar": "./src/undo-bar.tsx",
     "./app-sidebar": "./src/app-sidebar.tsx",
     "./audience-group-picker": "./src/audience-group-picker.tsx",
     "./audience-people-picker": "./src/audience-people-picker.tsx",
@@ -44,6 +54,8 @@
     "./editor/block-toolbar": "./src/editor/block-toolbar.tsx",
     "./editor/bubble": "./src/editor/bubble.tsx",
     "./editor/catalogue": "./src/editor/catalogue.ts",
+    "./editor/collab": "./src/editor/collab.ts",
+    "./editor/collab-rail": "./src/editor/collab-rail.tsx",
     "./editor/contract": "./src/editor/contract.ts",
     "./editor/convert": "./src/editor/convert.ts",
     "./editor/doc-editor": "./src/editor/doc-editor.tsx",
@@ -63,6 +75,8 @@
     "./editor/schema-rich": "./src/editor/schema-rich.ts",
     "./editor/services": "./src/editor/services.tsx",
     "./editor/slash": "./src/editor/slash.ts",
+    "./editor/suggesting": "./src/editor/suggesting.ts",
+    "./editor/suggestions": "./src/editor/suggestions.ts",
     "./editor/table-keys": "./src/editor/table-keys.ts",
     "./editor/toolbar": "./src/editor/toolbar.tsx",
     "./empty-state": "./src/empty-state.tsx",
@@ -98,6 +112,7 @@
     "./tabs": "./src/tabs.tsx",
     "./tag-input": "./src/tag-input.tsx",
     "./tenant-logo": "./src/tenant-logo.tsx",
+    "./tenant-switcher": "./src/tenant-switcher.tsx",
     "./textarea": "./src/textarea.tsx",
     "./theme-mode": "./src/theme-mode.ts",
     "./time-picker": "./src/time-picker.tsx",
@@ -119,7 +134,7 @@
     "react-hook-form": ">=7"
   },
   "dependencies": {
-    "@whity-org/tokens": "^0.2.0",
+    "@whity/tokens": "^0.2.0",
     "@tanstack/react-table": "^9.2.4",
     "@tiptap/core": "3.32.1",
     "@tiptap/extension-blockquote": "3.32.1",
@@ -171,6 +186,7 @@
     "vite": "^8.3.5"
   },
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
   }
 }

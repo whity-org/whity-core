@@ -38,6 +38,7 @@ final class AgentProposalRepository
      * @param array<string, mixed> $arguments
      * @param list<string>         $scope
      * @param list<string>         $permissions
+     * @param array<string, mixed>|null $diff
      */
     public function create(
         int $tenantId,
@@ -49,12 +50,14 @@ final class AgentProposalRepository
         array $permissions,
         string $summary,
         ?int $undoWindowSeconds = null,
+        // WHIT-833: what the call would change, from the tool's preview.
+        ?array $diff = null,
     ): int {
         $stmt = $this->db->prepare(
             'INSERT INTO agent_proposals
-                 (tenant_id, agent_principal_id, on_behalf_of_profile_id, tool, arguments, scope, permissions,
+                 (tenant_id, agent_principal_id, on_behalf_of_profile_id, tool, arguments, diff, scope, permissions,
                   summary, undo_window_seconds, status, expires_at, created_at)
-             VALUES (:tenant_id, :agent, :profile, :tool, :arguments, :scope, :permissions,
+             VALUES (:tenant_id, :agent, :profile, :tool, :arguments, :diff, :scope, :permissions,
                   :summary, :undo, :status, :expires_at, NOW())'
         );
         $stmt->execute([
@@ -63,6 +66,7 @@ final class AgentProposalRepository
             ':profile'     => $onBehalfOfProfileId,
             ':tool'        => $tool,
             ':arguments'   => self::encode($arguments === [] ? new \stdClass() : $arguments),
+            ':diff'        => $diff !== null ? self::encode($diff) : null,
             ':scope'       => self::encode($scope),
             ':permissions' => self::encode($permissions),
             ':summary'     => $summary,
@@ -111,6 +115,72 @@ final class AgentProposalRepository
     }
 
     /**
+     * What the approvals card calls each agent that asked, by principal id. A
+     * credential (`jti`) goes by the name its person gave it. A workspace agent
+     * (`agent:<assignmentId>`, WHIT-816) goes by its definition, in both
+     * languages, even once the assignment is revoked or the agent archived:
+     * history keeps naming who asked. An id that resolves to nothing is absent.
+     *
+     * @param list<string> $principalIds
+     * @return array<string, array{name: string, nameAr: ?string}>
+     */
+    public function agentNames(int $tenantId, array $principalIds): array
+    {
+        $principalIds = array_values(array_unique(array_filter($principalIds, static fn ($id): bool => $id !== '')));
+
+        $assignments = [];
+        $jtis        = [];
+        foreach ($principalIds as $principalId) {
+            $assignmentId = AgentAssignmentRepository::idFromPrincipal($principalId);
+            if ($assignmentId !== null) {
+                $assignments[] = $assignmentId;
+            } else {
+                $jtis[] = $principalId;
+            }
+        }
+
+        $names = [];
+        if ($jtis !== []) {
+            $placeholders = implode(', ', array_map(static fn (int $i): string => ':jti' . $i, array_keys($jtis)));
+            $stmt = $this->db->prepare(
+                'SELECT jti, name FROM mcp_tokens WHERE tenant_id = :tenant_id AND jti IN (' . $placeholders . ')'
+            );
+            $stmt->bindValue(':tenant_id', $tenantId, PDO::PARAM_INT);
+            foreach ($jtis as $i => $jti) {
+                $stmt->bindValue(':jti' . $i, $jti, PDO::PARAM_STR);
+            }
+            $stmt->execute();
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $names[(string) $row['jti']] = ['name' => (string) $row['name'], 'nameAr' => null];
+            }
+        }
+
+        if ($assignments !== []) {
+            $placeholders = implode(', ', array_map(static fn (int $i): string => ':assignment' . $i, array_keys($assignments)));
+            $stmt = $this->db->prepare(
+                'SELECT assignment.id, agent.name, agent.name_ar
+                   FROM agent_assignments assignment
+                   JOIN agents agent ON agent.id = assignment.agent_id AND agent.tenant_id = assignment.tenant_id
+                  WHERE assignment.tenant_id = :tenant_id AND assignment.id IN (' . $placeholders . ')'
+            );
+            $stmt->bindValue(':tenant_id', $tenantId, PDO::PARAM_INT);
+            foreach ($assignments as $i => $assignmentId) {
+                $stmt->bindValue(':assignment' . $i, $assignmentId, PDO::PARAM_INT);
+            }
+            $stmt->execute();
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $nameAr = (string) $row['name_ar'];
+                $names[AgentAssignmentRepository::principalId((int) $row['id'])] = [
+                    'name'   => (string) $row['name'],
+                    'nameAr' => $nameAr !== '' ? $nameAr : null,
+                ];
+            }
+        }
+
+        return $names;
+    }
+
+    /**
      * Move a waiting, unexpired proposal of $profileId's to $status, recording
      * who decided and, for an edit, the new arguments. True only for the one
      * caller that made the move.
@@ -146,6 +216,13 @@ final class AgentProposalRepository
     {
         $stmt = $this->db->prepare('UPDATE agent_proposals SET result = :result WHERE id = :id AND tenant_id = :tenant_id');
         $stmt->execute([':result' => self::encode($result), ':id' => $id, ':tenant_id' => $tenantId]);
+    }
+
+    /** An approved proposal whose action the person undid (WHIT-812). */
+    public function markUndone(int $id, int $tenantId): void
+    {
+        $stmt = $this->db->prepare('UPDATE agent_proposals SET status = :undone WHERE id = :id AND tenant_id = :tenant_id AND status = :approved');
+        $stmt->execute([':undone' => self::UNDONE, ':id' => $id, ':tenant_id' => $tenantId, ':approved' => self::APPROVED]);
     }
 
     /** Mark the tenant's waiting proposals past their expiry as expired ("Ask again"). */

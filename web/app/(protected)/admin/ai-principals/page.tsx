@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/lib/toast-context';
@@ -8,16 +9,16 @@ import { useCapabilities } from '@/hooks/useCapabilities';
 import { MCP_TOKENS_MANAGE } from '@/lib/capabilities';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
-import { Button } from '@whity-org/ui/button';
+import { Button } from '@whity/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@whity-org/ui/dropdown-menu';
+} from '@whity/ui/dropdown-menu';
 import { IconMenu2, IconPlugConnected } from '@tabler/icons-react';
-import { useTranslation } from '@whity-org/features/i18n';
-import { useDateDisplay } from '@whity-org/features/datetime';
+import { useTranslation } from '@whity/features/i18n';
+import { useDateDisplay } from '@whity/features/datetime';
 import { ConnectWizard } from './connect-wizard';
 import { RevokeAiPrincipalModal } from './revoke-modal';
 import type { AiPrincipal, AiPrincipalListResponse } from './types';
@@ -81,6 +82,15 @@ export default function AiPrincipalsPage() {
       header: t('aiPrincipals.table.name', 'Name'),
       enableSorting: true,
       enableColumnFilter: true,
+      // WHIT-810: an agent credential opens what it may do; its issuer sets it there.
+      cell: (row: AiPrincipal) =>
+        row.principalKind === 'ai-agent' ? (
+          <Link href={`/admin/ai-principals/${encodeURIComponent(row.jti)}`} className="font-medium text-primary hover:underline">
+            {row.name}
+          </Link>
+        ) : (
+          row.name
+        ),
     },
     { accessorKey: 'principalKind', header: t('aiPrincipals.table.kind', 'Kind'), enableSorting: true },
     { accessorKey: 'userId', header: t('aiPrincipals.table.userId', 'User ID'), enableSorting: true },

@@ -411,6 +411,63 @@ final class ToolsCallHandlerTest extends TestCase
         self::assertSame(self::USER_ID, $seen->profileId);
     }
 
+    public function testInvoke_aPersonsCallSaysAPersonIsCalling(): void
+    {
+        $seen = $this->contextFor(null);
+
+        self::assertSame(\Whity\Sdk\Mcp\McpToolContext::ACTOR_PERSON, $seen->actorKind);
+        self::assertFalse($seen->isAgent());
+        self::assertSame('user', $seen->principalKind);
+        self::assertNull($seen->agentId);
+        self::assertNull($seen->agentName);
+        self::assertNull($seen->subject);
+    }
+
+    public function testInvoke_anAgentsCallSaysWhichAgentForWhichPerson(): void
+    {
+        // SDK 1.59 (WHIT-837): so a tool can record "agent X for person Y".
+        $seen = $this->contextFor(new McpPrincipal(
+            self::USER_ID, self::USER_ID, self::TENANT_ID, 'ai-agent', ['tools:call'], 'oauth-agent:abc',
+            agentName: 'Whity Builder', subject: 'wid-sub-42',
+        ));
+
+        self::assertTrue($seen->isAgent());
+        self::assertSame(self::USER_ID, $seen->profileId, 'the person it acts for');
+        self::assertSame('ai-agent', $seen->principalKind);
+        self::assertSame('oauth-agent:abc', $seen->agentId);
+        self::assertSame('Whity Builder', $seen->agentName);
+        self::assertSame('wid-sub-42', $seen->subject);
+    }
+
+    private function contextFor(?McpPrincipal $principal): \Whity\Sdk\Mcp\McpToolContext
+    {
+        $seen     = null;
+        $registry = new \Whity\Mcp\Tools\AuthoredToolRegistry();
+        self::assertNull($registry->register([
+            'name'        => 'who_calls',
+            'description' => 'Say who calls.',
+            'inputSchema' => ['type' => 'object'],
+            'handler'     => static function (array $arguments, \Whity\Sdk\Mcp\McpToolContext $context) use (&$seen): array {
+                $seen = $context;
+                return [];
+            },
+            'open'        => true,
+            'annotations' => ['readOnlyHint' => true],
+        ], 'Periods'));
+        $tokens = $this->tokenValidator;
+        if ($principal !== null) {
+            $tokens = $this->createMock(TokenValidator::class);
+            $tokens->method('validateBearerForMcp')->willReturn($principal);
+        }
+        $handler = new ToolsCallHandler($this->toolDeriver, $this->router, $this->roleChecker, $tokens, authoredTools: $registry);
+
+        $result = ($handler)(['name' => 'who_calls', 'arguments' => []], self::BEARER);
+
+        self::assertArrayNotHasKey('isError', $result);
+        self::assertInstanceOf(\Whity\Sdk\Mcp\McpToolContext::class, $seen);
+        return $seen;
+    }
+
     public function testInvoke_authoredHandlerWrittenForAnOlderSdkStillRuns(): void
     {
         // Handlers written for SDK 1.43-1.45 take only the arguments.

@@ -3,7 +3,7 @@
  * email address becomes mailto:, and only web, mail and in-app addresses are
  * ever put in a link.
  */
-import { isSafeHref, normaliseHref } from '@whity-org/ui/editor/link-tools';
+import { isSafeHref, normaliseHref } from '@whity/ui/editor/link-tools';
 
 describe('normaliseHref', () => {
   it.each([

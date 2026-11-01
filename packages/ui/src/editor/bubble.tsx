@@ -12,9 +12,21 @@ import type { EditorLabels } from "./labels"
 /**
  * The selection bubble (EditorInline): after a short pause above a text
  * selection, bold, italic, underline, strikethrough, code · link, highlight.
- * Comment (M5) and Rewrite with an agent (M6) join it later.
+ * · Comment (M5). Rewrite with an agent (M6) joins it later. Without edit
+ * rights (Viewing) only Comment shows.
  */
-function SelectionBubble({ editor, labels, onLink }: { editor: Editor; labels: EditorLabels; onLink: () => void }) {
+function SelectionBubble({
+  editor,
+  labels,
+  onLink,
+  onComment,
+}: {
+  editor: Editor
+  labels: EditorLabels
+  onLink: () => void
+  /** M5: Comment on the selection; with it the bubble shows even where nothing can be edited. */
+  onComment?: () => void
+}) {
   const s = useEditorState({
     editor,
     selector: ({ editor: e }) => ({
@@ -25,6 +37,7 @@ function SelectionBubble({ editor, labels, onLink }: { editor: Editor; labels: E
       code: e.isActive("code"),
       link: e.isActive("link"),
       highlight: e.isActive("highlight"),
+      editable: e.isEditable,
     }),
   })
   const b = (icon: IconName, label: string, on: boolean, onClick: () => void, shortcut?: string) => (
@@ -44,7 +57,7 @@ function SelectionBubble({ editor, labels, onLink }: { editor: Editor; labels: E
       editor={editor}
       updateDelay={250}
       shouldShow={({ editor: e, state, from, to }) =>
-        e.isEditable && isTextSelection(state.selection) && from !== to && !e.isActive("codeBlock")
+        (e.isEditable || !!onComment) && isTextSelection(state.selection) && from !== to && !e.isActive("codeBlock")
       }
       options={{ placement: "top-start", offset: 8 }}
     >
@@ -54,14 +67,24 @@ function SelectionBubble({ editor, labels, onLink }: { editor: Editor; labels: E
         data-slot="selection-bubble"
         className="flex items-center gap-0.5 rounded-control border border-border bg-popover p-[3px] whitespace-nowrap shadow-float"
       >
-        {b("bold", labels.bold, s.bold, mark("bold"), "⌘B")}
-        {b("italic", labels.italic, s.italic, mark("italic"), "⌘I")}
-        {b("underline", labels.underline, s.underline, mark("underline"), "⌘U")}
-        {b("strike", labels.strike, s.strike, mark("strike"), "⇧⌘X")}
-        {b("code", labels.code, s.code, mark("code"), "⌘E")}
-        <span aria-hidden="true" className="mx-[3px] h-[18px] w-px bg-border" />
-        {b("link", labels.link, s.link, onLink, "⌘K")}
-        {b("highlight", labels.highlight, s.highlight, mark("highlight"))}
+        {s.editable && (
+          <>
+            {b("bold", labels.bold, s.bold, mark("bold"), "⌘B")}
+            {b("italic", labels.italic, s.italic, mark("italic"), "⌘I")}
+            {b("underline", labels.underline, s.underline, mark("underline"), "⌘U")}
+            {b("strike", labels.strike, s.strike, mark("strike"), "⇧⌘X")}
+            {b("code", labels.code, s.code, mark("code"), "⌘E")}
+            <span aria-hidden="true" className="mx-[3px] h-[18px] w-px bg-border" />
+            {b("link", labels.link, s.link, onLink, "⌘K")}
+            {b("highlight", labels.highlight, s.highlight, mark("highlight"))}
+          </>
+        )}
+        {onComment && (
+          <>
+            {s.editable && <span aria-hidden="true" className="mx-[3px] h-[18px] w-px bg-border" />}
+            {b("comment-add", labels.comment, false, onComment, "⌥⌘M")}
+          </>
+        )}
       </div>
     </BubbleMenu>
   )

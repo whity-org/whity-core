@@ -75,7 +75,7 @@ final class IssuerJwtVerifier
      *
      * @return array<string, mixed>|null
      */
-    public function verify(string $token, string $audience, ?string $type = null): ?array
+    public function verify(string $token, string|\Closure $audience, ?string $type = null): ?array
     {
         $segments = explode('.', $token);
         if (count($segments) !== 3) {
@@ -119,7 +119,10 @@ final class IssuerJwtVerifier
         }
 
         $aud = $claims['aud'] ?? null;
-        if (!in_array($audience, is_array($aud) ? $aud : [$aud], true)) {
+        $audiences = is_array($aud) ? $aud : [$aud];
+        // A closure judges the token's audiences itself, for a server that is
+        // several resources (WHIT-765).
+        if (is_string($audience) ? !in_array($audience, $audiences, true) : !$audience($audiences)) {
             return null;
         }
 

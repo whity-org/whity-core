@@ -18,6 +18,26 @@ use Whity\Core\Document\DocumentCollectionRepository;
 use Whity\Core\Document\DocumentIssuer;
 use Whity\Core\Document\DocumentRepository;
 use Whity\Core\Document\DocumentVisibilityPolicy;
+use Whity\Core\Document\Issuing\ActingAs;
+use Whity\Core\Document\Issuing\DocumentIssueRefused;
+use Whity\Core\Document\Issuing\IssueInput;
+use Whity\Core\Document\Issuing\TemplateIssuing;
+use Whity\Core\Document\Issuing\WorkerDocumentIssuing;
+use Whity\Core\Document\Embed\DocumentEmbedRegistry;
+use Whity\Core\RBAC\ScopedPermissionSet;
+use Whity\Core\Document\Issuing\WorkerDocumentServices;
+use Whity\Core\Document\Fields\DocumentFieldRegistry;
+use Whity\Core\Hooks\HookManager;
+use Whity\Sdk\Documents\Documents;
+use Whity\Core\Document\Issuing\SdkDocuments;
+use Whity\Core\Audit\AuditContext;
+use Whity\Sdk\Documents\DocumentNotIssuedException;
+use Whity\Sdk\Documents\IssueRequest as SdkIssueRequest;
+use Whity\Sdk\Documents\TemplateRef;
+use Whity\Core\Document\Fields\DocumentFieldProvider;
+use Whity\Core\Document\Slots\BackgroundIssuing;
+use Whity\Core\Document\DocumentSourceRepository;
+use Whity\Core\Audit\Actor;
 use Whity\Core\Document\Organizer\CoreDocumentSubstrates;
 use Whity\Core\Document\Organizer\CoreDocumentViews;
 use Whity\Core\Document\Organizer\DocumentSubstrateRegistry;
@@ -261,7 +281,7 @@ final class DocumentCreateApiRealEngineTest extends TestCase
      */
     public function testTheStoredValuesAreWhatPrintedIncludingBlanks(): void
     {
-        $this->settings->setTenant(self::TENANT, SettingsRegistry::BILLING_SELLER_NAME, 'Example Bakery');
+        $this->settings->setTenant(self::TENANT, SettingsRegistry::COMPANY_NAME, 'Example Bakery');
         $templateId = $this->editor->published(self::TENANT, self::RAISER, 'Delivery note', [
             $this->editor->para('From ', $this->editor->field('company.name'), ', ', $this->editor->field('template.reference')),
         ], ['own_fields' => self::OWN_FIELDS]);
@@ -883,7 +903,7 @@ final class DocumentCreateApiRealEngineTest extends TestCase
         self::assertSame(201, $filled->getStatusCode(), $filled->getBody());
         self::assertSame('0123456', $this->storedValues((int) self::decode($filled)['data']['id'])['company.tax_number']);
 
-        $this->settings->setTenant(self::TENANT, SettingsRegistry::BILLING_SELLER_TAX_ID, '7654321');
+        $this->settings->setTenant(self::TENANT, SettingsRegistry::COMPANY_TAX_ID, '7654321');
         $before = $this->countDocuments();
         $res = $this->create(self::RAISER, [
             'document_source_id' => $templateId,
@@ -929,7 +949,7 @@ final class DocumentCreateApiRealEngineTest extends TestCase
         self::assertSame([], $this->fakeRender->calls);
 
         // And with the value set, the same request issues it.
-        $this->settings->setTenant(self::TENANT, SettingsRegistry::BILLING_SELLER_TAX_ID, '0123456');
+        $this->settings->setTenant(self::TENANT, SettingsRegistry::COMPANY_TAX_ID, '0123456');
         self::assertSame(201, $this->create(self::RAISER, ['document_source_id' => $templateId])->getStatusCode());
     }
 
@@ -1090,6 +1110,279 @@ final class DocumentCreateApiRealEngineTest extends TestCase
         $values = $this->storedValues(self::data($res)['id']);
         self::assertSame('Example Bakery', $values['record.customer'] ?? null);
         self::assertSame('18.000 JOD', $values['record.price'] ?? null);
+    }
+
+    /**
+     * The service automations and the SDK call (WHIT-742) refuses with a
+     * stable `reason` and writes nothing; the REST route maps each one to the
+     * status and body above.
+     */
+    public function testTheIssuingServiceRefusesWithAStableReason(): void
+    {
+        $service = new TemplateIssuing(
+            $this->editor->issuing,
+            $this->editor->fields,
+            $this->settings,
+            fn (int $id, int $tenantId, int $callerId): ?array => $this->editor->sources->visibleRow($id, $tenantId, $callerId),
+            $this->slots,
+        );
+        $actor = new ActingAs(self::TENANT, self::RAISER, static fn (): bool => true);
+        $reason = static function (callable $issue): ?string {
+            try {
+                $issue();
+            } catch (DocumentIssueRefused $e) {
+                return $e->reason;
+            }
+
+            return null;
+        };
+        $about = $this->seedDocument(self::RAISER, 'Order 4812');
+
+        self::assertSame('slot_unavailable', $reason(fn () => $service->issue($actor, new IssueInput(slot: 'Courier.receipt'))));
+        $this->registerSlot();
+        self::assertSame('slot_unbound', $reason(fn () => $service->issue($actor, new IssueInput(slot: 'Courier.receipt'))));
+        self::assertSame('template_not_found', $reason(fn () => $service->issue($actor, new IssueInput(sourceId: 99999))));
+        self::assertSame('invalid_request', $reason(fn () => $service->issue($actor, new IssueInput())));
+        self::assertSame('template_unpublished', $reason(fn () => $service->issue($actor, new IssueInput(sourceId: $this->editor->draft(self::TENANT, self::RAISER, 'Draft')))));
+
+        $templateId = $this->slotTemplate();
+        $this->bindSlot($templateId);
+        self::assertSame('record_not_found', $reason(fn () => $service->issue($actor, new IssueInput(slot: 'Courier.receipt', record: 'document:99999'))));
+        self::assertSame('field_conflict', $reason(fn () => $service->issue($actor, new IssueInput(
+            slot: 'Courier.receipt',
+            record: 'document:' . $about,
+            values: ['document.title' => 'Overwritten'],
+        ))));
+        self::assertSame(1, $this->countDocuments(), 'only the seeded document');
+
+        $issued = $service->issue($actor, new IssueInput(slot: 'Courier.receipt', record: 'document:' . $about, originKey: 'automation:1:2', render: false));
+        self::assertFalse($issued['replayed']);
+        $again = $service->issue($actor, new IssueInput(slot: 'Courier.receipt', record: 'document:' . $about, originKey: 'automation:1:2', render: false));
+        self::assertTrue($again['replayed'], 'a retried step returns the first document');
+        self::assertSame($issued['document']['id'], $again['document']['id']);
+    }
+
+    /**
+     * What `queue:work` and `events:relay` resolve (WHIT-742): the issuing
+     * service built from the connection and the environment alone, with the
+     * template's visibility checked as the editor checks it. It issues the
+     * same document the REST route would.
+     */
+    public function testTheWorkerBuiltServiceIssuesFromASlot(): void
+    {
+        $roleChecker = new RoleChecker($this->wrapSqlite($this->pdo), new PermissionRegistry());
+        $service = WorkerDocumentIssuing::build(
+            $this->pdo,
+            $this->settings,
+            $this->editor->hooks,
+            $roleChecker,
+            new ResourceTypeRegistry(),
+            $this->editor->fields,
+            new DocumentEmbedRegistry(),
+            $this->slots,
+            ['ENCRYPTION_KEY' => str_repeat('k', 32), 'STORAGE_DRIVER' => 'local'],
+            $this->storageRoot,
+        );
+        $about = $this->seedDocument(self::RAISER, 'Order 4812');
+        $templateId = $this->slotTemplate();
+        $this->bindSlot($templateId);
+        $actor = new ActingAs(self::TENANT, self::RAISER, ScopedPermissionSet::forProfile($roleChecker, self::RAISER, self::TENANT));
+
+        $issued = $service->issue($actor, new IssueInput(slot: 'Courier.receipt', record: 'document:' . $about, render: false));
+
+        self::assertSame($templateId, $issued['document']['document_source_id']);
+        self::assertSame(2, $this->countDocuments());
+
+        // Read with the actor's own permissions: a profile with none in this
+        // workspace can't read the record (membership itself is the caller's
+        // to establish, as the auth layer does for a request).
+        $outsider = new ActingAs(self::TENANT, self::OTHER_TENANT_ADMIN, ScopedPermissionSet::forProfile($roleChecker, self::OTHER_TENANT_ADMIN, self::TENANT));
+        try {
+            $service->issue($outsider, new IssueInput(slot: 'Courier.receipt', record: 'document:' . $about, render: false));
+            self::fail('an outsider issued from the slot');
+        } catch (DocumentIssueRefused $e) {
+            self::assertSame('record_not_found', $e->reason);
+        }
+        self::assertSame(2, $this->countDocuments(), 'the refusal wrote nothing');
+    }
+
+    /**
+     * `queue:work` isn't a BaseCommand, so it registers its own document
+     * services (WHIT-742): what an automation or a plugin job resolves there
+     * issues exactly as a request does.
+     */
+    public function testTheQueueWorkerRegistersAWorkingIssuingService(): void
+    {
+        $saved = $GLOBALS['whity_services'] ?? [];
+        try {
+            $registries = WorkerDocumentServices::register(
+                $this->pdo,
+                new HookManager(),
+                ['ENCRYPTION_KEY' => str_repeat('k', 32), 'STORAGE_DRIVER' => 'local'],
+                $this->storageRoot,
+            );
+            self::assertSame($registries['slots'], \Whity\app(TemplateSlotRegistry::class));
+            self::assertSame($registries['fields'], \Whity\app(DocumentFieldRegistry::class));
+            self::assertInstanceOf(SdkDocuments::class, \Whity\app(Documents::class));
+
+            $roleChecker = new RoleChecker($this->wrapSqlite($this->pdo), new PermissionRegistry());
+            $actor = new ActingAs(self::TENANT, self::RAISER, ScopedPermissionSet::forProfile($roleChecker, self::RAISER, self::TENANT));
+            $issued = \Whity\app(TemplateIssuing::class)->issue($actor, new IssueInput(
+                sourceId: $this->circular('Faculty circular'),
+                values: ['template.reference' => 'FAC-1', 'template.date' => '1 November 2026'],
+                render: false,
+            ));
+
+            self::assertSame('Faculty circular', $issued['document']['title']);
+            self::assertSame(1, $this->countDocuments());
+        } finally {
+            $GLOBALS['whity_services'] = $saved;
+        }
+    }
+
+    /**
+     * The SDK's Documents (1.56): a plugin issues as the person whose request
+     * it is, through the same service, and gets the SDK's own refusal. With
+     * no person (a job, the relay) it refuses with no_actor.
+     */
+    public function testThePluginFacadeIssuesAsThePersonInTheRequest(): void
+    {
+        $roleChecker = new RoleChecker($this->wrapSqlite($this->pdo), new PermissionRegistry());
+        $documents = new SdkDocuments(new TemplateIssuing(
+            $this->editor->issuing,
+            $this->editor->fields,
+            $this->settings,
+            fn (int $id, int $tenantId, int $callerId): ?array => $this->editor->sources->visibleRow($id, $tenantId, $callerId),
+            $this->slots,
+        ), $roleChecker);
+        $about = $this->seedDocument(self::RAISER, 'Order 4812');
+        $templateId = $this->slotTemplate();
+        $this->bindSlot($templateId);
+        $request = new SdkIssueRequest(TemplateRef::slot('Courier.receipt'), record: 'document:' . $about, originKey: 'order:4812:receipt', render: false);
+
+        TenantContext::reset();
+        AuditContext::reset();
+        self::assertFalse($documents->canIssue());
+        try {
+            $documents->issue($request);
+            self::fail('issued with nobody to act for');
+        } catch (DocumentNotIssuedException $e) {
+            self::assertSame(DocumentNotIssuedException::NO_ACTOR, $e->reason);
+        }
+
+        TenantContext::setTenantId(self::TENANT);
+        AuditContext::set(self::RAISER, null);
+        try {
+            self::assertTrue($documents->canIssue());
+            $issued = $documents->issue($request);
+            self::assertFalse($issued->replayed);
+            self::assertSame('Receipt · #' . $about . ' · Order 4812', $issued->title);
+            self::assertNull($issued->contentUrl, 'recorded without a rendered file');
+            self::assertTrue($documents->issue($request)->replayed);
+
+            try {
+                $documents->issue(new SdkIssueRequest(TemplateRef::source(99999)));
+                self::fail('issued from a missing template');
+            } catch (DocumentNotIssuedException $e) {
+                self::assertSame(DocumentNotIssuedException::TEMPLATE_NOT_FOUND, $e->reason);
+            }
+        } finally {
+            AuditContext::reset();
+        }
+    }
+
+    /**
+     * A plugin's job issuing with no person (WHIT-742 slice 3): only from the
+     * plugin's own slot, only once the workspace allowed it, only with the
+     * permissions the plugin declares, recorded with no person and the system
+     * as the audit actor, and the events say which plugin.
+     */
+    public function testAPluginsJobIssuesInTheBackgroundOnlyWhereAllowed(): void
+    {
+        $this->editor->fields->add(new class implements DocumentFieldProvider {
+            public function recordType(): string { return 'Courier.parcel'; }
+            public function recordLabel(): string { return 'Parcel'; }
+            public function groups(int $tenantId): array { return [['group' => 'Parcel', 'items' => [['path' => 'parcel.code', 'label' => 'Code']]]]; }
+            public function values(int $tenantId, int $callerId, callable $hasPermission, ?string $recordId): ?array
+            {
+                return $hasPermission('courier:read') ? ['label' => 'Parcel ' . $recordId, 'values' => ['parcel.code' => 'P-' . $recordId]] : null;
+            }
+            public function records(int $tenantId, int $callerId, callable $hasPermission, string $query, int $limit): array { return []; }
+        });
+        $this->slots->register('Courier', [new TemplateSlot('Courier.label', 'Courier', ['en' => 'Label', 'ar' => 'ملصق'], 'Courier.parcel')]);
+        $this->slots->register('Other', [new TemplateSlot('Other.note', 'Other', ['en' => 'Note', 'ar' => 'ملاحظة'], 'Courier.parcel')]);
+        $this->slots->declareBackground('Courier', true);
+        $templateId = $this->editor->published(self::TENANT, self::RAISER, 'Parcel label', [
+            $this->editor->para('Parcel ', $this->editor->field('parcel.code')),
+        ], ['record_type' => 'Courier.parcel', 'scope' => 'tenant']);
+        $this->settings->setTenant(self::TENANT, SettingsRegistry::DOCUMENTS_SLOT_BINDINGS, SlotBindings::encode(['Courier.label' => $templateId, 'Other.note' => $templateId]));
+
+        $roleChecker = new RoleChecker($this->wrapSqlite($this->pdo), new PermissionRegistry());
+        $actors = [];
+        $this->editor->hooks->listen(Events::DOCUMENT_ISSUED, static function (array $data) use (&$actors): array {
+            $actors[] = [AuditContext::getActor()->kind, $data['actor'], $data['origin'] ?? null];
+
+            return $data;
+        });
+        $documents = new SdkDocuments(
+            new TemplateIssuing(
+                $this->editor->issuing,
+                $this->editor->fields,
+                $this->settings,
+                fn (int $id, int $tenantId, int $callerId): ?array => $this->editor->sources->visibleRow($id, $tenantId, $callerId),
+                $this->slots,
+                fn (int $id, int $tenantId): ?array => (new DocumentSourceRepository($this->pdo))->findById($id, $tenantId),
+            ),
+            $roleChecker,
+            static fn (string $job): ?array => str_starts_with($job, 'courier:') ? ['plugin' => 'Courier', 'permissions' => ['courier:read']] : null,
+            $this->slots,
+        );
+        $label = new SdkIssueRequest(TemplateRef::slot('Courier.label'), record: 'Courier.parcel:77', originKey: 'parcel:77:label', render: false);
+        $reason = static function (callable $issue): ?string {
+            try {
+                $issue();
+            } catch (DocumentNotIssuedException $e) {
+                return $e->reason;
+            }
+
+            return null;
+        };
+
+        TenantContext::reset();
+        TenantContext::setTenantId(self::TENANT);
+        AuditContext::reset();
+        AuditContext::setJob('courier:send_labels');
+        try {
+            self::assertSame(DocumentNotIssuedException::BACKGROUND_NOT_ALLOWED, $reason(fn () => $documents->issue($label)), 'not allowed yet');
+
+            $this->settings->setTenant(self::TENANT, SettingsRegistry::DOCUMENTS_BACKGROUND_ISSUING, BackgroundIssuing::encode(['Courier']));
+            self::assertSame(
+                DocumentNotIssuedException::BACKGROUND_NOT_ALLOWED,
+                $reason(fn () => $documents->issue(new SdkIssueRequest(TemplateRef::slot('Other.note'), record: 'Courier.parcel:77', render: false))),
+                "another plugin's slot",
+            );
+            self::assertSame(
+                DocumentNotIssuedException::BACKGROUND_NOT_ALLOWED,
+                $reason(fn () => $documents->issue(new SdkIssueRequest(TemplateRef::source($templateId), record: 'Courier.parcel:77', render: false))),
+                'a template by id, not a slot',
+            );
+            self::assertSame(0, $this->countDocuments());
+
+            $issued = $documents->issue($label);
+            self::assertFalse($issued->replayed);
+            $row = $this->documents->findById($issued->documentId, self::TENANT);
+            self::assertNotNull($row);
+            self::assertNull($row['created_by'], 'no person issued it');
+            self::assertSame(['P-77'], array_values(array_intersect(['P-77'], $this->storedValues($issued->documentId))), 'read with the permission the plugin declares');
+            self::assertSame([[Actor::SYSTEM, null, 'plugin:Courier']], $actors);
+            self::assertSame(Actor::SYSTEM, AuditContext::getActor()->kind, 'and the job is still the system');
+
+            AuditContext::setJob('other:thing');
+            self::assertSame(DocumentNotIssuedException::NO_ACTOR, $reason(fn () => $documents->issue($label)), 'a plugin that declares nothing');
+        } finally {
+            AuditContext::reset();
+            TenantContext::reset();
+        }
     }
 
     private function rebuildHandler(): void

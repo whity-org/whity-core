@@ -1399,6 +1399,114 @@ there, render inside the request, or have the job enqueue the document's
 
 ---
 
+## Step 12a — Ship agent presets (SDK 1.61)
+
+A preset is a ready-made agent template, such as a Collections clerk. A workspace admin creates an agent from it at `POST /api/agents` with `presetKey`. The agent is a copy, so a later preset version never changes it. Implement `PluginAgentPresetsInterface`, or add `agentPresets` to `plugin.json` in the same shape, keyed by `key`:
+
+```php
+public function getAgentPresets(): array
+{
+    return [[
+        'key'          => 'collections-clerk',
+        'version'      => 1,
+        'name'         => ['en' => 'Collections clerk', 'ar' => 'موظف التحصيل'],
+        'role'         => ['en' => 'Follows up unpaid invoices.', 'ar' => 'يتابع الفواتير غير المدفوعة.'],
+        'instructions' => ['en' => 'Group reminders by customer.', 'ar' => 'اجمع التذكيرات حسب العميل.'],
+        'tone'         => 'formal',          // plain, formal or brief
+        'language'     => 'auto',            // auto, en or ar
+        'toolsets'     => ['acme', 'core.documents'],
+        'grant'        => ['acme_invoices:read' => 'allow', 'acme_invoices:send' => 'ask'],
+    ]];
+}
+```
+
+The host addresses it as `<plugin toolset root>.<key>` (`acme.collections-clerk`). Name a preset by role, never a person's name. Toolsets must be the plugin's own or core's, and permissions must exist. A bad preset is dropped with a logged reason, and the plugin keeps loading.
+
+**A preset may start a read at Allowed (a permission whose action is `read` or `view`) but never a write.** Only the person using the agent sets a write to Allowed. A preset grants nothing by itself: the agent acts for that person, never above their permissions, and its writes are Ask first.
+
+## Step 12b — Issue from the workspace's templates (SDK 1.56)
+
+Step 12 prints content the plugin lays out itself. Most documents a plugin
+issues (an invoice, a receipt, a certificate) should look like the
+workspace's own: its letterhead, theme and wording, edited by its people in
+the document editor. For those, declare a **template slot** and let each
+workspace bind one of its templates to it.
+
+```php
+use Whity\Sdk\Documents\DocumentFieldProvider;
+use Whity\Sdk\Documents\TemplateSlot;
+use Whity\Sdk\PluginDocumentsInterface;
+
+final class InvoicingPlugin implements PluginInterface, PluginDocumentsInterface
+{
+    public function getTemplateSlots(): array
+    {
+        return [new TemplateSlot('invoice', ['en' => 'Invoice', 'ar' => 'فاتورة'], 'Invoicing.invoice')];
+    }
+
+    /** @return list<DocumentFieldProvider> your record types as merge fields */
+    public function getDocumentFieldProviders(): array
+    {
+        return [new InvoiceFieldProvider(/* ... */)];
+    }
+
+    public function issuesInBackground(): bool
+    {
+        return false;
+    }
+}
+```
+
+- **Slots** are addressed as `<plugin name>.<name>` (`Invoicing.invoice`).
+  Each workspace binds a published, workspace-shared template of the slot's
+  kind and record type with `PUT /api/document-template-slots/{key}`.
+- **Record types** must be `<plugin name>.<type>`. A provider answers for one
+  reader: `values()` returns null for a record that doesn't exist *and* for
+  one the reader can't see, and a field with no value maps to null. A record
+  is referenced as `Invoicing.invoice:4812`.
+- A slot for a record type nobody serves, or a record type outside your name,
+  is dropped at load with a logged reason; the plugin keeps loading.
+
+Then issue through the host's `Documents` service:
+
+```php
+use Whity\Sdk\Documents\DocumentNotIssuedException;
+use Whity\Sdk\Documents\Documents;
+use Whity\Sdk\Documents\IssueRequest;
+use Whity\Sdk\Documents\TemplateRef;
+
+try {
+    $issued = \Whity\app(Documents::class)->issue(new IssueRequest(
+        TemplateRef::slot('Invoicing.invoice'),
+        record: 'Invoicing.invoice:4812',
+        values: ['template.note' => 'Thank you for your order'],
+        originKey: 'order:4812:invoice',
+    ));
+    // $issued->documentId, ->replayed, ->contentUrl
+} catch (DocumentNotIssuedException $e) {
+    // $e->reason: slot_unbound, missing_fields, field_conflict, vetoed, ...
+}
+```
+
+- It acts as **the person whose request it is**, with their permissions, and
+  records them as the issuer.
+- **In your jobs, with no person (SDK 1.58).** Return `true` from
+  `issuesInBackground()` and a job of yours may issue, but only where the
+  workspace allowed it (`PUT /api/document-background-issuing/{plugin}`, by a
+  holder of `documents:publish`), only from your own slots, and with only the
+  permissions your plugin declares. The document is recorded with no person,
+  the system is the audit actor, and the document events carry
+  `origin: plugin:<name>`. Otherwise it's `background_not_allowed`; anywhere
+  else with no person it's `no_actor`.
+- **`originKey`** makes it safe to retry: the same key returns the first
+  document (`replayed: true`) instead of issuing a second.
+- A value for a field the record filled is refused (`field_conflict`), so
+  merge data can't overwrite an amount or a tax number.
+- `plugins/HelloWorld` declares a `greeting_card` slot for its greetings as a
+  worked example.
+
+---
+
 ## Step 13 — Declare it in `plugin.json` instead (SDK 1.47)
 
 Everything a plugin only *declares* can live in a JSON file instead of PHP methods: its identity and requirements, permissions, roles, `blocks` screens, owned tables, data types and limits. Put `plugin.json` next to an empty class:

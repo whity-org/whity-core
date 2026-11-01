@@ -84,6 +84,36 @@ final class DocumentThemesRealEngineTest extends TestCase
 
     // ── resolution ──────────────────────────────────────────────────────────
 
+    /**
+     * WHIT-788: the letterhead's lines come from the company's own settings,
+     * in the theme's order, and a line it hasn't filled in prints nothing.
+     */
+    public function testTheLetterheadPrintsTheCompanyLinesTheThemeLists(): void
+    {
+        $this->settings->setTenant(self::TENANT, SettingsRegistry::COMPANY_NAME, 'Example Bakery');
+        $this->settings->setTenant(self::TENANT, SettingsRegistry::COMPANY_ADDRESS, "1 Bread St\nAmman");
+        $this->settings->setTenant(self::TENANT, SettingsRegistry::COMPANY_TAX_ID, 'JO-123');
+        $this->settings->setTenant(self::TENANT, SettingsRegistry::COMPANY_EMAIL, 'hello@bakery.example');
+        $printer = new SourceDocumentPrinter(new DocumentFieldRegistry(), new DocumentEmbedRegistry(), $this->settings);
+
+        self::assertSame(
+            ['name' => 'Example Bakery', 'lines' => ['1 Bread St, Amman', 'JO-123']],
+            $printer->letterhead(self::TENANT),
+            'the default lines',
+        );
+        self::assertSame(
+            ['name' => 'Example Bakery', 'lines' => ['hello@bakery.example', 'JO-123']],
+            $printer->letterhead(self::TENANT, ['letterhead' => ['lines' => ['email', 'phone', 'taxId']]]),
+            'no phone yet, so it prints nothing',
+        );
+
+        $this->settings->setTenant(self::TENANT, SettingsRegistry::COMPANY_PHONE, '+962 6 555 0100');
+        self::assertSame(
+            ['+962 6 555 0100'],
+            $printer->letterhead(self::TENANT, ['letterhead' => ['lines' => ['phone']]])['lines'],
+        );
+    }
+
     public function testWithNothingSetADocumentPrintsInWhityBlueWithTheStandardLetterhead(): void
     {
         $theme = $this->resolver->resolve(self::TENANT);

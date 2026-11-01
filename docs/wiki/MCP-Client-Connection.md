@@ -39,13 +39,33 @@ The wizard hands out `APP_URL` + `/mcp`.
 
 If `APP_URL` is unset, the wizard warns and uses the address of the page instead.
 
-### Tool search for large catalogues
+### Search and call: use `/mcp`
 
-The endpoint `https://your-whity-host/mcp` gives the app a few everyday tools plus `search_operations` and `call_operation`, which reach everything else on demand, so it stays small however many plugins are installed. Add `?tools=full` for every operation as its own tool (the list before WHIT-750), or `?tools=discover` for only the two search tools. See MCP-Server, *Search and call*.
+The endpoint `https://your-whity-host/mcp` gives the app `init_session`, a few everyday tools, and `search_operations` and `call_operation`, which reach everything else on demand. It stays small however many plugins are installed, so this is the URL to use. See MCP-Server, *Search and call*.
+
+| You want | Use |
+|---|---|
+| The recommended connection | `/mcp` |
+| Every operation as its own tool (the list before WHIT-750) | `/mcp?tools=full` |
+| Only the two search tools | `/mcp?tools=discover` |
+| To limit what the app sees to some areas | `/mcp?toolsets=core.forms,acme.*` |
+| A hard boundary, or a client that handles very few tools | A split, such as `/mcp/forms` |
+
+`?toolsets=` only narrows the list. To limit what a token can actually call, issue it with `toolset:` entries in its scope:
+
+```json
+{"name": "forms-bot", "scope": ["tools:call", "toolset:core.forms", "toolset:acme.*"]}
+```
+
+`GET /api/mcp/splits` lists the splits you can reach, with their URLs. A split is served at `/mcp/<split>`, and what is outside it doesn't exist there.
+
+### When a call answers with a proposal
+
+If you connect as an agent rather than as yourself, a write may not run straight away. `tools/call` then returns a normal result whose JSON has a top-level `proposal`, with an `id` and `status: "waiting"`. Nothing has happened yet: tell the person it's waiting for them. `get_proposal {id}` says whether it was approved (with the result), declined or expired.
 
 ### Per-app setup, and what is not yet confirmed
 
-The setups come from `@whity-org/features/mcp`, so the desktop shell or your own frontend can offer the same ones. They were checked against each vendor's documentation on 2026-10-28.
+The setups come from `@whity/features/mcp`, so the desktop shell or your own frontend can offer the same ones. They were checked against each vendor's documentation on 2026-10-28.
 
 | App | Setup | Notes |
 |---|---|---|

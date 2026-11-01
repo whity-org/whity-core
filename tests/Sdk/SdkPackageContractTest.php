@@ -242,9 +242,27 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsOneEightForInteractiveBlocks(): void
     {
         $this->assertSame(
-            '1.55.0',
+            '1.61.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.55 ADDS TEMPLATE SLOTS: plugin.json gains documents.slots, the named places a workspace '
+            'SDK 1.61 ADDS AGENT PRESETS: PluginAgentPresetsInterface and agentPresets in plugin.json ship '
+            . 'ready-made agent templates (persona in English and Arabic, toolsets, where a grant starts); a preset '
+            . 'may start a read at Allowed but never a write (WHIT-818). Purely additive. '
+            . 'SDK 1.60 ADDS PLUGIN SECRETS: the host service PluginSecrets gives a plugin its own SecretStore, '
+            . 'set, get and delete per workspace, encrypted with the host key, kept apart by plugin, never read '
+            . 'back by settings or the API, audited by key only (WHIT-838). Purely additive. '
+            . 'SDK 1.59 SAYS WHO IS CALLING: McpToolContext gains actorKind, principalKind, and for an AI agent '
+            . 'a stable agentId and a display agentName, plus the Whity ID subject, so a tool can record '
+            . '"agent X for person Y" (WHIT-837). Purely additive. '
+            . 'SDK 1.58 ADDS BACKGROUND ISSUING: a job of a plugin that declares issuesInBackground() issues '
+            . 'with no person where the workspace allowed it, from its own slots only, refused otherwise with '
+            . 'BACKGROUND_NOT_ALLOWED (WHIT-742). Purely additive. '
+            . 'SDK 1.57 ADDS THE ISSUE_DOCUMENT AUTOMATION STEP: an automation may issue a document from one '
+            . 'of its own documents.slots for the triggering record, with merge values as expressions; the '
+            . 'host issues through the workspace binding under an origin key (WHIT-795). Purely additive. '
+            . 'SDK 1.56 ADDS DOCUMENTS FOR CODE PLUGINS: PluginDocumentsInterface declares template slots and '
+            . 'record types as merge fields, and the host Documents service issues from a slot or a template '
+            . 'as the person in the request, refusing with a stable reason (WHIT-742). Purely additive. '
+            . 'SDK 1.55 ADDS TEMPLATE SLOTS: plugin.json gains documents.slots, the named places a workspace '
             . 'plugin needs a document template, each for one of its record types; a workspace binds a '
             . 'published template to it and issuing names the slot (WHIT-742). Purely additive. '
             . 'SDK 1.54 ADDS MANIFEST TESTS: plugin.json gains tests, examples a record type rules must keep '

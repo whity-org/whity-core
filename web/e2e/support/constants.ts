@@ -90,8 +90,10 @@ export const SIDEBAR_SECTIONS = [
   { label: 'Organizational Units', href: '/admin/ous' },
   { label: 'Tenants', href: '/admin/tenants' },
   { label: 'User Groups', href: '/admin/user-groups' },
-  { label: 'Settings', href: '/settings' },
-  { label: 'Website Settings', href: '/admin/settings' },
+  // The one Settings entry opens the Settings area (WHIT-806). The personal
+  // account page is not in the nav: AppShell.openAccountSettings() uses the
+  // user row in the footer.
+  { label: 'Settings', href: '/admin/settings' },
 ] as const;
 
 /**

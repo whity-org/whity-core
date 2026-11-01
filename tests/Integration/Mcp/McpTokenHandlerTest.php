@@ -176,6 +176,20 @@ final class McpTokenHandlerTest extends TestCase
         self::assertSame('ai-agent', $this->jwtParser->parse((string) $body['token'])['principal_kind'] ?? null);
     }
 
+    public function testAnAgentCredentialIsNamedAndAPersonsTokenIsNot(): void
+    {
+        $handler = new McpTokenHandler(new TokenValidator($this->jwtParser, $this->pdo), new McpTokenService($this->pdo, $this->jwtParser), new PermissionRegistry());
+        $_COOKIE['access_token'] = $this->mintAccessToken();
+        $agent  = json_decode($handler->create(new Request('POST', '/api/mcp/tokens', ['Content-Type' => 'application/json'],
+            '{"name":"Billing assistant","agent":true,"scope":["tools:call"]}'))->getBody(), true);
+        $person = json_decode($handler->create(new Request('POST', '/api/mcp/tokens', ['Content-Type' => 'application/json'],
+            '{"name":"My Claude","scope":["tools:call"]}'))->getBody(), true);
+
+        $validator = new TokenValidator($this->jwtParser, $this->pdo);
+        self::assertSame('Billing assistant', $validator->validateMcpToken((string) $agent['token'])?->agentName);
+        self::assertNull($validator->validateMcpToken((string) $person['token'])?->agentName);
+    }
+
     public function testCreate_refusesAGrantOnAPersonsOwnToken(): void
     {
         $response = $this->createWithScope('["tools:call","grant:users:read=allow"]', new PermissionRegistry());

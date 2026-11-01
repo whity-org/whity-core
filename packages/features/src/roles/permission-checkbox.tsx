@@ -21,8 +21,8 @@
  */
 
 import { useMemo, useState } from 'react';
-import { Button } from '@whity-org/ui/button';
-import { Input } from '@whity-org/ui/input';
+import { Button } from '@whity/ui/button';
+import { Input } from '@whity/ui/input';
 import { IconChevronDown, IconSearch } from '@tabler/icons-react';
 import { groupPermissions, titleCase } from './permission-groups';
 import type { Permission, RolesTranslate } from './types';

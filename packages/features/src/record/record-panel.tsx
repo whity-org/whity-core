@@ -23,8 +23,8 @@
  */
 
 import type { ReactNode } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity-org/ui/card';
-import { Skeleton } from '@whity-org/ui/skeleton';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
+import { Skeleton } from '@whity/ui/skeleton';
 
 import type { RecordResource } from './types';
 
