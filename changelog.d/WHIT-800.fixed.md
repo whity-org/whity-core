@@ -1,1 +1,0 @@
-- Row menus in tables no longer close or lose their items while the page updates. Every cell in a table was being rebuilt whenever the page re-rendered, which could interrupt a click on a menu item; cells now stay in place.
