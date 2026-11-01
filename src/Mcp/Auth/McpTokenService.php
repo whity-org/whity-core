@@ -113,6 +113,48 @@ final class McpTokenService
     }
 
     /**
+     * One of the caller's active tokens, or null (WHIT-832).
+     *
+     * @return array<string, mixed>|null
+     */
+    public function findActive(string $jti, int $profileId, int $tenantId): ?array
+    {
+        $stmt = $this->db->prepare("
+            SELECT t.jti, t.name, t.principal_kind, t.scope, t.expires_at, t.created_at, t.last_used_at
+            FROM   mcp_tokens t
+            WHERE  t.jti = ?
+              AND  t.profile_id = ?
+              AND  t.tenant_id = ?
+              AND  t.expires_at > NOW()
+              AND  NOT EXISTS (
+                       SELECT 1 FROM revoked_tokens r WHERE r.jti = t.jti
+                   )
+            LIMIT 1
+        ");
+        $stmt->execute([$jti, $profileId, $tenantId]);
+        $row = $stmt->fetch();
+        if (!is_array($row)) {
+            return null;
+        }
+        $decoded      = json_decode((string) $row['scope'], true);
+        $row['scope'] = is_array($decoded) ? array_values(array_filter($decoded, 'is_string')) : [];
+        return $row;
+    }
+
+    /**
+     * Store a token's scope (WHIT-832: its grant changed). The validator reads
+     * grant entries from here on every call, so the change applies to the
+     * token the client already holds.
+     *
+     * @param list<string> $scope
+     */
+    public function updateScope(string $jti, int $profileId, int $tenantId, array $scope): void
+    {
+        $stmt = $this->db->prepare('UPDATE mcp_tokens SET scope = ? WHERE jti = ? AND profile_id = ? AND tenant_id = ?');
+        $stmt->execute([json_encode(array_values($scope), JSON_THROW_ON_ERROR), $jti, $profileId, $tenantId]);
+    }
+
+    /**
      * Record that a token reached the server (WHIT-697).
      *
      * Throttled to one write per token per {@see self::LAST_USED_RESOLUTION_SECONDS}:
