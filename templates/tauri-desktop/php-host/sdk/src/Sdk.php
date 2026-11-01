@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.59).
+ * SDK identity (v1.60).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -910,13 +910,20 @@ namespace Whity\Sdk;
  * came in with a Whity ID token, so a tool can record "agent X for person Y"
  * (WHIT-837).
  *
+ * Purely additive.) ->
+ * 1.60 (PLUGIN SECRETS: the host service {@see Secrets\PluginSecrets} gives a
+ * plugin its own {@see Secrets\SecretStore} (`for($this)`): `set`, `get` and
+ * `delete` a secret per workspace, encrypted with the host's key, kept apart
+ * by plugin, never read back by settings or the API, audited by key only.
+ * Resolvable in routes, MCP tools and jobs (WHIT-838).
+ *
  * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.59.0';
+    public const VERSION = '1.60.0';
 
     /**
      * Static identity only — never instantiated.

@@ -242,9 +242,12 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsOneEightForInteractiveBlocks(): void
     {
         $this->assertSame(
-            '1.59.0',
+            '1.60.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.59 SAYS WHO IS CALLING: McpToolContext gains actorKind, principalKind, and for an AI agent '
+            'SDK 1.60 ADDS PLUGIN SECRETS: the host service PluginSecrets gives a plugin its own SecretStore, '
+            . 'set, get and delete per workspace, encrypted with the host key, kept apart by plugin, never read '
+            . 'back by settings or the API, audited by key only (WHIT-838). Purely additive. '
+            . 'SDK 1.59 SAYS WHO IS CALLING: McpToolContext gains actorKind, principalKind, and for an AI agent '
             . 'a stable agentId and a display agentName, plus the Whity ID subject, so a tool can record '
             . '"agent X for person Y" (WHIT-837). Purely additive. '
             . 'SDK 1.58 ADDS BACKGROUND ISSUING: a job of a plugin that declares issuesInBackground() issues '
