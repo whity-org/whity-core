@@ -5,6 +5,7 @@ import { BlockIds } from "./block-ids"
 import { DocumentBehaviour } from "./behaviour"
 import { richNodeViews } from "./node-views"
 import { CheckItem, schemaExtensions } from "./schema"
+import { Suggesting } from "./suggesting"
 import { TableKeys } from "./table-keys"
 
 /** The checklist box: a real checkbox button, outside the editable text. */
@@ -72,6 +73,8 @@ export function documentExtensions({ placeholder }: DocumentExtensionOptions = {
     TableKeys,
     BlockIds,
     DocumentBehaviour,
+    // Off until the editor turns Suggesting mode on (M5); also draws comment highlights.
+    Suggesting,
     UndoRedo.configure({ depth: 200 }),
     Placeholder.configure({
       placeholder: placeholder ?? "Type / for blocks, {{ for fields, or just write",

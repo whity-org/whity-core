@@ -97,6 +97,11 @@ COPY render-service/package.json render-service/package-lock.json ./
 RUN npm ci --omit=dev
 
 COPY render-service/src ./src
+# Readex Pro (document titles) and Geist Mono (codes), the app's own files
+# (WHIT-733 part 2). src/flow/fonts.js embeds them in every page; without them
+# titles and codes fall back to Noto Sans and DejaVu Sans Mono.
+COPY packages/tokens/fonts/readex-pro-*.woff2 packages/tokens/fonts/geist-mono-*.woff2 packages/tokens/fonts/LICENSE-readex-pro.txt packages/tokens/fonts/LICENSE-geist-mono.txt ./fonts/
+ENV RENDER_FONT_DIR=/app/fonts
 COPY --from=build /workspace/render-service/dist ./dist
 
 # The BROWSER's identity, recorded after the dist/ from the build stage has

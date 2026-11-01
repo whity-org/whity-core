@@ -7,11 +7,11 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/lib/toast-context';
 import { useBranding } from '@/lib/branding-context';
-import { Button } from '@whity-org/ui/button';
+import { Button } from '@whity/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity-org/ui/card';
-import { Alert, AlertDescription } from '@whity-org/ui/alert';
-import { useRichTranslation, useTranslation } from '@whity-org/features/i18n';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
+import { Alert, AlertDescription } from '@whity/ui/alert';
+import { useRichTranslation, useTranslation } from '@whity/features/i18n';
 import { clearReferral, readReferralCode } from '@/lib/referral';
 
 /**

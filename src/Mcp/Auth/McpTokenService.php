@@ -49,6 +49,28 @@ final class McpTokenService
         array $scope,
         string $principalKind = 'user',
     ): string {
+        return $this->mint($profileId, $tenantId, $name, $scope, $principalKind, null)['token'];
+    }
+
+    /**
+     * Issue an `ai-agent` credential bound to a workspace agent's assignment
+     * (WHIT-816): its toolsets and grant are read from the assignment on
+     * every call, and revoking the assignment revokes it.
+     *
+     * @param string[] $scope
+     * @return array{token: string, jti: string}
+     */
+    public function issueForAssignment(int $profileId, int $tenantId, string $name, array $scope, int $assignmentId): array
+    {
+        return $this->mint($profileId, $tenantId, $name, $scope, 'ai-agent', $assignmentId);
+    }
+
+    /**
+     * @param string[] $scope
+     * @return array{token: string, jti: string}
+     */
+    private function mint(int $profileId, int $tenantId, string $name, array $scope, string $principalKind, ?int $assignmentId): array
+    {
         // Post-cutover: emit only {profile_id, active_tenant_id} — no legacy tenant_id.
         $token = $this->jwtParser->create([
             'profile_id'       => $profileId,
@@ -76,8 +98,12 @@ final class McpTokenService
             (string) json_encode($scope, JSON_THROW_ON_ERROR),
             date('Y-m-d H:i:s', (int) $claims['exp']),
         ]);
+        if ($assignmentId !== null) {
+            $bind = $this->db->prepare('UPDATE mcp_tokens SET agent_assignment_id = ? WHERE jti = ? AND tenant_id = ?');
+            $bind->execute([$assignmentId, $claims['jti'], $tenantId]);
+        }
 
-        return $token;
+        return ['token' => $token, 'jti' => (string) $claims['jti']];
     }
 
     /**

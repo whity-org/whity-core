@@ -186,6 +186,9 @@ abstract class BaseCommand implements CliCommand, CommandHelp
         $ouTypeRegistry->registerCoreOuTypes();
         \Whity\register_service(\Whity\Core\Ou\OuTypeRegistry::class, $ouTypeRegistry);
 
+        // Agent presets (WHIT-815), as public/index.php registers them.
+        \Whity\register_service(\Whity\Core\Agent\AgentPresetRegistry::class, new \Whity\Core\Agent\AgentPresetRegistry());
+
         // TIME-WINDOW TYPE catalogue (#1070), registered as a service for exactly
         // the same reason. A command is the natural home for period work — an
         // import that files records against a period, a scheduled close — and a

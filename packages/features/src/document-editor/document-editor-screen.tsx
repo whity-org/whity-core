@@ -2,12 +2,13 @@
 
 import * as React from 'react';
 
-import { Button } from '@whity-org/ui/button';
-import { DocEditor, type SaveState } from '@whity-org/ui/editor/doc-editor';
-import type { DocumentKind, EditorMode, ResolvedDocumentTheme, WhityDocument } from '@whity-org/ui/editor/contract';
-import type { FieldDef } from '@whity-org/ui/editor/fields';
-import { themedLetterhead } from '@whity-org/ui/editor/page-view';
-import type { EditorServices, FieldPreview } from '@whity-org/ui/editor/services';
+import { Button } from '@whity/ui/button';
+import { DocEditor, type SaveState } from '@whity/ui/editor/doc-editor';
+import type { EditorCollab, RailSuggestion, RailThread } from '@whity/ui/editor/collab';
+import type { Actor, DocumentKind, EditorMode, ResolvedDocumentTheme, WhityDocument } from '@whity/ui/editor/contract';
+import type { FieldDef } from '@whity/ui/editor/fields';
+import { themedLetterhead } from '@whity/ui/editor/page-view';
+import type { EditorServices, FieldPreview } from '@whity/ui/editor/services';
 import { useTranslation } from '../i18n';
 import { useEditorLabels } from './editor-labels';
 import { IssueBar } from './issue-bar';
@@ -40,6 +41,18 @@ const SAVE_DELAY_MS = 800;
 /** After a failed save, wait this long, doubling up to a minute, before trying again. */
 const RETRY_FIRST_MS = 2000;
 const RETRY_MAX_MS = 60000;
+/** Comments and suggestions are polled this often while the editor is open (M5). */
+const COLLAB_POLL_MS = 10000;
+
+/** Open suggestions in the server's id order. */
+function byId<T extends { id: string }>(list: T[]): T[] {
+  return [...list].sort((a, b) => Number(a.id) - Number(b.id) || a.id.localeCompare(b.id));
+}
+function upsert<T extends { id: string }>(list: T[], items: T[]): T[] {
+  const map = new Map(list.map((x) => [x.id, x]));
+  for (const item of items) map.set(item.id, item);
+  return byId([...map.values()]);
+}
 
 function time(d: Date): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
@@ -67,10 +80,19 @@ export function DocumentEditorScreen({
   path,
   onCommandPalette,
   issue,
+  canSuggest = false,
+  canComment = false,
+  me,
 }: {
   id: string;
   adapter: DocumentEditorAdapter;
   canEdit: boolean;
+  /** documents:suggest: Suggesting mode (E.10). */
+  canSuggest?: boolean;
+  /** documents:comment: start threads, reply, resolve and reopen. */
+  canComment?: boolean;
+  /** The person at the keyboard, for their own cards. */
+  me?: Actor & { kind: 'person' };
   onBack?: () => void;
   path?: string;
   onCommandPalette?: () => void;
@@ -83,7 +105,8 @@ export function DocumentEditorScreen({
   const [loadError, setLoadError] = React.useState(false);
   const [save, setSave] = React.useState<SaveState | undefined>(undefined);
   const [conflict, setConflict] = React.useState(false);
-  const [mode, setMode] = React.useState<EditorMode>('editing');
+  // Undefined: the editor picks (Editing with write, else Suggesting, else Viewing, E.10).
+  const [mode, setMode] = React.useState<EditorMode | undefined>(undefined);
   const [loadCount, setLoadCount] = React.useState(0);
   const [services, setServices] = React.useState<EditorServices | undefined>(undefined);
   const [template, setTemplate] = React.useState<TemplateSetup | null>(null);
@@ -103,6 +126,12 @@ export function DocumentEditorScreen({
   const [refusal, setRefusal] = React.useState<{ message: string; missing: string[] } | null>(null);
   const [notPublished, setNotPublished] = React.useState(false);
   const previewStarted = React.useRef(false);
+  // M5: comments and suggestions.
+  const [suggestions, setSuggestions] = React.useState<RailSuggestion[]>([]);
+  const [threads, setThreads] = React.useState<RailThread[]>([]);
+  const [revision, setRevision] = React.useState(0);
+  const cursor = React.useRef<string | null>(null);
+  const collabOn = !!adapter.loadCollab;
 
   const version = React.useRef(0);
   const pending = React.useRef<WhityDocument | null>(null);
@@ -230,6 +259,55 @@ export function DocumentEditorScreen({
     return () => window.removeEventListener('beforeunload', beforeUnload);
   }, [flush]);
 
+  /** The draft again after a decision changed it on the server, drawn with what is still open. */
+  const reloadDraft = React.useCallback(async () => {
+    if (pending.current || saving.current) return;
+    const loaded = await adapter.load(id);
+    version.current = loaded.version;
+    setDoc((prev) => (prev ? { ...prev, blocks: loaded.document.blocks, title: loaded.document.title } : loaded.document));
+    setRevision((n) => n + 1);
+  }, [adapter, id]);
+
+  const loadCollab = React.useCallback(async () => {
+    if (!adapter.loadCollab) return;
+    const snap = await adapter.loadCollab(id);
+    cursor.current = snap.cursor;
+    setSuggestions(byId(snap.suggestions.filter((s) => s.status === 'open')));
+    setThreads(snap.threads);
+  }, [adapter, id]);
+
+  React.useEffect(() => {
+    if (!adapter.loadCollab || issuingMode) return;
+    let live = true;
+    setSuggestions([]);
+    setThreads([]);
+    cursor.current = null;
+    loadCollab().catch(() => undefined);
+    // Polled every 10 s while open; a draft someone else changed (an accepted suggestion) is reloaded.
+    const timer = setInterval(() => {
+      if (!adapter.collabChanges || !live) return;
+      adapter
+        .collabChanges(id, cursor.current)
+        .then(async (changes) => {
+          if (!live) return;
+          cursor.current = changes.cursor;
+          if (changes.suggestions.length) {
+            // Every status comes back: only open ones are drawn; stale or decided ones leave the rail.
+            const open = changes.suggestions.filter((s) => s.status === 'open');
+            const gone = new Set(changes.suggestions.filter((s) => s.status !== 'open').map((s) => s.id));
+            setSuggestions((prev) => upsert(prev.filter((s) => !gone.has(s.id)), open));
+          }
+          if (changes.threads.length) setThreads((prev) => upsert(prev, changes.threads));
+          if (changes.draftVersion > version.current) await reloadDraft();
+        })
+        .catch(() => undefined);
+    }, COLLAB_POLL_MS);
+    return () => {
+      live = false;
+      clearInterval(timer);
+    };
+  }, [adapter, id, loadCount, issuingMode, loadCollab, reloadDraft]);
+
   // Issuing from a template shows its published version: nothing there is edited or saved.
   const editCapable = canEdit && !(issuingMode && doc?.kind === 'template');
 
@@ -250,6 +328,73 @@ export function DocumentEditorScreen({
     await flush();
     if (pending.current || conflictRef.current) throw new Error('The draft is not saved');
   }, [flush]);
+
+  const collab = React.useMemo<EditorCollab | undefined>(() => {
+    if (!collabOn || issuingMode) return undefined;
+    const afterDecision = async () => {
+      await Promise.all([reloadDraft(), loadCollab()]);
+    };
+    return {
+      suggestions,
+      threads,
+      revision,
+      canSuggest: canSuggest && !!adapter.suggest,
+      canComment: canComment && !!adapter.comment,
+      me,
+      onSuggest: adapter.suggest
+        ? async (change) => {
+            const saved = await adapter.suggest!(id, change);
+            setSuggestions((prev) => upsert(prev, [saved]));
+            return saved;
+          }
+        : undefined,
+      onDecide: adapter.decide
+        ? async (suggestionId, decision) => {
+            // Save what's waiting first: the accepted patch applies to the draft on the server.
+            if (pending.current) await flushNow();
+            // Stale (its text has gone) or already decided by someone else: no error, the
+            // card leaves and the rail and draft are fetched again either way.
+            await adapter.decide!(id, suggestionId, decision);
+            setSuggestions((prev) => prev.filter((s) => s.id !== suggestionId));
+            await afterDecision();
+          }
+        : undefined,
+      onDecideAll: adapter.decideAll
+        ? async (decision, filter) => {
+            if (pending.current) await flushNow();
+            await adapter.decideAll!(id, decision, filter);
+            await afterDecision();
+          }
+        : undefined,
+      onComment: adapter.comment
+        ? async (comment) => {
+            const thread = await adapter.comment!(id, comment);
+            setThreads((prev) => upsert(prev, [thread]));
+            return thread;
+          }
+        : undefined,
+      onReply: adapter.reply
+        ? async (threadId, body, mentions) => {
+            const message = await adapter.reply!(id, threadId, body, mentions);
+            setThreads((prev) => prev.map((t) => (t.id === threadId ? { ...t, messages: [...t.messages, message] } : t)));
+          }
+        : undefined,
+      onResolve: adapter.resolveThread
+        ? async (threadId) => {
+            const thread = await adapter.resolveThread!(id, threadId);
+            setThreads((prev) => upsert(prev, [thread]));
+          }
+        : undefined,
+      onReopen: adapter.reopenThread
+        ? async (threadId) => {
+            const thread = await adapter.reopenThread!(id, threadId);
+            setThreads((prev) => upsert(prev, [thread]));
+          }
+        : undefined,
+      searchPeople: adapter.searchPeople ? (query) => adapter.searchPeople!(id, query) : undefined,
+    };
+  }, [collabOn, issuingMode, suggestions, threads, revision, canSuggest, canComment, me, adapter, id, reloadDraft, loadCollab, flushNow]);
+
 
   const showPreview = React.useCallback(
     async (record: string | null) => {
@@ -434,6 +579,7 @@ export function DocumentEditorScreen({
           save={save}
           onCommandPalette={onCommandPalette}
           labels={labels}
+          collab={collab}
           services={services}
           theme={theme?.tokens ?? null}
           {...(printed && template

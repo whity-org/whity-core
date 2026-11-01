@@ -141,6 +141,13 @@ export const DOCUMENTS_ROUTE = 'documents:route';
 export const DOCUMENTS_READ = 'documents:read';
 export const DOCUMENTS_WRITE = 'documents:write';
 export const DOCUMENTS_PUBLISH = 'documents:publish';
+/**
+ * Editor M5 (E.10, E.29). `DOCUMENTS_SUGGEST` puts someone without write in
+ * Suggesting mode (people and agents alike); `DOCUMENTS_COMMENT` starts threads,
+ * replies, resolves and reopens. Accepting and rejecting is `DOCUMENTS_WRITE`.
+ */
+export const DOCUMENTS_SUGGEST = 'documents:suggest';
+export const DOCUMENTS_COMMENT = 'documents:comment';
 
 /**
  * Rendering (#947 item 1). Until editor M4c this also gated `POST /api/v1/documents`;

@@ -3,7 +3,7 @@
 The language plugin manifests use for rules, computed fields, conditions and visibility (SDK 1.48, WHIT-759). It's part of Whity Builder's core runtime (`docs/design/WHITY-BUILDER.md` section 2.4), and any plugin can use it.
 
 - PHP: `Whity\Sdk\Expression\Expression` (`validate`, `evaluate`), `ExpressionContext`, `ExpressionError`, `ExpressionDescriber`.
-- TypeScript: `@whity-org/features/expressions` (`validateExpression`, `evaluateExpression`, `ExpressionError`).
+- TypeScript: `@whity/features/expressions` (`validateExpression`, `evaluateExpression`, `ExpressionError`).
 - Shared fixtures: [`sdk/resources/expression-fixtures.json`](../../sdk/resources/expression-fixtures.json). Both evaluators must pass every case, so a rule checked in a form gives the same answer when the server checks it on save. To change the language, change the fixtures first.
 
 ## Shape

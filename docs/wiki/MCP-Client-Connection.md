@@ -45,7 +45,7 @@ The endpoint `https://your-whity-host/mcp` gives the app a few everyday tools pl
 
 ### Per-app setup, and what is not yet confirmed
 
-The setups come from `@whity-org/features/mcp`, so the desktop shell or your own frontend can offer the same ones. They were checked against each vendor's documentation on 2026-10-28.
+The setups come from `@whity/features/mcp`, so the desktop shell or your own frontend can offer the same ones. They were checked against each vendor's documentation on 2026-10-28.
 
 | App | Setup | Notes |
 |---|---|---|

@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@whity-org/ui/button';
-import { Textarea } from '@whity-org/ui/textarea';
+import { Button } from '@whity/ui/button';
+import { Textarea } from '@whity/ui/textarea';
 import { IconCheck, IconPencil, IconTrash, IconX } from '@tabler/icons-react';
-import { useTranslation } from '@whity-org/features/i18n';
+import { useTranslation } from '@whity/features/i18n';
 
 interface EditableTranslationCellProps {
   /** The current translation text, or null when no row exists for this scope yet. */

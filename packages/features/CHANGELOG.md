@@ -1,4 +1,4 @@
-# @whity-org/features
+# @whity/features
 
 ## 0.3.0
 

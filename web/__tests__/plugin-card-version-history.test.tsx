@@ -39,7 +39,7 @@ import {
   InstalledPluginCard,
   PluginStoreCard,
   type PluginItem,
-} from '@whity-org/ui/plugin-card';
+} from '@whity/ui/plugin-card';
 
 beforeAll(() => {
   // Radix dialogs/dropdowns need these; jsdom implements none of them.

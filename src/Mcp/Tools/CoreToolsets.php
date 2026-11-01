@@ -109,6 +109,11 @@ final class CoreToolsets
             'titleAr'     => 'الأمان وتسجيل الدخول',
             'description' => 'Sign-in providers, SSO, two-factor policies, email domains and the audit log.',
         ],
+        'core.agents' => [
+            'title'       => 'Agents',
+            'titleAr'     => 'الوكلاء',
+            'description' => "The workspace's agents: their persona, tools and starting grant, and the presets they start from.",
+        ],
         'core.plugins' => [
             'title'       => 'Plugins',
             'titleAr'     => 'الإضافات',
@@ -159,6 +164,7 @@ final class CoreToolsets
         'security'                 => 'core.security',
         'email-domains'            => 'core.security',
         'audit-logs'               => 'core.security',
+        'agents'                   => 'core.agents',
         'platform-ops'             => 'core.platform',
         'instance'                 => 'core.platform',
         'tenants'                  => 'core.platform',

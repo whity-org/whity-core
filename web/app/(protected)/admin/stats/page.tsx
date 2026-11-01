@@ -8,7 +8,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@whity-org/ui/card";
+} from "@whity/ui/card";
 import { useAuth } from "@/lib/auth-context";
 import {
   IconUsers,
@@ -21,11 +21,11 @@ import {
 } from "@tabler/icons-react";
 
 import { StatsChart } from "@/components/admin/stats-chart";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@whity-org/ui/tabs";
-import { Alert, AlertTitle, AlertDescription, AlertAction } from "@whity-org/ui/alert";
-import { Button } from "@whity-org/ui/button";
-import { useTranslation } from "@whity-org/features/i18n";
-import { useDateDisplay } from "@whity-org/features/datetime";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@whity/ui/tabs";
+import { Alert, AlertTitle, AlertDescription, AlertAction } from "@whity/ui/alert";
+import { Button } from "@whity/ui/button";
+import { useTranslation } from "@whity/features/i18n";
+import { useDateDisplay } from "@whity/features/datetime";
 
 interface StatsData {
   totals: {

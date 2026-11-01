@@ -13,29 +13,29 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Button } from '@whity-org/ui/button';
-import { Badge } from '@whity-org/ui/badge';
-import { Alert, AlertDescription, AlertTitle } from '@whity-org/ui/alert';
-import { RadioGroup, RadioGroupItem } from '@whity-org/ui/radio-group';
-import { Spinner } from '@whity-org/ui/spinner';
-import { Checkbox } from '@whity-org/ui/checkbox';
+import { Button } from '@whity/ui/button';
+import { Badge } from '@whity/ui/badge';
+import { Alert, AlertDescription, AlertTitle } from '@whity/ui/alert';
+import { RadioGroup, RadioGroupItem } from '@whity/ui/radio-group';
+import { Spinner } from '@whity/ui/spinner';
+import { Checkbox } from '@whity/ui/checkbox';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@whity-org/ui/select';
+} from '@whity/ui/select';
 import { IconAlertCircle, IconCircleCheck, IconPlugConnected } from '@tabler/icons-react';
-import { useTranslation } from '@whity-org/features/i18n';
-import { titleCase } from '@whity-org/features/roles';
+import { useTranslation } from '@whity/features/i18n';
+import { titleCase } from '@whity/features/roles';
 import {
   MCP_CLIENTS,
   mcpClient,
   mcpEndpoint,
   recommendsToolSearch,
   type McpClientId,
-} from '@whity-org/features/mcp';
+} from '@whity/features/mcp';
 import { ConnectSetup } from './connect-setup';
 import type { McpConnectInfo, McpPreviewTool, OwnMcpToken } from './types';
 

@@ -3,7 +3,7 @@ import type {
   DemoCatalogAdapter,
   DemoCatalogItem,
   DemoCatalogItemInput,
-} from "@whity-org/features/demo-catalog"
+} from "@whity/features/demo-catalog"
 
 /**
  * The desktop implementation of `DemoCatalogAdapter` — wires the exact same

@@ -2011,6 +2011,702 @@
                 ]
             }
         },
+        "/api/v1/agent-presets": {
+            "get": {
+                "operationId": "get_api_v1_agent_presets",
+                "summary": "List the presets a workspace agent can start from",
+                "tags": [
+                    "agents"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Core presets, by key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AgentPresetListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/agents": {
+            "get": {
+                "operationId": "get_api_v1_agents",
+                "summary": "List the workspace's agents",
+                "tags": [
+                    "agents"
+                ],
+                "parameters": [
+                    {
+                        "name": "archived",
+                        "in": "query",
+                        "required": false,
+                        "description": "1 to include archived agents",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The workspace's agents, by name",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AgentListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "operationId": "post_api_v1_agents",
+                "summary": "Create a workspace agent, from scratch or from a preset",
+                "tags": [
+                    "agents"
+                ],
+                "description": "Send `presetKey` to start from a preset; any other field sent overrides the preset's. Without a `slug`, one is made from the name.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AgentCreateRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The new agent",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AgentResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Another agent in this workspace already uses that slug",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid fields (the errors list says which)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/agents/{id}": {
+            "get": {
+                "operationId": "get_api_v1_agents_id",
+                "summary": "Get one workspace agent",
+                "tags": [
+                    "agents"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "description": "ID of the agent.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The agent",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AgentResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Agent not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "patch": {
+                "operationId": "patch_api_v1_agents_id",
+                "summary": "Change a workspace agent's persona, toolsets or starting grant",
+                "tags": [
+                    "agents"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "description": "ID of the agent.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AgentPersonaFields"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The agent after the change",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AgentResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Agent not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Another agent in this workspace already uses that slug",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid fields (the errors list says which)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/agents/{id}/archive": {
+            "post": {
+                "operationId": "post_api_v1_agents_id_archive",
+                "summary": "Archive a workspace agent so it is no longer offered",
+                "tags": [
+                    "agents"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "description": "ID of the agent.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The archived agent",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AgentResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Agent not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/agents/{id}/restore": {
+            "post": {
+                "operationId": "post_api_v1_agents_id_restore",
+                "summary": "Offer an archived workspace agent again",
+                "tags": [
+                    "agents"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "description": "ID of the agent.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The restored agent",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AgentResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Agent not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/audit-logs": {
             "get": {
                 "operationId": "get_api_v1_audit_logs",
@@ -9490,6 +10186,648 @@
                 ]
             }
         },
+        "/api/v1/document-sources/{id}/changes": {
+            "get": {
+                "operationId": "get_api_v1_document_sources_id_changes",
+                "summary": "What changed on an editor document since a cursor",
+                "tags": [
+                    "documents"
+                ],
+                "description": "Suggestions and comment threads changed since the cursor, and the draft version. The editor polls it every 10 seconds while open. An item may come back twice; keep the newest by id.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "since",
+                        "in": "query",
+                        "required": false,
+                        "description": "The cursor from the previous response. Left out, everything. A value that is not a cursor is a 422.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The changes and the next cursor",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DocumentChangesResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Document not found or not visible to the caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "since is not a cursor",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/document-sources/{id}/comments": {
+            "get": {
+                "operationId": "get_api_v1_document_sources_id_comments",
+                "summary": "List the comment threads on an editor document",
+                "tags": [
+                    "documents"
+                ],
+                "description": "Each thread with its anchor, quote and messages, and who resolved it.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "resolved",
+                        "in": "query",
+                        "required": false,
+                        "description": "`0` for open threads, `1` for resolved ones, `all` (the default) for both. Anything else is a 422.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The threads",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DocumentCommentThreadListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Document not found or not visible to the caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Unknown resolved value",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "operationId": "post_api_v1_document_sources_id_comments",
+                "summary": "Start a comment thread on an editor document",
+                "tags": [
+                    "documents"
+                ],
+                "description": "Anchored to a block of the draft and the text it quotes; nothing is written into the draft. Each person @mentioned who can read the document is told in-app.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DocumentCommentThreadCreateRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The thread",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DocumentCommentThreadResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Document not found or not visible to the caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid anchor, quote, body or mentions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/document-sources/{id}/comments/{tid}/messages": {
+            "post": {
+                "operationId": "post_api_v1_document_sources_id_comments_tid_messages",
+                "summary": "Reply in a comment thread",
+                "tags": [
+                    "documents"
+                ],
+                "description": "Each person @mentioned who can read the document is told in-app.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "tid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DocumentCommentMessageCreateRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The message",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DocumentCommentMessageResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Document or thread not found, or not visible to the caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid body or mentions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/document-sources/{id}/comments/{tid}/reopen": {
+            "post": {
+                "operationId": "post_api_v1_document_sources_id_comments_tid_reopen",
+                "summary": "Reopen a resolved comment thread",
+                "tags": [
+                    "documents"
+                ],
+                "description": "Recorded in the audit log. Reopening an open thread changes nothing.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "tid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The thread",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DocumentCommentThreadResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Document or thread not found, or not visible to the caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/document-sources/{id}/comments/{tid}/resolve": {
+            "post": {
+                "operationId": "post_api_v1_document_sources_id_comments_tid_resolve",
+                "summary": "Resolve a comment thread",
+                "tags": [
+                    "documents"
+                ],
+                "description": "Recorded in the audit log. Resolving a resolved thread changes nothing.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "tid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The thread",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DocumentCommentThreadResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Document or thread not found, or not visible to the caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/document-sources/{id}/copy": {
             "post": {
                 "operationId": "post_api_v1_document_sources_id_copy",
@@ -10126,6 +11464,112 @@
                 ]
             }
         },
+        "/api/v1/document-sources/{id}/mentionable": {
+            "get": {
+                "operationId": "get_api_v1_document_sources_id_mentionable",
+                "summary": "Find people to @mention in a comment",
+                "tags": [
+                    "documents"
+                ],
+                "description": "Up to 20 active members of the workspace who can read this document, matching q on display name or email. Nobody outside the workspace or the document's audience is listed.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "required": true,
+                        "description": "Part of a display name or email, 1 to 100 characters; case-insensitive. Empty is a 422.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The people",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DocumentMentionableListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Document not found or not visible to the caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "q is empty or longer than 100 characters",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/document-sources/{id}/preview": {
             "get": {
                 "operationId": "get_api_v1_document_sources_id_preview",
@@ -10726,6 +12170,489 @@
                     },
                     "503": {
                         "description": "Rendering is not enabled or temporarily unavailable",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/document-sources/{id}/suggestions": {
+            "get": {
+                "operationId": "get_api_v1_document_sources_id_suggestions",
+                "summary": "List the suggestions on an editor document",
+                "tags": [
+                    "documents"
+                ],
+                "description": "Open ones by default, in id order, each with its patch, who made it and when.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "required": false,
+                        "description": "`open` (the default) or `all`, which adds accepted, rejected and stale ones. Anything else is a 422.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The suggestions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DocumentSuggestionListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Document not found or not visible to the caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Unknown status",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "operationId": "post_api_v1_document_sources_id_suggestions",
+                "summary": "Suggest a change to an editor document",
+                "tags": [
+                    "documents"
+                ],
+                "description": "The change is a patch anchored to block ids and text (E.4, E.10); the draft is not changed until someone who can edit accepts it. The patch must apply to the current draft (422 with details.code patch_does_not_apply otherwise); base_version records the draft version. An agent's suggestion records the agent and the person it acts for.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DocumentSuggestionCreateRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The suggestion",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DocumentSuggestionResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Document not found or not visible to the caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid patch, kind or summary, or the patch does not apply",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/document-sources/{id}/suggestions/decisions": {
+            "post": {
+                "operationId": "post_api_v1_document_sources_id_suggestions_decisions",
+                "summary": "Accept or reject many suggestions at once",
+                "tags": [
+                    "documents"
+                ],
+                "description": "The rail's All menu (E.29): every open suggestion, those ids, or all from one agent. Accepted ones are applied in id order with one draft_version bump; stale ones are skipped, marked stale and listed. Each decision is audited. People only.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DocumentSuggestionBulkDecisionRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "What was decided, what was stale, and the draft version",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DocumentSuggestionBulkDecisionResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Document not found or not visible to the caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The document kept changing; details.code draft_changed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid decision, suggestion_ids or agent",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/document-sources/{id}/suggestions/{sid}/decision": {
+            "post": {
+                "operationId": "post_api_v1_document_sources_id_suggestions_sid_decision",
+                "summary": "Accept or reject a suggestion",
+                "tags": [
+                    "documents"
+                ],
+                "description": "Accepting applies the patch to the draft in one transaction and bumps draft_version (the new one is the ETag). When its text or block has gone it becomes stale: 409 with details.code suggestion_stale. A suggestion decided already is 409 already_decided. Recorded in the audit log with who decided (E.29). People only: agents never decide.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "sid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DocumentSuggestionDecisionRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The decided suggestion and the draft version",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DocumentSuggestionDecisionResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Document or suggestion not found, or not visible to the caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "details.code: suggestion_stale, already_decided or draft_changed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "decision must be accepted or rejected",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -20842,6 +22769,618 @@
                     },
                     "409": {
                         "description": "The proposal is no longer waiting (decided or expired)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/me/agents": {
+            "get": {
+                "operationId": "get_api_v1_me_agents",
+                "summary": "The workspace's agents, and which you use",
+                "tags": [
+                    "me"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Active agents, by name",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MyAgentListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/me/agents/{id}/assignment": {
+            "delete": {
+                "operationId": "delete_api_v1_me_agents_id_assignment",
+                "summary": "Stop using an agent",
+                "tags": [
+                    "me"
+                ],
+                "description": "Its credentials are revoked, and its waiting proposals can no longer run.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "description": "ID of the agent.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "How many credentials were revoked",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AgentUnassignResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No such agent, or you don't use it",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "operationId": "post_api_v1_me_agents_id_assignment",
+                "summary": "Use an agent for yourself",
+                "tags": [
+                    "me"
+                ],
+                "description": "Your grant starts from the agent's template, limited to what you hold: reads at most Allowed, writes at most Ask first.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "description": "ID of the agent.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Your grant for the agent",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AgentAssignmentGrantResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Agent not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "You already use this agent",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/me/agents/{id}/assignment/grant": {
+            "get": {
+                "operationId": "get_api_v1_me_agents_id_assignment_grant",
+                "summary": "Your grant for an agent, permission by permission",
+                "tags": [
+                    "me"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "description": "ID of the agent.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Each permission's mode, the modes you may set, and what the agent can do",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AgentAssignmentGrantResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No such agent, or you don't use it",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "operationId": "patch_api_v1_me_agents_id_assignment_grant",
+                "summary": "Change your grant for an agent",
+                "tags": [
+                    "me"
+                ],
+                "description": "Send permission => off, ask, allow or default. Each mode must be one the grant offers; it applies to every credential of the agent from its next call.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "description": "ID of the agent.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "anyOf": [
+                                    {
+                                        "type": "object",
+                                        "description": "permission => off, ask, allow or default",
+                                        "additionalProperties": {
+                                            "type": "string",
+                                            "enum": [
+                                                "off",
+                                                "ask",
+                                                "allow",
+                                                "default"
+                                            ]
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Your grant after the change",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AgentAssignmentGrantResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No such agent, or you don't use it",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A mode that isn't possible for that permission",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/me/agents/{id}/credentials": {
+            "post": {
+                "operationId": "post_api_v1_me_agents_id_credentials",
+                "summary": "A credential that acts as this agent for you",
+                "tags": [
+                    "me"
+                ],
+                "description": "An ai-agent token for MCP clients. Its toolsets and grant are read from your use of the agent on every call. The token is shown once.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "description": "ID of the agent.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "maxLength": 100,
+                                        "description": "What to call the credential; the agent's name by default"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The new credential",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AgentCredentialResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No such agent, or you don't use it",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "name is too long",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -42285,11 +44824,544 @@
                     }
                 }
             },
+            "Agent": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "slug": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "nameAr": {
+                        "type": "string"
+                    },
+                    "role": {
+                        "type": "string"
+                    },
+                    "roleAr": {
+                        "type": "string"
+                    },
+                    "instructions": {
+                        "type": "string"
+                    },
+                    "instructionsAr": {
+                        "type": "string"
+                    },
+                    "tone": {
+                        "type": "string",
+                        "enum": [
+                            "plain",
+                            "formal",
+                            "brief"
+                        ]
+                    },
+                    "language": {
+                        "type": "string",
+                        "enum": [
+                            "auto",
+                            "en",
+                            "ar"
+                        ]
+                    },
+                    "toolsets": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "grant": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "ask",
+                                "allow"
+                            ]
+                        }
+                    },
+                    "preset": {
+                        "nullable": true,
+                        "type": "object",
+                        "properties": {
+                            "key": {
+                                "type": "string"
+                            },
+                            "version": {
+                                "type": "integer"
+                            }
+                        },
+                        "description": "The preset it was created from"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "active",
+                            "archived"
+                        ]
+                    },
+                    "createdAt": {
+                        "type": "string"
+                    },
+                    "updatedAt": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "slug",
+                    "name",
+                    "nameAr",
+                    "role",
+                    "roleAr",
+                    "instructions",
+                    "instructionsAr",
+                    "tone",
+                    "language",
+                    "toolsets",
+                    "grant",
+                    "preset",
+                    "status",
+                    "createdAt",
+                    "updatedAt"
+                ]
+            },
+            "AgentAssignmentGrant": {
+                "type": "object",
+                "properties": {
+                    "assignmentId": {
+                        "type": "integer"
+                    },
+                    "principalId": {
+                        "type": "string"
+                    },
+                    "agent": {
+                        "type": "object",
+                        "properties": {
+                            "id": {
+                                "type": "integer"
+                            },
+                            "name": {
+                                "type": "string"
+                            },
+                            "nameAr": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "id",
+                            "name",
+                            "nameAr"
+                        ]
+                    },
+                    "permissions": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/AgentGrantRow"
+                        }
+                    }
+                },
+                "required": [
+                    "assignmentId",
+                    "principalId",
+                    "agent",
+                    "permissions"
+                ]
+            },
+            "AgentAssignmentGrantResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/AgentAssignmentGrant"
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "AgentCreateRequest": {
+                "type": "object",
+                "properties": {
+                    "slug": {
+                        "type": "string",
+                        "maxLength": 48,
+                        "description": "Lower-case letters, digits and dashes; unique in the workspace"
+                    },
+                    "name": {
+                        "type": "string",
+                        "maxLength": 60,
+                        "description": "Role name, for example \"Finance clerk\" (register 5.6b)"
+                    },
+                    "nameAr": {
+                        "type": "string",
+                        "maxLength": 60,
+                        "description": "The role name in Arabic"
+                    },
+                    "role": {
+                        "type": "string",
+                        "maxLength": 200,
+                        "description": "One sentence: what it does"
+                    },
+                    "roleAr": {
+                        "type": "string",
+                        "maxLength": 200,
+                        "description": "The role sentence in Arabic"
+                    },
+                    "instructions": {
+                        "type": "string",
+                        "maxLength": 4000,
+                        "description": "The workspace's guidance for the model. Never changes access."
+                    },
+                    "instructionsAr": {
+                        "type": "string",
+                        "maxLength": 4000,
+                        "description": "The instructions in Arabic"
+                    },
+                    "tone": {
+                        "type": "string",
+                        "enum": [
+                            "plain",
+                            "formal",
+                            "brief"
+                        ],
+                        "description": "plain (Whity's voice), formal or brief"
+                    },
+                    "language": {
+                        "type": "string",
+                        "enum": [
+                            "auto",
+                            "en",
+                            "ar"
+                        ],
+                        "description": "auto follows the person; en or ar fixes it"
+                    },
+                    "toolsets": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Toolset ids or prefix.*; empty means every toolset"
+                    },
+                    "grant": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "ask",
+                                "allow"
+                            ]
+                        },
+                        "description": "Where a new assignment starts, per permission"
+                    },
+                    "presetKey": {
+                        "type": "string",
+                        "description": "Start from this preset; fields sent override its own"
+                    }
+                }
+            },
+            "AgentCredentialResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "jti": {
+                                "type": "string"
+                            },
+                            "token": {
+                                "type": "string",
+                                "description": "Shown once"
+                            },
+                            "name": {
+                                "type": "string"
+                            },
+                            "principalId": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "jti",
+                            "token",
+                            "name",
+                            "principalId"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "AgentGrantRow": {
+                "type": "object",
+                "properties": {
+                    "permission": {
+                        "type": "string"
+                    },
+                    "mode": {
+                        "type": "string",
+                        "enum": [
+                            "off",
+                            "ask",
+                            "allow"
+                        ],
+                        "nullable": true,
+                        "description": "The mode set; null for the default"
+                    },
+                    "modes": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "ask",
+                                "allow"
+                            ]
+                        },
+                        "description": "The modes you may set"
+                    },
+                    "withheld": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "object",
+                            "properties": {
+                                "reason": {
+                                    "type": "string"
+                                },
+                                "message": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "reason",
+                                "message"
+                            ]
+                        }
+                    },
+                    "effective": {
+                        "type": "object",
+                        "properties": {
+                            "read": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "write": {
+                                "type": "string",
+                                "nullable": true
+                            }
+                        }
+                    }
+                },
+                "required": [
+                    "permission",
+                    "mode",
+                    "modes",
+                    "withheld",
+                    "effective"
+                ]
+            },
+            "AgentListResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/Agent"
+                        }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "AgentPersonaFields": {
+                "type": "object",
+                "properties": {
+                    "slug": {
+                        "type": "string",
+                        "maxLength": 48,
+                        "description": "Lower-case letters, digits and dashes; unique in the workspace"
+                    },
+                    "name": {
+                        "type": "string",
+                        "maxLength": 60,
+                        "description": "Role name, for example \"Finance clerk\" (register 5.6b)"
+                    },
+                    "nameAr": {
+                        "type": "string",
+                        "maxLength": 60,
+                        "description": "The role name in Arabic"
+                    },
+                    "role": {
+                        "type": "string",
+                        "maxLength": 200,
+                        "description": "One sentence: what it does"
+                    },
+                    "roleAr": {
+                        "type": "string",
+                        "maxLength": 200,
+                        "description": "The role sentence in Arabic"
+                    },
+                    "instructions": {
+                        "type": "string",
+                        "maxLength": 4000,
+                        "description": "The workspace's guidance for the model. Never changes access."
+                    },
+                    "instructionsAr": {
+                        "type": "string",
+                        "maxLength": 4000,
+                        "description": "The instructions in Arabic"
+                    },
+                    "tone": {
+                        "type": "string",
+                        "enum": [
+                            "plain",
+                            "formal",
+                            "brief"
+                        ],
+                        "description": "plain (Whity's voice), formal or brief"
+                    },
+                    "language": {
+                        "type": "string",
+                        "enum": [
+                            "auto",
+                            "en",
+                            "ar"
+                        ],
+                        "description": "auto follows the person; en or ar fixes it"
+                    },
+                    "toolsets": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Toolset ids or prefix.*; empty means every toolset"
+                    },
+                    "grant": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "ask",
+                                "allow"
+                            ]
+                        },
+                        "description": "Where a new assignment starts, per permission"
+                    }
+                }
+            },
+            "AgentPreset": {
+                "type": "object",
+                "properties": {
+                    "key": {
+                        "type": "string"
+                    },
+                    "version": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "nameAr": {
+                        "type": "string"
+                    },
+                    "role": {
+                        "type": "string"
+                    },
+                    "roleAr": {
+                        "type": "string"
+                    },
+                    "instructions": {
+                        "type": "string"
+                    },
+                    "instructionsAr": {
+                        "type": "string"
+                    },
+                    "tone": {
+                        "type": "string",
+                        "enum": [
+                            "plain",
+                            "formal",
+                            "brief"
+                        ]
+                    },
+                    "language": {
+                        "type": "string",
+                        "enum": [
+                            "auto",
+                            "en",
+                            "ar"
+                        ]
+                    },
+                    "toolsets": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "grant": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "string",
+                            "enum": [
+                                "off",
+                                "ask",
+                                "allow"
+                            ]
+                        }
+                    }
+                },
+                "required": [
+                    "key",
+                    "version",
+                    "name",
+                    "nameAr",
+                    "role",
+                    "roleAr",
+                    "instructions",
+                    "instructionsAr",
+                    "tone",
+                    "language",
+                    "toolsets",
+                    "grant"
+                ]
+            },
+            "AgentPresetListResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/AgentPreset"
+                        }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
             "AgentProposal": {
                 "type": "object",
                 "properties": {
                     "id": {
                         "type": "integer"
+                    },
+                    "agent": {
+                        "type": "object",
+                        "properties": {
+                            "name": {
+                                "type": "string",
+                                "nullable": true
+                            }
+                        },
+                        "required": [
+                            "name"
+                        ]
                     },
                     "status": {
                         "type": "string",
@@ -42342,6 +45414,7 @@
                 },
                 "required": [
                     "id",
+                    "agent",
                     "status",
                     "tool",
                     "summary",
@@ -42374,6 +45447,36 @@
                 "properties": {
                     "data": {
                         "$ref": "#/components/schemas/AgentProposal"
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "AgentResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/Agent"
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "AgentUnassignResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "revokedCredentials": {
+                                "type": "integer"
+                            }
+                        },
+                        "required": [
+                            "revokedCredentials"
+                        ]
                     }
                 },
                 "required": [
@@ -44191,6 +47294,54 @@
                     "artifacts"
                 ]
             },
+            "DocumentActor": {
+                "type": "object",
+                "properties": {
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "person",
+                            "agent",
+                            "system"
+                        ],
+                        "description": "A person, an agent acting for a person, or Whity"
+                    },
+                    "id": {
+                        "oneOf": [
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "string"
+                            }
+                        ],
+                        "description": "A person's profile id, or an agent's principal id; absent for the system"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "for": {
+                        "type": "object",
+                        "properties": {
+                            "id": {
+                                "type": "integer"
+                            },
+                            "name": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "id",
+                            "name"
+                        ],
+                        "description": "An agent only: the person it acts for"
+                    }
+                },
+                "required": [
+                    "kind",
+                    "name"
+                ]
+            },
             "DocumentArtifact": {
                 "type": "object",
                 "properties": {
@@ -44228,6 +47379,46 @@
                     "checksum_sha256",
                     "rendered_at",
                     "content_url"
+                ]
+            },
+            "DocumentChangesResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "cursor": {
+                                "type": "string",
+                                "description": "Send it back as since on the next poll; opaque"
+                            },
+                            "draft_version": {
+                                "type": "integer"
+                            },
+                            "suggestions": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/DocumentSuggestion"
+                                },
+                                "description": "Suggestions made or decided since the cursor, any status"
+                            },
+                            "comments": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/DocumentCommentThread"
+                                },
+                                "description": "Threads started, replied to, resolved or reopened since the cursor, with all their messages"
+                            }
+                        },
+                        "required": [
+                            "cursor",
+                            "draft_version",
+                            "suggestions",
+                            "comments"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
                 ]
             },
             "DocumentCollection": {
@@ -44336,6 +47527,180 @@
                 },
                 "required": [
                     "name"
+                ]
+            },
+            "DocumentCommentMessage": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "by": {
+                        "$ref": "#/components/schemas/DocumentActor"
+                    },
+                    "at": {
+                        "type": "string",
+                        "description": "ISO 8601 UTC"
+                    },
+                    "body": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": true
+                        },
+                        "description": "The contract Inline[]"
+                    },
+                    "mentions": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/DocumentActor"
+                        },
+                        "description": "The people @mentioned"
+                    }
+                },
+                "required": [
+                    "id",
+                    "by",
+                    "at",
+                    "body",
+                    "mentions"
+                ]
+            },
+            "DocumentCommentMessageCreateRequest": {
+                "type": "object",
+                "properties": {
+                    "body": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": true
+                        },
+                        "description": "The reply as the contract Inline[] (text, field, break, math), not empty"
+                    },
+                    "mentions": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "Profile ids @mentioned; members who can read the document are told in-app"
+                    }
+                },
+                "required": [
+                    "body"
+                ]
+            },
+            "DocumentCommentMessageResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/DocumentCommentMessage"
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "DocumentCommentThread": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "anchor_block_id": {
+                        "type": "string"
+                    },
+                    "quote": {
+                        "type": "string",
+                        "description": "The commented text; the editor highlights it by finding it in the anchor block"
+                    },
+                    "messages": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/DocumentCommentMessage"
+                        }
+                    },
+                    "resolved": {
+                        "type": "object",
+                        "nullable": true,
+                        "properties": {
+                            "by": {
+                                "$ref": "#/components/schemas/DocumentActor"
+                            },
+                            "at": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "by",
+                            "at"
+                        ],
+                        "description": "Who resolved it and when; null while it is open"
+                    }
+                },
+                "required": [
+                    "id",
+                    "anchor_block_id",
+                    "quote",
+                    "messages",
+                    "resolved"
+                ]
+            },
+            "DocumentCommentThreadCreateRequest": {
+                "type": "object",
+                "properties": {
+                    "anchor_block_id": {
+                        "type": "string",
+                        "description": "The id of the block the commented text is in"
+                    },
+                    "quote": {
+                        "type": "string",
+                        "description": "The commented text, at most 2000 characters"
+                    },
+                    "body": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": true
+                        },
+                        "description": "The first message as the contract Inline[] (text, field, break, math), not empty"
+                    },
+                    "mentions": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "Profile ids @mentioned; members who can read the document are told in-app"
+                    }
+                },
+                "required": [
+                    "anchor_block_id",
+                    "quote",
+                    "body"
+                ]
+            },
+            "DocumentCommentThreadListResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/DocumentCommentThread"
+                        }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "DocumentCommentThreadResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/DocumentCommentThread"
+                    }
+                },
+                "required": [
+                    "data"
                 ]
             },
             "DocumentConveningEntry": {
@@ -44836,6 +48201,49 @@
                     "pagination",
                     "view",
                     "sort"
+                ]
+            },
+            "DocumentMentionableListResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/DocumentMentionablePerson"
+                        }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "DocumentMentionablePerson": {
+                "type": "object",
+                "properties": {
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "person"
+                        ],
+                        "description": "Always person"
+                    },
+                    "id": {
+                        "type": "integer",
+                        "description": "The profile id, as sent in mentions"
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "The display name"
+                    },
+                    "email": {
+                        "type": "string",
+                        "description": "The primary email, when there is one"
+                    }
+                },
+                "required": [
+                    "kind",
+                    "id",
+                    "name"
                 ]
             },
             "DocumentOwnField": {
@@ -45468,6 +48876,20 @@
                     "resolvedTheme": {
                         "$ref": "#/components/schemas/ResolvedDocumentTheme"
                     },
+                    "suggestions": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/DocumentSuggestion"
+                        },
+                        "description": "GET /{id} only: the open suggestions (editor M5)"
+                    },
+                    "comments": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/DocumentCommentThread"
+                        },
+                        "description": "GET /{id} only: every comment thread, resolved or not (editor M5)"
+                    },
                     "created_at": {
                         "type": "string"
                     },
@@ -45966,6 +49388,323 @@
                 "required": [
                     "key",
                     "description"
+                ]
+            },
+            "DocumentSuggestion": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "text",
+                            "format",
+                            "block"
+                        ]
+                    },
+                    "summary": {
+                        "type": "string",
+                        "description": "What the rail card says, for example Replace 30 days with 14 days"
+                    },
+                    "request": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "For agents: what they were asked"
+                    },
+                    "permission": {
+                        "type": "string",
+                        "description": "The one permission the change used: documents:suggest"
+                    },
+                    "by": {
+                        "$ref": "#/components/schemas/DocumentActor"
+                    },
+                    "at": {
+                        "type": "string",
+                        "description": "When it was made, ISO 8601 UTC"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "open",
+                            "accepted",
+                            "rejected",
+                            "stale"
+                        ]
+                    },
+                    "patch": {
+                        "$ref": "#/components/schemas/DocumentSuggestionPatch"
+                    },
+                    "base_version": {
+                        "type": "integer",
+                        "description": "The draft version it was made against"
+                    },
+                    "decided_by": {
+                        "nullable": true,
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/DocumentActor"
+                            }
+                        ]
+                    },
+                    "decided_at": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "id",
+                    "kind",
+                    "summary",
+                    "request",
+                    "permission",
+                    "by",
+                    "at",
+                    "status",
+                    "patch",
+                    "base_version",
+                    "decided_by",
+                    "decided_at"
+                ]
+            },
+            "DocumentSuggestionBulkDecisionRequest": {
+                "type": "object",
+                "properties": {
+                    "decision": {
+                        "type": "string",
+                        "enum": [
+                            "accepted",
+                            "rejected"
+                        ],
+                        "description": "accepted applies each patch to the draft, in id order; rejected leaves the draft as it is"
+                    },
+                    "suggestion_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "nullable": true,
+                        "description": "Only these suggestions; left out, every open one"
+                    },
+                    "agent": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Only the suggestions this agent principal made (its id from by.id)"
+                    }
+                },
+                "required": [
+                    "decision"
+                ]
+            },
+            "DocumentSuggestionBulkDecisionResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "decided": {
+                                "type": "array",
+                                "items": {
+                                    "type": "integer"
+                                },
+                                "description": "The suggestions accepted or rejected"
+                            },
+                            "stale": {
+                                "type": "array",
+                                "items": {
+                                    "type": "integer"
+                                },
+                                "description": "The suggestions skipped because their text or block has gone; now stale"
+                            },
+                            "draft_version": {
+                                "type": "integer"
+                            }
+                        },
+                        "required": [
+                            "decided",
+                            "stale",
+                            "draft_version"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "DocumentSuggestionCreateRequest": {
+                "type": "object",
+                "properties": {
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "text",
+                            "format",
+                            "block"
+                        ],
+                        "description": "text for replace-text, format for format, block for insert-blocks, delete-blocks and move-block"
+                    },
+                    "summary": {
+                        "type": "string",
+                        "description": "What the card says, at most 500 characters, for example Replace 30 days with 14 days"
+                    },
+                    "patch": {
+                        "$ref": "#/components/schemas/DocumentSuggestionPatch",
+                        "description": "The change; it must apply to the current draft"
+                    },
+                    "request": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "For agents: what they were asked, at most 4000 characters"
+                    }
+                },
+                "required": [
+                    "kind",
+                    "summary",
+                    "patch"
+                ]
+            },
+            "DocumentSuggestionDecisionRequest": {
+                "type": "object",
+                "properties": {
+                    "decision": {
+                        "type": "string",
+                        "enum": [
+                            "accepted",
+                            "rejected"
+                        ],
+                        "description": "accepted applies the patch to the draft; rejected leaves the draft as it is"
+                    }
+                },
+                "required": [
+                    "decision"
+                ]
+            },
+            "DocumentSuggestionDecisionResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "suggestion": {
+                                "$ref": "#/components/schemas/DocumentSuggestion"
+                            },
+                            "draft_version": {
+                                "type": "integer",
+                                "description": "The draft version now (bumped when a suggestion was accepted)"
+                            }
+                        },
+                        "required": [
+                            "suggestion",
+                            "draft_version"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "DocumentSuggestionListResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/DocumentSuggestion"
+                        }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "DocumentSuggestionPatch": {
+                "type": "object",
+                "additionalProperties": true,
+                "required": [
+                    "op"
+                ],
+                "description": "One change, anchored to block ids and text, never offsets. Text is matched in a block's flattened inline text (its content, or a toggle's summary): text runs in order, each field, break or formula counting as the one character U+FFFC; the occurrence-th match (0-based) is the occurrence-th position, scanning one character at a time, where the text starts.",
+                "properties": {
+                    "op": {
+                        "type": "string",
+                        "enum": [
+                            "insert-blocks",
+                            "replace-text",
+                            "format",
+                            "delete-blocks",
+                            "move-block"
+                        ],
+                        "description": "What the patch does"
+                    },
+                    "afterBlockId": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "insert-blocks and move-block: the block to go after; null for the start of the document"
+                    },
+                    "blocks": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": true
+                        },
+                        "description": "insert-blocks: the contract Block[] to insert, with ids the draft doesn't use, and no suggestion attr or insertion/deletion marks"
+                    },
+                    "blockId": {
+                        "type": "string",
+                        "description": "replace-text, format and move-block: the block, at any depth"
+                    },
+                    "deleteText": {
+                        "type": "string",
+                        "description": "replace-text: the text to replace; \"\" for a pure insertion. format: always \"\""
+                    },
+                    "insert": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": true
+                        },
+                        "description": "replace-text: the contract Inline[] put in its place"
+                    },
+                    "occurrence": {
+                        "type": "integer",
+                        "description": "replace-text and format: which match, from 0. For a pure insertion, which match of before"
+                    },
+                    "before": {
+                        "type": "string",
+                        "description": "replace-text with deleteText \"\": up to 40 characters of the block's text just before the insertion point; \"\" for the start of the block"
+                    },
+                    "text": {
+                        "type": "string",
+                        "description": "format: the text to format"
+                    },
+                    "mark": {
+                        "type": "object",
+                        "additionalProperties": true,
+                        "description": "format: a contract mark, one of bold, italic, underline, strike, code, link ({type, href}) or highlight"
+                    },
+                    "add": {
+                        "type": "boolean",
+                        "description": "format: true adds the mark, false removes it"
+                    },
+                    "blockIds": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "delete-blocks: the blocks to delete"
+                    }
+                }
+            },
+            "DocumentSuggestionResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/DocumentSuggestion"
+                    }
+                },
+                "required": [
+                    "data"
                 ]
             },
             "DocumentTemplateSlot": {
@@ -50984,6 +54723,99 @@
                             "id",
                             "message"
                         ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "MyAgent": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "slug": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "nameAr": {
+                        "type": "string"
+                    },
+                    "role": {
+                        "type": "string"
+                    },
+                    "roleAr": {
+                        "type": "string"
+                    },
+                    "tone": {
+                        "type": "string",
+                        "enum": [
+                            "plain",
+                            "formal",
+                            "brief"
+                        ]
+                    },
+                    "language": {
+                        "type": "string",
+                        "enum": [
+                            "auto",
+                            "en",
+                            "ar"
+                        ]
+                    },
+                    "preset": {
+                        "nullable": true,
+                        "type": "object",
+                        "properties": {
+                            "key": {
+                                "type": "string"
+                            },
+                            "version": {
+                                "type": "integer"
+                            }
+                        }
+                    },
+                    "assignment": {
+                        "nullable": true,
+                        "type": "object",
+                        "description": "Your use of this agent; null when you don't use it",
+                        "properties": {
+                            "id": {
+                                "type": "integer"
+                            },
+                            "principalId": {
+                                "type": "string"
+                            },
+                            "createdAt": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "required": [
+                    "id",
+                    "slug",
+                    "name",
+                    "nameAr",
+                    "role",
+                    "roleAr",
+                    "tone",
+                    "language",
+                    "preset",
+                    "assignment"
+                ]
+            },
+            "MyAgentListResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/MyAgent"
+                        }
                     }
                 },
                 "required": [

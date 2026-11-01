@@ -805,7 +805,7 @@ namespace Whity\Sdk;
  * {@see Expression\ExpressionError} for type and budget failures, and
  * {@see Expression\ExpressionDescriber} for the English and Arabic words a
  * person approving a rule reads. Held to `resources/expression-fixtures.json`,
- * which the TypeScript twin in `@whity-org/features/expressions` passes too
+ * which the TypeScript twin in `@whity/features/expressions` passes too
  * (WHIT-759).
  *
  * Purely additive.) ->

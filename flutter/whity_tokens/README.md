@@ -2,7 +2,7 @@
 
 Generated Whity design tokens (colors, typography, spacing, radius) for
 Flutter / Material Design 3, mirroring the same `src/design/tokens/base.json`
-source of truth used by `@whity-org/ui` and `@whity-org/tokens` on the web
+source of truth used by `@whity/ui` and `@whity/tokens` on the web
 side.
 
 Not published to pub.dev — consume it as a git dependency, pinned to a tag or

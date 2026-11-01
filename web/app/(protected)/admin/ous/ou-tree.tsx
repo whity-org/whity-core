@@ -2,14 +2,14 @@
 
 import { useState, type KeyboardEvent } from 'react';
 import { cn } from '@/lib/utils';
-import { Button } from '@whity-org/ui/button';
+import { Button } from '@whity/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@whity-org/ui/dropdown-menu';
+} from '@whity/ui/dropdown-menu';
 import {
   IconChevronRight,
   IconDotsVertical,
@@ -17,7 +17,7 @@ import {
   IconFolderOpen,
   IconPointFilled,
 } from '@tabler/icons-react';
-import { useTranslation } from '@whity-org/features/i18n';
+import { useTranslation } from '@whity/features/i18n';
 import type { OuNode } from './ou-tree-util';
 import type { OuViewProps } from './ou-view';
 

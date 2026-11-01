@@ -24,6 +24,10 @@ final readonly class McpPrincipal
      * @param string   $principalKind Token principal kind ('user' or 'session').
      * @param string[] $scope         Granted scopes (e.g. ['tools:call']).
      * @param string   $jti           JWT ID (unique revocation handle).
+     * @param ?string  $agentId       The agent's stable principal id when it is not the
+     *                                jti: `agent:<assignmentId>` for a credential bound to
+     *                                a workspace agent (WHIT-816), so the agent stays one
+     *                                principal across all its credentials.
      */
     public function __construct(
         public int $profileId,
@@ -32,14 +36,25 @@ final readonly class McpPrincipal
         public string $principalKind,
         public array $scope,
         public string $jti,
+        public ?string $agentId = null,
     ) {}
 
-    /** The principal kind of an agent credential (ADR-0006 §3, WHIT-753). Not minted until agent proposals exist (WHIT-784). */
+    /** The principal kind of an agent credential (ADR-0006 §3, WHIT-753). */
     public const KIND_AGENT = 'ai-agent';
 
     public function isAgent(): bool
     {
         return $this->principalKind === self::KIND_AGENT;
+    }
+
+    /**
+     * The id proposals, actor columns and activity record for this agent: the
+     * assignment's `agent:<id>` when bound to a workspace agent, else the jti
+     * (which for a Whity ID agent is already its stable `oauth-agent:` id).
+     */
+    public function agentPrincipalId(): string
+    {
+        return $this->agentId ?? $this->jti;
     }
 
     /**
@@ -49,7 +64,7 @@ final readonly class McpPrincipal
     public function actor(): \Whity\Core\Audit\Actor
     {
         return $this->isAgent()
-            ? \Whity\Core\Audit\Actor::agent($this->jti, $this->userId)
+            ? \Whity\Core\Audit\Actor::agent($this->agentPrincipalId(), $this->userId)
             : \Whity\Core\Audit\Actor::person($this->userId);
     }
 }

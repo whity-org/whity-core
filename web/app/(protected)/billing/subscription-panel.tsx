@@ -2,10 +2,10 @@
 
 import { useAuth } from '@/lib/auth-context';
 import { useFetch } from '@/hooks/useFetch';
-import { Badge } from '@whity-org/ui/badge';
-import { useDateDisplay } from '@whity-org/features/datetime';
-import { useTranslation } from '@whity-org/features/i18n';
-import { formatMoney } from '@whity-org/ui/money/currency';
+import { Badge } from '@whity/ui/badge';
+import { useDateDisplay } from '@whity/features/datetime';
+import { useTranslation } from '@whity/features/i18n';
+import { formatMoney } from '@whity/ui/money/currency';
 import { AvailablePlans } from './available-plans';
 
 /**

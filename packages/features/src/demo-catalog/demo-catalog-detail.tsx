@@ -2,12 +2,12 @@
 
 import * as React from "react"
 
-import { Button } from "@whity-org/ui/button"
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@whity-org/ui/card"
-import { ErrorState } from "@whity-org/ui/empty-state"
-import { Input } from "@whity-org/ui/input"
-import { Skeleton } from "@whity-org/ui/skeleton"
-import { Textarea } from "@whity-org/ui/textarea"
+import { Button } from "@whity/ui/button"
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@whity/ui/card"
+import { ErrorState } from "@whity/ui/empty-state"
+import { Input } from "@whity/ui/input"
+import { Skeleton } from "@whity/ui/skeleton"
+import { Textarea } from "@whity/ui/textarea"
 
 import { useTranslation } from "../i18n"
 import type { DemoCatalogAdapter, DemoCatalogItem, DemoCatalogItemInput } from "./types"

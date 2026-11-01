@@ -1,5 +1,5 @@
 {
-  "about": "Shared fixtures for the manifest expression language (WHIT-759). Whity\\Sdk\\Expression\\Expression (PHP) and @whity-org/features/expressions (TypeScript) must both pass every case. 'evaluate' cases give an expression, a context and either 'expect' (the value) or 'error' (the ExpressionError kind). 'invalid' cases must fail validation with an error containing 'error'.",
+  "about": "Shared fixtures for the manifest expression language (WHIT-759). Whity\\Sdk\\Expression\\Expression (PHP) and @whity/features/expressions (TypeScript) must both pass every case. 'evaluate' cases give an expression, a context and either 'expect' (the value) or 'error' (the ExpressionError kind). 'invalid' cases must fail validation with an error containing 'error'.",
   "context": {
     "fields": {
       "customer": "Example Bakery",

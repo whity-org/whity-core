@@ -14,9 +14,9 @@
  */
 
 import { IconFileText } from '@tabler/icons-react';
-import { EmptyState } from '@whity-org/ui/empty-state';
-import { Spinner } from '@whity-org/ui/spinner';
-import { useTranslation } from '@whity-org/features/i18n';
+import { EmptyState } from '@whity/ui/empty-state';
+import { Spinner } from '@whity/ui/spinner';
+import { useTranslation } from '@whity/features/i18n';
 import {
   Dialog,
   DialogContent,
