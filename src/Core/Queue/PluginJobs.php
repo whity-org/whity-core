@@ -47,13 +47,16 @@ final class PluginJobs
      *                                      subscribed to. Wired together with the
      *                                      hook manager or not at all — a logger
      *                                      with no manager has nothing to hear.
+     * @param array{slots: \Whity\Core\Document\Slots\TemplateSlotRegistry, fields: \Whity\Core\Document\Fields\DocumentFieldRegistry}|null $documentRegistries
+     *                                      The worker's document registries (WHIT-742).
      */
     public static function register(
         JobRegistry $registry,
         ?string $pluginDir = null,
         ?LoggerInterface $logger = null,
         ?HookManager $hooks = null,
-        ?AuditLogger $auditLogger = null
+        ?AuditLogger $auditLogger = null,
+        ?array $documentRegistries = null,
     ): void {
         $pluginDir ??= dirname(__DIR__, 3) . '/plugins';
 
@@ -75,6 +78,9 @@ final class PluginJobs
                 null,
                 $auditLogger
             );
+            if ($documentRegistries !== null) {
+                $loader->setDocumentRegistries($documentRegistries['slots'], $documentRegistries['fields']);
+            }
             $loader->load();
             $loader->collectJobs($registry);
         } catch (Throwable $e) {

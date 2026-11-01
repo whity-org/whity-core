@@ -62,6 +62,22 @@ final class DocumentIssuingEntryPointWiringTest extends TestCase
         }
     }
 
+    /**
+     * `queue:work` is not a BaseCommand and never runs setupKernel(), so the
+     * kernel's registrations don't reach it. It registers its own through
+     * WorkerDocumentServices, and gives its plugin loader the registries.
+     */
+    public function testTheQueueWorkerRegistersItsOwnDocumentServices(): void
+    {
+        $worker = $this->read('src/Cli/Commands/QueueWorkCommand.php');
+        self::assertMatchesRegularExpression('/\$documentRegistries = \\\\?Whity\\\\Core\\\\Document\\\\Issuing\\\\WorkerDocumentServices::register\(/', $worker);
+        self::assertMatchesRegularExpression('/PluginJobs::register\([^;]*\$documentRegistries\);/', $worker);
+        self::assertStringContainsString(
+            "\$loader->setDocumentRegistries(\$documentRegistries['slots'], \$documentRegistries['fields']);",
+            $this->read('src/Core/Queue/PluginJobs.php'),
+        );
+    }
+
     public function testTheWorkerReadsAFreshSetOfPluginsForEachIssue(): void
     {
         // A worker lives for many jobs; a manifest cached from the last job
