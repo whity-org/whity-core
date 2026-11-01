@@ -629,6 +629,9 @@ function validateBlocks(content, at) {
       if (block.columns !== undefined && !Array.isArray(block.columns)) {
         return `"${at}[${i}].columns" must be an array`;
       }
+      if (block.align !== undefined && (!Array.isArray(block.align) || !block.align.every((a) => a === 'start' || a === 'end'))) {
+        return `"${at}[${i}].align" must be an array of "start" or "end"`;
+      }
     }
     if (block.type === 'qr') {
       if (typeof block.value !== 'string' || block.value === '') {

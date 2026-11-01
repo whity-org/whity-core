@@ -101,9 +101,7 @@ final class WhityDocumentPrinter
         $payload = [
             'title' => $title,
             'direction' => $doc['lang'] === 'ar' ? 'rtl' : 'ltr',
-            'page' => [
-                'widthMm' => 210.0,
-                'heightMm' => 297.0,
+            'page' => self::pageSize($doc['page']['size'] ?? null) + [
                 'margin' => ['topMm' => self::MARGIN_MM, 'rightMm' => self::MARGIN_MM, 'bottomMm' => self::MARGIN_MM, 'leftMm' => self::MARGIN_MM],
             ],
             'content' => $content,
@@ -315,6 +313,12 @@ final class WhityDocumentPrinter
      */
     private function table(array $block, array &$out): void
     {
+        // 6.6: numbers are end-aligned, so the column's alignment goes to print.
+        $align = [];
+        foreach ((is_array($block['columns'] ?? null) ? $block['columns'] : []) as $column) {
+            $align[] = is_array($column) && ($column['align'] ?? null) === 'end' ? 'end' : 'start';
+        }
+
         $rows = [];
         foreach ((is_array($block['rows'] ?? null) ? $block['rows'] : []) as $row) {
             $cells = [];
@@ -330,7 +334,21 @@ final class WhityDocumentPrinter
         if (($block['headerRow'] ?? false) === true) {
             $columns = array_shift($rows);
         }
-        $out[] = ['type' => 'table', 'columns' => $columns, 'rows' => $rows];
+        $out[] = ['type' => 'table', 'columns' => $columns, 'rows' => $rows] + (in_array('end', $align, true) ? ['align' => $align] : []);
+    }
+
+    /**
+     * The paper a document names (6.1); A4 when it names none.
+     *
+     * @return array{widthMm: float, heightMm: float}
+     */
+    private static function pageSize(mixed $size): array
+    {
+        return match ($size) {
+            'A5' => ['widthMm' => 148.0, 'heightMm' => 210.0],
+            'Letter' => ['widthMm' => 215.9, 'heightMm' => 279.4],
+            default => ['widthMm' => 210.0, 'heightMm' => 297.0],
+        };
     }
 
     /**

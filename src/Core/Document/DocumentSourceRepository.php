@@ -132,6 +132,33 @@ final class DocumentSourceRepository
     }
 
     /**
+     * Replace a seeded starter that nobody has touched: still at its first
+     * draft and never published. Returns whether it was replaced. A workspace's
+     * own changes bump the draft version, so they are never overwritten.
+     *
+     * @param array{title: string, page: array<string, mixed>, blocks: list<array<string, mixed>>, own_fields: list<array<string, string>>, lang: string} $starter
+     */
+    public function replaceUntouchedStarter(int $tenantId, string $starterKey, array $starter): bool
+    {
+        $stmt = $this->db->prepare(
+            'UPDATE document_sources
+                SET title = :title, lang = :lang, page = :page, blocks = :blocks, own_fields = :own_fields, updated_at = NOW()
+              WHERE tenant_id = :tenant_id AND starter_key = :starter_key AND draft_version = 1 AND published_version IS NULL'
+        );
+        $stmt->execute([
+            ':title'       => $starter['title'],
+            ':lang'        => $starter['lang'],
+            ':page'        => $this->encode($starter['page']),
+            ':blocks'      => $this->encode($starter['blocks']),
+            ':own_fields'  => $this->encode($starter['own_fields']),
+            ':tenant_id'   => $tenantId,
+            ':starter_key' => $starterKey,
+        ]);
+
+        return $stmt->rowCount() === 1;
+    }
+
+    /**
      * Save the draft if nobody saved since `$baseVersion`. Returns the new
      * version, or null when the row is at another version (or gone).
      *

@@ -289,17 +289,25 @@ body {
   line-height: 1.4;
 }
 
+/* 6.6: a strong rule under the header and hairlines between rows. No zebra
+ * stripes and no grid, so a document prints and faxes cleanly. */
 .flow-table th,
 .flow-table td {
-  border: 0.25mm solid var(--flow-grid);
+  border-block-end: 0.1mm solid var(--flow-grid);
   padding: 1.2mm 1.8mm;
   text-align: start;
   vertical-align: top;
 }
 
 .flow-table th {
-  background: var(--flow-tint);
+  border-block-end: 0.5mm solid var(--flow-ink);
   font-weight: 600;
+}
+
+/* Numbers: end-aligned, in tabular figures. */
+.flow-table .flow-cell-end {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ---- Figures ----------------------------------------------------------- */
