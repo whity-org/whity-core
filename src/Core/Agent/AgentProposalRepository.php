@@ -111,35 +111,68 @@ final class AgentProposalRepository
     }
 
     /**
-     * The names people gave the agent credentials that asked, by principal id
-     * (the credential's jti): what the approvals card calls the agent ("Billing
-     * assistant"). A revoked or renamed credential keeps whatever name its row
-     * holds; one that no longer exists is simply absent.
+     * What the approvals card calls each agent that asked, by principal id. A
+     * credential (`jti`) goes by the name its person gave it. A workspace agent
+     * (`agent:<assignmentId>`, WHIT-816) goes by its definition, in both
+     * languages, even once the assignment is revoked or the agent archived:
+     * history keeps naming who asked. An id that resolves to nothing is absent.
      *
      * @param list<string> $principalIds
-     * @return array<string, string>
+     * @return array<string, array{name: string, nameAr: ?string}>
      */
     public function agentNames(int $tenantId, array $principalIds): array
     {
         $principalIds = array_values(array_unique(array_filter($principalIds, static fn ($id): bool => $id !== '')));
-        if ($principalIds === []) {
-            return [];
-        }
 
-        $placeholders = implode(', ', array_map(static fn (int $i): string => ':jti' . $i, array_keys($principalIds)));
-        $stmt = $this->db->prepare(
-            'SELECT jti, name FROM mcp_tokens WHERE tenant_id = :tenant_id AND jti IN (' . $placeholders . ')'
-        );
-        $stmt->bindValue(':tenant_id', $tenantId, PDO::PARAM_INT);
-        foreach ($principalIds as $i => $id) {
-            $stmt->bindValue(':jti' . $i, $id, PDO::PARAM_STR);
+        $assignments = [];
+        $jtis        = [];
+        foreach ($principalIds as $principalId) {
+            $assignmentId = AgentAssignmentRepository::idFromPrincipal($principalId);
+            if ($assignmentId !== null) {
+                $assignments[] = $assignmentId;
+            } else {
+                $jtis[] = $principalId;
+            }
         }
-        $stmt->execute();
 
         $names = [];
-        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            $names[(string) $row['jti']] = (string) $row['name'];
+        if ($jtis !== []) {
+            $placeholders = implode(', ', array_map(static fn (int $i): string => ':jti' . $i, array_keys($jtis)));
+            $stmt = $this->db->prepare(
+                'SELECT jti, name FROM mcp_tokens WHERE tenant_id = :tenant_id AND jti IN (' . $placeholders . ')'
+            );
+            $stmt->bindValue(':tenant_id', $tenantId, PDO::PARAM_INT);
+            foreach ($jtis as $i => $jti) {
+                $stmt->bindValue(':jti' . $i, $jti, PDO::PARAM_STR);
+            }
+            $stmt->execute();
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $names[(string) $row['jti']] = ['name' => (string) $row['name'], 'nameAr' => null];
+            }
         }
+
+        if ($assignments !== []) {
+            $placeholders = implode(', ', array_map(static fn (int $i): string => ':assignment' . $i, array_keys($assignments)));
+            $stmt = $this->db->prepare(
+                'SELECT assignment.id, agent.name, agent.name_ar
+                   FROM agent_assignments assignment
+                   JOIN agents agent ON agent.id = assignment.agent_id AND agent.tenant_id = assignment.tenant_id
+                  WHERE assignment.tenant_id = :tenant_id AND assignment.id IN (' . $placeholders . ')'
+            );
+            $stmt->bindValue(':tenant_id', $tenantId, PDO::PARAM_INT);
+            foreach ($assignments as $i => $assignmentId) {
+                $stmt->bindValue(':assignment' . $i, $assignmentId, PDO::PARAM_INT);
+            }
+            $stmt->execute();
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $nameAr = (string) $row['name_ar'];
+                $names[AgentAssignmentRepository::principalId((int) $row['id'])] = [
+                    'name'   => (string) $row['name'],
+                    'nameAr' => $nameAr !== '' ? $nameAr : null,
+                ];
+            }
+        }
+
         return $names;
     }
 
