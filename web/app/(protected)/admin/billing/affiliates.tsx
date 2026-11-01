@@ -4,11 +4,11 @@ import { Fragment, useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/lib/toast-context';
 import { useFetch } from '@/hooks/useFetch';
-import { useTranslation } from '@whity-org/features/i18n';
-import { Button } from '@whity-org/ui/button';
-import { Badge } from '@whity-org/ui/badge';
+import { useTranslation } from '@whity/features/i18n';
+import { Button } from '@whity/ui/button';
+import { Badge } from '@whity/ui/badge';
 import { Input } from '@/components/ui/input';
-import { EmptyState } from '@whity-org/ui/empty-state';
+import { EmptyState } from '@whity/ui/empty-state';
 import {
   Dialog,
   DialogContent,

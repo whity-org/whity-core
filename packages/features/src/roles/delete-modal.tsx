@@ -32,9 +32,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@whity-org/ui/dialog';
-import { Button } from '@whity-org/ui/button';
-import { Alert, AlertDescription } from '@whity-org/ui/alert';
+} from '@whity/ui/dialog';
+import { Button } from '@whity/ui/button';
+import { Alert, AlertDescription } from '@whity/ui/alert';
 import { IconAlertCircle, IconAlertTriangle } from '@tabler/icons-react';
 import type { Role, RolesAdapter, RolesTranslate } from './types';
 

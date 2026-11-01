@@ -10,10 +10,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Button } from '@whity-org/ui/button';
+import { Button } from '@whity/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@whity-org/ui/textarea';
-import { useTranslation } from '@whity-org/features/i18n';
+import { Textarea } from '@whity/ui/textarea';
+import { useTranslation } from '@whity/features/i18n';
 import type { Person } from './types';
 
 interface EditPersonModalProps {

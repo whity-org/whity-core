@@ -2,12 +2,12 @@
 
 import * as React from 'react';
 
-import { Button } from '@whity-org/ui/button';
-import { DocEditor, type SaveState } from '@whity-org/ui/editor/doc-editor';
-import type { DocumentKind, EditorMode, ResolvedDocumentTheme, WhityDocument } from '@whity-org/ui/editor/contract';
-import type { FieldDef } from '@whity-org/ui/editor/fields';
-import { themedLetterhead } from '@whity-org/ui/editor/page-view';
-import type { EditorServices, FieldPreview } from '@whity-org/ui/editor/services';
+import { Button } from '@whity/ui/button';
+import { DocEditor, type SaveState } from '@whity/ui/editor/doc-editor';
+import type { DocumentKind, EditorMode, ResolvedDocumentTheme, WhityDocument } from '@whity/ui/editor/contract';
+import type { FieldDef } from '@whity/ui/editor/fields';
+import { themedLetterhead } from '@whity/ui/editor/page-view';
+import type { EditorServices, FieldPreview } from '@whity/ui/editor/services';
 import { useTranslation } from '../i18n';
 import { useEditorLabels } from './editor-labels';
 import { IssueBar } from './issue-bar';

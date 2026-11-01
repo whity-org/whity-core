@@ -2,8 +2,8 @@
 
 import { use } from 'react';
 import { useRouter } from 'next/navigation';
-import { DocumentEditorScreen } from '@whity-org/features/document-editor';
-import { useTranslation } from '@whity-org/features/i18n';
+import { DocumentEditorScreen } from '@whity/features/document-editor';
+import { useTranslation } from '@whity/features/i18n';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { DOCUMENTS_ISSUE, DOCUMENTS_WRITE } from '@/lib/capabilities';
 import { issueHref } from '@/lib/documents/issue';

@@ -2,9 +2,9 @@
 
 import * as React from 'react';
 
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@whity-org/ui/dialog';
-import { Icon } from '@whity-org/ui/icon';
-import { cn } from '@whity-org/ui/utils';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@whity/ui/dialog';
+import { Icon } from '@whity/ui/icon';
+import { cn } from '@whity/ui/utils';
 import { useTranslation } from '../i18n';
 import type { RecordChoice } from './types';
 

@@ -8,11 +8,11 @@ import { useNavigation } from '@/lib/navigation-context';
 import { useBranding } from '@/lib/branding-context';
 import { useThemeMode } from '@/lib/theme-mode-context';
 import { useToast } from '@/lib/toast-context';
-import { Button } from '@whity-org/ui/button';
-import { TenantSwitcher as WorkspaceSwitcher } from '@whity-org/ui/tenant-switcher';
-import { AppSidebar, useForcedRail } from '@whity-org/ui/app-sidebar';
-import { navGroupsFromServerItems } from '@whity-org/features/nav';
-import { LanguageSwitcher, useI18nEnabled, useTranslation } from '@whity-org/features/i18n';
+import { Button } from '@whity/ui/button';
+import { TenantSwitcher as WorkspaceSwitcher } from '@whity/ui/tenant-switcher';
+import { AppSidebar, useForcedRail } from '@whity/ui/app-sidebar';
+import { navGroupsFromServerItems } from '@whity/features/nav';
+import { LanguageSwitcher, useI18nEnabled, useTranslation } from '@whity/features/i18n';
 import * as TablerIcons from '@tabler/icons-react';
 import {
   IconLogout,
@@ -109,7 +109,7 @@ function prettifyGroupId(groupId: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// TenantSwitcher — uses the shared Switcher primitive from @whity-org/ui.
+// TenantSwitcher — uses the shared Switcher primitive from @whity/ui.
 // ---------------------------------------------------------------------------
 
 interface TenantSwitcherProps {

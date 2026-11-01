@@ -8,7 +8,7 @@
 @source "../../../packages/features/src/**/*.{ts,tsx}";
 
 /* Same three-import recipe packages/ui/src/globals.css uses — tokens/base
-   layer/fonts sourced from @whity-org/tokens, not hand-duplicated here. */
-@import "@whity-org/tokens/css";
-@import "@whity-org/tokens/base.css";
-@import "@whity-org/tokens/fonts.css";
+   layer/fonts sourced from @whity/tokens, not hand-duplicated here. */
+@import "@whity/tokens/css";
+@import "@whity/tokens/base.css";
+@import "@whity/tokens/fonts.css";

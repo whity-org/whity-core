@@ -22,8 +22,8 @@
     "tokens:check": "node ../src/design/tokens/generate-tokens.js check"
   },
   "dependencies": {
-    "@whity-org/features": "file:../packages/features",
-    "@whity-org/ui": "file:../packages/ui",
+    "@whity/features": "file:../packages/features",
+    "@whity/ui": "file:../packages/ui",
     "@hookform/resolvers": "^6.0.1",
     "@tabler/icons-react": "^3.50.0",
     "@xyflow/react": "^12.12.0",

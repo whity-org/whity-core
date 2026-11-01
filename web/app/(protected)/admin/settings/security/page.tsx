@@ -8,21 +8,21 @@ import { useCapabilities } from '@/hooks/useCapabilities';
 import { useFetch } from '@/hooks/useFetch';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
-import { Button } from '@whity-org/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity-org/ui/card';
+import { Button } from '@whity/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@whity-org/ui/badge';
-import { AccessDenied } from '@whity-org/ui/access-denied';
+import { Badge } from '@whity/ui/badge';
+import { AccessDenied } from '@whity/ui/access-denied';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@whity-org/ui/select';
+} from '@whity/ui/select';
 import { IconPlus, IconShieldLock, IconTrash } from '@tabler/icons-react';
-import { useTranslation, type TranslateFn } from '@whity-org/features/i18n';
-import { useDateDisplay } from '@whity-org/features/datetime';
+import { useTranslation, type TranslateFn } from '@whity/features/i18n';
+import { useDateDisplay } from '@whity/features/datetime';
 import { SECURITY_MANAGE, errorMessage, type AddToast } from '../settings-shared';
 import type { components } from '@/lib/api/schema';
 

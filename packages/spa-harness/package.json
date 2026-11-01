@@ -2,7 +2,7 @@
   "name": "spa-harness",
   "version": "0.0.0",
   "private": true,
-  "description": "Minimal Vite + Tailwind v4 SPA proving @whity-org/ui and @whity-org/features render outside Next.js — no next/* anywhere in this app. Not published.",
+  "description": "Minimal Vite + Tailwind v4 SPA proving @whity/ui and @whity/features render outside Next.js — no next/* anywhere in this app. Not published.",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,9 +10,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@whity-org/features": "file:../features",
-    "@whity-org/tokens": "file:../tokens",
-    "@whity-org/ui": "file:../ui",
+    "@whity/features": "file:../features",
+    "@whity/tokens": "file:../tokens",
+    "@whity/ui": "file:../ui",
     "@tabler/icons-react": "^3.50.0",
     "react": "19.3.1",
     "react-dom": "19.3.1"

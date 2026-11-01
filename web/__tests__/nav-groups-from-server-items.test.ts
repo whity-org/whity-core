@@ -1,12 +1,12 @@
 import {
   navGroupsFromServerItems,
   mostSpecificActiveItemId,
-} from '@whity-org/features/nav';
-import type { ServerNavItem } from '@whity-org/features/nav';
+} from '@whity/features/nav';
+import type { ServerNavItem } from '@whity/features/nav';
 
 /**
  * Tests for the SERVER-DRIVEN half of the nav contract
- * (@whity-org/features/nav): turning `GET /api/navigation`'s flat,
+ * (@whity/features/nav): turning `GET /api/navigation`'s flat,
  * RBAC-filtered item list into `AppSidebar`'s `AppSidebarNavGroup[]`.
  *
  * Three things here are regressions, not hypotheticals — each is a shape the

@@ -26,18 +26,18 @@ import type {
   ReferenceConfig,
 } from '@/lib/plugin-crud-schema';
 import { usePluginData } from '@/lib/use-plugin-data';
-import { Button } from '@whity-org/ui/button';
-import { BilingualInput } from '@whity-org/ui/bilingual-input';
+import { Button } from '@whity/ui/button';
+import { BilingualInput } from '@whity/ui/bilingual-input';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@whity-org/ui/textarea';
+import { Textarea } from '@whity/ui/textarea';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@whity-org/ui/select';
-import { useTranslation, type TranslateFn } from '@whity-org/features/i18n';
+} from '@whity/ui/select';
+import { useTranslation, type TranslateFn } from '@whity/features/i18n';
 
 /**
  * Row view-model for the schema-driven table: a plain record of unknown cell

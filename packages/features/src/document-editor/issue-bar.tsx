@@ -2,8 +2,8 @@
 
 import * as React from 'react';
 
-import { Button } from '@whity-org/ui/button';
-import { Icon } from '@whity-org/ui/icon';
+import { Button } from '@whity/ui/button';
+import { Icon } from '@whity/ui/icon';
 import { useTranslation } from '../i18n';
 
 /** A field the issuing person fills in: one of the template's own fields. */

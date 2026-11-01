@@ -71,16 +71,16 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
-import { Badge } from '@whity-org/ui/badge';
-import { Button } from '@whity-org/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity-org/ui/card';
+import { Badge } from '@whity/ui/badge';
+import { Button } from '@whity/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@whity-org/ui/select';
+} from '@whity/ui/select';
 import { IconUser } from '@tabler/icons-react';
 
 import {

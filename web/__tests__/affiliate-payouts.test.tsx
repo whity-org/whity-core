@@ -31,7 +31,7 @@ jest.mock('@/lib/toast-context', () => ({
   useToast: () => ({ addToast }),
 }));
 
-jest.mock('@whity-org/features/i18n', () => ({
+jest.mock('@whity/features/i18n', () => ({
   useTranslation:
     () =>
     (_key: string, fallback: string, vars?: Record<string, string | number>) =>

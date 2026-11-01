@@ -24,7 +24,7 @@ import { cn } from '@/lib/utils';
 import { api } from '@/lib/api/client';
 import { useFetch } from '@/hooks/useFetch';
 import { useNavigation } from '@/lib/navigation-context';
-import { useTranslation } from '@whity-org/features/i18n';
+import { useTranslation } from '@whity/features/i18n';
 import type { components } from '@/lib/api/schema';
 
 type SettingsTab = components['schemas']['SettingsTab'];

@@ -10,11 +10,11 @@ import {
 } from '@/lib/plugin-action-submit';
 import { useToast } from '@/lib/toast-context';
 import { AdminHeader } from '@/components/admin/admin-header';
-import { Button } from '@whity-org/ui/button';
+import { Button } from '@whity/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@whity-org/ui/textarea';
+import { Textarea } from '@whity/ui/textarea';
 import { IconAlertTriangle } from '@tabler/icons-react';
-import { useTranslation } from '@whity-org/features/i18n';
+import { useTranslation } from '@whity/features/i18n';
 
 /**
  * Generic "action" screen (WC-169 follow-up): renders the form declared by a

@@ -11,8 +11,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Button } from '@whity-org/ui/button';
-import { useTranslation } from '@whity-org/features/i18n';
+import { Button } from '@whity/ui/button';
+import { useTranslation } from '@whity/features/i18n';
 import type { User } from './page';
 import { useApproverCoverage, wouldStrandTenant } from '@/hooks/useApproverCoverage';
 

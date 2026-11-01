@@ -1,14 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { useTranslation } from '@whity-org/features/i18n';
-import { Button } from '@whity-org/ui/button';
+import { useTranslation } from '@whity/features/i18n';
+import { Button } from '@whity/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@whity-org/ui/dropdown-menu';
+} from '@whity/ui/dropdown-menu';
 import {
   IconDots,
   IconDownload,

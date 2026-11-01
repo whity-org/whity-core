@@ -1,6 +1,6 @@
 import * as React from "react"
 import type { Decorator } from "@storybook/nextjs-vite"
-import { LanguageProvider } from "@whity-org/features/i18n"
+import { LanguageProvider } from "@whity/features/i18n"
 import { DirectionProvider } from "@/lib/direction-context"
 import arAdmin from "../../database/i18n/ar/admin.json"
 import arCommon from "../../database/i18n/ar/common.json"
