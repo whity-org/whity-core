@@ -28,6 +28,8 @@ final class SessionBriefing
 {
     private const AGENT_KIND = 'ai-agent';
     private const AGENT_MODE = 'dev.whity/agentMode';
+    /** The briefing is read at the start of every session, so its list stays short. */
+    private const MAX_GRANTED_AGENTS = 20;
 
     /**
      * @param \Closure(int, int): array{name: ?string, workspace: ?string} $identity
@@ -37,11 +39,15 @@ final class SessionBriefing
      *        A workspace agent's definition (AgentRepository's shape) by the
      *        agent's principal id and tenant, or null when it is not a
      *        workspace agent (WHIT-817).
+     * @param \Closure(int, int): list<array<string, mixed>> $grantedAgents
+     *        The workspace agents a person has granted for themselves, by
+     *        profile and tenant (AgentRepository's shape; WHIT-824).
      */
     public function __construct(
         private readonly ?\Closure $identity = null,
         private readonly array $limits = ['perMinute' => 60, 'tenantPerMinute' => 300],
         private readonly ?\Closure $persona = null,
+        private readonly ?\Closure $grantedAgents = null,
     ) {
     }
 
@@ -141,7 +147,31 @@ final class SessionBriefing
             }
         }
 
+        // WHIT-824: a person's own connection names the agents they granted, so
+        // their client can offer them; each is its own sign-in at its `slug`,
+        // with its own grant. An agent is never told about the others.
+        if (!$isAgent && $this->grantedAgents !== null) {
+            $mine = ($this->grantedAgents)($principal->userId, $principal->tenantId);
+            if ($mine !== []) {
+                $briefing['grantedAgents'] = array_map(static fn (array $agent): array => [
+                    'slug' => (string) ($agent['slug'] ?? ''),
+                    'name' => self::localized($agent, 'name', $ar),
+                    'role' => self::localized($agent, 'role', $ar),
+                ], array_slice($mine, 0, self::MAX_GRANTED_AGENTS));
+            }
+        }
+
         return $briefing;
+    }
+
+    /**
+     * @param array<string, mixed> $agent
+     */
+    private static function localized(array $agent, string $field, bool $ar): string
+    {
+        $arabic = trim((string) ($agent[$field . '_ar'] ?? ''));
+
+        return $ar && $arabic !== '' ? $arabic : trim((string) ($agent[$field] ?? ''));
     }
 
     /**

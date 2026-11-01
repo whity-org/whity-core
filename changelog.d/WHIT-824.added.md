@@ -1,0 +1,1 @@
+- **Your own MCP connection now names the agents you've granted.** `init_session` lists them (slug, name and role, in your language), so a client like Whity Agent can offer them. Each agent is still its own sign-in at `/mcp/agents/<slug>`, with its own grant. An agent's own session never sees this list.

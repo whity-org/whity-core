@@ -78,6 +78,43 @@ final class InitSessionPersonaTest extends TestCase
         self::assertArrayNotHasKey('agent', (new SessionBriefing())->brief($this->agent(), self::TOOLS, 'en'));
     }
 
+    public function testAPersonIsToldWhichAgentsTheyGranted(): void
+    {
+        $asked = [];
+        $briefing = new SessionBriefing(grantedAgents: static function (int $profile, int $tenant) use (&$asked): array {
+            $asked[] = [$profile, $tenant];
+            return [self::CLERK + ['slug' => 'finance-clerk']];
+        });
+        $person = new McpPrincipal(7, 7, self::TENANT, 'user', ['tools:call'], 'jti-person');
+
+        $english = $briefing->brief($person, self::TOOLS, 'en')['grantedAgents'];
+        self::assertSame([['slug' => 'finance-clerk', 'name' => 'Finance clerk', 'role' => 'Prepares invoices for review.']], $english);
+        self::assertSame([[7, self::TENANT]], $asked);
+
+        $arabic = $briefing->brief($person, self::TOOLS, 'ar')['grantedAgents'][0];
+        self::assertSame('موظف المالية', $arabic['name']);
+        self::assertSame('Prepares invoices for review.', $arabic['role'], 'no Arabic role: English');
+    }
+
+    public function testAnAgentIsNeverToldAboutOtherAgentsAndNoneMeansNoKey(): void
+    {
+        $granted = new SessionBriefing(grantedAgents: static fn (int $p, int $t): array => [self::CLERK + ['slug' => 'finance-clerk']]);
+        self::assertArrayNotHasKey('grantedAgents', $granted->brief($this->agent(), self::TOOLS, 'en'));
+
+        $none   = new SessionBriefing(grantedAgents: static fn (int $p, int $t): array => []);
+        $person = new McpPrincipal(7, 7, self::TENANT, 'user', ['tools:call'], 'jti-person');
+        self::assertArrayNotHasKey('grantedAgents', $none->brief($person, self::TOOLS, 'en'));
+    }
+
+    public function testTheGrantedListStaysShort(): void
+    {
+        $many     = array_fill(0, 50, self::CLERK + ['slug' => 'x']);
+        $briefing = new SessionBriefing(grantedAgents: static fn (int $p, int $t): array => $many);
+        $person   = new McpPrincipal(7, 7, self::TENANT, 'user', ['tools:call'], 'jti-person');
+
+        self::assertCount(20, $briefing->brief($person, self::TOOLS, 'en')['grantedAgents']);
+    }
+
     public function testTheBriefingStaysSmallWithoutTheInstructions(): void
     {
         $agent = self::CLERK;
