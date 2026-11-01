@@ -493,6 +493,11 @@ $resourceTypeRegistry = new \Whity\Core\RBAC\ResourceTypeRegistry($hookManager);
 $resourceTypeRegistry->registerCoreResourceTypes();
 \Whity\register_service(\Whity\Core\RBAC\ResourceTypeRegistry::class, $resourceTypeRegistry); // @phpstan-ignore-line
 
+// Agent presets (WHIT-815): core's from database/agent-presets; plugin and
+// Whity Builder presets join at boot (WHIT-818).
+$agentPresetRegistry = new \Whity\Core\Agent\AgentPresetRegistry();
+\Whity\register_service(\Whity\Core\Agent\AgentPresetRegistry::class, $agentPresetRegistry); // @phpstan-ignore-line
+
 // 4c-ante. Organizational-unit TYPE catalogue (#822): which KINDS of unit a
 // plugin may contribute to a tenant's tree (campus, faculty, clinic, ward).
 // Constructed after the hook manager so a registration is announced on the
@@ -4683,7 +4688,7 @@ $router->register('POST', '/api/me/agent-proposals/{id:\d+}/decline',  [$agentPr
 // to every role holding mcp:tokens:manage. Writes are agentPolicy refuse.
 $agentsHandler = new \Whity\Api\AgentsApiHandler(
     new \Whity\Core\Agent\AgentRepository($db->getPdo()),
-    new \Whity\Core\Agent\AgentPresetRegistry(),
+    $agentPresetRegistry,
     $auditLogger,
 );
 $router->register('GET',   '/api/agents',                      [$agentsHandler, 'list'],    null, null, CorePermissions::AGENTS_MANAGE);

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Whity\Core\Agent;
 
+use Whity\Core\Container\HostWiredService;
+
 /**
  * Ready-made agent templates (WHIT-815; docs/design/AGENT-PERSONAS-AND-WHITY-AGENT.md
  * §4.5): a persona, its toolsets and a starting grant, shipped as manifests.
@@ -21,8 +23,11 @@ namespace Whity\Core\Agent;
  * Core presets are our own data, so a bad one is a build error, not a warning:
  * the constructor throws and {@see \Tests\Unit\Core\Agent\AgentPresetRegistryTest}
  * loads the real directory.
+ *
+ * Host-wired: plugin and Whity Builder presets join it at boot (WHIT-818), so
+ * an improvised instance would silently offer core's presets only.
  */
-final class AgentPresetRegistry
+final class AgentPresetRegistry implements HostWiredService
 {
     public const CORE_PREFIX = 'core.';
 
