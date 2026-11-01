@@ -207,6 +207,40 @@ services:
         echo "[queue-worker] durable job worker started";
         php public/index.php queue:work --max-runtime=3600 || echo "[queue-worker] exited (code $$?); restarting";
 
+  # Domain-event relay (#1063). Delivers what HookManager::dispatchAsync() records
+  # in event_outbox; without it those events are never delivered and the table
+  # grows without bound. It runs alongside queue:work, never instead of it, so it
+  # shares the `queue` profile. The command lives in bin/whity-cli, not in
+  # public/index.php. Recycles on --max-runtime like the worker.
+  events-relay:
+    image: whity-core:dev
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      DB_HOST: postgres
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${DB_NAME:-whity_core}
+      DB_USER: ${DB_USER:-whity}
+      DB_PASSWORD: ${DB_PASSWORD:-whity_dev}
+      JWT_SECRET: ${JWT_SECRET:-dev_secret_key_change_in_production}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-dev_encryption_key_change_in_production}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
+    volumes:
+      - .:/app
+    working_dir: /app
+    profiles:
+      - queue
+    restart: unless-stopped
+    command:
+      - sh
+      - -c
+      - |
+        echo "[events-relay] domain-event relay started";
+        php bin/whity-cli events:relay --max-runtime=3600 || echo "[events-relay] exited (code $$?); restarting";
+
   # Cron-tick scheduler (WC-scheduler). Runs the schedule:run loop that, once per
   # minute, enqueues every DUE scheduled_jobs row onto the queue and prunes
   # retained completed jobs. Exactly-once-per-minute ACROSS workers via the
