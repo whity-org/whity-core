@@ -3135,6 +3135,88 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/agents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The workspace's agents, and which you use */
+        get: operations["get_api_v1_me_agents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/agents/{id}/assignment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Use an agent for yourself
+         * @description Your grant starts from the agent's template, limited to what you hold: reads at most Allowed, writes at most Ask first.
+         */
+        post: operations["post_api_v1_me_agents_id_assignment"];
+        /**
+         * Stop using an agent
+         * @description Its credentials are revoked, and its waiting proposals can no longer run.
+         */
+        delete: operations["delete_api_v1_me_agents_id_assignment"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/agents/{id}/assignment/grant": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Your grant for an agent, permission by permission */
+        get: operations["get_api_v1_me_agents_id_assignment_grant"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Change your grant for an agent
+         * @description Send permission => off, ask, allow or default. Each mode must be one the grant offers; it applies to every credential of the agent from its next call.
+         */
+        patch: operations["patch_api_v1_me_agents_id_assignment_grant"];
+        trace?: never;
+    };
+    "/api/v1/me/agents/{id}/credentials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * A credential that acts as this agent for you
+         * @description An ai-agent token for MCP clients. Its toolsets and grant are read from your use of the agent on every call. The token is shown once.
+         */
+        post: operations["post_api_v1_me_agents_id_credentials"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/audit-logs": {
         parameters: {
             query?: never;
@@ -6251,6 +6333,19 @@ export interface components {
             createdAt: string;
             updatedAt: string;
         };
+        AgentAssignmentGrant: {
+            assignmentId: number;
+            principalId: string;
+            agent: {
+                id: number;
+                name: string;
+                nameAr: string;
+            };
+            permissions: components["schemas"]["AgentGrantRow"][];
+        };
+        AgentAssignmentGrantResponse: {
+            data: components["schemas"]["AgentAssignmentGrant"];
+        };
         AgentCreateRequest: {
             /** @description Lower-case letters, digits and dashes; unique in the workspace */
             slug?: string;
@@ -6284,6 +6379,35 @@ export interface components {
             };
             /** @description Start from this preset; fields sent override its own */
             presetKey?: string;
+        };
+        AgentCredentialResponse: {
+            data: {
+                jti: string;
+                /** @description Shown once */
+                token: string;
+                name: string;
+                principalId: string;
+            };
+        };
+        AgentGrantRow: {
+            permission: string;
+            /**
+             * @description The mode set; null for the default
+             * @enum {string|null}
+             */
+            mode: "off" | "ask" | "allow" | null;
+            /** @description The modes you may set */
+            modes: ("off" | "ask" | "allow")[];
+            withheld: {
+                [key: string]: {
+                    reason: string;
+                    message: string;
+                };
+            };
+            effective: {
+                read?: string | null;
+                write?: string | null;
+            };
         };
         AgentListResponse: {
             data: components["schemas"]["Agent"][];
@@ -6368,6 +6492,11 @@ export interface components {
         };
         AgentResponse: {
             data: components["schemas"]["Agent"];
+        };
+        AgentUnassignResponse: {
+            data: {
+                revokedCredentials: number;
+            };
         };
         ApprovalStatusResponse: {
             data: {
@@ -8745,6 +8874,31 @@ export interface components {
                 id: number;
                 message: string;
             };
+        };
+        MyAgent: {
+            id: number;
+            slug: string;
+            name: string;
+            nameAr: string;
+            role: string;
+            roleAr: string;
+            /** @enum {string} */
+            tone: "plain" | "formal" | "brief";
+            /** @enum {string} */
+            language: "auto" | "en" | "ar";
+            preset: {
+                key?: string;
+                version?: number;
+            } | null;
+            /** @description Your use of this agent; null when you don't use it */
+            assignment: {
+                id?: number;
+                principalId?: string;
+                createdAt?: string;
+            } | null;
+        };
+        MyAgentListResponse: {
+            data: components["schemas"]["MyAgent"][];
         };
         NavigationItem: {
             id: string;
@@ -27620,6 +27774,469 @@ export interface operations {
             };
             /** @description The proposal is no longer waiting (decided or expired) */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_me_agents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Active agents, by name */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyAgentListResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_me_agents_id_assignment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ID of the agent. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Your grant for the agent */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentAssignmentGrantResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Agent not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description You already use this agent */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    delete_api_v1_me_agents_id_assignment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ID of the agent. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description How many credentials were revoked */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentUnassignResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No such agent, or you don't use it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_me_agents_id_assignment_grant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ID of the agent. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Each permission's mode, the modes you may set, and what the agent can do */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentAssignmentGrantResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No such agent, or you don't use it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    patch_api_v1_me_agents_id_assignment_grant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ID of the agent. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: "off" | "ask" | "allow" | "default";
+                };
+            };
+        };
+        responses: {
+            /** @description Your grant after the change */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentAssignmentGrantResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No such agent, or you don't use it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A mode that isn't possible for that permission */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_me_agents_id_credentials: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ID of the agent. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description What to call the credential; the agent's name by default */
+                    name?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The new credential */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentCredentialResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No such agent, or you don't use it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description name is too long */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -447,7 +447,7 @@ final class ToolsCallHandler implements MethodHandler
         $summary    = is_string($tool['description'] ?? null) && $tool['description'] !== '' ? $tool['description'] : $toolName;
         $id = $this->proposals->create(
             $principal->tenantId,
-            $principal->jti,
+            $principal->agentPrincipalId(),
             $principal->userId,
             $toolName,
             $arguments,
