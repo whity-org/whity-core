@@ -9,7 +9,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { act, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { DataTable } from '@whity/ui/data-table';
 
 const mounts = jest.fn();
@@ -21,18 +21,18 @@ function Probe({ label }: { label: string }) {
   return <span>{label}</span>;
 }
 
-let rerenderParent: () => void = () => {};
-
 function Page({ prefix }: { prefix: string }) {
   const [, setTick] = useState(0);
-  rerenderParent = () => setTick((n) => n + 1);
   return (
-    <DataTable
-      data={[{ id: 1, name: 'Rana' }]}
-      getRowId={(row) => String(row.id)}
-      columns={[{ accessorKey: 'name', header: 'Name', cell: (row) => <Probe label={`${prefix} cell ${row.name}`} /> }]}
-      rowActions={(row) => <Probe label={`${prefix} menu ${row.name}`} />}
-    />
+    <>
+      <button onClick={() => setTick((n) => n + 1)}>Re-render</button>
+      <DataTable
+        data={[{ id: 1, name: 'Rana' }]}
+        getRowId={(row) => String(row.id)}
+        columns={[{ accessorKey: 'name', header: 'Name', cell: (row) => <Probe label={`${prefix} cell ${row.name}`} /> }]}
+        rowActions={(row) => <Probe label={`${prefix} menu ${row.name}`} />}
+      />
+    </>
   );
 }
 
@@ -43,8 +43,8 @@ it('keeps cells and row menus mounted when the parent re-renders', () => {
   expect(mounts).toHaveBeenCalledTimes(2);
 
   const menu = screen.getByText('a menu Rana');
-  act(() => rerenderParent());
-  act(() => rerenderParent());
+  fireEvent.click(screen.getByRole('button', { name: 'Re-render' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Re-render' }));
 
   expect(mounts).toHaveBeenCalledTimes(2);
   expect(screen.getByText('a menu Rana')).toBe(menu);
