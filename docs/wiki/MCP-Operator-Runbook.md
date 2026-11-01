@@ -62,6 +62,38 @@ A method outside the token's capabilities answers `-32003 Forbidden`.
 Prefer a narrowed token for any automation that does one job. If it leaks, it can do that job
 and nothing else.
 
+**Toolsets (optional).** `toolset:core.forms` or `toolset:acme.*` limits the token to those areas,
+on both the list and the call. They narrow further and never grant anything.
+
+### Tool list size and plugin tools
+
+`/mcp` lists at most 12 tools and 10 KB, per workspace. The **MCP Tools** admin page shows each
+operation's toolset, how apps see it and what agents may do with it, plus what each kind of
+connection costs an app in tokens.
+
+A plugin may ask for one read-only tool to be listed directly. It stays searchable-only until an
+administrator turns it on, with the switch on that page (the setting `mcp.always_on_plugin_tools`).
+Past the cap, the extra plugin tools drop out of the list and stay searchable, so a turned-on tool
+that isn't listed is not an error.
+
+### Splits
+
+`/mcp/<split>` serves one slice of the server. Core's areas and each plugin's toolset are there
+already. Name your own with `MCP_SPLITS`, for example:
+
+```
+MCP_SPLITS=sales=core.forms,acme.*;ops=core.time
+```
+
+A name that collides with a core area or `agents` is ignored. Rate limits are per principal across
+splits, and the audit trail records the split.
+
+### Agents, proposals and undo
+
+An agent's writes wait for its person's approval unless its grant says Allowed and the operation
+can be undone. Watch these audit actions: `agent.proposal.approved`, `agent.proposal.declined` and
+`agent.action.undone`. A proposal expires after 7 days. Undo needs nothing from an operator.
+
 **Older tokens.** Tokens issued before scopes were enforced keep working:
 - One with no recognized capability keeps every family.
 - Spellings such as `tools:list` or `prompts:get` count as their family's capability.
