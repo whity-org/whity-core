@@ -691,6 +691,75 @@
           }
         }
       }
+    },
+    "agentPresets": {
+      "description": "Agent presets (SDK 1.61): ready-made agent templates. The host addresses each as <plugin toolset root>.<key> and copies it when a workspace creates an agent from it. A preset may start a read at Allowed but never a write.",
+      "type": "object",
+      "maxProperties": 50,
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9-]{0,47}$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "role",
+          "instructions"
+        ],
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "name": {
+            "$ref": "#/$defs/label",
+            "description": "At most 60 characters in each language."
+          },
+          "role": {
+            "$ref": "#/$defs/label",
+            "description": "At most 200 characters in each language."
+          },
+          "instructions": {
+            "$ref": "#/$defs/label",
+            "description": "At most 4000 characters in each language."
+          },
+          "tone": {
+            "enum": [
+              "plain",
+              "formal",
+              "brief"
+            ]
+          },
+          "language": {
+            "enum": [
+              "auto",
+              "en",
+              "ar"
+            ]
+          },
+          "toolsets": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z0-9_-]+(\\.[a-z0-9_-]+)*(\\.\\*)?$"
+            }
+          },
+          "grant": {
+            "type": "object",
+            "propertyNames": {
+              "pattern": "^[a-z][a-z0-9_]*(:[a-z][a-z0-9_]*)+$"
+            },
+            "additionalProperties": {
+              "enum": [
+                "off",
+                "ask",
+                "allow"
+              ]
+            }
+          }
+        }
+      }
     }
   },
   "$defs": {

@@ -50,6 +50,7 @@ use Whity\Sdk\Http\Response;
 use Whity\Mcp\Prompts\Prompt;
 use Whity\Mcp\Prompts\PromptRegistry;
 use Whity\Mcp\Tools\AuthoredToolRegistry;
+use Whity\Sdk\PluginAgentPresetsInterface;
 use Whity\Sdk\PluginDocumentsInterface;
 use Whity\Sdk\PluginFrontendInterface;
 use Whity\Sdk\PluginInterface;
@@ -171,6 +172,7 @@ class PluginLoader
     // Where code plugins' template slots and merge-field record types go
     // (SDK 1.56, WHIT-742). Set by both entry points before load().
     private ?\Whity\Core\Document\Slots\TemplateSlotRegistry $templateSlotRegistry = null;
+    private ?\Whity\Core\Agent\AgentPresetRegistry $agentPresetRegistry = null;
     private ?\Whity\Core\Document\Fields\DocumentFieldRegistry $documentFieldRegistry = null;
 
     /**
@@ -851,9 +853,19 @@ class PluginLoader
         $this->documentFieldRegistry = $fields;
     }
 
+    /**
+     * Where plugins' agent presets go (SDK 1.61, WHIT-818). Both entry points
+     * call this before load(); a host without it registers none.
+     */
+    public function setAgentPresetRegistry(\Whity\Core\Agent\AgentPresetRegistry $presets): void
+    {
+        $this->agentPresetRegistry = $presets;
+    }
+
     private function unregisterAll(): void
     {
-        foreach ($this->registeredPlugins as $info) {
+        foreach ($this->registeredPlugins as $pluginKey => $info) {
+            $this->agentPresetRegistry?->unregisterPlugin((string) $pluginKey);
             $this->router->unregisterByNamespace($info['namespacePrefix']);
             // A reload re-declares them from the plugin as it is now.
             $this->templateSlotRegistry?->unregister($info['plugin']->getName());
@@ -3455,6 +3467,19 @@ class PluginLoader
         //     record type the host serves once the plugin's own are in.
         if ($plugin instanceof PluginDocumentsInterface) {
             $this->registerDocuments($plugin, $pluginKey);
+        }
+
+        // 2a-quater-bis. Agent presets (SDK 1.61, WHIT-818). Same shape: optional,
+        //     and a bad one is dropped with a logged reason while the plugin keeps
+        //     loading. A preset may start a read at Allowed but never a write.
+        if ($plugin instanceof PluginAgentPresetsInterface && $this->agentPresetRegistry !== null && $this->permissionRegistry !== null) {
+            try {
+                foreach ($this->agentPresetRegistry->registerPlugin($pluginKey, $plugin->getAgentPresets(), $this->permissionRegistry->exists(...)) as $reason) {
+                    $this->logWarning("[Plugin:{$pluginKey}] getAgentPresets(): {$reason}.");
+                }
+            } catch (Throwable $e) {
+                $this->handlePluginThrowable($pluginKey, $e, 'getAgentPresets');
+            }
         }
 
         // 2a-quinquies. Register declared SETTINGS (#713 item 1). Same shape as

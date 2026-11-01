@@ -187,7 +187,8 @@ abstract class BaseCommand implements CliCommand, CommandHelp
         \Whity\register_service(\Whity\Core\Ou\OuTypeRegistry::class, $ouTypeRegistry);
 
         // Agent presets (WHIT-815), as public/index.php registers them.
-        \Whity\register_service(\Whity\Core\Agent\AgentPresetRegistry::class, new \Whity\Core\Agent\AgentPresetRegistry());
+        $agentPresetRegistry = new \Whity\Core\Agent\AgentPresetRegistry();
+        \Whity\register_service(\Whity\Core\Agent\AgentPresetRegistry::class, $agentPresetRegistry);
 
         // TIME-WINDOW TYPE catalogue (#1070), registered as a service for exactly
         // the same reason. A command is the natural home for period work — an
@@ -498,6 +499,7 @@ abstract class BaseCommand implements CliCommand, CommandHelp
             )
         );
         $templateSlotRegistry = new \Whity\Core\Document\Slots\TemplateSlotRegistry($liveManifests);
+        $agentPresetRegistry->useManifests($liveManifests);
         \Whity\register_service(\Whity\Core\Document\Slots\TemplateSlotRegistry::class, $templateSlotRegistry);
         \Whity\register_service(
             \Whity\Core\Document\Issuing\TemplateIssuing::class,
@@ -529,6 +531,7 @@ abstract class BaseCommand implements CliCommand, CommandHelp
                 $roleChecker
             )
         );
+        $pluginLoader->setAgentPresetRegistry($agentPresetRegistry);
         $pluginLoader->setDocumentRegistries($templateSlotRegistry, $documentFieldRegistry);
         $pluginLoader->load();
 

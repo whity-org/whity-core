@@ -87,7 +87,7 @@ final class AgentsApiHandler
         $presetKey = $body['presetKey'] ?? null;
         $preset    = null;
         if ($presetKey !== null) {
-            $preset = is_string($presetKey) ? $this->presets->get($presetKey) : null;
+            $preset = is_string($presetKey) ? $this->presets->find($tenantId, $presetKey) : null;
             if ($preset === null) {
                 return Response::error('No such preset', 422);
             }
@@ -190,7 +190,7 @@ final class AgentsApiHandler
             return $caller;
         }
 
-        return Response::json(['data' => array_map(self::presentPreset(...), $this->presets->all())], 200);
+        return Response::json(['data' => array_map(self::presentPreset(...), $this->presets->forTenant($caller[0]))], 200);
     }
 
     /** @param array<string, string> $params */

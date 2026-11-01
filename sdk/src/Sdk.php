@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.60).
+ * SDK identity (v1.61).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -917,13 +917,21 @@ namespace Whity\Sdk;
  * by plugin, never read back by settings or the API, audited by key only.
  * Resolvable in routes, MCP tools and jobs (WHIT-838).
  *
+ * Purely additive.) ->
+ * 1.61 (AGENT PRESETS: the optional {@see PluginAgentPresetsInterface} and
+ * `agentPresets` in `plugin.json` ship ready-made agent templates: a persona in
+ * English and Arabic, toolsets and where a person's grant starts. Checked by
+ * {@see Manifest\AgentPresetValidator}, which refuses a preset that starts a
+ * write at Allowed; {@see Manifest\PluginManifest::agentPresets()} reads them
+ * (WHIT-818).
+ *
  * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.60.0';
+    public const VERSION = '1.61.0';
 
     /**
      * Static identity only — never instantiated.
