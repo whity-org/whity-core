@@ -1464,9 +1464,15 @@ try {
 ```
 
 - It acts as **the person whose request it is**, with their permissions, and
-  records them as the issuer. Outside a request (a job, a listener in the
-  relay) it refuses with `no_actor` until the background-issuing allow-list
-  arrives.
+  records them as the issuer.
+- **In your jobs, with no person (SDK 1.58).** Return `true` from
+  `issuesInBackground()` and a job of yours may issue, but only where the
+  workspace allowed it (`PUT /api/document-background-issuing/{plugin}`, by a
+  holder of `documents:publish`), only from your own slots, and with only the
+  permissions your plugin declares. The document is recorded with no person,
+  the system is the audit actor, and the document events carry
+  `origin: plugin:<name>`. Otherwise it's `background_not_allowed`; anywhere
+  else with no person it's `no_actor`.
 - **`originKey`** makes it safe to retry: the same key returns the first
   document (`replayed: true`) instead of issuing a second.
 - A value for a field the record filled is refused (`field_conflict`), so

@@ -16,7 +16,7 @@ namespace Whity\Core\Document\Issuing;
  * `template_unpublished`, `concurrent_edit`, `slot_unavailable`,
  * `slot_unbound`, `slot_misfit`, `missing_fields`, `field_conflict`,
  * `vetoed`, `origin_key_conflict`, `render_unavailable`,
- * `persist_unavailable`.
+ * `persist_unavailable`, `background_not_allowed`.
  */
 final class DocumentIssueRefused extends \RuntimeException
 {

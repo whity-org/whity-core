@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Whity\Core\Document\Issuing;
 
 use Whity\Core\Document\Fields\DocumentFieldRegistry;
+use Whity\Core\Document\Slots\BackgroundIssuing;
 use Whity\Core\Document\Slots\SlotBindings;
 use Whity\Core\Document\Slots\TemplateSlotRegistry;
 use Whity\Core\Settings\SettingsRegistry;
@@ -33,6 +34,9 @@ final class TemplateIssuing
     /** @var callable(int, int, int): (array<string, mixed>|null) */
     private $visibleSource;
 
+    /** @var (callable(int, int): (array<string, mixed>|null))|null */
+    private $workspaceSource;
+
     /** @var DocumentIssuing|\Closure(): DocumentIssuing */
     private DocumentIssuing|\Closure $issuing;
 
@@ -50,8 +54,12 @@ final class TemplateIssuing
         private readonly SettingsService $settings,
         callable $visibleSource,
         private readonly ?TemplateSlotRegistry $slots = null,
+        // A template by id in a workspace, for a plugin issuing with no person:
+        // its slot's binding decides it, and a bound template is never personal.
+        ?callable $workspaceSource = null,
     ) {
         $this->visibleSource = $visibleSource;
+        $this->workspaceSource = $workspaceSource;
         $this->issuing = $issuing;
     }
 
@@ -173,6 +181,9 @@ final class TemplateIssuing
         if ($input->both) {
             throw DocumentIssueRefused::invalid("Send 'slot' or 'document_source_id', not both");
         }
+        if ($actor->plugin !== null) {
+            return $this->backgroundSource($actor, $input);
+        }
         if ($input->slot !== null) {
             return $this->slotSource($actor, $input->slot);
         }
@@ -230,11 +241,39 @@ final class TemplateIssuing
         return $source;
     }
 
+    /**
+     * The template a plugin issues from with no person (DOCUMENT-AUTOMATION.md
+     * 3.7): one of its own slots, in a workspace that allowed it.
+     *
+     * @return array<string, mixed>
+     */
+    private function backgroundSource(ActingAs $actor, IssueInput $input): array
+    {
+        $plugin = (string) $actor->plugin;
+        $refuse = static fn (string $why): DocumentIssueRefused => new DocumentIssueRefused(
+            'background_not_allowed',
+            $why,
+            403,
+            ['code' => 'background_not_allowed', 'plugin' => $plugin],
+        );
+        if ($input->slot === null || !str_starts_with($input->slot, $plugin . '.')) {
+            throw $refuse("With no person to act for, {$plugin} may issue only from its own slots");
+        }
+        $effective = $this->settings->effective($actor->tenantId);
+        if (!in_array($plugin, BackgroundIssuing::parse((string) ($effective[SettingsRegistry::DOCUMENTS_BACKGROUND_ISSUING] ?? '')), true)) {
+            throw $refuse("This workspace hasn't allowed {$plugin} to issue documents with no person");
+        }
+
+        return $this->slotSource($actor, $input->slot);
+    }
+
     /** @return array<string, mixed> */
     private function visible(ActingAs $actor, int $id): array
     {
         // Not found rather than forbidden on a miss: forbidden would confirm the template exists.
-        $source = ($this->visibleSource)($id, $actor->tenantId, $actor->profileId);
+        $source = $actor->plugin !== null
+            ? ($this->workspaceSource !== null ? ($this->workspaceSource)($id, $actor->tenantId) : null)
+            : ($this->visibleSource)($id, $actor->tenantId, $actor->profileId);
         if ($source === null) {
             throw new DocumentIssueRefused('template_not_found', 'Template not found', 404);
         }

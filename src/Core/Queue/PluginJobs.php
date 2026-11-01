@@ -49,6 +49,7 @@ final class PluginJobs
      *                                      with no manager has nothing to hear.
      * @param array{slots: \Whity\Core\Document\Slots\TemplateSlotRegistry, fields: \Whity\Core\Document\Fields\DocumentFieldRegistry}|null $documentRegistries
      *                                      The worker's document registries (WHIT-742).
+     * @return PluginLoader|null The loader, or null when plugins couldn't load.
      */
     public static function register(
         JobRegistry $registry,
@@ -57,7 +58,7 @@ final class PluginJobs
         ?HookManager $hooks = null,
         ?AuditLogger $auditLogger = null,
         ?array $documentRegistries = null,
-    ): void {
+    ): ?PluginLoader {
         $pluginDir ??= dirname(__DIR__, 3) . '/plugins';
 
         // A worker that cannot load plugins must still run CORE's jobs —
@@ -83,6 +84,8 @@ final class PluginJobs
             }
             $loader->load();
             $loader->collectJobs($registry);
+
+            return $loader;
         } catch (Throwable $e) {
             $message = '[queue] plugin jobs unavailable, running core handlers only: ' . $e->getMessage();
             if ($logger !== null) {
@@ -91,5 +94,7 @@ final class PluginJobs
                 error_log($message);
             }
         }
+
+        return null;
     }
 }

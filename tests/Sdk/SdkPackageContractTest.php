@@ -242,9 +242,12 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsOneEightForInteractiveBlocks(): void
     {
         $this->assertSame(
-            '1.56.0',
+            '1.58.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.56 ADDS DOCUMENTS FOR CODE PLUGINS: PluginDocumentsInterface declares template slots and '
+            'SDK 1.58 ADDS BACKGROUND ISSUING: a job of a plugin that declares issuesInBackground() issues '
+            . 'with no person where the workspace allowed it, from its own slots only, refused otherwise with '
+            . 'BACKGROUND_NOT_ALLOWED (WHIT-742). Purely additive. '
+            . 'SDK 1.56 ADDS DOCUMENTS FOR CODE PLUGINS: PluginDocumentsInterface declares template slots and '
             . 'record types as merge fields, and the host Documents service issues from a slot or a template '
             . 'as the person in the request, refusing with a stable reason (WHIT-742). Purely additive. '
             . 'SDK 1.55 ADDS TEMPLATE SLOTS: plugin.json gains documents.slots, the named places a workspace '

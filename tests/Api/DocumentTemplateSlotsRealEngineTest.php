@@ -14,6 +14,7 @@ use Whity\Auth\RoleChecker;
 use Whity\Core\Document\DocumentAccessPolicy;
 use Whity\Core\Document\DocumentSourceRepository;
 use Whity\Core\Document\DocumentSourceVersionRepository;
+use Whity\Core\Document\Slots\BackgroundIssuing;
 use Whity\Core\Document\Slots\SlotBindings;
 use Whity\Core\Document\Slots\TemplateSlot;
 use Whity\Core\Document\Slots\TemplateSlotRegistry;
@@ -225,6 +226,53 @@ final class DocumentTemplateSlotsRealEngineTest extends TestCase
 
         self::assertSame(422, $this->createTemplate(['kind' => 'template', 'title' => 'Too long', 'record_type' => str_repeat('x', 161)])->getStatusCode());
         self::assertSame(422, $this->createTemplate(['kind' => 'template', 'title' => 'Not a type', 'record_type' => 42])->getStatusCode());
+    }
+
+    /**
+     * The background-issuing allow-list (WHIT-742 slice 3): only a plugin
+     * that declares it is listed or can be allowed, and allowing one is a
+     * setting the settings PATCH can't write.
+     */
+    public function testAPluginThatDeclaresBackgroundIssuingCanBeAllowedAndStopped(): void
+    {
+        $this->registry->register('Invoicing', [
+            new TemplateSlot('Invoicing.invoice', 'Invoicing', ['en' => 'Invoice', 'ar' => 'فاتورة'], 'Invoicing.invoice'),
+        ]);
+        $this->registry->declareBackground('Invoicing', true);
+
+        $listed = $this->json($this->call('backgroundList', 'GET', '/api/document-background-issuing'))['data'];
+        self::assertSame([['plugin' => 'Invoicing', 'allowed' => false, 'slots' => ['Invoicing.invoice']]], $listed);
+
+        $allowed = $this->call('backgroundSet', 'PUT', '/api/document-background-issuing/Invoicing', ['allowed' => true], ['plugin' => 'Invoicing']);
+        self::assertSame(200, $allowed->getStatusCode(), (string) $allowed->getBody());
+        self::assertTrue($this->json($allowed)['data']['allowed']);
+        self::assertSame('["Invoicing"]', $this->settings->effective(self::TENANT)[SettingsRegistry::DOCUMENTS_BACKGROUND_ISSUING], 'read back from the setting');
+
+        $stopped = $this->call('backgroundSet', 'PUT', '/api/document-background-issuing/Invoicing', ['allowed' => false], ['plugin' => 'Invoicing']);
+        self::assertFalse($this->json($stopped)['data']['allowed']);
+        self::assertSame('', $this->settings->effective(self::TENANT)[SettingsRegistry::DOCUMENTS_BACKGROUND_ISSUING]);
+    }
+
+    public function testOnlyADeclaringPluginCanBeAllowed(): void
+    {
+        $this->registry->declareBackground('Invoicing', false);
+
+        self::assertSame(404, $this->call('backgroundSet', 'PUT', '/api/document-background-issuing/CakeOrders', ['allowed' => true], ['plugin' => 'CakeOrders'])->getStatusCode(), 'a workspace plugin declares nothing');
+        self::assertSame(404, $this->call('backgroundSet', 'PUT', '/api/document-background-issuing/Invoicing', ['allowed' => true], ['plugin' => 'Invoicing'])->getStatusCode());
+        self::assertSame([], $this->json($this->call('backgroundList', 'GET', '/api/document-background-issuing'))['data']);
+
+        $this->registry->declareBackground('Invoicing', true);
+        self::assertSame(422, $this->call('backgroundSet', 'PUT', '/api/document-background-issuing/Invoicing', ['allowed' => 'yes'], ['plugin' => 'Invoicing'])->getStatusCode());
+    }
+
+    public function testTheAllowListSettingOnlyTakesAListOfPluginNames(): void
+    {
+        self::assertNull(BackgroundIssuing::validate(''));
+        self::assertNull(BackgroundIssuing::validate('["Invoicing"]'));
+        self::assertNotNull(BackgroundIssuing::validate('{"Invoicing":true}'));
+        self::assertNotNull(BackgroundIssuing::validate('["not a name"]'));
+        self::assertNotNull(BackgroundIssuing::validate('["A","A"]'));
+        self::assertSame('["A","B"]', BackgroundIssuing::encode(['B', 'A', 'B']));
     }
 
     // ── helpers ─────────────────────────────────────────────────────────────

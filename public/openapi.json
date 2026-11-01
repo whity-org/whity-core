@@ -7348,6 +7348,210 @@
                 ]
             }
         },
+        "/api/v1/document-background-issuing": {
+            "get": {
+                "operationId": "get_api_v1_document_background_issuing",
+                "summary": "List the plugins that would issue documents with no person, and whether each is allowed",
+                "tags": [
+                    "documents"
+                ],
+                "description": "A plugin that declares issuesInBackground() may issue from its jobs with no person, but only where the workspace allows it, only from its own slots, and only with the permissions it declares. Each is listed with its slots.",
+                "responses": {
+                    "200": {
+                        "description": "The plugins",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DocumentBackgroundIssuerListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Tenant context is required",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/document-background-issuing/{plugin}": {
+            "put": {
+                "operationId": "put_api_v1_document_background_issuing_plugin",
+                "summary": "Allow or stop a plugin issuing documents with no person",
+                "tags": [
+                    "documents"
+                ],
+                "description": "Allowing it lets the plugin's jobs issue numbered, QR-verified documents from its own slots with nobody present, recorded with no person and the system as the actor.",
+                "parameters": [
+                    {
+                        "name": "plugin",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DocumentBackgroundIssuingRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The plugin, allowed or not",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DocumentBackgroundIssuerResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No plugin here declares that it issues with no person",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "allowed is not a boolean, or the system tenant",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/document-collections": {
             "get": {
                 "operationId": "get_api_v1_document_collections",
@@ -44228,6 +44432,68 @@
                     "checksum_sha256",
                     "rendered_at",
                     "content_url"
+                ]
+            },
+            "DocumentBackgroundIssuer": {
+                "type": "object",
+                "properties": {
+                    "plugin": {
+                        "type": "string",
+                        "description": "A plugin that declares it issues documents from its jobs with no person"
+                    },
+                    "allowed": {
+                        "type": "boolean",
+                        "description": "Whether this workspace allows it"
+                    },
+                    "slots": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Its slots here, the only ones it may issue from with no person"
+                    }
+                },
+                "required": [
+                    "plugin",
+                    "allowed",
+                    "slots"
+                ]
+            },
+            "DocumentBackgroundIssuerListResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/DocumentBackgroundIssuer"
+                        }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "DocumentBackgroundIssuerResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/DocumentBackgroundIssuer"
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "DocumentBackgroundIssuingRequest": {
+                "type": "object",
+                "properties": {
+                    "allowed": {
+                        "type": "boolean",
+                        "description": "true lets the plugin issue from its own slots with no person, with only the permissions it declares; false stops it"
+                    }
+                },
+                "required": [
+                    "allowed"
                 ]
             },
             "DocumentCollection": {

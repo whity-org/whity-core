@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.56).
+ * SDK identity (v1.58).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -887,13 +887,20 @@ namespace Whity\Sdk;
  * template for a record, as the person whose request it is, and refuses with
  * {@see Documents\DocumentNotIssuedException} and a stable reason (WHIT-742).
  *
+ * Purely additive.) ->
+ * 1.58 (BACKGROUND ISSUING: a job of a plugin that declares
+ * `issuesInBackground()` may issue through {@see Documents\Documents} with no
+ * person, where the workspace allowed it, only from its own slots and with
+ * only the permissions it declares. Otherwise it is refused with the new
+ * {@see Documents\DocumentNotIssuedException::BACKGROUND_NOT_ALLOWED} (WHIT-742).
+ *
  * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.56.0';
+    public const VERSION = '1.58.0';
 
     /**
      * Static identity only — never instantiated.

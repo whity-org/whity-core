@@ -132,6 +132,7 @@ final class SettingsApiHandler
      */
     private const WRITTEN_ELSEWHERE = [
         SettingsRegistry::DOCUMENTS_SLOT_BINDINGS => 'PUT /api/v1/document-template-slots/{key}',
+        SettingsRegistry::DOCUMENTS_BACKGROUND_ISSUING => 'PUT /api/v1/document-background-issuing/{plugin}',
     ];
 
     /**

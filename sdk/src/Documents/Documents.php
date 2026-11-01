@@ -11,10 +11,13 @@ namespace Whity\Sdk\Documents;
  *
  * The host implements it; a plugin never does. It acts as the person whose
  * request it is in, with their permissions, and records them as the issuer:
- * a plugin can't widen what that person may do. Outside a request (a job, a
- * listener in the relay) there is nobody to act for, and issuing is refused
- * with {@see DocumentNotIssuedException::NO_ACTOR} until the workspace's
- * background-issuing allow-list arrives.
+ * a plugin can't widen what that person may do.
+ *
+ * In a job of a plugin that declares `issuesInBackground()` (SDK 1.58), it
+ * acts as the plugin: only from the plugin's own slots, only with the
+ * permissions the plugin declares, and only in workspaces whose admins
+ * allowed it, otherwise {@see DocumentNotIssuedException::BACKGROUND_NOT_ALLOWED}.
+ * Anywhere else with no person it is {@see DocumentNotIssuedException::NO_ACTOR}.
  *
  * For documents from templates this replaces `DocumentRenderer::issue()`:
  * they carry the workspace's letterhead, theme, fields and QR code.

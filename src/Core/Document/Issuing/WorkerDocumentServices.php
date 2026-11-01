@@ -51,9 +51,12 @@ final class WorkerDocumentServices
 
     /**
      * @param array<string, mixed> $env
+     * @param (\Closure(string): (array{plugin: string, permissions: list<string>}|null))|null $jobPlugin
+     *        the plugin a running job belongs to and the permissions it
+     *        declares, so its jobs can issue in the background where allowed
      * @return array{slots: TemplateSlotRegistry, fields: DocumentFieldRegistry}
      */
-    public static function register(PDO $pdo, HookManager $hooks, array $env, string $storageRoot, ?LoggerInterface $logger = null): array
+    public static function register(PDO $pdo, HookManager $hooks, array $env, string $storageRoot, ?LoggerInterface $logger = null, ?\Closure $jobPlugin = null): array
     {
         $settings = new SettingsService(new GlobalSettingsRepository($pdo), new TenantSettingsRepository($pdo));
         $permissions = new PermissionRegistry();
@@ -98,7 +101,7 @@ final class WorkerDocumentServices
         \Whity\register_service(DocumentFieldRegistry::class, $fields);
         \Whity\register_service(TemplateSlotRegistry::class, $slots);
         \Whity\register_service(TemplateIssuing::class, $issuing);
-        \Whity\register_service(Documents::class, new SdkDocuments($issuing, $roleChecker));
+        \Whity\register_service(Documents::class, new SdkDocuments($issuing, $roleChecker, $jobPlugin, $slots));
 
         return ['slots' => $slots, 'fields' => $fields];
     }

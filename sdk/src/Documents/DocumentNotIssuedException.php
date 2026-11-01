@@ -11,7 +11,11 @@ namespace Whity\Sdk\Documents;
  */
 final class DocumentNotIssuedException extends \RuntimeException
 {
-    /** No person to act for (outside a request), or no workspace. */
+    /**
+     * No person to act for and no allowed background plugin: outside a
+     * request and not a job of a plugin that declares `issuesInBackground()`,
+     * or no workspace.
+     */
     public const NO_ACTOR = 'no_actor';
     public const INVALID_REQUEST = 'invalid_request';
     public const SLOT_UNAVAILABLE = 'slot_unavailable';
@@ -26,6 +30,11 @@ final class DocumentNotIssuedException extends \RuntimeException
     public const ORIGIN_KEY_CONFLICT = 'origin_key_conflict';
     public const RENDER_UNAVAILABLE = 'render_unavailable';
     public const PERSIST_UNAVAILABLE = 'persist_unavailable';
+    /**
+     * A job issuing with no person (SDK 1.58): from a slot that isn't the
+     * plugin's own, or in a workspace that hasn't allowed the plugin to.
+     */
+    public const BACKGROUND_NOT_ALLOWED = 'background_not_allowed';
 
     /** @param array<string, mixed> $details */
     public function __construct(

@@ -110,14 +110,35 @@ final class QueueWorkCommand implements CliCommand
             // worker gets the same issuing service a request does. It is built
             // on the first issue: a worker that never issues needs neither the
             // render service nor storage.
+            // A plugin's job may issue with no person where the workspace
+            // allowed it (slice 3): which plugin a job is, and what it
+            // declares, is the host's answer from the registry and loader.
+            $loaded = new class {
+                public ?\Whity\Core\PluginLoader $loader = null;
+            };
+            $jobPlugin = static function (string $job) use ($registry, $loaded): ?array {
+                $plugin = $registry->sourceOf($job);
+                $loader = $loaded->loader;
+                if ($plugin === null || !$loader instanceof \Whity\Core\PluginLoader) {
+                    return null;
+                }
+                foreach ($loader->getPlugins() as $candidate) {
+                    if ($candidate->getName() === $plugin) {
+                        return ['plugin' => $plugin, 'permissions' => array_values(array_filter($candidate->getPermissions(), 'is_string'))];
+                    }
+                }
+
+                return null;
+            };
             $documentRegistries = \Whity\Core\Document\Issuing\WorkerDocumentServices::register(
                 $pdo,
                 $hookManager,
                 $_ENV,
                 getenv('STORAGE_ROOT') ?: (dirname(__DIR__, 3) . '/storage'),
                 $this->logger,
+                $jobPlugin,
             );
-            PluginJobs::register($registry, null, $this->logger, $hookManager, $auditLogger, $documentRegistries);
+            $loaded->loader = PluginJobs::register($registry, null, $this->logger, $hookManager, $auditLogger, $documentRegistries);
             $runner ??= new JobRunner($repo, $registry, $this->logger);
         }
         $this->repo = $repo;

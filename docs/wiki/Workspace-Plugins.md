@@ -257,7 +257,7 @@ The list shows only the slots of switched-on plugins, each with its binding and,
 
 The same origin key returns the first document (`replayed: true`), so a retried automation step never issues twice. In the worker, the render service, storage and QR parts are built on the first issue, and each issue reads the workspace's plugins afresh.
 
-Not yet: code plugins declaring slots through the SDK (`PluginDocumentsInterface`) and the SDK's `Documents` facade, starters, the background-issuing allow-list, and the `issue_document` automation step (WHIT-795).
+Code plugins declare slots with `PluginDocumentsInterface` and issue through the SDK's `Documents` (SDK 1.56), and from their jobs where the workspace allows it (SDK 1.58; see Plugin-Development step 12b). Not yet: starters (WHIT-687) and the `issue_document` automation step (WHIT-795).
 
 ## Tables (migration 164)
 

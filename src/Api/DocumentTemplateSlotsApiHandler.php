@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Whity\Api;
 
+use Whity\Core\Document\Slots\BackgroundIssuing;
 use Whity\Core\Document\Slots\SlotBindings;
 use Whity\Core\Document\Slots\TemplateSlot;
 use Whity\Core\Document\Slots\TemplateSlotRegistry;
@@ -29,6 +30,13 @@ use Whity\Http\JsonBody;
  * kind the slot takes and for the slot's record type; anything else is a 422
  * with a `code` saying which. The bindings are the tenant setting
  * `documents.slot_bindings`, which the settings PATCH refuses.
+ *
+ * The background-issuing allow-list (slice 3, DOCUMENT-AUTOMATION.md 3.7):
+ * GET /api/document-background-issuing (documents:read) lists the plugins
+ * that declare they issue with no person, each with its slots and whether
+ * this workspace allows it. PUT /api/document-background-issuing/{plugin}
+ * (documents:publish) allows or stops one. The tenant setting
+ * `documents.background_issuing` holds it; the settings PATCH refuses it.
  */
 final class DocumentTemplateSlotsApiHandler
 {
@@ -116,6 +124,73 @@ final class DocumentTemplateSlotsApiHandler
 
         return Response::json(['data' => $this->present($slot, $saved[$slot->key] ?? null, $tenantId, $callerId)])
             ->withHeaders(['ETag' => SlotBindings::etag($saved)]);
+    }
+
+    public function backgroundList(Request $request): Response
+    {
+        $ctx = $this->context($request);
+        if ($ctx instanceof Response) {
+            return $ctx;
+        }
+        [$tenantId] = $ctx;
+
+        $allowed = $this->allowed($tenantId);
+        $data = [];
+        foreach ($this->slots->backgroundPlugins() as $plugin) {
+            $data[] = $this->presentBackground($tenantId, $plugin, $allowed);
+        }
+
+        return Response::json(['data' => $data]);
+    }
+
+    /** @param array<string, string> $params */
+    public function backgroundSet(Request $request, array $params): Response
+    {
+        $ctx = $this->context($request);
+        if ($ctx instanceof Response) {
+            return $ctx;
+        }
+        [$tenantId] = $ctx;
+        if ($tenantId === 0) {
+            return Response::error('The system tenant runs no plugins of its own; sign in to a workspace', 422);
+        }
+        $plugin = (string) ($params['plugin'] ?? '');
+        if (!$this->slots->declaresBackground($plugin)) {
+            return Response::error("No plugin here declares that it issues documents with no person", 404);
+        }
+        $body = JsonBody::parsed($request);
+        if (!is_bool($body['allowed'] ?? null)) {
+            return Response::error("'allowed' is required: true or false", 422);
+        }
+
+        $allowed = array_values(array_diff($this->allowed($tenantId), [$plugin]));
+        if ($body['allowed']) {
+            $allowed[] = $plugin;
+        }
+        $this->settings->setTenant($tenantId, SettingsRegistry::DOCUMENTS_BACKGROUND_ISSUING, BackgroundIssuing::encode($allowed));
+
+        return Response::json(['data' => $this->presentBackground($tenantId, $plugin, $this->allowed($tenantId))]);
+    }
+
+    /**
+     * @param list<string> $allowed
+     * @return array{plugin: string, allowed: bool, slots: list<string>}
+     */
+    private function presentBackground(int $tenantId, string $plugin, array $allowed): array
+    {
+        return [
+            'plugin' => $plugin,
+            'allowed' => in_array($plugin, $allowed, true),
+            'slots' => array_map(static fn (TemplateSlot $slot): string => $slot->key, $this->slots->slotsOf($tenantId, $plugin)),
+        ];
+    }
+
+    /** @return list<string> */
+    private function allowed(int $tenantId): array
+    {
+        $effective = $this->settings->effective($tenantId);
+
+        return BackgroundIssuing::parse((string) ($effective[SettingsRegistry::DOCUMENTS_BACKGROUND_ISSUING] ?? ''));
     }
 
     /**
