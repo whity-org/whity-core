@@ -480,6 +480,7 @@ final class DiscoveryTools
             'status'      => $proposal['status'],
             'tool'        => $proposal['tool'],
             'summary'     => $proposal['summary'],
+            'diff'        => $proposal['diff'],
             'permissions' => $proposal['permissions'],
             'result'      => $proposal['result'],
             'decidedAt'   => $proposal['decided_at'],

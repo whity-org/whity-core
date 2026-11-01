@@ -405,6 +405,11 @@ abstract class BaseCommand implements CliCommand, CommandHelp
         \Whity\register_service(\Whity\Sdk\Sql\SequenceAllocator::class, $sequenceCounters);
         \Whity\register_service(\Whity\Database\SequenceCounters::class, $sequenceCounters);
 
+        // WHIT-833: previews of what an agent's proposed call would change. The
+        // CLI serves no MCP, so nothing files a proposal here, but the registry is
+        // host-wired: registered so \Whity\app() never improvises an empty one.
+        \Whity\register_service(\Whity\Mcp\Tools\ProposalDiffRegistry::class, new \Whity\Mcp\Tools\ProposalDiffRegistry());
+
         $baseDir = dirname(__DIR__, 3);
         // The registries are passed HERE, not just constructed above: this loader
         // previously received neither, so plugin-declared permissions were never

@@ -92,6 +92,31 @@ final class AgentAssignmentRepository
         ];
     }
 
+    /**
+     * The workspace agent an `agent:<id>` principal acts as, while its
+     * assignment is active, for the session briefing (WHIT-817).
+     *
+     * @return array<string, mixed>|null in {@see AgentRepository}'s shape
+     */
+    public function personaFor(string $principalId, int $tenantId, AgentRepository $agents): ?array
+    {
+        $assignmentId = self::idFromPrincipal($principalId);
+        if ($assignmentId === null) {
+            return null;
+        }
+        $stmt = $this->db->prepare(
+            'SELECT agent_id FROM agent_assignments WHERE id = :id AND tenant_id = :tenant_id AND revoked_at IS NULL'
+        );
+        $stmt->execute([':id' => $assignmentId, ':tenant_id' => $tenantId]);
+        $agentId = $stmt->fetchColumn();
+        if ($agentId === false) {
+            return null;
+        }
+        $agent = $agents->find((int) $agentId, $tenantId);
+
+        return $agent !== null && $agent['status'] === AgentRepository::ACTIVE ? $agent : null;
+    }
+
     /** @return array<string, mixed>|null the person's assignment for an agent, revoked or not */
     public function findFor(int $agentId, int $profileId, int $tenantId): ?array
     {

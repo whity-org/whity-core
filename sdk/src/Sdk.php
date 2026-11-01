@@ -888,6 +888,15 @@ namespace Whity\Sdk;
  * {@see Documents\DocumentNotIssuedException} and a stable reason (WHIT-742).
  *
  * Purely additive.) ->
+ * 1.57 (ISSUE A DOCUMENT FROM AN AUTOMATION: the `issue_document` step joins
+ * the automation catalogue. It names one of the manifest's own
+ * `documents.slots` for the triggering record type, with optional merge
+ * values for the template's own fields as expressions over the record. The
+ * host issues through the workspace's binding for that slot, as the person
+ * the run acts for, under an origin key so a retry never issues twice
+ * ({@see Manifest\AutomationValidator}, WHIT-795).
+ *
+ * Purely additive.) ->
  * 1.58 (BACKGROUND ISSUING: a job of a plugin that declares
  * `issuesInBackground()` may issue through {@see Documents\Documents} with no
  * person, where the workspace allowed it, only from its own slots and with

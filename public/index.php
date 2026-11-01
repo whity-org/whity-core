@@ -4769,7 +4769,11 @@ $mcpToolsListHandler = new ToolsListHandler($toolDeriver, $roleChecker, $tokenVa
 $mcpServerEnabled = (bool) filter_var($_ENV['MCP_ENABLED'] ?? 'false', FILTER_VALIDATE_BOOLEAN);
 // WHIT-784: an agent's Ask-first call is stored for its person to approve.
 $agentProposals = new \Whity\Core\Agent\AgentProposalRepository($db->getPdo());
-$mcpToolsCallHandler = new ToolsCallHandler($toolDeriver, $router, $roleChecker, $tokenValidator, auditLogger: $auditLogger, authoredTools: $authoredMcpTools, proposals: $agentProposals);
+// WHIT-833: previews of what a proposed call would change. Register one with
+// $proposalDiffs->register('<tool name>', fn (array $arguments, int $tenantId): ?array => ...).
+$proposalDiffs = new \Whity\Mcp\Tools\ProposalDiffRegistry();
+\Whity\register_service(\Whity\Mcp\Tools\ProposalDiffRegistry::class, $proposalDiffs); // @phpstan-ignore-line
+$mcpToolsCallHandler = new ToolsCallHandler($toolDeriver, $router, $roleChecker, $tokenValidator, auditLogger: $auditLogger, authoredTools: $authoredMcpTools, proposals: $agentProposals, proposalDiffs: $proposalDiffs);
 // The approvals inbox: the person an agent acts for approves, edits or
 // declines what it asked to do. Session-gated and never on the MCP surface:
 // an agent must not be able to approve its own proposal.
@@ -4878,6 +4882,12 @@ $mcpDiscovery = new DiscoveryTools(
             return ['name' => $display !== '' ? $display : null, 'workspace' => $tenant !== '' ? $tenant : null];
         },
         $mcpRateLimiter->limits(),
+        // WHIT-817: a workspace agent is briefed with its persona.
+        static fn (string $principalId, int $tenantId): ?array => $agentAssignments->personaFor(
+            $principalId,
+            $tenantId,
+            new \Whity\Core\Agent\AgentRepository($mcpBriefingPdo),
+        ),
     ),
     // WHIT-754: a plugin's always-on tool is listed only once this workspace's
     // admin turned it on (the mcp.always_on_plugin_tools setting).

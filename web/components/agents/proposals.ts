@@ -17,6 +17,8 @@ export type AgentProposal = components['schemas']['AgentProposal'];
  * reads `t()` calls only where `useTranslation` names their domain.
  */
 export interface ProposalWords {
+  /** Show a workspace agent's Arabic name when it has one. */
+  arabic?: boolean;
   /** For an agent whose credential is gone. */
   unknownAgent: string;
   minute: string;
@@ -90,7 +92,7 @@ export function undoWindowWords(seconds: number | null | undefined, words: Propo
 
 /** The agent's name, or a plain word when its credential is gone. */
 export function agentName(proposal: AgentProposal, words: ProposalWords): string {
-  return proposal.agent?.name || words.unknownAgent;
+  return (words.arabic && proposal.agent?.nameAr) || proposal.agent?.name || words.unknownAgent;
 }
 
 /** Oldest first: the queue's order (register 7.5b). */

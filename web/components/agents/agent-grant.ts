@@ -1,10 +1,10 @@
 import type { ScopeGrantGroup, ScopeGrantMode } from '@whity/ui/scope-grant';
 
 /**
- * The agent grant, per permission (WHIT-810 over WHIT-832's
- * `/api/mcp/tokens/{jti}/grant`). The row shape is `AgentGrantView`, which
- * WHIT-816's `/api/me/agents/{id}/assignment/grant` will serve unchanged, so
- * moving to it means changing `grantPath` and nothing else.
+ * The agent grant, per permission (WHIT-810). Two addresses serve the same
+ * rows (`AgentGrantView`) and take the same PATCH: an agent credential's,
+ * `/api/mcp/tokens/{jti}/grant` (WHIT-832), and a workspace agent the person
+ * uses, `/api/me/agents/{id}/assignment/grant` (WHIT-816).
  *
  * These routes are deliberately not in openapi.json (an agent must never be
  * able to reach its own grant), so the types live here.
@@ -28,14 +28,29 @@ export interface GrantRow {
 }
 
 export interface AgentGrant {
-  jti: string;
   name: string;
   permissions: GrantRow[];
 }
 
-/** Where one credential's grant lives. The only line that changes for WHIT-816. */
-export function grantPath(jti: string): string {
-  return `/api/v1/mcp/tokens/${encodeURIComponent(jti)}/grant`;
+export type GrantSubject = { kind: 'credential'; jti: string } | { kind: 'agent'; id: number };
+
+/** Where one subject's grant lives. */
+export function grantPath(subject: GrantSubject): string {
+  return subject.kind === 'credential'
+    ? `/api/v1/mcp/tokens/${encodeURIComponent(subject.jti)}/grant`
+    : `/api/v1/me/agents/${subject.id}/assignment/grant`;
+}
+
+/** What either address answers. A credential names itself; an assignment names its agent, in both languages. */
+export interface GrantResponse {
+  name?: string;
+  agent?: { name: string; nameAr?: string | null };
+  permissions: GrantRow[];
+}
+
+export function readGrant(body: GrantResponse, arabic: boolean): AgentGrant {
+  const name = (arabic && body.agent?.nameAr) || body.agent?.name || body.name || '';
+  return { name, permissions: body.permissions };
 }
 
 /** `tag-groups` → "Tag groups", `send_reminder` → "Send reminder". */

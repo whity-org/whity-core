@@ -45561,10 +45561,15 @@
                             "name": {
                                 "type": "string",
                                 "nullable": true
+                            },
+                            "nameAr": {
+                                "type": "string",
+                                "nullable": true
                             }
                         },
                         "required": [
-                            "name"
+                            "name",
+                            "nameAr"
                         ]
                     },
                     "status": {
