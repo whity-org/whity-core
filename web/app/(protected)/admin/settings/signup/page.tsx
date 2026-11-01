@@ -8,12 +8,11 @@ import { useAuth } from '@/lib/auth-context';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { useFetch } from '@/hooks/useFetch';
 import { AdminHeader } from '@/components/admin/admin-header';
-import { Button } from '@whity-org/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity-org/ui/card';
-import { AccessDenied } from '@whity-org/ui/access-denied';
+import { Button } from '@whity/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
+import { AccessDenied } from '@whity/ui/access-denied';
 import { IconDeviceFloppy } from '@tabler/icons-react';
-import { useTranslation } from '@whity-org/features/i18n';
-import { SettingsTabs } from '../settings-tabs';
+import { useTranslation } from '@whity/features/i18n';
 import {
   SETTINGS_MANAGE,
   SYSTEM_TENANT_ID,
@@ -91,7 +90,6 @@ export default function SignupSettingsPage() {
           'Control whether and how new people can create accounts on this instance.'
         )}
       />
-      <SettingsTabs active="signup" />
       <SignupSettingsForm addToast={addToast} />
     </div>
   );

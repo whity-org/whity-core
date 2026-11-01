@@ -5,12 +5,12 @@ import { apiClient } from '@/lib/api-client';
 import type { PluginFeature } from '@/lib/plugin-features';
 import { useToast } from '@/lib/toast-context';
 import { AdminHeader } from '@/components/admin/admin-header';
-import { Button } from '@whity-org/ui/button';
+import { Button } from '@whity/ui/button';
 import { Input } from '@/components/ui/input';
-import { Skeleton } from '@whity-org/ui/skeleton';
-import { ErrorState } from '@whity-org/ui/empty-state';
-import { useTranslation } from '@whity-org/features/i18n';
-import { useDateDisplay } from '@whity-org/features/datetime';
+import { Skeleton } from '@whity/ui/skeleton';
+import { ErrorState } from '@whity/ui/empty-state';
+import { useTranslation } from '@whity/features/i18n';
+import { useDateDisplay } from '@whity/features/datetime';
 import {
   IconAlertTriangle,
   IconMessageCircle,

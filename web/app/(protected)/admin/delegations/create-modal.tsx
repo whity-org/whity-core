@@ -15,17 +15,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Button } from '@whity-org/ui/button';
+import { Button } from '@whity/ui/button';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@whity-org/ui/select';
-import { Skeleton } from '@whity-org/ui/skeleton';
-import { Alert, AlertDescription } from '@whity-org/ui/alert';
-import { useRichTranslation, useTranslation } from '@whity-org/features/i18n';
+} from '@whity/ui/select';
+import { Skeleton } from '@whity/ui/skeleton';
+import { Alert, AlertDescription } from '@whity/ui/alert';
+import { useRichTranslation, useTranslation } from '@whity/features/i18n';
 import type {
   GranteeType,
   OuOption,

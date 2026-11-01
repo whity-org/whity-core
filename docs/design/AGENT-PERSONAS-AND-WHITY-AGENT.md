@@ -1,6 +1,6 @@
 # Agent personas, presets and whity-agent
 
-Status: **draft, Q1 decided (2026-10-31), Q2 to Q6 open in §9**. Part A's backend has started with WHIT-815 (migration 180).
+Status: **decided** (owner answers Q1 to Q6, 2026-10-31 and 2026-11-01, §9). Built so far: WHIT-815 (workspace agents and presets, migration 180) and WHIT-822 (whity-agent scaffold and sign-in).
 Related: `MCP-TOOL-SURFACE.md` (§5.4 token toolsets, §5.11 agent model, §5.12 splits), `00-decision-register.md` (Scope grant, 5.6a and 5.6b agent words, 7.5a to 7.5c), `15-agents.md`, `12-engineering-handoff.md` items 10 and 11, ADR-0006 (MCP server), ADR-0014 (AGPL with plugin exception), ADR-0015 (OAuth resource server, Whity ID), `WHITY-BUILDER.md` (manifests), `templates/tauri-desktop`.
 
 The owner's words: "agents will need personalities and tools and presets from whity POV to be created... we will also need whity-agent a local desktop app that auto connects your local claude-code codex etc... to whity seemlessly to help you work and chat with whity".
@@ -15,12 +15,12 @@ The owner's words: "agents will need personalities and tools and presets from wh
 - An external client attaches to a persona by connecting to the agent's MCP resource, **`/mcp/agents/<slug>`**. It is its own OAuth resource, like a split. With a Whity token, the token itself names the assignment.
 
 **Part B, whity-agent (a new desktop app).**
-- A Tauri 2 tray app for Windows, macOS and Linux, in English and Arabic, built from `templates/tauri-desktop` without the PHP host, sync or printer parts. Proposed repo: `whity-org/whity-agent`, open source (Q4).
+- A Tauri 2 tray app for Windows, macOS and Linux, in English and Arabic, built from `templates/tauri-desktop` without the PHP host, sync or printer parts. Repo: `whity-org/whity-agent`, public, MIT, free (Q4, decided).
 - It **finds** the AI tools on the machine (Claude Code, Codex CLI, Cursor, VS Code, Windsurf, Gemini CLI, Claude Desktop and others). It **signs in** through Whity ID (OAuth with PKCE, loopback redirect), or through a core device code for instances without Whity ID. It then **connects** each tool the person picks, as themselves or as one of their agents.
 - **No secret is ever written to a tool's config file.** A tool that can sign in to remote MCP itself gets only the URL and signs in on its own. Any other tool gets a command, `whity-agent mcp`: a small local stdio bridge that reads the token from the OS keychain. Tokens live in the OS keychain, in Rust only, and never in the webview or a file.
 - Every config edit is shown first as a diff, needs the person's consent per tool, is backed up, and can be undone. The app prefers each tool's own CLI (`claude mcp add`, `codex mcp add`) and falls back to a format-preserving edit.
-- A **chat** with Whity in the app. By default it runs on a tool the person already has (Claude Code or Codex in headless mode) with the Whity connection attached, so no extra model key is needed (Q3).
-- Signed auto-updates with `tauri-plugin-updater` and minisign. OS code signing is Q5.
+- A **chat** with Whity in the app. By default it runs on a tool the person already has (Claude Code or Codex in headless mode) with the Whity connection attached, so no extra model key is needed. Bring-your-own key comes next, and a Whity-hosted model only if people ask (Q3, decided).
+- Signed auto-updates with `tauri-plugin-updater` and minisign. No paid OS code signing for now (Q5, decided): clear install notes and published checksums instead, with the signing hooks ready but off.
 
 ## 2. What exists today (develop at bc0d8ffd)
 
@@ -89,7 +89,7 @@ The owner's words: "agents will need personalities and tools and presets from wh
 | `status` | VARCHAR(16) | `active` · `archived`. Archiving stops every assignment's credentials at once. |
 | `created_by_profile_id`, `updated_by_profile_id`, timestamps | | Actor columns, as for every write. |
 
-**Who creates agents:** a new core permission, `agents:manage` (tenant admins by default), creates and edits workspace agents. A new `agents:use` (every member by default) lets a person grant an agent for themselves. Personal agents, which a person defines only for themselves, come later (Q1, decided).
+**Who creates agents:** a new core permission, `agents:manage` (tenant admins by default), creates and edits workspace agents. Every signed-in member can grant an agent for themselves: the `/api/me/agents` routes are session-only, like `/api/me/agent-proposals`, rather than gated by a new `agents:use` permission, because the base member role holds no permission a grant could follow (decided with the orchestrator, 2026-11-01). Personal agents, which a person defines only for themselves, come later (Q1, decided).
 
 **Routes** (session or token, tenant-scoped, MCP-exposed as `core.agents`, `agentPolicy: refuse` on every write, so agents can't create or edit agents):
 - `GET /api/agents`, `GET /api/agents/{id}`, `POST /api/agents` (from scratch or `{presetKey}`), `PATCH /api/agents/{id}`, `POST /api/agents/{id}/archive`.
@@ -112,7 +112,7 @@ A preset's or agent's `grant_template` only sets where a new assignment **starts
 
 1. Only permissions the person holds count. Others are dropped, because the agent can never exceed the person.
 2. A template may set any permission to Off or Ask first.
-3. **A template may set Allowed only for reads.** Writes start Ask first, as decided (MCP design §10, decision 9). Only the person can set a write to Allowed, on the grant screen. A preset can't say "send invoices without asking" on someone's behalf (Q6).
+3. **A template may set Allowed only for reads.** Writes start Ask first, as decided (MCP design §10, decision 9). Only the person can set a write to Allowed, on the grant screen. A preset can't say "send invoices without asking" on someone's behalf (Q6, decided). This holds for core presets, workspace agents, and plugin and Whity Builder presets: `AgentDefinition` refuses a template that starts a write at Allowed, and a read is a permission whose action is `read` or `view`.
 4. Permissions the template doesn't name follow the decided defaults: reads Allowed, writes Ask first.
 5. `agentPolicy` and "no undo means Ask first" still cap everything at call time.
 
@@ -184,8 +184,8 @@ For an `ai-agent` principal with an assignment, `SessionBriefing::brief()` adds 
 ### 5.1 Repo, stack and licence
 
 - **Repo:** new `whity-org/whity-agent` (needs the orchestrator's check-in). It is a product with its own releases, signing and update channel, so it doesn't belong in whity-core's `templates/`.
-- **Stack:** Tauri 2 (Rust core, React 19, `@whity-org/ui`, `@whity-org/features`, `@whity-org/tokens` from npm). Starts from `templates/tauri-desktop`, drops the PHP host, SQLite sync, printer and plugin installer, and keeps `keyring`, `reqwest` with rustls, the updater and the Job Object handling. About 10 to 15 MB installed, against roughly 100 MB or more for Electron, and Rust is the right place for file edits and the keychain.
-- **Open or paid (Q4):** recommend **open source and free**. The app is a client: it sells the paid services (Whity ID sign-in, Builder, Render) by making them one click away, and an open app is easier to trust with editing other apps' configs and holding tokens. Licence: MIT, matching the client packages it is built from (`@whity-org/ui`, `features`, `tokens` and the Tauri template are MIT), rather than core's AGPL, since nobody runs it as a network service.
+- **Stack:** Tauri 2 (Rust core, React 19, `@whity/ui`, `@whity/features`, `@whity/tokens` from npm). Starts from `templates/tauri-desktop`, drops the PHP host, SQLite sync, printer and plugin installer, and keeps `keyring`, `reqwest` with rustls, the updater and the Job Object handling. About 10 to 15 MB installed, against roughly 100 MB or more for Electron, and Rust is the right place for file edits and the keychain.
+- **Open or paid (Q4, decided: public, MIT, free):** open source and free. The app is a client: it sells the paid services (Whity ID sign-in, Builder, Render) by making them one click away, and an open app is easier to trust with editing other apps' configs and holding tokens. Licence: MIT, matching the client packages it is built from (`@whity/ui`, `features`, `tokens` and the Tauri template are MIT), rather than core's AGPL, since nobody runs it as a network service.
 
 ### 5.2 Accounts and sign-in
 
@@ -220,7 +220,7 @@ Per tool, in order of preference:
 2. **The bridge**, for tools that can't sign in to remote MCP, or for workspaces without Whity ID: whity-agent writes a stdio entry, `{command: "<path>/whity-agent", args: ["mcp", "--connection", "<id>"]}`. The bridge is the same binary in a headless mode. It reads the token from the keychain, refreshes it, and relays MCP between stdio and `<instance>/mcp`. The file holds only a connection id.
 3. **Never:** `Authorization: Bearer …` in a file. The web wizard's copy-paste setups keep doing that, because a person chooses it there. whity-agent doesn't.
 
-**As yourself or as an agent.** For each tool, the person picks "Me" (the default, with today's behaviour) or one of the agents they've granted (`/mcp/agents/<slug>`, with Ask first and proposals). The server name in the tool's config shows which: `whity-example-bakery` or `whity-example-bakery-finance-clerk`.
+**As yourself or as an agent (decided, Q2).** For each tool, the person picks "Me" (the default, with today's behaviour) or one of the agents they've granted (`/mcp/agents/<slug>`, with Ask first and proposals). The server name in the tool's config shows which: `whity-example-bakery` or `whity-example-bakery-finance-clerk`.
 
 ### 5.5 Editing configs safely
 
@@ -237,7 +237,7 @@ Per tool, in order of preference:
 
 ### 5.6 Chat with Whity
 
-A chat window, and a ⌘K-style quick ask from the tray, for "work and chat with Whity". Which model answers is Q3. Options:
+A chat window, and a ⌘K-style quick ask from the tray, for "work and chat with Whity". Which model answers was Q3, decided 2026-11-01: A first, then B, and C only on demand. The options:
 
 | Option | How | For | Against |
 |---|---|---|---|
@@ -250,7 +250,7 @@ Recommend A first, B next, and C as a later paid service if people ask. In every
 ### 5.7 Updates, platforms and languages
 
 - **Auto-update:** `tauri-plugin-updater` with minisign signatures. A static endpoint on GitHub Releases (`latest.json`), unlike the template's runtime endpoint, because whity-agent isn't tied to one instance. Checks daily and on start, downloads in the background, asks before restarting. A stable and a beta channel.
-- **Builds:** Windows (MSI and NSIS, x64 and arm64), macOS (universal DMG), Linux (AppImage, deb, rpm). Built on GitHub Actions in the new repo when CI is back. OS code signing (Windows Authenticode, Apple Developer ID and notarisation) costs money: Q5. Without it, Windows SmartScreen and macOS Gatekeeper warn on install.
+- **Builds:** Windows (MSI and NSIS, x64 and arm64), macOS (universal DMG), Linux (AppImage, deb, rpm). Built on GitHub Actions in the new repo when CI is back. **No paid OS code signing for now (Q5, decided).** Windows SmartScreen and macOS Gatekeeper warn on install, so the download page and README carry clear English and Arabic install notes (SmartScreen: "More info" then "Run anyway"; the Gatekeeper override), and every release publishes SHA-256 checksums. Updates stay minisign-signed. CI keeps the Azure Trusted Signing and Apple notarisation steps ready but disabled, so either can be switched on later.
 - **Start-up:** a tray app, start at login opt-in, single instance. A deep link, `whity-agent://connect?instance=…&agent=…`, so the web connect wizard can offer "Open in whity-agent".
 - **English and Arabic:** `i18next` with English and Arabic catalogs, RTL by `dir` on the root and logical CSS, Noto Sans and Noto Sans Arabic bundled, the Whity tokens, Western digits. The language follows the OS, with a switch.
 
@@ -290,14 +290,14 @@ No card exists for these, so they are not to be invented. Built from existing co
 5. **whity-agent:** tray menu, first-run (sign in, found tools, choose and consent), a tool row (connected as me or as an agent, Disconnect, Restore), the config diff sheet, chat window and quick ask, settings, update prompt. Light, dark and Arabic.
 6. **Whity ID consent** line for acting as an agent ("Claude Code wants to act as Finance clerk for you").
 
-## 9. Open questions (for the owner, one at a time through the orchestrator)
+## 9. Owner decisions (asked one at a time through the orchestrator)
 
 1. **Who defines agents. Decided 2026-10-31: workspace agents only.** People with `agents:manage` (admins by default) create them from presets or from scratch. Every member can grant one for themselves (`agents:use`), with their own Off, Ask first or Allowed grant. Personal agents come later. **WHIT-667: confirmed** that agents, personas and presets extend the decided AI-principal, grant and proposal model and are not a new subsystem.
-2. **Connecting as yourself or as an agent.** Recommend: whity-agent and the wizard connect as **yourself** by default (as today), and offer an agent as a choice per tool. The alternative, agent by default, makes every write in a coding tool a proposal.
-3. **Chat model in whity-agent.** Recommend: A (use the person's Claude Code or Codex headless) first, B (own API key) next, C (Whity-hosted, paid) later.
-4. **whity-agent repo and licence.** Recommend: new public repo `whity-org/whity-agent`, MIT (like the client packages), free. Paid value stays in the services it connects to.
-5. **Code signing.** Recommend: buy Windows signing (Azure Trusted Signing is the cheapest current path) and an Apple Developer account before the first public release. Ship unsigned betas to testers until then.
-6. **Grant templates.** Recommend: presets may set reads to Allowed, but never writes. Only the person sets a write to Allowed.
+2. **Connecting as yourself or as an agent. Decided 2026-11-01: as yourself by default.** A connected AI tool acts under the person's own RBAC with no proposals, as today. On the same screen the person can pick one of their granted agents per tool instead ("Claude Code as Finance clerk"), and then its writes are Ask first.
+3. **Chat model in whity-agent. Decided 2026-11-01: A first, then B, C only on demand.** The chat drives the person's own Claude Code (`claude -p`) or Codex (`codex exec`) headless, with the Whity connection and the chosen agent's persona. Next, the person's own API key in the OS keychain, with whity-agent running its own tool loop over MCP. A Whity-hosted paid model only if people ask for it.
+4. **whity-agent repo and licence. Decided 2026-11-01: a new public repo, `whity-org/whity-agent`, MIT, free.** Set up like the other repos: required checks on main, auto-merge, `changelog.d` fragments, English and Arabic, the design tokens. Created 2026-11-01; its first PR (WHIT-822) has merged.
+5. **Code signing. Decided 2026-11-01: stay unsigned for now.** No paid OS code signing; updates stay minisign-signed. Make the unsigned install as smooth as possible with English and Arabic notes for SmartScreen and Gatekeeper on the download page and in the README, publish checksums with each release, and keep CI hooks for Azure Trusted Signing and Apple notarisation ready but disabled.
+6. **Grant templates. Decided 2026-11-01: reads only.** Templates (core, plugin and Builder presets, and workspace agents) may set reads to Allowed and anything to Off or Ask first, but never a write to Allowed. Only the person sets a write to Allowed, on their own grant screen. Enforced in `AgentDefinition` and tested for presets, the API and (with WHIT-818) plugin and Builder manifests.
 
 ## 10. Task breakdown
 
@@ -306,7 +306,7 @@ Taskaat, project WHIT, section **Agents**. WHIT-816 also feeds the credential an
 | Task | What | Depends on |
 |---|---|---|
 | WHIT-814 umbrella | This design, owner questions §9 | none |
-| WHIT-815 (A1) agents and presets | `agents` table, `AgentPresetRegistry` with five core presets (Arabic reviewed), `agents:manage` and `agents:use`, `/api/agents`, `/api/agent-presets`, toolset `core.agents` with `refuse` on writes | Q1 |
+| WHIT-815 (A1) agents and presets | `agents` table, `AgentPresetRegistry` with five core presets (Arabic reviewed), `agents:manage`, `/api/agents`, `/api/agent-presets`, toolset `core.agents` with `refuse` on writes | Q1 |
 | WHIT-816 (A2) assignments | `agent_assignments`, stable `agent:<id>` principal, server-side grant read on every call, clamping (§4.4), `mcp_tokens.agent_assignment_id`, `/api/me/agents`, credentials route; proposals and actor columns use the stable id | A1, Q6 |
 | WHIT-817 (A3) briefing | `init_session` `agent` key, rule line, prompt `agent_<slug>`, size budget test | A2 |
 | WHIT-818 (A4) SDK presets | `PluginAgentPresetsInterface`, manifest `agentPresets` key and schema, loader validation, conformance check | A1 |

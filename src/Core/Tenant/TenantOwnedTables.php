@@ -195,6 +195,10 @@ final class TenantOwnedTables
         // WHIT-784: an agent's Ask-first calls, waiting for the person who
         // granted it (migration 176).
         'agent_proposals' => '176_create_agent_proposals.php',
+        // WHIT-815: the workspace's agent definitions (migration 180).
+        'agents' => '180_create_agents.php',
+        // WHIT-816: a person's use of a workspace agent, with their grant (migration 181).
+        'agent_assignments' => '181_create_agent_assignments.php',
         'plugin_automation_runs' => '175_create_plugin_automation_runs.php',
 
         // #947 item 1 — issued documents and their stored render output

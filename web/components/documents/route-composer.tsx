@@ -123,29 +123,29 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Button } from '@whity-org/ui/button';
-import { Alert, AlertDescription } from '@whity-org/ui/alert';
-import { Badge } from '@whity-org/ui/badge';
+import { Button } from '@whity/ui/button';
+import { Alert, AlertDescription } from '@whity/ui/alert';
+import { Badge } from '@whity/ui/badge';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@whity-org/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@whity-org/ui/tabs';
+} from '@whity/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@whity/ui/tabs';
 import {
   AudienceGroupPicker,
   type AudienceGroupOption,
   type AudienceGroupPreview,
   type AudienceGroupPreviewStatus,
-} from '@whity-org/ui/audience-group-picker';
+} from '@whity/ui/audience-group-picker';
 import {
   AudiencePeoplePicker,
   type AudiencePersonOption,
-} from '@whity-org/ui/audience-people-picker';
+} from '@whity/ui/audience-people-picker';
 import { IconArrowDown, IconArrowUp, IconPlus, IconTrash } from '@tabler/icons-react';
-import { useTranslation } from '@whity-org/features/i18n';
+import { useTranslation } from '@whity/features/i18n';
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/lib/toast-context';
 import type { DraftStep, IssueRouteResponse, RoutingRule } from './routing-wire';

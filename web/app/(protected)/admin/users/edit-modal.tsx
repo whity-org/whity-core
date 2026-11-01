@@ -11,7 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Button } from '@whity-org/ui/button';
+import { Button } from '@whity/ui/button';
 import { Input } from '@/components/ui/input';
 import {
   Form,
@@ -20,19 +20,19 @@ import {
   FormLabel,
   FormControl,
   FormMessage,
-} from '@whity-org/ui/form';
+} from '@whity/ui/form';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@whity-org/ui/select';
-import { Alert, AlertDescription } from '@whity-org/ui/alert';
+} from '@whity/ui/select';
+import { Alert, AlertDescription } from '@whity/ui/alert';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useTranslation, type TranslateFn } from '@whity-org/features/i18n';
+import { useTranslation, type TranslateFn } from '@whity/features/i18n';
 import type { User } from './page';
 import { useRoleOptions } from './use-role-options';
 import { useOuOptions } from './use-ou-options';

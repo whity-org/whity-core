@@ -94,6 +94,7 @@ final class CorePermissionDescriptions
         CorePermissions::SETTINGS_WRITE               => 'Edit the current tenant\'s website-settings overrides',
         CorePermissions::SETTINGS_MANAGE              => 'Edit the global website-settings defaults',
         CorePermissions::MCP_TOKENS_MANAGE            => 'Mint and revoke MCP credentials — who may connect an AI client to this instance',
+        CorePermissions::AGENTS_MANAGE                => "Create, edit and archive the workspace's agents: their persona, tools and starting grant",
         CorePermissions::REGISTRATIONS_APPROVE        => 'Review and approve/reject pending self-service registrations (system tenant)',
         CorePermissions::AUTH_PROVIDERS_MANAGE        => 'Manage this tenant\'s identity-provider (SSO/OIDC) configurations',
         CorePermissions::EMAIL_DOMAINS_MANAGE         => 'Manage this tenant\'s verified email domains — which addresses may be trusted for sign-in',

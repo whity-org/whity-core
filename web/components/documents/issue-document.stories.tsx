@@ -1,9 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite"
 
-import { DocumentEditorScreen, type DocumentEditorAdapter } from "@whity-org/features/document-editor"
-import type { Block, FieldRef, WhityDocument } from "@whity-org/ui/editor/contract"
-import type { FieldGroup } from "@whity-org/ui/editor/fields"
-import { SAMPLE_DOCUMENT } from "@whity-org/ui/editor/sample"
+import { DocumentEditorScreen, type DocumentEditorAdapter } from "@whity/features/document-editor"
+import type { Block, FieldRef, WhityDocument } from "@whity/ui/editor/contract"
+import type { FieldGroup } from "@whity/ui/editor/fields"
+import { SAMPLE_DOCUMENT } from "@whity/ui/editor/sample"
 import { arabicHandlers, withArabic } from "../../.storybook/arabic"
 import { defaultHandlers } from "../../.storybook/mocks"
 

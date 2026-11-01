@@ -17,13 +17,14 @@ versions**, released on their own cadence:
 
 | Package | Path | Registry | Notes |
 |---|---|---|---|
-| `@whity-org/ui` | `packages/ui` | GitHub Packages | shared React component library |
-| `@whity-org/features` | `packages/features` | GitHub Packages | client-safe feature UI (adapter pattern, nav contract, sync UI) for non-Next clients (Tauri/Vite SPA, Flutter) |
-| `@whity-org/tokens` | `packages/tokens` | GitHub Packages | design tokens (CSS vars, Dart/Flutter export) |
+| `@whity/ui` | `packages/ui` | npm (public) | shared React component library |
+| `@whity/features` | `packages/features` | npm (public) | client-safe feature UI (adapter pattern, nav contract, sync UI) for non-Next clients (Tauri/Vite SPA, Flutter) |
+| `@whity/tokens` | `packages/tokens` | npm (public) | design tokens (CSS vars, Dart/Flutter export) |
+| `@whity/api-client` | `packages/api-client` | npm (public) | typed client for the Whity API, generated from the OpenAPI spec |
 | `whity/plugin-sdk` | `sdk` | Composer | PHP SDK for plugin authors |
 | `web` | `web` | — (private) | the reference app; deployed, never published |
 
-The backend (`amroksaleh/whity-core`) ships as a Docker image, not a package.
+The backend (`whity-org/whity-core`) ships as a Docker image, not a package.
 
 ## How a JS package release works (changesets)
 
@@ -46,7 +47,7 @@ its own semver.
    ```
    This consumes the pending changesets, bumps each affected `package.json`, and
    writes/updates its `CHANGELOG.md`. Commit the result.
-4. **Merge to `main`.** The `Publish @whity-org/ui` workflow runs on any push
+4. **Merge to `main`.** The `Publish @whity/ui` workflow runs on any push
    touching `packages/ui`, but it is **version-gated**: it publishes only when
    the `package.json` version isn't already in the registry, otherwise it skips
    with a notice. So a merge with a fresh version publishes; a merge that didn't
@@ -62,60 +63,83 @@ it unconditionally on every `packages/ui` change turned `main` red whenever a
 change didn't bump the version. The workflow now checks the registry first and
 only publishes a genuinely new version — bumps release, incidental edits don't.
 
+## Where the packages are published: public npm, `@whity` scope
+
+The four JS packages are published to the public npm registry
+(`https://registry.npmjs.org`) under the **`@whity`** npm organisation. Each
+`package.json` says so in its `publishConfig`
+(`{ "access": "public", "registry": "https://registry.npmjs.org" }`), and its
+`repository` field points at this repo with the package's `directory`, which
+npm needs to match a provenance statement to the source.
+
+| Package | Workflow that publishes it |
+|---|---|
+| `@whity/tokens` | `.github/workflows/publish-tokens.yml` |
+| `@whity/ui` | `.github/workflows/publish-ui.yml` |
+| `@whity/features` | `.github/workflows/publish-features.yml` |
+| `@whity/api-client` | `.github/workflows/publish-api-client.yml` |
+
+Before WHIT-834 the packages were named `@whity-org/*` and went to GitHub
+Packages. Nothing is published there any more.
+
+### Trusted publishing: no npm token anywhere
+
+The workflows use npm
+[trusted publishing](https://docs.npmjs.com/trusted-publishers): the job has
+`permissions: id-token: write`, GitHub Actions issues it an OIDC token, and npm
+exchanges that for a short-lived credential that can publish **only** the
+package whose Trusted Publisher names this repo and workflow file. So:
+
+- there is no `NPM_TOKEN` or `NODE_AUTH_TOKEN` secret to create, leak or rotate;
+- the workflows install npm 11.5.1 or newer (`npm install -g npm@latest`),
+  which trusted publishing requires;
+- they run `npm publish --provenance --access public`, so every version on
+  npmjs.com carries a signed provenance statement linking it to the commit and
+  workflow run that built it.
+
+### One-time owner setup (per package)
+
+npm only lets you configure a Trusted Publisher on a package that already
+exists, so each package needs one manual publish first. An owner of the `@whity`
+npm organisation does this once, from a clean checkout of `main`:
+
+1. **First publish, by hand.** Sign in with `npm login` (2FA on), then from
+   each package directory run `npm publish --access public`. Publish in
+   dependency order: `packages/tokens`, then `packages/ui` (depends on tokens),
+   then `packages/features` (depends on ui), then `packages/api-client`. Publish
+   the version that is already in `package.json`; the workflow's version gate
+   then skips it and publishes from the next bump on.
+2. **Configure the Trusted Publisher on npmjs.com.** For each package, open
+   *Package settings → Trusted Publisher → GitHub Actions* and enter:
+   - Organization or user: `whity-org`
+   - Repository: `whity-core`
+   - Workflow filename: the file from the table above, e.g. `publish-ui.yml`
+     (just the file name, not the path)
+   - Environment: leave empty
+3. **Optional hardening.** Once a release has gone out through the workflow, set
+   *Publishing access* to "Require two-factor authentication and disallow
+   tokens", so only the trusted workflow (or a person with 2FA) can publish.
+4. Sign out with `npm logout`. No token is stored in the repo or its secrets.
+
+If a workflow run fails with `ENEEDAUTH` or a 404 on `PUT`, the Trusted
+Publisher for that package is missing or names a different workflow file.
+
 ## Consuming a package from a DOWNSTREAM repo (not this monorepo)
 
-Everything above is how a package gets *published*. A separate repo (a native
-desktop client, or any other downstream product) that wants to `npm install
-@whity-org/ui` (or `features`/`tokens`) needs to *authenticate to GitHub
-Packages first* — **this is required even though the packages are public.**
-Unlike npmjs.org, `npm.pkg.github.com` requires a token on every request,
-including reads of public packages. Skipping this step is what makes
-`npm install` fail with a 404 as if the package didn't exist.
+The packages are public on npmjs.com, so a downstream repo installs them like
+any other npm package. No `.npmrc`, scope mapping or token is needed, locally or
+in CI:
 
-### One-time: local developer machine
-
-Add to `~/.npmrc` (per-user, not committed):
-
-```
-@whity-org:registry=https://npm.pkg.github.com
-//npm.pkg.github.com/:_authToken=${GH_PACKAGES_TOKEN}
+```bash
+npm install @whity/ui @whity/tokens
 ```
 
-Then export `GH_PACKAGES_TOKEN` (e.g. in your shell profile) as a **classic**
-GitHub PAT scoped to **`read:packages`** only. Generate one at
-[github.com/settings/tokens](https://github.com/settings/tokens) — a
-fine-grained PAT does not currently support the Packages API, so it must be a
-classic token. For a team (not one person's token going stale on offboarding),
-generate it from a shared machine/bot account instead of an individual's.
+If a downstream repo still has an `.npmrc` line mapping
+`@whity-org:registry=https://npm.pkg.github.com`, delete it and switch its
+imports from `@whity-org/*` to `@whity/*`.
 
-### CI (a downstream repo's GitHub Actions)
-
-Don't put a PAT in another repo's secrets — grant that repo direct read access
-to the package instead, and its own auto-provided `GITHUB_TOKEN` will work:
-
-1. Open the package's page on GitHub. The `@whity-org` packages belong to
-   the whity-org organization, so it is
-   `github.com/orgs/whity-org/packages/npm/package/<name>`. Packages published
-   before the move are still under `@amroksaleh` on the maintainer's account.
-2. **Package settings → Manage Actions access → Add repository** — add the
-   downstream repo, role **Read**.
-3. Repeat per package (`ui`, `features`, `tokens` — each is a separate grant).
-4. In the downstream workflow, configure npm the same way `setup-node` does it
-   in this repo's own publish workflows: `registry-url:
-   https://npm.pkg.github.com`, `scope: @whity-org`, and
-   `NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}` (the default token — no new
-   secret to create or rotate).
-
-### Troubleshooting
-
-- `404 Not Found` on `npm install` → no token configured at all (the most
-  common case — GitHub Packages 404s an unauthenticated request rather than
-  ever serving public package data anonymously).
-- `403 … You need at least read:packages scope` → a token IS present but
-  lacks the `read:packages` scope (e.g. a PAT created for something else, or a
-  fine-grained PAT — switch to a classic PAT with that scope).
-- Confirm what's actually published (needs a `read:packages`-scoped token):
-  `gh api users/<owner>/packages/npm/<name>/versions`.
+To check what's published: `npm view @whity/ui versions`. A version's
+provenance is shown on its npmjs.com page and by `npm audit signatures`.
 
 ## PHP SDK (`whity/plugin-sdk`)
 

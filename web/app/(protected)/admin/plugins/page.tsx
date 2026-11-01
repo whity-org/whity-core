@@ -10,13 +10,13 @@ import { useFetch } from '@/hooks/useFetch';
 import { useNavigation } from '@/lib/navigation-context';
 import { usePluginFeatures } from '@/lib/plugin-features-context';
 import { classifyPluginVersion, type PluginVersionTier } from '@/lib/plugin-version-badge';
-import { useRichTranslation, useTranslation } from '@whity-org/features/i18n';
+import { useRichTranslation, useTranslation } from '@whity/features/i18n';
 import { AdminHeader } from '@/components/admin/admin-header';
-import { Button } from '@whity-org/ui/button';
-import { Badge } from '@whity-org/ui/badge';
+import { Button } from '@whity/ui/button';
+import { Badge } from '@whity/ui/badge';
 import { PermissionButton } from '@/components/rbac/permission-button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@whity-org/ui/card';
-import { AccessDenied } from '@whity-org/ui/access-denied';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@whity/ui/card';
+import { AccessDenied } from '@whity/ui/access-denied';
 import {
   Dialog,
   DialogContent,
@@ -33,7 +33,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@whity-org/ui/alert-dialog';
+} from '@whity/ui/alert-dialog';
 import {
   IconPlug,
   IconReload,

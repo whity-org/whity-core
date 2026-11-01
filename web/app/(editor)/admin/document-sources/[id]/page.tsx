@@ -2,8 +2,8 @@
 
 import { use, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { DocumentEditorScreen } from '@whity-org/features/document-editor';
-import { useTranslation } from '@whity-org/features/i18n';
+import { DocumentEditorScreen } from '@whity/features/document-editor';
+import { useTranslation } from '@whity/features/i18n';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { useAuth } from '@/lib/auth-context';
 import { DOCUMENTS_COMMENT, DOCUMENTS_ISSUE, DOCUMENTS_SUGGEST, DOCUMENTS_WRITE } from '@/lib/capabilities';

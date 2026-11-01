@@ -57,9 +57,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
-import { Alert, AlertDescription } from '@whity-org/ui/alert';
-import { Button } from '@whity-org/ui/button';
-import { Input } from '@whity-org/ui/input';
+import { Alert, AlertDescription } from '@whity/ui/alert';
+import { Button } from '@whity/ui/button';
+import { Input } from '@whity/ui/input';
 import { IconAlertTriangle, IconShieldLock } from '@tabler/icons-react';
 
 import {

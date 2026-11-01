@@ -62,6 +62,44 @@ final class DocumentIssuingEntryPointWiringTest extends TestCase
         }
     }
 
+    /**
+     * `queue:work` is not a BaseCommand and never runs setupKernel(), so the
+     * kernel's registrations don't reach it. It registers its own through
+     * WorkerDocumentServices, and gives its plugin loader the registries.
+     */
+    public function testTheQueueWorkerRegistersItsOwnDocumentServices(): void
+    {
+        $worker = $this->read('src/Cli/Commands/QueueWorkCommand.php');
+        self::assertMatchesRegularExpression('/\$documentRegistries = \\\\?Whity\\\\Core\\\\Document\\\\Issuing\\\\WorkerDocumentServices::register\(/', $worker);
+        self::assertMatchesRegularExpression('/PluginJobs::register\([^;]*\$documentRegistries\);/', $worker);
+        self::assertStringContainsString(
+            "\$loader->setDocumentRegistries(\$documentRegistries['slots'], \$documentRegistries['fields']);",
+            $this->read('src/Core/Queue/PluginJobs.php'),
+        );
+    }
+
+    public function testBothEntryPointsGiveTheLoaderTheDocumentRegistriesBeforeLoading(): void
+    {
+        foreach (self::ENTRY_POINTS as $relative) {
+            self::assertMatchesRegularExpression(
+                '/\$pluginLoader->setDocumentRegistries\(\$templateSlotRegistry, \$documentFieldRegistry\);\s*\$pluginLoader->load\(\);/',
+                $this->read($relative),
+                "{$relative} must hand the loader the slot and field registries before load(), or code plugins' slots never register there."
+            );
+        }
+    }
+
+    public function testBothEntryPointsRegisterTheSdkDocumentsService(): void
+    {
+        foreach (self::ENTRY_POINTS as $relative) {
+            self::assertMatchesRegularExpression(
+                '/register_service\(\s*\\\\?Whity\\\\Sdk\\\\Documents\\\\Documents::class,\s*new \\\\?Whity\\\\Core\\\\Document\\\\Issuing\\\\SdkDocuments\(/',
+                $this->read($relative),
+                "{$relative} must register the SDK's Documents, or a plugin resolving it gets an exception."
+            );
+        }
+    }
+
     public function testTheWorkerReadsAFreshSetOfPluginsForEachIssue(): void
     {
         // A worker lives for many jobs; a manifest cached from the last job

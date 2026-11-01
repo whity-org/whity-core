@@ -1,13 +1,13 @@
-import type { Actor, Inline } from '@whity-org/ui/editor/contract';
-import type { MentionPerson, NewComment, NewSuggestion, RailSuggestion, RailThread } from '@whity-org/ui/editor/collab';
-import type { SuggestionPatch } from '@whity-org/ui/editor/suggestions';
+import type { Actor, Inline } from '@whity/ui/editor/contract';
+import type { MentionPerson, NewComment, NewSuggestion, RailSuggestion, RailThread } from '@whity/ui/editor/collab';
+import type { SuggestionPatch } from '@whity/ui/editor/suggestions';
 import type {
   BulkDecisionResult,
   CollabChanges,
   CollabSnapshot,
   DecisionResult,
   DocumentEditorAdapter,
-} from '@whity-org/features/document-editor';
+} from '@whity/features/document-editor';
 import { api } from '@/lib/api/client';
 import type { components } from '@/lib/api/schema';
 

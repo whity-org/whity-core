@@ -9,10 +9,10 @@
  */
 import { Editor } from '@tiptap/core';
 
-import type { Block, Inline } from '@whity-org/ui/editor/contract';
-import { fromEditorContent, toEditorContent } from '@whity-org/ui/editor/convert';
-import { documentExtensions } from '@whity-org/ui/editor/extensions';
-import { LOCAL_PREFIX, pendingFormats, renameSuggestion, suggestingKey } from '@whity-org/ui/editor/suggesting';
+import type { Block, Inline } from '@whity/ui/editor/contract';
+import { fromEditorContent, toEditorContent } from '@whity/ui/editor/convert';
+import { documentExtensions } from '@whity/ui/editor/extensions';
+import { LOCAL_PREFIX, pendingFormats, renameSuggestion, suggestingKey } from '@whity/ui/editor/suggesting';
 import {
   collectPatches,
   countMatches,
@@ -23,7 +23,7 @@ import {
   summarize,
   type LocalChange,
   type SuggestionPatch,
-} from '@whity-org/ui/editor/suggestions';
+} from '@whity/ui/editor/suggestions';
 
 const isLocal = (id: string) => id.startsWith(LOCAL_PREFIX);
 const p = (id: string, ...content: Inline[]): Block => ({ id, type: 'paragraph', content });

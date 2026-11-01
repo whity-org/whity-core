@@ -69,6 +69,50 @@ export interface McpClientSetup {
   fields?: McpFormField[]
 }
 
+/** An operating system, as Node and Tauri name it. */
+export type McpLocalOs = 'darwin' | 'win32' | 'linux'
+
+/**
+ * How a desktop companion (whity-agent, WHIT-823) finds this app on a
+ * computer and connects it WITHOUT a token: it never writes an Authorization
+ * header anywhere. Either the app signs in to the server itself, or it runs
+ * whity-agent's local bridge as a command, which holds the token in the OS
+ * keychain.
+ *
+ * Paths and commands follow the vendors' documentation as understood on
+ * 2026-11-01. `verified` stays false until whity-agent's detector for the app
+ * has been checked against it, as `McpInstallLink.verified` does for links.
+ */
+export interface McpLocalSupport {
+  /**
+   * Executables to look for on PATH (`claude`, `code`). Resolving platform
+   * shims such as `code.cmd` on Windows is left to whity-agent.
+   */
+  binaries?: string[]
+  /**
+   * The app's user-scope config files, per OS, with the placeholders the
+   * setup() blocks use (`~`, `%APPDATA%`). Absent for an OS the app doesn't
+   * run on or keeps no such file on.
+   */
+  configPaths?: Partial<Record<McpLocalOs, string[]>>
+  /**
+   * Whether an entry holding only the server URL makes the app run the MCP
+   * sign-in (OAuth) itself. Not the same as {@link McpClientSpec.requiresSignIn},
+   * which marks apps the web wizard can only offer once the server signs
+   * people in: this one says whether whity-agent may write a URL-only entry,
+   * or must use the bridge.
+   */
+  signsInItself: boolean
+  /** Whether the app can run a local command as an MCP server (stdio), for whity-agent's bridge. */
+  stdio: boolean
+  /**
+   * The app's own command to add a remote server, as argv, without any token.
+   * Pass the URL from {@link mcpEndpoint} as it is.
+   */
+  addCommand?: (connection: { name: string; url: string }) => string[]
+  verified: boolean
+}
+
 export interface McpClientSpec {
   id: McpClientId
   /** The product's own name. A proper noun, so it is not translated. */
@@ -88,6 +132,8 @@ export interface McpClientSpec {
    */
   toolLimit?: number
   setup?: (connection: McpConnection) => McpClientSetup
+  /** How whity-agent finds and connects the installed app (WHIT-823). */
+  local?: McpLocalSupport
 }
 
 /**
@@ -179,6 +225,14 @@ export const MCP_CLIENTS: readonly McpClientSpec[] = [
         },
       }
     },
+    local: {
+      binaries: ['claude'],
+      configPaths: { darwin: ['~/.claude.json'], win32: ['~/.claude.json'], linux: ['~/.claude.json'] },
+      signsInItself: true,
+      stdio: true,
+      addCommand: ({ name, url }) => ['claude', 'mcp', 'add', '--scope', 'user', '--transport', 'http', mcpServerName(name), url],
+      verified: false,
+    },
   },
   {
     id: 'cursor',
@@ -206,6 +260,13 @@ export const MCP_CLIENTS: readonly McpClientSpec[] = [
         },
       }
     },
+    local: {
+      binaries: ['cursor'],
+      configPaths: { darwin: ['~/.cursor/mcp.json'], win32: ['~/.cursor/mcp.json'], linux: ['~/.cursor/mcp.json'] },
+      signsInItself: true,
+      stdio: true,
+      verified: false,
+    },
   },
   {
     id: 'vscode',
@@ -227,6 +288,19 @@ export const MCP_CLIENTS: readonly McpClientSpec[] = [
         },
       }
     },
+    local: {
+      binaries: ['code'],
+      // The user profile's own mcp.json (VS Code's `servers` key, as above).
+      configPaths: {
+        darwin: ['~/Library/Application Support/Code/User/mcp.json'],
+        win32: ['%APPDATA%\\Code\\User\\mcp.json'],
+        linux: ['~/.config/Code/User/mcp.json'],
+      },
+      signsInItself: true,
+      stdio: true,
+      addCommand: ({ name, url }) => ['code', '--add-mcp', JSON.stringify({ name: mcpServerName(name), type: 'http', url })],
+      verified: false,
+    },
   },
   {
     id: 'windsurf',
@@ -241,6 +315,17 @@ export const MCP_CLIENTS: readonly McpClientSpec[] = [
         text: json({ mcpServers: { [mcpServerName(name)]: { serverUrl: url, headers: { Authorization: bearer(token) } } } }),
       },
     }),
+    local: {
+      configPaths: {
+        darwin: ['~/.config/devin/mcp_config.json'],
+        win32: ['%APPDATA%\\devin\\mcp_config.json'],
+        linux: ['~/.config/devin/mcp_config.json'],
+      },
+      // Not documented to sign in to a remote server by itself: use the bridge.
+      signsInItself: false,
+      stdio: true,
+      verified: false,
+    },
   },
   {
     id: 'codex',
@@ -257,6 +342,15 @@ export const MCP_CLIENTS: readonly McpClientSpec[] = [
           `http_headers = { "Authorization" = ${tomlString(bearer(token))} }\n`,
       },
     }),
+    local: {
+      binaries: ['codex'],
+      configPaths: { darwin: ['~/.codex/config.toml'], win32: ['~/.codex/config.toml'], linux: ['~/.codex/config.toml'] },
+      // A URL-only server signs in with `codex mcp login <name>`.
+      signsInItself: true,
+      stdio: true,
+      addCommand: ({ name, url }) => ['codex', 'mcp', 'add', mcpServerName(name), '--url', url],
+      verified: false,
+    },
   },
   {
     id: 'gemini-cli',
@@ -276,6 +370,14 @@ export const MCP_CLIENTS: readonly McpClientSpec[] = [
         },
       }
     },
+    local: {
+      binaries: ['gemini'],
+      configPaths: { darwin: ['~/.gemini/settings.json'], win32: ['~/.gemini/settings.json'], linux: ['~/.gemini/settings.json'] },
+      signsInItself: true,
+      stdio: true,
+      addCommand: ({ name, url }) => ['gemini', 'mcp', 'add', '--transport', 'http', '--scope', 'user', mcpServerName(name), url],
+      verified: false,
+    },
   },
   {
     id: 'n8n',
@@ -291,7 +393,23 @@ export const MCP_CLIENTS: readonly McpClientSpec[] = [
       ],
     }),
   },
-  { id: 'claude', name: 'Claude', requiresSignIn: true, docs: 'https://www.claude.com/docs/connectors/custom/remote-mcp' },
+  {
+    id: 'claude',
+    name: 'Claude',
+    requiresSignIn: true,
+    docs: 'https://www.claude.com/docs/connectors/custom/remote-mcp',
+    // Claude Desktop: remote servers are added in the app as connectors, so
+    // its config file takes whity-agent's bridge as a local command.
+    local: {
+      configPaths: {
+        darwin: ['~/Library/Application Support/Claude/claude_desktop_config.json'],
+        win32: ['%APPDATA%\\Claude\\claude_desktop_config.json'],
+      },
+      signsInItself: false,
+      stdio: true,
+      verified: false,
+    },
+  },
   { id: 'chatgpt', name: 'ChatGPT', requiresSignIn: true, docs: 'https://developers.openai.com/apps-sdk/build/auth' },
   {
     id: 'other',

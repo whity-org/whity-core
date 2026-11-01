@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/lib/toast-context';
-import { Button } from '@whity-org/ui/button';
-import { Badge } from '@whity-org/ui/badge';
+import { Button } from '@whity/ui/button';
+import { Badge } from '@whity/ui/badge';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,9 +15,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from '@whity-org/ui/alert-dialog';
-import { useTranslation } from '@whity-org/features/i18n';
-import { useDateDisplay } from '@whity-org/features/datetime';
+} from '@whity/ui/alert-dialog';
+import { useTranslation } from '@whity/features/i18n';
+import { useDateDisplay } from '@whity/features/datetime';
 import { IconDeviceDesktop, IconDeviceDesktopOff } from '@tabler/icons-react';
 
 /**

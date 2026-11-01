@@ -240,7 +240,7 @@ The list shows only the slots of switched-on plugins, each with its binding and,
 | `slot_unbound` | Nothing is bound to it |
 | `slot_misfit` | The bound template no longer fits; `reason` says why |
 
-**From code and the worker.** Core issues through one service, `Whity\Core\Document\Issuing\TemplateIssuing`, registered in both entry points: `public/index.php`, and the CLI kernel that `queue:work` and `events:relay` run in. `issue(ActingAs, IssueInput)` takes a slot or a template id, the record (`CakeOrders.order:12`), values, a title, an origin key and `render`. It returns the issued document, or throws `DocumentIssueRefused` with a stable `reason`, the HTTP `status` the REST route answers with, and `details`, having written nothing:
+**From code and the worker.** Core issues through one service, `Whity\Core\Document\Issuing\TemplateIssuing`, registered in `public/index.php`, in the CLI kernel (`BaseCommand`), and in `queue:work`, which isn't a `BaseCommand` and registers its own through `WorkerDocumentServices`. `events:relay` loads no plugins yet, so nothing there issues. `issue(ActingAs, IssueInput)` takes a slot or a template id, the record (`CakeOrders.order:12`), values, a title, an origin key and `render`. It returns the issued document, or throws `DocumentIssueRefused` with a stable `reason`, the HTTP `status` the REST route answers with, and `details`, having written nothing:
 
 | `reason` | Why |
 | --- | --- |

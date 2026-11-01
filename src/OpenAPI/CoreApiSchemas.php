@@ -137,6 +137,8 @@ final class CoreApiSchemas
             self::meInboxRoutes(),
             self::searchRoutes(),
             self::agentProposalRoutes(),
+            self::agentRoutes(),
+            self::myAgentRoutes(),
             self::userGroupRoutes(),
             self::documentRouteTemplateRoutes(),
             self::documentCollectionRoutes(),
@@ -5312,6 +5314,8 @@ final class CoreApiSchemas
             // ── Agent proposals (WHIT-784) ────────────────────────────────────
             'AgentProposal' => self::object([
                 'id' => self::int(),
+                // The agent, named by its credential ("Billing assistant"); null once that credential is gone.
+                'agent' => self::object(['name' => self::str(true)], ['name']),
                 // waiting · approved · declined · expired · undone
                 'status' => ['type' => 'string', 'enum' => ['waiting', 'approved', 'declined', 'expired', 'undone']],
                 'tool' => self::str(),
@@ -5324,9 +5328,89 @@ final class CoreApiSchemas
                 'decidedAt' => self::str(true),
                 'expiresAt' => self::str(),
                 'createdAt' => self::str(),
-            ], ['id', 'status', 'tool', 'summary', 'arguments', 'diff', 'permissions', 'undoWindowSeconds', 'result', 'decidedAt', 'expiresAt', 'createdAt']),
+            ], ['id', 'agent', 'status', 'tool', 'summary', 'arguments', 'diff', 'permissions', 'undoWindowSeconds', 'result', 'decidedAt', 'expiresAt', 'createdAt']),
             'AgentProposalListResponse' => self::listEnvelope('AgentProposal'),
             'AgentProposalResponse' => self::dataEnvelope(SchemaBuilder::ref('AgentProposal')),
+            // ── Workspace agents and presets (WHIT-815) ──────────────────────
+            'AgentPersonaFields' => self::object(self::agentPersonaProperties(), []),
+            'AgentCreateRequest' => self::object(self::agentPersonaProperties() + [
+                'presetKey' => ['type' => 'string', 'description' => 'Start from this preset; fields sent override its own'],
+            ], []),
+            'Agent' => self::object([
+                'id' => self::int(),
+                'slug' => self::str(),
+                'name' => self::str(),
+                'nameAr' => self::str(),
+                'role' => self::str(),
+                'roleAr' => self::str(),
+                'instructions' => self::str(),
+                'instructionsAr' => self::str(),
+                'tone' => ['type' => 'string', 'enum' => ['plain', 'formal', 'brief']],
+                'language' => ['type' => 'string', 'enum' => ['auto', 'en', 'ar']],
+                'toolsets' => ['type' => 'array', 'items' => self::str()],
+                'grant' => ['type' => 'object', 'additionalProperties' => ['type' => 'string', 'enum' => ['off', 'ask', 'allow']]],
+                'preset' => ['nullable' => true, 'type' => 'object', 'properties' => ['key' => self::str(), 'version' => self::int()], 'description' => 'The preset it was created from'],
+                'status' => ['type' => 'string', 'enum' => ['active', 'archived']],
+                'createdAt' => self::str(),
+                'updatedAt' => self::str(),
+            ], ['id', 'slug', 'name', 'nameAr', 'role', 'roleAr', 'instructions', 'instructionsAr', 'tone', 'language', 'toolsets', 'grant', 'preset', 'status', 'createdAt', 'updatedAt']),
+            'AgentListResponse' => self::listEnvelope('Agent'),
+            'AgentResponse' => self::dataEnvelope(SchemaBuilder::ref('Agent')),
+            'AgentPreset' => self::object([
+                'key' => self::str(),
+                'version' => self::int(),
+                'name' => self::str(),
+                'nameAr' => self::str(),
+                'role' => self::str(),
+                'roleAr' => self::str(),
+                'instructions' => self::str(),
+                'instructionsAr' => self::str(),
+                'tone' => ['type' => 'string', 'enum' => ['plain', 'formal', 'brief']],
+                'language' => ['type' => 'string', 'enum' => ['auto', 'en', 'ar']],
+                'toolsets' => ['type' => 'array', 'items' => self::str()],
+                'grant' => ['type' => 'object', 'additionalProperties' => ['type' => 'string', 'enum' => ['off', 'ask', 'allow']]],
+            ], ['key', 'version', 'name', 'nameAr', 'role', 'roleAr', 'instructions', 'instructionsAr', 'tone', 'language', 'toolsets', 'grant']),
+            'AgentPresetListResponse' => self::listEnvelope('AgentPreset'),
+            // ── A person's use of the workspace's agents (WHIT-816) ──────────
+            'MyAgent' => self::object([
+                'id' => self::int(),
+                'slug' => self::str(),
+                'name' => self::str(),
+                'nameAr' => self::str(),
+                'role' => self::str(),
+                'roleAr' => self::str(),
+                'tone' => ['type' => 'string', 'enum' => ['plain', 'formal', 'brief']],
+                'language' => ['type' => 'string', 'enum' => ['auto', 'en', 'ar']],
+                'preset' => ['nullable' => true, 'type' => 'object', 'properties' => ['key' => self::str(), 'version' => self::int()]],
+                'assignment' => [
+                    'nullable' => true,
+                    'type' => 'object',
+                    'description' => 'Your use of this agent; null when you don\'t use it',
+                    'properties' => ['id' => self::int(), 'principalId' => self::str(), 'createdAt' => self::str()],
+                ],
+            ], ['id', 'slug', 'name', 'nameAr', 'role', 'roleAr', 'tone', 'language', 'preset', 'assignment']),
+            'MyAgentListResponse' => self::listEnvelope('MyAgent'),
+            'AgentGrantRow' => self::object([
+                'permission' => self::str(),
+                'mode' => ['type' => 'string', 'enum' => ['off', 'ask', 'allow'], 'nullable' => true, 'description' => 'The mode set; null for the default'],
+                'modes' => ['type' => 'array', 'items' => ['type' => 'string', 'enum' => ['off', 'ask', 'allow']], 'description' => 'The modes you may set'],
+                'withheld' => ['type' => 'object', 'additionalProperties' => self::object(['reason' => self::str(), 'message' => self::str()], ['reason', 'message'])],
+                'effective' => self::object(['read' => self::str(true), 'write' => self::str(true)], []),
+            ], ['permission', 'mode', 'modes', 'withheld', 'effective']),
+            'AgentAssignmentGrant' => self::object([
+                'assignmentId' => self::int(),
+                'principalId' => self::str(),
+                'agent' => self::object(['id' => self::int(), 'name' => self::str(), 'nameAr' => self::str()], ['id', 'name', 'nameAr']),
+                'permissions' => ['type' => 'array', 'items' => SchemaBuilder::ref('AgentGrantRow')],
+            ], ['assignmentId', 'principalId', 'agent', 'permissions']),
+            'AgentAssignmentGrantResponse' => self::dataEnvelope(SchemaBuilder::ref('AgentAssignmentGrant')),
+            'AgentCredentialResponse' => self::dataEnvelope(self::object([
+                'jti' => self::str(),
+                'token' => ['type' => 'string', 'description' => 'Shown once'],
+                'name' => self::str(),
+                'principalId' => self::str(),
+            ], ['jti', 'token', 'name', 'principalId'])),
+            'AgentUnassignResponse' => self::dataEnvelope(self::object(['revokedCredentials' => self::int()], ['revokedCredentials'])),
             // ── The document organizer (#978, implementing #947 item 5) ───────
             // A "folder" is a NAMED QUERY, never a stored container: a document
             // raised centrally and needed by fifteen units has no single home,
@@ -11073,6 +11157,177 @@ final class CoreApiSchemas
                     ] + self::authErrors(),
                 ],
             ],
+        ];
+    }
+
+    /**
+     * The fields a workspace agent's create and update accept (WHIT-815).
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    private static function agentPersonaProperties(): array
+    {
+        return [
+            'slug' => ['type' => 'string', 'maxLength' => 48, 'description' => 'Lower-case letters, digits and dashes; unique in the workspace'],
+            'name' => ['type' => 'string', 'maxLength' => 60, 'description' => 'Role name, for example "Finance clerk" (register 5.6b)'],
+            'nameAr' => ['type' => 'string', 'maxLength' => 60, 'description' => 'The role name in Arabic'],
+            'role' => ['type' => 'string', 'maxLength' => 200, 'description' => 'One sentence: what it does'],
+            'roleAr' => ['type' => 'string', 'maxLength' => 200, 'description' => 'The role sentence in Arabic'],
+            'instructions' => ['type' => 'string', 'maxLength' => 4000, 'description' => 'The workspace\'s guidance for the model. Never changes access.'],
+            'instructionsAr' => ['type' => 'string', 'maxLength' => 4000, 'description' => 'The instructions in Arabic'],
+            'tone' => ['type' => 'string', 'enum' => ['plain', 'formal', 'brief'], 'description' => "plain (Whity's voice), formal or brief"],
+            'language' => ['type' => 'string', 'enum' => ['auto', 'en', 'ar'], 'description' => 'auto follows the person; en or ar fixes it'],
+            'toolsets' => ['type' => 'array', 'items' => self::str(), 'description' => 'Toolset ids or prefix.*; empty means every toolset'],
+            'grant' => ['type' => 'object', 'additionalProperties' => ['type' => 'string', 'enum' => ['off', 'ask', 'allow']], 'description' => 'Where a new assignment starts, per permission'],
+        ];
+    }
+
+    /**
+     * Workspace agents and the presets they start from (WHIT-815,
+     * docs/design/AGENT-PERSONAS-AND-WHITY-AGENT.md §4.2). Gated on
+     * `agents:manage`. Writes are `agentPolicy: refuse`: an agent never creates
+     * or edits agents, whatever its grant says.
+     *
+     * @return list<array{method: string, path: string, requiredRole: ?string, requiredPermission: ?string, schema: array<string, mixed>}>
+     */
+    private static function agentRoutes(): array
+    {
+        $id      = [['name' => 'id', 'in' => 'path', 'required' => true, 'description' => 'ID of the agent.', 'schema' => ['type' => 'integer']]];
+        $refuse  = ['agentPolicy' => 'refuse'];
+        $invalid = self::errorResponse('Invalid fields (the errors list says which)');
+
+        return [
+            self::permissionRoute('GET', '/api/agents', 'agents:manage', [
+                'summary' => 'List the workspace\'s agents',
+                'tags' => ['agents'],
+                'parameters' => [self::queryParam('archived', 'string', '1 to include archived agents')],
+                'responses' => [200 => self::jsonResponse('The workspace\'s agents, by name', 'AgentListResponse')] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/agents', 'agents:manage', [
+                'summary' => 'Create a workspace agent, from scratch or from a preset',
+                'description' => 'Send `presetKey` to start from a preset; any other field sent overrides the preset\'s. Without a `slug`, one is made from the name.',
+                'tags' => ['agents'],
+                'mcp' => $refuse,
+                'request' => 'AgentCreateRequest',
+                'responses' => [
+                    201 => self::jsonResponse('The new agent', 'AgentResponse'),
+                    409 => self::errorResponse('Another agent in this workspace already uses that slug'),
+                    422 => $invalid,
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/agents/{id:\d+}', 'agents:manage', [
+                'summary' => 'Get one workspace agent',
+                'tags' => ['agents'],
+                'parameters' => $id,
+                'responses' => [200 => self::jsonResponse('The agent', 'AgentResponse'), 404 => self::errorResponse('Agent not found')] + self::authErrors(),
+            ]),
+            self::permissionRoute('PATCH', '/api/agents/{id:\d+}', 'agents:manage', [
+                'summary' => 'Change a workspace agent\'s persona, toolsets or starting grant',
+                'tags' => ['agents'],
+                'mcp' => $refuse,
+                'parameters' => $id,
+                'request' => 'AgentPersonaFields',
+                'responses' => [
+                    200 => self::jsonResponse('The agent after the change', 'AgentResponse'),
+                    404 => self::errorResponse('Agent not found'),
+                    409 => self::errorResponse('Another agent in this workspace already uses that slug'),
+                    422 => $invalid,
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/agents/{id:\d+}/archive', 'agents:manage', [
+                'summary' => 'Archive a workspace agent so it is no longer offered',
+                'tags' => ['agents'],
+                'mcp' => $refuse,
+                'parameters' => $id,
+                'responses' => [200 => self::jsonResponse('The archived agent', 'AgentResponse'), 404 => self::errorResponse('Agent not found')] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/agents/{id:\d+}/restore', 'agents:manage', [
+                'summary' => 'Offer an archived workspace agent again',
+                'tags' => ['agents'],
+                'mcp' => $refuse,
+                'parameters' => $id,
+                'responses' => [200 => self::jsonResponse('The restored agent', 'AgentResponse'), 404 => self::errorResponse('Agent not found')] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/agent-presets', 'agents:manage', [
+                'summary' => 'List the presets a workspace agent can start from',
+                'tags' => ['agents'],
+                'responses' => [200 => self::jsonResponse('Core presets, by key', 'AgentPresetListResponse')] + self::authErrors(),
+            ]),
+        ];
+    }
+
+    /**
+     * A person's use of the workspace's agents (WHIT-816).
+     *
+     * No route gate: every signed-in member may use an agent for themselves,
+     * and each route answers only for the caller. NOT agent-callable, on
+     * purpose: an agent must never be able to grant itself or widen its grant,
+     * so these stay off the MCP surface (MyAgentsRoutesStayOffMcpTest).
+     *
+     * @return list<array{method: string, path: string, requiredRole: ?string, requiredPermission: ?string, schema: array<string, mixed>}>
+     */
+    private static function myAgentRoutes(): array
+    {
+        $id  = [['name' => 'id', 'in' => 'path', 'required' => true, 'description' => 'ID of the agent.', 'schema' => ['type' => 'integer']]];
+        $me  = static fn (string $method, string $path, array $schema): array => [
+            'method' => $method,
+            'path' => $path,
+            'requiredRole' => null,
+            'requiredPermission' => null,
+            'schema' => ['tags' => ['me']] + $schema,
+        ];
+        $notYours = self::errorResponse('No such agent, or you don\'t use it');
+
+        return [
+            $me('GET', '/api/me/agents', [
+                'summary' => 'The workspace\'s agents, and which you use',
+                'responses' => [200 => self::jsonResponse('Active agents, by name', 'MyAgentListResponse')] + self::authErrors(),
+            ]),
+            $me('POST', '/api/me/agents/{id:\d+}/assignment', [
+                'summary' => 'Use an agent for yourself',
+                'description' => 'Your grant starts from the agent\'s template, limited to what you hold: reads at most Allowed, writes at most Ask first.',
+                'parameters' => $id,
+                'responses' => [
+                    201 => self::jsonResponse('Your grant for the agent', 'AgentAssignmentGrantResponse'),
+                    404 => self::errorResponse('Agent not found'),
+                    409 => self::errorResponse('You already use this agent'),
+                ] + self::authErrors(),
+            ]),
+            $me('DELETE', '/api/me/agents/{id:\d+}/assignment', [
+                'summary' => 'Stop using an agent',
+                'description' => 'Its credentials are revoked, and its waiting proposals can no longer run.',
+                'parameters' => $id,
+                'responses' => [200 => self::jsonResponse('How many credentials were revoked', 'AgentUnassignResponse'), 404 => $notYours] + self::authErrors(),
+            ]),
+            $me('GET', '/api/me/agents/{id:\d+}/assignment/grant', [
+                'summary' => 'Your grant for an agent, permission by permission',
+                'parameters' => $id,
+                'responses' => [200 => self::jsonResponse('Each permission\'s mode, the modes you may set, and what the agent can do', 'AgentAssignmentGrantResponse'), 404 => $notYours] + self::authErrors(),
+            ]),
+            $me('PATCH', '/api/me/agents/{id:\d+}/assignment/grant', [
+                'summary' => 'Change your grant for an agent',
+                'description' => 'Send permission => off, ask, allow or default. Each mode must be one the grant offers; it applies to every credential of the agent from its next call.',
+                'parameters' => $id,
+                // A map keyed by permission, the same body as PATCH
+                // /api/mcp/tokens/{jti}/grant, so the grant screen sends both alike.
+                'request' => ['anyOf' => [[
+                    'type' => 'object',
+                    'description' => 'permission => off, ask, allow or default',
+                    'additionalProperties' => ['type' => 'string', 'enum' => ['off', 'ask', 'allow', 'default']],
+                ]]],
+                'responses' => [
+                    200 => self::jsonResponse('Your grant after the change', 'AgentAssignmentGrantResponse'),
+                    404 => $notYours,
+                    422 => self::errorResponse('A mode that isn\'t possible for that permission'),
+                ] + self::authErrors(),
+            ]),
+            $me('POST', '/api/me/agents/{id:\d+}/credentials', [
+                'summary' => 'A credential that acts as this agent for you',
+                'description' => 'An ai-agent token for MCP clients. Its toolsets and grant are read from your use of the agent on every call. The token is shown once.',
+                'parameters' => $id,
+                'request' => self::object(['name' => ['type' => 'string', 'maxLength' => 100, 'description' => 'What to call the credential; the agent\'s name by default']], []),
+                'responses' => [201 => self::jsonResponse('The new credential', 'AgentCredentialResponse'), 404 => $notYours, 422 => self::errorResponse('name is too long')] + self::authErrors(),
+            ]),
         ];
     }
 

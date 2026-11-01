@@ -13,16 +13,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Button } from '@whity-org/ui/button';
-import { Badge } from '@whity-org/ui/badge';
+import { Button } from '@whity/ui/button';
+import { Badge } from '@whity/ui/badge';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@whity-org/ui/select';
-import { useTranslation } from '@whity-org/features/i18n';
+} from '@whity/ui/select';
+import { useTranslation } from '@whity/features/i18n';
 import type { User } from './page';
 import { useRoleOptions } from './use-role-options';
 

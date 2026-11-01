@@ -41,7 +41,7 @@ When this was written there was no core setting for the tenant's main colour. It
 
 ### 1.3 Tokens
 
-`src/design/tokens/base.json` (v3.0.0) is the source; `generate-tokens.js` writes `web/app/globals.css`, `packages/tokens/generated/*` (published as `@whity-org/tokens` by `publish-tokens.yml` on pushes to `main` that change `packages/tokens/**` with a new version) and the Flutter tokens. It rejects non-OKLCH colours, mismatched light and dark keys and any weight ≥ 700. Fonts are self-hosted woff2 in `packages/tokens/fonts`, including Readex Pro 600 Latin and Arabic. **There is no document or print token group**: the print scale lives in prose (`16-documents.md`) and as px literals in `packages/ui/src/editor/editor.css:314-377`.
+`src/design/tokens/base.json` (v3.0.0) is the source; `generate-tokens.js` writes `web/app/globals.css`, `packages/tokens/generated/*` (published as `@whity/tokens` by `publish-tokens.yml` on pushes to `main` that change `packages/tokens/**` with a new version) and the Flutter tokens. It rejects non-OKLCH colours, mismatched light and dark keys and any weight ≥ 700. Fonts are self-hosted woff2 in `packages/tokens/fonts`, including Readex Pro 600 Latin and Arabic. **There is no document or print token group**: the print scale lives in prose (`16-documents.md`) and as px literals in `packages/ui/src/editor/editor.css:314-377`.
 
 ### 1.4 Rendering, and where it disagrees with the register
 
@@ -262,7 +262,7 @@ What plugins can't do in v1: add token keys, ship CSS, ship fonts. There is no f
 
 Both take the same payload (owner, Q9). The changes below are made in the open renderer in `render-service/`; Whity Render, the paid hosted upgrade, keeps the same contract.
 
-- The container gets the token fonts from `@whity-org/tokens` (Noto Sans, Noto Sans Arabic, Readex Pro 600 Latin and Arabic, Geist Mono) as `@font-face` with local file URLs, replacing the Debian font stack, and `flow.css` takes its sizes from the generated document tokens (phase 1). This is the fix for 6.5 and E.33 in print, and it's needed with or without themes.
+- The container gets the token fonts from `@whity/tokens` (Noto Sans, Noto Sans Arabic, Readex Pro 600 Latin and Arabic, Geist Mono) as `@font-face` with local file URLs, replacing the Debian font stack, and `flow.css` takes its sizes from the generated document tokens (phase 1). This is the fix for 6.5 and E.33 in print, and it's needed with or without themes.
 - The payload's `theme` grows from `{accent}` to the resolved theme's render keys: `accent`, `accentUse`, `titleFace`, `scale`, plus `logo` (data URI or an internal URL with the render secret) and letterhead lines through the existing letterhead block. `THEME_KEYS` becomes an enum-checked list; `muted`, `line` and `tint` are no longer accepted from callers (they become base tokens).
 - `WhityDocumentPrinter` takes a `ResolvedDocumentTheme` rather than an accent string.
 

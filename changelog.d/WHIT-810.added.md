@@ -1,0 +1,1 @@
+- An agent credential now opens a page that sets what it may do for you, permission by permission: Off, Ask first (it proposes and you approve) or Allowed. It shows what each choice lets the agent read and change, and why a mode isn't available. A change applies from the agent's next call, with no new token.

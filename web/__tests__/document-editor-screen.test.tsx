@@ -5,16 +5,16 @@
  */
 import { act, fireEvent, render, screen } from '@testing-library/react';
 
-import { DocumentEditorScreen, type DocumentEditorAdapter, type SaveResult } from '@whity-org/features/document-editor';
-import { SAMPLE_DOCUMENT } from '@whity-org/ui/editor/sample';
-import type { ResolvedDocumentTheme, WhityDocument } from '@whity-org/ui/editor/contract';
+import { DocumentEditorScreen, type DocumentEditorAdapter, type SaveResult } from '@whity/features/document-editor';
+import { SAMPLE_DOCUMENT } from '@whity/ui/editor/sample';
+import type { ResolvedDocumentTheme, WhityDocument } from '@whity/ui/editor/contract';
 
 let lastOnChange: ((doc: WhityDocument) => void) | null = null;
 let lastServices: unknown = 'not rendered';
 let lastProps: Record<string, unknown> = {};
 
 // The editor itself is covered by editor-*.test.ts; here only its onChange matters.
-jest.mock('@whity-org/ui/editor/doc-editor', () => ({
+jest.mock('@whity/ui/editor/doc-editor', () => ({
   DocEditor: (props: { document: WhityDocument; onChange: (d: WhityDocument) => void; save?: { state: string }; services?: unknown }) => {
     lastOnChange = props.onChange;
     lastServices = props.services;

@@ -57,6 +57,36 @@ final class AgentScopeGrant
         return new self($modes);
     }
 
+    /**
+     * The modes the person set, by permission. A permission not listed
+     * follows the default.
+     *
+     * @return array<string, string>
+     */
+    public function entries(): array
+    {
+        return $this->modes;
+    }
+
+    /**
+     * $scope with $permission's grant entry set to $mode, or removed (null: back
+     * to the default). Every other entry is kept as it was (WHIT-832).
+     *
+     * @param list<string> $scope
+     * @return list<string>
+     */
+    public static function withMode(array $scope, string $permission, ?string $mode): array
+    {
+        $kept = array_values(array_filter(
+            $scope,
+            static fn (string $entry): bool => (self::parse($entry)[0] ?? null) !== $permission,
+        ));
+        if ($mode !== null) {
+            $kept[] = self::PREFIX . "{$permission}={$mode}";
+        }
+        return $kept;
+    }
+
     /** The principal kind of an agent credential (ADR-0006 §3). Not minted until agent proposals exist (WHIT-784). */
     public const AGENT_KIND = 'ai-agent';
 

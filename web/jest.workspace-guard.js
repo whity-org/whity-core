@@ -6,16 +6,16 @@
  * Worktrees in this repo live at `.claude/worktrees/<name>` — INSIDE the repo.
  * A worktree that has never had `npm install` run in it has no `node_modules`
  * of its own, so Node's resolution walks up from `<worktree>/web/` and finds
- * the MAIN checkout's `node_modules`, whose `@whity-org/ui` entry is an
+ * the MAIN checkout's `node_modules`, whose `@whity/ui` entry is an
  * npm-workspaces symlink to the MAIN checkout's `packages/ui`.
  *
  * Which half of the mock that strands is worth stating precisely, because it
  * decides where the fix belongs. The component under test keeps loading the
- * LOCAL copy: `web/tsconfig.json` maps `@whity-org/ui/*` to
+ * LOCAL copy: `web/tsconfig.json` maps `@whity/ui/*` to
  * `../packages/ui/src/*`, `next/jest` hands those `paths` to SWC, and SWC emits
  * every ESM import as a RELATIVE require — `require("../../../packages/ui/
  * src/dialog")` — which cannot leave the checkout. It is the string in
- * `jest.mock('@whity-org/ui/dialog')` that escapes: a call argument rather
+ * `jest.mock('@whity/ui/dialog')` that escapes: a call argument rather
  * than an import, so SWC leaves it alone and Jest resolves it as a bare
  * specifier, walking node_modules up and out.
  *
@@ -56,11 +56,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 /**
- * The package whose resolution is probed. Any `@whity-org/ui` subpath would
+ * The package whose resolution is probed. Any `@whity/ui` subpath would
  * do; `button` is a leaf with no module-level side effects, so probing it
  * cannot execute component code as a side effect of loading the guard.
  */
-export const PROBE_SPECIFIER = '@whity-org/ui/button';
+export const PROBE_SPECIFIER = '@whity/ui/button';
 
 /**
  * Resolve symlinks and casing so two spellings of one location compare equal.
@@ -122,7 +122,7 @@ export function foreignResolutionMessage({ resolved, workspaceRoot }) {
     'becomes dead code and the assertions depending on it fail, which reads as',
     'a broken component rather than a broken environment (#840).',
     '',
-    "Fix: restore the '@whity-org/*' moduleNameMapper entries in",
+    "Fix: restore the '@whity/*' moduleNameMapper entries in",
     'jest.config.mjs, which pin these packages to this checkout — or run',
     '`npm install` once here, giving the checkout its own node_modules.',
   ].join('\n');

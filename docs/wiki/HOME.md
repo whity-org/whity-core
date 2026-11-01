@@ -34,7 +34,7 @@ Welcome to the Whity Core documentation.
 
 - **[Development Workflow](Development-Workflow.md)** — How work is planned and shipped: the Instruction Set (IS) and the Tasker flow (`WC-XX` numbering, task lifecycle, parallel execution).
 - **[Testing Against PostgreSQL](Testing-Against-PostgreSQL.md)** — Closing the SQLite/PostgreSQL dialect gap: how to point core's and a plugin's suites at a real engine, and the catalogue of differences that pass silently on SQLite.
-- **[Package Releases](Package-Releases.md)** — How the publishable packages (`@whity-org/ui`, the PHP plugin SDK) are versioned and released: monorepo + independently-versioned packages, changesets, version-gated publish.
+- **[Package Releases](Package-Releases.md)** — How the publishable packages (`@whity/ui`, the PHP plugin SDK) are versioned and released: monorepo + independently-versioned packages, changesets, version-gated publish.
 - **[CONTRIBUTING.md](../../CONTRIBUTING.md)** — Dev setup, coding standards, testing, and the PR process.
 - **[Plugin Development](Plugin-Development.md)** — Build plugins against `PluginInterface`.
 

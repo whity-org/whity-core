@@ -13,8 +13,8 @@
     "isolatedModules": true,
     "jsx": "react-jsx",
     "paths": {
-      "@whity-org/ui": ["../ui/src/index.ts"],
-      "@whity-org/ui/*": ["../ui/src/*"]
+      "@whity/ui": ["../ui/src/index.ts"],
+      "@whity/ui/*": ["../ui/src/*"]
     }
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],

@@ -5,10 +5,10 @@
  */
 import { Editor } from '@tiptap/core';
 
-import { documentExtensions } from '@whity-org/ui/editor/extensions';
-import { listMarkers, moveBlock } from '@whity-org/ui/editor/behaviour';
-import { fromEditorContent, toEditorContent } from '@whity-org/ui/editor/convert';
-import type { Block } from '@whity-org/ui/editor/contract';
+import { documentExtensions } from '@whity/ui/editor/extensions';
+import { listMarkers, moveBlock } from '@whity/ui/editor/behaviour';
+import { fromEditorContent, toEditorContent } from '@whity/ui/editor/convert';
+import type { Block } from '@whity/ui/editor/contract';
 
 const text = (t: string) => ({ type: 'text' as const, text: t });
 

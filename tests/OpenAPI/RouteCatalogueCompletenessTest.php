@@ -96,6 +96,10 @@ final class RouteCatalogueCompletenessTest extends TestCase
         'DELETE /api/mcp/tokens/{jti}',
         'GET /api/mcp/tokens',
         'POST /api/mcp/tokens',
+        // WHIT-832: an agent credential's grant. Never declared: a declared
+        // route becomes an MCP tool, and an agent must not reach its own grant.
+        'GET /api/mcp/tokens/{jti}/grant',
+        'PATCH /api/mcp/tokens/{jti}/grant',
         // WC-0208ce4d: MCP admin endpoints — OpenAPI schema to follow once
         // the generate:openapi snapshot is regenerated in a dedicated task.
         'DELETE /api/admin/mcp/tokens/{jti}',

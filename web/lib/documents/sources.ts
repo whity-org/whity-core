@@ -1,7 +1,7 @@
-import type { Block, DocumentKind, PublishBlocker, ResolvedDocumentTheme, WhityDocument } from '@whity-org/ui/editor/contract';
-import type { FieldGroup } from '@whity-org/ui/editor/fields';
-import type { BrandLogos } from '@whity-org/ui/editor/page-view';
-import type { EditorServices, FieldPreview, RecordView, UploadedFile } from '@whity-org/ui/editor/services';
+import type { Block, DocumentKind, PublishBlocker, ResolvedDocumentTheme, WhityDocument } from '@whity/ui/editor/contract';
+import type { FieldGroup } from '@whity/ui/editor/fields';
+import type { BrandLogos } from '@whity/ui/editor/page-view';
+import type { EditorServices, FieldPreview, RecordView, UploadedFile } from '@whity/ui/editor/services';
 import type {
   DocumentEditorAdapter,
   IssueResult,
@@ -9,7 +9,7 @@ import type {
   SaveResult,
   TemplateSetup,
   VersionContent,
-} from '@whity-org/features/document-editor';
+} from '@whity/features/document-editor';
 import { api } from '@/lib/api/client';
 import type { components } from '@/lib/api/schema';
 import { collabAdapter } from './collab';

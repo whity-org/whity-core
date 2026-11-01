@@ -8,10 +8,10 @@ import * as React from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import type { Editor } from '@tiptap/core';
 
-import type { EditorCollab, RailSuggestion, RailThread } from '@whity-org/ui/editor/collab';
-import type { WhityDocument } from '@whity-org/ui/editor/contract';
-import { DocEditor } from '@whity-org/ui/editor/doc-editor';
-import { SAMPLE_DOCUMENT } from '@whity-org/ui/editor/sample';
+import type { EditorCollab, RailSuggestion, RailThread } from '@whity/ui/editor/collab';
+import type { WhityDocument } from '@whity/ui/editor/contract';
+import { DocEditor } from '@whity/ui/editor/doc-editor';
+import { SAMPLE_DOCUMENT } from '@whity/ui/editor/sample';
 
 const t = (text: string) => ({ type: 'text' as const, text });
 const DOC: WhityDocument = {

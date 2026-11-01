@@ -6,11 +6,11 @@ import type {
   NewSuggestion,
   RailSuggestion,
   RailThread,
-} from '@whity-org/ui/editor/collab';
-import type { Inline, LabelPrintSource, PublishBlocker, ResolvedDocumentTheme, WhityDocument } from '@whity-org/ui/editor/contract';
-import type { FieldGroup } from '@whity-org/ui/editor/fields';
-import type { BrandLogos, Letterhead, LetterheadParts } from '@whity-org/ui/editor/page-view';
-import type { EditorServices, FieldPreview } from '@whity-org/ui/editor/services';
+} from '@whity/ui/editor/collab';
+import type { Inline, LabelPrintSource, PublishBlocker, ResolvedDocumentTheme, WhityDocument } from '@whity/ui/editor/contract';
+import type { FieldGroup } from '@whity/ui/editor/fields';
+import type { BrandLogos, Letterhead, LetterheadParts } from '@whity/ui/editor/page-view';
+import type { EditorServices, FieldPreview } from '@whity/ui/editor/services';
 
 /** A document as the server keeps it: the contract's document plus its draft version. */
 export interface LoadedDocument {

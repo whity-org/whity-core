@@ -8,21 +8,25 @@ import { useNavigation } from '@/lib/navigation-context';
 import { useBranding } from '@/lib/branding-context';
 import { useThemeMode } from '@/lib/theme-mode-context';
 import { useToast } from '@/lib/toast-context';
-import { Button } from '@whity-org/ui/button';
-import { TenantSwitcher as WorkspaceSwitcher } from '@whity-org/ui/tenant-switcher';
-import { AppSidebar, useForcedRail } from '@whity-org/ui/app-sidebar';
-import { navGroupsFromServerItems } from '@whity-org/features/nav';
-import { LanguageSwitcher, useI18nEnabled, useTranslation } from '@whity-org/features/i18n';
+import { Button } from '@whity/ui/button';
+import { TenantSwitcher as WorkspaceSwitcher } from '@whity/ui/tenant-switcher';
+import { AppSidebar, useForcedRail } from '@whity/ui/app-sidebar';
+import { navGroupsFromServerItems } from '@whity/features/nav';
+import { LanguageSwitcher, useI18nEnabled, useTranslation } from '@whity/features/i18n';
 import * as TablerIcons from '@tabler/icons-react';
 import {
   IconLogout,
   IconDashboard,
   IconUserCog,
+  IconSettings,
   IconWorld,
   IconSun,
   IconMoon,
 } from '@tabler/icons-react';
 import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useNavItemLabels } from '@/lib/nav-item-labels';
+import { WAITING_CHANGED_EVENT } from '@/lib/waiting-changed';
+import { SETTINGS_AREA_NAV_IDS, SETTINGS_AREA_PREFIXES } from '@/components/settings/settings-area';
 import type { Icon } from '@tabler/icons-react';
 
 /**
@@ -91,6 +95,9 @@ const LEGACY_NAV_GROUPS: Readonly<Record<string, string>> = {
   system: 'platform',
 };
 
+/** The personal account page's nav item; the footer's user row opens it instead. */
+const ACCOUNT_SETTINGS_ITEM_ID = 'settings';
+
 /** The system tenant: the only one that runs the platform itself. */
 const SYSTEM_TENANT_ID = 0;
 
@@ -104,7 +111,7 @@ function prettifyGroupId(groupId: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// TenantSwitcher — uses the shared Switcher primitive from @whity-org/ui.
+// TenantSwitcher — uses the shared Switcher primitive from @whity/ui.
 // ---------------------------------------------------------------------------
 
 interface TenantSwitcherProps {
@@ -179,12 +186,21 @@ function TenantSwitcher({ memberships, activeTenantId, collapsed }: TenantSwitch
 /**
  * How many things wait for the person, by nav item id: the Inbox's open items,
  * summed over its sources (`GET /api/me/inbox/sources` carries each source's
- * open count for exactly this badge). Re-read on every page change, so acting
+ * open count for exactly this badge), and the agent proposals waiting for
+ * their approval (`GET /api/me/agent-proposals?status=waiting`). Re-read on every page change, so acting
  * on an item and moving on updates the count. A failed read shows no count
  * rather than a wrong one.
  */
 function useWaitingCounts(pathname: string | null): Record<string, number> {
   const [counts, setCounts] = useState<Record<string, number>>({});
+  // A page that just changed what waits (Approvals after a decision) says so
+  // with WAITING_CHANGED_EVENT, so the count follows without a navigation.
+  const [nudge, setNudge] = useState(0);
+  useEffect(() => {
+    const onChanged = () => setNudge((n) => n + 1);
+    window.addEventListener(WAITING_CHANGED_EVENT, onChanged);
+    return () => window.removeEventListener(WAITING_CHANGED_EVENT, onChanged);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -199,12 +215,22 @@ function useWaitingCounts(pathname: string | null): Record<string, number> {
       } catch {
         inbox = 0;
       }
-      if (!cancelled) setCounts((prev) => ({ ...prev, inbox }));
+      let approvals = 0;
+      try {
+        const response = await fetch('/api/v1/me/agent-proposals?status=waiting', { credentials: 'include' });
+        if (response.ok) {
+          const body = (await response.json()) as { data?: unknown[] };
+          approvals = body.data?.length ?? 0;
+        }
+      } catch {
+        approvals = 0;
+      }
+      if (!cancelled) setCounts((prev) => ({ ...prev, inbox, approvals }));
     })();
     return () => {
       cancelled = true;
     };
-  }, [pathname]);
+  }, [pathname, nudge]);
 
   return counts;
 }
@@ -276,42 +302,23 @@ export function Sidebar() {
   // rewording a label upstream is a translation edit and not a key rename. An
   // id this map does not know keeps the server's label: that is the case for
   // every plugin-contributed entry, whose name is a plugin's to give.
-  const itemLabels = useMemo<Record<string, string>>(
-    () => ({
-      dashboard: t('sidebar.item.dashboard', 'Dashboard'),
-      inbox: t('sidebar.item.inbox', 'Inbox'),
-      users: t('sidebar.item.users', 'Users'),
-      roles: t('sidebar.item.roles', 'Roles'),
-      ous: t('sidebar.item.ous', 'Organizational Units'),
-      delegations: t('sidebar.item.delegations', 'Delegations'),
-      relations: t('sidebar.item.relations', 'Family Relations'),
-      'tag-groups': t('sidebar.item.tagGroups', 'Tag Groups'),
-      tags: t('sidebar.item.tags', 'Tags'),
-      tenants: t('sidebar.item.tenants', 'Tenants'),
-      'audit-logs': t('sidebar.item.auditLogs', 'Audit Logs'),
-      errors: t('sidebar.item.errors', 'Errors'),
-      plugins: t('sidebar.item.plugins', 'Plugins'),
-      'plugin-store': t('sidebar.item.pluginStore', 'Plugin Store'),
-      'website-settings': t('sidebar.item.websiteSettings', 'Website Settings'),
-      'document-library': t('sidebar.item.documentLibrary', 'Documents'),
-      'document-templates': t('sidebar.item.documentTemplates', 'Document templates'),
-      'document-sources': t('sidebar.item.documentSources', 'Notes and wiki'),
-      'approval-gating': t('sidebar.item.approvalGating', 'Approval Gating'),
-      'ai-principals': t('sidebar.item.aiPrincipals', 'AI Principals'),
-      'mcp-tools': t('sidebar.item.mcpTools', 'MCP Tools'),
-      languages: t('sidebar.item.languages', 'Languages'),
-      translations: t('sidebar.item.translations', 'Translations'),
-      settings: t('sidebar.item.settings', 'Settings'),
-    }),
-    [t],
-  );
+  const itemLabels = useNavItemLabels();
 
   const groups = useMemo(() => {
-    const regrouped = navItems.map((item) =>
-      item.group && LEGACY_NAV_GROUPS[item.group]
-        ? { ...item, group: LEGACY_NAV_GROUPS[item.group] }
-        : item,
-    );
+    // The Settings area (WHIT-806, owner decision D1): every settings page,
+    // the data pages it holds and the server's `settings` group become ONE
+    // entry at the foot, opening the area's own sub-nav. The personal account
+    // page leaves the nav too: it is the user row in the footer.
+    const inSettingsArea = (item: { id: string; group?: string }) =>
+      item.group === 'settings' || (SETTINGS_AREA_NAV_IDS as readonly string[]).includes(item.id);
+    const settingsEntry = navItems.find((item) => item.id === 'website-settings') ?? navItems.find(inSettingsArea);
+    const regrouped = navItems
+      .filter((item) => !inSettingsArea(item) && item.id !== ACCOUNT_SETTINGS_ITEM_ID)
+      .map((item) =>
+        item.group && LEGACY_NAV_GROUPS[item.group]
+          ? { ...item, group: LEGACY_NAV_GROUPS[item.group] }
+          : item,
+      );
     const built = navGroupsFromServerItems(regrouped, {
       currentPath: pathname,
       groupOrder: NAV_GROUP_ORDER,
@@ -325,12 +332,30 @@ export function Sidebar() {
     });
     const countLabel = (count: number) =>
       t('sidebar.count.waiting', '{count} waiting').replace('{count}', String(count));
-    return built.map((group) => ({
+    const withCounts = built.map((group) => ({
       ...group,
       items: group.items.map((item) =>
         counts[item.id] ? { ...item, count: counts[item.id], countLabel: countLabel(counts[item.id]) } : item,
       ),
     }));
+    if (!settingsEntry) return withCounts;
+    return [
+      ...withCounts,
+      {
+        id: 'settings',
+        items: [
+          {
+            id: 'settings-area',
+            label: t('sidebar.item.settings', 'Settings'),
+            href: settingsEntry.href,
+            icon: <IconSettings size={20} />,
+            active: SETTINGS_AREA_PREFIXES.some(
+              (prefix) => pathname === prefix || (pathname ?? '').startsWith(`${prefix}/`),
+            ),
+          },
+        ],
+      },
+    ];
   }, [navItems, pathname, groupLabels, itemLabels, counts, t]);
 
   const handleLogout = () => {
