@@ -130,6 +130,11 @@ final class CorePermissions
     // authenticate AI clients to the MCP endpoint.
     public const MCP_TOKENS_MANAGE = 'mcp:tokens:manage';
 
+    // Workspace agents (WHIT-815). Creates, edits and archives the workspace's
+    // agent definitions: persona, toolsets and grant template. Migration 180
+    // grants it to every role holding mcp:tokens:manage.
+    public const AGENTS_MANAGE = 'agents:manage';
+
     // Self-service registration approval (WC-235). Gates the system-tenant-only
     // review of pending registrations: list, approve (invited → active) and
     // reject (invited → suspended). Necessary but not sufficient — the handler
@@ -482,6 +487,7 @@ final class CorePermissions
             self::SETTINGS_WRITE,
             self::SETTINGS_MANAGE,
             self::MCP_TOKENS_MANAGE,
+            self::AGENTS_MANAGE,
             self::REGISTRATIONS_APPROVE,
             self::AUTH_PROVIDERS_MANAGE,
             self::EMAIL_DOMAINS_MANAGE,
