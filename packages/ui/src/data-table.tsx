@@ -65,6 +65,9 @@ import {
  * Table's `ColumnDef` — callers describe WHAT a column is (key/header/cell),
  * this component wires up HOW it sorts/filters/resizes/hides.
  */
+/** What the table calls to render one cell, given the cell's context. */
+type CellRenderer<TRow> = (info: { row: { original: TRow } }) => React.ReactNode
+
 export interface DataTableColumn<TData> {
   /** Unique column id. Defaults to `accessorKey` when omitted. */
   id?: string
@@ -448,6 +451,25 @@ export function DataTable<TData>({
   /** Passing `search` implies the search box, whether or not the flag is set. */
   const showSearchInput = enableGlobalFilter || serverSearch != null
 
+  // ONE RENDERER PER COLUMN, FOR THE LIFE OF THE TABLE (WHIT-800).
+  //
+  // The table renders a cell's function as a React component, so a new function
+  // is a new component type. Callers build `columns` and `rowActions` inline,
+  // which made them new on every render, so React unmounted and remounted every
+  // cell each time the page re-rendered: an open row menu closed and its items
+  // detached mid-click. So the function handed to the table never changes, and
+  // reads the caller's current closures here when it runs. Assigned during render
+  // rather than in an effect because the cells render in this same pass.
+  const latestCells = React.useRef({ columns, rowActions })
+  latestCells.current = { columns, rowActions }
+  const cellRenderers = React.useRef(new Map<string, CellRenderer<TableRow<TData>>>())
+  const stableCell = (id: string, render: CellRenderer<TableRow<TData>>) => {
+    const existing = cellRenderers.current.get(id)
+    if (existing) return existing
+    cellRenderers.current.set(id, render)
+    return render
+  }
+
   const columnDefs = React.useMemo<ColumnDef<TableFeatureSet, TableRow<TData>, unknown>[]>(() => {
     const defs: ColumnDef<TableFeatureSet, TableRow<TData>, unknown>[] = columns.map((column) => {
       const id = column.id ?? column.accessorKey
@@ -458,18 +480,18 @@ export function DataTable<TData>({
         id,
         accessorKey: column.accessorKey,
         header: column.header as string,
-        cell: column.cell
-          ? (info) => column.cell!(info.row.original)
-          : (info) => {
-              const value = column.accessorKey
-                ? (info.row.original as Record<string, unknown>)[column.accessorKey]
-                : undefined
-              return value == null || value === "" ? (
-                <span className="text-muted-foreground">—</span>
-              ) : (
-                String(value)
-              )
-            },
+        cell: stableCell(id, (info) => {
+          const current = latestCells.current.columns.find((c) => (c.id ?? c.accessorKey) === id)
+          if (current?.cell) return current.cell(info.row.original)
+          const value = current?.accessorKey
+            ? (info.row.original as Record<string, unknown>)[current.accessorKey]
+            : undefined
+          return value == null || value === "" ? (
+            <span className="text-muted-foreground">—</span>
+          ) : (
+            String(value)
+          )
+        }),
         enableSorting: column.enableSorting ?? false,
         enableColumnFilter: column.enableColumnFilter ?? false,
         enableHiding: column.enableHiding ?? true,
@@ -481,13 +503,14 @@ export function DataTable<TData>({
       defs.push({
         id: "__row-actions",
         header: rowActionsLabel,
-        cell: (info) => rowActions(info.row.original),
+        cell: stableCell("__row-actions", (info) => latestCells.current.rowActions?.(info.row.original) ?? null),
         enableSorting: false,
         enableColumnFilter: false,
         enableHiding: false,
       })
     }
     return defs
+    // `stableCell` only touches a ref, so it needs no place here.
   }, [columns, rowActions, rowActionsLabel])
 
   const table = useTable<TableFeatureSet, TableRow<TData>>({
