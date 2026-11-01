@@ -36,6 +36,8 @@ export function useNavItemLabels(): Record<string, string> {
       'document-templates': t('sidebar.item.documentTemplates', 'Document templates'),
       'document-sources': t('sidebar.item.documentSources', 'Notes and wiki'),
       'approval-gating': t('sidebar.item.approvalGating', 'Approval Gating'),
+      'my-agents': t('sidebar.item.myAgents', 'My agents'),
+      agents: t('sidebar.item.agents', 'Agents'),
       'ai-principals': t('sidebar.item.aiPrincipals', 'AI Principals'),
       'mcp-tools': t('sidebar.item.mcpTools', 'MCP Tools'),
       languages: t('sidebar.item.languages', 'Languages'),
