@@ -107,15 +107,31 @@ final class AgentProposalsRealEngineTest extends TestCase
 
         $listed = json_decode($this->inbox->list($this->as(self::RANA))->getBody(), true)['data'][0];
 
-        self::assertSame(['name' => 'Billing assistant'], $listed['agent']);
+        self::assertSame(['name' => 'Billing assistant', 'nameAr' => null], $listed['agent']);
         self::assertArrayNotHasKey('agent_principal_id', $listed, 'the credential id stays server-side');
+    }
+
+    public function testAWorkspaceAgentIsNamedByItsDefinitionEvenOnceRetired(): void
+    {
+        $this->pdo->exec("INSERT INTO agents (id, tenant_id, slug, name, name_ar, status)
+                          VALUES (7, 1, 'billing', 'Billing assistant', 'مساعد الفواتير', 'archived')");
+        $this->pdo->exec("INSERT INTO tenants (id, name, slug) VALUES (2, 'Example Clinic', 'example-clinic')");
+        $this->pdo->exec("INSERT INTO agents (id, tenant_id, slug, name) VALUES (8, 2, 'front-desk', 'Front desk')");
+        $this->pdo->prepare('INSERT INTO agent_assignments (id, tenant_id, agent_id, profile_id, revoked_at) VALUES (31, 1, 7, ?, CURRENT_TIMESTAMP)')->execute([self::RANA]);
+        $this->pdo->prepare('INSERT INTO agent_assignments (id, tenant_id, agent_id, profile_id) VALUES (32, 2, 8, ?)')->execute([self::RANA]);
+
+        self::assertSame(
+            ['agent:31' => ['name' => 'Billing assistant', 'nameAr' => 'مساعد الفواتير']],
+            $this->proposals->agentNames(self::TENANT, ['agent:31', 'agent:32']),
+            "revoked and archived still named; another workspace's assignment is not",
+        );
     }
 
     public function testAnAgentWhoseCredentialIsGoneHasNoName(): void
     {
         ($this->toolsCall)(['name' => 'post_api_forms', 'arguments' => ['name' => 'Leave request']], 'bearer');
 
-        self::assertSame(['name' => null], json_decode($this->inbox->list($this->as(self::RANA))->getBody(), true)['data'][0]['agent']);
+        self::assertSame(['name' => null, 'nameAr' => null], json_decode($this->inbox->list($this->as(self::RANA))->getBody(), true)['data'][0]['agent']);
     }
 
     public function testAnInvalidCallIsNeverPutToAPerson(): void

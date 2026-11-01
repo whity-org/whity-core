@@ -212,6 +212,19 @@ final class AgentAssignmentsRealEngineTest extends TestCase
         self::assertNull($this->assignments->activeScope($assignmentId, self::TENANT, self::RANA));
     }
 
+    public function testTheBriefingFindsThePersonaWhileTheAgentIsInUse(): void
+    {
+        $assignmentId = $this->assign();
+        $principalId  = 'agent:' . $assignmentId;
+
+        self::assertSame('Finance clerk', $this->assignments->personaFor($principalId, self::TENANT, $this->agents)['name'] ?? null);
+        self::assertNull($this->assignments->personaFor($principalId, self::CAFE, $this->agents), 'another workspace');
+        self::assertNull($this->assignments->personaFor('jti-123', self::TENANT, $this->agents), 'not a workspace agent');
+
+        $this->agents->setStatus($this->clerk, self::TENANT, AgentRepository::ARCHIVED, self::RANA);
+        self::assertNull($this->assignments->personaFor($principalId, self::TENANT, $this->agents), 'archived');
+    }
+
     private function assign(): int
     {
         $response = $this->api->assign($this->as(self::RANA), ['id' => (string) $this->clerk]);

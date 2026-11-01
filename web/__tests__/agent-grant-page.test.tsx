@@ -10,7 +10,7 @@
 
 import React from 'react';
 import { render, screen, waitFor, within, fireEvent } from '@testing-library/react';
-import { shownMode, type GrantRow } from '@/components/agents/agent-grant';
+import { grantPath, readGrant, shownMode, type GrantRow } from '@/components/agents/agent-grant';
 
 const mockApiClient = jest.fn();
 jest.mock('@/lib/auth-context', () => ({ useAuth: () => ({ apiClient: mockApiClient }) }));
@@ -98,5 +98,19 @@ describe('shownMode', () => {
     expect(shownMode(row('a:b', { effective: { read: null, write: 'ask' } }))).toBe('ask');
     expect(shownMode(row('a:b', { effective: { read: null, write: null } }))).toBe('off');
     expect(shownMode(row('a:b', { mode: 'off' }))).toBe('off');
+  });
+});
+
+describe('the two addresses', () => {
+  it('points a credential and a workspace agent at their own grant', () => {
+    expect(grantPath({ kind: 'credential', jti: 'a/b' })).toBe('/api/v1/mcp/tokens/a%2Fb/grant');
+    expect(grantPath({ kind: 'agent', id: 7 })).toBe('/api/v1/me/agents/7/assignment/grant');
+  });
+
+  it('names a credential by itself, and an agent by its definition in the language shown', () => {
+    expect(readGrant({ name: 'My bot', permissions: [] }, true).name).toBe('My bot');
+    const agent = { agent: { name: 'Billing assistant', nameAr: 'مساعد الفواتير' }, permissions: [] };
+    expect(readGrant(agent, false).name).toBe('Billing assistant');
+    expect(readGrant(agent, true).name).toBe('مساعد الفواتير');
   });
 });

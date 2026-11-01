@@ -4874,6 +4874,12 @@ $mcpDiscovery = new DiscoveryTools(
             return ['name' => $display !== '' ? $display : null, 'workspace' => $tenant !== '' ? $tenant : null];
         },
         $mcpRateLimiter->limits(),
+        // WHIT-817: a workspace agent is briefed with its persona.
+        static fn (string $principalId, int $tenantId): ?array => $agentAssignments->personaFor(
+            $principalId,
+            $tenantId,
+            new \Whity\Core\Agent\AgentRepository($mcpBriefingPdo),
+        ),
     ),
     // WHIT-754: a plugin's always-on tool is listed only once this workspace's
     // admin turned it on (the mcp.always_on_plugin_tools setting).

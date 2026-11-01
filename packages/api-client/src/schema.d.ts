@@ -6657,6 +6657,7 @@ export interface components {
             id: number;
             agent: {
                 name: string | null;
+                nameAr: string | null;
             };
             /** @enum {string} */
             status: "waiting" | "approved" | "declined" | "expired" | "undone";
