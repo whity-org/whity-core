@@ -382,6 +382,7 @@ final class ToolsCallHandler implements MethodHandler
                         $proposalId,
                         UndoSpec::fromAuthored($authored['undo'] ?? null),
                         $authored['description'] !== '' ? $authored['description'] : $toolName,
+                        $authored['requiredPermission'],
                         fn (): mixed => $this->executeAuthored($toolName, $arguments, $authored, $principal),
                     );
                 } finally {
@@ -424,6 +425,7 @@ final class ToolsCallHandler implements MethodHandler
                 $proposalId,
                 $this->toolDeriver->undoFor($toolName),
                 (string) ($this->toolDeriver->toolFor($toolName)['description'] ?? $toolName),
+                $this->toolDeriver->buildAccessMap()[$toolName]['requiredPermission'] ?? null,
                 fn (): mixed => $this->executeResolved($toolName, $arguments, $declaration, $principal),
             );
         } finally {
@@ -468,21 +470,36 @@ final class ToolsCallHandler implements MethodHandler
     }
 
     /**
-     * Run $execute, and when an agent ran an operation that declares an undo,
-     * record what its inverse needs (WHIT-812). The result gains
+     * Run $execute, and record what an agent did (WHIT-812): an approved
+     * proposal always, and any run of an operation that declares an undo,
+     * with what its inverse needs. When it can be undone the result gains
      * `_meta['dev.whity/undo'] = {actionId, until, windowSeconds}`.
      *
      * Undo is offered only when it can be built: a read that fails before the
-     * call, or an inverse argument that points at nothing, leaves the action
-     * done and not undoable, and never fails the call itself.
+     * call, or an inverse argument that points at nothing, records the action
+     * as one that can't be undone. Recording never fails the call itself.
      *
      * @param array<string, mixed> $arguments
      * @param \Closure(): mixed   $execute
      */
-    private function withUndo(McpPrincipal $principal, string $toolName, array $arguments, ?int $proposalId, ?UndoSpec $spec, string $summary, \Closure $execute): mixed
+    private function withUndo(McpPrincipal $principal, string $toolName, array $arguments, ?int $proposalId, ?UndoSpec $spec, string $summary, ?string $permission, \Closure $execute): mixed
     {
-        if ($spec === null || $this->actions === null || !AgentScopeGrant::appliesTo($principal)) {
+        if ($this->actions === null || !AgentScopeGrant::appliesTo($principal) || ($spec === null && $proposalId === null)) {
             return $execute();
+        }
+        $permissions = $permission !== null && $permission !== '' ? [$permission] : [];
+        $plain       = function (mixed $result) use ($principal, $toolName, $arguments, $proposalId, $summary, $permissions): mixed {
+            if (is_array($result) && ($result['isError'] ?? false) !== true) {
+                try {
+                    $this->actions?->record($principal->tenantId, $principal->jti, $principal->userId, $proposalId, $toolName, $arguments, $summary, $permissions, null, null);
+                } catch (\Throwable $e) {
+                    error_log("[mcp] recording {$toolName} failed (tenant {$principal->tenantId}): " . $e->getMessage());
+                }
+            }
+            return $result;
+        };
+        if ($spec === null) {
+            return $plain($execute());
         }
 
         $readArguments = null;
@@ -491,7 +508,7 @@ final class ToolsCallHandler implements MethodHandler
             $readArguments = UndoSpec::resolve($spec->readArguments, ['arguments' => $arguments]);
             $before        = $readArguments !== null ? $this->readJson($principal, $spec->readOperation, $readArguments) : null;
             if ($before === null) {
-                return $execute();
+                return $proposalId !== null ? $plain($execute()) : $execute();
             }
         }
 
@@ -515,7 +532,7 @@ final class ToolsCallHandler implements MethodHandler
                     : UndoSpec::resolve($spec->arguments, $document);
                 if ($inverseArguments === null) {
                     error_log("[mcp] undo for {$toolName} not offered: an inverse argument points at nothing");
-                    return $result;
+                    return $proposalId !== null ? $plain($result) : $result;
                 }
                 $inverse['arguments'] = $inverseArguments;
             } else {
@@ -543,6 +560,7 @@ final class ToolsCallHandler implements MethodHandler
                 $toolName,
                 $arguments,
                 $summary,
+                $permissions,
                 $inverse,
                 $spec->windowSeconds,
             );

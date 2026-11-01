@@ -5358,18 +5358,20 @@ final class CoreApiSchemas
             // ── Agent actions and undo (WHIT-812) ─────────────────────────────
             'AgentAction' => self::object([
                 'id' => self::int(),
-                // done · undone
-                'status' => ['type' => 'string', 'enum' => ['done', 'undone']],
+                // done · undone · expired (done, and its undo window has closed)
+                'status' => ['type' => 'string', 'enum' => ['done', 'undone', 'expired']],
                 'tool' => self::str(),
                 'summary' => self::str(),
+                'agent' => self::object(['name' => self::str(true)], ['name']),
+                'permissions' => ['type' => 'array', 'items' => self::str()],
                 'arguments' => ['type' => 'object', 'additionalProperties' => true],
                 'proposalId' => self::int(true),
-                'undoWindowSeconds' => self::int(),
-                'undoableUntil' => self::str() + ['description' => 'UTC, ISO 8601: Undo is offered until then'],
+                'undoWindowSeconds' => self::int(true),
+                'undoableUntil' => self::str(true) + ['description' => 'UTC, ISO 8601: Undo is offered until then; null when it cannot be undone'],
                 'undoneBy' => self::object(['id' => self::int(), 'name' => self::str(true)], ['id', 'name']) + ['nullable' => true],
                 'undoneAt' => self::str(true),
                 'createdAt' => self::str(),
-            ], ['id', 'status', 'tool', 'summary', 'arguments', 'proposalId', 'undoWindowSeconds', 'undoableUntil', 'undoneBy', 'undoneAt', 'createdAt']),
+            ], ['id', 'status', 'tool', 'summary', 'agent', 'permissions', 'arguments', 'proposalId', 'undoWindowSeconds', 'undoableUntil', 'undoneBy', 'undoneAt', 'createdAt']),
             'AgentActionListResponse' => self::listEnvelope('AgentAction'),
             'AgentActionResponse' => self::dataEnvelope(SchemaBuilder::ref('AgentAction')),
             'AgentProposalResponse' => self::dataEnvelope(SchemaBuilder::ref('AgentProposal')),
@@ -11421,8 +11423,12 @@ final class CoreApiSchemas
                 'requiredRole' => null,
                 'requiredPermission' => null,
                 'schema' => [
-                    'summary' => 'What agents did for you that can be undone',
+                    'summary' => 'What agents did for you, and what can still be undone',
                     'tags' => ['me'],
+                    'parameters' => [
+                        self::queryParam('since', 'string', 'Only actions from this time on (UTC, ISO 8601)'),
+                        self::queryParam('status', 'string', 'done, undone or expired; all when omitted'),
+                    ],
                     'responses' => [200 => self::jsonResponse('Your agents\' actions, newest first', 'AgentActionListResponse')] + self::authErrors(),
                 ],
             ],
@@ -11439,7 +11445,7 @@ final class CoreApiSchemas
                     'responses' => [
                         200 => self::jsonResponse('The action, now undone', 'AgentActionResponse'),
                         404 => self::errorResponse('No such action taken on your behalf'),
-                        409 => self::errorResponse('Already undone, its undo window has closed, or what it changed has changed since'),
+                        409 => self::errorResponse('Already undone, it cannot be undone, its undo window has closed, or what it changed has changed since'),
                         422 => self::errorResponse('The undo itself failed; the action stays done'),
                     ] + self::authErrors(),
                 ],

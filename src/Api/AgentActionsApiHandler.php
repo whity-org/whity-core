@@ -19,7 +19,8 @@ use Whity\Mcp\Tools\Undo\UndoConflictException;
 /**
  * What agents did for you, and undoing it (WHIT-812; register 7.5c Undo).
  *
- *   GET  /api/me/agent-actions             the caller's agent actions, newest first
+ *   GET  /api/me/agent-actions             what agents did for the caller, newest first
+ *                                          (?since=<UTC time>&status=done|undone|expired)
  *   POST /api/me/agent-actions/{id}/undo   undo one, inside its window
  *
  * Only actions an agent took on the caller's behalf are visible or undoable.
@@ -54,7 +55,14 @@ final class AgentActionsApiHandler
         }
         [$tenantId, $profileId] = $caller;
 
-        return Response::json(['data' => array_map(self::present(...), $this->actions->listFor($tenantId, $profileId))], 200);
+        parse_str((string) parse_url($request->getPath(), PHP_URL_QUERY), $query);
+        $query += $_GET;
+        $status = is_string($query['status'] ?? null) && in_array($query['status'], [
+            AgentActionRepository::DONE, AgentActionRepository::UNDONE, AgentActionRepository::EXPIRED,
+        ], true) ? $query['status'] : null;
+        $since = is_string($query['since'] ?? null) && ($time = strtotime($query['since'])) !== false ? gmdate('Y-m-d H:i:s', $time) : null;
+
+        return Response::json(['data' => array_map(self::present(...), $this->actions->listFor($tenantId, $profileId, 100, $since, $status))], 200);
     }
 
     /** @param array<string, string> $params */
@@ -73,6 +81,9 @@ final class AgentActionsApiHandler
         }
         if ($action['status'] !== AgentActionRepository::DONE) {
             return Response::error('This was already undone', 409);
+        }
+        if ($action['undoable_until'] === null || $action['inverse'] === null) {
+            return Response::error('This can\'t be undone', 409);
         }
         if (strtotime($action['undoable_until'] . ' UTC') <= time()) {
             return Response::error('This can no longer be undone: its undo window has closed', 409);
@@ -99,11 +110,13 @@ final class AgentActionsApiHandler
         if ($action['proposal_id'] !== null) {
             $this->proposals?->markUndone((int) $action['proposal_id'], $tenantId);
         }
+        // Actor: the person who undid it ("Undone by Rana").
         $this->audit?->record('agent.action.undone', [
-            'tenant_id'   => $tenantId,
-            'target_type' => 'agent_action',
-            'target_id'   => $id,
-            'metadata'    => ['tool' => $action['tool'], 'proposal_id' => $action['proposal_id']],
+            'tenant_id'     => $tenantId,
+            'actor_user_id' => $profileId,
+            'target_type'   => 'agent_action',
+            'target_id'     => $id,
+            'metadata'      => ['action_id' => $id, 'tool' => $action['tool'], 'proposal_id' => $action['proposal_id'], 'agent_principal_id' => $action['agent_principal_id']],
         ]);
 
         $fresh = $this->actions->find($id, $tenantId);
@@ -119,15 +132,24 @@ final class AgentActionsApiHandler
      */
     public static function present(array $action): array
     {
+        $until  = $action['undoable_until'];
+        $status = $action['status'] === AgentActionRepository::DONE && $until !== null && strtotime($until . ' UTC') <= time()
+            ? AgentActionRepository::EXPIRED
+            : $action['status'];
+
         return [
             'id'                => $action['id'],
-            'status'            => $action['status'],
+            // done · undone · expired (done, and its undo window has closed)
+            'status'            => $status,
             'tool'              => $action['tool'],
             'summary'           => $action['summary'],
+            'agent'             => ['name' => $action['agent_name']],
+            'permissions'       => $action['permissions'],
             'arguments'         => $action['arguments'] === [] ? new \stdClass() : $action['arguments'],
             'proposalId'        => $action['proposal_id'],
+            // Null when it can't be undone.
             'undoWindowSeconds' => $action['undo_window_seconds'],
-            'undoableUntil'     => self::utc($action['undoable_until']),
+            'undoableUntil'     => $until !== null ? self::utc($until) : null,
             'undoneBy'          => $action['undone_by_profile_id'] !== null
                 ? ['id' => $action['undone_by_profile_id'], 'name' => $action['undone_by_name']]
                 : null,

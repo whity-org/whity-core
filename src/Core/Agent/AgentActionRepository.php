@@ -15,20 +15,28 @@ use PDO;
  */
 final class AgentActionRepository
 {
-    public const DONE   = 'done';
-    public const UNDONE = 'undone';
+    public const DONE    = 'done';
+    public const UNDONE  = 'undone';
+    /** Not stored: a done action whose undo window has closed reads as expired. */
+    public const EXPIRED = 'expired';
 
     private const COLUMNS = 'a.id, a.tenant_id, a.agent_principal_id, a.on_behalf_of_profile_id, a.proposal_id, a.tool,
-                             a.arguments, a.summary, a.inverse, a.undo_window_seconds, a.undoable_until, a.status,
-                             a.undone_by_profile_id, a.undone_at, a.undo_result, a.created_at, p.display_name AS undone_by_name';
+                             a.arguments, a.summary, a.permissions, a.inverse, a.undo_window_seconds, a.undoable_until, a.status,
+                             a.undone_by_profile_id, a.undone_at, a.undo_result, a.created_at, p.display_name AS undone_by_name,
+                             t.name AS agent_name';
+
+    /** Who undid it, and the agent credential's name (null once it is gone, or for a signed-in agent). */
+    private const JOINS = 'LEFT JOIN profiles p ON p.id = a.undone_by_profile_id
+                           LEFT JOIN mcp_tokens t ON t.jti = a.agent_principal_id';
 
     public function __construct(private readonly PDO $db)
     {
     }
 
     /**
-     * @param array<string, mixed> $arguments
-     * @param array<string, mixed> $inverse
+     * @param array<string, mixed>      $arguments
+     * @param list<string>              $permissions
+     * @param array<string, mixed>|null $inverse       null: it can't be undone
      */
     public function record(
         int $tenantId,
@@ -38,15 +46,17 @@ final class AgentActionRepository
         string $tool,
         array $arguments,
         string $summary,
-        array $inverse,
-        int $windowSeconds,
+        array $permissions,
+        ?array $inverse,
+        ?int $windowSeconds,
     ): int {
-        $stmt = $this->db->prepare(
+        $undoable = $inverse !== null && $windowSeconds !== null;
+        $stmt     = $this->db->prepare(
             'INSERT INTO agent_actions
                  (tenant_id, agent_principal_id, on_behalf_of_profile_id, proposal_id, tool, arguments, summary,
-                  inverse, undo_window_seconds, undoable_until, status, created_at)
+                  permissions, inverse, undo_window_seconds, undoable_until, status, created_at)
              VALUES (:tenant_id, :agent, :profile, :proposal, :tool, :arguments, :summary,
-                  :inverse, :window, :until, :status, NOW())'
+                  :permissions, :inverse, :window, :until, :status, NOW())'
         );
         $stmt->execute([
             ':tenant_id' => $tenantId,
@@ -55,10 +65,11 @@ final class AgentActionRepository
             ':proposal'  => $proposalId,
             ':tool'      => $tool,
             ':arguments' => self::encode($arguments === [] ? new \stdClass() : $arguments),
-            ':summary'   => $summary,
-            ':inverse'   => self::encode($inverse),
-            ':window'    => $windowSeconds,
-            ':until'     => gmdate('Y-m-d H:i:s', time() + $windowSeconds),
+            ':summary'     => $summary,
+            ':permissions' => self::encode($permissions),
+            ':inverse'     => $undoable ? self::encode($inverse) : null,
+            ':window'      => $undoable ? $windowSeconds : null,
+            ':until'       => $undoable ? gmdate('Y-m-d H:i:s', time() + (int) $windowSeconds) : null,
             ':status'    => self::DONE,
         ]);
 
@@ -68,8 +79,7 @@ final class AgentActionRepository
     /** @return array<string, mixed>|null */
     public function find(int $id, int $tenantId): ?array
     {
-        $stmt = $this->db->prepare('SELECT ' . self::COLUMNS . ' FROM agent_actions a
-            LEFT JOIN profiles p ON p.id = a.undone_by_profile_id
+        $stmt = $this->db->prepare('SELECT ' . self::COLUMNS . ' FROM agent_actions a ' . self::JOINS . '
             WHERE a.id = :id AND a.tenant_id = :tenant_id');
         $stmt->execute([':id' => $id, ':tenant_id' => $tenantId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -78,18 +88,37 @@ final class AgentActionRepository
     }
 
     /**
-     * A person's agent actions, newest first.
+     * A person's agent actions, newest first: since a UTC time, and with a
+     * status (done, undone, or expired: done with its window closed).
      *
      * @return list<array<string, mixed>>
      */
-    public function listFor(int $tenantId, int $profileId, int $limit = 50): array
+    public function listFor(int $tenantId, int $profileId, int $limit = 50, ?string $since = null, ?string $status = null): array
     {
-        $stmt = $this->db->prepare('SELECT ' . self::COLUMNS . ' FROM agent_actions a
-            LEFT JOIN profiles p ON p.id = a.undone_by_profile_id
-            WHERE a.tenant_id = :tenant_id AND a.on_behalf_of_profile_id = :profile
-            ORDER BY a.id DESC LIMIT :limit');
-        $stmt->bindValue(':tenant_id', $tenantId, PDO::PARAM_INT);
-        $stmt->bindValue(':profile', $profileId, PDO::PARAM_INT);
+        $now    = gmdate('Y-m-d H:i:s');
+        $sql    = 'SELECT ' . self::COLUMNS . ' FROM agent_actions a ' . self::JOINS . '
+            WHERE a.tenant_id = :tenant_id AND a.on_behalf_of_profile_id = :profile';
+        $params = [':tenant_id' => $tenantId, ':profile' => $profileId];
+        if ($since !== null) {
+            $sql .= ' AND a.created_at >= :since';
+            $params[':since'] = $since;
+        }
+        if ($status === self::UNDONE) {
+            $sql .= ' AND a.status = :undone';
+            $params[':undone'] = self::UNDONE;
+        } elseif ($status === self::DONE) {
+            $sql .= ' AND a.status = :done AND (a.undoable_until IS NULL OR a.undoable_until > :now)';
+            $params[':done'] = self::DONE;
+            $params[':now']  = $now;
+        } elseif ($status === self::EXPIRED) {
+            $sql .= ' AND a.status = :done AND a.undoable_until <= :now';
+            $params[':done'] = self::DONE;
+            $params[':now']  = $now;
+        }
+        $stmt = $this->db->prepare($sql . ' ORDER BY a.id DESC LIMIT :limit');
+        foreach ($params as $name => $value) {
+            $stmt->bindValue($name, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
+        }
         $stmt->bindValue(':limit', max(1, min($limit, 200)), PDO::PARAM_INT);
         $stmt->execute();
 
@@ -108,8 +137,7 @@ final class AgentActionRepository
             return [];
         }
         $marks = implode(', ', array_fill(0, count($proposalIds), '?'));
-        $stmt  = $this->db->prepare('SELECT ' . self::COLUMNS . " FROM agent_actions a
-            LEFT JOIN profiles p ON p.id = a.undone_by_profile_id
+        $stmt  = $this->db->prepare('SELECT ' . self::COLUMNS . ' FROM agent_actions a ' . self::JOINS . "
             WHERE a.tenant_id = ? AND a.proposal_id IN ({$marks})");
         $stmt->execute([$tenantId, ...$proposalIds]);
 
@@ -162,15 +190,17 @@ final class AgentActionRepository
             'tool'                    => (string) $row['tool'],
             'arguments'               => (array) $json($row['arguments'], []),
             'summary'                 => (string) $row['summary'],
-            'inverse'                 => (array) $json($row['inverse'], []),
-            'undo_window_seconds'     => (int) $row['undo_window_seconds'],
-            'undoable_until'          => (string) $row['undoable_until'],
+            'permissions'             => array_values(array_filter((array) $json($row['permissions'], []), 'is_string')),
+            'inverse'                 => $json($row['inverse'], null),
+            'undo_window_seconds'     => $row['undo_window_seconds'] === null ? null : (int) $row['undo_window_seconds'],
+            'undoable_until'          => $row['undoable_until'] === null ? null : (string) $row['undoable_until'],
             'status'                  => (string) $row['status'],
             'undone_by_profile_id'    => $row['undone_by_profile_id'] === null ? null : (int) $row['undone_by_profile_id'],
             'undone_by_name'          => $row['undone_by_name'] === null ? null : (string) $row['undone_by_name'],
             'undone_at'               => $row['undone_at'] === null ? null : (string) $row['undone_at'],
             'undo_result'             => $json($row['undo_result'], null),
             'created_at'              => (string) $row['created_at'],
+            'agent_name'              => $row['agent_name'] === null ? null : (string) $row['agent_name'],
         ];
     }
 

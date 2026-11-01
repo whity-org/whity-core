@@ -7,22 +7,25 @@ namespace Database\Migrations;
 use Whity\Database\Database;
 
 /**
- * The undo log: what an agent did that can still be undone (WHIT-812; register
- * 7.5c Undo; MCP-TOOL-SURFACE §5.11).
+ * What agents did, and the undo log (WHIT-812; register 7.5c Undo; MCP-TOOL-
+ * SURFACE §5.11).
  *
- * When an agent runs an operation that declares an undo, by an Allowed call or
- * an approved proposal, a row records what the inverse needs. The person it
- * acted for can undo it until `undoable_until`; undo runs the inverse as them,
- * after every check runs again.
+ * A row for every write an agent ran: an Allowed call of an operation that
+ * declares an undo, or an approved proposal. When the operation declares an
+ * undo, the row records what the inverse needs and the person it acted for can
+ * undo it until `undoable_until`; undo runs the inverse as them, after every
+ * check runs again. Otherwise the undo columns are null: it is activity only.
  *
  * - `agent_principal_id`, `on_behalf_of_profile_id`: the agent and the person
  *   it acted for, the only one who may undo it.
  * - `proposal_id`: the approved proposal it ran from; null for an Allowed call.
- * - `tool`, `arguments`, `summary`: what ran.
+ * - `tool`, `arguments`, `summary`, `permissions`: what ran, and the
+ *   permissions it used.
  * - `inverse`: the operation that reverses it and its resolved arguments, plus
  *   the read and the values it left, to tell whether anything changed since.
+ *   Null when it can't be undone.
  * - `undo_window_seconds`, `undoable_until`: the operation's undo window, from
- *   when it ran.
+ *   when it ran; null when it can't be undone.
  * - `status`: done · undone.
  * - `undone_by_profile_id`, `undone_at`, `undo_result`: who undid it, when, and
  *   what the inverse answered.
@@ -41,9 +44,10 @@ class CreateAgentActions
                 tool                    VARCHAR(128) NOT NULL,
                 arguments               JSONB        NOT NULL DEFAULT '{}'::jsonb,
                 summary                 TEXT         NOT NULL DEFAULT '',
-                inverse                 JSONB        NOT NULL,
-                undo_window_seconds     INTEGER      NOT NULL,
-                undoable_until          TIMESTAMP    NOT NULL,
+                permissions             JSONB        NOT NULL DEFAULT '[]'::jsonb,
+                inverse                 JSONB,
+                undo_window_seconds     INTEGER,
+                undoable_until          TIMESTAMP,
                 status                  VARCHAR(16)  NOT NULL DEFAULT 'done',
                 undone_by_profile_id    INTEGER      REFERENCES profiles(id) ON DELETE SET NULL,
                 undone_at               TIMESTAMP,

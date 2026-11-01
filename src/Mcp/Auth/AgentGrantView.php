@@ -35,7 +35,7 @@ final class AgentGrantView
     ];
 
     /**
-     * @param list<array{permission: string, readOnly: bool, agentPolicy: string}> $operations
+     * @param list<array{permission: string, readOnly: bool, agentPolicy: string, undoWindowSeconds?: ?int}> $operations
      *        every operation an agent could be offered, with its gate
      */
     public function __construct(private readonly array $operations)
@@ -76,6 +76,9 @@ final class AgentGrantView
                 'modes'      => $choices['modes'],
                 'withheld'   => $choices['withheld'],
                 'effective'  => $this->effective($permission, $scope),
+                // WHIT-812: the longest undo window among its writes; null when
+                // none can be undone.
+                'undoWindowSeconds' => $this->undoWindow($permission),
             ];
         }
         return $rows;
@@ -107,7 +110,7 @@ final class AgentGrantView
         // What each mode would let the agent do here, after the ceilings.
         $reach = static fn (string $mode, array $operations): array => array_map(
             static fn (array $op): string => AgentScopeGrant::fromScope([AgentScopeGrant::PREFIX . "{$permission}={$mode}"])
-                ->effectiveMode($permission, $op['readOnly'], $op['agentPolicy'], false),
+                ->effectiveMode($permission, $op['readOnly'], $op['agentPolicy'], ($op['undoWindowSeconds'] ?? null) !== null),
             $operations,
         );
         $operations = array_values(array_filter($this->operations, static fn (array $op): bool => $op['permission'] === $permission));
@@ -145,12 +148,24 @@ final class AgentGrantView
                 continue;
             }
             $kind = $op['readOnly'] ? 'read' : 'write';
-            $mode = $grant->effectiveMode($permission, $op['readOnly'], $op['agentPolicy'], false);
+            $mode = $grant->effectiveMode($permission, $op['readOnly'], $op['agentPolicy'], ($op['undoWindowSeconds'] ?? null) !== null);
             if ($best[$kind] === null || self::rank($mode) > self::rank($best[$kind])) {
                 $best[$kind] = $mode;
             }
         }
         return $best;
+    }
+
+    private function undoWindow(string $permission): ?int
+    {
+        $longest = null;
+        foreach ($this->operations as $op) {
+            $window = $op['undoWindowSeconds'] ?? null;
+            if ($op['permission'] === $permission && !$op['readOnly'] && is_int($window) && ($longest === null || $window > $longest)) {
+                $longest = $window;
+            }
+        }
+        return $longest;
     }
 
     private static function rank(string $mode): int
@@ -171,7 +186,7 @@ final class AgentGrantView
      *
      * @param iterable<array<string, mixed>> $tools
      * @param array<string, array<string, mixed>> $access tool name => access entry
-     * @return list<array{permission: string, readOnly: bool, agentPolicy: string}>
+     * @return list<array{permission: string, readOnly: bool, agentPolicy: string, undoWindowSeconds: ?int}>
      */
     public static function operationsFrom(iterable $tools, array $access): array
     {
@@ -188,6 +203,7 @@ final class AgentGrantView
                 'permission'  => $permission,
                 'readOnly'    => ($annotations['readOnlyHint'] ?? false) === true,
                 'agentPolicy' => is_string($meta[ToolSurface::META_AGENT_POLICY] ?? null) ? $meta[ToolSurface::META_AGENT_POLICY] : ToolSurface::AGENT_ALLOW,
+                'undoWindowSeconds' => is_int($meta[ToolSurface::META_UNDO_WINDOW] ?? null) ? $meta[ToolSurface::META_UNDO_WINDOW] : null,
             ];
         }
         return $operations;

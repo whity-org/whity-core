@@ -264,6 +264,56 @@ final class AgentUndoRealEngineTest extends TestCase
         self::assertSame([], json_decode($this->undoApi->list($this->as(self::OMAR))->getBody(), true)['data']);
     }
 
+    public function testAnApprovedProposalThatCantBeUndoneIsStillActivity(): void
+    {
+        $this->notes[1] = ['id' => 1, 'name' => 'Bread order'];
+        $this->caller   = self::agent();
+        $proposalId     = (int) json_decode($this->call('delete_api_notes_id', ['id' => 1])['content'][0]['text'], true)['proposal']['id'];
+
+        $approved = json_decode($this->inbox->approve($this->as(self::RANA), ['id' => (string) $proposalId])->getBody(), true)['data'];
+
+        self::assertSame([], $this->notes);
+        self::assertNull($approved['undoWindowSeconds']);
+        self::assertSame('done', $approved['action']['status']);
+        self::assertNull($approved['action']['undoableUntil'], 'it cannot be undone');
+        self::assertSame(['notes:manage'], $approved['action']['permissions']);
+        $response = $this->undo($approved['action']['id'], self::RANA);
+        self::assertSame(409, $response->getStatusCode());
+        self::assertStringContainsString("can't be undone", $response->getBody());
+    }
+
+    public function testAnActionPastItsWindowReadsAsExpiredAndFilters(): void
+    {
+        $open   = $this->call('post_api_notes', ['name' => 'Bread order'])['_meta'][ToolsCallHandler::META_UNDO]['actionId'];
+        $closed = $this->call('post_api_notes', ['name' => 'Cake order'])['_meta'][ToolsCallHandler::META_UNDO]['actionId'];
+        $this->pdo->prepare('UPDATE agent_actions SET undoable_until = :past WHERE id = :id')
+            ->execute([':past' => gmdate('Y-m-d H:i:s', time() - 1), ':id' => $closed]);
+
+        self::assertSame([$closed], array_column($this->list('?status=expired'), 'id'));
+        self::assertSame([$open], array_column($this->list('?status=done'), 'id'));
+        self::assertSame('expired', $this->list('?status=expired')[0]['status']);
+        self::assertSame([], $this->list('?since=' . rawurlencode(gmdate('Y-m-d\TH:i:s\Z', time() + 3600))));
+    }
+
+    public function testAnActionNamesTheAgentCredential(): void
+    {
+        $this->pdo->prepare("INSERT INTO mcp_tokens (jti, profile_id, tenant_id, name, principal_kind, scope, expires_at, created_at)
+                             VALUES (?, ?, ?, 'Office assistant', 'ai-agent', '[]', ?, CURRENT_TIMESTAMP)")
+            ->execute([self::AGENT, self::RANA, self::TENANT, gmdate('Y-m-d H:i:s', time() + 3600)]);
+
+        $this->call('post_api_notes', ['name' => 'Bread order']);
+
+        self::assertSame(['name' => 'Office assistant'], $this->list('')[0]['agent']);
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function list(string $query): array
+    {
+        $request       = new Request('GET', '/api/me/agent-actions' . $query, [], '');
+        $request->user = (object) ['profile_id' => self::RANA];
+        return json_decode($this->undoApi->list($request)->getBody(), true)['data'];
+    }
+
     /**
      * @param array<string, mixed> $arguments
      * @return array<string, mixed>
