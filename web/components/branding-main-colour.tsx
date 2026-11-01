@@ -12,8 +12,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api/client';
-import { Button } from '@whity-org/ui/button';
-import { useTranslation } from '@whity-org/features/i18n';
+import { Button } from '@whity/ui/button';
+import { useTranslation } from '@whity/features/i18n';
 import { IconCheck, IconRotate } from '@tabler/icons-react';
 
 const HEX_RE = /^#[0-9a-f]{6}$/;

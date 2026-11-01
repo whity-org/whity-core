@@ -712,7 +712,7 @@
       "title": "Admin Data Table",
       "description": "Generic sortable data table with loading skeletons and row actions.",
       "dependencies": [
-        "@whity-org/ui"
+        "@whity/ui"
       ],
       "files": [
         {

@@ -2,7 +2,7 @@
  * Desktop renderer for the SDK's declare-once block contract
  * (`sdk/src/Frontend/Blocks/BlockContract.php`) — the desktop twin of
  * `web/components/plugin/blocks/block-renderer.tsx`. Maps each block `type`
- * to an `@whity-org/ui` primitive via a switch/registry, exactly like the
+ * to an `@whity/ui` primitive via a switch/registry, exactly like the
  * web version; data-bound blocks fetch/submit through the PHP host proxy
  * (`use-plugin-data.ts`/`submit-plugin-action.ts`) instead of a browser
  * fetch. Never throws: an unknown or malformed node renders
@@ -10,26 +10,26 @@
  */
 import * as React from "react"
 
-import { Alert, AlertDescription, AlertTitle } from "@whity-org/ui/alert"
-import { Badge } from "@whity-org/ui/badge"
-import { BilingualInput, type BilingualValue } from "@whity-org/ui/bilingual-input"
-import { Button } from "@whity-org/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@whity-org/ui/card"
-import { Chart } from "@whity-org/ui/chart"
-import { Checkbox } from "@whity-org/ui/checkbox"
-import { DataTable } from "@whity-org/ui/data-table"
-import { DatePicker } from "@whity-org/ui/date-picker"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@whity-org/ui/dialog"
-import { EmptyState, ErrorState } from "@whity-org/ui/empty-state"
-import { Input } from "@whity-org/ui/input"
-import { Pagination } from "@whity-org/ui/pagination"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@whity-org/ui/select"
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@whity-org/ui/sheet"
-import { Skeleton } from "@whity-org/ui/skeleton"
-import { Slider } from "@whity-org/ui/slider"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@whity-org/ui/table"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@whity-org/ui/tabs"
-import { Textarea } from "@whity-org/ui/textarea"
+import { Alert, AlertDescription, AlertTitle } from "@whity/ui/alert"
+import { Badge } from "@whity/ui/badge"
+import { BilingualInput, type BilingualValue } from "@whity/ui/bilingual-input"
+import { Button } from "@whity/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@whity/ui/card"
+import { Chart } from "@whity/ui/chart"
+import { Checkbox } from "@whity/ui/checkbox"
+import { DataTable } from "@whity/ui/data-table"
+import { DatePicker } from "@whity/ui/date-picker"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@whity/ui/dialog"
+import { EmptyState, ErrorState } from "@whity/ui/empty-state"
+import { Input } from "@whity/ui/input"
+import { Pagination } from "@whity/ui/pagination"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@whity/ui/select"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@whity/ui/sheet"
+import { Skeleton } from "@whity/ui/skeleton"
+import { Slider } from "@whity/ui/slider"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@whity/ui/table"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@whity/ui/tabs"
+import { Textarea } from "@whity/ui/textarea"
 
 import { resolveContextPath } from "./context-path"
 import { resolveTablerIcon } from "./resolve-tabler-icon"

@@ -3,11 +3,11 @@
 import * as React from "react"
 import { IconPlus } from "@tabler/icons-react"
 
-import { Badge } from "@whity-org/ui/badge"
-import { Button } from "@whity-org/ui/button"
-import { Card, CardContent } from "@whity-org/ui/card"
-import { EmptyState, ErrorState } from "@whity-org/ui/empty-state"
-import { Skeleton } from "@whity-org/ui/skeleton"
+import { Badge } from "@whity/ui/badge"
+import { Button } from "@whity/ui/button"
+import { Card, CardContent } from "@whity/ui/card"
+import { EmptyState, ErrorState } from "@whity/ui/empty-state"
+import { Skeleton } from "@whity/ui/skeleton"
 
 import { useTranslation } from "../i18n"
 import type { DemoCatalogAdapter, DemoCatalogItem } from "./types"

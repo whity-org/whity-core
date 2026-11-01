@@ -71,7 +71,7 @@ function MockSelectItem({ children, value }: React.PropsWithChildren<{ value: st
   return null;
 }
 
-jest.mock('@whity-org/ui/select', () => ({
+jest.mock('@whity/ui/select', () => ({
   Select: MockSelect,
   SelectTrigger: ({ children }: React.PropsWithChildren) => <>{children}</>,
   SelectValue: () => null,
@@ -79,13 +79,13 @@ jest.mock('@whity-org/ui/select', () => ({
   SelectItem: MockSelectItem,
 }));
 
-import { RolesScreen, RoleRecordScreen } from '@whity-org/features/roles';
+import { RolesScreen, RoleRecordScreen } from '@whity/features/roles';
 import type {
   Role,
   RoleWithPermissions,
   RolesAdapter,
   Transport,
-} from '@whity-org/features/roles';
+} from '@whity/features/roles';
 import { createRolesAdapter } from '@/lib/roles-adapter';
 
 const GLOBAL_BADGE = 'Global';

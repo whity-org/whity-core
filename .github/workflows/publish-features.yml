@@ -1,4 +1,4 @@
-name: Publish @whity-org/features
+name: Publish @whity/features
 
 on:
   push:
@@ -9,18 +9,25 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    # Trusted publishing (WHIT-834): npm exchanges this job's GitHub OIDC
+    # token for a short-lived publish credential, so there is no npm token
+    # secret anywhere. id-token: write is what lets the job request it.
     permissions:
       contents: read
-      packages: write
+      id-token: write
 
     steps:
       - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v7
         with:
-          node-version: "20"
-          registry-url: "https://npm.pkg.github.com"
-          scope: "@whity-org"
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+
+      # Trusted publishing needs npm 11.5.1 or newer; the npm bundled with
+      # Node may be older.
+      - name: Use a current npm
+        run: npm install -g npm@latest
 
       - name: Install dependencies
         working-directory: packages/features
@@ -43,8 +50,6 @@ jobs:
       # packages/features without a version bump must not fail the build.
       - name: Publish if the version is new
         working-directory: packages/features
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           NAME=$(node -p "require('./package.json').name")
           VERSION=$(node -p "require('./package.json').version")
@@ -52,5 +57,5 @@ jobs:
             echo "::notice::$NAME@$VERSION is already published — skipping. Bump the version in packages/features/package.json to publish a new release."
           else
             echo "Publishing $NAME@$VERSION"
-            npm publish
+            npm publish --provenance --access public
           fi

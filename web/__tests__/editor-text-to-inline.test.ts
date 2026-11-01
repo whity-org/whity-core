@@ -2,8 +2,8 @@
  * Editor M3: the block toolbar edits a caption or value as plain text and
  * turns it back into inline content, keeping the merge fields that were there.
  */
-import { inlineText, textToInline } from '@whity-org/ui/editor/services';
-import type { Inline } from '@whity-org/ui/editor/contract';
+import { inlineText, textToInline } from '@whity/ui/editor/services';
+import type { Inline } from '@whity/ui/editor/contract';
 
 const field = { type: 'field', path: 'customer.name', label: 'Customer' } as Inline;
 const text = (t: string) => ({ type: 'text' as const, text: t });

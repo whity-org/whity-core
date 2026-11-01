@@ -184,8 +184,8 @@ For an `ai-agent` principal with an assignment, `SessionBriefing::brief()` adds 
 ### 5.1 Repo, stack and licence
 
 - **Repo:** new `whity-org/whity-agent` (needs the orchestrator's check-in). It is a product with its own releases, signing and update channel, so it doesn't belong in whity-core's `templates/`.
-- **Stack:** Tauri 2 (Rust core, React 19, `@whity-org/ui`, `@whity-org/features`, `@whity-org/tokens` from npm). Starts from `templates/tauri-desktop`, drops the PHP host, SQLite sync, printer and plugin installer, and keeps `keyring`, `reqwest` with rustls, the updater and the Job Object handling. About 10 to 15 MB installed, against roughly 100 MB or more for Electron, and Rust is the right place for file edits and the keychain.
-- **Open or paid (Q4, decided: public, MIT, free):** open source and free. The app is a client: it sells the paid services (Whity ID sign-in, Builder, Render) by making them one click away, and an open app is easier to trust with editing other apps' configs and holding tokens. Licence: MIT, matching the client packages it is built from (`@whity-org/ui`, `features`, `tokens` and the Tauri template are MIT), rather than core's AGPL, since nobody runs it as a network service.
+- **Stack:** Tauri 2 (Rust core, React 19, `@whity/ui`, `@whity/features`, `@whity/tokens` from npm). Starts from `templates/tauri-desktop`, drops the PHP host, SQLite sync, printer and plugin installer, and keeps `keyring`, `reqwest` with rustls, the updater and the Job Object handling. About 10 to 15 MB installed, against roughly 100 MB or more for Electron, and Rust is the right place for file edits and the keychain.
+- **Open or paid (Q4, decided: public, MIT, free):** open source and free. The app is a client: it sells the paid services (Whity ID sign-in, Builder, Render) by making them one click away, and an open app is easier to trust with editing other apps' configs and holding tokens. Licence: MIT, matching the client packages it is built from (`@whity/ui`, `features`, `tokens` and the Tauri template are MIT), rather than core's AGPL, since nobody runs it as a network service.
 
 ### 5.2 Accounts and sign-in
 

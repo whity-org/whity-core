@@ -26,11 +26,11 @@ import {
   setBrandingHost,
   type Branding,
 } from '@/lib/api/branding-upload';
-import { Button } from '@whity-org/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity-org/ui/card';
+import { Button } from '@whity/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
 import { Input } from '@/components/ui/input';
 import { BrandingMainColour } from '@/components/branding-main-colour';
-import { useTranslation } from '@whity-org/features/i18n';
+import { useTranslation } from '@whity/features/i18n';
 import {
   IconDeviceFloppy,
   IconInfoCircle,

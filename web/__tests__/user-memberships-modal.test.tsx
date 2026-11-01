@@ -33,7 +33,7 @@ jest.mock('@/lib/auth-context', () => ({
   }),
 }));
 
-jest.mock('@whity-org/ui/dialog', () => ({
+jest.mock('@whity/ui/dialog', () => ({
   Dialog: ({ children, open }: React.PropsWithChildren<{ open?: boolean }>) =>
     open ? <div data-testid="dialog">{children}</div> : null,
   DialogContent: ({ children }: React.PropsWithChildren) => <div>{children}</div>,
@@ -43,7 +43,7 @@ jest.mock('@whity-org/ui/dialog', () => ({
   DialogFooter: ({ children }: React.PropsWithChildren) => <div>{children}</div>,
 }));
 
-jest.mock('@whity-org/ui/button', () => ({
+jest.mock('@whity/ui/button', () => ({
   Button: ({
     children,
     variant,
@@ -56,7 +56,7 @@ jest.mock('@whity-org/ui/button', () => ({
   },
 }));
 
-jest.mock('@whity-org/ui/badge', () => ({
+jest.mock('@whity/ui/badge', () => ({
   Badge: ({ children }: React.PropsWithChildren) => <span>{children}</span>,
 }));
 
@@ -115,7 +115,7 @@ function MockSelectItem({ children, value }: React.PropsWithChildren<{ value: st
   return null;
 }
 
-jest.mock('@whity-org/ui/select', () => ({
+jest.mock('@whity/ui/select', () => ({
   Select: MockSelect,
   SelectTrigger: ({ children }: React.PropsWithChildren) => <>{children}</>,
   SelectValue: ({ placeholder }: { placeholder?: string }) => <span>{placeholder}</span>,

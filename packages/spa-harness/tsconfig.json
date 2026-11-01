@@ -12,10 +12,10 @@
     "jsx": "react-jsx",
     "strict": true,
     "paths": {
-      "@whity-org/ui": ["../ui/src/index.ts"],
-      "@whity-org/ui/*": ["../ui/src/*"],
-      "@whity-org/features": ["../features/src/index.ts"],
-      "@whity-org/features/*": ["../features/src/*"]
+      "@whity/ui": ["../ui/src/index.ts"],
+      "@whity/ui/*": ["../ui/src/*"],
+      "@whity/features": ["../features/src/index.ts"],
+      "@whity/features/*": ["../features/src/*"]
     }
   },
   "include": ["src"]

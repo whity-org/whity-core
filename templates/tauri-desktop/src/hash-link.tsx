@@ -1,4 +1,4 @@
-import type { NavLinkAdapter } from "@whity-org/features/nav"
+import type { NavLinkAdapter } from "@whity/features/nav"
 
 /**
  * The app's `NavLinkAdapter` implementation — a zero-dependency hash router

@@ -34,11 +34,11 @@
  * that fact: `editable` means an open row names you.
  */
 
-import { Alert, AlertDescription, AlertTitle } from '@whity-org/ui/alert';
-import { Badge } from '@whity-org/ui/badge';
-import { RecordList, RecordListItem } from '@whity-org/features/record';
-import { useDateDisplay } from '@whity-org/features/datetime';
-import { useTranslation } from '@whity-org/features/i18n';
+import { Alert, AlertDescription, AlertTitle } from '@whity/ui/alert';
+import { Badge } from '@whity/ui/badge';
+import { RecordList, RecordListItem } from '@whity/features/record';
+import { useDateDisplay } from '@whity/features/datetime';
+import { useTranslation } from '@whity/features/i18n';
 
 import { personName, unitName } from './trail';
 import type { Directory, RouteRecipient } from './types';

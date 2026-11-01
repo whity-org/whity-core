@@ -1,8 +1,8 @@
-import { resolveNavGroups, identityTranslate } from '@whity-org/features/nav';
-import type { NavConfig } from '@whity-org/features/nav';
+import { resolveNavGroups, identityTranslate } from '@whity/features/nav';
+import type { NavConfig } from '@whity/features/nav';
 
 /**
- * Tests for the app-shell nav contract's resolver (@whity-org/features/nav):
+ * Tests for the app-shell nav contract's resolver (@whity/features/nav):
  * the one piece of logic the contract owns — label translation and
  * active-route matching — bridging a client-authored `NavConfig` into
  * `AppSidebar`'s `AppSidebarNavGroup[]` props.

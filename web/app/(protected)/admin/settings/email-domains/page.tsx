@@ -6,12 +6,12 @@ import { useToast } from '@/lib/toast-context';
 import { useAuth } from '@/lib/auth-context';
 import { useFetch } from '@/hooks/useFetch';
 import { AdminHeader } from '@/components/admin/admin-header';
-import { Button } from '@whity-org/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity-org/ui/card';
+import { Button } from '@whity/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
 import { Input } from '@/components/ui/input';
-import { Switch } from '@whity-org/ui/switch';
-import { Badge } from '@whity-org/ui/badge';
-import { AccessDenied } from '@whity-org/ui/access-denied';
+import { Switch } from '@whity/ui/switch';
+import { Badge } from '@whity/ui/badge';
+import { AccessDenied } from '@whity/ui/access-denied';
 import {
   IconAlertCircle,
   IconCircleCheck,
@@ -20,7 +20,7 @@ import {
   IconTrash,
   IconWorld,
 } from '@tabler/icons-react';
-import { useTranslation } from '@whity-org/features/i18n';
+import { useTranslation } from '@whity/features/i18n';
 
 const NATIVE_SELECT_CLASS =
   'h-7 w-full min-w-0 rounded-md border border-input bg-input/20 px-2 text-sm transition-colors outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-50';

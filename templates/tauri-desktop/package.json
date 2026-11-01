@@ -2,7 +2,7 @@
   "name": "whity-tauri-desktop-template",
   "private": true,
   "version": "0.2.0",
-  "description": "Boilerplate Tauri v2 desktop app consuming @whity-org/ui + @whity-org/features. Start here, then add crates for native capabilities (see src-tauri/src/commands/printer.rs for a worked example).",
+  "description": "Boilerplate Tauri v2 desktop app consuming @whity/ui + @whity/features. Start here, then add crates for native capabilities (see src-tauri/src/commands/printer.rs for a worked example).",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -12,9 +12,9 @@
     "tauri": "tauri"
   },
   "dependencies": {
-    "@whity-org/features": "file:../../packages/features",
-    "@whity-org/tokens": "file:../../packages/tokens",
-    "@whity-org/ui": "file:../../packages/ui",
+    "@whity/features": "file:../../packages/features",
+    "@whity/tokens": "file:../../packages/tokens",
+    "@whity/ui": "file:../../packages/ui",
     "@hookform/resolvers": "^6.0.1",
     "@tabler/icons-react": "^3.50.0",
     "@tauri-apps/api": "^2.12.4",

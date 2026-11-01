@@ -7,11 +7,11 @@ import { useAuth } from '@/lib/auth-context';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { ApprovalGatingTabs } from '@/components/admin/approval-gating-tabs';
-import { Button } from '@whity-org/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity-org/ui/card';
-import { AccessDenied } from '@whity-org/ui/access-denied';
+import { Button } from '@whity/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
+import { AccessDenied } from '@whity/ui/access-denied';
 import { IconCheck, IconInbox, IconX } from '@tabler/icons-react';
-import { useTranslation } from '@whity-org/features/i18n';
+import { useTranslation } from '@whity/features/i18n';
 
 /**
  * Pending self-service registrations (WC-235 admin-approval activation).

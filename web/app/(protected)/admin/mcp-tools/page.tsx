@@ -5,12 +5,12 @@ import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/lib/toast-context';
 import { useFetch } from '@/hooks/useFetch';
 import { AdminHeader } from '@/components/admin/admin-header';
-import { Badge } from '@whity-org/ui/badge';
-import { Card, CardContent } from '@whity-org/ui/card';
-import { Switch } from '@whity-org/ui/switch';
+import { Badge } from '@whity/ui/badge';
+import { Card, CardContent } from '@whity/ui/card';
+import { Switch } from '@whity/ui/switch';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { IconLock, IconLockOpen } from '@tabler/icons-react';
-import { useTranslation } from '@whity-org/features/i18n';
+import { useTranslation } from '@whity/features/i18n';
 import type { McpAgentPolicy, McpListSize, McpTool, McpToolListResponse, McpToolVisibility } from './types';
 
 /** The setting that holds the plugin tools this workspace lists directly (WHIT-754). */

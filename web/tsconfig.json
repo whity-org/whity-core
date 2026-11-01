@@ -21,10 +21,10 @@
     "preserveSymlinks": true,
     "paths": {
       "@/*": ["./*"],
-      "@whity-org/ui": ["../packages/ui/src/index.ts"],
-      "@whity-org/ui/*": ["../packages/ui/src/*"],
-      "@whity-org/features": ["../packages/features/src/index.ts"],
-      "@whity-org/features/*": ["../packages/features/src/*"]
+      "@whity/ui": ["../packages/ui/src/index.ts"],
+      "@whity/ui/*": ["../packages/ui/src/*"],
+      "@whity/features": ["../packages/features/src/index.ts"],
+      "@whity/features/*": ["../packages/features/src/*"]
     }
   },
   "include": [

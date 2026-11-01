@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import axe from 'axe-core';
-import { Chart } from '@whity-org/ui/chart';
+import { Chart } from '@whity/ui/chart';
 
 /**
  * recharts' ResponsiveContainer measures its parent via ResizeObserver and
