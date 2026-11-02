@@ -222,6 +222,43 @@ final class PublicFormsApiRealEngineTest extends TestCase
         );
     }
 
+    public function testAPublicSubmissionLeavesOutAQuestionItsConditionHid(): void
+    {
+        $formId = $this->publishedForm();
+        $this->fields->create(self::TENANT, $formId, 'has_minors', 'checkbox', ['en' => 'Minors involved?'], null, false, [], [], null, null, null);
+        $this->fields->create(
+            self::TENANT,
+            $formId,
+            'minor_count',
+            'number',
+            ['en' => 'How many?'],
+            null,
+            true,
+            [],
+            [],
+            null,
+            null,
+            null,
+            ['field' => 'has_minors', 'equals' => true],
+        );
+        $slug = $this->openLink($formId);
+
+        $rendered = self::asList(self::data($this->render($slug))['fields']);
+        self::assertSame(['field' => 'has_minors', 'equals' => true], $rendered[count($rendered) - 1]['visible_when']);
+
+        // Required, and hidden, so it blocks nothing and nothing is kept for it.
+        $hidden = $this->submit($slug, ['full_name' => 'Layla Haddad', 'has_minors' => false, 'minor_count' => 4]);
+        self::assertSame(201, $hidden->getStatusCode());
+        self::assertEqualsCanonicalizing(
+            ['full_name' => 'Layla Haddad', 'has_minors' => false],
+            json_decode((string) $this->onlySubmission()['data'], true)
+        );
+
+        // Asked once the box is ticked, so now it is required.
+        $shown = $this->submit($slug, ['full_name' => 'Layla Haddad', 'has_minors' => true]);
+        self::assertSame(422, $shown->getStatusCode());
+    }
+
     /**
      * A public submission CIRCULATES, and the person it reaches was chosen by
      * the organisation rather than by the caller.
@@ -345,7 +382,7 @@ final class PublicFormsApiRealEngineTest extends TestCase
         self::assertSame(
             [
                 'field_key', 'field_type', 'label', 'help_text', 'is_required',
-                'options', 'validation', 'section_key', 'position', 'multi_valued',
+                'options', 'validation', 'section_key', 'position', 'visible_when', 'multi_valued',
             ],
             array_keys(self::asList($data['fields'])[0])
         );

@@ -75,7 +75,7 @@ final class SubmissionValidator
      *
      * @return array{values: array<string, mixed>, ignored: list<string>}
      *         `values` is what to store; `ignored` names answer keys that match no
-     *         field on the form.
+     *         field on the form, and answers to questions a condition hid.
      *
      * @throws FormRejectedException On the first field that fails, naming that field.
      */
@@ -83,10 +83,16 @@ final class SubmissionValidator
     {
         $values = [];
         $known = [];
+        $visible = FieldCondition::visibility($fields, $data);
 
         foreach ($fields as $field) {
             $key = (string) ($field['field_key'] ?? '');
             if ($key === '') {
+                continue;
+            }
+            // A hidden question is left out of `$known` so an answer sent for it
+            // is reported as ignored, like any other answer nobody asked for.
+            if (($visible[$key] ?? true) === false) {
                 continue;
             }
             $known[$key] = true;

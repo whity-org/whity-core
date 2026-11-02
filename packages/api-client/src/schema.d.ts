@@ -8515,10 +8515,17 @@ export interface components {
             prefill_backed?: boolean;
             section_key?: string | null;
             position: number;
+            visible_when?: components["schemas"]["FormFieldCondition"];
             multi_valued?: boolean;
             created_at?: string;
             updated_at?: string;
         };
+        FormFieldCondition: {
+            field: string;
+            /** @description Text, a number, or true or false, compared with the answer. */
+            equals?: unknown;
+            in?: string[];
+        } | null;
         FormFieldCreateRequest: {
             /** @description Permanent key the answers are stored under: a lower-case letter, then letters, digits or `_`. */
             field_key: string;
@@ -8544,6 +8551,8 @@ export interface components {
             prefill_source?: string | null;
             /** @description Section to group the field under; fields sharing a key form one section. */
             section_key?: string;
+            /** @description Show this question only when another answer matches; null means always. */
+            visible_when?: components["schemas"]["FormFieldCondition"];
             /** @description Position in the form; omitted appends it at the end. */
             position?: number;
         };
@@ -8588,6 +8597,8 @@ export interface components {
             prefill_source?: string | null;
             /** @description Section to group the field under. */
             section_key?: string;
+            /** @description Show this question only when another answer matches; null means always. */
+            visible_when?: components["schemas"]["FormFieldCondition"];
             /** @description New position in the form. */
             position?: number;
         };
@@ -10008,6 +10019,7 @@ export interface components {
             };
             section_key?: string | null;
             position: number;
+            visible_when?: components["schemas"]["FormFieldCondition"];
             multi_valued?: boolean;
         };
         PublicFormResponse: {

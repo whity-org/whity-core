@@ -52132,6 +52132,9 @@
                     "position": {
                         "type": "integer"
                     },
+                    "visible_when": {
+                        "$ref": "#/components/schemas/FormFieldCondition"
+                    },
                     "multi_valued": {
                         "type": "boolean"
                     },
@@ -52152,6 +52155,29 @@
                     "is_required",
                     "position"
                 ]
+            },
+            "FormFieldCondition": {
+                "type": "object",
+                "nullable": true,
+                "properties": {
+                    "field": {
+                        "type": "string"
+                    },
+                    "equals": {
+                        "description": "Text, a number, or true or false, compared with the answer."
+                    },
+                    "in": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "maxItems": 100
+                    }
+                },
+                "required": [
+                    "field"
+                ],
+                "additionalProperties": false
             },
             "FormFieldCreateRequest": {
                 "type": "object",
@@ -52221,6 +52247,10 @@
                         "type": "string",
                         "maxLength": 255,
                         "description": "Section to group the field under; fields sharing a key form one section."
+                    },
+                    "visible_when": {
+                        "$ref": "#/components/schemas/FormFieldCondition",
+                        "description": "Show this question only when another answer matches; null means always."
                     },
                     "position": {
                         "type": "integer",
@@ -52363,6 +52393,10 @@
                         "type": "string",
                         "maxLength": 255,
                         "description": "Section to group the field under."
+                    },
+                    "visible_when": {
+                        "$ref": "#/components/schemas/FormFieldCondition",
+                        "description": "Show this question only when another answer matches; null means always."
                     },
                     "position": {
                         "type": "integer",
@@ -57790,6 +57824,9 @@
                     },
                     "position": {
                         "type": "integer"
+                    },
+                    "visible_when": {
+                        "$ref": "#/components/schemas/FormFieldCondition"
                     },
                     "multi_valued": {
                         "type": "boolean"

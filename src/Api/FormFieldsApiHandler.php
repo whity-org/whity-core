@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Whity\Api;
 
+use Whity\Core\Form\FieldCondition;
 use Whity\Core\Form\FieldType;
 use Whity\Core\Form\FormFieldRepository;
 use Whity\Core\Form\FormRejectedException;
@@ -196,6 +197,12 @@ final class FormFieldsApiHandler
                 return $sectionKey;
             }
 
+            $visibleWhen = FieldCondition::parse($body['visible_when'] ?? null);
+            FieldCondition::assertAuthorable([
+                ...$this->fields->listForForm($tenantId, (int) $form['id']),
+                ['field_key' => $fieldKey, 'field_type' => $fieldType, 'visible_when' => $visibleWhen],
+            ]);
+
             $id = $this->fields->create(
                 $tenantId,
                 (int) $form['id'],
@@ -209,6 +216,7 @@ final class FormFieldsApiHandler
                 $prefill,
                 $sectionKey,
                 self::intField($body, 'position'),
+                $visibleWhen,
             );
 
             return Response::json([
@@ -321,8 +329,11 @@ final class FormFieldsApiHandler
                     'validation' => $validation,
                     'prefill_source' => $prefill,
                     'section_key' => $sectionKey,
+                    'visible_when' => FieldCondition::parse($entry['visible_when'] ?? null),
                 ];
             }
+
+            FieldCondition::assertAuthorable($normalised);
 
             return Response::json([
                 'data' => $this->fields->replaceAll($tenantId, (int) $form['id'], $normalised),
@@ -447,6 +458,19 @@ final class FormFieldsApiHandler
                 $changes['options'] = $options;
             }
 
+            if (array_key_exists('visible_when', $body)) {
+                $changes['visible_when'] = FieldCondition::parse($body['visible_when']);
+            }
+            // Asked of the set as it would be, because a change of TYPE can break
+            // another question's rule as surely as a change of rule can.
+            if (array_key_exists('visible_when', $changes) || array_key_exists('field_type', $changes)) {
+                $after = [];
+                foreach ($this->fields->listForForm($tenantId, $formId) as $row) {
+                    $after[] = (int) $row['id'] === $fieldId ? array_merge($row, $changes) : $row;
+                }
+                FieldCondition::assertAuthorable($after);
+            }
+
             if ($changes === []) {
                 return Response::error('No updatable fields supplied', 422);
             }
@@ -488,6 +512,23 @@ final class FormFieldsApiHandler
 
             $formId = (int) $form['id'];
             $fieldId = (int) ($params['fieldId'] ?? 0);
+
+            // Refused rather than left dangling: a question whose condition names
+            // a field that has gone would start being asked of everybody.
+            $field = $this->fields->find($tenantId, $formId, $fieldId);
+            if ($field !== null) {
+                $dependants = FieldCondition::dependantsOf(
+                    $this->fields->listForForm($tenantId, $formId),
+                    (string) $field['field_key'],
+                );
+                if ($dependants !== []) {
+                    return Response::error(
+                        'Other questions are shown based on this answer: ' . implode(', ', $dependants)
+                        . '. Change their conditions first.',
+                        422
+                    );
+                }
+            }
 
             if (!$this->fields->delete($tenantId, $formId, $fieldId)) {
                 return Response::error('Form field not found', 404);
