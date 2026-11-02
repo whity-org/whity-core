@@ -45,6 +45,17 @@
         "refusal.required": "{label} is required.",
         "refusal.tooFewChoices": "{label} needs at least {min} choices.",
         "refusal.tooLong": "{label} must be {limit} characters or fewer.",
-        "refusal.tooManyChoices": "{label} allows at most {max} choices."
+        "refusal.tooManyChoices": "{label} allows at most {max} choices.",
+        "review.attached": "Attached",
+        "review.change": "Change",
+        "review.intro": "Check your answers, then send them. You can go back and change anything.",
+        "review.no": "No",
+        "review.noAnswer": "No answer",
+        "step.back": "Back",
+        "step.continue": "Continue",
+        "step.label": "Steps of this form",
+        "step.of": "Step {number} of {total}",
+        "step.review": "Review",
+        "step.untitled": "Part {number}"
     }
 }

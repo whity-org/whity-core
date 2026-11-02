@@ -46,6 +46,17 @@
         "refusal.required": "{label} مطلوب.",
         "refusal.tooFewChoices": "يحتاج {label} إلى {min} خيارات على الأقل.",
         "refusal.tooLong": "يجب ألا يتجاوز {label} {limit} حرفًا.",
-        "refusal.tooManyChoices": "يسمح {label} بـ {max} خيارات كحد أقصى."
+        "refusal.tooManyChoices": "يسمح {label} بـ {max} خيارات كحد أقصى.",
+        "review.attached": "مُرفق",
+        "review.change": "تغيير",
+        "review.intro": "راجع إجاباتك ثم أرسلها. يمكنك الرجوع وتغيير أي شيء.",
+        "review.no": "لا",
+        "review.noAnswer": "لا توجد إجابة",
+        "step.back": "رجوع",
+        "step.continue": "متابعة",
+        "step.label": "خطوات هذا النموذج",
+        "step.of": "الخطوة {number} من {total}",
+        "step.review": "مراجعة",
+        "step.untitled": "الجزء {number}"
     }
 }

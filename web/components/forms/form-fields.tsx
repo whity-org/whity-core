@@ -438,7 +438,9 @@ export function FormField({
         <Input
           id={id}
           type={field.field_type === 'number' ? 'number' : 'text'}
-          required={field.is_required}
+          // Not `required`: Input draws its own star for that, and the label above
+          // already has one.
+          aria-required={field.is_required}
           value={typeof value === 'string' ? value : ''}
           onChange={(e) => onChange(e.target.value)}
         />
