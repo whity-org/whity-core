@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Whity\Api;
 
 use Whity\Core\Form\FormFieldRepository;
+use Whity\Core\Form\FormReferenceFormat;
 use Whity\Core\Form\FormRejectedException;
 use Whity\Core\Form\FormRenderer;
 use Whity\Core\Form\FormRepository;
@@ -291,6 +292,9 @@ final class FormsApiHandler
             }
             if (array_key_exists('sections', $body)) {
                 $changes['sections'] = self::sections($body['sections']);
+            }
+            if (array_key_exists('reference_format', $body)) {
+                $changes['reference_format'] = FormReferenceFormat::parse($body['reference_format']);
             }
             if (array_key_exists('route_template_id', $body)) {
                 $routeTemplateId = self::routeTemplateId($tenantId, $body);

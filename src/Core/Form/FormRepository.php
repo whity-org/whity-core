@@ -48,7 +48,7 @@ final class FormRepository
      * Written once and shared by every read, so a column added to the table
      * cannot reach one caller and not another.
      */
-    private const COLUMNS = 'id, tenant_id, form_key, name, description, submit_label, sections, status, version,
+    private const COLUMNS = 'id, tenant_id, form_key, name, description, submit_label, sections, reference_format, status, version,
                              route_template_id, created_by_profile_id, created_at, updated_at,
                              public_enabled, public_slug, public_opens_at, public_closes_at,
                              public_enabled_at, public_enabled_by_profile_id,
@@ -393,7 +393,7 @@ final class FormRepository
      * Returns false when the form does not exist in this tenant.
      *
      * @param array<string, mixed> $changes Any of: name, description, route_template_id,
-     *                                     submit_label, sections.
+     *                                     submit_label, sections, reference_format.
      */
     public function update(int $tenantId, int $id, array $changes): bool
     {
@@ -413,6 +413,10 @@ final class FormRepository
         if (array_key_exists('route_template_id', $changes)) {
             $sets[] = 'route_template_id = :route_template_id';
             $params[':route_template_id'] = $changes['route_template_id'];
+        }
+        if (array_key_exists('reference_format', $changes)) {
+            $sets[] = 'reference_format = :reference_format';
+            $params[':reference_format'] = $changes['reference_format'];
         }
         if (array_key_exists('submit_label', $changes)) {
             $sets[] = 'submit_label = :submit_label';
@@ -570,6 +574,7 @@ final class FormRepository
                 isset($row['description']) ? (string) $row['description'] : null
             ) ?: new \stdClass(),
             'submit_label' => isset($row['submit_label']) ? LocalizedLabel::decode((string) $row['submit_label']) : null,
+            'reference_format' => isset($row['reference_format']) ? (string) $row['reference_format'] : null,
             'sections' => self::decodeSections($row['sections'] ?? null),
             'status' => $status,
             'version' => (int) $row['version'],
