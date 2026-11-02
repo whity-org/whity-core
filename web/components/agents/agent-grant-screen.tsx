@@ -40,7 +40,7 @@ import { undoWindowWords } from './proposals';
 /** useFetch keeps only a message, so the 404 travels as this one. */
 const NOT_YOURS = 'agent-grant:not-yours';
 
-export function AgentGrantScreen({ subject, backHref }: { subject: GrantSubject; backHref: string }) {
+export function AgentGrantScreen({ subject, backHref, backLabel }: { subject: GrantSubject; backHref: string; backLabel?: string }) {
   const t = useTranslation('admin');
   const language = useFormattingLocale();
   const arabic = language === 'ar';
@@ -137,7 +137,7 @@ export function AgentGrantScreen({ subject, backHref }: { subject: GrantSubject;
     <Button variant="outline" asChild>
       <Link href={backHref}>
         <Icon name="chevron-left" size={16} className="rtl:-scale-x-100" />
-        {t('agentGrant.back', 'AI principals')}
+        {backLabel ?? t('agentGrant.back', 'AI principals')}
       </Link>
     </Button>
   );
