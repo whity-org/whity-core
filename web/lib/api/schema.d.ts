@@ -8449,6 +8449,15 @@ export interface components {
                 en?: string;
             };
             description?: string | null;
+            description_i18n?: {
+                ar?: string;
+                en?: string;
+            };
+            submit_label?: {
+                ar?: string;
+                en?: string;
+            } | null;
+            sections?: components["schemas"]["FormSectionText"][];
             /** @enum {string} */
             status: "draft" | "published" | "archived";
             version: number;
@@ -8484,8 +8493,8 @@ export interface components {
                 ar?: string;
                 en?: string;
             };
-            /** @description What the form is for. */
-            description?: string;
+            /** @description What the form is for: text, or `{"en": ..., "ar": ...}`. */
+            description?: unknown;
             /** @description Route template that circulates each submission for approval (see GET /api/document-route-templates); null for none. */
             route_template_id?: number | null;
         };
@@ -8508,6 +8517,10 @@ export interface components {
                 en?: string;
             };
             help_text?: string | null;
+            help_text_i18n?: {
+                ar?: string;
+                en?: string;
+            };
             is_required: boolean;
             options?: components["schemas"]["FormFieldOption"][];
             validation?: components["schemas"]["FormFieldValidation"];
@@ -8539,8 +8552,8 @@ export interface components {
                 ar?: string;
                 en?: string;
             };
-            /** @description Hint shown under the field. */
-            help_text?: string;
+            /** @description Hint shown under the field: text, or `{"en": ..., "ar": ...}`. */
+            help_text?: unknown;
             /** @description Whether a submission must answer this field. */
             is_required?: boolean;
             /** @description Choices for select and multiselect fields. */
@@ -8585,8 +8598,8 @@ export interface components {
                 ar?: string;
                 en?: string;
             };
-            /** @description New hint shown under the field. */
-            help_text?: string;
+            /** @description New hint: text, or `{"en": ..., "ar": ...}`. Plain text sets the English and keeps the Arabic. */
+            help_text?: unknown;
             /** @description Whether a submission must answer this field. */
             is_required?: boolean;
             /** @description Replacement choices for select and multiselect fields. */
@@ -8645,6 +8658,25 @@ export interface components {
         FormSection: {
             key: string | null;
             field_keys: string[];
+            title?: {
+                ar?: string;
+                en?: string;
+            } | null;
+            description?: {
+                ar?: string;
+                en?: string;
+            } | null;
+        };
+        FormSectionText: {
+            key: string;
+            title?: {
+                ar?: string;
+                en?: string;
+            };
+            description?: {
+                ar?: string;
+                en?: string;
+            };
         };
         FormSubmission: {
             id: number;
@@ -8692,10 +8724,17 @@ export interface components {
                 ar?: string;
                 en?: string;
             };
-            /** @description New description. */
-            description?: string;
+            /** @description New description: text, or `{"en": ..., "ar": ...}`. Plain text sets the English and keeps the Arabic. */
+            description?: unknown;
             /** @description Route template for approving submissions; null removes it. */
             route_template_id?: number | null;
+            /** @description What the submit button says; null for the default wording. */
+            submit_label?: {
+                ar?: string;
+                en?: string;
+            } | null;
+            /** @description The title and description of each section, by `section_key`. */
+            sections?: components["schemas"]["FormSectionText"][];
         };
         FormUploadResponse: {
             data: {
@@ -10010,6 +10049,10 @@ export interface components {
                 en?: string;
             };
             help_text?: string | null;
+            help_text_i18n?: {
+                ar?: string;
+                en?: string;
+            };
             is_required: boolean;
             options?: {
                 [key: string]: unknown;
@@ -10030,6 +10073,14 @@ export interface components {
                     en?: string;
                 };
                 description?: string | null;
+                description_i18n?: {
+                    ar?: string;
+                    en?: string;
+                };
+                submit_label?: {
+                    ar?: string;
+                    en?: string;
+                } | null;
                 fields: components["schemas"]["PublicFormField"][];
                 sections: components["schemas"]["FormSection"][];
                 accepts_submissions: boolean;
@@ -37760,7 +37811,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description An answer failed validation, or the form is outside its submission window */
+            /** @description An answer failed validation, or the form is outside its submission window. A refused answer carries `details.reason`, `details.field_key` and sometimes `details.params`, so a page can word it in the reader's language. */
             422: {
                 headers: {
                     [name: string]: unknown;

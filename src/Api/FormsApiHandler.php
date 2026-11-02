@@ -67,6 +67,12 @@ use Whity\Http\JsonBody;
  */
 final class FormsApiHandler
 {
+    /** What a button or a step title can sensibly say, in characters. */
+    private const SUBMIT_LABEL_MAX = 200;
+
+    /** Bounds `forms.sections`: more steps than this is not a form anyone finishes. */
+    private const SECTIONS_MAX = 100;
+
     public function __construct(
         private readonly FormRepository $forms,
         private readonly FormFieldRepository $fields,
@@ -188,10 +194,11 @@ final class FormsApiHandler
 
             $name = LocalizedLabel::fromInput($body['name'] ?? null, 'name');
 
-            $description = self::optionalText($body, 'description');
-            if ($description instanceof Response) {
-                return $description;
-            }
+            $description = LocalizedLabel::optionalForStorage(
+                $body['description'] ?? null,
+                'description',
+                InputLimits::TEXT_MAX,
+            );
 
             $routeTemplateId = self::routeTemplateId($tenantId, $body);
             if ($routeTemplateId instanceof Response) {
@@ -266,11 +273,24 @@ final class FormsApiHandler
                 $changes['name'] = LocalizedLabel::fromInput($body['name'], 'name');
             }
             if (array_key_exists('description', $body)) {
-                $description = self::optionalText($body, 'description');
-                if ($description instanceof Response) {
-                    return $description;
-                }
-                $changes['description'] = $description;
+                /** @var array<string, string> $existingDescription */
+                $existingDescription = is_array($form['description_i18n'] ?? null) ? $form['description_i18n'] : [];
+                $changes['description'] = LocalizedLabel::optionalForStorage(
+                    $body['description'],
+                    'description',
+                    InputLimits::TEXT_MAX,
+                    $existingDescription,
+                );
+            }
+            if (array_key_exists('submit_label', $body)) {
+                $changes['submit_label'] = LocalizedLabel::optionalForStorage(
+                    $body['submit_label'],
+                    'submit_label',
+                    self::SUBMIT_LABEL_MAX,
+                );
+            }
+            if (array_key_exists('sections', $body)) {
+                $changes['sections'] = self::sections($body['sections']);
             }
             if (array_key_exists('route_template_id', $body)) {
                 $routeTemplateId = self::routeTemplateId($tenantId, $body);
@@ -727,25 +747,44 @@ final class FormsApiHandler
     }
 
     /**
-     * @param array<string, mixed> $body
+     * `forms.sections` from a request body.
+     *
+     * @return list<array{key: string, title: array<string, string>, description: array<string, string>}>
+     *
+     * @throws FormRejectedException
      */
-    private static function optionalText(array $body, string $field): string|null|Response
+    private static function sections(mixed $raw): array
     {
-        if (!array_key_exists($field, $body) || $body[$field] === null) {
-            return null;
-        }
-        if (!is_string($body[$field])) {
-            return Response::error("{$field} must be text or null", 422);
-        }
-        $value = trim($body[$field]);
-        if ($value === '') {
-            return null;
-        }
-        if ($violation = InputLimits::firstViolation([$field => [$value, InputLimits::TEXT_MAX]])) {
-            return $violation;
+        if (!is_array($raw) || !array_is_list($raw) || count($raw) > self::SECTIONS_MAX) {
+            throw new FormRejectedException('sections must be a list of at most ' . self::SECTIONS_MAX . ' entries');
         }
 
-        return $value;
+        $sections = [];
+        $seen = [];
+        foreach ($raw as $index => $entry) {
+            $key = is_array($entry) ? ($entry['key'] ?? null) : null;
+            if (!is_string($key) || $key === '' || strlen($key) > FormFieldRepository::KEY_MAX) {
+                throw new FormRejectedException("sections[{$index}].key must be a section key");
+            }
+            if (isset($seen[$key])) {
+                throw new FormRejectedException("sections[{$index}].key '{$key}' appears more than once");
+            }
+            $seen[$key] = true;
+
+            $title = LocalizedLabel::optionalForStorage($entry['title'] ?? null, "sections[{$index}].title", self::SUBMIT_LABEL_MAX);
+            $description = LocalizedLabel::optionalForStorage(
+                $entry['description'] ?? null,
+                "sections[{$index}].description",
+                InputLimits::TEXT_MAX,
+            );
+            $sections[] = [
+                'key' => $key,
+                'title' => LocalizedLabel::decode($title),
+                'description' => LocalizedLabel::decode($description),
+            ];
+        }
+
+        return $sections;
     }
 
     /**

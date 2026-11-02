@@ -1302,7 +1302,8 @@ final class CoreApiSchemas
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('PATCH', '/api/forms/{id:\d+}', 'forms:manage', [
-                // WHIT-812: undone by restoring its name, description and route, unless they changed again since.
+                // WHIT-812: undone by restoring its text and route, unless they changed again since.
+                // The `_i18n` map, because restoring the string would lose the Arabic.
                 'mcp' => ['undo' => [
                     'windowSeconds' => self::UNDO_WINDOW_SECONDS,
                     'read' => ['operation' => 'get_api_forms_id', 'arguments' => ['id' => '/arguments/id']],
@@ -1310,7 +1311,9 @@ final class CoreApiSchemas
                     'arguments' => [
                         'id' => '/arguments/id',
                         'name' => '/before/data/name',
-                        'description' => '/before/data/description',
+                        'description' => '/before/data/description_i18n',
+                        'submit_label' => '/before/data/submit_label',
+                        'sections' => '/before/data/sections',
                         'route_template_id' => '/before/data/route_template_id',
                     ],
                 ]],
@@ -1570,7 +1573,9 @@ final class CoreApiSchemas
                         201 => self::jsonResponse('Received', 'PublicFormSubmissionResponse'),
                         404 => self::errorResponse('No publicly-open form is served at this address'),
                         422 => self::errorResponse(
-                            'An answer failed validation, or the form is outside its submission window'
+                            'An answer failed validation, or the form is outside its submission window. '
+                            . 'A refused answer carries `details.reason`, `details.field_key` and sometimes '
+                            . '`details.params`, so a page can word it in the reader\'s language.'
                         ),
                         429 => self::errorResponse('Too many attempts from this address, or for this form'),
                         503 => self::errorResponse('Temporarily unavailable'),
@@ -6800,6 +6805,11 @@ final class CoreApiSchemas
                 'form_key' => self::str(),
                 'name' => self::localizedText(),
                 'description' => self::str(true),
+                'description_i18n' => self::localizedText(),
+                'submit_label' => self::localizedText() + ['nullable' => true],
+                // Titles by section key. Which sections exist is still derived
+                // from the fields.
+                'sections' => ['type' => 'array', 'items' => SchemaBuilder::ref('FormSectionText')],
                 'status' => ['type' => 'string', 'enum' => ['draft', 'published', 'archived']],
                 'version' => self::int(),
                 // Null means "collect only, do not circulate" — a legitimate
@@ -6874,6 +6884,7 @@ final class CoreApiSchemas
                 ]],
                 'label' => self::localizedText(),
                 'help_text' => self::str(true),
+                'help_text_i18n' => self::localizedText(),
                 'is_required' => self::bool(),
                 'options' => ['type' => 'array', 'items' => SchemaBuilder::ref('FormFieldOption')],
                 'validation' => SchemaBuilder::ref('FormFieldValidation'),
@@ -6918,7 +6929,14 @@ final class CoreApiSchemas
             'FormSection' => self::object([
                 'key' => self::str(true),
                 'field_keys' => ['type' => 'array', 'items' => ['type' => 'string']],
+                'title' => self::localizedText() + ['nullable' => true],
+                'description' => self::localizedText() + ['nullable' => true],
             ], ['key', 'field_keys']),
+            'FormSectionText' => self::object([
+                'key' => self::str(),
+                'title' => self::localizedText(),
+                'description' => self::localizedText(),
+            ], ['key']),
             'FormFieldResponse' => self::dataEnvelope(SchemaBuilder::ref('FormField')),
             'FormFieldListResponse' => self::object([
                 'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('FormField')],
@@ -6954,7 +6972,7 @@ final class CoreApiSchemas
                 // one language only is the ordinary case, and demanding the object
                 // shape would 422 a request that meant something perfectly clear.
                 'name' => self::localizedText() + ['description' => 'Form name as `{"en": ..., "ar": ...}`; a plain string is read as English.'],
-                'description' => self::text() + ['description' => 'What the form is for.'],
+                'description' => ['description' => 'What the form is for: text, or `{"en": ..., "ar": ...}`.'],
                 'route_template_id' => self::int(true) + ['description' => 'Route template that circulates each submission for approval (see GET /api/document-route-templates); null for none.'],
             ], ['form_key', 'name']),
             // `form_key` and `status` are absent because both are REFUSED with a
@@ -6962,8 +6980,10 @@ final class CoreApiSchemas
             // dropping it silently would leave them believing a change happened.
             'FormUpdateRequest' => self::object([
                 'name' => self::localizedText() + ['description' => 'New name as `{"en": ..., "ar": ...}`; a plain string is read as English.'],
-                'description' => self::text() + ['description' => 'New description.'],
+                'description' => ['description' => 'New description: text, or `{"en": ..., "ar": ...}`. Plain text sets the English and keeps the Arabic.'],
                 'route_template_id' => self::int(true) + ['description' => 'Route template for approving submissions; null removes it.'],
+                'submit_label' => self::localizedText() + ['nullable' => true, 'description' => 'What the submit button says; null for the default wording.'],
+                'sections' => ['type' => 'array', 'maxItems' => 100, 'items' => SchemaBuilder::ref('FormSectionText'), 'description' => 'The title and description of each section, by `section_key`.'],
             ], []) + ['minProperties' => 1],
             'FormFieldCreateRequest' => self::object([
                 'field_key' => [
@@ -6980,7 +7000,7 @@ final class CoreApiSchemas
                     'description' => 'Kind of input: text, textarea, number, date, select, multiselect, checkbox, file, profile_ref (a person) or ou_ref (a unit).',
                 ],
                 'label' => self::localizedText() + ['description' => 'Field label as `{"en": ..., "ar": ...}`; a plain string is read as English.'],
-                'help_text' => self::text() + ['description' => 'Hint shown under the field.'],
+                'help_text' => ['description' => 'Hint shown under the field: text, or `{"en": ..., "ar": ...}`.'],
                 'is_required' => self::bool() + ['description' => 'Whether a submission must answer this field.'],
                 'options' => ['type' => 'array', 'items' => SchemaBuilder::ref('FormFieldOption'), 'description' => 'Choices for select and multiselect fields.'],
                 'validation' => SchemaBuilder::ref('FormFieldValidation') + ['description' => 'Extra checks on the answer (length, range, pattern).'],
@@ -7010,7 +7030,7 @@ final class CoreApiSchemas
                     'description' => 'Kind of input: text, textarea, number, date, select, multiselect, checkbox, file, profile_ref (a person) or ou_ref (a unit).',
                 ],
                 'label' => self::localizedText() + ['description' => 'New label as `{"en": ..., "ar": ...}`; a plain string is read as English.'],
-                'help_text' => self::text() + ['description' => 'New hint shown under the field.'],
+                'help_text' => ['description' => 'New hint: text, or `{"en": ..., "ar": ...}`. Plain text sets the English and keeps the Arabic.'],
                 'is_required' => self::bool() + ['description' => 'Whether a submission must answer this field.'],
                 'options' => ['type' => 'array', 'items' => SchemaBuilder::ref('FormFieldOption'), 'description' => 'Replacement choices for select and multiselect fields.'],
                 'validation' => SchemaBuilder::ref('FormFieldValidation') + ['description' => 'Replacement checks on the answer.'],
@@ -7083,6 +7103,8 @@ final class CoreApiSchemas
                 'slug' => self::str(),
                 'name' => self::localizedText(),
                 'description' => self::str(true),
+                'description_i18n' => self::localizedText(),
+                'submit_label' => self::localizedText() + ['nullable' => true],
                 'fields' => ['type' => 'array', 'items' => SchemaBuilder::ref('PublicFormField')],
                 'sections' => ['type' => 'array', 'items' => SchemaBuilder::ref('FormSection')],
                 'accepts_submissions' => self::bool(),
@@ -7107,6 +7129,7 @@ final class CoreApiSchemas
                 ]],
                 'label' => self::localizedText(),
                 'help_text' => self::str(true),
+                'help_text_i18n' => self::localizedText(),
                 'is_required' => self::bool(),
                 'options' => ['type' => 'array', 'items' => ['type' => 'object', 'additionalProperties' => true]],
                 'validation' => ['type' => 'object', 'additionalProperties' => true],

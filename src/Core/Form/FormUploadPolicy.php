@@ -162,6 +162,10 @@ final class FormUploadPolicy
             throw new FormRejectedException(
                 'That file is too large — the limit is ' . self::describeSize($maxBytes) . '.',
                 'form upload refused: ' . $size . ' bytes exceeds the ' . $maxBytes . '-byte ceiling',
+                null,
+                'file_too_large',
+                null,
+                ['limit_mb' => intdiv($maxBytes, 1024 * 1024)],
             );
         }
         if ($size === 0) {
@@ -169,7 +173,7 @@ final class FormUploadPolicy
             // that will read back as nothing, and a submission carrying one
             // would satisfy a required `file` field while attaching no evidence
             // at all.
-            throw new FormRejectedException('That file is empty.');
+            throw new FormRejectedException('That file is empty.', '', null, 'file_empty');
         }
 
         $sniffed = self::sniff($bytes);
@@ -177,6 +181,8 @@ final class FormUploadPolicy
             throw new FormRejectedException(
                 'That kind of file cannot be attached — please upload a PDF, PNG or JPEG.',
                 'form upload refused: leading bytes match no accepted signature',
+                null,
+                'file_kind_refused',
             );
         }
 
@@ -188,6 +194,8 @@ final class FormUploadPolicy
             throw new FormRejectedException(
                 'That file does not look like what it claims to be.',
                 "form upload refused: declared '{$normalizedDeclared}' but bytes are '{$sniffed}'",
+                null,
+                'file_mismatch',
             );
         }
 

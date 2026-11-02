@@ -413,7 +413,12 @@ final class FormFieldRepository
             'field_key' => (string) $row['field_key'],
             'field_type' => $type,
             'label' => LocalizedLabel::decode(isset($row['label']) ? (string) $row['label'] : null),
-            'help_text' => $row['help_text'] === null ? null : (string) $row['help_text'],
+            // The string stays the one existing clients read, and the map is the
+            // whole text: see {@see LocalizedLabel::preferred()}.
+            'help_text' => self::preferredOrNull($row['help_text'] ?? null),
+            'help_text_i18n' => LocalizedLabel::decode(
+                isset($row['help_text']) ? (string) $row['help_text'] : null
+            ) ?: new \stdClass(),
             // PostgreSQL hands a BOOLEAN back as the string 't'/'f' through PDO
             // on some driver builds and as a PHP bool on others; SQLite hands
             // back 0/1. Normalising here is what stops a client from having to
@@ -457,6 +462,16 @@ final class FormFieldRepository
     private static function emptyMapAsObject(array $map): array|\stdClass
     {
         return $map === [] ? new \stdClass() : $map;
+    }
+
+    private static function preferredOrNull(mixed $stored): ?string
+    {
+        if ($stored === null) {
+            return null;
+        }
+        $text = LocalizedLabel::preferred(LocalizedLabel::decode((string) $stored));
+
+        return $text === '' ? null : $text;
     }
 
     private static function toBool(mixed $value): bool

@@ -376,12 +376,15 @@ final class PublicFormsApiRealEngineTest extends TestCase
         $data = self::data($this->render($slug));
 
         self::assertSame(
-            ['slug', 'name', 'description', 'fields', 'sections', 'accepts_submissions', 'opens_at', 'closes_at'],
+            [
+                'slug', 'name', 'description', 'description_i18n', 'submit_label', 'fields', 'sections',
+                'accepts_submissions', 'opens_at', 'closes_at',
+            ],
             array_keys($data)
         );
         self::assertSame(
             [
-                'field_key', 'field_type', 'label', 'help_text', 'is_required',
+                'field_key', 'field_type', 'label', 'help_text', 'help_text_i18n', 'is_required',
                 'options', 'validation', 'section_key', 'position', 'visible_when', 'multi_valued',
             ],
             array_keys(self::asList($data['fields'])[0])

@@ -408,7 +408,7 @@ final class PublicFormsApiHandler
 
             return Response::error($e->clientMessage, $e->status);
         } catch (FormRejectedException $e) {
-            return Response::error($e->clientMessage, 422);
+            return Response::error($e->clientMessage, 422, $e->details());
         } catch (StorageException $e) {
             error_log('[PublicFormsApiHandler] upload storage write failed: ' . $e->getMessage());
 
@@ -539,7 +539,7 @@ final class PublicFormsApiHandler
             // the person's OWN field label — "Contact number is required" — which
             // is written for whoever is looking at the form. They disclose only
             // labels the caller was already shown.
-            return Response::error($e->clientMessage, 422);
+            return Response::error($e->clientMessage, 422, $e->details());
         } catch (\Throwable $e) {
             error_log('[PublicFormsApiHandler] submit failed: ' . $e->getMessage());
 

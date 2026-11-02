@@ -124,7 +124,7 @@ final class FormSubmissionsApiHandler
             // path produces name the person's OWN field label — "Contact number
             // is required" — because they are written for whoever is looking at
             // the form, not for its author.
-            return Response::error($e->clientMessage, 422);
+            return Response::error($e->clientMessage, 422, $e->details());
         } catch (\Exception $e) {
             error_log('[FormSubmissionsApiHandler] submit failed: ' . $e->getMessage());
 
