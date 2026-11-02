@@ -1184,7 +1184,7 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'href' => '/admin/my-agents',
         'icon' => 'robot',
         'group' => 'ai',
-        'order' => -2,
+        'order' => 1,
     ];
     $items[] = [
         'id' => 'agents',
@@ -1192,7 +1192,7 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'href' => '/admin/agents',
         'icon' => 'robot',
         'group' => 'ai',
-        'order' => -1,
+        'order' => 2,
         'requiredPermission' => \Whity\Core\RBAC\CorePermissions::AGENTS_MANAGE,
     ];
     $items[] = [
@@ -1201,7 +1201,7 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'href' => '/admin/ai-principals',
         'icon' => 'robot',
         'group' => 'ai',
-        'order' => 1,
+        'order' => 3,
         // WC-0208ce4d: mirrors GET /api/v1/admin/mcp/tokens, gated on the
         // mcp:tokens:manage permission. Nav item carries the same requirement so
         // permission-aware clients can hide it; the page enforces it server-side.
@@ -1213,7 +1213,7 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'href' => '/admin/mcp-tools',
         'icon' => 'tools',
         'group' => 'ai',
-        'order' => 2,
+        'order' => 4,
         // WC-0208ce4d: read-only view of MCP tools available in this tenant.
         // Gated on mcp:tokens:manage so only admins who manage AI credentials
         // can see which tools those credentials expose.
