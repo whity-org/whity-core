@@ -97,6 +97,26 @@ describe('MoneyInput', () => {
   });
 });
 
+describe('MoneyInput with hostile input', () => {
+  it('formats a long run of zeros quickly', () => {
+    const zeros = '0'.repeat(100_000);
+    const started = Date.now();
+    render(<MoneyInput aria-label="Long" currency="JOD" value={`${zeros}1.5`} onValueChange={() => {}} />);
+    expect((screen.getByLabelText('Long') as HTMLInputElement).value).toBe('1.500');
+    expect(Date.now() - started).toBeLessThan(2000);
+  });
+
+  it('leaves text that is not a number as typed', () => {
+    render(<MoneyInput aria-label="Odd" currency="JOD" value={`${'0'.repeat(50_000)}x`} onValueChange={() => {}} />);
+    expect((screen.getByLabelText('Odd') as HTMLInputElement).value).toBe(`${'0'.repeat(50_000)}x`);
+  });
+
+  it('formats zero and a bare fraction', () => {
+    render(<MoneyInput aria-label="Zero" currency="JOD" value="000" onValueChange={() => {}} />);
+    expect((screen.getByLabelText('Zero') as HTMLInputElement).value).toBe('0.000');
+  });
+});
+
 describe('DataTable selection', () => {
   const rows = [
     { id: 'a', name: 'Rana', amount: 10 },

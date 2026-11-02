@@ -54,7 +54,9 @@ function formatForBlur(text: string, decimals: number): string {
   const [whole = "", fraction = "", ...rest] = (negative ? text.slice(1) : text).split(".")
   // Text that isn't a plain number stays as typed, for the field's error to show.
   if (rest.length > 0 || (whole === "" && fraction === "") || !isDigits(whole) || !isDigits(fraction)) return text
-  const grouped = groupThousands(whole.replace(/^0+/, "") || "0")
+  let firstDigit = 0
+  while (firstDigit < whole.length - 1 && whole[firstDigit] === "0") firstDigit++
+  const grouped = groupThousands(whole.slice(firstDigit) || "0")
   const padded = decimals > 0 ? `.${fraction.padEnd(decimals, "0")}` : ""
   return `${negative ? "-" : ""}${grouped}${padded}`
 }
