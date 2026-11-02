@@ -64,7 +64,9 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
   const refusalMessage = useRefusalMessage();
 
   const [form, setForm] = useState<PublicForm | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  // Which failure, not its wording: the words are chosen when they are drawn, so a
+  // language loading late can't restart the fetch below.
+  const [loadError, setLoadError] = useState<'notValid' | 'loadFailed' | null>(null);
   const [loading, setLoading] = useState(true);
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -81,14 +83,14 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
         if (!response.ok || !body.data) {
           // A wrong slug, a withdrawn link and an unpublished form are one
           // refusal by design, so this page's wording can stand in for the server's.
-          setLoadError(t('fill.notValid', 'This form link is not valid, or is no longer open.'));
+          setLoadError('notValid');
 
           return;
         }
         setForm(body.data);
       })
       .catch(() => {
-        if (!cancelled) setLoadError(t('fill.loadFailed', 'This form could not be loaded. Check your connection and try again.'));
+        if (!cancelled) setLoadError('loadFailed');
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -97,7 +99,7 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
     return () => {
       cancelled = true;
     };
-  }, [slug, t]);
+  }, [slug]);
 
   const ordered = useMemo(
     () => (form?.fields ?? []).slice().sort((a, b) => a.position - b.position),
@@ -203,7 +205,11 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
       <Card>
         <CardHeader>
           <CardTitle>{t('fill.notAvailable', 'This form is not available')}</CardTitle>
-          <CardDescription>{loadError}</CardDescription>
+          <CardDescription>
+            {loadError === 'loadFailed'
+              ? t('fill.loadFailed', 'This form could not be loaded. Check your connection and try again.')
+              : t('fill.notValid', 'This form link is not valid, or is no longer open.')}
+          </CardDescription>
         </CardHeader>
       </Card>
     );

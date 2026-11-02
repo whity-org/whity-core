@@ -79,7 +79,9 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
   const refusalMessage = useRefusalMessage();
 
   const [rendered, setRendered] = useState<RenderedForm | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  // Which failure, not its wording: the words are chosen when they are drawn, so a
+  // language loading late can't refetch the form and reseed the answers below.
+  const [loadError, setLoadError] = useState<'notOpened' | 'loadFailed' | null>(null);
   const [loading, setLoading] = useState(true);
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -131,7 +133,7 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
         if (!response.ok || !body.data) {
           // Only a 404 or a permission refusal reaches here, and neither says
           // more than this to the person looking at it.
-          setLoadError(t('fill.notOpened', 'This form could not be opened.'));
+          setLoadError('notOpened');
 
           return;
         }
@@ -152,7 +154,7 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
         setRestored(Object.keys(draft).length > 0);
       })
       .catch(() => {
-        if (!cancelled) setLoadError(t('fill.loadFailed', 'This form could not be loaded. Check your connection and try again.'));
+        if (!cancelled) setLoadError('loadFailed');
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -161,7 +163,7 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
     return () => {
       cancelled = true;
     };
-  }, [id, t]);
+  }, [id]);
 
   // Keep the draft current. File answers are deliberately EXCLUDED: an upload
   // reference is single-use, so restoring one would hand the server a reference
@@ -289,7 +291,11 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
       <Card>
         <CardHeader>
           <CardTitle>{t('fill.notAvailable', 'This form is not available')}</CardTitle>
-          <CardDescription>{loadError}</CardDescription>
+          <CardDescription>
+            {loadError === 'loadFailed'
+              ? t('fill.loadFailed', 'This form could not be loaded. Check your connection and try again.')
+              : t('fill.notOpened', 'This form could not be opened.')}
+          </CardDescription>
         </CardHeader>
       </Card>
     );
