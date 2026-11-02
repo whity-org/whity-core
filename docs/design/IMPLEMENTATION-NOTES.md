@@ -1,42 +1,168 @@
-# Document editor: implementation notes (M0)
+# Implementation notes
 
-Milestone M0 of `PLAN.md`: a survey of whity-core against the design (register E.1–E.39, sections 12 and 18, `handoff/editor/`), and a proposal for the server side, which the design leaves open. No feature code is in this change, and no design file or register entry was changed. Everything that looks wrong or open in the design is under [Questions for the owner](#questions-for-the-owner).
+The working plan for design system 2.9 (A0 to A6), checked against `develop` at `a8fd3a96` on 2 Nov 2026. This replaces the M0 summary and M0's foundation table. The rest of the M0 notes, including the owner's answers of 29 Oct, are kept unchanged [below](#m0-notes-29-oct-2026).
 
-Surveyed on `develop` at `0c525285` (29 Oct 2026). Paths are relative to the repository root.
+How it was checked: the code was read on `origin/develop`, screen by screen against each card's README. Screens were not compared with screenshots; each milestone does that. The only browser check was `app.whity.dev/login` on v0.2.23: body 14px, button 36px, input 28px with 12px text.
 
-## Summary
+## What the 2.9 merge did
 
-- **The foundation is mostly not in place.** The code runs on tokens 2.0.0. Of section 12's 13 items, none is done, eight are partly done and five are missing. Item 13 is partly done: the repository has moved to `whity-org`, and the npm scope rename is open as PR #1407.
-- **A Document designer already exists** at `/admin/documents`: a 1,893-line screen with a canvas mode and a flow mode, its own JSON model (DocTemplate v2), its own tables (`document_templates`, `document_blocks`) and two Whity Render routes. The new editor replaces or absorbs it. Which of the two is the biggest decision before M2 (Q1).
-- **No editor library is installed** (TipTap, ProseMirror, Lexical, Slate). Rich text today is an in-house `TextRun[]` model.
-- **The server has none of the collaboration and agent pieces**: no document versions, no optimistic concurrency, no comments, no suggestions, no realtime channel, no generic file upload, no agent identity, no proposals and no per-permission modes. An agent today *is* a person's token, and the audit log can't tell the two apart.
-- **What fits well:** the permission registry, the tenant-isolation guards, route-derived MCP tools, the event outbox, the render service's JSON-in/PDF-out protocol and its deterministic paginator, which the editor's page view can reuse, and the plugin system's interfaces, which can be extended with block definitions.
-- **Estimate:** about 39–51 engineer-weeks for M1–M8 including the server work, or 10–13 months for one engineer (see [Estimates](#dependencies-risks-and-estimates)).
-- **The owner answered every question on 29 Oct 2026** (see [Owner's answers](#owners-answers-29-oct-2026)). The editor replaces both modes of the current designer. Three blocks and a label sheet kind were added to the register as E.40–E.43, approved the same day, with the matching contract types.
+2.9 was merged into `docs/design/` three ways against the original 2.2 import (`6c0c9a9a`), not unzipped over it.
 
-## 1. Foundation status (section 12, "Changes whity-core needs")
+| Result | Files | Notes |
+| --- | --- | --- |
+| Added | 352 | Sections 19-25, the new cards and screenshots, the 2.9 PDF |
+| Taken from 2.9 | 292 | The repo hadn't changed them since 2.2 |
+| Merged line by line | 3 | `00-decision-register.md`, `13-app-map.md`, `PLAN.md`, no conflicts |
+| Repo's version kept | 7 | 2.9 hadn't changed them: `16-documents.md`, `18-document-editor.md`, `handoff/editor/README.md`, `handoff/editor/whity-document.ts`, and the `EditorAgents`, `EditorBlocks` and `EditorCollab` READMEs |
+| Removed | 1 | `Whity-Brand-Guidelines-v2.2.pdf`, replaced by 2.9's |
 
-| # | Item | Status | What's there |
+Every file only the repo has stays, including the `Cover` card.
+
+**For the design team to pick up** (their package lacks all of this, so the next package should start from this folder):
+
+- Register: E.40-E.47, the E.45 relaxation in 6.3, and 6.8's Invoice and credit note in the free set, with the Tax invoice and fiscal credit note being what Front Office adds.
+- Contract: `handoff/editor/whity-document.ts` with barcode, QR, maths, label sheets, own fields and themes. A test holds it equal to `packages/ui/src/editor/contract.ts`.
+- Text: the free-set paragraph in section 16; blocks and label sheets in section 18; M4d and plugin themes in `PLAN.md`; D1 in `13-app-map.md`; the corrected cross-references (M0 Q12).
+- `CLAUDE-snippet.md`: 2.9's version dropped three rules still in force. They are back: the 16px editor sheet, "with the permission it used", and the pointer to section 18 and `handoff/editor/`.
+- E.40-E.47 still have no cards. Themes need a picker and a screen (WHIT-785).
+
+## Section 12, items 1-15
+
+| # | Item | Status | Where it stands |
 | --- | --- | --- | --- |
-| 1 | Tokens v3 | **Missing** | `src/design/tokens/base.json` is version 2.0.0. `muted-foreground` is oklch(0.556), not 0.52. `input` is oklch(0.922) light and `oklch(1 0 0 / 15%)` dark, not 0.66 / 0.52. Status colours are single fills with no text or tint. There is no `primary-tint`, `divider`, `table-header`, `chart-6`, `plane-deep`, `mark-sheet` or blueprint colours, and `chart-2…5` are greys. No `shadow-plane*`, `shadow-float` or `bg-blueprint-grid`. The primary colour is already right: oklch(0.5 0.16 255) = #0961bb, asserted in `web/__tests__/generate-tokens.test.ts`. The generator (`src/design/tokens/generate-tokens.js`) writes `web/app/globals.css` (generated block), `packages/tokens/generated/*` and `flutter/whity_tokens/.../tokens.dart`, and CI checks for drift. |
-| 2 | Type | **Partly** | Noto Sans, Noto Sans Arabic and Geist Mono load through `next/font/google` (`web/app/layout.tsx`), and `packages/tokens/generated/fonts.css` self-hosts them for non-Next clients, including 700. **Readex Pro isn't loaded anywhere.** No 14px default is set (`body` inherits 16px), and components use `text-xs` about as often as `text-sm`. `font-bold` appears 95 times in 41 files, and the `--font-weight-bold: 700` token exists. Document data uses `fontWeight: 'bold'` about 40 times (`packages/features/src/document-designer/starters.ts`). |
-| 3 | Button, input, select | **Missing** | Buttons are 32 / 28 / 36 (default / sm / lg), not 36 / 28 / 40, with an 8px radius, not ¼ of the height (`packages/ui/src/button.tsx`). An outline variant exists, but `secondary` is a grey fill. No plane. |
-| 4 | Badge, alert, nav, tabs | **Partly** | Badges and alerts are tinted, but with Tailwind palette classes. 264 palette-class lines across 13 files, nearly all in `packages/ui` (`button.tsx`, `badge.tsx`, `card.tsx`, `alert.tsx`, `access-denied.tsx`, `beta-warning.tsx`, `plugin-card.tsx`, `color-*.tsx`, `route-flow/editor.tsx`). Tabs have an unused `line` variant, and the default is a pill. 82 raw hex values outside tests and stories. |
-| 5 | Card, menus, dialogs | **Partly** | The default card has `shadow-2xs` and `rounded-xl`. Floating layers don't use `shadow-float`, which doesn't exist yet. |
-| 6 | `data-table.tsx` | **Partly** | `packages/ui/src/data-table.tsx` (1,083 lines) has sort, server pagination and search, a skeleton while loading, empty and error states, and a row-actions render prop. **Missing:** checkbox selection, the bulk bar, the sticky header and the totals row. |
-| 7 | App shell | **Partly** | `packages/ui/src/app-sidebar.tsx`: 256px, collapsing to 64px by a manual toggle, not at 1024. Drawer below 768. Tenant logo slot and tenant switcher present. |
-| 8 | Icons | **Partly** | Tabler (`@tabler/icons-react`) only, so the set is right. No agent icon (robot face), no stroke 2.25 at 16px, and the 116-icon curated list isn't enforced. |
-| 9 | brand.whity.dev logos | **Not in this repository** | Out of scope here. Needs checking where brand.whity.dev is built. |
-| 10 | Agent proposals (server) | **Missing** | Nothing called a proposal exists in `src`, `database`, `plugins` or `sdk`. The nearest patterns are human approval queues: password reset (076), two-factor recovery (077) and route verdicts. |
-| 11 | Per-permission mode on AI principals | **Missing** | There is no agent principal. `mcp_tokens.principal_kind` is `user`, `session` or `oauth`. ADR 0006 §3 names `ai-agent` and `service`, but neither is minted. `AiPrincipalsApiHandler` only lists and revokes tokens. |
-| 12 | Whity Render: `Doc` rules, 13 templates, amount in words, JoFotara | **Missing** | `render-service/` (Express, puppeteer-core, its own paginator) renders the current designer's canvas and flow models. None of stage 6's `Doc` rules, the templates, amount in words or the JoFotara QR is built. The QR it draws is Whity's own verification code (`document_qr_tokens`). |
-| 13 | Move to a Whity organisation | **Partly** | The repository is `whity-org/whity-core` and `origin` points there. The npm scope rename to `@whity-org/*` is PR #1407 (`chore/move-to-whity-org`, open; 358 files). `composer.json`, `sdk/composer.json` and several docs still say `amroksaleh`. |
+| 1 | Tokens v3 | Done, 2.9 sizes missing | `src/design/tokens/base.json` is 3.0.0 with the colours. Text, control, row and corner sizes are 2.2's. A0 |
+| 2 | Type | Partly | Fonts and no-700 are done and guarded. Default is 14px. 576 `text-xs` lines (12px) and 117 fixed sizes under 12px. A0 |
+| 3 | Button, input, select | Partly | Button is at the 2.2 sizes. Input and select are 28px with 12px text. A0 |
+| 4 | Badge, alert, nav, tabs | Partly | Badge is done. Palette classes remain in `alert`, `card`, `color-card`, `color-picker`, `plugin-card`, `route-flow/editor` and `admin/stats`. A0, except `stats` in A6 |
+| 5 | Card, menus, dialogs | Partly | Floating layers are done. `card.tsx` keeps `shadow-2xs`. A0 |
+| 6 | `data-table.tsx` | Partly | Sort, paging and states exist. No row click, selection, bulk bar, sticky header or totals. Rows aren't 48px. A0 |
+| 7 | App shell | Mostly | 240px, 56px rail, drawer and switcher exist. Group labels are 11px capitals. A0. `BuiltOnWhity` is missing (A2) |
+| 8 | Icons | Done | `robot` maps to `IconRobotFace`, stroke 2.25 at 16px and below |
+| 9 | brand.whity.dev | Not checked | It lives in `whity-org/whity-web`, not here. 2.9's logo files match 2.2's |
+| 10 | Agent proposals | Done | Migration 176, `/api/me/agent-proposals`; undo in 182 (WHIT-812) |
+| 11 | Per-permission modes | Done | Migrations 180-181, `AgentDefinition`, server-side grants |
+| 12 | Whity Render | Partly | All 13 starters seeded in both languages (189, 190). Amount in words is typed. JoFotara belongs to Front Office, not core |
+| 13 | Move to a Whity organisation | Done | `whity-org`, `@whity/*`. `composer.json` keeps the name `amroksaleh/whity-core` and the item's text is out of date |
+| 14 | Build every screen from its card | Partly | See the milestones below |
+| 15 | Text size, Show technical details | Missing | Theme is browser-only, language is on the profile, `/api/ui/preferences` is per workspace. A0 |
 
-Also relevant:
+## Milestones
 
-- **i18n** is in-house: `t(key, 'English')`, with English extracted into `database/i18n/*.json` and Arabic hand-written in `database/i18n/ar/*.json`. Every domain is complete in Arabic except `admin`, which is missing 123 keys. The editor gets its own domain (`editor`), so the "every string has an Arabic label" rule can be checked by the existing drift guard.
-- **RTL:** `web/lib/direction-context.tsx` sets `dir` and `lang` before paint, logical classes are widely used, and there's an `rtl-direction` e2e spec.
-- **Tests:** Jest (about 190 files), Playwright (about 37 specs, including the document designer), 10 axe tests. **No screenshot or visual-regression tests.** The per-milestone visual check needs a harness (proposed in M1).
+Client work only; server items are listed apart. A0 comes first and the rest can run side by side. Editor M6-M8 are separate: M6 and M7 aren't started, and M8 hasn't been checked against its list.
+
+### A0 Foundation
+
+Tokens 2.9, text size and technical details per person, and what every screen shares: `DataTable` selection and bulk bar, page states, confirm tiers, record tabs with the save bar, `Stepper`, `MoneyInput`, `SearchField`. Server: S1. Done by the foundation PR.
+
+### A1 Home, People and Inbox
+
+| Screen | Now | Cards | Existing API | Main gaps |
+| --- | --- | --- | --- | --- |
+| A01 Dashboard | Placeholder | `TplHome`, `TplHomeMember` | `/api/admin/stats`, `/api/me/inbox`, `/api/me/agent-proposals` | Whole page. `/admin` still goes to stats |
+| A02 Inbox | Partly | `TplInbox` | `/api/me/inbox` | From column, row click, translated states |
+| A03 Approvals | Nearly | `TplAgentApprovals`, `TplAgentApprovalsAr` | `/api/me/agent-proposals`, `/api/me/agent-actions` | Permission codes, skeletons, retry |
+| A10 Users | Partly | `TplUsers`, `TplUserRecord`, `TplUserRecordAr` | `/api/users` | Tabs, save bar, names, avatars, filters, bulk |
+| A11 Groups | Partly | `TplUserGroups` | `/api/user-groups` | Drawer, "Profile #" |
+| A12 Roles | Partly | `TplRoles`, `TplRoleRecord` | `/api/roles` | Tabs, save bar, the area grid |
+| A13 Units | Partly | `TplOrgUnits` | `/api/ous` | Drawer tabs, permission checks on drawer actions |
+| A14 Delegations | Partly | `TplDelegations` | `/api/delegations` | "Role #", confirm tier |
+| A15 Relations | Partly | `TplRelations` | `/api/persons` | Server search, confirm on remove |
+| A16, A48 Registrations, gating | Partly | `TplApprovalGating` | Registrations, reset and recovery routes | Dates, tiers 2 and 3 |
+
+Server: S2, S3.
+
+### A2 Forms
+
+| Screen | Now | Cards | Existing API | Main gaps |
+| --- | --- | --- | --- | --- |
+| A34 Builder and responses | Block tree | `TplFormsManage`, `TplFormBuilder`, `TplFormBuilderAr`, `TplFormResponses` | Forms, fields, submissions | New React builder (Q5) |
+| A34 Catalogue, submissions | Descriptor tables | `TplFormsCatalog`, `TplMySubmissions` | `/api/me/form-submissions` | Drafts, where each one is |
+| A34 Filling, public | Partly | `TplFormFill`, `TplFormPublic`, `TplFormPublicStates` | Public form routes | No translations at all (`forms/[id]`, `f/[slug]`), native selects, brand, Stepper |
+
+Server: S4.
+
+### A3 Documents and routing
+
+| Screen | Now | Cards | Existing API | Main gaps |
+| --- | --- | --- | --- | --- |
+| A30 Library, record | Library mostly, record partly | `TplLibrary`, `TplDocRecord` | Document library, routing, QR | Four tabs, header actions, "Account #" |
+| A30 Notes and wiki | Partly | `TplNotesWiki` | `/api/document-sources` | The list, New wiki page as main |
+| A31 Templates | Mostly | `TplDocTemplates` | Document sources | Wording, start from a starter |
+| A32 Routes | Partly | `TplRouteTemplates`, `TplFlowEditor`, `TplDocRouting`, `TplDocRoutingAr` | Route templates, routing | Sentence, rename, leave guard, top-down only, redirect `document-routing` to the Routing tab |
+| A33 Designer | Editor through M5 | `TplDocDesigner` | Document sources | Compare only. The route is `/admin/document-sources/[id]` |
+
+Server: S5.
+
+### A4 AI and agents
+
+| Screen | Now | Cards | Existing API | Main gaps |
+| --- | --- | --- | --- | --- |
+| A20 Agents, connected apps | Partly | `TplAgents`, `TplAgentPresets`, `TplConnectedApps`, `TplConnectWizard` | `/api/agents`, `/api/me/agents`, `/api/agent-presets`, AI principals | Tabs, gallery, raw columns, naming |
+| A21 Agent page | Forms only | `TplAgentRecord`, `TplAgentRecordAr`, `TplAgentInstructions`, `TplAgentScope` | Agent CRUD, grants | Record page with four tabs |
+| A22 What AI can do | Technical view | `TplWhatAICanDo` | `/api/v1/admin/mcp/tools` | The whole plain-word view |
+| A23 Activity | Only inside Approvals | `AgentActivity`, `Timeline`, `UndoBar` | `/api/me/agent-actions` | The page |
+
+Server: S6.
+
+### A5 Plugin store
+
+| Screen | Now | Cards | Existing API | Main gaps |
+| --- | --- | --- | --- | --- |
+| A41 Store, plugin, install, installed | Partly | `TplPluginStore`, `TplPluginDetail`, `TplPluginInstall`, `TplPluginsInstalled`, `PluginCard` | Upload, enable, uninstall, install from store | Plugin page, install dialog, one sidebar item, operator menu |
+
+Server: S7.
+
+### A6 Workspace, billing and settings
+
+| Screen | Now | Cards | Existing API | Main gaps |
+| --- | --- | --- | --- | --- |
+| A40 Tenants | Partly | `TplTenants` | `/api/tenants` with `q` | Use server search, typed delete |
+| A42, A43 Billing, promotions | Partly | `TplBilling`, `TplBillingAr`, `TplPlans`, `TplPromotions` | Plans, prices, invoices, promotions | Normal-unit money, JOD default, tier 1 retire |
+| A44 Audit, errors, System | Partly | `TplAuditLog`, `TplErrors`, `TplSystem` | `/api/audit-logs`, errors, `/api/admin/stats` | Sentences, technical details, palette classes |
+| A45, A46, A47 | Partly | `TplSettingsTranslations`, `TplPlatformSettings`, `TplSettingsTags`, `TplNotificationDelivery` | Existing | Native selects, one Tags page |
+| A50-A53 Settings | Partly | `TplSettingsGeneral`, `TplAdminBranding`, `TplSettingsEmailDomains`, `TplSettingsSecurity`, `TplSettingsSSO`, `TplPlatformSettings` | Existing | Save bar, native selects, tiers, "User #" |
+| U01-U03 Sign-in, invitation | Mostly | `TplAuthSignIn`, `TplAuthTwoStep`, `TplAuthReset`, `TplAuthInvite` | Existing | `OtpInput`, password checklist, SSO first |
+| U04 Account | Stacked cards | `TplAccountPrefs`, `TplAccountSecurity`, `TplLicensing` | Profile, sessions, S1 | Tabs, the Preferences tab |
+| U05, U06 Status, errors | U05 mostly, U06 missing | `TplSystemStates` | `/status` | `not-found`, `error`, `global-error` |
+| R01-R13 Starters | Seeded | `TplDoc*` | Starters | Compare only; both amounts in words need S8 |
+
+Server: S8. P01 Front Office is a separate product, and nothing here builds it.
+
+## Server work that's really missing
+
+| # | For | Work |
+| --- | --- | --- |
+| S1 | A0 | Per-person preferences: text size, Show technical details. Migration |
+| S2 | A1 | One merged waiting list (`/api/me/inbox` requires `source` by decision); home cards in the plugin manifest (SDK minor); a member-visible Dashboard item; `/admin` to `/dashboard`; System item for the system tenant only |
+| S3 | A1 | Users: last active, two-step state, display name, role and unit filters, bulk role change, per-user require two-step. Roles: people count, built-in flag, permission-to-area map. Groups: row count, Used in. Units: member count. Delegations: expiry (migration), names, un-revoke. Inbox: sender. Registrations and gating: paging, reason, an any-of nav gate |
+| S4 | A2 | Server form drafts (migration), responses summary, withdraw, Save the answer to, translatable form text (check the description column) |
+| S5 | A3 | Names for people in one batch, so "Account #" can go when the viewer lacks `users:read`; route usage count; withdraw a document |
+| S6 | A4 | Agent paused state (migration); counts and last active per agent; admin activity with a filter by agent; plain name, area and undo window per tool; what an agent may read; preset summaries |
+| S7 | A5 | `plugins:install` split from `plugins:upload` (grant by capability); 30-day keep on uninstall; trust, price and usage data; update approval; active on install; one nav item. Per-workspace install if Q4 says so |
+| S8 | A6 | Audit: names, sentences, agent filter, CSV. Tenants: plan and status. Remind for two-step. Plan change. Platform nav gates by system tenant. Email domains on a permission. 500 reference and maintenance signal. Inviter and role on an invitation. Amount in words in both languages |
+
+## Questions for the owner
+
+The two registers merged with no conflict: no row was changed on both sides. The real conflicts are between 2.9 and decisions recorded elsewhere in the repo, or between 2.9's own files. Each has a default that holds until the owner says otherwise. None blocks A0.
+
+| # | Conflict | Default |
+| --- | --- | --- |
+| Q1 | **Settings.** D1 (31 Oct, app map) keeps Email, Storage, Languages and Feature flags in the settings area. W.1 and W.2 (2 Nov) move them to Platform and add Devices. Section 21 also calls a group "Workspace" | W.1 and W.2: they're newer, and those pages are already gated to the system tenant |
+| Q2 | **Verified plugins.** M0 Q8 keeps native rendering to first-party blocks, with every third-party plugin in the frame. E.17, S.4 and S.12 say Verified runs natively and is active on install | Q8. Verified means the publisher is checked; the plugin still runs in the frame |
+| Q3 | **What an agent is.** Section 24 and its cards say an agent works for one person, and anyone can create one with everything on Ask first. The decided plan (`AGENT-PERSONAS-AND-WHITY-AGENT.md`) has workspace agents under `agents:manage`, per-person assignments, and reads that can start Allowed | The built model. "Works for" reads from assignments, Everyone's agents lists the workspace's agents, the register's AI.1-AI.4 are unaffected |
+| Q4 | **Where a plugin installs.** S.1 installs into one workspace. The plugin lifecycle looks install-wide (`PluginsApiHandler`) | Keep the lifecycle, build the pages. Check this first in S7 |
+| Q5 | **The form builder.** F.1 draws a canvas. Forms are descriptors so desktop and mobile share them | A web-only React builder; filling in keeps working on every platform |
+| Q6 | **Routes.** The app map has agents under `/admin/ai-principals` and the designer at `/admin/documents` | The built `/admin/agents`, `/admin/my-agents` and `/admin/document-sources/[id]` |
+| Q7 | **Approval between milestones.** `PLAN.md` and the snippet say to stop. The owner's standing rule is merge on green, with only a release needing approval | The standing rule. The text is left as the design team wrote it until the owner asks to change it |
+| Q8 | **Larger text.** Marked open to change at 17px, every size one step up | Build it as drawn |
+
+Still not designed, on top of `HANDOFF.md`'s list: the user menu (WHIT-827), Decided and Edit in Approvals (WHIT-828), the impact plan (WHIT-829), issuing an agent credential (WHIT-830) and the theme picker (WHIT-785). The cards cover WHIT-826, most of WHIT-821 and the store revamp (WHIT-831). The Arabic cards' dark screenshots are the same files as the light ones in the package, so they aren't a target.
+
+---
+
+# M0 notes (29 Oct 2026)
+
+Kept as written, as the record of the editor's server proposal and the owner's answers. Much has been built since, so where it describes the code as it was, the sections above win: for example, TipTap is installed, the old designer is gone, and proposals, comments and suggestions exist.
 
 ## 2. Mapping check: where each part lands
 

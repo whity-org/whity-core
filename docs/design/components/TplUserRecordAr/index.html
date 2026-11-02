@@ -1,0 +1,53 @@
+<!-- @dsCard group="Templates · People and inbox" height=917 width=1280 subtitle="V.3: the 2.5 Arabic card: the user record mirrored, names and email stay as written" -->
+<!doctype html>
+<html dir="rtl" lang="ar">
+<head><link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../bundle.css"><script src="../../preview-runtime/react.production.min.js"></script><script src="../../preview-runtime/react-dom.production.min.js"></script><script src="../bundle.js"></script><script>(function(){var t=(location.hash.match(/theme=(dark|light)/)||[])[1]||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',t);})();</script><style>body{margin:0;background:var(--background);color:var(--foreground);font-family:var(--font-sans);width:1280px;min-height:917px}</style><meta charset="utf-8"><title>User record Arabic</title><style>html,body{height:100%} #root{min-height:100%} body{font-family:var(--font-arabic)} .wy-shell__brand{direction:ltr}</style></head>
+<body>
+<div id="root"></div>
+<script>
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 16 }); }
+  var NAVL = {};
+  function L(s) { return NAVL[s] || s; }
+  /* The sidebar as built (inventory, 1 Nov 2026), in sentence case; only the current group is open (2.5). */
+  var GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['approval', 'Approvals', 3], ['form', 'My submissions']]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations'], ['user', 'Family relations'], ['two-step', 'Approval gating']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['routing', 'Route templates'], ['page', 'Notes and wiki'], ['form', 'Form builder'], ['list-todo', 'Forms']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]],
+    ['Platform', [['tenant', 'Tenants'], ['money', 'Plans and pricing'], ['receipt', 'Promotions'], ['chart', 'System'], ['error', 'Errors'], ['notification', 'Notification delivery']]]];
+  function appNav(active, o) { o = o || {};
+    return GROUPS.filter(function (g) { return g[0] !== 'Platform' || o.operator; }).map(function (g) {
+      var has = g[1].some(function (x) { return x[1] === active; });
+      return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
+  var topBar = h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' }));
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: o.tenant || 'Example Bakery', user: o.user || 'Rana Haddad', role: o.role || 'Owner', nav: appNav(active, o), topActions: topBar, searchLabel: o.search, dir: o.dir }, kids); }
+  function person(name, sub, o) { o = o || {}; return h('div', { className: 'wy-person' }, h(W.Avatar, { name: name, size: o.size || 28, kind: o.kind }), h('div', { style: { minWidth: 0 } }, h('b', null, name), sub ? h('small', null, sub) : null)); }
+  function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
+  function recHead(o) { return h('div', { className: 'wy-rech' }, o.avatar || h('span', { className: 'wy-rech__ic', 'aria-hidden': 'true' }, I(o.icon || 'document', 26)),
+      h('div', { style: { minWidth: 0 } }, h('h1', null, o.title, o.badges || null), h('div', { className: 'wy-rech__facts' }, (o.facts || []).map(function (f, i) { return h('span', { key: i }, f[0] ? I(f[0], 14) : null, f[1]); }))),
+      h('div', { className: 'wy-rech__acts' }, o.actions || null)); }
+  function saveBar(text, L2) { L2 = L2 || {}; return h('div', { className: 'wy-savebar', role: 'region', 'aria-label': L2.label || 'Unsaved changes' }, I('edit'), h('span', null, text), h(W.Button, { variant: 'ghost' }, L2.discard || 'Discard'), h(W.Button, null, L2.save || 'Save changes')); }
+  function userRecord(T) {
+    var tabs = h(W.Tabs, { items: [{ value: 'o', label: T.overview }, { value: 'a', label: T.access, count: 3 }, { value: 'h', label: T.history }], defaultValue: 'o' });
+    var details = h(W.Card, { title: T.details }, h('div', { className: 'wy-form2' },
+      h(W.Input, { label: T.name, defaultValue: T.vName }), h(W.Input, { label: T.email, defaultValue: 'omar@examplebakery.jo', dir: 'ltr', helperText: T.verified }),
+      h(W.PhoneInput ? W.PhoneInput : W.Input, { label: T.phone, defaultCountry: 'JO', defaultValue: '791234567' }),
+      h('div', { className: 'wy-changed' }, h(W.Select, { label: T.unit, defaultValue: 'ab', options: [{ value: 'sw', label: T.sweifieh }, { value: 'ab', label: T.abdoun }], helperText: T.was })),
+      h(W.Select, { label: T.manager, defaultValue: 'd', options: [{ value: 'd', label: T.dana }] }), h(W.Select, { label: T.lang, defaultValue: 'ar', options: [{ value: 'ar', label: T.arabic }, { value: 'en', label: 'English' }] })));
+    var side = h('div', { style: { display: 'grid', gap: 16 } },
+      h(W.Card, { title: T.glance }, h(W.DescriptionList, { items: [{ label: T.roles, value: h('div', { className: 'wy-chips' }, h(W.Badge, { variant: 'secondary' }, T.staff), h(W.Badge, { variant: 'secondary' }, T.driverR)) }, { label: T.groups, value: T.groupsV }, { label: T.twostep, value: h(W.Badge, { variant: 'warning' }, T.off) }, { label: T.signed, value: T.signedV }, { label: T.joined, value: T.joinedV }] })),
+      h(W.Card, { title: T.agents, description: T.agentsD }, person(T.stockAgent, T.agentFor, { kind: 'agent' })));
+    return h(F, null, h(W.Breadcrumb, { items: [{ label: T.users }, { label: T.vName }] }),
+      recHead({ avatar: h(W.Avatar, { name: 'Omar Khalil', size: 56 }), title: T.vName, badges: h(W.Badge, { variant: 'secondary' }, T.active),
+        facts: [['role', T.staff], ['tenant', T.sweifieh], ['mail', 'omar@examplebakery.jo'], ['clock', T.lastActive]],
+        actions: h(F, null, h(W.Button, { variant: 'outline', icon: 'send' }, T.reset), h(W.Button, { variant: 'outline', icon: 'two-step' }, T.require2), h(W.Menu, { label: T.more, items: [{ icon: 'hide', label: T.deactivate }, { divider: true }, { icon: 'delete', label: T.del, danger: true }] })) }),
+      h('div', { className: 'wy-rectabs' }, tabs), h('div', { className: 'wy-recbody' }, details, side), saveBar(T.changed, { discard: T.discard, save: T.save, label: T.unsaved }));
+  }
+
+  NAVL = { 'Dashboard': 'لوحة المتابعة', 'Inbox': 'الوارد', 'Approvals': 'الموافقات', 'My submissions': 'ما أرسلتُه', 'People': 'الأشخاص', 'Users': 'المستخدمون', 'User groups': 'مجموعات المستخدمين', 'Roles': 'الأدوار', 'Organisational units': 'الوحدات التنظيمية', 'Delegations': 'التفويضات', 'Family relations': 'صلات القرابة', 'Approval gating': 'طلبات تحتاج موافقة', 'AI': 'الذكاء الاصطناعي', 'Documents': 'المستندات', 'Workspace': 'مساحة العمل' };
+  ReactDOM.createRoot(document.getElementById('root')).render(shell('Users', userRecord({ overview: 'نظرة عامة', access: 'الصلاحيات', history: 'السجل', details: 'التفاصيل', name: 'الاسم', vName: 'عمر خليل', email: 'البريد الإلكتروني', verified: 'تم التحقق', phone: 'الهاتف', unit: 'الوحدة التنظيمية', sweifieh: 'الصويفية', abdoun: 'عبدون', was: 'كانت: الصويفية', manager: 'المدير المباشر', dana: 'دانة يوسف', lang: 'اللغة', arabic: 'العربية', glance: 'لمحة سريعة', roles: 'الأدوار', staff: 'موظف', driverR: 'سائق (الصويفية)', groups: 'المجموعات', groupsV: 'فريق الصويفية، الخبّازون', twostep: 'التحقق بخطوتين', off: 'غير مفعّل', signed: 'آخر دخول', signedV: 'أمس من iPhone', joined: 'انضم في', joinedV: '12 آذار 2025', agents: 'وكلاؤه', agentsD: 'وكلاء يعملون نيابةً عنه وضمن صلاحياته.', stockAgent: 'مساعد المخزون', agentFor: 'يسأل أولاً في كل شيء', users: 'المستخدمون', active: 'نشط', lastActive: 'نشط أمس', reset: 'إرسال رابط إعادة التعيين', more: 'المزيد', require2: 'اشتراط التحقق بخطوتين', deactivate: 'تعطيل', del: 'حذف', changed: h(F, null, h('b', null, 'تغيير واحد'), ' · الوحدة التنظيمية: الصويفية ← عبدون'), discard: 'تجاهل', save: 'حفظ التغييرات', unsaved: 'تغييرات غير محفوظة' }), { user: 'رنا حداد', role: 'المالكة', tenant: 'Example Bakery', search: 'بحث', dir: 'rtl' }));
+</script>
+</body>
+</html>

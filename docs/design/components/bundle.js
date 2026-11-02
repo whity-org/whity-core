@@ -170,7 +170,9 @@
         h('div', { className: 'wy-shell__brand' }, col ? (props.brandMark || h(Mark, { size: 24 })) : (props.brand || h(Lockup, { height: 24 })), h(IconButton, { icon: 'close', label: L.close, size: 'sm', className: 'wy-shell__close', onClick: function () { open[1](false); } })),
         props.tenant ? h('button', { type: 'button', className: 'wy-shell__tenant', 'aria-label': col ? props.tenant : undefined }, h('span', { className: 'wy-shell__tenant-logo', 'aria-hidden': 'true' }, String(props.tenant).charAt(0)), h('span', { className: 'wy-shell__label' }, props.tenant), h(Icon, { name: 'sort', size: 14, className: 'wy-shell__chev' })) : null,
         h('nav', { className: 'wy-shell__nav', 'aria-label': L.main }, nav.map(function (g, gi) {
-          return h('div', { key: gi, className: 'wy-shell__group' }, g.label ? h('div', { className: 'wy-shell__glabel' }, g.label) : null, g.items.map(item));
+          /* 2.5: groups collapse (only the current group open, as built); `collapsed` false/true makes the label a toggle. */
+          var fold = g.collapsed !== undefined && g.label;
+          return h('div', { key: gi, className: cx('wy-shell__group', g.collapsed && 'is-folded') }, g.label ? (fold ? h('button', { type: 'button', className: 'wy-shell__glabel wy-shell__glabel--btn', 'aria-expanded': !g.collapsed }, h('span', null, g.label), h(Icon, { name: g.collapsed ? 'chevron-right' : 'chevron-down', size: 12 })) : h('div', { className: 'wy-shell__glabel' }, g.label)) : null, g.collapsed ? null : g.items.map(item));
         })),
         props.user ? h('div', { className: 'wy-shell__user' }, h('span', { className: 'wy-actor__avatar wy-actor__avatar--lg', 'aria-hidden': 'true' }, initials(props.user)), h('div', { className: 'wy-shell__label' }, h('div', { className: 'wy-shell__uname' }, props.user), props.role ? h('div', { className: 'wy-shell__urole' }, props.role) : null)) : null),
       h('div', { className: 'wy-shell__main' },

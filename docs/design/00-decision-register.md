@@ -13,6 +13,8 @@ The brand is being rebuilt one stage at a time. A stage is locked before the nex
 8. Files and templates: locked 28 Oct 2026
 9. Final guideline: locked 28 Oct 2026
 
+Later versions: 2.1 P2 components · 2.2 Document editor · 2.3 Plugin store (locked 31 Oct 2026; S.9–S.12 added 2 Nov) · 2.4 Home (locked 2 Nov 2026) · 2.5 Page patterns and People (locked 2 Nov 2026) · 2.6 Forms (locked 2 Nov 2026) · 2.7 Ease of use and Documents and routing (locked 2 Nov 2026) · 2.8 AI and agents (locked 2 Nov 2026) · 2.9 Workspace, billing and settings (locked 2 Nov 2026)
+
 ## Stage 1 · Logo (locked 28 Oct 2026)
 
 ### The mark
@@ -385,6 +387,152 @@ A Notion-, Gutenberg- and Google Docs–inspired editor for whity-core's Documen
 | E.47 | Large print | A theme option: an 11pt body in print with headings scaled by the same steps as 6.5 and E.33; Arabic stays at 100% of the Latin size (3.7a). Asked and decided 31 Oct 2026. |
 
 Parts: 1 shell (locked 29 Oct, cards EditorShell) · 2 canvas (locked 29 Oct, cards EditorShell, EditorPageView) · 3 blocks (locked 29 Oct, cards EditorBlocks, EditorBlockChrome) · 3b plugin and saved blocks (locked 29 Oct, card EditorCustomBlocks) · 4 inline (locked 29 Oct, card EditorInline) · 5 inserting (locked 29 Oct, card EditorInsert) · 6 collaboration (locked 29 Oct, card EditorCollab) · 7 agents (locked 29 Oct, card EditorAgents) · 8 typography (locked 29 Oct, card EditorType). All parts locked 29 Oct 2026; compiled into version 2.2. E.40–E.43 added on 29 Oct 2026 with the engineering survey (M0), when the editor was chosen to replace both modes of the existing Document designer; they have no cards yet.
+
+## Plugin store (version 2.3, locked 31 Oct 2026)
+The pages where a workspace finds, installs and manages plugins (A41). Guideline section 19; cards in "Templates · Plugin store".
+
+| # | Decision | Locked value |
+| --- | --- | --- |
+| S.1 | Where | In the app first: inside each workspace (A41, `/admin/plugins/store`), installing into that workspace. A public marketplace site reuses the same pages later. |
+| S.2 | Billing | Paid plugins are billed through Whity: one invoice from Whity, which takes the marketplace cut and pays publishers. Prices show as `[price]` until decided. |
+| S.3 | Who installs | Anyone whose role has the `plugins:install` permission (S.9). Agents can't install directly; with "Ask first" it becomes a proposal like any other action (7.5). |
+| S.4 | Trust | Verified and By Whity badges, the permissions a plugin asks for, "used by N workspaces" and its last update. No ratings or reviews until there are enough installs for them to mean something. |
+| S.5 | Agent tools on install | Every tool a plugin adds starts on Ask first; read-only tools may start Allowed. An admin changes modes afterwards in MCP tools, like any other tool. |
+| S.6 | Updates | Updates install automatically. An update that asks for new permissions or new outside domains waits for an admin's approval, and the old version keeps running meanwhile. Every update is in the audit log. |
+| S.7 | Uninstall | The plugin's data is kept 30 days; reinstalling in that time restores everything, then it is deleted. Its blocks show the plugin-off placeholder (E.20) meanwhile. |
+| S.8 | Trials | A paid plugin may offer a free trial; the publisher sets the length. Billing starts when it ends, with a reminder before it does. |
+| S.9 | Install and upload | Two permissions: `plugins:install` installs from the store; `plugins:upload` (operators) uploads a .zip of unreviewed code. `plugins:read` sees the pages. Decided 2 Nov 2026 against the built app. |
+| S.10 | Sidebar | One sidebar item, Plugins. Its page has two tabs, Store and Installed, which keep their own routes (`/admin/plugins/store`, `/admin/plugins`). |
+| S.11 | Operator tools | Upload plugin and Reload plugins sit in a ⋯ menu on the Installed tab, for `plugins:upload`. Store sources and their access tokens move to Settings › Advanced. A failed plugin's error and stack trace are in its details drawer, collapsed. |
+| S.12 | State after install | Verified and By Whity plugins are active once installed (the Access step is the consent). Sandboxed plugins install turned off, with Turn on on the Done step. |
+
+Values set while drawing, open to change:
+- Third-party plugins are named for their job, "[Job] for Whity" or a plain name. Names starting with "Whity" are kept for first-party products.
+- Trust marks: By Whity in the primary colour, Verified in the success colour, Sandboxed in muted grey with a lock. "Adds" chips on every tile: Screens, Document blocks, Agent tools (primary tint), Fields, Connects out.
+- Install is one dialog with a Stepper: Access, Plan (paid only), Set up (only if the plugin declares settings), Done. Outside domains always show in a warning row.
+- Installed states: Active, Trial, Update waiting, Failed, Turned off; uninstalled plugins sit under "Recently removed" for the 30 days.
+
+## Home (version 2.4, locked 2 Nov 2026)
+The page people land on after signing in, replacing the `/dashboard` placeholder and the Dashboard link to server statistics. Decided 2 Nov 2026, from the Whity team's inventory of the built app:
+
+| # | Decision | Locked value |
+| --- | --- | --- |
+| H.1 | One home | Everyone lands on `/dashboard`, the sidebar's Dashboard. It is built per person: it shows only the cards for what that person can see and do. System-tenant operators also get the platform cards of the admin dashboard. |
+| H.2 | What leads | **Waiting for you**: one list merging Inbox documents and agent Approvals, oldest first, with the decision buttons inline. |
+| H.3 | Server statistics | `/admin/stats` becomes **System**, under Platform, for system-tenant operators only. Its numbers also feed the operators' cards on the home. |
+| H.4 | Cards | Installed apps can each add one card to the home. People can hide cards but not rearrange them (v1). |
+
+Values set while drawing, open to change:
+- The title greets the person by first name with the time of day; the description gives the date, the workspace and their branch.
+- Waiting for you shows at most six rows, then "and N more". Decisions are inline outline buttons (Approve beside a ghost Decline or Reject; Open when the item needs reading), so the home has no filled main button. When nothing waits, it collapses to one line.
+- Owners and admins see "Finish setting up" until it's done: logo and colour, team, an agent, the tax number (invoices need it) and a plan.
+- App cards: the app's logo and name, one number, a few lines, at most one chart; ⋯ has Hide from home and Open; hidden cards are listed at the foot with Show. A card shows only the person's scope.
+
+## Finishing the app (versions 2.5–2.9, planned 2 Nov 2026)
+Every screen in the Whity team's web app inventory (develop at `01db4bcd`, 1 Nov 2026) gets a design by 2.9.
+
+| # | Decision | Locked value |
+| --- | --- | --- |
+| V.1 | Order | 2.5 page patterns and People · 2.6 Forms · 2.7 Documents and routing · 2.8 AI and agents · 2.9 Workspace, billing and settings. The inventory's problems (raw ids, missing confirmations, untranslated strings, kit violations) are fixed in the version that draws each screen. |
+| V.2 | Depth | Each screen is drawn in its main state. Loading, empty, error, read-only and access denied are drawn once as patterns (2.5), and each screen's README names its own versions of them. |
+| V.3 | Arabic | One Arabic card per version, the busiest screen mirrored; every README lists the Arabic labels. |
+| V.4 | Delivery | Register, cards and sections are published every version; the guidelines PDF and the handoff zip are rebuilt once, at 2.9. |
+
+## 2.5 Page patterns and People (locked 2 Nov 2026)
+Patterns every later version reuses, then the People screens. Decided 2 Nov 2026:
+
+| # | Decision | Locked value |
+| --- | --- | --- |
+| P.1 | Row click | Things with history and settings (people, roles, workspaces) open a full record page with its own address. Small things (a group, a delegation, a tag, a unit) open a side drawer. |
+| P.2 | Record page | A header with the name, status and key facts, then tabs: Overview, Access, History. |
+| P.3 | Editing | Fields are edited where they are. A sticky bar with Discard and Save changes appears as soon as something changes, and leaving asks first. |
+| P.4 | Confirming | By how undoable it is. Undoable: it happens at once with Undo. Hard to undo: a dialog that names the consequence. Security-sensitive or irreversible: the dialog plus typing the name. |
+
+Values set while drawing, open to change:
+- The sidebar follows the built app's groups in sentence case; only the current group is open, the others fold to their label (`AppShell` nav groups take `collapsed`).
+- People are always names with avatars, never ids; units, roles and dates are words. History is written in sentences, never event codes.
+- A changed field gets the primary ring and a "Was …" note; the save bar names the changes.
+- Filter buttons tint and name their value when set. Status lists use a segmented switch.
+- Inbox states are words the app composes and translates: Your decision, To review, For your information, You approved, You rejected, Returned to you.
+- A role's Access tab is a grid of areas by See, Create, Change, Delete, Approve; built-in roles are read-only with Duplicate to change.
+
+## 2.6 Forms (locked 2 Nov 2026)
+Form Builder, the forms catalogue, filling in, the public form and My submissions (A34). Decided 2 Nov 2026:
+
+| # | Decision | Locked value |
+| --- | --- | --- |
+| F.1 | Builder | The form as it will look, with questions edited in place on a canvas; the selected question's settings (type, required, help, logic, who sees answers) in a side panel. |
+| F.2 | Filling | Short forms on one page. A form with sections shows them as steps with a Stepper, saving a draft as people go. |
+| F.3 | Public form | The workspace's brand leads (logo and colour); a small "Built on Whity" in the footer. |
+| F.4 | Responses | Each form has Questions, Responses and Settings tabs. Responses shows a summary per question, then a table; a response opens as a record with its routing. |
+
+Values set while drawing, open to change:
+- Sections carry a bar in the main colour; a selected question gets the primary ring and a small toolbar (move, duplicate, delete); conditional questions show an "Only if …" pill.
+- The settings panel includes "Save the answer to", mapping an answer to a field on a record.
+- Prefilled answers show as a summary from the person's profile, not as fields to retype. Drafts save on the server.
+- The Forms page shows cards, drafts first under "Continue where you left off". My submissions shows where each submission is.
+- Public form states: sent (with a reference), closed (with a way to reach the workspace), not available. Buttons name the action ("Send application").
+
+## Ease of use (version 2.7, locked 2 Nov 2026)
+Company infrastructure and management screens are used mostly by people over 50. These override earlier values where they differ.
+
+| # | Decision | Locked value |
+| --- | --- | --- |
+| A.1 | Size | Product text 15px (was 14px, 3.5a); nothing below 13px (was 11px); controls 40px (small 32, large 44; was 36, 28, 40); table rows 48px (was 44); control corners stay ¼ of height (10px). Printed documents and the editor sheet are unchanged. |
+| A.2 | Actions | Common actions are visible, labelled buttons. Icon-only buttons always have a text label on hover and focus. ⋯ holds only rare or destructive actions. |
+| A.3 | Plain words | Management screens speak in plain words. Permission codes, ids and stack traces appear only when the person turns on **Show technical details** (a personal setting, also on the page where codes matter). |
+| A.4 | Applies to | Everything designed so far is updated (home, store, 2.5, 2.6, components) and every screen from 2.7 on follows it. |
+
+## 2.7 Documents and routing (locked 2 Nov 2026)
+The library and document record, templates, notes and wiki, route templates and the flow editor, and circulation (A30–A32). Decided 2 Nov 2026:
+
+| # | Decision | Locked value |
+| --- | --- | --- |
+| D.1 | Areas | Library, Templates, Route templates and Notes and wiki stay separate sidebar items, each its own page. |
+| D.2 | Flow editor | A top-down flow: stages stacked with arrows; branches (approved, rejected) side by side under their stage; the selected stage's settings in an inspector beside it. |
+| D.3 | Circulation | A tab on the document record. Record tabs: Document, Routing, History, Verification. `/admin/document-routing/[id]` redirects to the Routing tab. |
+| D.4 | Library | A rail of saved-search folders (Created by me, Awaiting me, Starred, collections and the rest) beside a list or grid, as built. |
+
+Values set while drawing, open to change:
+- Route stages: done green with a check, current in the main colour with a ring, next grey; each shows the people reached, the rule and the time.
+- Your decision: an optional note seen by everyone on the route, then Approve (main), Reject, Return to the sender, Forward to someone else, and one sentence on what happens next.
+- Routes are described in one sentence in the route list. Flow editor branches are labelled on their arrows; the inspector shows how many people a stage reaches today.
+- A document's SHA-256 checksum appears only with Show technical details (A.3).
+
+## 2.8 AI and agents (locked 2 Nov 2026)
+Whity's own agents, outside AI apps connected to Whity, and what AI can do (A20–A23). Decided 2 Nov 2026:
+
+| # | Decision | Locked value |
+| --- | --- | --- |
+| AI.1 | Naming | **Agents** are Whity's own agents. **Connected AI apps** (was AI principals) are outside apps (Claude, Cursor, ChatGPT and others) signed in to Whity. The sidebar's AI group: Agents, Connected AI apps, What AI can do. |
+| AI.2 | New agent | Start from a preset: a gallery of ready agents (Billing assistant, Stock assistant and others); pick one, adjust it, done. Blank is the last card. |
+| AI.3 | Agent page | A record page (P.2) with tabs: Overview (what it does and for whom), Instructions, What it may do (Off, Ask first, Allowed), Activity. |
+| AI.4 | What AI can do | The MCP tools page becomes **What AI can do**: actions in plain words, grouped by area, with how agents may use each. Tool names, toolsets and token counts appear only with Show technical details (A.3). |
+
+Values set while drawing, open to change:
+- The agents list shows "On its own" as counts of Allowed and Ask first actions. Tabs: My agents, Everyone's agents (admins).
+- Presets show what each is for, three things it does, and what it needs (an app, or "Works with Whity alone").
+- Instructions are a plain text box written as to a new colleague; "What it may read" lists pages and templates; tone and language are choices.
+- Connect an AI app: three steps (app, what it may do, set up) with the app's own steps, Copy address, and a dashed waiting line; no filled button on the last step.
+- What AI can do columns: Action, Area, Agents (can do it, proposes, suggests only, never), If it goes wrong.
+
+## 2.9 Workspace, billing and settings (locked 2 Nov 2026)
+The Settings area, a person's account, billing, the audit log, and the operators' Platform pages (A40–A53, U04). Decided 2 Nov 2026:
+
+| # | Decision | Locked value |
+| --- | --- | --- |
+| W.1 | Settings | One Settings entry in the sidebar; each settings page has a grouped sub-nav beside it (Workspace, Sign-in and security, Email, Data, Advanced) and keeps its own address, as built. |
+| W.2 | Operators | Install-wide pages (Tenants, Plans and pricing, Promotions, System, Errors, Notification delivery, and the install's email, storage, feature flags and languages) live in the sidebar's **Platform** group, shown only to the system tenant. Workspace admins never see them. |
+| W.3 | Account | A person's own settings in tabs: Profile, Sign-in and security, Sessions and devices, Preferences (language, theme, **text size** Standard or Larger, Show technical details). |
+| W.4 | Audit log | Sentences grouped by day ("Rana Haddad changed Omar Khalil's unit to Abdoun"), with filters for person, agent, area and date; raw details behind Show technical details. |
+
+Values set while drawing, open to change:
+- The settings sub-nav adds a Devices group (Licensed devices), which had no link in the built app.
+- Tags and tag groups share one page. Translations shows coverage tiles and "Only missing Arabic" by default.
+- Text size Larger is 17px, every size one step up.
+- Prices and discounts are typed with MoneyInput in normal units with the currency's decimals; Promotions default to JOD.
+- System refreshes every minute and says so. Errors lead with plain words; technical details on request.
+- Platform settings: install-wide switches as sentences; Email, File storage, Languages and Error tracking as tabs.
 
 ## Carried forward, to be re-confirmed in their own stage
 - The name is "Whity", with a capital W, in Latin letters only. There is no Arabic name, logo or brand copy.

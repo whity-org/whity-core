@@ -1,4 +1,4 @@
-<!-- @dsCard group="Templates · Whity admin" height=882 width=1280 subtitle="White-label settings with a live preview" -->
+<!-- @dsCard group="Templates · Whity admin" height=920 width=1280 subtitle="White-label settings with a live preview" -->
 <!doctype html>
 <html>
 <head><meta charset="utf-8"><title>Branding</title><style>html,body{height:100%} #root{min-height:100%} </style></head>
@@ -25,7 +25,7 @@
         h('div', { className: 'wy-grid' }, h('span', { className: 'wy-section-title' }, 'Preview'),
           h('div', { className: 'wy-preview-frame', style: W.tenantTheme(c, document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light') },
             h('div', { style: { padding: 16, display: 'grid', gap: 12, background: 'var(--background)' } },
-              h('div', { className: 'wy-row', style: { fontWeight: 600, fontSize: 14 } }, h('span', { className: 'wy-shell__tenant-logo' }, 'E'), 'Example Office'),
+              h('div', { className: 'wy-row', style: { fontWeight: 600, fontSize: 15 } }, h('span', { className: 'wy-shell__tenant-logo' }, 'E'), 'Example Office'),
               h(W.Tabs, { items: [{ value: 'a', label: 'Quotes' }, { value: 'b', label: 'Invoices' }] }),
               h('div', { className: 'wy-row' }, h(W.Button, { size: 'sm', icon: 'send' }, 'Send invoice'), h(W.Button, { size: 'sm', variant: 'link' }, 'View history')),
               h(W.BuiltOnWhity, null))))));

@@ -144,9 +144,9 @@
   --space-6: 24px;
   --space-8: 32px;
   --radius: 0.5625rem;
-  --radius-control-sm: 7px;
-  --radius-control: 9px;
-  --radius-control-lg: 10px;
+  --radius-control-sm: 8px;
+  --radius-control: 10px;
+  --radius-control-lg: 11px;
   --radius-sm: 4px;
   --radius-md: 7px;
   --radius-card: 12px;
@@ -161,10 +161,10 @@
   --logo-min-horizontal: 20px;
   --logo-min-stacked: 48px;
   --mark-cut-switch: 24px;
-  --control-h-sm: 28px;
-  --control-h: 36px;
-  --control-h-lg: 40px;
-  --row-h: 44px;
+  --control-h-sm: 32px;
+  --control-h: 40px;
+  --control-h-lg: 44px;
+  --row-h: 48px;
   --icon: 16px;
   --sidebar-w: 240px;
   --sidebar-w-collapsed: 56px;
@@ -192,14 +192,14 @@
 .title-card { font-family: var(--font-sans); font-size: 1.125rem; line-height: 1.25; font-weight: 600; }
 .stat { font-family: var(--font-sans); font-size: 1.5rem; line-height: 1.2; font-weight: 600; }
 .text-lg { font-family: var(--font-sans); font-size: 1rem; line-height: 1.5; font-weight: 400; }
-.text { font-family: var(--font-sans); font-size: 0.875rem; line-height: 1.5; font-weight: 400; }
-.label { font-family: var(--font-sans); font-size: 0.875rem; line-height: 1.25; font-weight: 500; }
-.caption { font-family: var(--font-sans); font-size: 0.75rem; line-height: 1.5; font-weight: 400; }
-.micro { font-family: var(--font-sans); font-size: 0.6875rem; line-height: 1.25; font-weight: 500; }
-.arabic-text { font-family: var(--font-arabic); font-size: 0.875rem; line-height: 1.7; font-weight: 400; }
+.text { font-family: var(--font-sans); font-size: 0.9375rem; line-height: 1.5; font-weight: 400; }
+.label { font-family: var(--font-sans); font-size: 0.9375rem; line-height: 1.25; font-weight: 500; }
+.caption { font-family: var(--font-sans); font-size: 0.8125rem; line-height: 1.5; font-weight: 400; }
+.micro { font-family: var(--font-sans); font-size: 0.8125rem; line-height: 1.25; font-weight: 500; }
+.arabic-text { font-family: var(--font-arabic); font-size: 0.9375rem; line-height: 1.7; font-weight: 400; }
 .arabic-title { font-family: var(--font-arabic); font-size: 1.5rem; line-height: 1.5; font-weight: 600; }
-.mono { font-family: var(--font-mono); font-size: 0.8125rem; line-height: 1.5; font-weight: 400; }
-.mono-sm { font-family: var(--font-mono); font-size: 0.75rem; line-height: 1.5; font-weight: 500; }
+.mono { font-family: var(--font-mono); font-size: 0.875rem; line-height: 1.5; font-weight: 400; }
+.mono-sm { font-family: var(--font-mono); font-size: 0.8125rem; line-height: 1.5; font-weight: 500; }
 @font-face { font-family: 'Noto Sans'; src: url('fonts/noto-sans-latin-400.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
 @font-face { font-family: 'Noto Sans'; src: url('fonts/noto-sans-latin-500.woff2') format('woff2'); font-weight: 500; font-style: normal; font-display: swap; }
 @font-face { font-family: 'Noto Sans'; src: url('fonts/noto-sans-latin-600.woff2') format('woff2'); font-weight: 600; font-style: normal; font-display: swap; }

@@ -1,0 +1,42 @@
+<!-- @dsCard group="Templates · Platform" height=772 width=1280 subtitle="Plans side by side, prices typed as money in JOD, and what each includes" -->
+<!doctype html>
+<html>
+<head><link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../bundle.css"><script src="../../preview-runtime/react.production.min.js"></script><script src="../../preview-runtime/react-dom.production.min.js"></script><script src="../bundle.js"></script><script>(function(){var t=(location.hash.match(/theme=(dark|light)/)||[])[1]||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',t);})();</script><style>body{margin:0;background:var(--background);color:var(--foreground);font-family:var(--font-sans);width:1280px;min-height:772px}</style><meta charset="utf-8"><title>Plans and pricing</title><style>html,body{height:100%} #root{min-height:100%} </style></head>
+<body>
+<div id="root"></div>
+<script>
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 16 }); }
+  var NAVL = {};
+  function L(s) { return NAVL[s] || s; }
+  /* The sidebar as built (inventory, 1 Nov 2026), in sentence case; only the current group is open (2.5). */
+  var GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['approval', 'Approvals', 3], ['form', 'My submissions']]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations'], ['user', 'Family relations'], ['two-step', 'Approval gating']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['routing', 'Route templates'], ['page', 'Notes and wiki'], ['form', 'Form builder'], ['list-todo', 'Forms']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]],
+    ['Platform', [['tenant', 'Tenants'], ['money', 'Plans and pricing'], ['receipt', 'Promotions'], ['chart', 'System'], ['error', 'Errors'], ['notification', 'Notification delivery']]]];
+  function appNav(active, o) { o = o || {};
+    return GROUPS.filter(function (g) { return g[0] !== 'Platform' || o.operator; }).map(function (g) {
+      var has = g[1].some(function (x) { return x[1] === active; });
+      return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
+  var topBar = h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' }));
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: o.tenant || 'Example Bakery', user: o.user || 'Rana Haddad', role: o.role || 'Owner', nav: appNav(active, o), topActions: topBar, searchLabel: o.search, dir: o.dir }, kids); }
+  function person(name, sub, o) { o = o || {}; return h('div', { className: 'wy-person' }, h(W.Avatar, { name: name, size: o.size || 28, kind: o.kind }), h('div', { style: { minWidth: 0 } }, h('b', null, name), sub ? h('small', null, sub) : null)); }
+  function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
+  function recHead(o) { return h('div', { className: 'wy-rech' }, o.avatar || h('span', { className: 'wy-rech__ic', 'aria-hidden': 'true' }, I(o.icon || 'document', 26)),
+      h('div', { style: { minWidth: 0 } }, h('h1', null, o.title, o.badges || null), h('div', { className: 'wy-rech__facts' }, (o.facts || []).map(function (f, i) { return h('span', { key: i }, f[0] ? I(f[0], 14) : null, f[1]); }))),
+      h('div', { className: 'wy-rech__acts' }, o.actions || null)); }
+  function saveBar(text, L2) { L2 = L2 || {}; return h('div', { className: 'wy-savebar', role: 'region', 'aria-label': L2.label || 'Unsaved changes' }, I('edit'), h('span', null, text), h(W.Button, { variant: 'ghost' }, L2.discard || 'Discard'), h(W.Button, null, L2.save || 'Save changes')); }
+  var _shell = shell; shell = function (a, k) { return _shell(a, k, { tenant: 'Platform (system)', user: 'Amro Saleh', role: 'Operator', operator: true }); };
+
+  function plan(n, price, list, cur, ws) { return h('div', { className: 'wy-plan' + (cur ? ' is-current' : '') }, h('h3', null, n, h(W.Badge, { variant: 'secondary' }, ws)), h('div', { className: 'wy-plan__price' }, price, h('small', null, ' / month')), h('ul', null, list.map(function (x, i) { return h('li', { key: i }, x); })), h(W.Button, { variant: 'outline' }, 'Edit plan')); }
+  ReactDOM.createRoot(document.getElementById('root')).render(shell('Plans and pricing', h(F, null,
+    h(W.PageHeader, { title: 'Plans and pricing', description: 'What workspaces pay and what each plan includes. Prices are in JOD unless a plan says otherwise.', actions: h(W.Button, { icon: 'plus' }, 'New plan') }),
+    h(W.Tabs, { items: [{ value: 'p', label: 'Plans' }, { value: 'c', label: 'Compare features' }, { value: 'a', label: 'Affiliates' }], defaultValue: 'p' }),
+    h('div', { className: 'wy-plans', style: { marginTop: 20 } }, plan('[plan name] Starter', '[price]', ['Up to 5 people', 'Documents and forms', 'One agent'], false, '12 workspaces'), plan('[plan name] Business', '[price]', ['Up to 50 people', 'Plugins', 'Agents for everyone'], true, '31 workspaces'), plan('[plan name] Enterprise', '[price]', ['Unlimited people', 'Single sign-on', 'Your own domain'], false, '4 workspaces')),
+    h(W.Card, { title: 'Edit price: Business, monthly' }, h('div', { className: 'wy-form2' }, h(W.MoneyInput, { label: 'Price', currency: 'JOD', defaultValue: '49.000', helperText: 'Type the amount as you’d write it. JOD has 3 decimals.' }), h(W.Select, { label: 'Billed', defaultValue: 'm', options: [{ value: 'm', label: 'Every month' }, { value: 'y', label: 'Every year' }] }))))));
+</script>
+</body>
+</html>

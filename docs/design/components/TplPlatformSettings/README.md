@@ -1,0 +1,3 @@
+# Platform settings (A53, operators)
+
+Install-wide switches, each a sentence with what it does (feature flags had labels generated from key names): sign-up, approval, self-service password reset and its approval, plugin store, connected AI apps, languages and more. Tabs hold **Email** (how mail is sent, the SMTP connection, a test email with a plain result), **File storage** (on this server or S3; S3 fields appear only when S3 is chosen), **Languages** (code, name, direction, on/off) and **Error tracking** (where errors go, retention). Sign-up's switches live here only (they were in two places).

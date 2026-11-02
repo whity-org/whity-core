@@ -1,0 +1,42 @@
+<!-- @dsCard group="Templates · Platform" height=772 width=1280 subtitle="H.3: the server statistics page as System, for operators only" -->
+<!doctype html>
+<html>
+<head><link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../bundle.css"><script src="../../preview-runtime/react.production.min.js"></script><script src="../../preview-runtime/react-dom.production.min.js"></script><script src="../bundle.js"></script><script>(function(){var t=(location.hash.match(/theme=(dark|light)/)||[])[1]||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',t);})();</script><style>body{margin:0;background:var(--background);color:var(--foreground);font-family:var(--font-sans);width:1280px;min-height:772px}</style><meta charset="utf-8"><title>System</title><style>html,body{height:100%} #root{min-height:100%} </style></head>
+<body>
+<div id="root"></div>
+<script>
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 16 }); }
+  var NAVL = {};
+  function L(s) { return NAVL[s] || s; }
+  /* The sidebar as built (inventory, 1 Nov 2026), in sentence case; only the current group is open (2.5). */
+  var GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['approval', 'Approvals', 3], ['form', 'My submissions']]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations'], ['user', 'Family relations'], ['two-step', 'Approval gating']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['routing', 'Route templates'], ['page', 'Notes and wiki'], ['form', 'Form builder'], ['list-todo', 'Forms']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]],
+    ['Platform', [['tenant', 'Tenants'], ['money', 'Plans and pricing'], ['receipt', 'Promotions'], ['chart', 'System'], ['error', 'Errors'], ['notification', 'Notification delivery']]]];
+  function appNav(active, o) { o = o || {};
+    return GROUPS.filter(function (g) { return g[0] !== 'Platform' || o.operator; }).map(function (g) {
+      var has = g[1].some(function (x) { return x[1] === active; });
+      return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
+  var topBar = h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' }));
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: o.tenant || 'Example Bakery', user: o.user || 'Rana Haddad', role: o.role || 'Owner', nav: appNav(active, o), topActions: topBar, searchLabel: o.search, dir: o.dir }, kids); }
+  function person(name, sub, o) { o = o || {}; return h('div', { className: 'wy-person' }, h(W.Avatar, { name: name, size: o.size || 28, kind: o.kind }), h('div', { style: { minWidth: 0 } }, h('b', null, name), sub ? h('small', null, sub) : null)); }
+  function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
+  function recHead(o) { return h('div', { className: 'wy-rech' }, o.avatar || h('span', { className: 'wy-rech__ic', 'aria-hidden': 'true' }, I(o.icon || 'document', 26)),
+      h('div', { style: { minWidth: 0 } }, h('h1', null, o.title, o.badges || null), h('div', { className: 'wy-rech__facts' }, (o.facts || []).map(function (f, i) { return h('span', { key: i }, f[0] ? I(f[0], 14) : null, f[1]); }))),
+      h('div', { className: 'wy-rech__acts' }, o.actions || null)); }
+  function saveBar(text, L2) { L2 = L2 || {}; return h('div', { className: 'wy-savebar', role: 'region', 'aria-label': L2.label || 'Unsaved changes' }, I('edit'), h('span', null, text), h(W.Button, { variant: 'ghost' }, L2.discard || 'Discard'), h(W.Button, null, L2.save || 'Save changes')); }
+  var _shell = shell; shell = function (a, k) { return _shell(a, k, { tenant: 'Platform (system)', user: 'Amro Saleh', role: 'Operator', operator: true }); };
+
+  function tile(t, v, s, w) { return h('div', { className: 'wy-tile' + (w ? ' is-warn' : '') }, h('span', null, t), h('b', null, v), h('small', null, s)); }
+  ReactDOM.createRoot(document.getElementById('root')).render(shell('System', h(F, null,
+    h(W.PageHeader, { title: 'System', description: 'How this Whity is running. Updated every minute.', actions: h(W.Button, { variant: 'outline', icon: 'sync' }, 'Refresh now') }),
+    h('div', { className: 'wy-tiles' }, tile('Workspaces', '24', '+4 this month'), tile('People', '412', '+38 this month'), tile('Agent actions today', '1,284', '38 waiting for a person'), tile('Backups', '3 days ago', 'Overdue', true)),
+    h('div', { className: 'wy-recbody', style: { marginTop: 0 } }, h(W.Card, { title: 'New people per week' }, h(W.LineChart, { height: 220, valueLabel: 'New people', data: [{ label: '14 Sep', value: 12 }, { label: '21 Sep', value: 18 }, { label: '28 Sep', value: 9 }, { label: '5 Oct', value: 22 }, { label: '12 Oct', value: 17 }, { label: '19 Oct', value: 25 }, { label: '26 Oct', value: 38 }] })),
+      h(W.Card, { title: 'Server' }, h(W.DescriptionList, { items: [{ label: 'Version', value: 'Whity 0.2.23' }, { label: 'Database', value: 'Healthy · 2.1 GB' }, { label: 'Files', value: '18 GB of 100 GB' }, { label: 'Time zone', value: 'Amman (UTC+3)' }] }))))));
+</script>
+</body>
+</html>
