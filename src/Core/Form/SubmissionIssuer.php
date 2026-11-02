@@ -430,7 +430,7 @@ final class SubmissionIssuer
      *
      * @throws FormRejectedException
      */
-    private function assertReferencesExist(int $tenantId, array $fields, array $values): void
+    public function assertReferencesExist(int $tenantId, array $fields, array $values): void
     {
         foreach ($fields as $field) {
             $type = (string) ($field['field_type'] ?? '');

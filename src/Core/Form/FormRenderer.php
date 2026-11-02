@@ -68,7 +68,9 @@ final class FormRenderer
     public function render(int $tenantId, ?int $profileId, array $form): array
     {
         $formId = (int) $form['id'];
-        $fields = $this->fields->listForForm($tenantId, $formId);
+        // Rendering is what an applicant is shown. Staff fields are read through
+        // the fields API (`forms:read`) and answered through the review route.
+        $fields = FormFieldRepository::applicantFields($this->fields->listForForm($tenantId, $formId));
 
         return [
             'form' => $form,

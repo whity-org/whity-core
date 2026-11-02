@@ -3864,28 +3864,39 @@ $formUploadsHandler = new \Whity\Api\FormUploadsApiHandler(
 );
 $router->register('POST', '/api/forms/{id:\d+}/uploads', [$formUploadsHandler, 'upload'], null, null, CorePermissions::FORMS_SUBMIT);
 
+$submissionIssuer = new \Whity\Core\Form\SubmissionIssuer(
+    $db->getPdo(),
+    $formSubmissionRepository,
+    $documentIssuer,
+    $routeTemplateRepository,
+    $documentRouter,
+    // The two collaborators that turn a `file` answer into evidence: the
+    // upload repository CLAIMS the staged upload (the check that stops a key
+    // from another tenant becoming an artifact on this one), and the artifact
+    // repository records the row that makes the bytes reachable through the
+    // ordinary document-artifact download route.
+    $formUploadRepository,
+    $documentArtifactRepository
+);
 $formSubmissionsHandler = new \Whity\Api\FormSubmissionsApiHandler(
     $formRepository,
     $formFieldRepository,
     $formSubmissionRepository,
-    new \Whity\Core\Form\SubmissionIssuer(
-        $db->getPdo(),
-        $formSubmissionRepository,
-        $documentIssuer,
-        $routeTemplateRepository,
-        $documentRouter,
-        // The two collaborators that turn a `file` answer into evidence: the
-        // upload repository CLAIMS the staged upload (the check that stops a key
-        // from another tenant becoming an artifact on this one), and the artifact
-        // repository records the row that makes the bytes reachable through the
-        // ordinary document-artifact download route.
-        $formUploadRepository,
-        $documentArtifactRepository
-    )
+    $submissionIssuer
+);
+$formSubmissionReviewsHandler = new \Whity\Api\FormSubmissionReviewsApiHandler(
+    $formFieldRepository,
+    $formSubmissionRepository,
+    new \Whity\Core\Form\FormSubmissionReviewRepository($db->getPdo()),
+    $submissionIssuer
 );
 $router->register('POST', '/api/forms/{id:\d+}/submissions', [$formSubmissionsHandler, 'submit'], null, null, CorePermissions::FORMS_SUBMIT);
 $router->register('GET', '/api/form-submissions', [$formSubmissionsHandler, 'list'], null, null, CorePermissions::FORMS_READ);
 $router->register('GET', '/api/form-submissions/{id:\d+}', [$formSubmissionsHandler, 'show'], null, null, CorePermissions::FORMS_READ);
+// The office's record on a submission (migration 194). Somebody who can read a
+// submission can read what became of it; recording takes `forms:review`.
+$router->register('GET', '/api/form-submissions/{id:\d+}/review', [$formSubmissionReviewsHandler, 'show'], null, null, CorePermissions::FORMS_READ);
+$router->register('POST', '/api/form-submissions/{id:\d+}/review', [$formSubmissionReviewsHandler, 'record'], null, null, CorePermissions::FORMS_REVIEW);
 // Only ever the caller's own rows — the ROUTE decides whose, not a query param,
 // so no client can widen it. `forms:submit` rather than `forms:read`: the rows
 // already name exactly one person, so a tenant-wide permission has nothing left
