@@ -965,3 +965,86 @@ describe('LoginPage - forgot-password / account-recovery links (WC-password-rese
     );
   });
 });
+
+describe('LoginPage - returning from SSO with several workspaces (WHIT-848)', () => {
+  const memberships = [
+    { tenant_id: 1, tenant_name: 'Example Bakery', role: 'admin' },
+    { tenant_id: 4, tenant_name: 'Example Clinic', role: 'admin' },
+  ];
+
+  // Answer by URL: the auth provider's own calls make queued mocks order-dependent.
+  const respond = (pending: () => Promise<unknown>) => {
+    (global.fetch as jest.Mock).mockImplementation((url: string, init?: RequestInit) => {
+      if (url === '/api/v1/auth/select-tenant' && (init?.method ?? 'GET') === 'GET') {
+        return pending();
+      }
+      return Promise.resolve({ ok: false, status: 401, json: async () => ({}) });
+    });
+  };
+
+  const renderReturn = () => {
+    window.history.pushState({}, '', '/login?sso=select');
+    render(
+      <AuthProvider>
+        <ToastProvider>
+          <LoginPage />
+          <ToastContainer />
+        </ToastProvider>
+      </AuthProvider>
+    );
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (useRouter as jest.Mock).mockReturnValue(mockRouter);
+  });
+
+  afterEach(() => {
+    window.history.pushState({}, '', '/login');
+  });
+
+  test('shows the picker from the pending selection, without asking for a password', async () => {
+    respond(() =>
+      Promise.resolve({ ok: true, status: 200, json: async () => ({ data: { memberships } }) })
+    );
+    renderReturn();
+
+    expect(await screen.findByRole('button', { name: /Example Bakery/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Example Clinic/ })).toBeInTheDocument();
+    expect(document.querySelector('input[type="password"]')).not.toBeInTheDocument();
+    expect(window.location.search).toBe('');
+  });
+
+  test('choosing a workspace completes the sign-in for that workspace', async () => {
+    respond(() =>
+      Promise.resolve({ ok: true, status: 200, json: async () => ({ data: { memberships } }) })
+    );
+    renderReturn();
+
+    fireEvent.click(await screen.findByRole('button', { name: /Example Clinic/ }));
+
+    await waitFor(() => {
+      const post = (global.fetch as jest.Mock).mock.calls.find(
+        ([url, init]) => url === '/api/v1/auth/select-tenant' && init?.method === 'POST'
+      );
+      expect(post?.[1]?.body).toBe(JSON.stringify({ tenant_id: 4 }));
+    });
+  });
+
+  test.each([
+    ['an expired selection', () => Promise.resolve({ ok: false, status: 401 })],
+    ['a network failure', () => Promise.reject(new Error('offline'))],
+    [
+      'a selection with no workspaces',
+      () =>
+        Promise.resolve({ ok: true, status: 200, json: async () => ({ data: { memberships: [] } }) }),
+    ],
+  ])('falls back to the sign-in form and message on %s', async (_name, pending) => {
+    respond(pending);
+    renderReturn();
+
+    expect(await screen.findByText(/sign in to choose one/)).toBeInTheDocument();
+    expect(document.querySelector('input[type="password"]')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Example Bakery/ })).not.toBeInTheDocument();
+  });
+});
