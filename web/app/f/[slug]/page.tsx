@@ -69,6 +69,7 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
   const [loading, setLoading] = useState(true);
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
   const [submitted, setSubmitted] = useState(false);
+  const [reference, setReference] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -157,8 +158,10 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
       },
       body: JSON.stringify({ data: toSend }),
     });
-    if (!response.ok) return (await response.json().catch(() => ({}))) as RefusalBody;
+    const body = (await response.json().catch(() => ({}))) as RefusalBody & { data?: { reference?: string | null } };
+    if (!response.ok) return body;
 
+    setReference(body.data?.reference ?? null);
     setSubmitted(true);
 
     return null;
@@ -207,6 +210,9 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
           <CardDescription>
             {t('fill.sentPublic', '{title} was submitted successfully. You may close this page.', { title })}
           </CardDescription>
+          {reference !== null && (
+            <p className="text-sm font-medium">{t('fill.reference', 'Your reference: {reference}', { reference })}</p>
+          )}
         </CardHeader>
       </Card>
     );

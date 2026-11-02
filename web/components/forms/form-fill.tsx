@@ -28,6 +28,7 @@ import {
   type ReferenceOption,
 } from '@/components/forms/form-fields';
 import { fieldVisibility, type FieldConditionRule } from '@/components/forms/form-conditions';
+import type { TableRow } from '@/components/forms/form-field-kinds';
 import { useRefusalMessage, type RefusalBody } from '@/components/forms/form-refusals';
 
 export interface FormSectionSpec {
@@ -42,10 +43,23 @@ export type FillableField = FormFieldSpec & { visible_when?: FieldConditionRule 
 /** The Stepper is drawn across the page for up to this many steps, and down it beyond. */
 const HORIZONTAL_STEPS_MAX = 6;
 
+function hasText(value: unknown): boolean {
+  if (typeof value === 'string') return value.trim() !== '';
+
+  return value !== undefined && value !== null && value !== false;
+}
+
 function isUnanswered(field: FillableField, value: Answer | undefined): boolean {
   if (field.field_type === 'checkbox') return value !== true;
   if (value === undefined) return true;
   if (typeof value === 'string') return value.trim() === '';
+  // A row with nothing typed in it is dropped by the server, so it can't answer.
+  if (field.field_type === 'repeating') {
+    return !Array.isArray(value) || !(value as TableRow[]).some((row) => Object.values(row).some(hasText));
+  }
+  if (field.field_type === 'signature') {
+    return typeof value !== 'object' || !('name' in value) || !hasText(value.name);
+  }
 
   return Array.isArray(value) && value.length === 0;
 }
@@ -329,7 +343,37 @@ function ReviewAnswer({
   }
   if (value === undefined || value === '' || (Array.isArray(value) && value.length === 0)) return nothing;
   // The answer is an opaque reference, and the question itself shows the file's name.
-  if (field.field_type === 'file') return <>{t('review.attached', 'Attached')}</>;
+  if (field.field_type === 'file') {
+    return Array.isArray(value)
+      ? <>{t('review.attachedCount', '{count} attached', { count: value.length })}</>
+      : <>{t('review.attached', 'Attached')}</>;
+  }
+  if (field.field_type === 'signature') {
+    return typeof value === 'object' && 'name' in value && value.name.trim() !== '' ? <>{value.name}</> : nothing;
+  }
+  if (field.field_type === 'repeating') {
+    const columns = field.validation?.columns ?? [];
+    const rows = (Array.isArray(value) ? (value as TableRow[]) : []).filter((row) => Object.values(row).some(hasText));
+    if (rows.length === 0) return nothing;
+
+    return (
+      <ul className="space-y-1">
+        {rows.map((row, index) => (
+          <li key={index}>
+            {columns
+              .filter((column) => hasText(row[column.key]))
+              .map((column) => {
+                const cell = row[column.key];
+                const label = localized(column.label, preferArabic) || column.key;
+
+                return `${label}: ${cell === true ? t('field.yes', 'Yes') : String(cell)}`;
+              })
+              .join(' · ')}
+          </li>
+        ))}
+      </ul>
+    );
+  }
 
   const optionText = (one: string): string => {
     for (const option of field.options) {
@@ -343,7 +387,7 @@ function ReviewAnswer({
     return references?.[field.field_type]?.find((option) => option.value === one)?.label ?? one;
   };
 
-  if (Array.isArray(value)) return <>{value.map(optionText).join(', ')}</>;
+  if (Array.isArray(value)) return <>{(value as string[]).map(optionText).join(', ')}</>;
 
   return <>{typeof value === 'string' ? optionText(value) : String(value)}</>;
 }

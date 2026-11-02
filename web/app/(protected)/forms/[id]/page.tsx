@@ -85,6 +85,7 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
   const [loading, setLoading] = useState(true);
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
   const [submitted, setSubmitted] = useState(false);
+  const [reference, setReference] = useState<string | null>(null);
   const [units, setUnits] = useState<ReferenceOption[]>([]);
   const [restored, setRestored] = useState(false);
 
@@ -247,8 +248,10 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
       },
       body: JSON.stringify({ data: toSend }),
     });
-    if (!response.ok) return (await response.json().catch(() => ({}))) as RefusalBody;
+    const body = (await response.json().catch(() => ({}))) as RefusalBody & { data?: { reference?: string | null } };
+    if (!response.ok) return body;
 
+    setReference(body.data?.reference ?? null);
     // Only once the server has it. Clearing on the attempt would lose the
     // answers precisely when the attempt failed.
     discardDraft();
@@ -293,6 +296,9 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
           <CardDescription>
             {t('fill.sentMember', '{title} was recorded. It appears under your own submissions.', { title })}
           </CardDescription>
+          {reference !== null && (
+            <p className="text-sm font-medium">{t('fill.reference', 'Your reference: {reference}', { reference })}</p>
+          )}
         </CardHeader>
       </Card>
     );

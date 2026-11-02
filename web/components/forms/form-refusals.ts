@@ -74,6 +74,16 @@ export function useRefusalMessage(): RefusalMessage {
         return t('refusal.fileNotFound', 'We could not find the file attached to {label}. Please attach it again.', vars);
       case 'bad_reference':
         return t('refusal.badReference', '{label} must name a record in this workspace.', vars);
+      case 'too_many_files':
+        return t('refusal.tooManyFiles', '{label} allows at most {max} files.', vars);
+      case 'bad_rows':
+        return t('refusal.badRows', '{label} must be a list of rows.', vars);
+      case 'too_few_rows':
+        return t('refusal.tooFewRows', '{label} needs at least {min} rows.', vars);
+      case 'too_many_rows':
+        return t('refusal.tooManyRows', '{label} allows at most {max} rows.', vars);
+      case 'bad_signature':
+        return t('refusal.badSignature', '{label} must be your full name.', vars);
       case 'file_too_large':
         return t('refusal.fileTooLarge', 'That file is too large. The limit is {limit_mb} MB.', vars);
       case 'file_empty':
