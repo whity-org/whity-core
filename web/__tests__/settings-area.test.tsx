@@ -49,7 +49,7 @@ describe('SettingsArea', () => {
 
     const nav = await screen.findByTestId('settings-area-nav');
     await waitFor(() => expect(within(nav).getByText('Workspace')).toBeInTheDocument());
-    const headings = Array.from(nav.querySelectorAll('p.uppercase')).map((p) => p.textContent);
+    const headings = Array.from(nav.querySelectorAll('[data-settings-group]')).map((p) => p.textContent);
     expect(headings).toEqual(['Workspace', 'Sign-in and security', 'Email', 'Data', 'Advanced']);
     const links = within(nav).getAllByRole('link').map((a) => a.getAttribute('href'));
     expect(links).toEqual([

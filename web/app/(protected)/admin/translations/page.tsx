@@ -279,15 +279,15 @@ export default function TranslationsPage() {
                   })}
                 </span>
                 {isSource ? (
-                  <Badge variant="secondary" className="ms-2 text-[10px]">
+                  <Badge variant="secondary" className="ms-2 text-xs">
                     {t('translations.coverage.sourceLanguage', 'Source language')}
                   </Badge>
                 ) : language.missing > 0 ? (
-                  <Badge variant="destructive" className="ms-2 text-[10px]">
+                  <Badge variant="destructive" className="ms-2 text-xs">
                     {t('translations.coverage.missing', '{count} missing', { count: language.missing })}
                   </Badge>
                 ) : (
-                  <Badge variant="secondary" className="ms-2 text-[10px]">
+                  <Badge variant="secondary" className="ms-2 text-xs">
                     {t('translations.coverage.complete', 'Complete')}
                   </Badge>
                 )}
@@ -312,7 +312,7 @@ export default function TranslationsPage() {
                       total: domainCoverage.total,
                     })}
                     {domainCoverage.missing > 0 && (
-                      <Badge variant="destructive" className="text-[10px]">
+                      <Badge variant="destructive" className="text-xs">
                         {t('translations.coverage.missing', '{count} missing', {
                           count: domainCoverage.missing,
                         })}
@@ -390,7 +390,7 @@ export default function TranslationsPage() {
               <th className="p-3 text-start font-medium">
                 {t('translations.column.systemDefault', 'System default')}
                 {isSystemTenant && (
-                  <Badge variant="secondary" className="ms-2 text-[10px]">
+                  <Badge variant="secondary" className="ms-2 text-xs">
                     {t('translations.badge.editable', 'editable')}
                   </Badge>
                 )}
@@ -398,7 +398,7 @@ export default function TranslationsPage() {
               <th className="p-3 text-start font-medium">
                 {t('translations.column.tenantOverride', 'Tenant override')}
                 {!isSystemTenant && (
-                  <Badge variant="secondary" className="ms-2 text-[10px]">
+                  <Badge variant="secondary" className="ms-2 text-xs">
                     {t('translations.badge.editable', 'editable')}
                   </Badge>
                 )}

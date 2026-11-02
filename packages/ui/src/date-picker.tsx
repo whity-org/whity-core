@@ -194,7 +194,7 @@ const DatePicker = React.forwardRef<HTMLDivElement, DatePickerProps>(
             id={id}
             disabled={disabled}
             className={cn(
-              "relative flex h-7 w-full items-center justify-start rounded-md border border-input bg-card ps-8 pe-8 py-0.5 text-xs font-medium text-foreground transition-colors outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive/20",
+              "relative flex h-10 w-full items-center justify-start rounded-control border border-input bg-card ps-8 pe-8 py-0.5 text-sm text-foreground transition-colors outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive/20",
               !selectedDate && "text-muted-foreground font-normal",
               className
             )}
@@ -248,7 +248,7 @@ const DatePicker = React.forwardRef<HTMLDivElement, DatePickerProps>(
           {/* Day Names Row */}
           <div className="grid grid-cols-7 gap-1 text-center mb-1">
             {DAY_NAMES.map((dayName) => (
-              <span key={dayName} className="text-[0.625rem] font-semibold text-muted-foreground uppercase">
+              <span key={dayName} className="text-xs font-semibold text-muted-foreground uppercase">
                 {dayName}
               </span>
             ))}
@@ -264,7 +264,7 @@ const DatePicker = React.forwardRef<HTMLDivElement, DatePickerProps>(
                   setViewDate(new Date(d.getFullYear(), d.getMonth(), 1))
                   handleSelectDay(d)
                 }}
-                className="flex h-7 w-full items-center justify-center rounded-md text-xs text-muted-foreground/35 hover:bg-muted/40 transition-colors"
+                className="flex h-9 w-full items-center justify-center rounded-md text-xs text-muted-foreground/35 hover:bg-muted/40 transition-colors"
               >
                 {d.getDate()}
               </button>
@@ -279,7 +279,7 @@ const DatePicker = React.forwardRef<HTMLDivElement, DatePickerProps>(
                   type="button"
                   onClick={() => handleSelectDay(d)}
                   className={cn(
-                    "flex h-7 w-full items-center justify-center rounded-md text-xs font-medium transition-colors hover:bg-accent hover:text-accent-foreground",
+                    "flex h-9 w-full items-center justify-center rounded-md text-xs font-medium transition-colors hover:bg-accent hover:text-accent-foreground",
                     isTodayDay && !isSelected && "border border-primary/40 font-semibold text-primary",
                     isSelected && "bg-primary text-primary-foreground font-semibold shadow-2xs hover:bg-primary/90"
                   )}
@@ -297,7 +297,7 @@ const DatePicker = React.forwardRef<HTMLDivElement, DatePickerProps>(
                   setViewDate(new Date(d.getFullYear(), d.getMonth(), 1))
                   handleSelectDay(d)
                 }}
-                className="flex h-7 w-full items-center justify-center rounded-md text-xs text-muted-foreground/35 hover:bg-muted/40 transition-colors"
+                className="flex h-9 w-full items-center justify-center rounded-md text-xs text-muted-foreground/35 hover:bg-muted/40 transition-colors"
               >
                 {d.getDate()}
               </button>
@@ -313,7 +313,7 @@ const DatePicker = React.forwardRef<HTMLDivElement, DatePickerProps>(
                 setViewDate(now)
                 handleSelectDay(now)
               }}
-              className="text-[0.6875rem] font-semibold text-primary hover:underline"
+              className="text-xs font-semibold text-primary hover:underline"
             >
               {todayLabel}
             </button>
@@ -325,7 +325,7 @@ const DatePicker = React.forwardRef<HTMLDivElement, DatePickerProps>(
                   onChange?.(null)
                   setOpen(false)
                 }}
-                className="text-[0.6875rem] text-muted-foreground hover:text-foreground"
+                className="text-xs text-muted-foreground hover:text-foreground"
               >
                 {clearButtonLabel}
               </button>
@@ -368,9 +368,9 @@ const DatePicker = React.forwardRef<HTMLDivElement, DatePickerProps>(
               )}
               {triggerButton}
               {errorText ? (
-                <p className="text-[0.6875rem] font-medium text-destructive">{errorText}</p>
+                <p className="text-xs font-medium text-destructive">{errorText}</p>
               ) : (
-                helperText && <p className="text-[0.6875rem] text-muted-foreground">{helperText}</p>
+                helperText && <p className="text-xs text-muted-foreground">{helperText}</p>
               )}
             </div>
           )}
@@ -408,9 +408,9 @@ const DatePicker = React.forwardRef<HTMLDivElement, DatePickerProps>(
         )}
         {triggerButton}
         {errorText ? (
-          <p className="text-[0.6875rem] font-medium text-destructive">{errorText}</p>
+          <p className="text-xs font-medium text-destructive">{errorText}</p>
         ) : (
-          helperText && <p className="text-[0.6875rem] text-muted-foreground">{helperText}</p>
+          helperText && <p className="text-xs text-muted-foreground">{helperText}</p>
         )}
       </div>
     )

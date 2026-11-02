@@ -7,7 +7,7 @@ import { cn } from "./utils"
 
 /**
  * The reference is docs/design/components/Button (bundle.css `.wy-btn`).
- * Heights 36 / 28 / 40 with corners ¼ of the height (decisions 4.1, 4.2).
+ * Heights 40 / 32 / 44 (A.1) with corners ¼ of the height (decisions 4.1, 4.2).
  * Secondary buttons are outline (7.1). The filled `default` button is the one
  * action a view is for and the only one on the plane (4.3): a hard offset
  * down-left that grows on hover and never mirrors in RTL, which is why its
@@ -29,14 +29,14 @@ const buttonVariants = cva(
         link: "bg-transparent text-primary underline underline-offset-4",
       },
       size: {
-        default: "h-9 px-3.5 [&_svg:not([class*='size-'])]:size-4",
-        xs: "h-6 gap-1 rounded-[6px] px-2 text-xs [&_svg:not([class*='size-'])]:size-3",
-        sm: "h-7 gap-1 rounded-control-sm px-2.5 text-[0.8125rem] [&_svg:not([class*='size-'])]:size-4",
-        lg: "h-10 rounded-control-lg px-4 [&_svg:not([class*='size-'])]:size-4",
-        icon: "size-9 px-0 [&_svg:not([class*='size-'])]:size-4",
-        "icon-xs": "size-6 rounded-[6px] px-0 [&_svg:not([class*='size-'])]:size-3",
-        "icon-sm": "size-7 rounded-control-sm px-0 [&_svg:not([class*='size-'])]:size-4",
-        "icon-lg": "size-10 rounded-control-lg px-0 [&_svg:not([class*='size-'])]:size-4",
+        default: "h-10 px-3.5 [&_svg:not([class*='size-'])]:size-4",
+        xs: "h-8 gap-1 rounded-control-sm px-2.5 text-xs [&_svg:not([class*='size-'])]:size-4",
+        sm: "h-8 gap-1 rounded-control-sm px-2.5 text-xs [&_svg:not([class*='size-'])]:size-4",
+        lg: "h-11 rounded-control-lg px-4 [&_svg:not([class*='size-'])]:size-4",
+        icon: "size-10 px-0 [&_svg:not([class*='size-'])]:size-4",
+        "icon-xs": "size-8 rounded-control-sm px-0 [&_svg:not([class*='size-'])]:size-4",
+        "icon-sm": "size-8 rounded-control-sm px-0 [&_svg:not([class*='size-'])]:size-4",
+        "icon-lg": "size-11 rounded-control-lg px-0 [&_svg:not([class*='size-'])]:size-4",
       },
     },
     compoundVariants: [

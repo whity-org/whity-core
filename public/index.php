@@ -4440,6 +4440,12 @@ $notificationPreferencesHandler = new \Whity\Api\NotificationPreferencesApiHandl
 $router->register('GET', '/api/me/notification-preferences', [$notificationPreferencesHandler, 'list'],   null);
 $router->register('PUT', '/api/me/notification-preferences', [$notificationPreferencesHandler, 'update'], null);
 
+// A person's text size and Show technical details (design decisions W.3, A.3).
+// Self-scoped, session-gated, no RBAC permission.
+$displayPreferencesHandler = new \Whity\Api\DisplayPreferencesApiHandler($tokenValidator, $db->getPdo());
+$router->register('GET', '/api/me/display-preferences', [$displayPreferencesHandler, 'get'], null);
+$router->register('PUT', '/api/me/display-preferences', [$displayPreferencesHandler, 'update'], null);
+
 // Per-tenant notification SENDER configuration (WC-notifications, d70c6083). A
 // tenant admin manages their OWN tenant's per-channel sender (from/reply-to,
 // transport, encrypted creds). settings:manage gated; creds are write-only.

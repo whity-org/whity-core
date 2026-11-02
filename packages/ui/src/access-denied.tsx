@@ -242,7 +242,7 @@ function AccessDenied({
           {/* Inline Search Results List */}
           {(activeResults.length > 0 || (hasSearched && searchQuery.trim())) && (
             <div className="flex flex-col gap-2 rounded-xl border border-border/80 bg-muted/30 p-3 text-start transition-all">
-              <div className="flex items-center justify-between px-1 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+              <div className="flex items-center justify-between px-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 <span>Search Results ({activeResults.length})</span>
                 {searchQuery && <span className="normal-case italic opacity-80">&quot;{searchQuery}&quot;</span>}
               </div>
@@ -265,13 +265,13 @@ function AccessDenied({
                               {result.title}
                             </span>
                             {result.category && (
-                              <Badge variant="outline" className="text-[9px] px-1.5 py-0">
+                              <Badge variant="outline" className="text-xs px-1.5 py-0">
                                 {result.category}
                               </Badge>
                             )}
                           </div>
                           {result.description && (
-                            <p className="text-[11px] text-muted-foreground truncate">
+                            <p className="text-xs text-muted-foreground truncate">
                               {result.description}
                             </p>
                           )}

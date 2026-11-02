@@ -144,9 +144,9 @@ class AppTokens {
 
   // Font sizes (logical pixels)
   static const fontSize = <String, double>{
-    '2xs': 11.0,
-    'xs': 12.0,
-    'sm': 14.0,
+    '2xs': 13.0,
+    'xs': 13.0,
+    'sm': 15.0,
     'base': 16.0,
     'lg': 18.0,
     'xl': 20.0,
@@ -179,9 +179,9 @@ class AppTokens {
     'lg': 10.0,
     'xl': 12.0,
     '2xl': 16.0,
-    'control-sm': 7.0,
-    'control': 9.0,
-    'control-lg': 10.0,
+    'control-sm': 8.0,
+    'control': 10.0,
+    'control-lg': 11.0,
     'card': 12.0,
     'dialog': 16.0,
     'full': 999.0,

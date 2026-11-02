@@ -307,7 +307,7 @@ const TimePicker = React.forwardRef<HTMLDivElement, TimePickerProps>(
 
       return (
         <div className="flex flex-col items-center gap-1">
-          <span className="text-[0.625rem] font-semibold text-muted-foreground uppercase">{colLabel}</span>
+          <span className="text-xs font-semibold text-muted-foreground uppercase">{colLabel}</span>
           <div
             onWheel={onWheel}
             className="relative flex flex-col items-center justify-center w-16 select-none rounded-xl border border-border/60 bg-card p-1 shadow-2xs"
@@ -319,7 +319,7 @@ const TimePicker = React.forwardRef<HTMLDivElement, TimePickerProps>(
             <button
               type="button"
               onClick={() => onSelect(items[top2Idx])}
-              className="flex h-6 w-full items-center justify-center text-[0.6875rem] font-medium text-muted-foreground/40 transition-colors hover:text-foreground"
+              className="flex h-6 w-full items-center justify-center text-xs font-medium text-muted-foreground/40 transition-colors hover:text-foreground"
             >
               {items[top2Idx]}
             </button>
@@ -351,7 +351,7 @@ const TimePicker = React.forwardRef<HTMLDivElement, TimePickerProps>(
             <button
               type="button"
               onClick={() => onSelect(items[bot2Idx])}
-              className="flex h-6 w-full items-center justify-center text-[0.6875rem] font-medium text-muted-foreground/40 transition-colors hover:text-foreground"
+              className="flex h-6 w-full items-center justify-center text-xs font-medium text-muted-foreground/40 transition-colors hover:text-foreground"
             >
               {items[bot2Idx]}
             </button>
@@ -403,7 +403,7 @@ const TimePicker = React.forwardRef<HTMLDivElement, TimePickerProps>(
           <div className="flex items-center justify-between pb-2 mb-2 border-b border-border/50">
             <span className="text-xs font-semibold text-foreground">{timeHeadingLabel}</span>
             <div className="flex items-center gap-1.5">
-              <div className="flex items-center rounded-md bg-muted p-0.5 text-[0.625rem] font-semibold">
+              <div className="flex items-center rounded-md bg-muted p-0.5 text-xs font-semibold">
                 <button
                   type="button"
                   onClick={() => {
@@ -443,7 +443,7 @@ const TimePicker = React.forwardRef<HTMLDivElement, TimePickerProps>(
               </div>
 
               {activeFormat === "12h" && (
-                <div className="flex items-center rounded-md bg-muted p-0.5 text-[0.625rem] font-semibold">
+                <div className="flex items-center rounded-md bg-muted p-0.5 text-xs font-semibold">
                   <button
                     type="button"
                     onClick={() => updateTime(hour, minute, "AM", activeFormat)}
@@ -498,7 +498,7 @@ const TimePicker = React.forwardRef<HTMLDivElement, TimePickerProps>(
             )}
           </div>
 
-          <p className="mt-1 text-center text-[0.625rem] text-muted-foreground">
+          <p className="mt-1 text-center text-xs text-muted-foreground">
             {scrollHint}
           </p>
 
@@ -507,7 +507,7 @@ const TimePicker = React.forwardRef<HTMLDivElement, TimePickerProps>(
             <button
               type="button"
               onClick={handleSetNow}
-              className="text-[0.6875rem] font-semibold text-primary hover:underline"
+              className="text-xs font-semibold text-primary hover:underline"
             >
               {nowLabel}
             </button>
@@ -519,7 +519,7 @@ const TimePicker = React.forwardRef<HTMLDivElement, TimePickerProps>(
                   onChange?.(null)
                   setOpen(false)
                 }}
-                className="text-[0.6875rem] text-muted-foreground hover:text-foreground"
+                className="text-xs text-muted-foreground hover:text-foreground"
               >
                 {clearButtonLabel}
               </button>
@@ -561,9 +561,9 @@ const TimePicker = React.forwardRef<HTMLDivElement, TimePickerProps>(
               )}
               {triggerButton}
               {errorText ? (
-                <p className="text-[0.6875rem] font-medium text-destructive">{errorText}</p>
+                <p className="text-xs font-medium text-destructive">{errorText}</p>
               ) : (
-                helperText && <p className="text-[0.6875rem] text-muted-foreground">{helperText}</p>
+                helperText && <p className="text-xs text-muted-foreground">{helperText}</p>
               )}
             </div>
           )}
@@ -601,9 +601,9 @@ const TimePicker = React.forwardRef<HTMLDivElement, TimePickerProps>(
         )}
         {triggerButton}
         {errorText ? (
-          <p className="text-[0.6875rem] font-medium text-destructive">{errorText}</p>
+          <p className="text-xs font-medium text-destructive">{errorText}</p>
         ) : (
-          helperText && <p className="text-[0.6875rem] text-muted-foreground">{helperText}</p>
+          helperText && <p className="text-xs text-muted-foreground">{helperText}</p>
         )}
       </div>
     )

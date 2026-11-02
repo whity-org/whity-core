@@ -43,12 +43,14 @@ import { cn } from "./utils"
 import {
   Table,
   TableBody,
+  TableFooter,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
 } from "./table"
 import { Button } from "./button"
+import { Checkbox } from "./checkbox"
 import { Input } from "./input"
 import { Pagination } from "./pagination"
 import { Skeleton } from "./skeleton"
@@ -66,7 +68,7 @@ import {
  * this component wires up HOW it sorts/filters/resizes/hides.
  */
 /** What the table calls to render one cell, given the cell's context. */
-type CellRenderer<TRow> = (info: { row: { original: TRow } }) => React.ReactNode
+type CellRenderer<TRow> = (info: { row: { id: string; original: TRow } }) => React.ReactNode
 
 export interface DataTableColumn<TData> {
   /** Unique column id. Defaults to `accessorKey` when omitted. */
@@ -165,10 +167,42 @@ export interface DataTableServerSearch {
   debounceMs?: number
 }
 
+/** Row selection with the bulk bar (decision 7.6). The caller owns which rows are selected. */
+export interface DataTableSelection<TData> {
+  /** Row ids, as `getRowId` gives them. `getRowId` is required with selection. */
+  selected: ReadonlySet<string>
+  onSelectedChange: (next: Set<string>) => void
+  /** The bulk actions, normally `<Button variant="outline" size="sm">`. */
+  actions?: React.ReactNode
+  /** The money total of the selected rows, shown beside the count. */
+  summary?: (rows: TData[]) => React.ReactNode
+  labels?: {
+    /** "{count} selected" */
+    count?: (count: number) => string
+    clear?: string
+    selectAll?: string
+    selectRow?: string
+  }
+}
+
 export interface DataTableProps<TData> {
   columns: DataTableColumn<TData>[]
   data: TData[]
   getRowId?: (row: TData, index: number) => string
+  /**
+   * Opens the row (P.1). A click on a control inside the row does not count, so
+   * row menus and links keep working. Rows stay reachable by keyboard through
+   * whatever link or button the row itself holds.
+   */
+  onRowClick?: (row: TData) => void
+  /** Checkbox column and the bulk bar at the foot (7.6). */
+  selection?: DataTableSelection<TData>
+  /** Keep the header in view while the table scrolls inside `maxHeight` (7.6). */
+  stickyHeader?: boolean
+  /** The scroll height for `stickyHeader`, such as "60vh". */
+  maxHeight?: string
+  /** One cell per visible column, for money totals; rendered as the table's foot. */
+  totals?: React.ReactNode[]
   /** Trailing actions cell render-prop, matching the previous DataTable's convention. */
   rowActions?: (row: TData) => React.ReactNode
   isLoading?: boolean
@@ -347,11 +381,110 @@ const tableFeatures = {
   columnMeta: {} as { className?: string },
 }
 
+/** A click on one of these inside a row is that control's, not the row's. */
+function isInteractiveTarget(target: EventTarget): boolean {
+  return (
+    target instanceof Element &&
+    target.closest('a,button,input,select,textarea,label,[role="button"],[role="menuitem"],[role="checkbox"],[role="switch"]') !== null
+  )
+}
+
+type SelectionRef<TData> = React.RefObject<{
+  selection?: DataTableSelection<TData>
+  data: TData[]
+  getRowId?: (row: TData, index: number) => string
+}>
+
+function pageRowIds<TData>(latest: SelectionRef<TData>): string[] {
+  const { data, getRowId } = latest.current
+  return data.map((row, index) => (getRowId ? getRowId(row, index) : String(index)))
+}
+
+function SelectAllCell<TData>({ latest }: { latest: SelectionRef<TData> }) {
+  const { selection } = latest.current
+  if (!selection) return null
+  const ids = pageRowIds(latest)
+  const chosen = ids.filter((id) => selection.selected.has(id)).length
+  return (
+    <Checkbox
+      aria-label={selection.labels?.selectAll ?? "Select all"}
+      checked={chosen === 0 ? false : chosen === ids.length ? true : "indeterminate"}
+      onCheckedChange={(checked) => {
+        const next = new Set(selection.selected)
+        for (const id of ids) {
+          if (checked === true) next.add(id)
+          else next.delete(id)
+        }
+        selection.onSelectedChange(next)
+      }}
+    />
+  )
+}
+
+function SelectRowCell<TData>({ latest, rowId }: { latest: SelectionRef<TData>; rowId: string }) {
+  const { selection } = latest.current
+  if (!selection) return null
+  return (
+    <Checkbox
+      aria-label={selection.labels?.selectRow ?? "Select row"}
+      checked={selection.selected.has(rowId)}
+      onCheckedChange={(checked) => {
+        const next = new Set(selection.selected)
+        if (checked === true) next.add(rowId)
+        else next.delete(rowId)
+        selection.onSelectedChange(next)
+      }}
+    />
+  )
+}
+
+/** `.wy-bulkbar`: the dark bar with the count, the total, the actions and Clear. */
+function BulkBar<TData>({
+  selection,
+  data,
+  getRowId,
+}: {
+  selection: DataTableSelection<TData>
+  data: TData[]
+  getRowId?: (row: TData, index: number) => string
+}) {
+  const count = selection.selected.size
+  const rows = data.filter((row, index) => selection.selected.has(getRowId ? getRowId(row, index) : String(index)))
+  return (
+    <div
+      data-slot="data-table-bulk-bar"
+      role="region"
+      aria-live="polite"
+      className="sticky bottom-4 z-[2] mt-3 flex flex-wrap items-center gap-2 rounded-control-lg bg-foreground py-2 ps-3.5 pe-2.5 text-sm text-background shadow-float"
+    >
+      <span className="me-auto font-semibold tabular-nums">
+        {selection.labels?.count?.(count) ?? `${count} selected`}
+        {selection.summary && <span className="ms-2 font-normal">{selection.summary(rows)}</span>}
+      </span>
+      {selection.actions}
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="text-background hover:bg-background/15"
+        onClick={() => selection.onSelectedChange(new Set())}
+      >
+        {selection.labels?.clear ?? "Clear"}
+      </Button>
+    </div>
+  )
+}
+
 export function DataTable<TData>({
   columns,
   data,
   getRowId,
   rowActions,
+  onRowClick,
+  selection,
+  stickyHeader = false,
+  maxHeight,
+  totals,
   isLoading = false,
   overrideContent,
   emptyState,
@@ -460,8 +593,9 @@ export function DataTable<TData>({
   // detached mid-click. So the function handed to the table never changes, and
   // reads the caller's current closures here when it runs. Assigned during render
   // rather than in an effect because the cells render in this same pass.
-  const latestCells = React.useRef({ columns, rowActions })
-  latestCells.current = { columns, rowActions }
+  const latestCells = React.useRef({ columns, rowActions, selection, data, getRowId })
+  latestCells.current = { columns, rowActions, selection, data, getRowId }
+  const hasSelection = selection !== undefined
   const cellRenderers = React.useRef(new Map<string, CellRenderer<TableRow<TData>>>())
   const stableCell = (id: string, render: CellRenderer<TableRow<TData>>) => {
     const existing = cellRenderers.current.get(id)
@@ -509,9 +643,20 @@ export function DataTable<TData>({
         enableHiding: false,
       })
     }
+    if (hasSelection) {
+      defs.unshift({
+        id: "__select",
+        header: () => <SelectAllCell latest={latestCells} />,
+        cell: stableCell("__select", (info) => <SelectRowCell latest={latestCells} rowId={info.row.id} />),
+        enableSorting: false,
+        enableColumnFilter: false,
+        enableHiding: false,
+        meta: { className: "w-10" },
+      })
+    }
     return defs
     // `stableCell` only touches a ref, so it needs no place here.
-  }, [columns, rowActions, rowActionsLabel])
+  }, [columns, rowActions, rowActionsLabel, hasSelection])
 
   const table = useTable<TableFeatureSet, TableRow<TData>>({
     features: tableFeatures,
@@ -726,12 +871,15 @@ export function DataTable<TData>({
       ) : rows.length === 0 ? (
         <EmptyState title={emptyStateTitle} {...emptyState} />
       ) : (
-        <div className="overflow-hidden rounded-lg border border-border">
+        <div
+          className={cn("rounded-card border border-border bg-card", maxHeight ? "overflow-auto" : "overflow-hidden")}
+          style={maxHeight ? { maxHeight } : undefined}
+        >
           <Table
             aria-label={ariaLabel}
             style={enableColumnResizing ? { width: table.getCenterTotalSize() } : undefined}
           >
-            <TableHeader>
+            <TableHeader className={stickyHeader ? "sticky top-0 z-[1]" : undefined}>
               {table.getHeaderGroups().map((headerGroup) => (
                 <TableRow key={headerGroup.id}>
                   {headerGroup.headers.map((header) => {
@@ -884,7 +1032,21 @@ export function DataTable<TData>({
             </TableHeader>
             <TableBody>
               {rows.map((row) => (
-                <TableRow key={row.id}>
+                <TableRow
+                  key={row.id}
+                  aria-selected={selection ? selection.selected.has(row.id) : undefined}
+                  className={cn(
+                    onRowClick && "cursor-pointer",
+                    selection?.selected.has(row.id) && "bg-primary-tint hover:bg-primary-tint"
+                  )}
+                  onClick={
+                    onRowClick
+                      ? (event) => {
+                          if (!isInteractiveTarget(event.target)) onRowClick(row.original)
+                        }
+                      : undefined
+                  }
+                >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell
                       key={cell.id}
@@ -897,8 +1059,25 @@ export function DataTable<TData>({
                 </TableRow>
               ))}
             </TableBody>
+            {totals && (
+              <TableFooter>
+                <TableRow>
+                  {hasSelection && <TableCell />}
+                  {totals.map((cell, index) => (
+                    <TableCell key={index} className="font-medium">
+                      {cell}
+                    </TableCell>
+                  ))}
+                  {rowActions && <TableCell />}
+                </TableRow>
+              </TableFooter>
+            )}
           </Table>
         </div>
+      )}
+
+      {selection && selection.selected.size > 0 && (
+        <BulkBar selection={selection} data={data} getRowId={getRowId} />
       )}
 
       {pagination && rows.length > 0 && (

@@ -278,7 +278,7 @@ const Slider = React.forwardRef<
               )}
             </div>
             {showValueBadge && (!showInput || !!formatValue) && (
-              <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[0.6875rem] font-semibold text-muted-foreground">
+              <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs font-semibold text-muted-foreground">
                 {renderDisplayVal()}
               </span>
             )}
@@ -286,9 +286,9 @@ const Slider = React.forwardRef<
         )}
         {renderCombinedSlider()}
         {errorText ? (
-          <p className="text-[0.6875rem] font-medium text-destructive">{errorText}</p>
+          <p className="text-xs font-medium text-destructive">{errorText}</p>
         ) : (
-          helperText && <p className="text-[0.6875rem] text-muted-foreground">{helperText}</p>
+          helperText && <p className="text-xs text-muted-foreground">{helperText}</p>
         )}
       </div>
     )

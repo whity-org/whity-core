@@ -512,7 +512,7 @@ function VersionBar({
       {/* The checksum is on the wire precisely so a reader can prove the bytes
           are the bytes that were issued. Truncated for the eye, complete in the
           title, so verifying is a copy rather than a second request. */}
-      <p className="font-mono text-[0.65rem] text-muted-foreground" title={artifact.checksum_sha256}>
+      <p className="font-mono text-xs text-muted-foreground" title={artifact.checksum_sha256}>
         {t('blocks.documentViewer.checksum', 'SHA-256 {digest}', {
           digest: artifact.checksum_sha256.slice(0, 16) + '…',
         })}

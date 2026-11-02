@@ -1,3 +1,6 @@
+import { ConfirmAction } from "./confirm-action"
+import { AccessDeniedPanel, AreaError, EmptyFiltered, EmptyFirstTime, LoadingRows, ReadOnlyNotice } from "./page-states"
+import { Stepper as StepperComponent } from "./stepper"
 import type { Meta, StoryObj } from "@storybook/react-vite"
 import * as React from "react"
 
@@ -455,4 +458,94 @@ export const EditorShellCard: Story = {
   name: "EditorShell",
   parameters: { designCard: { name: "EditorShell", width: 1280, height: 820 } },
   render: () => <EditorCard />,
+}
+
+/** docs/design/components/PatternStates: the six states, drawn once. */
+function StateCell({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="grid content-start gap-3">
+      <p className="font-mono text-xs tracking-wide uppercase text-muted-foreground">{title}</p>
+      <div className="rounded-card border border-border bg-card p-4">{children}</div>
+    </div>
+  )
+}
+
+export const PatternStates: Story = {
+  name: "PatternStates",
+  parameters: { designCard: { name: "PatternStates", width: 1280, height: 723 } },
+  render: () => (
+    <div className="grid grid-cols-3 gap-4 px-4 py-4">
+      <StateCell title="Loading">
+        <LoadingRows label="Loading people" headers={["Person", "Role", "Last active"]} />
+      </StateCell>
+      <StateCell title="Empty, first time">
+        <EmptyFirstTime
+          icon="users"
+          title="No one here yet"
+          description="Invite your team. They'll get an email to set a password."
+          action={<Button icon="mail">Invite people</Button>}
+        />
+      </StateCell>
+      <StateCell title="Empty after a filter">
+        <EmptyFiltered
+          title="No one matches “Khalda”"
+          description="Try another name, or clear the filters."
+          clearLabel="Clear filters"
+          onClear={() => {}}
+        />
+      </StateCell>
+      <StateCell title="Error">
+        <AreaError
+          message="People didn't load. Your connection or our server had a problem."
+          retryLabel="Try again"
+          onRetry={() => {}}
+        />
+      </StateCell>
+      <StateCell title="Read-only">
+        <ReadOnlyNotice
+          title="You can view this role but not change it"
+          description="Changing roles needs permission to manage roles. Ask an owner or admin."
+        />
+      </StateCell>
+      <StateCell title="Access denied">
+        <AccessDeniedPanel
+          title="You don't have access to Users"
+          description="Seeing people needs permission to view users. Rana Haddad and 1 other can give it to you."
+          askLabel="Ask for access"
+          onAsk={() => {}}
+        />
+      </StateCell>
+    </div>
+  ),
+}
+
+/** docs/design/components/PatternConfirm: tier 3, typing the name. */
+export const PatternConfirm: Story = {
+  name: "PatternConfirm",
+  parameters: { designCard: { name: "PatternConfirm", width: 1280, height: 560 } },
+  render: () => (
+    <ConfirmAction
+      open
+      onOpenChange={() => {}}
+      title="Clear two-step for Hala Mansour?"
+      description="This removes her authenticator and recovery codes and emails her a reset link. Until she sets them up again, her password alone signs her in. It's logged with your name."
+      confirmLabel="Clear two-step"
+      cancelLabel="Cancel"
+      onConfirm={() => {}}
+      typeToConfirm={{ value: "hala@examplebakery.jo", label: "Type hala@examplebakery.jo to confirm" }}
+    />
+  ),
+}
+
+export const Stepper: Story = {
+  parameters: card("Stepper", 200),
+  render: () => (
+    <Root>
+      <StepperComponent
+        label="Set up"
+        current={1}
+        steps={[{ label: "Access" }, { label: "Plan" }, { label: "Set up" }, { label: "Done" }]}
+      />
+    </Root>
+  ),
 }

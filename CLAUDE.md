@@ -12,5 +12,5 @@
 - Example data uses Example Bakery and friends; plan names and prices stay `[plan name]` and `[price]`.
 - The reference for screens is `docs/design/components/` (each card's `README.md`, `index.html`) and `docs/design/screenshots/`; `13-app-map.md` maps each route to its cards. Compare built screens with the screenshots in both themes before calling UI work done.
 - Work one milestone per branch and pull request (`PLAN.md`), and stop for approval between milestones.
+- Use the size tokens and `text-xs`, `text-sm` and the control sizes, never fixed sizes; the 13px floor and Larger text depend on it.
 - The document editor: section 18, `docs/design/handoff/editor/` (contract and TipTap mapping) and `docs/design/PLAN.md`.
-- Until milestone A0 lands, the code is still at 14px text, 36px controls and 44px rows. Use the size tokens, never fixed sizes, so A0 moves them.

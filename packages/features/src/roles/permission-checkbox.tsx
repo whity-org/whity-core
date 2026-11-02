@@ -192,7 +192,7 @@ export function PermissionCheckbox({ permissions, selectedIds, onChange, t }: Pe
                         className="flex flex-1 items-center justify-between text-start"
                       >
                         <span className="text-xs font-semibold uppercase tracking-wide text-foreground">{titleCase(group)}</span>
-                        <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
                           {inGroup}/{perms.length}
                           <IconChevronDown size={12} className={`transition-transform ${isCollapsed ? '-rotate-90' : ''}`} />
                         </span>

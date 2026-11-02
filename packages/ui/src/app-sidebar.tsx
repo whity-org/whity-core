@@ -302,7 +302,7 @@ export function AppSidebar({
                 aria-expanded={open}
                 aria-controls={bodyId}
                 onClick={() => toggleGroup(group.id)}
-                className="flex w-full items-center gap-1 rounded-md px-2 py-1 text-[0.6875rem] font-semibold tracking-wider text-muted-foreground uppercase outline-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                className="flex w-full items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground outline-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-ring"
               >
                 {open ? (
                   <IconChevronDown className="size-3 shrink-0" />
@@ -313,7 +313,7 @@ export function AppSidebar({
               </button>
             )}
             {showHeading && !isDisclosure && (
-              <div className="px-2 py-1 text-[0.6875rem] font-semibold tracking-wider text-muted-foreground uppercase">
+              <div className="px-2 py-1 text-xs font-medium text-muted-foreground">
                 {group.label}
               </div>
             )}
@@ -357,7 +357,7 @@ export function AppSidebar({
                     {count > 0 && !collapsed && (
                       <span
                         data-slot="app-sidebar-count"
-                        className="rounded-full bg-primary px-1.5 py-px text-[0.6875rem] leading-4 font-semibold text-primary-foreground tabular-nums"
+                        className="rounded-full bg-primary px-1.5 py-px text-xs leading-4 font-semibold text-primary-foreground tabular-nums"
                       >
                         <span aria-hidden="true">{count}</span>
                         <span className="sr-only">{countText}</span>

@@ -72,7 +72,7 @@ export function StatsChart({
                   opacity: 0.7 + (i / data.length) * 0.3
                 }}
               />
-              <div className="absolute bottom-full mb-2 hidden group-hover:block bg-popover text-popover-foreground text-[10px] px-1.5 py-0.5 rounded border shadow-sm whitespace-nowrap z-10">
+              <div className="absolute bottom-full mb-2 hidden group-hover:block bg-popover text-popover-foreground text-xs px-1.5 py-0.5 rounded border shadow-sm whitespace-nowrap z-10">
                 {tooltipLabel(d.count, label)}
               </div>
             </div>
@@ -80,7 +80,7 @@ export function StatsChart({
         })}
       </div>
       {axisLabels ? (
-        <div className="flex justify-between mt-2 px-2 text-[10px] text-muted-foreground border-t pt-2">
+        <div className="flex justify-between mt-2 px-2 text-xs text-muted-foreground border-t pt-2">
           <span>{axisLabels.start}</span>
           <span>{axisLabels.end}</span>
         </div>

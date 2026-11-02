@@ -42,7 +42,7 @@ export function BarcodeSvg({
 
   if (svg === null) {
     return (
-      <div className="flex h-full w-full items-center justify-center rounded-sm border border-dashed border-border bg-muted/30 text-[8px] text-muted-foreground">
+      <div className="flex h-full w-full items-center justify-center rounded-sm border border-dashed border-border bg-muted/30 text-xs text-muted-foreground">
         {value.trim() === '' ? 'no value' : 'invalid for symbology'}
       </div>
     );

@@ -24015,6 +24015,176 @@
                 }
             }
         },
+        "/api/v1/me/display-preferences": {
+            "get": {
+                "operationId": "get_api_v1_me_display_preferences",
+                "summary": "The caller's text size and Show technical details",
+                "tags": [
+                    "profile"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The caller's display preferences",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DisplayPreferencesResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "put": {
+                "operationId": "put_api_v1_me_display_preferences",
+                "summary": "Change the caller's text size, Show technical details, or both",
+                "tags": [
+                    "profile"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DisplayPreferencesUpdateRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The caller's updated display preferences",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DisplayPreferencesResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Nothing to change, or a value that isn't allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/me/emails": {
             "get": {
                 "operationId": "get_api_v1_me_emails",
@@ -47762,6 +47932,51 @@
                     "already_present",
                     "rejected"
                 ]
+            },
+            "DisplayPreferences": {
+                "type": "object",
+                "properties": {
+                    "textSize": {
+                        "type": "string",
+                        "enum": [
+                            "standard",
+                            "larger"
+                        ]
+                    },
+                    "showTechnicalDetails": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "textSize",
+                    "showTechnicalDetails"
+                ]
+            },
+            "DisplayPreferencesResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/DisplayPreferences"
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "DisplayPreferencesUpdateRequest": {
+                "type": "object",
+                "properties": {
+                    "textSize": {
+                        "type": "string",
+                        "enum": [
+                            "standard",
+                            "larger"
+                        ]
+                    },
+                    "showTechnicalDetails": {
+                        "type": "boolean"
+                    }
+                }
             },
             "Document": {
                 "type": "object",

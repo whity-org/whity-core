@@ -139,7 +139,7 @@ export function SettingsArea({ children }: { children: ReactNode }) {
         <div className="flex gap-4 overflow-x-auto pb-2 md:grid md:gap-3 md:overflow-visible md:pb-0">
           {groups.map((group) => (
             <div key={group.id} className="grid shrink-0 content-start gap-px">
-              <p className="px-2 py-1 text-[0.6875rem] font-semibold tracking-wider text-muted-foreground uppercase">
+              <p data-settings-group className="px-2 py-1 text-xs font-medium text-muted-foreground">
                 {group.label}
               </p>
               {group.links.map((link) => {

@@ -2587,6 +2587,34 @@ final class CoreApiSchemas
                     ] + self::authErrors(),
                 ],
             ],
+            [
+                'method' => 'GET',
+                'path' => '/api/me/display-preferences',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'The caller\'s text size and Show technical details',
+                    'tags' => ['profile'],
+                    'responses' => [
+                        200 => self::jsonResponse('The caller\'s display preferences', 'DisplayPreferencesResponse'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'PUT',
+                'path' => '/api/me/display-preferences',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Change the caller\'s text size, Show technical details, or both',
+                    'tags' => ['profile'],
+                    'request' => 'DisplayPreferencesUpdateRequest',
+                    'responses' => [
+                        200 => self::jsonResponse('The caller\'s updated display preferences', 'DisplayPreferencesResponse'),
+                        422 => self::errorResponse('Nothing to change, or a value that isn\'t allowed'),
+                    ] + self::authErrors(),
+                ],
+            ],
         ];
     }
 
@@ -7894,6 +7922,17 @@ final class CoreApiSchemas
                 'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('NotificationPreferenceEntry')],
                 'transactional_prefixes' => ['type' => 'array', 'items' => self::str()],
             ], ['data', 'transactional_prefixes']),
+            'DisplayPreferences' => self::object([
+                'textSize' => ['type' => 'string', 'enum' => ['standard', 'larger']],
+                'showTechnicalDetails' => self::bool(),
+            ], ['textSize', 'showTechnicalDetails']),
+            'DisplayPreferencesResponse' => self::object([
+                'data' => SchemaBuilder::ref('DisplayPreferences'),
+            ], ['data']),
+            'DisplayPreferencesUpdateRequest' => self::object([
+                'textSize' => ['type' => 'string', 'enum' => ['standard', 'larger']],
+                'showTechnicalDetails' => self::bool(),
+            ], []),
             'NotificationPreferencesUpdateRequest' => self::object([
                 'preferences' => ['type' => 'array', 'items' => SchemaBuilder::ref('NotificationPreferenceEntry'), 'description' => 'Entries of `{type, channel, enabled}` to set for the signed-in user. Transactional notification types cannot be turned off.'],
             ], ['preferences']),

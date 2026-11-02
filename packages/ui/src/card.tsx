@@ -45,15 +45,15 @@ function Card({
 
   // Elevated solid background & shadow styling according to variant
   const variantClasses = {
-    default: "bg-card text-card-foreground shadow-2xs border border-border/60 ring-0",
-    flat: "bg-card text-card-foreground shadow-2xs border border-border/40 ring-0",
+    default: "bg-card text-card-foreground border border-border ring-0",
+    flat: "bg-card text-card-foreground border border-border ring-0",
     outline: "bg-card/60 text-card-foreground border border-border ring-0",
-    elevated: "bg-card text-card-foreground shadow-md border border-border/60 ring-0",
-    purple: "bg-card text-card-foreground shadow-2xs border border-purple-500/25 dark:bg-purple-950/20 dark:border-purple-500/35 ring-0",
-    info: "bg-card text-card-foreground shadow-2xs border border-blue-500/25 dark:bg-blue-950/20 dark:border-blue-500/35 ring-0",
-    success: "bg-card text-card-foreground shadow-2xs border border-emerald-500/25 dark:bg-emerald-950/20 dark:border-emerald-500/35 ring-0",
-    warning: "bg-card text-card-foreground shadow-2xs border border-amber-500/25 dark:bg-amber-950/25 dark:border-amber-500/30 ring-0",
-    destructive: "bg-card text-card-foreground shadow-2xs border border-red-500/25 dark:bg-red-950/20 dark:border-red-500/35 ring-0",
+    elevated: "bg-card text-card-foreground border border-border ring-0",
+    purple: "bg-primary-tint text-card-foreground border border-transparent ring-0",
+    info: "bg-info-tint text-card-foreground border border-transparent ring-0",
+    success: "bg-success-tint text-card-foreground border border-transparent ring-0",
+    warning: "bg-warning-tint text-card-foreground border border-warning/40 ring-0",
+    destructive: "bg-error-tint text-card-foreground border border-transparent ring-0",
   }[variant]
 
   // Border style modifier
