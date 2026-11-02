@@ -118,6 +118,12 @@ services:
       # match the render service's own and be >= 32 chars once both are up.
       RENDER_SERVICE_URL: ${RENDER_SERVICE_URL:-http://render:8130}
       RENDER_SHARED_SECRET: ${RENDER_SHARED_SECRET:-}
+      # Everything people upload, and every rendered PDF. The default path is
+      # inside the container, so without the volume below those files are lost
+      # whenever the container is recreated, which every image update does.
+      STORAGE_ROOT: /app/storage
+    volumes:
+      - storage_data_staging:/app/storage
     depends_on:
       postgres:
         condition: service_healthy
@@ -222,3 +228,4 @@ services:
 
 volumes:
   postgres_data_staging:
+  storage_data_staging:
