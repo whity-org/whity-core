@@ -1,0 +1,55 @@
+<!-- @dsCard group="Templates · Documents and routing" height=900 width=1280 subtitle="D.2: a top-down flow with branches side by side, and the selected stage’s settings beside it" -->
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Route flow editor</title><style>html,body{height:100%} #root{min-height:100%} </style></head>
+<body>
+<div id="root"></div>
+<script>
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 16 }); }
+  var NAVL = {};
+  function L(s) { return NAVL[s] || s; }
+  /* The sidebar as built (inventory, 1 Nov 2026), in sentence case; only the current group is open (2.5). */
+  var GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['approval', 'Approvals', 3], ['form', 'My submissions']]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations'], ['user', 'Family relations'], ['two-step', 'Approval gating']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['routing', 'Route templates'], ['page', 'Notes and wiki'], ['form', 'Form builder'], ['list-todo', 'Forms']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]],
+    ['Platform', [['tenant', 'Tenants'], ['money', 'Plans and pricing'], ['receipt', 'Promotions'], ['chart', 'System'], ['error', 'Errors'], ['notification', 'Notification delivery']]]];
+  function appNav(active, o) { o = o || {};
+    return GROUPS.filter(function (g) { return g[0] !== 'Platform' || o.operator; }).map(function (g) {
+      var has = g[1].some(function (x) { return x[1] === active; });
+      return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
+  var topBar = h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' }));
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: o.tenant || 'Example Bakery', user: o.user || 'Rana Haddad', role: o.role || 'Owner', nav: appNav(active, o), topActions: topBar, searchLabel: o.search, dir: o.dir }, kids); }
+  function person(name, sub, o) { o = o || {}; return h('div', { className: 'wy-person' }, h(W.Avatar, { name: name, size: o.size || 28, kind: o.kind }), h('div', { style: { minWidth: 0 } }, h('b', null, name), sub ? h('small', null, sub) : null)); }
+  function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
+  function recHead(o) { return h('div', { className: 'wy-rech' }, o.avatar || h('span', { className: 'wy-rech__ic', 'aria-hidden': 'true' }, I(o.icon || 'document', 26)),
+      h('div', { style: { minWidth: 0 } }, h('h1', null, o.title, o.badges || null), h('div', { className: 'wy-rech__facts' }, (o.facts || []).map(function (f, i) { return h('span', { key: i }, f[0] ? I(f[0], 14) : null, f[1]); }))),
+      h('div', { className: 'wy-rech__acts' }, o.actions || null)); }
+  function saveBar(text, L2) { L2 = L2 || {}; return h('div', { className: 'wy-savebar', role: 'region', 'aria-label': L2.label || 'Unsaved changes' }, I('edit'), h('span', null, text), h(W.Button, { variant: 'ghost' }, L2.discard || 'Discard'), h(W.Button, null, L2.save || 'Save changes')); }
+  function node(o) { return h('div', { className: 'wy-fnode' + (o.on ? ' is-on' : '') }, h('b', null, o.t), h('small', null, o.d), o.tags ? h('div', { className: 'wy-fnode__tags' }, o.tags) : null); }
+  function arrow(label) { return h('div', { className: 'wy-farrow' }, label ? h('span', null, label) : null); }
+  var canvas = h('div', { className: 'wy-flowed__canvas' },
+    h('div', { className: 'wy-fnode is-start' }, I('send', 14), 'A purchase order is sent'), arrow(),
+    node({ t: '1 · Branch manager checks', d: 'The manager of the sender’s unit', tags: [h(W.Badge, { key: 1, variant: 'secondary' }, 'Any one decides')] }), arrow(),
+    node({ t: '2 · Owner approval', d: 'Rana Haddad', on: true, tags: [h(W.Badge, { key: 1, variant: 'secondary' }, 'Decision'), h(W.Badge, { key: 2, variant: 'outline' }, 'Only over JOD 1,000')] }), arrow(),
+    h('div', { className: 'wy-fbranch' },
+      h('div', null, arrow('Approved'), node({ t: '3 · Finance records it', d: 'Lina Saad', tags: [h(W.Badge, { key: 1, variant: 'outline' }, 'Sent, not asked')] }), arrow(), h('div', { className: 'wy-fnode is-end' }, I('success', 14), 'Done')),
+      h('div', null, arrow('Rejected'), node({ t: 'Back to the sender', d: 'With the note' }), arrow(), h('div', { className: 'wy-fnode is-end' }, I('close', 14), 'Ends here'))),
+    h('div', { className: 'wy-fadd2' }, h(W.Button, { variant: 'outline', size: 'sm', icon: 'plus' }, 'Add a stage')));
+  var panel = h('aside', { className: 'wy-flowed__panel', 'aria-label': 'Stage settings' }, h('h3', null, 'Stage 2'),
+    h(W.Input, { label: 'Name', defaultValue: 'Owner approval' }),
+    h(W.Select, { label: 'Who it goes to', defaultValue: 'p', options: [{ value: 'p', label: 'A person: Rana Haddad' }, { value: 'r', label: 'A role' }, { value: 'g', label: 'A group' }, { value: 'm', label: 'The sender’s manager' }], helperText: 'Reaches 1 person today.' }),
+    h(W.RadioGroup, { label: 'What they do', defaultValue: 'd', options: [{ value: 'd', label: 'Decide: approve or reject' }, { value: 's', label: 'Receive it, no decision' }] }),
+    h(W.Select, { label: 'Counts as approved when', defaultValue: 'one', options: [{ value: 'one', label: 'Any one approves' }, { value: 'all', label: 'Everyone approves' }] }),
+    h(W.Select, { label: 'Only when', defaultValue: 'amt', options: [{ value: 'always', label: 'Always' }, { value: 'amt', label: 'Amount is over JOD 1,000' }] }),
+    h(W.Button, { variant: 'ghost', icon: 'delete' }, 'Remove this stage'));
+  ReactDOM.createRoot(document.getElementById('root')).render(shell('Route templates', h(F, null,
+    h(W.Breadcrumb, { items: [{ label: 'Route templates' }, { label: 'Purchase orders' }] }),
+    recHead({ icon: 'routing', title: 'Purchase orders', facts: [['routing', '3 stages'], ['clock', 'Used 46 times'], ['user', 'Changed 3 Oct by Rana Haddad']], actions: h(F, null, h(W.Button, { variant: 'outline' }, 'Rename'), h(W.Button, null, 'Save route')) }),
+    h('div', { className: 'wy-flowed' }, canvas, panel))));
+</script>
+</body>
+</html>

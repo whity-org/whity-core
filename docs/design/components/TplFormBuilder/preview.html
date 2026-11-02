@@ -1,0 +1,66 @@
+<!-- @dsCard group="Templates · Forms" height=1322 width=1280 subtitle="F.1: the form as it will look, edited in place, with the selected question’s settings beside it" -->
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Form builder</title><style>html,body{height:100%} #root{min-height:100%} </style></head>
+<body>
+<div id="root"></div>
+<script>
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 16 }); }
+  var NAVL = {};
+  function L(s) { return NAVL[s] || s; }
+  /* The sidebar as built (inventory, 1 Nov 2026), in sentence case; only the current group is open (2.5). */
+  var GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['approval', 'Approvals', 3], ['form', 'My submissions']]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations'], ['user', 'Family relations'], ['two-step', 'Approval gating']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['routing', 'Route templates'], ['page', 'Notes and wiki'], ['form', 'Form builder'], ['list-todo', 'Forms']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]],
+    ['Platform', [['tenant', 'Tenants'], ['money', 'Plans and pricing'], ['receipt', 'Promotions'], ['chart', 'System'], ['error', 'Errors'], ['notification', 'Notification delivery']]]];
+  function appNav(active, o) { o = o || {};
+    return GROUPS.filter(function (g) { return g[0] !== 'Platform' || o.operator; }).map(function (g) {
+      var has = g[1].some(function (x) { return x[1] === active; });
+      return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
+  var topBar = h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' }));
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: o.tenant || 'Example Bakery', user: o.user || 'Rana Haddad', role: o.role || 'Owner', nav: appNav(active, o), topActions: topBar, searchLabel: o.search, dir: o.dir }, kids); }
+  function person(name, sub, o) { o = o || {}; return h('div', { className: 'wy-person' }, h(W.Avatar, { name: name, size: o.size || 28, kind: o.kind }), h('div', { style: { minWidth: 0 } }, h('b', null, name), sub ? h('small', null, sub) : null)); }
+  function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
+  function recHead(o) { return h('div', { className: 'wy-rech' }, o.avatar || h('span', { className: 'wy-rech__ic', 'aria-hidden': 'true' }, I(o.icon || 'document', 26)),
+      h('div', { style: { minWidth: 0 } }, h('h1', null, o.title, o.badges || null), h('div', { className: 'wy-rech__facts' }, (o.facts || []).map(function (f, i) { return h('span', { key: i }, f[0] ? I(f[0], 14) : null, f[1]); }))),
+      h('div', { className: 'wy-rech__acts' }, o.actions || null)); }
+  function saveBar(text, L2) { L2 = L2 || {}; return h('div', { className: 'wy-savebar', role: 'region', 'aria-label': L2.label || 'Unsaved changes' }, I('edit'), h('span', null, text), h(W.Button, { variant: 'ghost' }, L2.discard || 'Discard'), h(W.Button, null, L2.save || 'Save changes')); }
+  function builder(T) {
+    function q(o) { return h('div', { className: 'wy-q' + (o.on ? ' is-on' : '') },
+      o.on ? h('div', { className: 'wy-q__tools' }, h(W.IconButton, { icon: 'drag', label: T.move, size: 'sm' }), h(W.IconButton, { icon: 'copy', label: T.dup, size: 'sm' }), h(W.IconButton, { icon: 'delete', label: T.del, size: 'sm' })) : null,
+      h('span', { className: 'wy-q__type' }, I(o.icon, 14), o.type),
+      h('div', { className: 'wy-q__title' }, h('span', { className: 'wy-q__n' }, o.n), o.t, o.req ? h('span', { className: 'wy-q__req', 'aria-label': T.required }, '*') : null),
+      o.help ? h('div', { className: 'wy-q__help' }, o.help) : null, o.logic ? h('span', { className: 'wy-q__logic' }, I('routing', 12), o.logic) : null, o.body); }
+    var canvas = h('div', { className: 'wy-fb__canvas' },
+      h('div', { className: 'wy-fhead' }, h('h2', null, T.title), h('p', null, T.desc)),
+      h('div', { className: 'wy-fsec' }, h('b', null, T.sec1), h('span', null, T.sec1d)),
+      q({ n: '1', t: T.q1, req: true, icon: 'text', type: T.short, body: h('div', { className: 'wy-q__fake' }, T.shortAns) }),
+      q({ n: '2', t: T.q2, req: true, on: true, icon: 'list-bullet', type: T.one, help: T.q2h, body: h('div', { className: 'wy-q__opts' }, [T.o1, T.o2, T.o3, T.o4].map(function (o) { return h('span', { key: o }, h('i'), o); })) }),
+      q({ n: '3', t: T.q3, icon: 'text', type: T.long, logic: T.q3l, body: h('div', { className: 'wy-q__fake', style: { height: 56 } }, T.longAns) }),
+      h('div', { className: 'wy-fadd' }, h(W.Button, { variant: 'outline', size: 'sm', icon: 'plus' }, T.add)),
+      h('div', { className: 'wy-fsec' }, h('b', null, T.sec2), h('span', null, T.sec2d)),
+      q({ n: '4', t: T.q4, req: true, icon: 'upload', type: T.file, body: h('div', { className: 'wy-q__fake' }, I('upload', 14), ' ', T.fileAns) }));
+    var panel = h('aside', { className: 'wy-fb__panel', 'aria-label': T.qset },
+      h('h3', null, T.qset, h(W.Badge, { variant: 'secondary' }, T.qn)),
+      h(W.Select, { label: T.typeL, defaultValue: 'one', options: [{ value: 'one', label: T.one }, { value: 'sev', label: T.several }, { value: 's', label: T.short }] }),
+      h(W.Input, { label: T.qL, defaultValue: T.q2 }), h(W.Textarea, { label: T.helpL, defaultValue: T.q2h, rows: 2 }),
+      h('div', { style: { display: 'grid', gap: 6 } }, h('div', { className: 'wy-field__label' }, T.optsL), [T.o1, T.o2, T.o3, T.o4].map(function (o) { return h('div', { key: o, className: 'wy-optrow' }, I('drag', 14), h('input', { className: 'wy-input', defaultValue: o, 'aria-label': T.optsL }), h(W.IconButton, { icon: 'close', label: T.del, size: 'sm' })); }),
+        h(W.Checkbox, { label: T.other })),
+      h('div', { className: 'wy-fb__sep' }), h(W.Switch, { label: T.required, defaultChecked: true }),
+      h(W.Select, { label: T.showL, defaultValue: 'a', options: [{ value: 'a', label: T.always }, { value: 'i', label: T.onlyIf }] }),
+      h(W.Select, { label: T.saveL, defaultValue: 'c', helperText: T.saveH, options: [{ value: 'c', label: T.saveV }] }));
+    return h(F, null, h(W.Breadcrumb, { items: [{ label: T.fb }, { label: T.title }] }),
+      recHead({ icon: 'form', title: T.title, badges: h(W.Badge, { variant: 'secondary' }, T.draft), facts: [['world', T.f1], ['routing', T.f2], ['clock', T.f3]],
+        actions: h(F, null, h(W.Button, { variant: 'outline', icon: 'view' }, T.preview), h(W.Button, { icon: 'send' }, T.publish)) }),
+      h('div', { className: 'wy-rectabs' }, h(W.Tabs, { items: [{ value: 'q', label: T.tq }, { value: 'r', label: T.tr, count: 12 }, { value: 's', label: T.ts }], defaultValue: 'q' })),
+      h('div', { className: 'wy-fb' }, canvas, panel));
+  }
+
+  ReactDOM.createRoot(document.getElementById('root')).render(shell('Form builder', builder({ move: 'Move', dup: 'Duplicate', del: 'Delete', required: 'Required', title: 'Become a supplier', desc: 'Tell us about your company. We reply within 3 working days.', sec1: 'Section 1 · Your company', sec1d: '3 questions', q1: 'Company name', short: 'Short text', shortAns: 'Short answer', q2: 'What do you supply?', one: 'Choose one', several: 'Choose several', long: 'Long text', file: 'File', q2h: 'Pick the closest. You can explain below.', o1: 'Ingredients', o2: 'Packaging', o3: 'Equipment', o4: 'Cleaning and hygiene', q3: 'Tell us more about your equipment', q3l: 'Only if “Equipment” is chosen', longAns: 'Long answer', add: 'Add question', sec2: 'Section 2 · Documents', sec2d: '1 question', q4: 'Trade licence', fileAns: 'PDF, PNG or JPG up to 10 MB', qset: 'Question', qn: 'Question 2', typeL: 'Type', qL: 'Question', helpL: 'Help text', optsL: 'Options', other: 'Add an “Other” option', showL: 'Show this question', always: 'Always', onlyIf: 'Only if…', saveL: 'Save the answer to', saveH: 'Answers can fill a field on the supplier record.', saveV: 'Supplier › Category', fb: 'Form builder', draft: 'Draft', f1: 'Public link', f2: 'Routed to Lina Saad', f3: 'Changed 10 min ago', preview: 'Preview', publish: 'Publish', tq: 'Questions', tr: 'Responses', ts: 'Settings' })));
+</script>
+</body>
+</html>

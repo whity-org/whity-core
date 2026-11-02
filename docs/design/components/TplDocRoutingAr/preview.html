@@ -1,0 +1,56 @@
+<!-- @dsCard group="Templates · Documents and routing" height=900 width=1280 subtitle="V.3: the 2.7 Arabic card: the routing tab mirrored" -->
+<!doctype html>
+<html dir="rtl" lang="ar">
+<head><meta charset="utf-8"><title>Document routing Arabic</title><style>html,body{height:100%} #root{min-height:100%} body{font-family:var(--font-arabic)} .wy-shell__brand{direction:ltr}</style></head>
+<body>
+<div id="root"></div>
+<script>
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 16 }); }
+  var NAVL = {};
+  function L(s) { return NAVL[s] || s; }
+  /* The sidebar as built (inventory, 1 Nov 2026), in sentence case; only the current group is open (2.5). */
+  var GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['approval', 'Approvals', 3], ['form', 'My submissions']]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations'], ['user', 'Family relations'], ['two-step', 'Approval gating']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['routing', 'Route templates'], ['page', 'Notes and wiki'], ['form', 'Form builder'], ['list-todo', 'Forms']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]],
+    ['Platform', [['tenant', 'Tenants'], ['money', 'Plans and pricing'], ['receipt', 'Promotions'], ['chart', 'System'], ['error', 'Errors'], ['notification', 'Notification delivery']]]];
+  function appNav(active, o) { o = o || {};
+    return GROUPS.filter(function (g) { return g[0] !== 'Platform' || o.operator; }).map(function (g) {
+      var has = g[1].some(function (x) { return x[1] === active; });
+      return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
+  var topBar = h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' }));
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: o.tenant || 'Example Bakery', user: o.user || 'Rana Haddad', role: o.role || 'Owner', nav: appNav(active, o), topActions: topBar, searchLabel: o.search, dir: o.dir }, kids); }
+  function person(name, sub, o) { o = o || {}; return h('div', { className: 'wy-person' }, h(W.Avatar, { name: name, size: o.size || 28, kind: o.kind }), h('div', { style: { minWidth: 0 } }, h('b', null, name), sub ? h('small', null, sub) : null)); }
+  function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
+  function recHead(o) { return h('div', { className: 'wy-rech' }, o.avatar || h('span', { className: 'wy-rech__ic', 'aria-hidden': 'true' }, I(o.icon || 'document', 26)),
+      h('div', { style: { minWidth: 0 } }, h('h1', null, o.title, o.badges || null), h('div', { className: 'wy-rech__facts' }, (o.facts || []).map(function (f, i) { return h('span', { key: i }, f[0] ? I(f[0], 14) : null, f[1]); }))),
+      h('div', { className: 'wy-rech__acts' }, o.actions || null)); }
+  function saveBar(text, L2) { L2 = L2 || {}; return h('div', { className: 'wy-savebar', role: 'region', 'aria-label': L2.label || 'Unsaved changes' }, I('edit'), h('span', null, text), h(W.Button, { variant: 'ghost' }, L2.discard || 'Discard'), h(W.Button, null, L2.save || 'Save changes')); }
+  var PO = h(W.Doc, {"lead": "en", "title": {"en": "Purchase order", "ar": "أمر شراء"}, "number": "PO-0057", "date": "24 Oct 2026", "tenant": {"name": {"en": "Example Bakery", "ar": "مخبز المثال"}, "initial": "E", "lines": {"en": ["[Street], Amman, Jordan", "Tax no. [000000000] · CR [00000]", "+962 6 000 0000 · hello@example.jo"], "ar": ["[الشارع]، عمّان، الأردن", "الرقم الضريبي [000000000] · سجل تجاري [00000]", "+962 6 000 0000 · hello@example.jo"]}}, "parties": [{"label": {"en": "Supplier", "ar": "المورِّد"}, "value": "Example Mills", "lines": ["[Address], Zarqa", "Tax no. [000000000]"]}, {"label": {"en": "Deliver to", "ar": "التسليم إلى"}, "value": "Example Bakery", "lines": ["[Street], Amman", "Back door, before 08:00"]}, {"label": {"en": "Deliver by", "ar": "التسليم قبل"}, "value": "27 Oct 2026", "lines": ["Payment 30 days after invoice"]}], "columns": [{"key": "desc", "label": "desc"}, {"key": "qty", "label": "qty", "align": "end", "width": "14mm"}, {"key": "unit", "label": "unit", "type": "money", "width": "26mm"}, {"key": "amt", "label": "amount", "type": "money", "width": "28mm"}], "rows": [{"desc": {"en": "Flour, type 1 (50 kg bag)", "ar": "طحين نوع أول (كيس 50 كغ)"}, "qty": 20, "unit": 18.5, "amt": 370.0}, {"desc": {"en": "Butter, unsalted (10 kg)", "ar": "زبدة غير مملحة (10 كغ)"}, "qty": 6, "unit": 42, "amt": 252}, {"desc": {"en": "Sugar (50 kg bag)", "ar": "سكر (كيس 50 كغ)"}, "qty": 4, "unit": 31, "amt": 124}, {"desc": {"en": "Pistachio, ground (1 kg)", "ar": "فستق حلبي مطحون (1 كغ)"}, "qty": 10, "unit": 14.75, "amt": 147.5}, {"desc": {"en": "Date paste (5 kg)", "ar": "عجوة (5 كغ)"}, "qty": 8, "unit": 9.5, "amt": 76.0}], "totals": [{"label": "subtotal", "value": 969.5}, {"label": "tax16", "value": 155.12}], "grand": {"label": "total", "value": 1124.62}, "footNote": "Raised by Omar Saleh; approved by Rana Haddad in Whity on 24 Oct 2026."}, h(W.DocNote, { lead: 'en', label: 'termsBlock' }, ["Quote PO-0057 on your delivery note and invoice.", "Tell us by 25 Oct if you can't deliver the full quantity.", "We check quantities and best-before dates on delivery."].map(function (t, i) { return h('p', { key: i }, t); })), h(W.DocSign, { lead: 'en', fields: [{ l: {"en": "Approved by", "ar": "اعتمده"}, value: 'Rana Haddad' }, 'signature', 'date'] }));
+  function docHead(T, tab) { return h(F, null, h(W.Breadcrumb, { items: [{ label: T.lib }, { label: 'PO-0142' }] }),
+    recHead({ icon: 'document', title: T.title, badges: h(W.Badge, { variant: 'warning' }, T.waiting), facts: [['user', T.raised], ['calendar', T.issued], ['routing', T.stage], ['qr', T.code]],
+      actions: h(F, null, h(W.Button, { variant: 'outline', icon: 'download' }, T.pdf), h(W.Button, { variant: 'outline', icon: 'print' }, T.print), h(W.Menu, { label: T.more, items: [{ icon: 'form', label: T.coll }, { icon: 'lock', label: T.withdraw, danger: true }] })) }),
+    h('div', { className: 'wy-rectabs' }, h(W.Tabs, { items: [{ value: 'd', label: T.tDoc }, { value: 'r', label: T.tRoute, count: 1 }, { value: 'h', label: T.tHist }, { value: 'v', label: T.tVer }], defaultValue: tab }))); }
+
+  function stage(st, n, t, meta, people, extra) { return h('div', { className: 'wy-rstage is-' + st }, h('div', { className: 'wy-rstage__rail' }, h('span', { className: 'wy-rstage__dot' }, st === 'done' ? I('check', 14) : n), h('span', { className: 'wy-rstage__line' })),
+    h('div', { className: 'wy-rstage__body' }, h('div', { className: 'wy-rstage__title' }, t, extra || null), h('div', { className: 'wy-rstage__meta' }, meta), people ? h('div', { className: 'wy-rstage__people' }, people) : null)); }
+  function routingTab(T) { return h('div', { className: 'wy-docrec' },
+    h(W.Card, { title: T.route, description: T.routeD }, h('div', { className: 'wy-route' },
+      stage('done', 1, T.s1, T.s1m, [h(W.ActorChip, { key: 1, name: T.dana })], h(W.Badge, { variant: 'success' }, T.approved)),
+      stage('now', 2, T.s2, T.s2m, [h(W.ActorChip, { key: 1, name: T.rana })], h(W.Badge, { variant: 'warning' }, T.waitingYou)),
+      stage('next', 3, T.s3, T.s3m, [h(W.ActorChip, { key: 1, name: T.lina })]))),
+    h(W.Card, { title: T.yours, description: T.yoursD }, h('div', { className: 'wy-act' },
+      h(W.Textarea, { label: T.note, rows: 3, placeholder: T.noteP }),
+      h('div', { className: 'wy-act__btns' }, h(W.Button, { icon: 'check' }, T.approve), h(W.Button, { variant: 'outline' }, T.reject), h(W.Button, { variant: 'outline', icon: 'undo' }, T.ret)),
+      h('div', { className: 'wy-act__btns' }, h(W.Button, { variant: 'ghost', icon: 'send' }, T.forward)),
+      h('p', { className: 'wy-muted', style: { margin: 0, fontSize: 13 } }, T.after)))); }
+
+  NAVL = { 'Dashboard': 'لوحة المتابعة', 'Inbox': 'الوارد', 'Approvals': 'الموافقات', 'My submissions': 'ما أرسلتُه', 'People': 'الأشخاص', 'AI': 'الذكاء الاصطناعي', 'Documents': 'المستندات', 'Library': 'المكتبة', 'Templates': 'القوالب', 'Route templates': 'قوالب المسارات', 'Notes and wiki': 'الملاحظات والويكي', 'Form builder': 'منشئ النماذج', 'Forms': 'النماذج', 'Workspace': 'مساحة العمل' };
+  ReactDOM.createRoot(document.getElementById('root')).render(shell('Library', h(F, null, docHead({ lib: 'المكتبة', title: 'أمر شراء PO-0142', waiting: 'بانتظار قرارك', raised: 'أنشأه عمر خليل', issued: 'صدر أمس، 16:20', stage: 'المرحلة 2 من 3: موافقة المالك', code: 'رمز التحقق فعّال', pdf: 'تنزيل PDF', print: 'طباعة', more: 'المزيد', coll: 'أضف إلى مجموعة', withdraw: 'سحب هذا المستند', tDoc: 'المستند', tRoute: 'المسار', tHist: 'السجل', tVer: 'التحقق' }, 'r'),
+    routingTab({ route: 'مسار أوامر الشراء', routeD: 'بدأه عمر خليل أمس.', s1: 'مراجعة مدير الفرع', s1m: 'مديرا عبدون والصويفية · يكفي قرار أحدهما · أمس، 17:02', dana: 'دانة يوسف', approved: 'تمت الموافقة', s2: 'موافقة المالك', s2m: 'مطلوبة للمبالغ فوق 1,000 دينار · منذ أمس، 17:02', rana: 'رنا حداد', waitingYou: 'بانتظارك', s3: 'تسجيل في المالية', s3m: 'يُرسل دون طلب قرار', lina: 'لينا سعد', yours: 'قرارك', yoursD: 'المرحلة 2 من 3: موافقة المالك', note: 'ملاحظة (اختيارية)', noteP: 'يراها كل من على هذا المسار', approve: 'موافقة', reject: 'رفض', ret: 'إعادة إلى عمر', forward: 'تحويل إلى شخص آخر', after: 'بعد موافقتك، يذهب إلى لينا سعد في المالية.' })), { user: 'رنا حداد', role: 'المالكة', search: 'بحث', dir: 'rtl' }));
+</script>
+</body>
+</html>

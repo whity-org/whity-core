@@ -128,7 +128,7 @@ export const colors = {
   }
 } as const;
 export const space = {"0": "0px", "1": "4px", "2": "8px", "3": "12px", "4": "16px", "6": "24px", "8": "32px"} as const;
-export const radius = {"radius": "0.5625rem", "radius-control-sm": "7px", "radius-control": "9px", "radius-control-lg": "10px", "radius-sm": "4px", "radius-md": "7px", "radius-card": "12px", "radius-dialog": "16px", "radius-full": "999px", "radius-lg": "10px", "radius-xl": "12px", "radius-2xl": "16px"} as const;
+export const radius = {"radius": "0.5625rem", "radius-control-sm": "8px", "radius-control": "10px", "radius-control-lg": "11px", "radius-sm": "4px", "radius-md": "7px", "radius-card": "12px", "radius-dialog": "16px", "radius-full": "999px", "radius-lg": "10px", "radius-xl": "12px", "radius-2xl": "16px"} as const;
 export const shadow = {
   "plane-rest": {
     "light": "-3px 3px 0 0 oklch(0.5 0.16 255)",
@@ -160,4 +160,4 @@ export const fonts = {
 } as const;
 export const plane = { offset: "0.1875rem", lift: "0.3125rem" } as const;
 export const motion = { fast: 120, base: 180, slow: 250, easeOut: "cubic-bezier(0.2, 0, 0, 1)" } as const;
-export const size = {"logo-min-mark": "16px", "logo-min-horizontal": "20px", "logo-min-stacked": "48px", "mark-cut-switch": "24px", "control-h-sm": "28px", "control-h": "36px", "control-h-lg": "40px", "row-h": "44px", "icon": "16px", "sidebar-w": "240px", "sidebar-w-collapsed": "56px", "content-max": "1280px", "form-max": "720px", "gutter": "24px", "logo-clear-space": "25%"} as const;
+export const size = {"logo-min-mark": "16px", "logo-min-horizontal": "20px", "logo-min-stacked": "48px", "mark-cut-switch": "24px", "control-h-sm": "32px", "control-h": "40px", "control-h-lg": "44px", "row-h": "48px", "icon": "16px", "sidebar-w": "240px", "sidebar-w-collapsed": "56px", "content-max": "1280px", "form-max": "720px", "gutter": "24px", "logo-clear-space": "25%"} as const;

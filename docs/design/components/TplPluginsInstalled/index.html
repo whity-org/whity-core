@@ -1,0 +1,64 @@
+<!-- @dsCard group="Templates · Plugin store" height=1025 width=1280 subtitle="A41 Installed tab: updates waiting for approval, trials, failed, turned off and recently removed" -->
+<!doctype html>
+<html>
+<head><link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../bundle.css"><script src="../../preview-runtime/react.production.min.js"></script><script src="../../preview-runtime/react-dom.production.min.js"></script><script src="../bundle.js"></script><script>(function(){var t=(location.hash.match(/theme=(dark|light)/)||[])[1]||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',t);})();</script><style>body{margin:0;background:var(--background);color:var(--foreground);font-family:var(--font-sans);width:1280px;min-height:1025px}</style><meta charset="utf-8"><title>Installed plugins</title><style>html,body{height:100%} #root{min-height:100%} </style></head>
+<body>
+<div id="root"></div>
+<script>
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 16 }); }
+  function nav(active, L) { L = L || {}; function it(icon, label, key) { return { icon: icon, label: L[key || label] || label, active: (key || label) === active }; }
+    return [{ items: [it('dashboard', 'Dashboard'), it('inbox', 'Inbox'), it('approval', 'Approvals')] },
+      { label: L.People || 'People', items: [it('users', 'Users'), it('role', 'Roles'), it('delegation', 'Delegations')] },
+      { label: L.AI || 'AI', items: [it('robot', 'Agents'), it('link', 'Connected AI apps'), it('tool', 'What AI can do')] },
+      { label: L.Documents || 'Documents', items: [it('document', 'Library'), it('routing', 'Routing')] },
+      { label: L.Platform || 'Platform', items: [it('tenant', 'Tenants'), it('plugin', 'Plugins'), it('branding', 'Branding'), it('audit', 'Audit log')] }]; }
+  var topBar = h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' }));
+  function shell(kids, o) { o = o || {}; return h(W.AppShell, { tenant: 'Example Bakery', user: 'Rana Haddad', role: 'Owner', nav: nav('Plugins', o.L), topActions: topBar, labels: o.shellLabels }, kids); }
+  function logo(p, size) { return h('span', { className: size === 'lg' ? 'wy-pdetail__ic' : 'wy-ptile__ic', style: { background: p.color }, 'aria-hidden': 'true' }, p.whity ? h(W.Mark, { size: size === 'lg' ? 34 : 22, tone: 'onbrand', label: '' }) : p.initial || p.name.charAt(0)); }
+  function trust(p, L) { L = L || {}; return p.whity ? h('span', { className: 'wy-trust wy-trust--whity' }, I('success', 12), L.byWhity || 'By Whity') : p.verified ? h('span', { className: 'wy-trust wy-trust--verified' }, I('success', 12), L.verified || 'Verified') : h('span', { className: 'wy-trust wy-trust--sandbox' }, I('lock', 12), L.sandboxed || 'Sandboxed'); }
+  function adds(p, L) { L = L || {}; return h('div', { className: 'wy-adds' }, (p.adds || []).map(function (a) { var m = { screens: ['dashboard', L.screens || 'Screens'], blocks: ['page', L.blocks || 'Document blocks'], agent: ['robot', L.agent || 'Agent tools'], fields: ['field', L.fields || 'Fields'], connect: ['link', L.connect || 'Connects out'] }[a];
+    return h('span', { key: a, className: 'wy-add' + (a === 'agent' ? ' wy-add--agent' : '') }, I(m[0], 12), m[1]); })); }
+  function tile(p, L) { L = L || {}; return h('a', { className: 'wy-ptile', href: '#', key: p.name },
+      h('div', { className: 'wy-ptile__top' }, logo(p), h('div', { style: { minWidth: 0 } }, h('div', { className: 'wy-ptile__name' }, p.name), h('div', { className: 'wy-ptile__by' }, p.by, h('span', null, '·'), trust(p, L)))),
+      h('p', { className: 'wy-ptile__desc' }, p.line), adds(p, L),
+      h('div', { className: 'wy-ptile__foot' }, h('span', null, p.used), h('span', { className: 'wy-ptile__price' }, p.price))); }
+  var P = {
+    front: { name: 'Front Office', by: 'Whity', whity: true, color: '#0961bb', line: 'Leads, quotes and JoFotara-compliant invoices, with the Billing assistant.', adds: ['screens', 'blocks', 'agent'], used: 'New', price: '[price] / month' },
+    render: { name: 'Whity Render', by: 'Whity', whity: true, color: '#0961bb', line: 'Pixel-exact PDFs of your documents and templates, in Arabic and English.', adds: ['blocks'], used: 'Used by 210 workspaces', price: '[price] / month' },
+    id: { name: 'Whity ID', by: 'Whity', whity: true, color: '#0961bb', line: 'Single sign-on for your team and customers.', adds: ['screens'], used: 'Coming soon', price: '[price]' },
+    inv: { name: 'Inventory for Whity', by: 'Example Labs', verified: true, color: '#35aa76', initial: 'I', line: 'Stock levels, transfers between branches and reorder alerts.', adds: ['screens', 'blocks', 'agent'], used: 'Used by 140 workspaces', price: '[price] / month' },
+    del: { name: 'Delivery Tracker', by: 'Example Logistics', verified: true, color: '#3a3a3a', initial: 'D', line: 'Track orders from packed to delivered, with live status in documents.', adds: ['screens', 'blocks'], used: 'Used by 86 workspaces', price: 'Free' },
+    pay: { name: 'Payroll for Whity', by: 'Example Payroll Co.', verified: true, color: '#9d2398', initial: 'P', line: 'Monthly payroll, payslips and social security reports for Jordan.', adds: ['screens', 'fields', 'agent'], used: 'Used by 64 workspaces', price: '[price] / month' },
+    maps: { name: 'Route Maps', by: 'Example Labs', verified: false, color: '#5a5a5a', initial: 'R', line: 'Delivery routes on a map, for notes and wiki pages.', adds: ['blocks', 'connect'], used: 'Used by 12 workspaces', price: 'Free' },
+    msg: { name: 'Messaging for Whity', by: 'Example Messaging', verified: true, color: '#f7a224', initial: 'M', line: 'Send receipts and reminders by SMS and chat apps, with approval.', adds: ['agent', 'connect'], used: 'Used by 97 workspaces', price: '[price] / month' },
+    sup: { name: 'Support Desk for Whity', by: 'Example Support', verified: true, color: '#1a8a8a', initial: 'S', line: 'Customer questions in one inbox; agents draft replies for you to send.', adds: ['screens', 'agent'], used: 'Used by 38 workspaces', price: '[price] / month' },
+    cal: { name: 'Calendar Sync', by: 'Example Labs', verified: false, color: '#5a5a5a', initial: 'C', line: 'Lets agents book deliveries and meetings in your shared calendars.', adds: ['agent', 'connect'], used: 'Used by 22 workspaces', price: 'Free' },
+    books: { name: 'Bookkeeping for Whity', by: 'Example Accounts', verified: true, color: '#0b4c92', initial: 'B', line: 'Ledger, VAT returns and month-end close, linked to your invoices.', adds: ['screens', 'agent'], used: 'Used by 51 workspaces', price: '[price] / month' }
+  };
+  function cell(p, sub) { return h('div', { className: 'wy-pcell' }, logo(p), h('div', { style: { minWidth: 0 } }, h('b', null, p.name), h('small', null, p.by + ' · ' + (p.whity ? 'By Whity' : p.verified ? 'Verified' : 'Sandboxed')))); }
+  function st(v, t, sub) { return h('div', null, h(W.Badge, { variant: v }, t), sub ? h('span', { className: 'wy-psub' }, sub) : null); }
+  var rows = [
+    { id: 1, p: P.front, s: st('info', 'Trial', 'Ends 9 Nov · then [price] / month'), v: '1.2.0', u: 'Updated automatically 20 Oct', b: '[price] / month' },
+    { id: 2, p: P.inv, s: st('success', 'Active'), v: '2.4.1', u: 'Updated automatically 12 Oct', b: '[price] / month' },
+    { id: 3, p: P.pay, s: st('warning', 'Update waiting', '3.0 asks for new access'), v: '2.9.4', u: 'Running 2.9.4 until approved', b: '[price] / month' },
+    { id: 4, p: P.render, s: st('success', 'Active'), v: '4.0.2', u: 'Updated automatically 2 Oct', b: '[price] / month' },
+    { id: 5, p: P.maps, s: st('destructive', 'Failed', 'Didn’t load after the last update'), v: '0.8.0', u: 'Its blocks show a placeholder', b: 'Free' },
+    { id: 6, p: P.del, s: st('secondary', 'Turned off', 'By Rana Haddad, 3 Oct'), v: '1.5.0', u: 'Data kept', b: 'Free' }];
+  ReactDOM.createRoot(document.getElementById('root')).render(shell(h(F, null,
+    h(W.PageHeader, { title: 'Plugins', description: 'Add apps, document blocks and agent tools to Example Bakery.' }),
+    h(W.Tabs, { items: [{ value: 'store', label: 'Store' }, { value: 'installed', label: 'Installed', count: 6 }], defaultValue: 'installed' }),
+    h('div', { style: { display: 'grid', gap: 16, marginTop: 20 } },
+      h(W.Alert, { variant: 'warning', title: 'Payroll for Whity 3.0 needs your approval', action: h(W.Button, { size: 'sm', variant: 'outline' }, 'Review access') }, 'It asks to export bank payment files, and to send payslips to ', h('b', null, 'api.payroll.example.jo'), '. Until you approve, 2.9.4 keeps running.'),
+      h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } }, h('span', { style: { fontSize: 14, color: 'var(--muted-foreground)' } }, '6 installed \u00b7 4 running \u00b7 2 need attention'),
+        h(W.Menu, { label: 'Plugin tools', defaultOpen: true, items: [{ heading: 'For operators' }, { icon: 'upload', label: 'Upload plugin', hint: 'A .zip of unreviewed code, up to 32 MB' }, { icon: 'sync', label: 'Reload plugins' }, { divider: true }, { icon: 'settings', label: 'Store sources', hint: 'Settings \u203a Advanced' }] })),
+      h(W.DataTable, { label: 'Installed plugins', rowMenu: true, rows: rows, columns: [
+        { key: 'p', label: 'Plugin', render: function (r) { return cell(r.p); } },
+        { key: 's', label: 'Status', width: 230, render: function (r) { return r.s; } },
+        { key: 'v', label: 'Version', width: 220, render: function (r) { return h('div', null, h('span', { style: { fontFamily: 'var(--font-mono)', fontSize: 13 } }, r.v), h('span', { className: 'wy-psub' }, r.u)); } },
+        { key: 'b', label: 'Billing', width: 150, render: function (r) { return r.b; } }] }),
+      h('div', { style: { display: 'grid', gap: 8 } }, h('h2', { className: 'wy-store__h2', style: { fontSize: 15 } }, 'Recently removed'),
+        h('div', { className: 'wy-ptile', style: { flexDirection: 'row', alignItems: 'center', gap: 16 } }, h('div', { className: 'wy-pcell', style: { flex: 1 } }, logo(P.msg), h('div', null, h('b', null, 'Messaging for Whity'), h('small', null, 'Removed by Rana Haddad on 22 Oct · its data is kept until 21 Nov, then deleted'))), h(W.Button, { variant: 'outline', size: 'sm', icon: 'undo' }, 'Reinstall'))))), {}));
+</script>
+</body>
+</html>

@@ -1,0 +1,44 @@
+<!-- @dsCard group="Templates · Account and billing" height=760 width=1280 subtitle="V.3: the 2.9 Arabic card: billing mirrored, amounts in Western digits" -->
+<!doctype html>
+<html dir="rtl" lang="ar">
+<head><link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../bundle.css"><script src="../../preview-runtime/react.production.min.js"></script><script src="../../preview-runtime/react-dom.production.min.js"></script><script src="../bundle.js"></script><script>(function(){var t=(location.hash.match(/theme=(dark|light)/)||[])[1]||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',t);})();</script><style>body{margin:0;background:var(--background);color:var(--foreground);font-family:var(--font-sans);width:1280px;min-height:760px}</style><meta charset="utf-8"><title>Billing Arabic</title><style>html,body{height:100%} #root{min-height:100%} body{font-family:var(--font-arabic)} .wy-shell__brand{direction:ltr}</style></head>
+<body>
+<div id="root"></div>
+<script>
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 16 }); }
+  var NAVL = {};
+  function L(s) { return NAVL[s] || s; }
+  /* The sidebar as built (inventory, 1 Nov 2026), in sentence case; only the current group is open (2.5). */
+  var GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['approval', 'Approvals', 3], ['form', 'My submissions']]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations'], ['user', 'Family relations'], ['two-step', 'Approval gating']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['routing', 'Route templates'], ['page', 'Notes and wiki'], ['form', 'Form builder'], ['list-todo', 'Forms']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]],
+    ['Platform', [['tenant', 'Tenants'], ['money', 'Plans and pricing'], ['receipt', 'Promotions'], ['chart', 'System'], ['error', 'Errors'], ['notification', 'Notification delivery']]]];
+  function appNav(active, o) { o = o || {};
+    return GROUPS.filter(function (g) { return g[0] !== 'Platform' || o.operator; }).map(function (g) {
+      var has = g[1].some(function (x) { return x[1] === active; });
+      return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
+  var topBar = h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' }));
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: o.tenant || 'Example Bakery', user: o.user || 'Rana Haddad', role: o.role || 'Owner', nav: appNav(active, o), topActions: topBar, searchLabel: o.search, dir: o.dir }, kids); }
+  function person(name, sub, o) { o = o || {}; return h('div', { className: 'wy-person' }, h(W.Avatar, { name: name, size: o.size || 28, kind: o.kind }), h('div', { style: { minWidth: 0 } }, h('b', null, name), sub ? h('small', null, sub) : null)); }
+  function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
+  function recHead(o) { return h('div', { className: 'wy-rech' }, o.avatar || h('span', { className: 'wy-rech__ic', 'aria-hidden': 'true' }, I(o.icon || 'document', 26)),
+      h('div', { style: { minWidth: 0 } }, h('h1', null, o.title, o.badges || null), h('div', { className: 'wy-rech__facts' }, (o.facts || []).map(function (f, i) { return h('span', { key: i }, f[0] ? I(f[0], 14) : null, f[1]); }))),
+      h('div', { className: 'wy-rech__acts' }, o.actions || null)); }
+  function saveBar(text, L2) { L2 = L2 || {}; return h('div', { className: 'wy-savebar', role: 'region', 'aria-label': L2.label || 'Unsaved changes' }, I('edit'), h('span', null, text), h(W.Button, { variant: 'ghost' }, L2.discard || 'Discard'), h(W.Button, null, L2.save || 'Save changes')); }
+  function billing(T) { var rows = [{ id: 1, n: 'INV-W-0311', s: ['success', T.paid], t: 'JOD 49.000', o: 'JOD 0.000', d: '1 Oct 2026' }, { id: 2, n: 'INV-W-0342', s: ['warning', T.due], t: 'JOD 61.000', o: 'JOD 61.000', d: '1 Nov 2026' }];
+    return h(F, null, h(W.PageHeader, { title: T.title, description: T.desc }),
+      h('div', { style: { display: 'grid', gap: 16 } },
+        h('div', { className: 'wy-recbody', style: { marginTop: 0 } },
+          h(W.Card, { title: T.plan, action: h(W.Badge, { variant: 'success' }, T.active) }, h(W.DescriptionList, { items: [{ label: T.planL, value: '[plan name] · [price] / ' + T.month }, { label: T.renews, value: '1 December 2026' }, { label: T.addons, value: 'Front Office · Inventory for Whity' }, { label: T.payBy, value: T.payByV }] })),
+          h(W.Card, { title: T.next }, h('div', { style: { display: 'grid', gap: 12 } }, h('div', { className: 'wy-appcard__big' }, 'JOD 61.000'), h('span', { className: 'wy-muted' }, T.nextD), h(W.Button, { icon: 'billing' }, T.payNow)))),
+        h(W.Card, { title: T.invoices }, h(W.DataTable, { label: T.invoices, rowMenu: true, rows: rows, columns: [{ key: 'n', label: T.cInv, render: function (r) { return h('span', { dir: 'ltr', style: { fontFamily: 'var(--font-mono)' } }, r.n); } }, { key: 's', label: T.cSt, render: function (r) { return h(W.Badge, { variant: r.s[0] }, r.s[1]); } }, { key: 't', label: T.cTot, align: 'end' }, { key: 'o', label: T.cOut, align: 'end' }, { key: 'd', label: T.cDue }] })))); }
+
+  NAVL = { 'Dashboard': 'لوحة المتابعة', 'Inbox': 'الوارد', 'Approvals': 'الموافقات', 'My submissions': 'ما أرسلتُه', 'People': 'الأشخاص', 'AI': 'الذكاء الاصطناعي', 'Documents': 'المستندات', 'Workspace': 'مساحة العمل', 'Plugins': 'الإضافات', 'Billing': 'الفوترة', 'Audit log': 'سجل التدقيق', 'Settings': 'الإعدادات' };
+  ReactDOM.createRoot(document.getElementById('root')).render(shell('Billing', billing({ title: 'الفوترة', desc: 'باقتك، ودفعتك القادمة، وفواتير Whity لـ Example Bakery.', plan: 'باقتك', active: 'فعّالة', planL: 'الباقة', month: 'شهر', renews: 'تتجدد في', addons: 'إضافات تُفوتر معها', payBy: 'طريقة الدفع', payByV: 'حوالة بنكية (CliQ)', next: 'الدفعة القادمة', nextD: 'مستحقة في 1 تشرين الثاني 2026 · الباقة وإضافتان', payNow: 'ادفع الآن', invoices: 'الفواتير', paid: 'مدفوعة', due: 'مستحقة', cInv: 'الفاتورة', cSt: 'الحالة', cTot: 'المجموع', cOut: 'المتبقي', cDue: 'تاريخ الاستحقاق' }), { user: 'رنا حداد', role: 'المالكة', search: 'بحث', dir: 'rtl' }));
+</script>
+</body>
+</html>

@@ -1,0 +1,41 @@
+<!-- @dsCard group="Templates · Settings" height=773 width=1280 subtitle="Tag groups with their tags in one place, with where each tag is used" -->
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Settings: Tags</title><style>html,body{height:100%} #root{min-height:100%} </style></head>
+<body>
+<div id="root"></div>
+<script>
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 16 }); }
+  var NAVL = {};
+  function L(s) { return NAVL[s] || s; }
+  /* The sidebar as built (inventory, 1 Nov 2026), in sentence case; only the current group is open (2.5). */
+  var GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['approval', 'Approvals', 3], ['form', 'My submissions']]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations'], ['user', 'Family relations'], ['two-step', 'Approval gating']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['routing', 'Route templates'], ['page', 'Notes and wiki'], ['form', 'Form builder'], ['list-todo', 'Forms']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]],
+    ['Platform', [['tenant', 'Tenants'], ['money', 'Plans and pricing'], ['receipt', 'Promotions'], ['chart', 'System'], ['error', 'Errors'], ['notification', 'Notification delivery']]]];
+  function appNav(active, o) { o = o || {};
+    return GROUPS.filter(function (g) { return g[0] !== 'Platform' || o.operator; }).map(function (g) {
+      var has = g[1].some(function (x) { return x[1] === active; });
+      return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
+  var topBar = h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' }));
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: o.tenant || 'Example Bakery', user: o.user || 'Rana Haddad', role: o.role || 'Owner', nav: appNav(active, o), topActions: topBar, searchLabel: o.search, dir: o.dir }, kids); }
+  function person(name, sub, o) { o = o || {}; return h('div', { className: 'wy-person' }, h(W.Avatar, { name: name, size: o.size || 28, kind: o.kind }), h('div', { style: { minWidth: 0 } }, h('b', null, name), sub ? h('small', null, sub) : null)); }
+  function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
+  function recHead(o) { return h('div', { className: 'wy-rech' }, o.avatar || h('span', { className: 'wy-rech__ic', 'aria-hidden': 'true' }, I(o.icon || 'document', 26)),
+      h('div', { style: { minWidth: 0 } }, h('h1', null, o.title, o.badges || null), h('div', { className: 'wy-rech__facts' }, (o.facts || []).map(function (f, i) { return h('span', { key: i }, f[0] ? I(f[0], 14) : null, f[1]); }))),
+      h('div', { className: 'wy-rech__acts' }, o.actions || null)); }
+  function saveBar(text, L2) { L2 = L2 || {}; return h('div', { className: 'wy-savebar', role: 'region', 'aria-label': L2.label || 'Unsaved changes' }, I('edit'), h('span', null, text), h(W.Button, { variant: 'ghost' }, L2.discard || 'Discard'), h(W.Button, null, L2.save || 'Save changes')); }
+  var SUBNAV = [['Workspace', ['General', 'Branding']], ['Sign-in and security', ['Security', 'Single sign-on', 'Sign-up']], ['Email', ['Email domains']], ['Data', ['Tags', 'Translations']], ['Advanced', ['Error tracking']]];
+  function setPage(active, title, desc, kids, actions) { return shell('Settings', h(F, null, h(W.PageHeader, { breadcrumb: [{ label: 'Settings' }, { label: active }], title: title, description: desc, actions: actions }),
+    h('div', { className: 'wy-set' }, h('nav', { className: 'wy-subnav', 'aria-label': 'Settings' }, SUBNAV.map(function (g) { return h(F, { key: g[0] }, h('h4', null, g[0]), g[1].map(function (x) { return h('a', { key: x, href: '#', className: x === active ? 'is-on' : '' }, x); })); })), h('div', { className: 'wy-set__main' }, kids)))); }
+
+  var rows = [{ id: 1, g: 'Customer type', t: 'Hotel, Café, Restaurant, Walk-in', u: 'Used on 214 customers' }, { id: 2, g: 'Priority', t: 'Urgent, Normal', u: 'Used on 38 documents' }, { id: 3, g: 'Allergens', t: 'Gluten, Nuts, Dairy, Eggs', u: 'Used on 61 products' }];
+  ReactDOM.createRoot(document.getElementById('root')).render(setPage('Tags', 'Tags', 'Labels people put on customers, documents and products. Each tag belongs to a group.', h(F, null,
+    h(W.DataTable, { label: 'Tag groups', rowMenu: true, onRowClick: function () {}, rows: rows, columns: [{ key: 'g', label: 'Group', render: function (r) { return h('b', { style: { fontWeight: 500 } }, r.g); } }, { key: 't', label: 'Tags' }, { key: 'u', label: 'Used', align: 'end' }] })), h(W.Button, { icon: 'plus' }, 'New tag group')));
+</script>
+</body>
+</html>
