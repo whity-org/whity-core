@@ -150,7 +150,7 @@ final class FormUploadPolicyTest extends TestCase
      *
      * A ZIP declaring itself a PDF is the shape that matters: `PK\x03\x04` is
      * also what a .docx, a .jar and a zip bomb start with, which is exactly why
-     * office formats are not on the allow-list.
+     * a ZIP has to prove it is a Word document.
      */
     public function testAZipDeclaringItselfAPdfIsRefused(): void
     {
@@ -162,7 +162,7 @@ final class FormUploadPolicyTest extends TestCase
             );
             self::fail('a ZIP must not be accepted, whatever it calls itself');
         } catch (FormRejectedException $e) {
-            self::assertStringContainsString('PDF, PNG or JPEG', $e->clientMessage);
+            self::assertStringContainsString('PDF, Word (.docx), PNG or JPEG', $e->clientMessage);
         }
     }
 
@@ -218,7 +218,12 @@ final class FormUploadPolicyTest extends TestCase
     public function testTheAdvertisedTypesAreExactlyTheAcceptedOnes(): void
     {
         self::assertSame(
-            ['application/pdf', 'image/png', 'image/jpeg'],
+            [
+                'application/pdf',
+                'image/png',
+                'image/jpeg',
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            ],
             FormUploadPolicy::acceptedContentTypes()
         );
 

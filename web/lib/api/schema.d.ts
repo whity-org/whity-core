@@ -2926,7 +2926,7 @@ export interface paths {
         put?: never;
         /**
          * Attach a file to a form you are filling in
-         * @description MULTIPART, one part named `file`. Returns the `reference` a `file` answer carries, plus the filename, the SNIFFED content type, the byte size and the server's SHA-256 of what it stored. Gated `forms:submit` — the same permission as the submit itself, because uploading is half of answering. ACCEPTS application/pdf, image/png and image/jpeg ONLY, decided by the LEADING BYTES: a declared Content-Type that contradicts the bytes is a 422, and a declared type is never what gets stored. Office formats are absent on purpose — a .docx is indistinguishable from any other ZIP by magic bytes. MAXIMUM 10 MiB. REFUSED (422) on a form that is not accepting submissions, and on a form with no `file` field — so a broad permission cannot be aimed at arbitrary form ids as a way into a tenant's storage. THROTTLED to 20 uploads per caller per hour. THE UPLOAD IS SINGLE-USE and expires: it is spent by the first submission that names it, and anything never submitted is deleted by the `form-uploads:sweep` retention job (24 h by default).
+         * @description MULTIPART, one part named `file`. Returns the `reference` a `file` answer carries, plus the filename, the SNIFFED content type, the byte size and the server's SHA-256 of what it stored. Gated `forms:submit` — the same permission as the submit itself, because uploading is half of answering. ACCEPTS application/pdf, image/png, image/jpeg and Word (.docx) ONLY, decided by the BYTES: a declared Content-Type that contradicts them is a 422, and a declared type is never what gets stored. A .docx is checked by reading the archive's index without unpacking it, and a macro-enabled one is refused; legacy .doc and other office formats are refused. MAXIMUM 10 MiB. REFUSED (422) on a form that is not accepting submissions, and on a form with no `file` field — so a broad permission cannot be aimed at arbitrary form ids as a way into a tenant's storage. THROTTLED to 20 uploads per caller per hour. THE UPLOAD IS SINGLE-USE and expires: it is spent by the first submission that names it, and anything never submitted is deleted by the `form-uploads:sweep` retention job (24 h by default).
          */
         post: operations["post_api_v1_forms_id_uploads"];
         delete?: never;
@@ -8656,6 +8656,8 @@ export interface components {
             max?: number;
             maxLength?: number;
             pattern?: string;
+            /** @description How many files a file question takes, 1 to 20. Above 1 the answer is a list. */
+            maxFiles?: number;
         };
         FormListResponse: {
             data: components["schemas"]["Form"][];

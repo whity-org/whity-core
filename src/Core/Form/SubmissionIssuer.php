@@ -303,37 +303,40 @@ final class SubmissionIssuer
             }
             $key = (string) ($field['field_key'] ?? '');
             $answer = $values[$key] ?? null;
-            if (!is_string($answer) || $answer === '') {
-                // An optional `file` field nobody filled in. The validator has
-                // already refused a blank REQUIRED one, so there is nothing to
-                // decide here.
-                continue;
-            }
 
-            $upload = $this->uploads->claim($tenantId, $formId, $answer, $actorProfileId, $submissionId);
-            if ($upload === null) {
-                /** @var array<string, string> $label */
-                $label = is_array($field['label'] ?? null) ? $field['label'] : [];
-                $name = LocalizedLabel::preferred($label);
-                throw new FormRejectedException(
-                    'We could not find the file attached to '
-                        . ($name !== '' ? $name : $key)
-                        . ' — please attach it again.',
-                    'form upload claim failed on field ' . $key . ' in tenant ' . $tenantId,
-                    null,
-                    'file_not_found',
-                    $key,
-                );
-            }
+            // One string, or a list when the field allows several. An optional
+            // `file` field nobody filled in has nothing here, and the validator
+            // has already refused a blank REQUIRED one.
+            foreach (is_array($answer) ? $answer : [$answer] as $reference) {
+                if (!is_string($reference) || $reference === '') {
+                    continue;
+                }
 
-            $this->artifacts->create($tenantId, [
-                'document_id'     => $documentId,
-                'storage_key'     => $upload['storage_key'],
-                'content_type'    => $upload['content_type'],
-                'byte_size'       => $upload['byte_size'],
-                'checksum_sha256' => $upload['checksum_sha256'],
-                'rendered_by'     => $actorProfileId,
-            ]);
+                $upload = $this->uploads->claim($tenantId, $formId, $reference, $actorProfileId, $submissionId);
+                if ($upload === null) {
+                    /** @var array<string, string> $label */
+                    $label = is_array($field['label'] ?? null) ? $field['label'] : [];
+                    $name = LocalizedLabel::preferred($label);
+                    throw new FormRejectedException(
+                        'We could not find the file attached to '
+                            . ($name !== '' ? $name : $key)
+                            . ' — please attach it again.',
+                        'form upload claim failed on field ' . $key . ' in tenant ' . $tenantId,
+                        null,
+                        'file_not_found',
+                        $key,
+                    );
+                }
+
+                $this->artifacts->create($tenantId, [
+                    'document_id'     => $documentId,
+                    'storage_key'     => $upload['storage_key'],
+                    'content_type'    => $upload['content_type'],
+                    'byte_size'       => $upload['byte_size'],
+                    'checksum_sha256' => $upload['checksum_sha256'],
+                    'rendered_by'     => $actorProfileId,
+                ]);
+            }
         }
     }
 
