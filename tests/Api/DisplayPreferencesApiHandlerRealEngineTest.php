@@ -11,6 +11,8 @@ use Tests\Support\SchemaFromMigrations;
 use Whity\Api\DisplayPreferencesApiHandler;
 use Whity\Auth\TokenValidator;
 use Whity\Core\Request;
+use Whity\Mcp\McpExposure;
+use Whity\OpenAPI\CoreApiSchemas;
 
 /**
  * Real-engine tests for {@see DisplayPreferencesApiHandler}: defaults, changes
@@ -106,6 +108,18 @@ final class DisplayPreferencesApiHandlerRealEngineTest extends TestCase
             'nothing'           => ['{}'],
             'not json'          => ['nope'],
         ];
+    }
+
+    public function testAPersonsDisplayPreferencesAreNotAnAgentTool(): void
+    {
+        $found = 0;
+        foreach (CoreApiSchemas::routes() as $route) {
+            if ($route['path'] === '/api/me/display-preferences') {
+                $found++;
+                self::assertFalse(McpExposure::exposes($route), $route['method']);
+            }
+        }
+        self::assertSame(2, $found);
     }
 
     public function testNoSessionIsRefused(): void

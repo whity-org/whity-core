@@ -187,8 +187,6 @@ final class CoreApiSchemas
         'POST /api/me/notifications/{id:\d+}/read',
         'GET /api/me/notification-preferences',
         'PUT /api/me/notification-preferences',
-        'GET /api/me/display-preferences',
-        'PUT /api/me/display-preferences',
         'GET /api/me/inbox/sources',
         'GET /api/me/inbox',
         // WHIT-783: searches only the record types the caller may list, each
