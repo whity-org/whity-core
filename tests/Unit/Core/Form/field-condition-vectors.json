@@ -1,0 +1,73 @@
+{
+  "fields": [
+    { "field_key": "has_minors", "field_type": "checkbox", "visible_when": null },
+    { "field_key": "minor_count", "field_type": "number", "visible_when": { "field": "has_minors", "equals": true } },
+    { "field_key": "no_minors_note", "field_type": "text", "visible_when": { "field": "has_minors", "equals": false } },
+    { "field_key": "parent_consent", "field_type": "text", "visible_when": { "field": "minor_count", "equals": 3 } },
+    { "field_key": "study_kind", "field_type": "select", "visible_when": null },
+    { "field_key": "drug_name", "field_type": "text", "visible_when": { "field": "study_kind", "equals": "clinical" } },
+    { "field_key": "site_note", "field_type": "text", "visible_when": { "field": "study_kind", "in": ["clinical", "field"] } },
+    { "field_key": "methods", "field_type": "multiselect", "visible_when": null },
+    { "field_key": "interview_guide", "field_type": "text", "visible_when": { "field": "methods", "equals": "interview" } },
+    { "field_key": "survey_or_panel", "field_type": "text", "visible_when": { "field": "methods", "in": ["survey", "panel"] } },
+    { "field_key": "moved_up", "field_type": "text", "visible_when": { "field": "last_answer", "equals": "yes" } },
+    { "field_key": "last_answer", "field_type": "select", "visible_when": null }
+  ],
+  "cases": [
+    {
+      "name": "nothing answered: an unticked box says no, and nothing else matches",
+      "data": {},
+      "hidden": ["minor_count", "parent_consent", "drug_name", "site_note", "interview_guide", "survey_or_panel", "moved_up"]
+    },
+    {
+      "name": "ticked, in every spelling a client sends",
+      "data": { "has_minors": true },
+      "hidden": ["no_minors_note", "parent_consent", "drug_name", "site_note", "interview_guide", "survey_or_panel", "moved_up"]
+    },
+    {
+      "name": "ticked as the string 1",
+      "data": { "has_minors": "1" },
+      "hidden": ["no_minors_note", "parent_consent", "drug_name", "site_note", "interview_guide", "survey_or_panel", "moved_up"]
+    },
+    {
+      "name": "unticked as the string 0",
+      "data": { "has_minors": "0" },
+      "hidden": ["minor_count", "parent_consent", "drug_name", "site_note", "interview_guide", "survey_or_panel", "moved_up"]
+    },
+    {
+      "name": "a number typed as text matches a numeric rule, down a chain",
+      "data": { "has_minors": true, "minor_count": "3" },
+      "hidden": ["no_minors_note", "drug_name", "site_note", "interview_guide", "survey_or_panel", "moved_up"]
+    },
+    {
+      "name": "a hidden controller's stale answer does not count",
+      "data": { "has_minors": false, "minor_count": "3" },
+      "hidden": ["minor_count", "parent_consent", "drug_name", "site_note", "interview_guide", "survey_or_panel", "moved_up"]
+    },
+    {
+      "name": "one choice against equals and in",
+      "data": { "study_kind": "clinical" },
+      "hidden": ["minor_count", "parent_consent", "interview_guide", "survey_or_panel", "moved_up"]
+    },
+    {
+      "name": "a choice only the in list holds",
+      "data": { "study_kind": "field" },
+      "hidden": ["minor_count", "parent_consent", "drug_name", "interview_guide", "survey_or_panel", "moved_up"]
+    },
+    {
+      "name": "several choices match when any one does",
+      "data": { "methods": ["interview", "panel"] },
+      "hidden": ["minor_count", "parent_consent", "drug_name", "site_note", "moved_up"]
+    },
+    {
+      "name": "an empty list matches nothing",
+      "data": { "methods": [] },
+      "hidden": ["minor_count", "parent_consent", "drug_name", "site_note", "interview_guide", "survey_or_panel", "moved_up"]
+    },
+    {
+      "name": "a controller later in the form still decides",
+      "data": { "last_answer": "yes" },
+      "hidden": ["minor_count", "parent_consent", "drug_name", "site_note", "interview_guide", "survey_or_panel"]
+    }
+  ]
+}

@@ -225,6 +225,10 @@ final class PublicFormView
             'validation' => $field['validation'] ?? new \stdClass(),
             'section_key' => $field['section_key'] ?? null,
             'position' => (int) ($field['position'] ?? 0),
+            // Which question decides whether this one is asked. It names a key
+            // and a value from this same form, both of which the page already
+            // has, and the page cannot draw the form correctly without it.
+            'visible_when' => $field['visible_when'] ?? null,
             'multi_valued' => ($field['multi_valued'] ?? false) === true,
         ];
     }

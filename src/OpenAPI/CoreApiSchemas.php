@@ -6881,10 +6881,24 @@ final class CoreApiSchemas
                 'prefill_backed' => self::bool(),
                 'section_key' => self::str(true),
                 'position' => self::int(),
+                'visible_when' => SchemaBuilder::ref('FormFieldCondition'),
                 'multi_valued' => self::bool(),
                 'created_at' => self::str(),
                 'updated_at' => self::str(),
             ], ['id', 'tenant_id', 'form_id', 'field_key', 'field_type', 'label', 'is_required', 'position']),
+            // Null means always shown. Exactly one of `equals` and `in` is set.
+            // A hidden question is not required and an answer to it is not stored.
+            'FormFieldCondition' => [
+                'type' => 'object',
+                'nullable' => true,
+                'properties' => [
+                    'field' => self::str(),
+                    'equals' => ['description' => 'Text, a number, or true or false, compared with the answer.'],
+                    'in' => ['type' => 'array', 'items' => self::str(), 'maxItems' => 100],
+                ],
+                'required' => ['field'],
+                'additionalProperties' => false,
+            ],
             'FormFieldOption' => self::object([
                 'value' => self::name(nonEmpty: true),
                 'label' => self::localizedText(),
@@ -6972,6 +6986,7 @@ final class CoreApiSchemas
                 'validation' => SchemaBuilder::ref('FormFieldValidation') + ['description' => 'Extra checks on the answer (length, range, pattern).'],
                 'prefill_source' => self::str(true) + ['description' => 'Fill the field in advance from the submitter\'s profile; sources are listed in the field list\'s `meta.prefill_sources`.'],
                 'section_key' => self::name() + ['description' => 'Section to group the field under; fields sharing a key form one section.'],
+                'visible_when' => SchemaBuilder::ref('FormFieldCondition') + ['description' => 'Show this question only when another answer matches; null means always.'],
                 // Absent means the server appends it after the current maximum.
                 'position' => self::int() + ['description' => 'Position in the form; omitted appends it at the end.'],
             ], ['field_key', 'field_type', 'label']),
@@ -7001,6 +7016,7 @@ final class CoreApiSchemas
                 'validation' => SchemaBuilder::ref('FormFieldValidation') + ['description' => 'Replacement checks on the answer.'],
                 'prefill_source' => self::str(true) + ['description' => 'Profile detail to prefill from; null for none.'],
                 'section_key' => self::name() + ['description' => 'Section to group the field under.'],
+                'visible_when' => SchemaBuilder::ref('FormFieldCondition') + ['description' => 'Show this question only when another answer matches; null means always.'],
                 'position' => self::int() + ['description' => 'New position in the form.'],
             ], []) + ['minProperties' => 1],
             // `prefill` is keyed by FIELD KEY, not by source: two fields may name
@@ -7096,6 +7112,7 @@ final class CoreApiSchemas
                 'validation' => ['type' => 'object', 'additionalProperties' => true],
                 'section_key' => self::str(true),
                 'position' => self::int(),
+                'visible_when' => SchemaBuilder::ref('FormFieldCondition'),
                 'multi_valued' => self::bool(),
             ], ['field_key', 'field_type', 'label', 'is_required', 'position']),
             // A RECEIPT, not the submission row. An anonymous caller gets

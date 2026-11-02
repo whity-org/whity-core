@@ -33,7 +33,7 @@ final class FormFieldRepository
 {
     private const COLUMNS = 'id, tenant_id, form_id, field_key, field_type, label, help_text,
                              is_required, options, validation, prefill_source, section_key, position,
-                             created_at, updated_at';
+                             visible_when, created_at, updated_at';
 
     /** Matches `VARCHAR(128)` in migration 127. */
     public const KEY_MAX = 128;
@@ -152,6 +152,7 @@ final class FormFieldRepository
                     $field['prefill_source'] === null ? null : (string) $field['prefill_source'],
                     $field['section_key'] === null ? null : (string) $field['section_key'],
                     $position,
+                    /** @var array<string, mixed>|null */ $field['visible_when'] ?? null,
                 );
             }
 
@@ -209,6 +210,7 @@ final class FormFieldRepository
      * @param array<string, string> $label      A `{ar?, en?}` label.
      * @param list<array{value: string, label: array<string, string>}> $options
      * @param array<string, mixed>  $validation
+     * @param array<string, mixed>|null $visibleWhen See {@see FieldCondition}.
      *
      * @throws FormRejectedException When the form already holds the key.
      */
@@ -225,15 +227,18 @@ final class FormFieldRepository
         ?string $prefillSource,
         ?string $sectionKey,
         ?int $position,
+        ?array $visibleWhen = null,
     ): int {
         try {
             $stmt = $this->db->prepare(
                 'INSERT INTO form_fields
                      (tenant_id, form_id, field_key, field_type, label, help_text, is_required,
-                      options, validation, prefill_source, section_key, position, created_at, updated_at)
+                      options, validation, prefill_source, section_key, position, visible_when,
+                      created_at, updated_at)
                  VALUES
                      (:tenant_id, :form_id, :field_key, :field_type, :label, :help_text, :is_required,
-                      :options, :validation, :prefill_source, :section_key, :position, NOW(), NOW())'
+                      :options, :validation, :prefill_source, :section_key, :position, :visible_when,
+                      NOW(), NOW())'
             );
             $stmt->execute([
                 ':tenant_id' => $tenantId,
@@ -251,6 +256,7 @@ final class FormFieldRepository
                 ':prefill_source' => $prefillSource,
                 ':section_key' => $sectionKey,
                 ':position' => $position ?? $this->nextPosition($tenantId, $formId),
+                ':visible_when' => $visibleWhen === null ? null : self::encodeJson($visibleWhen, '{}'),
             ]);
         } catch (PDOException $e) {
             throw new FormRejectedException(
@@ -319,6 +325,12 @@ final class FormFieldRepository
             $validation = $changes['validation'];
             $sets[] = 'validation = :validation';
             $params[':validation'] = self::encodeJson($validation, '{}');
+        }
+        if (array_key_exists('visible_when', $changes)) {
+            /** @var array<string, mixed>|null $visibleWhen */
+            $visibleWhen = $changes['visible_when'];
+            $sets[] = 'visible_when = :visible_when';
+            $params[':visible_when'] = $visibleWhen === null ? null : self::encodeJson($visibleWhen, '{}');
         }
 
         $stmt = $this->db->prepare(
@@ -425,6 +437,9 @@ final class FormFieldRepository
             'prefill_backed' => $prefill !== null && PrefillSource::isBacked($prefill),
             'section_key' => $row['section_key'] === null ? null : (string) $row['section_key'],
             'position' => (int) $row['position'],
+            'visible_when' => ($row['visible_when'] ?? null) === null
+                ? null
+                : self::decodeJsonMap($row['visible_when']),
             'created_at' => (string) $row['created_at'],
             'updated_at' => (string) $row['updated_at'],
             // Derived from the type, so a renderer does not carry a second copy
