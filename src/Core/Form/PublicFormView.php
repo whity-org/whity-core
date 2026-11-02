@@ -162,7 +162,7 @@ final class PublicFormView
     public static function answerableFields(array $fields): array
     {
         $out = [];
-        foreach ($fields as $field) {
+        foreach (FormFieldRepository::applicantFields($fields) as $field) {
             if (self::isPubliclyAnswerable((string) ($field['field_type'] ?? ''))) {
                 $out[] = $field;
             }
@@ -187,7 +187,7 @@ final class PublicFormView
     public static function unanswerableFieldKeys(array $fields): array
     {
         $out = [];
-        foreach ($fields as $field) {
+        foreach (FormFieldRepository::applicantFields($fields) as $field) {
             if (!self::isPubliclyAnswerable((string) ($field['field_type'] ?? ''))) {
                 $out[] = (string) ($field['field_key'] ?? '');
             }

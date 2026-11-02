@@ -2687,6 +2687,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/form-submissions/{id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What the office recorded about a submission
+         * @description The current review, every earlier one, and the staff fields they answer. The applicant has no route to this.
+         */
+        get: operations["get_api_v1_form_submissions_id_review"];
+        put?: never;
+        /**
+         * Record the office's decision on a submission
+         * @description Checked against the form's staff fields as a submission is checked against its own, and sent whole. Each save is a new row and the newest is current, so changing a decision leaves the old one readable. The submission itself is never changed. Works on a closed form. `meta.ignored_keys` names answers that matched no staff field.
+         */
+        post: operations["post_api_v1_form_submissions_id_review"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/forms": {
         parameters: {
             query?: never;
@@ -8529,6 +8553,8 @@ export interface components {
             section_key?: string | null;
             position: number;
             visible_when?: components["schemas"]["FormFieldCondition"];
+            /** @enum {string} */
+            audience?: "applicant" | "staff";
             multi_valued?: boolean;
             created_at?: string;
             updated_at?: string;
@@ -8566,6 +8592,11 @@ export interface components {
             section_key?: string;
             /** @description Show this question only when another answer matches; null means always. */
             visible_when?: components["schemas"]["FormFieldCondition"];
+            /**
+             * @description Who answers it. A staff field is never shown to the applicant; the office answers it when recording a review.
+             * @enum {string}
+             */
+            audience?: "applicant" | "staff";
             /** @description Position in the form; omitted appends it at the end. */
             position?: number;
         };
@@ -8612,6 +8643,11 @@ export interface components {
             section_key?: string;
             /** @description Show this question only when another answer matches; null means always. */
             visible_when?: components["schemas"]["FormFieldCondition"];
+            /**
+             * @description Who answers it. A staff field is never shown to the applicant.
+             * @enum {string}
+             */
+            audience?: "applicant" | "staff";
             /** @description New position in the form. */
             position?: number;
         };
@@ -8717,6 +8753,28 @@ export interface components {
         };
         FormSubmissionListResponse: {
             data: components["schemas"]["FormSubmission"][];
+        };
+        FormSubmissionReview: {
+            id: number;
+            submission_id: number;
+            data: {
+                [key: string]: unknown;
+            };
+            recorded_by_profile_id?: number | null;
+            recorded_at: string;
+        };
+        FormSubmissionReviewDetailResponse: {
+            data: {
+                current: components["schemas"]["FormSubmissionReview"];
+                history: components["schemas"]["FormSubmissionReview"][];
+                fields: components["schemas"]["FormField"][];
+            };
+        };
+        FormSubmissionReviewResponse: {
+            data: components["schemas"]["FormSubmissionReview"];
+            meta?: {
+                ignored_keys?: string[];
+            };
         };
         FormUpdateRequest: {
             /** @description New name as `{"en": ..., "ar": ...}`; a plain string is read as English. */
@@ -25554,6 +25612,162 @@ export interface operations {
             };
             /** @description Method not allowed */
             405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_form_submissions_id_review: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The review and its history */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormSubmissionReviewDetailResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Submission not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_form_submissions_id_review: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FormSubmissionCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description The recorded review */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormSubmissionReviewResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Submission not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The form has no staff fields, or an answer failed validation */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -18133,6 +18133,208 @@
                 ]
             }
         },
+        "/api/v1/form-submissions/{id}/review": {
+            "get": {
+                "operationId": "get_api_v1_form_submissions_id_review",
+                "summary": "What the office recorded about a submission",
+                "tags": [
+                    "forms"
+                ],
+                "description": "The current review, every earlier one, and the staff fields they answer. The applicant has no route to this.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The review and its history",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/FormSubmissionReviewDetailResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Submission not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "operationId": "post_api_v1_form_submissions_id_review",
+                "summary": "Record the office's decision on a submission",
+                "tags": [
+                    "forms"
+                ],
+                "description": "Checked against the form's staff fields as a submission is checked against its own, and sent whole. Each save is a new row and the newest is current, so changing a decision leaves the old one readable. The submission itself is never changed. Works on a closed form. `meta.ignored_keys` names answers that matched no staff field.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/FormSubmissionCreateRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The recorded review",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/FormSubmissionReviewResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Submission not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "The form has no staff fields, or an answer failed validation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/forms": {
             "get": {
                 "operationId": "get_api_v1_forms",
@@ -52176,6 +52378,13 @@
                     "visible_when": {
                         "$ref": "#/components/schemas/FormFieldCondition"
                     },
+                    "audience": {
+                        "type": "string",
+                        "enum": [
+                            "applicant",
+                            "staff"
+                        ]
+                    },
                     "multi_valued": {
                         "type": "boolean"
                     },
@@ -52290,6 +52499,14 @@
                     "visible_when": {
                         "$ref": "#/components/schemas/FormFieldCondition",
                         "description": "Show this question only when another answer matches; null means always."
+                    },
+                    "audience": {
+                        "type": "string",
+                        "enum": [
+                            "applicant",
+                            "staff"
+                        ],
+                        "description": "Who answers it. A staff field is never shown to the applicant; the office answers it when recording a review."
                     },
                     "position": {
                         "type": "integer",
@@ -52434,6 +52651,14 @@
                     "visible_when": {
                         "$ref": "#/components/schemas/FormFieldCondition",
                         "description": "Show this question only when another answer matches; null means always."
+                    },
+                    "audience": {
+                        "type": "string",
+                        "enum": [
+                            "applicant",
+                            "staff"
+                        ],
+                        "description": "Who answers it. A staff field is never shown to the applicant."
                     },
                     "position": {
                         "type": "integer",
@@ -52806,6 +53031,90 @@
                         "type": "array",
                         "items": {
                             "$ref": "#/components/schemas/FormSubmission"
+                        }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "FormSubmissionReview": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "submission_id": {
+                        "type": "integer"
+                    },
+                    "data": {
+                        "type": "object",
+                        "additionalProperties": true
+                    },
+                    "recorded_by_profile_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "recorded_at": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "submission_id",
+                    "data",
+                    "recorded_at"
+                ]
+            },
+            "FormSubmissionReviewDetailResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "current": {
+                                "$ref": "#/components/schemas/FormSubmissionReview",
+                                "nullable": true
+                            },
+                            "history": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/FormSubmissionReview"
+                                }
+                            },
+                            "fields": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/FormField"
+                                }
+                            }
+                        },
+                        "required": [
+                            "current",
+                            "history",
+                            "fields"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "FormSubmissionReviewResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/FormSubmissionReview"
+                    },
+                    "meta": {
+                        "type": "object",
+                        "properties": {
+                            "ignored_keys": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            }
                         }
                     }
                 },

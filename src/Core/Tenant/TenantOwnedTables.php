@@ -498,6 +498,10 @@ final class TenantOwnedTables
         // state is unreachable by construction, since the only path that could
         // ever reference it is the claim, which refuses a claimed row.
         'form_uploads' => '133_create_form_uploads.php',
+        // `form_submission_reviews` (migration 194) — the office's record on a
+        // submission. Every statement binds `tenant_id`, so a submission id from
+        // another tenant reads as not found.
+        'form_submission_reviews' => '194_add_form_staff_fields_and_reviews.php',
         // Convening (migrations 130/131/134) — deliberative bodies, who sits on
         // them, their meetings, the agenda each meeting carries, the decisions
         // taken, who was invited, and who actually turned up. All seven are

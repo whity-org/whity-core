@@ -98,7 +98,7 @@ final class FormSubmissionsApiHandler
                 $tenantId,
                 self::actorProfileId($request),
                 $form,
-                $this->fields->listForForm($tenantId, $formId),
+                FormFieldRepository::applicantFields($this->fields->listForForm($tenantId, $formId)),
                 $answers,
             );
 

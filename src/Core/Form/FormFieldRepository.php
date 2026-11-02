@@ -33,7 +33,11 @@ final class FormFieldRepository
 {
     private const COLUMNS = 'id, tenant_id, form_id, field_key, field_type, label, help_text,
                              is_required, options, validation, prefill_source, section_key, position,
-                             visible_when, created_at, updated_at';
+                             visible_when, audience, created_at, updated_at';
+
+    /** Who answers a question (migration 194). */
+    public const AUDIENCE_APPLICANT = 'applicant';
+    public const AUDIENCE_STAFF = 'staff';
 
     /** Matches `VARCHAR(128)` in migration 127. */
     public const KEY_MAX = 128;
@@ -51,6 +55,38 @@ final class FormFieldRepository
 
     public function __construct(private readonly PDO $db)
     {
+    }
+
+    /**
+     * The questions an applicant is asked.
+     *
+     * The one filter every applicant surface goes through, so what a form shows and
+     * what a submission is checked against cannot differ. An answer sent for a staff
+     * question falls out as an unknown key and is dropped.
+     *
+     * @param list<array<string, mixed>> $fields
+     * @return list<array<string, mixed>>
+     */
+    public static function applicantFields(array $fields): array
+    {
+        return array_values(array_filter(
+            $fields,
+            static fn (array $field): bool => ($field['audience'] ?? self::AUDIENCE_APPLICANT) !== self::AUDIENCE_STAFF,
+        ));
+    }
+
+    /**
+     * The questions the office answers.
+     *
+     * @param list<array<string, mixed>> $fields
+     * @return list<array<string, mixed>>
+     */
+    public static function staffFields(array $fields): array
+    {
+        return array_values(array_filter(
+            $fields,
+            static fn (array $field): bool => ($field['audience'] ?? self::AUDIENCE_APPLICANT) === self::AUDIENCE_STAFF,
+        ));
     }
 
     /**
@@ -153,6 +189,7 @@ final class FormFieldRepository
                     $field['section_key'] === null ? null : (string) $field['section_key'],
                     $position,
                     /** @var array<string, mixed>|null */ $field['visible_when'] ?? null,
+                    (string) ($field['audience'] ?? self::AUDIENCE_APPLICANT),
                 );
             }
 
@@ -228,17 +265,18 @@ final class FormFieldRepository
         ?string $sectionKey,
         ?int $position,
         ?array $visibleWhen = null,
+        string $audience = self::AUDIENCE_APPLICANT,
     ): int {
         try {
             $stmt = $this->db->prepare(
                 'INSERT INTO form_fields
                      (tenant_id, form_id, field_key, field_type, label, help_text, is_required,
                       options, validation, prefill_source, section_key, position, visible_when,
-                      created_at, updated_at)
+                      audience, created_at, updated_at)
                  VALUES
                      (:tenant_id, :form_id, :field_key, :field_type, :label, :help_text, :is_required,
                       :options, :validation, :prefill_source, :section_key, :position, :visible_when,
-                      NOW(), NOW())'
+                      :audience, NOW(), NOW())'
             );
             $stmt->execute([
                 ':tenant_id' => $tenantId,
@@ -257,6 +295,7 @@ final class FormFieldRepository
                 ':section_key' => $sectionKey,
                 ':position' => $position ?? $this->nextPosition($tenantId, $formId),
                 ':visible_when' => $visibleWhen === null ? null : self::encodeJson($visibleWhen, '{}'),
+                ':audience' => $audience,
             ]);
         } catch (PDOException $e) {
             throw new FormRejectedException(
@@ -296,6 +335,7 @@ final class FormFieldRepository
             'prefill_source' => ':prefill_source',
             'section_key' => ':section_key',
             'position' => ':position',
+            'audience' => ':audience',
         ];
         foreach ($simple as $column => $placeholder) {
             if (array_key_exists($column, $changes)) {
@@ -445,6 +485,7 @@ final class FormFieldRepository
             'visible_when' => ($row['visible_when'] ?? null) === null
                 ? null
                 : self::decodeJsonMap($row['visible_when']),
+            'audience' => (string) ($row['audience'] ?? self::AUDIENCE_APPLICANT),
             'created_at' => (string) $row['created_at'],
             'updated_at' => (string) $row['updated_at'],
             // Derived from the type, so a renderer does not carry a second copy
