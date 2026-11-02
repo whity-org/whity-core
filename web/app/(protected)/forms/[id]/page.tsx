@@ -23,6 +23,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whit
 import { Button } from '@whity/ui/button';
 import { useDirection } from '@/lib/direction-context';
 import { apiClient } from '@/lib/api-client';
+import { useTranslation } from '@whity/features/i18n';
 import {
   FormField,
   localized,
@@ -32,19 +33,22 @@ import {
   type ReferenceOption,
   type UploadedFileRef,
 } from '@/components/forms/form-fields';
+import { useRefusalMessage, type RefusalBody } from '@/components/forms/form-refusals';
 
 interface RenderedForm {
   form: {
     id: number;
     name: LocalizedText | string | null;
     description: string | null;
+    description_i18n?: LocalizedText | [] | null;
+    submit_label?: LocalizedText | null;
     status: string;
     public_enabled?: boolean;
     public_url?: string | null;
   };
   fields: FormFieldSpec[];
   prefill: Record<string, unknown>;
-  unresolved_prefill: string[];
+  unresolved_prefill: Array<{ field_key: string }>;
   accepts_submissions: boolean;
 }
 
@@ -71,9 +75,13 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
   const { id } = use(params);
   const { dir } = useDirection();
   const preferArabic = dir === 'rtl';
+  const t = useTranslation('forms');
+  const refusalMessage = useRefusalMessage();
 
   const [rendered, setRendered] = useState<RenderedForm | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  // Which failure, not its wording: the words are chosen when they are drawn, so a
+  // language loading late can't refetch the form and reseed the answers below.
+  const [loadError, setLoadError] = useState<'notOpened' | 'loadFailed' | null>(null);
   const [loading, setLoading] = useState(true);
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -123,7 +131,9 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
         const body = (await response.json().catch(() => ({}))) as { data?: RenderedForm; error?: string };
         if (cancelled) return;
         if (!response.ok || !body.data) {
-          setLoadError(body.error ?? 'This form could not be opened.');
+          // Only a 404 or a permission refusal reaches here, and neither says
+          // more than this to the person looking at it.
+          setLoadError('notOpened');
 
           return;
         }
@@ -144,7 +154,7 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
         setRestored(Object.keys(draft).length > 0);
       })
       .catch(() => {
-        if (!cancelled) setLoadError('This form could not be loaded. Check your connection and try again.');
+        if (!cancelled) setLoadError('loadFailed');
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -186,6 +196,12 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
     [rendered]
   );
 
+  function labelOf(fieldKey: string): string {
+    const field = rendered?.fields.find((candidate) => candidate.field_key === fieldKey);
+
+    return (field !== undefined ? localized(field.label, preferArabic) : '') || fieldKey;
+  }
+
   /**
    * Upload one file and hand back the reference the `file` answer will carry.
    *
@@ -199,10 +215,9 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
    * ambient credential. A cross-site page cannot set it without a preflight the
    * origin allowlist refuses.
    *
-   * THROWS the server's own sentence. It is the only party that knows the size
-   * ceiling and the accepted kinds, and it already writes them for a person —
-   * "That file is too large — the limit is 10 MB." beats anything this page
-   * could invent from a status code.
+   * THROWS the refusal in the reader's language. The server is the only party that
+   * knows the size ceiling and the accepted kinds, and it sends them as a reason
+   * and numbers for {@link useRefusalMessage} to word.
    */
   async function uploadAttachment(file: File): Promise<UploadedFileRef> {
     const body = new FormData();
@@ -213,12 +228,11 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
       headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
       body,
     });
-    const payload = (await response.json().catch(() => ({}))) as {
-      data?: UploadedFileRef;
-      error?: string;
-    };
+    const payload = (await response.json().catch(() => ({}))) as RefusalBody & { data?: UploadedFileRef };
     if (!response.ok || payload.data === undefined) {
-      throw new Error(payload.error ?? 'That file could not be uploaded. Please try again.');
+      throw new Error(
+        refusalMessage(payload, labelOf, t('field.uploadFailed', 'That file could not be uploaded. Please try again.'))
+      );
     }
 
     return payload.data;
@@ -245,9 +259,11 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
         },
         body: JSON.stringify({ data: answers }),
       });
-      const body = (await response.json().catch(() => ({}))) as { error?: string };
+      const body = (await response.json().catch(() => ({}))) as RefusalBody;
       if (!response.ok) {
-        setSubmitError(body.error ?? 'This could not be submitted. Please check your answers and try again.');
+        setSubmitError(
+          refusalMessage(body, labelOf, t('fill.submitFailed', 'This could not be submitted. Please check your answers and try again.'))
+        );
 
         return;
       }
@@ -256,7 +272,7 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
       discardDraft();
       setSubmitted(true);
     } catch {
-      setSubmitError('This could not be submitted. Check your connection and try again.');
+      setSubmitError(t('fill.submitFailedConnection', 'This could not be submitted. Check your connection and try again.'));
     } finally {
       setSubmitting(false);
     }
@@ -265,7 +281,7 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
   if (loading) {
     return (
       <Card>
-        <CardContent className="py-10 text-center text-sm text-muted-foreground">Loading…</CardContent>
+        <CardContent className="py-10 text-center text-sm text-muted-foreground">{t('fill.loading', 'Loading…')}</CardContent>
       </Card>
     );
   }
@@ -274,22 +290,29 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
     return (
       <Card>
         <CardHeader>
-          <CardTitle>This form is not available</CardTitle>
-          <CardDescription>{loadError}</CardDescription>
+          <CardTitle>{t('fill.notAvailable', 'This form is not available')}</CardTitle>
+          <CardDescription>
+            {loadError === 'loadFailed'
+              ? t('fill.loadFailed', 'This form could not be loaded. Check your connection and try again.')
+              : t('fill.notOpened', 'This form could not be opened.')}
+          </CardDescription>
         </CardHeader>
       </Card>
     );
   }
 
-  const title = localized(rendered.form.name, preferArabic) || 'Form';
+  const title = localized(rendered.form.name, preferArabic) || t('fill.untitled', 'Form');
+  const translatedDescription = Array.isArray(rendered.form.description_i18n) ? null : rendered.form.description_i18n;
+  const description = localized(translatedDescription, preferArabic) || rendered.form.description;
+  const submitLabel = localized(rendered.form.submit_label, preferArabic) || t('fill.submit', 'Submit');
 
   if (submitted) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Submitted</CardTitle>
+          <CardTitle>{t('fill.sentMemberTitle', 'Submitted')}</CardTitle>
           <CardDescription>
-            {title} was recorded. It appears under your own submissions.
+            {t('fill.sentMember', '{title} was recorded. It appears under your own submissions.', { title })}
           </CardDescription>
         </CardHeader>
       </Card>
@@ -301,22 +324,20 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
       <Card>
         <CardHeader>
           <CardTitle>{title}</CardTitle>
-          {rendered.form.description !== null && rendered.form.description !== '' && (
-            <CardDescription>{rendered.form.description}</CardDescription>
-          )}
+          {description !== null && description !== '' && <CardDescription>{description}</CardDescription>}
         </CardHeader>
 
         <CardContent>
           {!rendered.accepts_submissions ? (
             <p className="py-6 text-sm text-muted-foreground">
-              This form is not accepting responses. Only a published form can be filled in.
+              {t('fill.notAcceptingMember', 'This form is not accepting responses. Only a published form can be filled in.')}
             </p>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-6" noValidate>
               {restored && (
                 <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-card p-3 text-sm shadow-2xs">
                   <span className="text-muted-foreground">
-                    Your unsent answers were restored from this browser.
+                    {t('fill.draftRestored', 'Your unsent answers were restored from this browser.')}
                   </span>
                   <Button
                     type="button"
@@ -328,7 +349,7 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
                       setRestored(false);
                     }}
                   >
-                    Start again
+                    {t('fill.startAgain', 'Start again')}
                   </Button>
                 </div>
               )}
@@ -347,8 +368,11 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
 
               {rendered.unresolved_prefill.length > 0 && (
                 <p className="text-xs text-muted-foreground">
-                  Some fields could not be filled in from your saved details (
-                  {rendered.unresolved_prefill.join(', ')}) — please complete them yourself.
+                  {t(
+                    'fill.unresolvedPrefill',
+                    'Some questions could not be filled in from your saved details ({fields}). Please complete them yourself.',
+                    { fields: rendered.unresolved_prefill.map((entry) => labelOf(entry.field_key)).join(', ') }
+                  )}
                 </p>
               )}
 
@@ -359,7 +383,7 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
               )}
 
               <Button type="submit" disabled={submitting}>
-                {submitting ? 'Submitting…' : 'Submit'}
+                {submitting ? t('fill.submitting', 'Submitting…') : submitLabel}
               </Button>
             </form>
           )}

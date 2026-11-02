@@ -20,6 +20,7 @@ import { useState } from 'react';
 import { Input } from '@whity/ui/input';
 import { Textarea } from '@whity/ui/textarea';
 import { Checkbox } from '@whity/ui/checkbox';
+import { useTranslation } from '@whity/features/i18n';
 
 export interface LocalizedText {
   ar?: string;
@@ -32,6 +33,8 @@ export interface FormFieldSpec {
   field_type: string;
   label: LocalizedText | string | null;
   help_text: string | null;
+  /** The help text in each language; `help_text` is one of these for older clients. */
+  help_text_i18n?: LocalizedText | [] | null;
   is_required: boolean;
   options: Array<{ value?: string; label?: LocalizedText | string } | string>;
   multi_valued: boolean;
@@ -172,6 +175,7 @@ function FileField({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [attached, setAttached] = useState<{ name: string; size: number } | null>(null);
+  const t = useTranslation('forms');
 
   if (upload === undefined) {
     // No uploader means this surface cannot accept files. Say so rather than
@@ -179,7 +183,7 @@ function FileField({
     // worse than an absent one.
     return (
       <p className="text-sm text-muted-foreground" role="note">
-        Files cannot be attached here.
+        {t('field.noFiles', 'Files cannot be attached here.')}
       </p>
     );
   }
@@ -212,17 +216,24 @@ function FileField({
               // The answer is cleared, not left pointing at whatever was
               // attached before — see the component docblock.
               onChange('');
-              setError(cause instanceof Error ? cause.message : 'That file could not be uploaded.');
+              setError(
+                cause instanceof Error
+                  ? cause.message
+                  : t('field.uploadFailed', 'That file could not be uploaded. Please try again.')
+              );
             })
             .finally(() => setBusy(false));
         }}
       />
 
-      {busy && <p className="text-xs text-muted-foreground">Uploading…</p>}
+      {busy && <p className="text-xs text-muted-foreground">{t('field.uploading', 'Uploading…')}</p>}
 
       {!busy && attached !== null && (
         <p className="text-xs text-muted-foreground">
-          Attached: {attached.name} ({humanSize(attached.size)})
+          {t('field.attached', 'Attached: {name} ({size})', {
+            name: attached.name,
+            size: humanSize(attached.size),
+          })}
         </p>
       )}
 
@@ -267,7 +278,11 @@ export function FormField({
    */
   upload?: FileUploader;
 }) {
+  const t = useTranslation('forms');
   const label = localized(field.label, preferArabic) || field.field_key;
+  // Empty translations come back from the server as `{}`, or `[]` from an older one.
+  const translatedHelp = Array.isArray(field.help_text_i18n) ? null : field.help_text_i18n;
+  const help = localized(translatedHelp, preferArabic) || field.help_text;
   const id = `field-${field.field_key}`;
   const multiple = field.field_type === 'multiselect' || field.multi_valued;
 
@@ -282,9 +297,7 @@ export function FormField({
         )}
       </label>
 
-      {field.help_text !== null && field.help_text !== '' && (
-        <p className="text-xs text-muted-foreground">{field.help_text}</p>
-      )}
+      {help !== null && help !== '' && <p className="text-xs text-muted-foreground">{help}</p>}
 
       {field.field_type === 'file' ? (
         // AN UPLOAD, not a text box. Before this branch existed a `file` field
@@ -313,7 +326,7 @@ export function FormField({
             checked={value === true}
             onCheckedChange={(checked) => onChange(checked === true)}
           />
-          <span className="text-sm text-muted-foreground">Yes</span>
+          <span className="text-sm text-muted-foreground">{t('field.yes', 'Yes')}</span>
         </div>
       ) : multiple ? (
         // CHECKBOXES, not `<select multiple>`. A native multi-select is a list
