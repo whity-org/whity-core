@@ -24,6 +24,12 @@ namespace Whity\Core\Form;
  *
  * Every catch site in this subsystem returns `->clientMessage`, never
  * `->getMessage()`.
+ *
+ * `$reason`, `$fieldKey` AND `$params` ARE THE TRANSLATABLE HALF. `$clientMessage`
+ * is English, so a page in Arabic cannot show it. A refusal about one answer also
+ * says which question and why, in a stable code, and the page words it in the
+ * reader's language and takes them to that question. {@see details()} is what goes
+ * on the wire; the sentence stays for callers that have no words of their own.
  */
 final class FormRejectedException extends \RuntimeException
 {
@@ -33,12 +39,37 @@ final class FormRejectedException extends \RuntimeException
      *                              client message when there is nothing extra to
      *                              say, so the common case stays a one-argument
      *                              call.
+     * @param string|null $reason   A stable code, e.g. `required`.
+     * @param string|null $fieldKey The question this is about, when there is one.
+     * @param array<string, int|float|string> $params Numbers the wording needs.
      */
     public function __construct(
         public readonly string $clientMessage,
         string $logMessage = '',
         ?\Throwable $previous = null,
+        public readonly ?string $reason = null,
+        public readonly ?string $fieldKey = null,
+        public readonly array $params = [],
     ) {
         parent::__construct($logMessage !== '' ? $logMessage : $clientMessage, 0, $previous);
+    }
+
+    /**
+     * The `details` of a 422 response. Empty when there is no code, so a refusal
+     * that has none looks as it always did.
+     *
+     * @return array<string, mixed>
+     */
+    public function details(): array
+    {
+        if ($this->reason === null) {
+            return [];
+        }
+
+        return array_filter([
+            'reason' => $this->reason,
+            'field_key' => $this->fieldKey,
+            'params' => $this->params === [] ? null : $this->params,
+        ], static fn (mixed $value): bool => $value !== null);
     }
 }

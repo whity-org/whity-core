@@ -320,6 +320,9 @@ final class SubmissionIssuer
                         . ($name !== '' ? $name : $key)
                         . ' — please attach it again.',
                     'form upload claim failed on field ' . $key . ' in tenant ' . $tenantId,
+                    null,
+                    'file_not_found',
+                    $key,
                 );
             }
 
@@ -449,7 +452,11 @@ final class SubmissionIssuer
                 $label = is_array($field['label'] ?? null) ? $field['label'] : [];
                 $name = LocalizedLabel::preferred($label);
                 throw new FormRejectedException(
-                    ($name !== '' ? $name : $key) . ' must name a record in this tenant'
+                    ($name !== '' ? $name : $key) . ' must name a record in this tenant',
+                    '',
+                    null,
+                    'bad_reference',
+                    $key,
                 );
             }
         }

@@ -215,6 +215,7 @@ final class PublicFormView
             'field_type' => (string) ($field['field_type'] ?? ''),
             'label' => $field['label'] ?? [],
             'help_text' => $field['help_text'] ?? null,
+            'help_text_i18n' => $field['help_text_i18n'] ?? new \stdClass(),
             'is_required' => ($field['is_required'] ?? false) === true,
             // The choices for a select, and the rules the server will apply
             // anyway. Withholding `validation` would only mean the person
@@ -264,8 +265,10 @@ final class PublicFormView
             'slug' => $form['public_slug'] ?? null,
             'name' => $form['name'] ?? [],
             'description' => $form['description'] ?? null,
+            'description_i18n' => $form['description_i18n'] ?? new \stdClass(),
+            'submit_label' => $form['submit_label'] ?? null,
             'fields' => $public,
-            'sections' => FormRenderer::sectionsOf($public),
+            'sections' => FormRenderer::sectionsOf($public, FormRenderer::sectionMeta($form)),
             // The single fact a renderer branches on: draw a submit button, or
             // draw a notice. Restated at the top level for the reason
             // {@see FormRenderer} restates it — a client made to dig for it

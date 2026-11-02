@@ -188,10 +188,7 @@ final class FormFieldsApiHandler
                 return $prefill;
             }
 
-            $helpText = self::optionalText($body, 'help_text');
-            if ($helpText instanceof Response) {
-                return $helpText;
-            }
+            $helpText = LocalizedLabel::optionalForStorage($body['help_text'] ?? null, 'help_text', InputLimits::TEXT_MAX);
             $sectionKey = self::optionalName($body, 'section_key');
             if ($sectionKey instanceof Response) {
                 return $sectionKey;
@@ -262,6 +259,14 @@ final class FormFieldsApiHandler
                 return Response::error("'fields' must be a list of field definitions", 422);
             }
 
+            /** @var array<string, array<string, string>> $existingHelp */
+            $existingHelp = [];
+            foreach ($this->fields->listForForm($tenantId, (int) $form['id']) as $row) {
+                if (is_array($row['help_text_i18n'])) {
+                    $existingHelp[(string) $row['field_key']] = $row['help_text_i18n'];
+                }
+            }
+
             /** @var list<array<string, mixed>> $normalised */
             $normalised = [];
             $seen = [];
@@ -310,10 +315,12 @@ final class FormFieldsApiHandler
                 if ($prefill instanceof Response) {
                     return $prefill;
                 }
-                $helpText = self::optionalText($entry, 'help_text');
-                if ($helpText instanceof Response) {
-                    return $helpText;
-                }
+                $helpText = LocalizedLabel::optionalForStorage(
+                    $entry['help_text'] ?? null,
+                    "fields[{$index}].help_text",
+                    InputLimits::TEXT_MAX,
+                    $existingHelp[$fieldKey] ?? [],
+                );
                 $sectionKey = self::optionalName($entry, 'section_key');
                 if ($sectionKey instanceof Response) {
                     return $sectionKey;
@@ -410,11 +417,14 @@ final class FormFieldsApiHandler
                 $changes['is_required'] = $body['is_required'] === true;
             }
             if (array_key_exists('help_text', $body)) {
-                $helpText = self::optionalText($body, 'help_text');
-                if ($helpText instanceof Response) {
-                    return $helpText;
-                }
-                $changes['help_text'] = $helpText;
+                /** @var array<string, string> $existingHelpText */
+                $existingHelpText = is_array($field['help_text_i18n']) ? $field['help_text_i18n'] : [];
+                $changes['help_text'] = LocalizedLabel::optionalForStorage(
+                    $body['help_text'],
+                    'help_text',
+                    InputLimits::TEXT_MAX,
+                    $existingHelpText,
+                );
             }
             if (array_key_exists('section_key', $body)) {
                 $sectionKey = self::optionalName($body, 'section_key');
@@ -809,28 +819,6 @@ final class FormFieldsApiHandler
             )),
             'prefill_sources' => $sources,
         ];
-    }
-
-    /**
-     * @param array<string, mixed> $body
-     */
-    private static function optionalText(array $body, string $field): string|null|Response
-    {
-        if (!array_key_exists($field, $body) || $body[$field] === null) {
-            return null;
-        }
-        if (!is_string($body[$field])) {
-            return Response::error("{$field} must be text or null", 422);
-        }
-        $value = trim($body[$field]);
-        if ($value === '') {
-            return null;
-        }
-        if ($violation = InputLimits::firstViolation([$field => [$value, InputLimits::TEXT_MAX]])) {
-            return $violation;
-        }
-
-        return $value;
     }
 
     /**

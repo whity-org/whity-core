@@ -33441,7 +33441,7 @@
                         }
                     },
                     "422": {
-                        "description": "An answer failed validation, or the form is outside its submission window",
+                        "description": "An answer failed validation, or the form is outside its submission window. A refused answer carries `details.reason`, `details.field_key` and sometimes `details.params`, so a page can word it in the reader's language.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -51866,6 +51866,37 @@
                         "type": "string",
                         "nullable": true
                     },
+                    "description_i18n": {
+                        "type": "object",
+                        "x-whity-localized-text": true,
+                        "properties": {
+                            "ar": {
+                                "type": "string"
+                            },
+                            "en": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "submit_label": {
+                        "type": "object",
+                        "x-whity-localized-text": true,
+                        "properties": {
+                            "ar": {
+                                "type": "string"
+                            },
+                            "en": {
+                                "type": "string"
+                            }
+                        },
+                        "nullable": true
+                    },
+                    "sections": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/FormSectionText"
+                        }
+                    },
                     "status": {
                         "type": "string",
                         "enum": [
@@ -52010,9 +52041,7 @@
                         "description": "Form name as `{\"en\": ..., \"ar\": ...}`; a plain string is read as English."
                     },
                     "description": {
-                        "type": "string",
-                        "maxLength": 10000,
-                        "description": "What the form is for."
+                        "description": "What the form is for: text, or `{\"en\": ..., \"ar\": ...}`."
                     },
                     "route_template_id": {
                         "type": "integer",
@@ -52105,6 +52134,18 @@
                     "help_text": {
                         "type": "string",
                         "nullable": true
+                    },
+                    "help_text_i18n": {
+                        "type": "object",
+                        "x-whity-localized-text": true,
+                        "properties": {
+                            "ar": {
+                                "type": "string"
+                            },
+                            "en": {
+                                "type": "string"
+                            }
+                        }
                     },
                     "is_required": {
                         "type": "boolean"
@@ -52219,9 +52260,7 @@
                         "description": "Field label as `{\"en\": ..., \"ar\": ...}`; a plain string is read as English."
                     },
                     "help_text": {
-                        "type": "string",
-                        "maxLength": 10000,
-                        "description": "Hint shown under the field."
+                        "description": "Hint shown under the field: text, or `{\"en\": ..., \"ar\": ...}`."
                     },
                     "is_required": {
                         "type": "boolean",
@@ -52365,9 +52404,7 @@
                         "description": "New label as `{\"en\": ..., \"ar\": ...}`; a plain string is read as English."
                     },
                     "help_text": {
-                        "type": "string",
-                        "maxLength": 10000,
-                        "description": "New hint shown under the field."
+                        "description": "New hint: text, or `{\"en\": ..., \"ar\": ...}`. Plain text sets the English and keeps the Arabic."
                     },
                     "is_required": {
                         "type": "boolean",
@@ -52563,11 +52600,72 @@
                         "items": {
                             "type": "string"
                         }
+                    },
+                    "title": {
+                        "type": "object",
+                        "x-whity-localized-text": true,
+                        "properties": {
+                            "ar": {
+                                "type": "string"
+                            },
+                            "en": {
+                                "type": "string"
+                            }
+                        },
+                        "nullable": true
+                    },
+                    "description": {
+                        "type": "object",
+                        "x-whity-localized-text": true,
+                        "properties": {
+                            "ar": {
+                                "type": "string"
+                            },
+                            "en": {
+                                "type": "string"
+                            }
+                        },
+                        "nullable": true
                     }
                 },
                 "required": [
                     "key",
                     "field_keys"
+                ]
+            },
+            "FormSectionText": {
+                "type": "object",
+                "properties": {
+                    "key": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "object",
+                        "x-whity-localized-text": true,
+                        "properties": {
+                            "ar": {
+                                "type": "string"
+                            },
+                            "en": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "description": {
+                        "type": "object",
+                        "x-whity-localized-text": true,
+                        "properties": {
+                            "ar": {
+                                "type": "string"
+                            },
+                            "en": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "required": [
+                    "key"
                 ]
             },
             "FormSubmission": {
@@ -52732,14 +52830,34 @@
                         "description": "New name as `{\"en\": ..., \"ar\": ...}`; a plain string is read as English."
                     },
                     "description": {
-                        "type": "string",
-                        "maxLength": 10000,
-                        "description": "New description."
+                        "description": "New description: text, or `{\"en\": ..., \"ar\": ...}`. Plain text sets the English and keeps the Arabic."
                     },
                     "route_template_id": {
                         "type": "integer",
                         "nullable": true,
                         "description": "Route template for approving submissions; null removes it."
+                    },
+                    "submit_label": {
+                        "type": "object",
+                        "x-whity-localized-text": true,
+                        "properties": {
+                            "ar": {
+                                "type": "string"
+                            },
+                            "en": {
+                                "type": "string"
+                            }
+                        },
+                        "nullable": true,
+                        "description": "What the submit button says; null for the default wording."
+                    },
+                    "sections": {
+                        "type": "array",
+                        "maxItems": 100,
+                        "items": {
+                            "$ref": "#/components/schemas/FormSectionText"
+                        },
+                        "description": "The title and description of each section, by `section_key`."
                     }
                 },
                 "minProperties": 1
@@ -57804,6 +57922,18 @@
                         "type": "string",
                         "nullable": true
                     },
+                    "help_text_i18n": {
+                        "type": "object",
+                        "x-whity-localized-text": true,
+                        "properties": {
+                            "ar": {
+                                "type": "string"
+                            },
+                            "en": {
+                                "type": "string"
+                            }
+                        }
+                    },
                     "is_required": {
                         "type": "boolean"
                     },
@@ -57863,6 +57993,31 @@
                             },
                             "description": {
                                 "type": "string",
+                                "nullable": true
+                            },
+                            "description_i18n": {
+                                "type": "object",
+                                "x-whity-localized-text": true,
+                                "properties": {
+                                    "ar": {
+                                        "type": "string"
+                                    },
+                                    "en": {
+                                        "type": "string"
+                                    }
+                                }
+                            },
+                            "submit_label": {
+                                "type": "object",
+                                "x-whity-localized-text": true,
+                                "properties": {
+                                    "ar": {
+                                        "type": "string"
+                                    },
+                                    "en": {
+                                        "type": "string"
+                                    }
+                                },
                                 "nullable": true
                             },
                             "fields": {
