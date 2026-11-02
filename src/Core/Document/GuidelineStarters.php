@@ -21,7 +21,8 @@ namespace Whity\Core\Document;
  * imitation of the real thing: lines are a fixed number of rows, the amount in
  * words and the running balance are typed in, and there is no JoFotara stamp or
  * reference. Nothing here makes a document compliant with JoFotara; section 16's
- * "Before shipping" review is still open.
+ * "Before shipping" review is still open. The invoice here is an Invoice: the
+ * Tax invoice is what Front Office adds (owner, 2 Nov 2026).
  */
 final class GuidelineStarters
 {
@@ -100,7 +101,7 @@ final class GuidelineStarters
     /** @return array{0: string, 1: list<array<string, mixed>>, 2: array<string, string>} */
     private function invoice(): array
     {
-        return [$this->t('Tax invoice', 'فاتورة ضريبية'), [
+        return [$this->t('Invoice', 'فاتورة'), [
             $this->facts([
                 [['Invoice no.', 'رقم الفاتورة'], $this->f('invoice_no', 'Invoice number', 'رقم الفاتورة', 'INV-1042')],
                 [['Bill to', 'العميل'], $this->f('bill_to', 'Bill to', 'العميل', 'Example Clinic')],

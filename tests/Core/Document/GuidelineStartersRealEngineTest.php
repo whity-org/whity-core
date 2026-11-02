@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Core\Document;
 
+use Database\Migrations\RetitleGuidelineInvoiceStarters;
 use Database\Migrations\SeedGuidelineDocumentStarters;
 use PDO;
 use PHPUnit\Framework\TestCase;
@@ -59,7 +60,8 @@ final class GuidelineStartersRealEngineTest extends TestCase
             self::assertDoesNotMatchRegularExpression('/\p{Arabic}/u', $starters[$key]['title']);
             self::assertMatchesRegularExpression('/\p{Arabic}/u', $starters[$key . '.ar']['title'], $key);
         }
-        self::assertSame('Tax invoice', $starters['editor.invoice']['title']);
+        self::assertSame('Invoice', $starters['editor.invoice']['title'], 'the Tax invoice is what Front Office adds');
+        self::assertSame('فاتورة', $starters['editor.invoice.ar']['title']);
         self::assertSame('A5', $starters['editor.receipt']['page']['size'], 'the receipt is A5 (section 16)');
     }
 
@@ -171,10 +173,11 @@ final class GuidelineStartersRealEngineTest extends TestCase
         self::assertSame('Our letter', $this->title(1, 'editor.letter'), "a changed copy is the workspace's");
         self::assertSame('Old invoice', $this->title(1, 'editor.invoice'), 'a published copy is left alone');
         self::assertNull($this->title(1, 'editor.exam'), 'a deleted starter stays deleted');
-        self::assertSame('Tax invoice', $this->title(1, 'editor.quote') === null ? null : $this->title(2, 'editor.invoice'), 'an untouched copy reaches the guideline');
+        self::assertNotNull($this->title(1, 'editor.quote'), 'the new starters arrive');
+        self::assertSame('Invoice', $this->title(2, 'editor.invoice'), 'an untouched copy reaches the guideline');
+        self::assertNotSame('[]', $this->blocksOf(2, 'editor.invoice'), 'with the guideline\'s content');
         self::assertSame('Letter', $this->title(2, 'editor.letter'));
-        self::assertSame('Tax invoice', $this->title(2, 'editor.invoice'));
-        self::assertSame('فاتورة ضريبية', $this->title(1, 'editor.invoice.ar'));
+                self::assertSame('فاتورة', $this->title(1, 'editor.invoice.ar'));
         self::assertSame('سند قبض', $this->title(2, 'editor.receipt.ar'));
         self::assertSame(count($this->seeder->starters()), $this->starterCount(2));
 
@@ -194,6 +197,48 @@ final class GuidelineStartersRealEngineTest extends TestCase
         self::assertNotNull($this->title(1, 'editor.quote'), 'a changed starter stays');
         self::assertNull($this->title(1, 'editor.receipt'));
         self::assertNotNull($this->title(1, 'editor.invoice'));
+    }
+
+    /** Migration 189 titled these "Tax invoice"; an untouched copy takes the new name. */
+    public function testTheInvoiceRetitleReachesOnlyUntouchedCopies(): void
+    {
+        $this->seeder->provisionTenant(1, 'Example Bakery');
+        $this->seeder->provisionTenant(2, 'Example Clinic');
+        $this->pdo->exec("UPDATE document_sources SET title = 'Tax invoice' WHERE starter_key = 'editor.invoice'");
+        $this->pdo->exec("UPDATE document_sources SET title = 'فاتورة ضريبية' WHERE starter_key = 'editor.invoice.ar'");
+        // Workspace 2 edited its English copy, published its Arabic one and has renamed nothing else.
+        $this->pdo->exec("UPDATE document_sources SET draft_version = 2 WHERE tenant_id = 2 AND starter_key = 'editor.invoice'");
+        $this->pdo->exec("UPDATE document_sources SET published_version = 1 WHERE tenant_id = 2 AND starter_key = 'editor.invoice.ar'");
+        // Workspace 1 deleted its Arabic copy.
+        $this->pdo->exec("DELETE FROM document_sources WHERE tenant_id = 1 AND starter_key = 'editor.invoice.ar'");
+
+        RetitleGuidelineInvoiceStarters::up($this->db);
+
+        self::assertSame('Invoice', $this->title(1, 'editor.invoice'));
+        self::assertNull($this->title(1, 'editor.invoice.ar'), 'a deleted starter stays deleted');
+        self::assertSame('Tax invoice', $this->title(2, 'editor.invoice'), "a changed copy is the workspace's");
+        self::assertSame('فاتورة ضريبية', $this->title(2, 'editor.invoice.ar'), 'a published copy is left alone');
+
+        RetitleGuidelineInvoiceStarters::up($this->db);
+        self::assertSame('Invoice', $this->title(1, 'editor.invoice'), 'running again changes nothing');
+    }
+
+    public function testTheRetitleLeavesATitleTheWorkspaceChose(): void
+    {
+        $this->seeder->provisionTenant(1, 'Example Bakery');
+        $this->pdo->exec("UPDATE document_sources SET title = 'Our bill' WHERE tenant_id = 1 AND starter_key = 'editor.invoice'");
+
+        RetitleGuidelineInvoiceStarters::up($this->db);
+
+        self::assertSame('Our bill', $this->title(1, 'editor.invoice'));
+    }
+
+    private function blocksOf(int $tenantId, string $key): string
+    {
+        $stmt = $this->pdo->prepare('SELECT blocks FROM document_sources WHERE tenant_id = :t AND starter_key = :k');
+        $stmt->execute([':t' => $tenantId, ':k' => $key]);
+
+        return (string) $stmt->fetchColumn();
     }
 
     /** A workspace as it was before this migration: the six older starters only. */
