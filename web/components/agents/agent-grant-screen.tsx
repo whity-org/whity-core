@@ -35,6 +35,7 @@ import {
   type GrantRow,
   type GrantSubject,
 } from './agent-grant';
+import { undoWindowWords } from './proposals';
 
 /** useFetch keeps only a message, so the 404 travels as this one. */
 const NOT_YOURS = 'agent-grant:not-yours';
@@ -73,6 +74,20 @@ export function AgentGrantScreen({ subject, backHref }: { subject: GrantSubject;
     refused_for_agents: t('agentGrant.withheld.refused', 'Nothing this permission allows is open to agents.'),
   };
 
+  const undoWords: Parameters<typeof undoWindowWords>[1] = {
+    unknownAgent: '',
+    acted: '',
+    asked: '',
+    approved: '',
+    declined: '',
+    minute: t('agentGrant.undo.minute', '1 minute'),
+    minutes: t('agentGrant.undo.minutes', '{n} minutes'),
+    hour: t('agentGrant.undo.hour', '1 hour'),
+    hours: t('agentGrant.undo.hours', '{n} hours'),
+    day: t('agentGrant.undo.day', '1 day'),
+    days: t('agentGrant.undo.days', '{n} days'),
+  };
+
   const hint = (row: GrantRow): string | undefined => {
     const parts: string[] = [];
     if (row.mode === null) parts.push(t('agentGrant.default', 'Default'));
@@ -84,6 +99,8 @@ export function AgentGrantScreen({ subject, backHref }: { subject: GrantSubject;
       effective.push(t('agentGrant.effective.write', 'Changes: {mode}').replace('{mode}', modeWords[row.effective.write]));
     }
     if (effective.length > 0) parts.push(effective.join(' · '));
+    const undoable = undoWindowWords(row.undoWindowSeconds, undoWords);
+    if (undoable) parts.push(t('agentGrant.undoable', 'Can be undone for {window}').replace('{window}', undoable));
     const withheld = Object.values(row.withheld)[0];
     if (withheld) parts.push(reasonWords[withheld.reason] ?? withheld.message);
     return parts.length > 0 ? parts.join(' — ') : undefined;

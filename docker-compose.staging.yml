@@ -381,7 +381,7 @@ services:
       - -c
       - |
         echo "[events-relay] domain-event relay started";
-        exec php public/index.php events:relay --max-runtime=3600
+        exec php bin/whity-cli events:relay --max-runtime=3600
 
   scheduler:
     build:
