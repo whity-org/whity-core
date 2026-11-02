@@ -11,6 +11,6 @@
 - Every visible string has an English default and an Arabic label. Use logical CSS properties; numbers, codes and amounts stay Western digits and left to right.
 - Example data uses Example Bakery and friends; plan names and prices stay `[plan name]` and `[price]`.
 - The reference for screens is `docs/design/components/` (each card's `README.md`, `index.html`) and `docs/design/screenshots/`; `13-app-map.md` maps each route to its cards. Compare built screens with the screenshots in both themes before calling UI work done.
-- Work one milestone per branch and pull request (`PLAN.md`), and stop for approval between milestones.
+- Work one milestone per branch and pull request (`PLAN.md`). Pull requests merge on green CI; only a release into main needs the owner.
 - Use the size tokens and `text-xs`, `text-sm` and the control sizes, never fixed sizes; the 13px floor and Larger text depend on it.
 - The document editor: section 18, `docs/design/handoff/editor/` (contract and TipTap mapping) and `docs/design/PLAN.md`.
