@@ -2,7 +2,7 @@
 
 ## Document editor
 
-The editor is designed (section 18, decisions E.1–E.39, the Document editor cards, `handoff/editor/`). This plan turns it into code in whity-core, one milestone at a time. Each milestone is a branch and a pull request; don't start the next until the owner has approved the last.
+The editor is designed (section 18, decisions E.1–E.39, the Document editor cards, `handoff/editor/`). This plan turns it into code in whity-core, one milestone at a time. Each milestone is a branch and a pull request; pull requests merge on green CI, and only a release into main needs the owner (owner, 2 Nov 2026).
 
 **Visual check for every milestone:** render the built screen at the card's size (see `cards.html`) in light and dark, and in Arabic where there's an Arabic card, and compare with `screenshots/`. Differences in spacing, colour, type or state are bugs unless the register says otherwise.
 
