@@ -379,7 +379,7 @@ function EmailSettingsForm({
                 <Badge
                   data-testid="email-password-status"
                   variant={hasPassword ? 'secondary' : 'outline'}
-                  className="text-[10px]"
+                  className="text-xs"
                 >
                   {hasPassword
                     ? t('settings.email.smtp.password.status.set', 'Password is set')

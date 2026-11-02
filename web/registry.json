@@ -108,6 +108,7 @@
       ],
       "registryDependencies": [
         "@whity/button",
+        "@whity/checkbox",
         "@whity/dropdown-menu",
         "@whity/empty-state",
         "@whity/input",

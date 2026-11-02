@@ -1,0 +1,1 @@
+Design system 2.9 foundation: 15px text with nothing below 13px, 40px controls, 48px table rows, and a per-person text size and Show technical details (`GET` and `PUT /api/v1/me/display-preferences`). Adds page states, confirm tiers, the save bar, `Stepper`, `SearchField`, `MoneyInput` and table row selection to `@whity/ui`.

@@ -426,7 +426,7 @@ function RouteFlowNodeCard({ data }: NodeProps<Node<RouteFlowNodeData>>) {
         <span className="flex items-center gap-1.5">
           <span className="truncate text-sm font-medium text-foreground">{title}</span>
           {step.decision && (
-            <span className="shrink-0 rounded bg-primary/10 px-1 text-[10px] font-medium uppercase text-primary">
+            <span className="shrink-0 rounded bg-primary/10 px-1 text-xs font-medium uppercase text-primary">
               {labels.decision}
             </span>
           )}
@@ -442,7 +442,7 @@ function RouteFlowNodeCard({ data }: NodeProps<Node<RouteFlowNodeData>>) {
               the title row cannot grow because of this. */}
           {step.satisfiedBy === 'delivery' && (
             <span
-              className="shrink-0 rounded bg-muted px-1 text-[10px] font-medium uppercase text-muted-foreground"
+              className="shrink-0 rounded bg-muted px-1 text-xs font-medium uppercase text-muted-foreground"
               data-slot="route-flow-node-delivery-badge"
             >
               {labels.delivery}
@@ -502,7 +502,7 @@ function RouteFlowNodeCard({ data }: NodeProps<Node<RouteFlowNodeData>>) {
             WebkitLineClamp: ROUTE_FLOW_MAX_NOTES,
             overflow: 'hidden',
           }}
-          className="text-[10px] uppercase leading-tight tracking-wide text-muted-foreground"
+          className="text-xs uppercase leading-tight tracking-wide text-muted-foreground"
         >
           {notes.join(' · ')}
         </span>

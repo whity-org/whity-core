@@ -15,6 +15,7 @@ import { getBranding, getBrandThemeCss } from "@/lib/branding";
 import { BrandingProvider } from "@/lib/branding-context";
 import { getThemeOverrides } from "@/lib/theme";
 import { ThemeModeProvider, ThemeModeInitScript } from "@/lib/theme-mode-context";
+import { DisplayPreferencesProvider, DisplayPreferencesInitScript } from "@/lib/display-preferences-context";
 import { DirectionInitScript } from "@/lib/direction-context";
 import { AppLanguageProvider } from "@/lib/app-language-provider";
 import { getUiPreferences } from "@/lib/ui-preferences";
@@ -115,6 +116,7 @@ export default async function RootLayout({
           of globals.css, rather than left to ThemeModeProvider's own effects.
         */}
         <ThemeModeInitScript />
+        <DisplayPreferencesInitScript />
         {/*
           Blocking for the same reason, and a louder one: `dir` decides where
           everything on the page IS. Applied after the theme script only because
@@ -161,6 +163,7 @@ export default async function RootLayout({
                 changes the identity without reloading the page. See
                 lib/ui-preferences-context.tsx.
               */}
+              <DisplayPreferencesProvider>
               <UiPreferencesProvider initial={uiPreferences}>
                 {/*
                   The language provider is ABOVE DirectionProvider deliberately:
@@ -185,6 +188,7 @@ export default async function RootLayout({
                   </DirectionProvider>
                 </AppLanguageProvider>
               </UiPreferencesProvider>
+              </DisplayPreferencesProvider>
             </AuthProvider>
           </ThemeModeProvider>
         </BrandingProvider>

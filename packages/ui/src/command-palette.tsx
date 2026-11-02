@@ -295,9 +295,9 @@ export function CommandPalette({
         </div>
         {footer !== undefined && (
           <div className="flex gap-4 border-t border-border px-4 py-2 text-[0.8125rem] text-muted-foreground">
-            <span><kbd className="me-1 rounded border border-border px-1 font-mono text-[0.6875rem]">↑↓</kbd>{footer.move}</span>
-            <span><kbd className="me-1 rounded border border-border px-1 font-mono text-[0.6875rem]">Enter</kbd>{footer.open}</span>
-            <span><kbd className="me-1 rounded border border-border px-1 font-mono text-[0.6875rem]">Esc</kbd>{footer.close}</span>
+            <span><kbd className="me-1 rounded border border-border px-1 font-mono text-xs">↑↓</kbd>{footer.move}</span>
+            <span><kbd className="me-1 rounded border border-border px-1 font-mono text-xs">Enter</kbd>{footer.open}</span>
+            <span><kbd className="me-1 rounded border border-border px-1 font-mono text-xs">Esc</kbd>{footer.close}</span>
           </div>
         )}
       </div>

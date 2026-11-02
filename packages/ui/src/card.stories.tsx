@@ -92,7 +92,7 @@ export const PluginStoreCard: Story = {
             </div>
           </div>
           <CardAction>
-            <Badge variant="secondary" className="text-[10px]">Verified</Badge>
+            <Badge variant="secondary" className="text-xs">Verified</Badge>
           </CardAction>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -100,8 +100,8 @@ export const PluginStoreCard: Story = {
             Automatically extract key takeaways, action items, and structural summaries from uploaded PDF and Word documents.
           </p>
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline" className="text-[10px]">Productivity</Badge>
-            <Badge variant="outline" className="text-[10px]">LLM Powered</Badge>
+            <Badge variant="outline" className="text-xs">Productivity</Badge>
+            <Badge variant="outline" className="text-xs">LLM Powered</Badge>
             <div className="ms-auto flex items-center gap-1 text-xs text-amber-500 font-semibold">
               <IconStarFilled className="size-3.5" />
               <span>4.9 (128)</span>
@@ -129,7 +129,7 @@ export const PluginStoreCard: Story = {
             </div>
           </div>
           <CardAction>
-            <Badge variant="info" className="text-[10px]">Installed</Badge>
+            <Badge variant="info" className="text-xs">Installed</Badge>
           </CardAction>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -137,8 +137,8 @@ export const PluginStoreCard: Story = {
             Stream seamless backups and document attachments directly to your AWS S3 or MinIO bucket storage.
           </p>
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline" className="text-[10px]">Storage</Badge>
-            <Badge variant="outline" className="text-[10px]">Cloud</Badge>
+            <Badge variant="outline" className="text-xs">Storage</Badge>
+            <Badge variant="outline" className="text-xs">Cloud</Badge>
             <div className="ms-auto flex items-center gap-1 text-xs text-amber-500 font-semibold">
               <IconStarFilled className="size-3.5" />
               <span>4.8 (84)</span>
@@ -180,7 +180,7 @@ export const FeatureInstallCard: Story = {
         </p>
 
         <div className="space-y-2 rounded-lg bg-muted/40 p-3 border border-border/50">
-          <span className="text-[11px] font-semibold text-foreground uppercase tracking-wider">Features Included:</span>
+          <span className="text-xs font-semibold text-foreground uppercase tracking-wider">Features Included:</span>
           <ul className="space-y-1.5 text-xs text-muted-foreground">
             <li className="flex items-center gap-2">
               <IconCheck className="size-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
@@ -233,7 +233,7 @@ export const InteractiveWithInputFieldCard: Story = {
         </div>
       </CardContent>
       <CardFooter className="border-t border-border/40 pt-3 flex items-center justify-between">
-        <span className="text-[11px] text-muted-foreground">Expires in 90 days</span>
+        <span className="text-xs text-muted-foreground">Expires in 90 days</span>
         <Button size="sm" variant="outline">
           Regenerate Key
         </Button>
@@ -257,7 +257,7 @@ export const InformationalCard: Story = {
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-semibold text-foreground font-heading">1.42 M</div>
-          <p className="text-[11px] text-muted-foreground mt-1">Average 48.2k requests / day</p>
+          <p className="text-xs text-muted-foreground mt-1">Average 48.2k requests / day</p>
         </CardContent>
       </Card>
 
@@ -273,7 +273,7 @@ export const InformationalCard: Story = {
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-semibold text-foreground font-heading">328</div>
-          <p className="text-[11px] text-muted-foreground mt-1">24 new tenants signed up this week</p>
+          <p className="text-xs text-muted-foreground mt-1">24 new tenants signed up this week</p>
         </CardContent>
       </Card>
 
@@ -289,7 +289,7 @@ export const InformationalCard: Story = {
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-semibold text-foreground font-heading">0 Incidents</div>
-          <p className="text-[11px] text-muted-foreground mt-1">Zero downtime over 90 days</p>
+          <p className="text-xs text-muted-foreground mt-1">Zero downtime over 90 days</p>
         </CardContent>
       </Card>
     </div>

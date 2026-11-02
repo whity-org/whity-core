@@ -224,13 +224,13 @@ export default function EmailDomainsPage() {
                     <Badge
                       data-testid={`email-domain-status-${d.id}`}
                       variant={d.is_verified ? 'default' : 'outline'}
-                      className="text-[10px]"
+                      className="text-xs"
                     >
                       {d.is_verified
                         ? t('settings.emailDomains.status.verified', 'Verified')
                         : t('settings.emailDomains.status.pending', 'Pending verification')}
                     </Badge>
-                    <Badge variant="secondary" className="text-[10px]">
+                    <Badge variant="secondary" className="text-xs">
                       {d.auto_provision
                         ? t('settings.emailDomains.autoProvision.on', 'Auto-provision on')
                         : t('settings.emailDomains.autoProvision.off', 'Auto-provision off')}

@@ -104,3 +104,60 @@ describe('curated icons', () => {
     }
   });
 });
+
+/**
+ * Ease of use (decision A.1): nothing a person reads below 13px, and Whity selects
+ * instead of native dropdowns. The screens still holding a native select are named
+ * here and leave with their milestone. Fixing one fails until it's removed from the
+ * list, so the list only shrinks.
+ */
+describe('ease of use (A.1)', () => {
+  const product = [
+    ...walk(path.join(ROOT, 'web', 'app')),
+    ...walk(path.join(ROOT, 'web', 'components')),
+    ...walk(path.join(ROOT, 'packages', 'ui', 'src')),
+    ...walk(path.join(ROOT, 'packages', 'features', 'src')),
+  ].filter((f) => f.endsWith('.tsx') && !f.includes('.stories.'));
+
+  const TOO_SMALL = /\btext-\[(?:\d|1[0-2])(?:\.\d+)?px\]|\btext-\[0?\.(?:[0-7]\d*|80\d*)rem\]/;
+  const NATIVE_SELECT = /<select\b/;
+
+  const NATIVE_SELECT_ALLOWED = [
+    'packages/features/src/demo-catalog/demo-catalog-detail.tsx',
+    'packages/features/src/i18n/EXAMPLE.tsx',
+    'packages/features/src/i18n/LanguageSwitcher.tsx',
+    'packages/ui/src/editor/block-toolbar.tsx',
+    'web/app/(protected)/admin/languages/create-modal.tsx',
+    'web/app/(protected)/admin/languages/page.tsx',
+    'web/app/(protected)/admin/languages/record-screen.tsx',
+    'web/app/(protected)/admin/plugins/store/page.tsx',
+    'web/app/(protected)/admin/settings/email-domains/page.tsx',
+    'web/app/(protected)/admin/settings/settings-shared.tsx',
+    'web/app/(protected)/admin/settings/sso/page.tsx',
+    'web/components/forms/form-fields.tsx',
+  ];
+
+  const relative = (f: string) => path.relative(ROOT, f).split(path.sep).join('/');
+
+  it('scans the product code', () => {
+    expect(product.length).toBeGreaterThan(200);
+  });
+
+  it('sets no fixed text size below 13px', () => {
+    expect(product.filter((f) => TOO_SMALL.test(readFileSync(f, 'utf8'))).map(relative)).toEqual([]);
+  });
+
+  it('the size scanner catches what it is meant to catch', () => {
+    for (const bad of ['text-[10px]', 'text-[12.5px]', 'text-[0.75rem]', 'text-[0.6875rem]', 'text-[.75rem]']) {
+      expect(TOO_SMALL.test(bad)).toBe(true);
+    }
+    for (const good of ['text-[13px]', 'text-[0.8125rem]', 'text-[0.9375rem]', 'text-xs', 'text-[15px]']) {
+      expect(TOO_SMALL.test(good)).toBe(false);
+    }
+  });
+
+  it('holds native selects only in the files named, and each named file still has one', () => {
+    const found = product.filter((f) => NATIVE_SELECT.test(readFileSync(f, 'utf8'))).map(relative).sort();
+    expect(found).toEqual([...NATIVE_SELECT_ALLOWED].sort());
+  });
+});

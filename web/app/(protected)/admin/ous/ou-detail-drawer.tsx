@@ -187,7 +187,7 @@ export function OuDetailDrawer({ ou, onClose, onAction, onChanged }: OuDetailDra
               <SheetDescription>
                 {ou.description ? ou.description : t('ous.detail.noDescription', 'No description.')}
               </SheetDescription>
-              <p className="mt-1 font-mono text-[0.625rem] text-muted-foreground">
+              <p className="mt-1 font-mono text-xs text-muted-foreground">
                 {t('ous.detail.slug', 'slug: {slug}', { slug: ou.slug })}
               </p>
             </SheetHeader>

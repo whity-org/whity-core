@@ -347,7 +347,7 @@ function ErrorTrackingSettingsForm({
                 <Badge
                   data-testid="error-tracking-dsn-status"
                   variant={hasDsn ? 'secondary' : 'outline'}
-                  className="text-[10px]"
+                  className="text-xs"
                 >
                   {hasDsn
                     ? t('settings.errorTracking.dsn.statusSet', 'DSN is set')

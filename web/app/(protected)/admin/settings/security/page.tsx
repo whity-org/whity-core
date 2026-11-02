@@ -259,7 +259,7 @@ function TwoFactorPoliciesSection({
                     <span className="font-medium text-foreground">
                       {scopeLabel(policy, ous ?? [], users ?? [], t)}
                     </span>
-                    <Badge variant="secondary" className="text-[10px] uppercase">
+                    <Badge variant="secondary" className="text-xs uppercase">
                       {policy.scope_type}
                     </Badge>
                   </div>
@@ -537,7 +537,7 @@ function EnrollmentStatusSection({ refreshKey }: { refreshKey: number }) {
       id: 'enrolled',
       header: t('settings.security.status.column.enrolled', '2FA status'),
       cell: (row) => (
-        <Badge variant={row.enrolled ? 'default' : 'destructive'} className="text-[10px]">
+        <Badge variant={row.enrolled ? 'default' : 'destructive'} className="text-xs">
           {row.enrolled
             ? t('settings.security.status.enrolled', 'Enrolled')
             : t('settings.security.status.notEnrolled', 'Not enrolled')}

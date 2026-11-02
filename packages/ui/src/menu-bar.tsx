@@ -194,7 +194,7 @@ function MenuBarLabel({ className, ...props }: React.ComponentProps<typeof Menub
   return (
     <MenubarPrimitive.Label
       data-slot="menu-bar-label"
-      className={cn("px-2 py-1 text-[0.625rem] font-semibold uppercase tracking-wide text-muted-foreground", className)}
+      className={cn("px-2 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground", className)}
       {...props}
     />
   )
@@ -215,7 +215,7 @@ function MenuBarShortcut({ className, ...props }: React.ComponentProps<"span">) 
     <span
       data-slot="menu-bar-shortcut"
       className={cn(
-        "ms-auto ps-4 text-[0.625rem] tracking-widest text-muted-foreground group-focus/menu-bar-item:text-accent-foreground",
+        "ms-auto ps-4 text-xs tracking-widest text-muted-foreground group-focus/menu-bar-item:text-accent-foreground",
         className
       )}
       {...props}

@@ -206,7 +206,7 @@ export function PluginStoreCard({
 
           {plugin.verified && (
             <div className="absolute top-2.5 right-2.5">
-              <Badge variant="default" className="text-[10px] shadow-xs">
+              <Badge variant="default" className="text-xs shadow-xs">
                 {text.verified}
               </Badge>
             </div>
@@ -215,10 +215,10 @@ export function PluginStoreCard({
 
         <CardHeader className="pt-3 space-y-1.5">
           {/* Rating Stars ABOVE Plugin Title in Color Neutral Styling */}
-          <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground/80">
+          <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground/80">
             <IconStarFilled className="size-3.5 text-muted-foreground/60" />
             <span className="font-semibold text-foreground">{plugin.rating.toFixed(1)}</span>
-            <span className="text-[10px] text-muted-foreground/70">({plugin.reviewCount} reviews)</span>
+            <span className="text-xs text-muted-foreground/70">({plugin.reviewCount} reviews)</span>
           </div>
 
           <div className="flex items-center gap-3">
@@ -241,7 +241,7 @@ export function PluginStoreCard({
           </p>
 
           <div className="flex items-center gap-2">
-            <Badge variant="outline" className="text-[10px]">{plugin.category}</Badge>
+            <Badge variant="outline" className="text-xs">{plugin.category}</Badge>
           </div>
         </CardContent>
 
@@ -382,13 +382,13 @@ export function InstalledPluginCard({
           </p>
 
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline" className="text-[10px]">{plugin.category}</Badge>
+            <Badge variant="outline" className="text-xs">{plugin.category}</Badge>
 
             {/* Version Rollback Dropdown */}
             {pastVersions.length > 0 && !stateConfig.disabled && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button size="xs" variant="outline" className="ms-auto text-[11px] gap-1.5 h-6">
+                  <Button size="xs" variant="outline" className="ms-auto text-xs gap-1.5 h-6">
                     <IconHistory className="size-3" />
                     <span>{text.rollback}</span>
                   </Button>
@@ -407,7 +407,7 @@ export function InstalledPluginCard({
                         <span className="font-semibold">v{ver.version}</span>
                       </div>
                       {ver.releasedLabel !== undefined && (
-                        <span className="text-[10px] text-muted-foreground">{ver.releasedLabel}</span>
+                        <span className="text-xs text-muted-foreground">{ver.releasedLabel}</span>
                       )}
                     </DropdownMenuItem>
                   ))}
@@ -511,7 +511,7 @@ export function InstalledPluginCard({
                 <IconAlertCircle className="size-4 shrink-0" />
                 Warning: Version Degradation
               </div>
-              <p className="text-[11px] opacity-90 leading-relaxed">
+              <p className="text-xs opacity-90 leading-relaxed">
                 Rolling back to v{rollbackTarget} will restore legacy schemas and configuration defaults. Ensure any data migration backups are complete.
               </p>
             </div>
@@ -585,7 +585,7 @@ function PluginDetailsModal({
             <div>
               <DialogTitle className="text-lg font-semibold flex items-center gap-2">
                 {plugin.name}
-                {plugin.verified && <Badge variant="default" className="text-[10px]">{text.verified}</Badge>}
+                {plugin.verified && <Badge variant="default" className="text-xs">{text.verified}</Badge>}
               </DialogTitle>
               <DialogDescription className="text-xs">
                 by {plugin.author} · Version v{plugin.version}
@@ -645,7 +645,7 @@ function PluginDetailsModal({
                   <div className="flex items-center justify-between">
                     <span className="font-semibold text-xs text-foreground">Version {ver.version}</span>
                     {ver.releasedLabel !== undefined && (
-                      <span className="text-[10px] text-muted-foreground">{ver.releasedLabel}</span>
+                      <span className="text-xs text-muted-foreground">{ver.releasedLabel}</span>
                     )}
                   </div>
                   {ver.changelog && (
@@ -759,10 +759,10 @@ function PluginImageGallery({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <span className="text-[11px] font-semibold text-foreground uppercase tracking-wider">
+        <span className="text-xs font-semibold text-foreground uppercase tracking-wider">
           Interface Gallery & Screenshots
         </span>
-        <span className="text-[10px] text-muted-foreground">
+        <span className="text-xs text-muted-foreground">
           {activeIndex + 1} of {items.length}
         </span>
       </div>
@@ -836,7 +836,7 @@ function PluginImageGallery({
               ) : (
                 <div className={cn("absolute inset-0 bg-linear-to-br", item.gradient)} />
               )}
-              <span className="relative z-10 text-[9px] font-semibold text-foreground/90 truncate drop-shadow-xs">
+              <span className="relative z-10 text-xs font-semibold text-foreground/90 truncate drop-shadow-xs">
                 {item.kind === "placeholder" ? item.label : item.title}
               </span>
             </button>
