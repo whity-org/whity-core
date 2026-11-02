@@ -1,5 +1,3 @@
-import * as React from "react"
-
 import { Icon } from "./icon"
 import { cn } from "./utils"
 

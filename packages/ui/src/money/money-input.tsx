@@ -34,11 +34,27 @@ function decimalsOf(text: string): number {
   return dot === -1 ? 0 : text.length - dot - 1
 }
 
+function isDigits(text: string): boolean {
+  for (const ch of text) {
+    if (ch < "0" || ch > "9") return false
+  }
+  return true
+}
+
+function groupThousands(digits: string): string {
+  const groups: string[] = []
+  for (let end = digits.length; end > 0; end -= 3) {
+    groups.unshift(digits.slice(Math.max(0, end - 3), end))
+  }
+  return groups.join(",")
+}
+
 function formatForBlur(text: string, decimals: number): string {
-  if (!/^-?\d*\.?\d*$/.test(text) || text === "" || text === "." || text === "-") return text
   const negative = text.startsWith("-")
-  const [whole = "", fraction = ""] = (negative ? text.slice(1) : text).split(".")
-  const grouped = (whole === "" ? "0" : whole.replace(/^0+(?=\d)/, "")).replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+  const [whole = "", fraction = "", ...rest] = (negative ? text.slice(1) : text).split(".")
+  // Text that isn't a plain number stays as typed, for the field's error to show.
+  if (rest.length > 0 || (whole === "" && fraction === "") || !isDigits(whole) || !isDigits(fraction)) return text
+  const grouped = groupThousands(whole.replace(/^0+/, "") || "0")
   const padded = decimals > 0 ? `.${fraction.padEnd(decimals, "0")}` : ""
   return `${negative ? "-" : ""}${grouped}${padded}`
 }
