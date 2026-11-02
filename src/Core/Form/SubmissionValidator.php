@@ -111,7 +111,15 @@ final class SubmissionValidator
                 continue;
             }
 
-            $values[$key] = self::normalizeOne($field, $type, $raw, $rules, $options);
+            $value = self::normalizeOne($field, $type, $raw, $rules, $options);
+
+            // Asked after normalizing, because `"0"`, `0` and `"false"` are all
+            // the same unticked box by the time they get here.
+            if ($required && $type === FieldType::CHECKBOX && $value !== true) {
+                throw new FormRejectedException(self::describe($field) . ' must be ticked');
+            }
+
+            $values[$key] = $value;
         }
 
         $ignored = [];
@@ -167,10 +175,16 @@ final class SubmissionValidator
     /**
      * Whether an answer counts as "not given".
      *
-     * A `checkbox` is the exception that makes the rule worth writing down: a
-     * false checkbox is an ANSWER — "no, I do not consent" — and treating it as
-     * blank would make a required consent box impossible to decline and, worse,
-     * would store nothing where the form promised to store a decision.
+     * A `checkbox` is the exception that makes the rule worth writing down: on an
+     * OPTIONAL box, false is an ANSWER — "no" — and is stored as one, so a reader
+     * can tell "they left it unticked" from "they were never sent this question".
+     *
+     * A REQUIRED box is different and {@see validate()} refuses it unticked.
+     * Required on a single checkbox means it must be ticked, which is what HTML's
+     * `required` means and what an author writing "I confirm the above" means. The
+     * rule used to be that false satisfied it, so a declaration nobody had made
+     * was stored and reported as submitted. A question whose honest answer may be
+     * no is a `select` with two choices.
      *
      * A WHITESPACE-ONLY STRING IS BLANK. The check trims before deciding rather
      * than after, because the per-kind normalizers trim too and a required field
