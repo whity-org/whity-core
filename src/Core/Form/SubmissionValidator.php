@@ -227,7 +227,7 @@ final class SubmissionValidator
             FieldType::SELECT => self::choice($field, $raw, $options),
             FieldType::MULTISELECT => self::choices($field, $raw, $options, $rules),
             FieldType::CHECKBOX => self::checkbox($field, $raw),
-            FieldType::FILE => self::storageReference($field, $raw),
+            FieldType::FILE => self::files($field, $raw, $rules),
             FieldType::PROFILE_REF, FieldType::OU_REF => self::reference($field, $raw),
             // Unreachable while the CHECK constraint and FieldType agree, which
             // FieldTypeTest enforces. Refused rather than passed through: a value
@@ -419,7 +419,39 @@ final class SubmissionValidator
     }
 
     /**
-     * A `file` answer: the storage key of an already-uploaded object.
+     * A `file` answer: one reference, or a list when the field allows several.
+     *
+     * A field with `validation.maxFiles` above 1 always stores a LIST, even of one,
+     * so a reader of the column never has to guess. Without it the answer stays the
+     * single string it has always been, and old submissions read unchanged.
+     *
+     * Repeats are removed here: an upload is single-use, so the same one twice would
+     * otherwise fail at the claim with a sentence that says the file is missing.
+     *
+     * @param array<string, mixed> $field
+     * @param array<string, mixed> $rules
+     * @return string|list<string>
+     */
+    private static function files(array $field, mixed $raw, array $rules): string|array
+    {
+        $max = self::intRule($rules, 'maxFiles') ?? 1;
+        if ($max <= 1) {
+            return self::storageReference($field, $raw);
+        }
+
+        $references = [];
+        foreach (is_array($raw) ? array_values($raw) : [$raw] as $one) {
+            $references[self::storageReference($field, $one)] = true;
+        }
+        if (count($references) > $max) {
+            throw self::refuse($field, 'too_many_files', " allows at most {$max} files", ['max' => $max]);
+        }
+
+        return array_map('strval', array_keys($references));
+    }
+
+    /**
+     * One `file` reference: the storage key of an already-uploaded object.
      *
      * Shape only. Whether the object EXISTS, and whether this caller may point at
      * it, is the storage subsystem's question and is deliberately not answered

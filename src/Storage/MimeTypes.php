@@ -33,6 +33,7 @@ final class MimeTypes
     /** @var array<string, string> */
     private const MAP = [
         'png'  => 'image/png',
+        'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         'webp' => 'image/webp',
         'svg'  => 'image/svg+xml',
         'ico'  => 'image/x-icon',

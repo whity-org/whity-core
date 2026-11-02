@@ -66,6 +66,8 @@ use Whity\Http\JsonBody;
  */
 final class FormFieldsApiHandler
 {
+    private const MAX_FILES_PER_QUESTION = 20;
+
     public function __construct(
         private readonly FormRepository $forms,
         private readonly FormFieldRepository $fields,
@@ -775,6 +777,18 @@ final class FormFieldsApiHandler
                 return Response::error('validation.pattern is not a valid expression', 422);
             }
             $rules['pattern'] = $pattern;
+        }
+
+        // HOW MANY files a `file` question takes. The ceiling is a stop on one
+        // question spending a tenant's storage, not a modelling opinion.
+        if (isset($raw['maxFiles'])) {
+            if (!is_int($raw['maxFiles']) || $raw['maxFiles'] < 1 || $raw['maxFiles'] > self::MAX_FILES_PER_QUESTION) {
+                return Response::error(
+                    'validation.maxFiles must be a whole number from 1 to ' . self::MAX_FILES_PER_QUESTION,
+                    422
+                );
+            }
+            $rules['maxFiles'] = $raw['maxFiles'];
         }
 
         // WHICH KIND of unit an `ou_ref` accepts.

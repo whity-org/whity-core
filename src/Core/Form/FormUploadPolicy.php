@@ -26,25 +26,22 @@ namespace Whity\Core\Form;
  * disagreeing is itself the signal, and the object would go on to be served with
  * a type its bytes contradict.
  *
- * WHY THE ALLOW-LIST IS THREE ENTRIES AND MUST STAY SMALL
+ * WHY THE ALLOW-LIST IS FOUR ENTRIES AND MUST STAY SMALL
  * -------------------------------------------------------
- * The case this exists for is an applicant attaching a published paper, or a
- * scan of a certificate. That is a PDF or a photograph, and both have magic
- * bytes that identify them with certainty in the first eight bytes.
+ * The case this exists for is an applicant attaching a published paper, a scan of
+ * a certificate, or a research protocol. That is a PDF, a photograph or a Word
+ * document. The first three have magic bytes that identify them with certainty in
+ * the first eight bytes.
  *
- * OFFICE FORMATS ARE DELIBERATELY ABSENT, and the reason is not fastidiousness.
- * A `.docx` IS a ZIP; so is a `.xlsx`, a `.jar`, and a zip bomb. Their leading
- * bytes are `PK\x03\x04` and nothing else, so "accept DOCX" cannot be
- * implemented as a magic-byte check at all — it is "accept any ZIP", plus a
- * decision to open and walk an archive supplied by an anonymous caller in order
- * to tell which kind it is. {@see \Whity\Core\PluginInstaller} does that work
- * for plugin packages, with zip-slip and zip-bomb defences and a permission gate
- * in front of it; a form attachment is not worth a second copy of that
- * apparatus. An author who needs a Word document asks for a PDF export, which is
- * what the recipient wanted anyway.
+ * WORD IS THE EXCEPTION, AND IT IS HANDLED APART. A `.docx` IS a ZIP, so a signature
+ * says nothing: `PK\x03\x04` is also a `.jar` and a zip bomb. Offices do ask for
+ * editable documents, so {@see WordDocumentInspector} reads the archive's index
+ * without unpacking it, and refuses macros. Other office formats stay out: nothing
+ * has asked for them, and each is a further way to put a file that can run code in
+ * front of somebody who trusts the form.
  *
- * Adding a kind here is a real decision: it needs an unambiguous signature, and
- * it widens what an unauthenticated caller can put in a tenant's bucket.
+ * Adding a kind here is a real decision: it needs a way to be certain what the bytes
+ * are, and it widens what an unauthenticated caller can put in a tenant's bucket.
  *
  * THE CEILINGS
  * -------------
@@ -72,6 +69,8 @@ namespace Whity\Core\Form;
  */
 final class FormUploadPolicy
 {
+    private const WORD_DOCUMENT = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
     /** Ceiling for an authenticated upload: 10 MiB. */
     public const MAX_BYTES = 10 * 1024 * 1024;
 
@@ -94,6 +93,7 @@ final class FormUploadPolicy
         'application/pdf' => 'pdf',
         'image/png'       => 'png',
         'image/jpeg'      => 'jpg',
+        self::WORD_DOCUMENT => 'docx',
     ];
 
     /**
@@ -107,6 +107,9 @@ final class FormUploadPolicy
         ["%PDF-", 'application/pdf'],
         ["\xff\xd8\xff", 'image/jpeg'],
     ];
+
+    /** @var list<string> */
+    private const ZIP_TYPES = ['application/zip', 'application/x-zip-compressed'];
 
     /**
      * Static policy only — never instantiated.
@@ -179,7 +182,7 @@ final class FormUploadPolicy
         $sniffed = self::sniff($bytes);
         if ($sniffed === null) {
             throw new FormRejectedException(
-                'That kind of file cannot be attached — please upload a PDF, PNG or JPEG.',
+                'That kind of file cannot be attached — please upload a PDF, Word (.docx), PNG or JPEG.',
                 'form upload refused: leading bytes match no accepted signature',
                 null,
                 'file_kind_refused',
@@ -187,6 +190,12 @@ final class FormUploadPolicy
         }
 
         $normalizedDeclared = self::normalizeDeclared($declared);
+        // A `.docx` IS a ZIP, and a browser on a machine with no Office installed
+        // says so. That is a true statement about the bytes rather than a relabel,
+        // and it excuses nothing else.
+        if ($sniffed === self::WORD_DOCUMENT && in_array($normalizedDeclared, self::ZIP_TYPES, true)) {
+            $normalizedDeclared = null;
+        }
         if ($normalizedDeclared !== null && $normalizedDeclared !== $sniffed) {
             // Not merely "the client was wrong". The two disagreeing is the
             // signal — an honest browser sends what it read off the file, so a
@@ -210,11 +219,16 @@ final class FormUploadPolicy
      * every input, so a caller would have to compare the answer against an
      * allow-list anyway — and their answer depends on which magic database the
      * container happens to ship, which is a policy that changes under you on a
-     * base-image bump. Three fixed signatures give the same verdict on every
-     * host, forever.
+     * base-image bump. Fixed signatures give the same verdict on every host,
+     * forever. Word has no signature of its own, so a ZIP goes to
+     * {@see WordDocumentInspector}.
      */
     public static function sniff(string $bytes): ?string
     {
+        if (str_starts_with($bytes, "PK\x03\x04")) {
+            return WordDocumentInspector::isWordDocument($bytes) ? self::WORD_DOCUMENT : null;
+        }
+
         foreach (self::SIGNATURES as [$magic, $type]) {
             if (str_starts_with($bytes, $magic)) {
                 return $type;

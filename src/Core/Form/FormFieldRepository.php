@@ -490,7 +490,7 @@ final class FormFieldRepository
             'updated_at' => (string) $row['updated_at'],
             // Derived from the type, so a renderer does not carry a second copy
             // of the vocabulary's rules.
-            'multi_valued' => FieldType::isMultiValued($type),
+            'multi_valued' => FieldType::isMultiValued($type) || self::allowsSeveralFiles($type, $row['validation'] ?? null),
         ];
     }
 
@@ -503,6 +503,16 @@ final class FormFieldRepository
     private static function emptyMapAsObject(array $map): array|\stdClass
     {
         return $map === [] ? new \stdClass() : $map;
+    }
+
+    private static function allowsSeveralFiles(string $type, mixed $validation): bool
+    {
+        if ($type !== FieldType::FILE) {
+            return false;
+        }
+        $max = self::decodeJsonMap($validation)['maxFiles'] ?? 1;
+
+        return is_int($max) && $max > 1;
     }
 
     private static function preferredOrNull(mixed $stored): ?string

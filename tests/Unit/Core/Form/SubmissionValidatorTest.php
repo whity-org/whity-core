@@ -117,6 +117,48 @@ final class SubmissionValidatorTest extends TestCase
         SubmissionValidator::validate($fields, []);
     }
 
+    public function testAFileQuestionWithoutMaxFilesStaysOneString(): void
+    {
+        $fields = [self::field('paper', FieldType::FILE)];
+
+        self::assertSame(['paper' => 'k/1.pdf'], SubmissionValidator::validate($fields, ['paper' => 'k/1.pdf'])['values']);
+
+        $this->expectException(FormRejectedException::class);
+        SubmissionValidator::validate($fields, ['paper' => ['k/1.pdf', 'k/2.pdf']]);
+    }
+
+    public function testAFileQuestionTakingSeveralAlwaysStoresAList(): void
+    {
+        $fields = [self::field('papers', FieldType::FILE, ['validation' => ['maxFiles' => 2]])];
+
+        self::assertSame(['papers' => ['k/1.pdf']], SubmissionValidator::validate($fields, ['papers' => 'k/1.pdf'])['values']);
+        self::assertSame(
+            ['papers' => ['k/1.pdf', 'k/2.pdf']],
+            SubmissionValidator::validate($fields, ['papers' => ['k/1.pdf', 'k/2.pdf', 'k/1.pdf']])['values'],
+        );
+    }
+
+    public function testAFileQuestionRefusesMoreThanItTakes(): void
+    {
+        $fields = [self::field('papers', FieldType::FILE, ['validation' => ['maxFiles' => 2]])];
+
+        try {
+            SubmissionValidator::validate($fields, ['papers' => ['k/1.pdf', 'k/2.pdf', 'k/3.pdf']]);
+            self::fail('expected a refusal');
+        } catch (FormRejectedException $e) {
+            self::assertSame(['reason' => 'too_many_files', 'field_key' => 'papers', 'params' => ['max' => 2]], $e->details());
+        }
+    }
+
+    public function testARequiredFileQuestionTakingSeveralRefusesAnEmptyList(): void
+    {
+        $fields = [self::field('papers', FieldType::FILE, ['is_required' => true, 'validation' => ['maxFiles' => 2]])];
+
+        $this->expectException(FormRejectedException::class);
+        $this->expectExceptionMessage('Papers is required');
+        SubmissionValidator::validate($fields, ['papers' => []]);
+    }
+
     public function testACheckboxRefusesAStringItCannotMeanAndDoesNotCoerceIt(): void
     {
         $fields = [self::field('accepts_terms', FieldType::CHECKBOX)];
