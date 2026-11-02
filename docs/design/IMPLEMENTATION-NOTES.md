@@ -25,6 +25,7 @@ Every file only the repo has stays, including the `Cover` card.
 - Text: the free-set paragraph in section 16; blocks and label sheets in section 18; M4d and plugin themes in `PLAN.md`; D1 in `13-app-map.md`; the corrected cross-references (M0 Q12).
 - `CLAUDE-snippet.md`: 2.9's version dropped three rules still in force. They are back: the 16px editor sheet, "with the permission it used", and the pointer to section 18 and `handoff/editor/`.
 - E.40-E.47 still have no cards. Themes need a picker and a screen (WHIT-785).
+- The owner's answers of 2 Nov: section 24 and its cards should describe workspace agents with per-person assignments (Q3); the settings paragraph in the app map should follow W.1 and W.2 (Q1); `PLAN.md`, `HANDOFF-PROMPT.md` and the snippet should say pull requests merge on green and only a release needs the owner (Q7). The Verified rule in S.4 should say that only an operator or Whity's store can grant it (Q2).
 
 ## Section 12, items 1-15
 
@@ -138,22 +139,22 @@ Server: S8. P01 Front Office is a separate product, and nothing here builds it.
 | S4 | A2 | Server form drafts (migration), responses summary, withdraw, Save the answer to, translatable form text (check the description column) |
 | S5 | A3 | Names for people in one batch, so "Account #" can go when the viewer lacks `users:read`; route usage count; withdraw a document |
 | S6 | A4 | Agent paused state (migration); counts and last active per agent; admin activity with a filter by agent; plain name, area and undo window per tool; what an agent may read; preset summaries |
-| S7 | A5 | `plugins:install` split from `plugins:upload` (grant by capability); 30-day keep on uninstall; trust, price and usage data; update approval; active on install; one nav item. Per-workspace install if Q4 says so |
+| S7 | A5 | `plugins:install` split from `plugins:upload` (grant by capability); 30-day keep on uninstall; trust, price and usage data; update approval; one nav item. Per-workspace install if Q4 says so. **Verified (Q2):** a server-side mark only an operator or Whity's store can grant, never set by a plugin's manifest, an upload or an install; the verification process; what native access means for a plugin's code, and the mechanism that loads it, decided before any third-party plugin runs natively. Unverified plugins stay in the frame, off after install |
 | S8 | A6 | Audit: names, sentences, agent filter, CSV. Tenants: plan and status. Remind for two-step. Plan change. Platform nav gates by system tenant. Email domains on a permission. 500 reference and maintenance signal. Inviter and role on an invitation. Amount in words in both languages |
 
 ## Questions for the owner
 
-The two registers merged with no conflict: no row was changed on both sides. The real conflicts are between 2.9 and decisions recorded elsewhere in the repo, or between 2.9's own files. Each has a default that holds until the owner says otherwise. None blocks A0.
+The two registers merged with no conflict: no row was changed on both sides. The real conflicts are between 2.9 and decisions recorded elsewhere in the repo, or between 2.9's own files. The owner answered Q1, Q2, Q3 and Q7 on 2 Nov 2026, as relayed by the orchestrator session. The others keep their defaults until the owner says otherwise.
 
-| # | Conflict | Default |
+| # | Conflict | Answer or default |
 | --- | --- | --- |
-| Q1 | **Settings.** D1 (31 Oct, app map) keeps Email, Storage, Languages and Feature flags in the settings area. W.1 and W.2 (2 Nov) move them to Platform and add Devices. Section 21 also calls a group "Workspace" | W.1 and W.2: they're newer, and those pages are already gated to the system tenant |
-| Q2 | **Verified plugins.** M0 Q8 keeps native rendering to first-party blocks, with every third-party plugin in the frame. E.17, S.4 and S.12 say Verified runs natively and is active on install | Q8. Verified means the publisher is checked; the plugin still runs in the frame |
-| Q3 | **What an agent is.** Section 24 and its cards say an agent works for one person, and anyone can create one with everything on Ask first. The decided plan (`AGENT-PERSONAS-AND-WHITY-AGENT.md`) has workspace agents under `agents:manage`, per-person assignments, and reads that can start Allowed | The built model. "Works for" reads from assignments, Everyone's agents lists the workspace's agents, the register's AI.1-AI.4 are unaffected |
+| Q1 | **Settings.** D1 (31 Oct, app map) keeps Email, Storage, Languages and Feature flags in the settings area. W.1 and W.2 (2 Nov) move them to Platform and add Devices. Section 21 also calls a group "Workspace" | **Owner: follow 2.9.** Those four go under Platform, and Devices is added. D1's paragraph in the app map is out of date on this |
+| Q2 | **Verified plugins.** M0 Q8 keeps native rendering to first-party blocks, with every third-party plugin in the frame. E.17, S.4 and S.12 say Verified runs natively and is active on install | **Owner: follow 2.9. This reverses M0 Q8.** Verified plugins run natively and activate on install. Nothing can become Verified by itself: only an operator or Whity's store can grant it. The frame stays as it is for everything else. The process, and what native access means for a plugin's code, are in S7 |
+| Q3 | **What an agent is.** Section 24 and its cards say an agent works for one person, and anyone can create one with everything on Ask first. The decided plan (`AGENT-PERSONAS-AND-WHITY-AGENT.md`) has workspace agents under `agents:manage`, per-person assignments, and reads that can start Allowed | **Owner: keep the 1 Nov decision, workspace agents as built.** "Works for" reads from assignments and Everyone's agents lists the workspace's agents. The design team should correct section 24 |
 | Q4 | **Where a plugin installs.** S.1 installs into one workspace. The plugin lifecycle looks install-wide (`PluginsApiHandler`) | Keep the lifecycle, build the pages. Check this first in S7 |
 | Q5 | **The form builder.** F.1 draws a canvas. Forms are descriptors so desktop and mobile share them | A web-only React builder; filling in keeps working on every platform |
 | Q6 | **Routes.** The app map has agents under `/admin/ai-principals` and the designer at `/admin/documents` | The built `/admin/agents`, `/admin/my-agents` and `/admin/document-sources/[id]` |
-| Q7 | **Approval between milestones.** `PLAN.md` and the snippet say to stop. The owner's standing rule is merge on green, with only a release needing approval | The standing rule. The text is left as the design team wrote it until the owner asks to change it |
+| Q7 | **Approval between milestones.** `PLAN.md` and the snippet say to stop. The owner's standing rule is merge on green, with only a release needing approval | **Owner: the standing rule.** `PLAN.md` now says so. `CLAUDE.md` and `CLAUDE-snippet.md` change once the owner confirms it in the session making the edit |
 | Q8 | **Larger text.** Marked open to change at 17px, every size one step up | Build it as drawn |
 
 Still not designed, on top of `HANDOFF.md`'s list: the user menu (WHIT-827), Decided and Edit in Approvals (WHIT-828), the impact plan (WHIT-829), issuing an agent credential (WHIT-830) and the theme picker (WHIT-785). The cards cover WHIT-826, most of WHIT-821 and the store revamp (WHIT-831). The Arabic cards' dark screenshots are the same files as the light ones in the package, so they aren't a target.
@@ -405,7 +406,7 @@ The 13 templates, amount in words and JoFotara (the rest of item 12) aren't in t
 | 5 | **Plural `documents:*` slugs and a `document_sources` table.** | As proposed in 3.1 and 3.5. |
 | 6 | **Field providers.** | `DocumentFieldProvider` per record type, registered by core (Company, Today) and plugins; Record blocks resolve through it. The contract carries the internal id and shows the display number. |
 | 7 | **Separate slugs, granted to readers.** | As proposed in 3.5. |
-| 8 | **Native rendering for first-party blocks only.** | Every third-party plugin uses the sandboxed frame, verified or not, until a signed-module mechanism exists. |
+| 8 | **Native rendering for first-party blocks only.** Reversed by the owner on 2 Nov 2026: see Q2 above. | Every third-party plugin uses the sandboxed frame, verified or not, until a signed-module mechanism exists. |
 | 9 | **The suggestion itself is the approval.** | No proposal is wrapped around an agent's suggestion. |
 | 10 | **PHP print view.** | As proposed in 3.7. `print.renderer` in the contract needs a register-approved rename or reinterpretation before M7. |
 | 11 | **TipTap 3.** | `handoff/editor/README.md` says TipTap 2; the build uses 3. |
