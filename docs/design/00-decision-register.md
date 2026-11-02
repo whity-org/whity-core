@@ -212,7 +212,7 @@ These are the building blocks for everything Whity Render prints. They were show
 | 6.7 | Footer | The JoFotara stamp, reference and "Page x of y" at the start side; the QR code ("Scan to verify") at the end side. |
 | 6.7 | Continuation pages | A small running header (logo, number, "continued"), the table header repeated, "Carried forward" at the foot, and totals on the last page only. |
 | — | Legal fields | Every legal field comes from tenant settings. Confirm the required invoice fields with an accountant and the JoFotara specification before shipping. |
-| 6.8 | Document set | All four groups are in scope for stage 8. Sales: quote, invoice, receipt, credit note (the Tax invoice, through JoFotara, is what Front Office adds; owner, 2 Nov 2026). Accounts: statement, payment reminder, delivery note. People: payslip, employment letter, leave approval. General: report, letter, purchase order. 80 mm thermal receipts come later. |
+| 6.8 | Document set | All four groups are in scope for stage 8. Sales: quote, invoice, receipt, credit note (the Tax invoice and the fiscal credit note, through JoFotara, are what Front Office adds; owner, 2 Nov 2026). Accounts: statement, payment reminder, delivery note. People: payslip, employment letter, leave approval. General: report, letter, purchase order. 80 mm thermal receipts come later. |
 
 ## Stage 7 · UI components (locked 28 Oct 2026)
 
