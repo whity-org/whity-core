@@ -52871,7 +52871,9 @@
                             "checkbox",
                             "file",
                             "profile_ref",
-                            "ou_ref"
+                            "ou_ref",
+                            "repeating",
+                            "signature"
                         ]
                     },
                     "label": {
@@ -52959,6 +52961,51 @@
                     "position"
                 ]
             },
+            "FormFieldColumn": {
+                "type": "object",
+                "properties": {
+                    "key": {
+                        "type": "string"
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "text",
+                            "textarea",
+                            "number",
+                            "date",
+                            "select",
+                            "checkbox"
+                        ]
+                    },
+                    "label": {
+                        "type": "object",
+                        "x-whity-localized-text": true,
+                        "properties": {
+                            "ar": {
+                                "type": "string"
+                            },
+                            "en": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "required": {
+                        "type": "boolean"
+                    },
+                    "options": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/FormFieldOption"
+                        }
+                    }
+                },
+                "required": [
+                    "key",
+                    "type",
+                    "label"
+                ]
+            },
             "FormFieldCondition": {
                 "type": "object",
                 "nullable": true,
@@ -53004,7 +53051,9 @@
                             "checkbox",
                             "file",
                             "profile_ref",
-                            "ou_ref"
+                            "ou_ref",
+                            "repeating",
+                            "signature"
                         ],
                         "description": "Kind of input: text, textarea, number, date, select, multiselect, checkbox, file, profile_ref (a person) or ou_ref (a unit)."
                     },
@@ -53156,7 +53205,9 @@
                             "checkbox",
                             "file",
                             "profile_ref",
-                            "ou_ref"
+                            "ou_ref",
+                            "repeating",
+                            "signature"
                         ],
                         "description": "Kind of input: text, textarea, number, date, select, multiselect, checkbox, file, profile_ref (a person) or ou_ref (a unit)."
                     },
@@ -53239,6 +53290,22 @@
                     "maxFiles": {
                         "type": "integer",
                         "description": "How many files a file question takes, 1 to 20. Above 1 the answer is a list."
+                    },
+                    "columns": {
+                        "type": "array",
+                        "maxItems": 20,
+                        "items": {
+                            "$ref": "#/components/schemas/FormFieldColumn"
+                        },
+                        "description": "The columns of a repeating question. Required on one."
+                    },
+                    "minRows": {
+                        "type": "integer",
+                        "description": "Fewest rows a repeating question takes when it has any."
+                    },
+                    "maxRows": {
+                        "type": "integer",
+                        "description": "Most rows a repeating question takes, up to 200."
                     }
                 }
             },
@@ -58898,7 +58965,10 @@
                             "date",
                             "select",
                             "multiselect",
-                            "checkbox"
+                            "checkbox",
+                            "file",
+                            "repeating",
+                            "signature"
                         ]
                     },
                     "label": {

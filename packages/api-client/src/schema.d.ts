@@ -8643,7 +8643,7 @@ export interface components {
             form_id: number;
             field_key: string;
             /** @enum {string} */
-            field_type: "text" | "textarea" | "number" | "date" | "select" | "multiselect" | "checkbox" | "file" | "profile_ref" | "ou_ref";
+            field_type: "text" | "textarea" | "number" | "date" | "select" | "multiselect" | "checkbox" | "file" | "profile_ref" | "ou_ref" | "repeating" | "signature";
             label: {
                 ar?: string;
                 en?: string;
@@ -8667,6 +8667,17 @@ export interface components {
             created_at?: string;
             updated_at?: string;
         };
+        FormFieldColumn: {
+            key: string;
+            /** @enum {string} */
+            type: "text" | "textarea" | "number" | "date" | "select" | "checkbox";
+            label: {
+                ar?: string;
+                en?: string;
+            };
+            required?: boolean;
+            options?: components["schemas"]["FormFieldOption"][];
+        };
         FormFieldCondition: {
             field: string;
             /** @description Text, a number, or true or false, compared with the answer. */
@@ -8680,7 +8691,7 @@ export interface components {
              * @description Kind of input: text, textarea, number, date, select, multiselect, checkbox, file, profile_ref (a person) or ou_ref (a unit).
              * @enum {string}
              */
-            field_type: "text" | "textarea" | "number" | "date" | "select" | "multiselect" | "checkbox" | "file" | "profile_ref" | "ou_ref";
+            field_type: "text" | "textarea" | "number" | "date" | "select" | "multiselect" | "checkbox" | "file" | "profile_ref" | "ou_ref" | "repeating" | "signature";
             /** @description Field label as `{"en": ..., "ar": ...}`; a plain string is read as English. */
             label: {
                 ar?: string;
@@ -8731,7 +8742,7 @@ export interface components {
              * @description Kind of input: text, textarea, number, date, select, multiselect, checkbox, file, profile_ref (a person) or ou_ref (a unit).
              * @enum {string}
              */
-            field_type?: "text" | "textarea" | "number" | "date" | "select" | "multiselect" | "checkbox" | "file" | "profile_ref" | "ou_ref";
+            field_type?: "text" | "textarea" | "number" | "date" | "select" | "multiselect" | "checkbox" | "file" | "profile_ref" | "ou_ref" | "repeating" | "signature";
             /** @description New label as `{"en": ..., "ar": ...}`; a plain string is read as English. */
             label?: {
                 ar?: string;
@@ -8766,6 +8777,12 @@ export interface components {
             pattern?: string;
             /** @description How many files a file question takes, 1 to 20. Above 1 the answer is a list. */
             maxFiles?: number;
+            /** @description The columns of a repeating question. Required on one. */
+            columns?: components["schemas"]["FormFieldColumn"][];
+            /** @description Fewest rows a repeating question takes when it has any. */
+            minRows?: number;
+            /** @description Most rows a repeating question takes, up to 200. */
+            maxRows?: number;
         };
         FormListResponse: {
             data: components["schemas"]["Form"][];
@@ -10248,7 +10265,7 @@ export interface components {
         PublicFormField: {
             field_key: string;
             /** @enum {string} */
-            field_type: "text" | "textarea" | "number" | "date" | "select" | "multiselect" | "checkbox";
+            field_type: "text" | "textarea" | "number" | "date" | "select" | "multiselect" | "checkbox" | "file" | "repeating" | "signature";
             label: {
                 ar?: string;
                 en?: string;

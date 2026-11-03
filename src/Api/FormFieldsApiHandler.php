@@ -12,6 +12,7 @@ use Whity\Core\Form\FormRepository;
 use Whity\Core\Form\FormStatus;
 use Whity\Core\Form\LocalizedLabel;
 use Whity\Core\Form\PrefillSource;
+use Whity\Core\Form\SubmissionValidator;
 use Whity\Core\Request;
 use Whity\Core\Response;
 use Whity\Core\Tenant\TenantContext;
@@ -67,6 +68,8 @@ use Whity\Http\JsonBody;
 final class FormFieldsApiHandler
 {
     private const MAX_FILES_PER_QUESTION = 20;
+
+    private const MAX_COLUMNS = 20;
 
     public function __construct(
         private readonly FormRepository $forms,
@@ -180,7 +183,7 @@ final class FormFieldsApiHandler
                 return $options;
             }
 
-            $validation = self::validationRules($body);
+            $validation = self::validationRules($body, $fieldType);
             if ($validation instanceof Response) {
                 return $validation;
             }
@@ -314,7 +317,7 @@ final class FormFieldsApiHandler
                 if ($options instanceof Response) {
                     return $options;
                 }
-                $validation = self::validationRules($entry);
+                $validation = self::validationRules($entry, $fieldType);
                 if ($validation instanceof Response) {
                     return $validation;
                 }
@@ -459,12 +462,18 @@ final class FormFieldsApiHandler
                 }
                 $changes['position'] = $position;
             }
-            if (array_key_exists('validation', $body)) {
-                $validation = self::validationRules($body);
+            // Asked of the rules it would end up with, so changing a field's type to
+            // `repeating` without sending any columns is refused like any other way
+            // of making a table with no columns.
+            if (array_key_exists('validation', $body) || $effectiveType === FieldType::REPEATING) {
+                $rules = array_key_exists('validation', $body) ? $body : ['validation' => (array) $field['validation']];
+                $validation = self::validationRules($rules, $effectiveType);
                 if ($validation instanceof Response) {
                     return $validation;
                 }
-                $changes['validation'] = $validation;
+                if (array_key_exists('validation', $body)) {
+                    $changes['validation'] = $validation;
+                }
             }
 
             // Options are re-derived whenever EITHER the options or the type
@@ -616,6 +625,73 @@ final class FormFieldsApiHandler
     }
 
     /**
+     * `columns`, `minRows` and `maxRows` for a repeating question.
+     *
+     * A table with no columns renders, accepts nothing, and reports success, so it is
+     * refused for the reason a `select` with no choices is.
+     *
+     * @param array<array-key, mixed> $raw
+     * @return array<string, mixed>|Response
+     */
+    private static function repeatingRules(array $raw): array|Response
+    {
+        $incoming = $raw['columns'] ?? null;
+        if (!is_array($incoming) || !array_is_list($incoming) || $incoming === [] || count($incoming) > self::MAX_COLUMNS) {
+            return Response::error('A table needs validation.columns: a list of 1 to ' . self::MAX_COLUMNS . ' columns', 422);
+        }
+
+        $columns = [];
+        $seen = [];
+        foreach ($incoming as $index => $column) {
+            $key = is_array($column) ? ($column['key'] ?? null) : null;
+            if (!is_string($key) || preg_match(FormFieldRepository::KEY_PATTERN, $key) !== 1 || strlen($key) > FormFieldRepository::KEY_MAX) {
+                return Response::error("validation.columns[{$index}].key must be a lower-case key", 422);
+            }
+            if (isset($seen[$key])) {
+                return Response::error("validation.columns[{$index}].key '{$key}' appears more than once", 422);
+            }
+            $seen[$key] = true;
+
+            $type = $column['type'] ?? null;
+            if (!is_string($type) || !in_array($type, FieldType::COLUMN_KINDS, true)) {
+                return Response::error(
+                    "validation.columns[{$index}].type must be one of: " . implode(', ', FieldType::COLUMN_KINDS),
+                    422
+                );
+            }
+
+            $options = self::options($column, $type);
+            if ($options instanceof Response) {
+                return $options;
+            }
+
+            $columns[] = [
+                'key' => $key,
+                'type' => $type,
+                'label' => LocalizedLabel::fromInput($column['label'] ?? null, "validation.columns[{$index}].label"),
+                'required' => ($column['required'] ?? false) === true,
+                'options' => $options,
+            ];
+        }
+
+        $rules = ['columns' => $columns];
+        foreach (['minRows', 'maxRows'] as $limit) {
+            if (!isset($raw[$limit])) {
+                continue;
+            }
+            if (!is_int($raw[$limit]) || $raw[$limit] < 1 || $raw[$limit] > SubmissionValidator::ROWS_MAX) {
+                return Response::error("validation.{$limit} must be a whole number from 1 to " . SubmissionValidator::ROWS_MAX, 422);
+            }
+            $rules[$limit] = $raw[$limit];
+        }
+        if (isset($rules['minRows'], $rules['maxRows']) && $rules['minRows'] > $rules['maxRows']) {
+            return Response::error('validation.minRows cannot be greater than validation.maxRows', 422);
+        }
+
+        return $rules;
+    }
+
+    /**
      * @param array<string, mixed> $body
      */
     private static function audience(array $body): string|Response
@@ -732,7 +808,7 @@ final class FormFieldsApiHandler
      * @param array<string, mixed> $body
      * @return array<string, mixed>|Response
      */
-    private static function validationRules(array $body): array|Response
+    private static function validationRules(array $body, string $fieldType = ''): array|Response
     {
         // `??` already turns an explicit null into the empty rule set, which is
         // what "clear the rules" means on a PATCH.
@@ -777,6 +853,14 @@ final class FormFieldsApiHandler
                 return Response::error('validation.pattern is not a valid expression', 422);
             }
             $rules['pattern'] = $pattern;
+        }
+
+        if ($fieldType === FieldType::REPEATING) {
+            $table = self::repeatingRules($raw);
+            if ($table instanceof Response) {
+                return $table;
+            }
+            $rules += $table;
         }
 
         // HOW MANY files a `file` question takes. The ceiling is a stop on one
