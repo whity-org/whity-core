@@ -107,13 +107,24 @@ final class FormsApiHandler
                 }
             }
 
+            $rows = $this->forms->listForTenant(
+                $tenantId,
+                $status,
+                self::intQuery($query, 'limit') ?? 100,
+                self::intQuery($query, 'offset') ?? 0,
+            );
+            $counts = $this->submissions->countForForms($tenantId, array_map(
+                static fn (array $form): int => (int) $form['id'],
+                $rows,
+            ));
+
             return Response::json([
-                'data' => array_map([$this, 'present'], $this->forms->listForTenant(
-                    $tenantId,
-                    $status,
-                    self::intQuery($query, 'limit') ?? 100,
-                    self::intQuery($query, 'offset') ?? 0,
-                )),
+                'data' => array_map(
+                    fn (array $form): array => $this->present($form) + [
+                        'submission_count' => $counts[(int) $form['id']] ?? 0,
+                    ],
+                    $rows,
+                ),
             ]);
         } catch (\Exception $e) {
             error_log('[FormsApiHandler] list failed: ' . $e->getMessage());
@@ -470,6 +481,80 @@ final class FormsApiHandler
             error_log('[FormsApiHandler] closeToMembers failed: ' . $e->getMessage());
 
             return Response::error('Failed to close this form to members', 500);
+        }
+    }
+
+    /**
+     * GET /api/v1/forms/{id}/preview — the form as a person filling it in would see it,
+     * whatever state it is in, for the author checking their work. On `forms:manage`
+     * because a draft's questions aren't anybody else's yet.
+     *
+     * `accepts_submissions` stays what it really is, so a preview can't be mistaken for
+     * the live form, and `preview` says which this is. Nothing here can be submitted.
+     *
+     * @param array<string, string> $params
+     */
+    public function preview(Request $request, array $params): Response
+    {
+        try {
+            $tenantId = self::tenantId();
+            if ($tenantId instanceof Response) {
+                return $tenantId;
+            }
+            $form = $this->forms->find($tenantId, (int) ($params['id'] ?? 0));
+            if ($form === null) {
+                return Response::error('Form not found', 404);
+            }
+
+            $rendered = $this->renderer->render($tenantId, self::actorProfileId($request), $form);
+            $rendered['form'] = $this->present($form);
+
+            return Response::json(['data' => $rendered + ['preview' => true]]);
+        } catch (\Exception $e) {
+            error_log('[FormsApiHandler] preview failed: ' . $e->getMessage());
+
+            return Response::error('Failed to preview form', 500);
+        }
+    }
+
+    /**
+     * DELETE /api/v1/forms/{id} — delete a form nobody has answered.
+     *
+     * A form with submissions is refused, because they would have nothing left to say
+     * what they answered: archive it instead. A published form is refused because
+     * people may have it open: archive it first.
+     *
+     * @param array<string, string> $params
+     */
+    public function delete(Request $request, array $params): Response
+    {
+        try {
+            $tenantId = self::tenantId();
+            if ($tenantId instanceof Response) {
+                return $tenantId;
+            }
+            $id = (int) ($params['id'] ?? 0);
+            $form = $this->forms->find($tenantId, $id);
+            if ($form === null) {
+                return Response::error('Form not found', 404);
+            }
+
+            if ((string) $form['status'] === FormStatus::PUBLISHED) {
+                return Response::error('This form is published. Archive it before deleting it.', 409, ['reason' => 'form_is_published']);
+            }
+            if (!$this->forms->deleteUnanswered($tenantId, $id)) {
+                return Response::error(
+                    'People have answered this form, so it can only be archived.',
+                    409,
+                    ['reason' => 'form_has_submissions']
+                );
+            }
+
+            return Response::json(['data' => ['deleted' => true]]);
+        } catch (\Exception $e) {
+            error_log('[FormsApiHandler] delete failed: ' . $e->getMessage());
+
+            return Response::error('Failed to delete form', 500);
         }
     }
 
