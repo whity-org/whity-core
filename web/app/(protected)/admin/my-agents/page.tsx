@@ -11,9 +11,11 @@ import { CopyBlock } from '@whity/ui/copy-block';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@whity/ui/dialog';
 import { Icon } from '@whity/ui/icon';
 import { AreaError, EmptyFirstTime, LoadingRows } from '@whity/ui/page-states';
+import { useDateDisplay } from '@whity/features/datetime';
 import { useFormattingLocale, useTranslation } from '@whity/features/i18n';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { AgentsTabs } from '@/components/agents/agents-tabs';
+import { OnItsOwn } from '@/components/agents/agent-status';
 import { localized, refusal, type MyAgent } from '@/components/agents/workspace-agents';
 import { useFetch } from '@/hooks/useFetch';
 import { useAuth } from '@/lib/auth-context';
@@ -23,12 +25,15 @@ import { useToast } from '@/lib/toast-context';
  * My agents (A20, TplAgents): the workspace's agents and which ones this
  * person uses (WHIT-820). Every member may use one for themselves, so
  * `/api/me/agents` has no permission gate. Stopping revokes its credentials and
- * can't be undone, so it asks first (tier 2). "On its own" counts, last active
- * and Pause wait for S6.
+ * can't be undone, so it asks first (tier 2). Each person sees their own use: how
+ * much it does on its own under their grant, today's count, and when it was last
+ * active. Only someone who manages agents can pause one, so a paused agent just
+ * says so here, and can't be connected until it is resumed.
  */
 export default function MyAgentsPage() {
   const t = useTranslation('admin');
   const arabic = useFormattingLocale() === 'ar';
+  const dates = useDateDisplay();
   const { apiClient } = useAuth();
   const { addToast } = useToast();
   const [connecting, setConnecting] = useState<MyAgent | null>(null);
@@ -69,6 +74,16 @@ export default function MyAgentsPage() {
       <div className="min-w-0 flex-1">
         <p className="font-medium">{nameOf(agent)}</p>
         <p className="text-sm text-muted-foreground">{localized(agent.role, agent.roleAr, arabic)}</p>
+        {agent.assignment !== null && (
+          <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+            <OnItsOwn counts={agent.onItsOwn} />
+            <span>{t('agentRecord.today', '{n} actions today', { n: agent.actionsToday })}</span>
+            {agent.waiting > 0 && <span>{t('myAgents.waiting', '{n} waiting for you', { n: agent.waiting })}</span>}
+            {dates.dateTime(agent.lastActiveAt) !== null && (
+              <span>{t('myAgents.lastActive', 'Last active {when}', { when: dates.dateTime(agent.lastActiveAt) ?? '' })}</span>
+            )}
+          </p>
+        )}
       </div>
       {agent.assignment === null ? (
         <Button variant="outline" disabled={busyId !== null} loading={busyId === agent.id} onClick={() => void act(agent, 'POST')}>
@@ -76,11 +91,15 @@ export default function MyAgentsPage() {
         </Button>
       ) : (
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="success">{t('myAgents.using', 'Working for you')}</Badge>
+          {agent.paused ? (
+            <Badge variant="outline">{t('agents.status.paused', 'Paused')}</Badge>
+          ) : (
+            <Badge variant="success">{t('myAgents.using', 'Working for you')}</Badge>
+          )}
           <Button variant="outline" asChild>
             <Link href={`/admin/my-agents/${agent.id}`}>{t('myAgents.permissions', 'What it may do')}</Link>
           </Button>
-          <Button variant="outline" onClick={() => setConnecting(agent)}>
+          <Button variant="outline" disabled={agent.paused} onClick={() => setConnecting(agent)}>
             {t('myAgents.connect', 'Connect an app')}
           </Button>
           <Button variant="ghost" onClick={() => setStopping(agent)}>

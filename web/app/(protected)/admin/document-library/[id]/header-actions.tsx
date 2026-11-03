@@ -2,10 +2,9 @@
 
 /**
  * The record's header actions (A30): Download PDF and Print as buttons, and a
- * ⋯ menu that holds the rarely used one, Add to a collection.
- *
- * Withdraw this document is on the card but no route withdraws a document yet
- * (server item S5), so it is not here.
+ * ⋯ menu that holds the rare ones, Add to a collection and Withdraw this document.
+ * Withdrawing asks first (tier 2): it cannot be undone. A withdrawn document keeps
+ * Download and Print, because the record is kept and someone may need the paper.
  *
  * The PDF is fetched through `apiClient` because its address is an API path that
  * needs the session; a plain link would arrive without it. The current version
@@ -13,9 +12,10 @@
  */
 
 import { useCallback, useState } from 'react';
-import { IconDots, IconDownload, IconFolderPlus, IconPrinter } from '@tabler/icons-react';
+import { IconDots, IconDownload, IconFolderPlus, IconLock, IconPrinter } from '@tabler/icons-react';
 import { useTranslation } from '@whity/features/i18n';
 import { Button } from '@whity/ui/button';
+import { ConfirmAction } from '@whity/ui/confirm-action';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,6 +24,8 @@ import {
 } from '@whity/ui/dropdown-menu';
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/lib/toast-context';
+import { useCapabilities } from '@/hooks/useCapabilities';
+import { DOCUMENTS_WITHDRAW } from '@/lib/capabilities';
 
 import { FileIntoCollectionDialog } from '../collection-dialogs';
 import type { DocumentCollection } from '../types';
@@ -31,6 +33,7 @@ import type { DocumentRecord } from './types';
 
 export interface DocumentHeaderActionsProps {
   record: DocumentRecord;
+  onWithdrawn: () => void;
 }
 
 /** A file name the browser will accept: the title with path characters removed. */
@@ -39,7 +42,7 @@ function pdfName(title: string): string {
   return `${cleaned === '' ? 'document' : cleaned}.pdf`;
 }
 
-export function DocumentHeaderActions({ record }: DocumentHeaderActionsProps) {
+export function DocumentHeaderActions({ record, onWithdrawn }: DocumentHeaderActionsProps) {
   const t = useTranslation('documents');
   const { apiClient } = useAuth();
   const { addToast } = useToast();
@@ -50,6 +53,9 @@ export function DocumentHeaderActions({ record }: DocumentHeaderActionsProps) {
   const [collections, setCollections] = useState<DocumentCollection[]>([]);
   const [filedIn, setFiledIn] = useState<number[]>(record.collection_ids ?? []);
   const [filingBusy, setFilingBusy] = useState(false);
+  const [withdrawing, setWithdrawing] = useState(false);
+  const { has } = useCapabilities();
+  const canWithdraw = has(DOCUMENTS_WITHDRAW) && (record.withdrawn_at ?? null) === null;
 
   const fetchPdf = useCallback(async (): Promise<Blob> => {
     if (current === null) throw new Error('no artifact');
@@ -133,6 +139,16 @@ export function DocumentHeaderActions({ record }: DocumentHeaderActionsProps) {
     [addToast, apiClient, record.id, t]
   );
 
+  const withdraw = useCallback(async () => {
+    const response = await apiClient(`/api/v1/documents/${record.id}/withdraw`, { method: 'POST' });
+    if (!response.ok) {
+      addToast(t('record.withdraw.error', 'The document could not be withdrawn'), 'error');
+      return;
+    }
+    addToast(t('record.withdraw.done', 'The document was withdrawn'), 'success');
+    onWithdrawn();
+  }, [addToast, apiClient, onWithdrawn, record.id, t]);
+
   const noFile = t('record.actions.noFile', 'Nothing has been rendered from this document yet');
 
   return (
@@ -166,8 +182,27 @@ export function DocumentHeaderActions({ record }: DocumentHeaderActionsProps) {
             <IconFolderPlus className="size-4 me-2" aria-hidden />
             {t('organizer.table.fileInto', 'Add to collection…')}
           </DropdownMenuItem>
+          {canWithdraw && (
+            <DropdownMenuItem variant="destructive" onSelect={() => setWithdrawing(true)}>
+              <IconLock className="size-4 me-2" aria-hidden />
+              {t('record.withdraw.action', 'Withdraw this document')}
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
+
+      <ConfirmAction
+        open={withdrawing}
+        onOpenChange={setWithdrawing}
+        title={t('record.withdraw.title', 'Withdraw {title}?', { title: record.title })}
+        description={t(
+          'record.withdraw.consequence',
+          'Its printed codes stop confirming it, anyone waiting on it is no longer asked, and it cannot be sent on or corrected. The record and its history are kept. This cannot be undone.'
+        )}
+        confirmLabel={t('record.withdraw.confirm', 'Withdraw document')}
+        cancelLabel={t('record.withdraw.cancel', 'Keep it')}
+        onConfirm={withdraw}
+      />
 
       <FileIntoCollectionDialog
         documentRow={filing ? { ...record, collection_ids: filedIn } : null}

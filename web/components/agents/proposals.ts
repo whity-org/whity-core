@@ -98,6 +98,11 @@ export function agentName(subject: Pick<AgentProposal, 'agent'>, words: Proposal
   return (words.arabic && subject.agent?.nameAr) || subject.agent?.name || words.unknownAgent;
 }
 
+/** What it did or would do in the reader's language; the server's own summary otherwise. */
+export function plainSummary(subject: Pick<AgentProposal, 'summary' | 'toolInfo'>, words: ProposalWords): string {
+  return (words.arabic && subject.toolInfo?.plainNameAr) || subject.summary;
+}
+
 /** Oldest first: the queue's order (register 7.5b). */
 export function oldestFirst(proposals: AgentProposal[]): AgentProposal[] {
   return [...proposals].sort((a, b) => a.id - b.id);
@@ -116,12 +121,13 @@ export function proposalActivity(
   const items: AgentActivityItem[] = [];
   for (const proposal of proposals) {
     const agent = agentName(proposal, words);
+    const summary = plainSummary(proposal, words);
     items.push({
       id: `${proposal.id}-asked`,
       kind: 'propose',
       actor: agent,
       onBehalfOf: you,
-      text: words.asked.replace('{summary}', proposal.summary),
+      text: words.asked.replace('{summary}', summary),
       timeLabel: time(proposal.createdAt),
       dateTime: proposal.createdAt,
       tool: proposal.tool,
@@ -132,7 +138,7 @@ export function proposalActivity(
         kind: proposal.status === 'approved' ? 'approve' : 'undo',
         actor: you,
         actorKind: 'person',
-        text: (proposal.status === 'approved' ? words.approved : words.declined).replace('{summary}', proposal.summary),
+        text: (proposal.status === 'approved' ? words.approved : words.declined).replace('{summary}', summary),
         timeLabel: time(proposal.decidedAt),
         dateTime: proposal.decidedAt,
       });
@@ -171,7 +177,7 @@ export function actionActivity(
     kind: action.status === 'undone' ? 'undo' : 'act',
     actor: agentName(action, words),
     onBehalfOf: you,
-    text: words.acted.replace('{summary}', action.summary),
+    text: words.acted.replace('{summary}', plainSummary(action, words)),
     timeLabel: time(action.createdAt),
     dateTime: action.createdAt,
     tool: action.tool,

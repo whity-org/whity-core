@@ -2,7 +2,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { test, expect } from './support/fixtures';
-import { ADMIN, DELEGATE_USER } from './support/constants';
+import { ADMIN, DELEGATE_USER, SYSTEM_ADMIN } from './support/constants';
 import { toastWithText } from './support/pages';
 import { LoginPage } from './support/pages';
 import {
@@ -47,7 +47,7 @@ const PLUGINS_URL = '/admin/plugins';
 
 /** Best-effort uninstall of the fixture plugin so the next run can re-upload. */
 async function uninstallFixture(baseURL: string): Promise<void> {
-  const api = await createAuthedApi(baseURL, ADMIN);
+  const api = await createAuthedApi(baseURL, SYSTEM_ADMIN);
   try {
     await api
       .post(`/api/v1/plugins/${FIXTURE_PLUGIN_ID}/uninstall`, {

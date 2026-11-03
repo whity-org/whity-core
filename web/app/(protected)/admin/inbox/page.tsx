@@ -148,6 +148,7 @@ export default function InboxPage() {
   const stateOf = (row: InboxItem): { label: string; done: boolean } | null => {
     const meta = routingMeta(row);
     if (meta === null) return null;
+    if (meta.document_withdrawn) return { label: t('inbox.state.withdrawn', 'Withdrawn'), done: true };
     if (!meta.open) return { label: t('inbox.state.done', 'Done'), done: true };
     if (meta.decision) return { label: t('inbox.state.decision', 'Your decision'), done: false };
     if (meta.arrived_by === 'returned') {

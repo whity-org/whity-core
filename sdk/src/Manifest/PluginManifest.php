@@ -309,6 +309,19 @@ final class PluginManifest
         return $this->map('agentPresets');
     }
 
+    /**
+     * This plugin's card on the home page (SDK 1.62), when it declares one.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function homeCard(): ?array
+    {
+        $card = $this->data['homeCard'] ?? null;
+
+        /** @var array<string, mixed>|null */
+        return is_array($card) ? $card : null;
+    }
+
     /** @return array<string, mixed> */
     private function plugin(): array
     {
