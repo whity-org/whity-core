@@ -23,6 +23,7 @@ import { Button } from '@whity/ui/button';
 import { TechnicalDetails } from '@whity/ui/display-preferences';
 import { Badge } from '@whity/ui/badge';
 import { EmptyState } from '@whity/ui/empty-state';
+import { AccessDeniedPanel, AreaError } from '@whity/ui/page-states';
 import { Skeleton } from '@whity/ui/skeleton';
 import { AccessDenied } from '@whity/ui/access-denied';
 
@@ -97,6 +98,8 @@ export default function ErrorsPage() {
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<number | null>(null);
+  // A refused request and a failed one are not an empty inbox.
+  const [problem, setProblem] = useState<'denied' | 'failed' | null>(null);
 
   const load = useCallback(async (status: ErrorStatus) => {
     setLoading(true);
@@ -107,11 +110,19 @@ export default function ErrorsPage() {
       const res = await fetch(`/api/v1/errors?status=${status}`, {
         headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
       });
+      if (res.status === 403) {
+        setProblem('denied');
+        setGroups([]);
+        return;
+      }
       if (!res.ok) throw new Error(String(res.status));
       const body = (await res.json()) as ListResponse;
+      setProblem(null);
       setGroups(body.data ?? []);
       setCounts(body.counts ?? {});
     } catch {
+      setProblem('failed');
+      setGroups([]);
       addToast(t('errors.toast.loadFailed', 'Could not load errors'), 'error');
     } finally {
       setLoading(false);
@@ -201,6 +212,20 @@ export default function ErrorsPage() {
           <Skeleton className="h-16 w-full" />
           <Skeleton className="h-16 w-full" />
         </div>
+      ) : problem === 'denied' ? (
+        <AccessDeniedPanel
+          title={t('errors.denied.title', 'You don’t have access to the error inbox')}
+          description={t(
+            'errors.denied.description',
+            'Errors are shown to the people who run this Whity installation.'
+          )}
+        />
+      ) : problem === 'failed' ? (
+        <AreaError
+          message={t('errors.toast.loadFailed', 'Could not load errors')}
+          retryLabel={t('errors.retry', 'Try again')}
+          onRetry={() => void load(tab)}
+        />
       ) : groups.length === 0 ? (
         <EmptyState
           title={

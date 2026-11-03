@@ -887,6 +887,9 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'icon' => 'building',
         'group' => 'platform',
         'order' => 1,
+        // A workspace admin may hold tenants:read for their own row, but managing
+        // workspaces is the platform's job. /admin/tenants still opens by URL for them.
+        'systemTenantOnly' => true,
         // #990: mirrors GET /api/tenants, now gated on tenants:read (migration
         // 138 grants it to every role that may write or delete a tenant).
         // requiredRole is cleared so the item follows the route it mirrors rather
@@ -1177,16 +1180,15 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'order' => 7,
         // WC-password-reset-2fa-recovery: unified admin page (tabs: Signup /
         // Password reset / 2FA auth reset — see web/app/(protected)/admin/
-        // approval-gating/). The first tab, at this href, is the WC-235
-        // pending-registrations queue (folded in unchanged: system-tenant +
-        // registrations:approve). Gated here on the broad 'admin' ROLE rather
-        // than any single one of the three underlying permissions, since a
-        // tenant admin who holds ONLY password_resets:approve or
-        // two_factor_recovery:approve (never registrations:approve, and never
-        // acting in the system tenant) must still see this entry to reach
-        // their own tab — each tab enforces its OWN precise permission +
-        // tenant/system-tenant scope server-side regardless of nav visibility.
-        'requiredRole' => 'admin',
+        // approval-gating/). Three tabs, three permissions, so the entry shows for
+        // whoever holds any of them (design 2.9, A16: the permission, not the role
+        // named admin). Each tab enforces its OWN precise permission + tenant scope
+        // server-side regardless of nav visibility.
+        'requiredAnyPermission' => [
+            \Whity\Core\RBAC\CorePermissions::REGISTRATIONS_APPROVE,
+            \Whity\Core\RBAC\CorePermissions::PASSWORD_RESETS_APPROVE,
+            \Whity\Core\RBAC\CorePermissions::TWO_FACTOR_RECOVERY_APPROVE,
+        ],
     ];
     $items[] = [
         // WHIT-820: every member may use an agent for themselves, so this is
@@ -1877,6 +1879,7 @@ $router->register('DELETE', '/api/invitations/{id:\d+}',         [$invitationsHa
 
 // 11. Register API handlers
 $usersHandler = new UsersApiHandler($db->getPdo(), $hookManager);
+$usersBulkHandler = new \Whity\Api\UsersBulkApiHandler($db->getPdo(), $roleChecker, $hookManager, $auditLogger);
 // WC-203: gate users routes on fine-grained permission grants instead of the
 // bare 'admin' role. requiredRole is cleared (null) so the check is driven
 // entirely by requiredPermission; migration 022 grants all three to admin.
@@ -1887,6 +1890,10 @@ $router->register('GET',    '/api/users',           [$usersHandler, 'list'],   n
 // "who is profile 412?" with silence once a tenant passes 100 people. A record
 // page is addressable by definition (a pasted URL must work), so it needs the
 // single-record read rather than a filtered list.
+$router->register('POST',   '/api/users/bulk/role',             [$usersBulkHandler, 'changeRole'],     null, null, CorePermissions::USERS_WRITE);
+$router->register('POST',   '/api/users/bulk/require-two-step', [$usersBulkHandler, 'requireTwoStep'], null, null, CorePermissions::SECURITY_MANAGE);
+$router->register('PUT',    '/api/users/{id:\d+}/two-step-requirement', [$usersBulkHandler, 'setRequirement'],   null, null, CorePermissions::SECURITY_MANAGE);
+$router->register('DELETE', '/api/users/{id:\d+}/two-step-requirement', [$usersBulkHandler, 'clearRequirement'], null, null, CorePermissions::SECURITY_MANAGE);
 $router->register('GET',    '/api/users/{id:\d+}',  [$usersHandler, 'get'],    null, null, CorePermissions::USERS_READ);
 $router->register('POST',   '/api/users',           [$usersHandler, 'create'], null, null, CorePermissions::USERS_WRITE);
 $router->register('PATCH',  '/api/users/{id:\d+}',  [$usersHandler, 'update'], null, null, CorePermissions::USERS_WRITE);
@@ -2459,6 +2466,7 @@ $delegationsHandler = new DelegationsApiHandler($db->getPdo(), $delegationServic
 $router->register('GET', '/api/delegations', [$delegationsHandler, 'list'], null, null, CorePermissions::DELEGATION_MANAGE);
 $router->register('POST', '/api/delegations', [$delegationsHandler, 'create'], null, null, CorePermissions::DELEGATION_MANAGE);
 $router->register('DELETE', '/api/delegations/{id:\d+}', [$delegationsHandler, 'revoke'], null, null, CorePermissions::DELEGATION_MANAGE);
+$router->register('POST', '/api/delegations/{id:\d+}/restore', [$delegationsHandler, 'restore'], null, null, CorePermissions::DELEGATION_MANAGE);
 
 // 13. Register the audit-log read API (WC-34). Gated on the audit:read permission
 // (6th positional arg; requiredRole stays null so RbacMiddleware enforces the
@@ -3751,6 +3759,7 @@ $userGroupsHandler = new \Whity\Api\UserGroupsApiHandler(
 );
 $router->register('GET',    '/api/group-rules',                    [$userGroupsHandler, 'rules'],         null, null, CorePermissions::GROUPS_READ);
 $router->register('GET',    '/api/user-groups',                    [$userGroupsHandler, 'index'],         null, null, CorePermissions::GROUPS_READ);
+$router->register('GET',    '/api/user-groups/usage',              [$userGroupsHandler, 'usage'],         null, null, CorePermissions::GROUPS_READ);
 $router->register('POST',   '/api/user-groups/preview',            [$userGroupsHandler, 'previewDraft'],  null, null, CorePermissions::GROUPS_WRITE);
 $router->register('POST',   '/api/user-groups',                    [$userGroupsHandler, 'create'],        null, null, CorePermissions::GROUPS_WRITE);
 $router->register('GET',    '/api/user-groups/{id:\d+}/preview',   [$userGroupsHandler, 'preview'],       null, null, CorePermissions::GROUPS_READ);
@@ -3992,6 +4001,17 @@ $memberFormsHandler = new \Whity\Api\MemberFormsApiHandler(
     $submissionIssuer,
     $formUploadsHandler
 );
+$formDraftsHandler = new \Whity\Api\FormDraftsApiHandler(
+    $db->getPdo(),
+    $formRepository,
+    $formFieldRepository,
+    new \Whity\Core\Form\FormDraftRepository($db->getPdo()),
+    $roleChecker
+);
+$router->register('GET', '/api/me/form-drafts', [$formDraftsHandler, 'list'], null);
+$router->register('GET', '/api/me/forms/{id:\d+}/draft', [$formDraftsHandler, 'show'], null);
+$router->register('PUT', '/api/me/forms/{id:\d+}/draft', [$formDraftsHandler, 'save'], null);
+$router->register('DELETE', '/api/me/forms/{id:\d+}/draft', [$formDraftsHandler, 'delete'], null);
 $router->register('GET', '/api/me/forms', [$memberFormsHandler, 'list'], null);
 $router->register('GET', '/api/me/forms/{id:\d+}/render', [$memberFormsHandler, 'render'], null);
 $router->register('POST', '/api/me/forms/{id:\d+}/uploads', [$memberFormsHandler, 'upload'], null);
@@ -4952,6 +4972,16 @@ $router->register('POST', '/api/me/agent-proposals/{id:\d+}/decline',  [$agentPr
 // first. Session-gated and self-scoped like the two surfaces it reads.
 $meWaitingHandler = new \Whity\Api\MeWaitingApiHandler($inboxSourceRegistry, $agentProposals, $agentAssignments);
 $router->register('GET', '/api/me/waiting', [$meWaitingHandler, 'list'], null);
+// WHIT-872 (H.4): the cards apps add to the caller's home. The handler lists only
+// what the caller holds the permission for, and each card's data is its own route.
+$homeCardsHandler = new \Whity\Api\HomeCardsApiHandler($db->getPdo(), $roleChecker, $pluginLoader, $tenantManifestHost, $tenantRecordRepository, $router);
+$router->register('GET', '/api/me/home-cards', [$homeCardsHandler, 'list'], null);
+// WHIT-872: Your recent documents (the caller's own rows, so no permission) and
+// Finish setting up (for people who can change the workspace).
+$meHomeHandler = new \Whity\Api\MeHomeApiHandler($db->getPdo());
+$router->register('GET', '/api/me/recent-documents', [$meHomeHandler, 'recentDocuments'], null);
+$router->register('GET', '/api/me/setup-steps', [$meHomeHandler, 'setupSteps'], null, null, CorePermissions::SETTINGS_WRITE);
+$router->register('PUT', '/api/me/home-cards/{key:[A-Za-z][A-Za-z0-9_]*}/hidden', [$homeCardsHandler, 'setHidden'], null);
 // WHIT-815: workspace agents (persona, toolsets, starting grant) and the
 // presets they start from. Gated on agents:manage, which migration 180 grants
 // to every role holding mcp:tokens:manage. Writes are agentPolicy refuse.

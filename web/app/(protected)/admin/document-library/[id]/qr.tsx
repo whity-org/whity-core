@@ -151,13 +151,13 @@ export interface DocumentQrPanelProps {
    */
   canWrite: boolean;
   /**
-   * The screen's "ids are showing because you may not read the directory"
-   * notice, rendered ONLY when this panel actually numbers somebody.
+   * The screen's "names could not be loaded" notice, rendered ONLY when this panel
+   * actually names somebody.
    *
    * Passed as a node rather than rebuilt here so there is one copy of that
    * explanation on the page — two copies is two chances for them to explain it
    * differently, which is the reason the screen owns it. But the SCREEN cannot
-   * know whether this panel has a person to number: the panel fetches for
+   * know whether this panel has a person to name: the panel fetches for
    * itself, and a document with no code and no signed-in scanner shows nobody.
    * Rendering the notice there anyway would put a true sentence on screen that
    * applies to nothing in front of the reader.
@@ -818,7 +818,10 @@ function ScanTrail({
                           // as a person the system failed to name. Nobody was
                           // named because nobody was recorded.
                           t('record.qr.scans.public', 'A member of the public')
-                        : personName(t, directory, scan.scanner_profile_id)}
+                        : // Who scanned is named only to a reader of the directory
+                          // (see DocumentPeople), and this is who it is to everyone else.
+                          directory.people.get(scan.scanner_profile_id) ??
+                          t('record.qr.scans.member', 'Someone signed in')}
                     </TableCell>
                     <TableCell>
                       <ScanOutcome outcome={scan.outcome} t={t} />

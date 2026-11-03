@@ -304,6 +304,9 @@ class OuTenantIsolationTest extends TestCase
      */
     private static function normalizeSql(string $sql): string
     {
+        // The member count is a column, not a filter on the row: its own WHERE is about
+        // memberships, so it must not read as this statement narrowing the units.
+        $sql = (string) preg_replace('/\(SELECT COUNT\(DISTINCT m\.profile_id\).*?\) AS member_count/s', '0 AS member_count', $sql);
         $sql = (string) preg_replace('/\b(?:ou|t)\.(?=[a-z_]+\b)/', '', $sql);
 
         return (string) preg_replace('/\s+/', ' ', $sql);

@@ -6,11 +6,13 @@ namespace Whity\Api;
 
 use Psr\Log\LoggerInterface;
 use Whity\Auth\RoleChecker;
+use Whity\Auth\TwoFactorRequirementReader;
 use Whity\Core\PasswordPolicy;
 use Whity\Core\Request;
 use Whity\Core\Response;
 use Whity\Core\Hooks\HookManager;
 use Whity\Core\Identity\AuthMethod;
+use Whity\Core\Identity\PersonName;
 use Whity\Core\Identity\ProfileProvisioner;
 use Whity\Http\InputLimits;
 use Whity\Http\JsonBody;
@@ -185,11 +187,15 @@ class UsersApiHandler
     private static function listSpec(bool $systemTenant): ListSpec
     {
         $sortable = [
-            'name' => 'pe.email',
+            'name' => "COALESCE(NULLIF(p.display_name, ''), pe.email)",
             'email' => 'pe.email',
             'role' => 'r.name',
             'status' => 'p.status',
             'created' => 'm.created_at',
+            // Text, so somebody who has never signed in sorts the same way on both
+            // engines; see DelegationRepository::listSpec() on NULL ordering. Scoped
+            // to the row's tenant: activity elsewhere is not this tenant's to see.
+            'lastActive' => "COALESCE(CAST((SELECT MAX(s.last_seen_at) FROM sessions s WHERE s.profile_id = m.profile_id AND s.tenant_id = m.tenant_id) AS TEXT), '')",
         ];
 
         if ($systemTenant) {
@@ -203,7 +209,7 @@ class UsersApiHandler
             // tenant id is a number a reader matches exactly rather than
             // searches for a substring of, so it is a sort key and not a search
             // column — `q=1` must not mean "every tenant whose id contains 1".
-            searchable: ['pe.email', 'r.name'],
+            searchable: ['p.display_name', 'pe.email', 'r.name'],
             defaultSort: 'created',
             defaultDirection: 'desc',
         );
@@ -230,6 +236,11 @@ class UsersApiHandler
      * does: the two branches now answer the same question the same way, and a
      * caller who wants the tenant grouping asks for `sort=tenant` — which is
      * only offered to the caller for whom it orders anything.
+     *
+     * FILTERS (design 2.9, A10): `role_id` and `ou_id` (comma-separated ids),
+     * `two_step` (on|off) and `account_status` (active|inactive). Each narrows the
+     * count and the page alike, and a malformed value is a 422, never a silent
+     * read of everybody. Another tenant's id matches nothing, like any unknown id.
      */
     public function list(Request $request): Response
     {
@@ -245,6 +256,12 @@ class UsersApiHandler
             // about what is being filtered. It is the empty string when no `q`
             // was sent, which is why it can be concatenated unconditionally.
             $search = $q->andSearch($this->db);
+
+            $filters = self::listFilters($request);
+            if ($filters instanceof Response) {
+                return $filters;
+            }
+            [$filter, $filterParams] = $filters;
 
             // The COUNT carries the SELECT's JOINs even though it needs none of
             // their columns for itself, because the search predicate reads
@@ -263,8 +280,11 @@ class UsersApiHandler
                      JOIN roles r ON m.role_id = r.id
                      JOIN profiles p ON p.id = m.profile_id
                      LEFT JOIN profile_emails pe ON pe.profile_id = m.profile_id AND pe.is_primary = true
-                     WHERE m.is_primary AND m.status = 'active'" . $search
+                     WHERE m.is_primary AND m.status = 'active'" . $filter . $search
                 );
+                foreach ($filterParams as $name => $value) {
+                    $countStmt->bindValue($name, $value, PDO::PARAM_INT);
+                }
                 $q->bindSearch($countStmt);
                 $countStmt->execute();
                 $countRow = $countStmt->fetch(PDO::FETCH_ASSOC);
@@ -273,15 +293,20 @@ class UsersApiHandler
                 // @tenant-guard-ignore: system-tenant (id 0) lists active memberships across all tenants; scoped else-branch binds m.tenant_id = :tenant_id
                 $stmt = $this->db->prepare(
                     "SELECT m.profile_id AS id, pe.email, r.name AS role,
-                            m.tenant_id, m.ou_id, m.created_at, m.status,
-                            p.status AS account_status, p.auth_method
+                            m.tenant_id, m.ou_id, m.created_at, m.status, m.role_id,
+                            p.status AS account_status, p.auth_method, p.display_name, p.two_factor_enabled,
+                            (SELECT ou.name FROM organizational_units ou WHERE ou.id = m.ou_id AND ou.tenant_id = m.tenant_id) AS ou_name,
+                            (SELECT MAX(s.last_seen_at) FROM sessions s WHERE s.profile_id = m.profile_id AND s.tenant_id = m.tenant_id) AS last_active_at
                      FROM memberships m
                      JOIN roles r ON m.role_id = r.id
                      JOIN profiles p ON p.id = m.profile_id
                      LEFT JOIN profile_emails pe ON pe.profile_id = m.profile_id AND pe.is_primary = true
-                     WHERE m.is_primary AND m.status = 'active'" . $search
+                     WHERE m.is_primary AND m.status = 'active'" . $filter . $search
                     . ' ' . $q->orderBy() . ' LIMIT :limit OFFSET :offset'
                 );
+                foreach ($filterParams as $name => $value) {
+                    $stmt->bindValue($name, $value, PDO::PARAM_INT);
+                }
                 $q->bindAll($stmt);
                 $stmt->execute();
             } else {
@@ -291,9 +316,12 @@ class UsersApiHandler
                      JOIN roles r ON m.role_id = r.id
                      JOIN profiles p ON p.id = m.profile_id
                      LEFT JOIN profile_emails pe ON pe.profile_id = m.profile_id AND pe.is_primary = true
-                     WHERE m.is_primary AND m.tenant_id = :tenant_id AND m.status = 'active'" . $search
+                     WHERE m.is_primary AND m.tenant_id = :tenant_id AND m.status = 'active'" . $filter . $search
                 );
                 $countStmt->bindValue(':tenant_id', $tenantId, PDO::PARAM_INT);
+                foreach ($filterParams as $name => $value) {
+                    $countStmt->bindValue($name, $value, PDO::PARAM_INT);
+                }
                 $q->bindSearch($countStmt);
                 $countStmt->execute();
                 $countRow = $countStmt->fetch(PDO::FETCH_ASSOC);
@@ -301,16 +329,21 @@ class UsersApiHandler
 
                 $stmt = $this->db->prepare(
                     "SELECT m.profile_id AS id, pe.email, r.name AS role,
-                            m.tenant_id, m.ou_id, m.created_at, m.status,
-                            p.status AS account_status, p.auth_method
+                            m.tenant_id, m.ou_id, m.created_at, m.status, m.role_id,
+                            p.status AS account_status, p.auth_method, p.display_name, p.two_factor_enabled,
+                            (SELECT ou.name FROM organizational_units ou WHERE ou.id = m.ou_id AND ou.tenant_id = m.tenant_id) AS ou_name,
+                            (SELECT MAX(s.last_seen_at) FROM sessions s WHERE s.profile_id = m.profile_id AND s.tenant_id = m.tenant_id) AS last_active_at
                      FROM memberships m
                      JOIN roles r ON m.role_id = r.id
                      JOIN profiles p ON p.id = m.profile_id
                      LEFT JOIN profile_emails pe ON pe.profile_id = m.profile_id AND pe.is_primary = true
-                     WHERE m.is_primary AND m.tenant_id = :tenant_id AND m.status = 'active'" . $search
+                     WHERE m.is_primary AND m.tenant_id = :tenant_id AND m.status = 'active'" . $filter . $search
                     . ' ' . $q->orderBy() . ' LIMIT :limit OFFSET :offset'
                 );
                 $stmt->bindValue(':tenant_id', $tenantId, PDO::PARAM_INT);
+                foreach ($filterParams as $name => $value) {
+                    $stmt->bindValue($name, $value, PDO::PARAM_INT);
+                }
                 $q->bindAll($stmt);
                 $stmt->execute();
             }
@@ -318,7 +351,12 @@ class UsersApiHandler
             /** @var array<int, array<string, mixed>> $rows */
             $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-            $users = array_map(fn (array $row): array => $this->toPublicUser($row), $rows);
+            // One read of the two-step policies for the whole page.
+            $twoStep = (new TwoFactorRequirementReader($this->db))->forRows($rows);
+            $users = array_map(
+                fn (array $row): array => $this->toPublicUser($row, $twoStep[(int) $row['tenant_id'] . ':' . (int) $row['id']] ?? null),
+                $rows
+            );
 
             return Response::json(['data' => $users, 'pagination' => $q->meta($total)], 200);
         } catch (\Throwable $e) {
@@ -332,30 +370,96 @@ class UsersApiHandler
     }
 
     /**
+     * The list's filters as a fragment for both statements, and its parameters.
+     *
+     * @return array{0: string, 1: array<string, int>}|Response
+     */
+    private static function listFilters(Request $request): array|Response
+    {
+        parse_str((string) parse_url($request->getPath(), PHP_URL_QUERY), $fromPath);
+        $query = $fromPath + $_GET;
+
+        $sql = '';
+        $params = [];
+
+        foreach (['role_id' => 'm.role_id', 'ou_id' => 'm.ou_id'] as $key => $column) {
+            $raw = $query[$key] ?? '';
+            if (!is_string($raw) || $raw === '') {
+                continue;
+            }
+            $names = [];
+            foreach (explode(',', $raw) as $i => $id) {
+                if (!ctype_digit($id)) {
+                    return Response::error($key . ' must be a comma-separated list of ids', 422);
+                }
+                $name = ':f_' . $key . '_' . $i;
+                $names[] = $name;
+                $params[$name] = (int) $id;
+            }
+            $sql .= ' AND ' . $column . ' IN (' . implode(', ', $names) . ')';
+        }
+
+        $twoStep = $query['two_step'] ?? '';
+        if ($twoStep !== '') {
+            if ($twoStep !== 'on' && $twoStep !== 'off') {
+                return Response::error('two_step must be on or off', 422);
+            }
+            $sql .= $twoStep === 'on' ? ' AND p.two_factor_enabled = TRUE' : ' AND p.two_factor_enabled = FALSE';
+        }
+
+        $accountStatus = $query['account_status'] ?? '';
+        if ($accountStatus !== '') {
+            if ($accountStatus !== 'active' && $accountStatus !== 'inactive') {
+                return Response::error('account_status must be active or inactive', 422);
+            }
+            $sql .= $accountStatus === 'active' ? " AND p.status = 'active'" : " AND p.status = 'inactive'";
+        }
+
+        return [$sql, $params];
+    }
+
+    /**
      * Map a membership/profile row to the public API contract consumed by the UI.
      *
-     * `id` is the canonical `profile_id`. There is no `name` column in the
-     * identity model, so `name` is derived from the email local-part to give the
-     * Edit User form a non-empty value to pre-fill (its zod schema marks name
-     * required). Snake_case columns are aliased to the camelCase keys the
-     * frontend `User` type binds; the password hash is never included.
+     * `id` is the canonical `profile_id`. `name` is what to show: the display name,
+     * or the email's local part when there is none ({@see PersonName}). `displayName`
+     * is the stored value, which may be empty, for the form that edits it. Snake_case
+     * columns are aliased to the camelCase keys the frontend `User` type binds; the
+     * password hash is never included.
      *
-     * @param array<string, mixed> $row Raw row (id = profile_id, email, role, tenant_id, ou_id, created_at, status, account_status, auth_method).
-     * @return array{id: int, name: string, email: string, role: string, tenantId: int, ou_id: int|null, createdAt: string|null, status: string, accountStatus: string, authMethod: string}
+     * `lastActiveAt` is the latest session activity in THIS tenant, updated when a
+     * session refreshes, so it is accurate to the access token's lifetime. Null means
+     * no session here. `twoStep` is whether the person has it on, and whether a policy
+     * requires it (`requiredDirectly` when the policy names them).
+     *
+     * @param array<string, mixed> $row Raw row (id = profile_id, email, role, tenant_id, ou_id, created_at, status, account_status, auth_method, display_name, two_factor_enabled, ou_name, last_active_at, role_id).
+     * @param array{required: bool, requiredDirectly: bool}|null $requirement From the page's batch; read for this row when absent.
+     * @return array<string, mixed>
      */
-    private function toPublicUser(array $row): array
+    private function toPublicUser(array $row, ?array $requirement = null): array
     {
         $email = (string)($row['email'] ?? '');
-        $localPart = strstr($email, '@', true);
+        $displayName = (string)($row['display_name'] ?? '');
+        $requirement ??= (new TwoFactorRequirementReader($this->db))->forRows([$row])[(int)($row['tenant_id'] ?? 0) . ':' . (int)($row['id'] ?? 0)]
+            ?? ['required' => false, 'requiredDirectly' => false];
 
         return [
             // `id` is the canonical profile_id (ADR 0005 hard cutover).
             'id' => (int)($row['id'] ?? 0),
-            'name' => $localPart !== false && $localPart !== '' ? $localPart : $email,
+            'name' => PersonName::of($displayName, $email),
+            'displayName' => $displayName,
             'email' => $email,
             'role' => (string)($row['role'] ?? ''),
+            'roleId' => isset($row['role_id']) ? (int)$row['role_id'] : null,
             'tenantId' => (int)($row['tenant_id'] ?? 0),
             'ou_id' => isset($row['ou_id']) && $row['ou_id'] !== null ? (int)$row['ou_id'] : null,
+            'ouName' => isset($row['ou_name']) ? (string)$row['ou_name'] : null,
+            'lastActiveAt' => isset($row['last_active_at']) ? (string)$row['last_active_at'] : null,
+            'twoStep' => [
+                'enabled' => DbBool::of($row['two_factor_enabled'] ?? false),
+                'required' => $requirement['required'],
+                'requiredDirectly' => $requirement['requiredDirectly'],
+            ],
             'createdAt' => isset($row['created_at']) ? (string)$row['created_at'] : null,
             // The membership status (active|invited|suspended). The list only
             // ever returns 'active', but GET/{id} may surface others.
@@ -828,6 +932,33 @@ class UsersApiHandler
                 $passwordChanged = true;
             }
 
+            // Display name lives on the GLOBAL profile, so it shows in every workspace
+            // the person belongs to. A workspace may name its own people but not
+            // rename somebody for another workspace: that person changes it
+            // themselves, or the system tenant does.
+            $displayNameChanged = false;
+            $newDisplayName = null;
+            if (array_key_exists('displayName', $body)) {
+                $requested = is_string($body['displayName']) ? trim($body['displayName']) : '';
+                if ($requested === '') {
+                    return Response::error('Display name cannot be empty', 422);
+                }
+                if ($tooLong = InputLimits::firstViolation(['displayName' => [$requested, InputLimits::NAME_MAX]])) {
+                    return $tooLong;
+                }
+                if ($requested !== (string)($membership['display_name'] ?? '')) {
+                    if ($currentTenantId !== self::SYSTEM_TENANT_ID && $this->belongsToAnotherTenant($profileId, $currentTenantId)) {
+                        return Response::error(
+                            'This person also belongs to another workspace, so only they can change their name',
+                            409,
+                            ['reason' => 'shared_profile']
+                        );
+                    }
+                    $newDisplayName = $requested;
+                    $displayNameChanged = true;
+                }
+            }
+
             // Role assignment lives on the membership. The resolved role must be
             // visible to the acting tenant (owned by it, global, or — for the
             // SYSTEM tenant — any role).
@@ -880,7 +1011,7 @@ class UsersApiHandler
             }
 
             // A true no-op (nothing genuinely changed) still returns a sensible 200.
-            if (!$roleChanged && !$ouChanged && !$emailChanged && !$passwordChanged && !$accountStatusChanged) {
+            if (!$roleChanged && !$ouChanged && !$emailChanged && !$passwordChanged && !$accountStatusChanged && !$displayNameChanged) {
                 $this->log('info', 'User update was a no-op', [
                     'event' => 'users.update.noop',
                     'tenant_id' => $currentTenantId,
@@ -932,6 +1063,12 @@ class UsersApiHandler
                         $newPasswordHash,
                         $idpOverrideUsed
                     );
+                }
+                if ($displayNameChanged && $newDisplayName !== null) {
+                    // @tenant-guard-ignore: profiles is a sanctioned GLOBAL identity table (ADR 0005 §1); the shared-profile refusal above keeps this to the caller's own people
+                    $this->db->prepare(
+                        'UPDATE profiles SET display_name = ?, updated_at = NOW() WHERE id = ?'
+                    )->execute([$newDisplayName, $profileId]);
                 }
                 if ($accountStatusChanged && $newAccountStatus !== null) {
                     // @tenant-guard-ignore: profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
@@ -1026,6 +1163,11 @@ class UsersApiHandler
                 'ou_changed' => $ouChanged,
                 'account_status_changed' => $accountStatusChanged,
             ];
+            if ($displayNameChanged) {
+                $payload['display_name_changed'] = true;
+                $payload['previous_display_name'] = (string)($membership['display_name'] ?? '');
+                $payload['display_name'] = $newDisplayName;
+            }
             if ($roleChanged && $newRoleId !== null) {
                 $previousRoleId = (int) $membership['role_id'];
                 $payload['previous_role_id'] = $previousRoleId;
@@ -1628,7 +1770,9 @@ class UsersApiHandler
             $stmt = $this->db->prepare("
                 SELECT m.profile_id AS id, pe.email, r.name AS role,
                        m.tenant_id, m.ou_id, m.created_at, m.status, m.role_id,
-                       p.status AS account_status, p.auth_method
+                       p.status AS account_status, p.auth_method, p.display_name, p.two_factor_enabled,
+                            (SELECT ou.name FROM organizational_units ou WHERE ou.id = m.ou_id AND ou.tenant_id = m.tenant_id) AS ou_name,
+                            (SELECT MAX(s.last_seen_at) FROM sessions s WHERE s.profile_id = m.profile_id AND s.tenant_id = m.tenant_id) AS last_active_at
                 FROM memberships m
                 JOIN roles r ON m.role_id = r.id
                 JOIN profiles p ON p.id = m.profile_id
@@ -1642,7 +1786,9 @@ class UsersApiHandler
             $stmt = $this->db->prepare("
                 SELECT m.profile_id AS id, pe.email, r.name AS role,
                        m.tenant_id, m.ou_id, m.created_at, m.status, m.role_id,
-                       p.status AS account_status, p.auth_method
+                       p.status AS account_status, p.auth_method, p.display_name, p.two_factor_enabled,
+                            (SELECT ou.name FROM organizational_units ou WHERE ou.id = m.ou_id AND ou.tenant_id = m.tenant_id) AS ou_name,
+                            (SELECT MAX(s.last_seen_at) FROM sessions s WHERE s.profile_id = m.profile_id AND s.tenant_id = m.tenant_id) AS last_active_at
                 FROM memberships m
                 JOIN roles r ON m.role_id = r.id
                 JOIN profiles p ON p.id = m.profile_id
@@ -1894,6 +2040,18 @@ class UsersApiHandler
         }
 
         return (int)$row['id'];
+    }
+
+    /**
+     * Whether this profile holds a membership in any tenant other than the given one.
+     */
+    private function belongsToAnotherTenant(int $profileId, int $tenantId): bool
+    {
+        // @tenant-guard-ignore: asks only whether another tenant exists for this profile, and returns nothing about it
+        $stmt = $this->db->prepare('SELECT 1 FROM memberships WHERE profile_id = ? AND tenant_id <> ? LIMIT 1');
+        $stmt->execute([$profileId, $tenantId]);
+
+        return $stmt->fetchColumn() !== false;
     }
 
     /**

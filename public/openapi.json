@@ -3184,7 +3184,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/TokenOnlyRequest"
+                                "$ref": "#/components/schemas/TwoFactorRecoveryConfirmRequest"
                             }
                         }
                     }
@@ -7432,7 +7432,7 @@
                         "name": "includeRevoked",
                         "in": "query",
                         "required": false,
-                        "description": "Include revoked delegations",
+                        "description": "Include delegations that have ended, whether revoked or past their end date",
                         "schema": {
                             "type": "boolean"
                         }
@@ -7681,6 +7681,102 @@
                     },
                     "405": {
                         "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/delegations/{id}/restore": {
+            "post": {
+                "operationId": "post_api_v1_delegations_id_restore",
+                "summary": "Undo a revoke: only by the person who revoked it, soon after",
+                "tags": [
+                    "delegations"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Restore confirmation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MutationResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Delegation not found, or not revoked",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "It can no longer be undone: too late, past its end date, or the grantor no longer holds the permission",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -25778,6 +25874,77 @@
                 }
             }
         },
+        "/api/v1/me/form-drafts": {
+            "get": {
+                "operationId": "get_api_v1_me_form_drafts",
+                "summary": "The caller's unsent answers, on forms still open to them",
+                "tags": [
+                    "forms"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The drafts",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/FormDraftListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/me/form-submissions": {
             "get": {
                 "operationId": "get_api_v1_me_form_submissions",
@@ -25930,6 +26097,271 @@
                     },
                     "405": {
                         "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/me/forms/{id}/draft": {
+            "delete": {
+                "operationId": "delete_api_v1_me_forms_id_draft",
+                "summary": "Throw away the caller's draft",
+                "tags": [
+                    "forms"
+                ],
+                "description": "Idempotent, and works on a form that has since closed.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Deleted"
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "get": {
+                "operationId": "get_api_v1_me_forms_id_draft",
+                "summary": "The caller's draft of a form, or null",
+                "tags": [
+                    "forms"
+                ],
+                "description": "Nobody else can read a draft. The same 404 for a form that does not exist, is not open, or that the caller may not fill in.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The draft, or null",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/FormDraftResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not available to this caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "put": {
+                "operationId": "put_api_v1_me_forms_id_draft",
+                "summary": "Save the caller's unsent answers",
+                "tags": [
+                    "forms"
+                ],
+                "description": "Not validated, because half-finished answers are what a draft is. Staff questions, file answers and unknown keys are dropped. Sending the form deletes the draft.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/FormDraftSaveRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The saved draft",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/FormDraftResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not available to this caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Malformed, or larger than 256 KB",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -26219,6 +26651,189 @@
                     },
                     "429": {
                         "description": "Too many uploads",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/me/home-cards": {
+            "get": {
+                "operationId": "get_api_v1_me_home_cards",
+                "summary": "The cards installed apps add to the caller's home, in install order",
+                "tags": [
+                    "home"
+                ],
+                "description": "Only cards whose permission the caller holds in this workspace. Hidden ones are listed too, so a client can offer Show. A card names its data route in `source`; that route applies its own permission and the caller's scope.",
+                "responses": {
+                    "200": {
+                        "description": "The cards",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HomeCardListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/me/home-cards/{key}/hidden": {
+            "put": {
+                "operationId": "put_api_v1_me_home_cards_key_hidden",
+                "summary": "Hide a home card or show it again, for the caller in this workspace",
+                "tags": [
+                    "home"
+                ],
+                "parameters": [
+                    {
+                        "name": "key",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/HomeCardHiddenRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The card and its new state",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HomeCardHiddenResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No card by that name that the caller may see",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "hidden is missing or not true or false",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -27170,6 +27785,154 @@
                         }
                     }
                 }
+            }
+        },
+        "/api/v1/me/recent-documents": {
+            "get": {
+                "operationId": "get_api_v1_me_recent_documents",
+                "summary": "The caller's drafts and the documents they sent this week, newest first, at most five",
+                "tags": [
+                    "home"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The rows",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RecentDocumentListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/me/setup-steps": {
+            "get": {
+                "operationId": "get_api_v1_me_setup_steps",
+                "summary": "What still blocks real work in this workspace: branding, team, an agent, the tax number and a plan",
+                "tags": [
+                    "home"
+                ],
+                "description": "A step that does not apply is left out, such as a plan on an install with no plans. The system tenant has none.",
+                "responses": {
+                    "200": {
+                        "description": "The steps and how many are done",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SetupStepsResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
             }
         },
         "/api/v1/me/waiting": {
@@ -43973,6 +44736,103 @@
                 ]
             }
         },
+        "/api/v1/user-groups/usage": {
+            "get": {
+                "operationId": "get_api_v1_user_groups_usage",
+                "summary": "How many people each group holds now, and where it is used",
+                "tags": [
+                    "user-groups"
+                ],
+                "parameters": [
+                    {
+                        "name": "ids",
+                        "in": "query",
+                        "required": false,
+                        "description": "Group ids, comma-separated, at most 100: the rows on screen. A group of another workspace is left out.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "One entry per group found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UserGroupUsageResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "`ids` missing, malformed or too many",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/user-groups/{id}": {
             "delete": {
                 "operationId": "delete_api_v1_user_groups_id",
@@ -44393,7 +45253,7 @@
                         "name": "sort",
                         "in": "query",
                         "required": false,
-                        "description": "Sort key: `name`, `email`, `role`, `status`, `created` (default), plus `tenant` for a system-tenant caller. `name` and `email` order identically \u2014 the name IS the email's local part. An unrecognised key is not an error: it falls back to the default, because a client asking for a column it cannot see should get a list rather than a 400.",
+                        "description": "Sort key: `name`, `email`, `role`, `status`, `created` (default), `lastActive`, plus `tenant` for a system-tenant caller. An unrecognised key is not an error: it falls back to the default, because a client asking for a column it cannot see should get a list rather than a 400.",
                         "schema": {
                             "type": "string"
                         }
@@ -44411,7 +45271,43 @@
                         "name": "q",
                         "in": "query",
                         "required": false,
-                        "description": "Case-insensitive substring match on email or role name. It narrows `pagination.total` too, so the envelope always describes the filtered list.",
+                        "description": "Case-insensitive substring match on display name, email or role name. It narrows `pagination.total` too, so the envelope always describes the filtered list.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "role_id",
+                        "in": "query",
+                        "required": false,
+                        "description": "Only people whose primary role is one of these ids, comma-separated.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "ou_id",
+                        "in": "query",
+                        "required": false,
+                        "description": "Only people in one of these organizational units, comma-separated.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "two_step",
+                        "in": "query",
+                        "required": false,
+                        "description": "`on` or `off`: whether the person has two-step turned on.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "account_status",
+                        "in": "query",
+                        "required": false,
+                        "description": "`active` or `inactive`. Both are listed when omitted.",
                         "schema": {
                             "type": "string"
                         }
@@ -44460,6 +45356,16 @@
                     },
                     "405": {
                         "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A malformed filter",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -44574,6 +45480,228 @@
                     },
                     "422": {
                         "description": "Email longer than 255 characters",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/users/bulk/require-two-step": {
+            "post": {
+                "operationId": "post_api_v1_users_bulk_require_two_step",
+                "summary": "Require two-step of several people, through a policy naming each of them",
+                "tags": [
+                    "users"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UsersBulkTwoStepRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Who now has a policy and who already had one",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UsersBulkResultResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A malformed request, or a target that was not found; `details.refused` lists them",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/users/bulk/role": {
+            "post": {
+                "operationId": "post_api_v1_users_bulk_role",
+                "summary": "Change the primary role of several people at once, all or nothing",
+                "tags": [
+                    "users"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UsersBulkRoleRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Who changed and who already held the role",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UsersBulkResultResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The role has permissions the caller does not hold",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "The role is not available in a target's workspace",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "This would leave a workspace with nobody able to manage people",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A malformed request, or a target that cannot be changed; `details.refused` gives the reason for each",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -45278,6 +46406,206 @@
                     },
                     "422": {
                         "description": "Invalid user id, or the user has no email address",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/users/{id}/two-step-requirement": {
+            "delete": {
+                "operationId": "delete_api_v1_users_id_two_step_requirement",
+                "summary": "Remove the policy naming one person. A workspace or unit policy still applies.",
+                "tags": [
+                    "users"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The person no longer has a policy naming them",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UserTwoStepClearedResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "User not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "put": {
+                "operationId": "put_api_v1_users_id_two_step_requirement",
+                "summary": "Require two-step of one person",
+                "tags": [
+                    "users"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UserTwoStepRequirementRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Whether a policy was added",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UsersBulkResultResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A malformed request, or the person was not found",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -49631,6 +50959,34 @@
                     "revokedAt": {
                         "type": "string",
                         "nullable": true
+                    },
+                    "expiresAt": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "active",
+                            "expired",
+                            "revoked"
+                        ]
+                    },
+                    "grantorName": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "granteeName": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "ouName": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "permissionDescription": {
+                        "type": "string",
+                        "nullable": true
                     }
                 },
                 "required": [
@@ -49642,7 +50998,9 @@
                     "permission",
                     "ouId",
                     "grantedAt",
-                    "revokedAt"
+                    "revokedAt",
+                    "expiresAt",
+                    "status"
                 ]
             },
             "DelegationCreateRequest": {
@@ -49672,6 +51030,11 @@
                         "type": "integer",
                         "nullable": true,
                         "description": "Limit the delegation to this organizational unit and the units below it. Null or omitted applies tenant-wide."
+                    },
+                    "expiresAt": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "When it ends, an ISO-8601 moment in the future. Null or omitted is no end date."
                     }
                 },
                 "required": [
@@ -49700,6 +51063,10 @@
                             },
                             "ouId": {
                                 "type": "integer",
+                                "nullable": true
+                            },
+                            "expiresAt": {
+                                "type": "string",
                                 "nullable": true
                             },
                             "permissions": {
@@ -51526,6 +52893,9 @@
                         "type": "boolean"
                     },
                     "closed_by_delivery": {
+                        "type": "boolean"
+                    },
+                    "closed_by_withdrawal": {
                         "type": "boolean"
                     },
                     "created_at": {
@@ -54169,6 +55539,103 @@
                     "data"
                 ]
             },
+            "FormDraft": {
+                "type": "object",
+                "properties": {
+                    "form_id": {
+                        "type": "integer"
+                    },
+                    "data": {
+                        "type": "object",
+                        "additionalProperties": true
+                    },
+                    "step": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "updated_at": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "form_id",
+                    "data",
+                    "updated_at"
+                ]
+            },
+            "FormDraftListResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "form_id": {
+                                    "type": "integer"
+                                },
+                                "form_name": {
+                                    "type": "object",
+                                    "x-whity-localized-text": true,
+                                    "properties": {
+                                        "ar": {
+                                            "type": "string"
+                                        },
+                                        "en": {
+                                            "type": "string"
+                                        }
+                                    }
+                                },
+                                "step": {
+                                    "type": "integer",
+                                    "nullable": true
+                                },
+                                "updated_at": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "form_id",
+                                "form_name",
+                                "updated_at"
+                            ]
+                        }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "FormDraftResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/FormDraft",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "FormDraftSaveRequest": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "additionalProperties": true,
+                        "description": "The answers so far, keyed by field key."
+                    },
+                    "step": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "Which step the person is on."
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
             "FormField": {
                 "type": "object",
                 "properties": {
@@ -55567,6 +57034,101 @@
                     }
                 }
             },
+            "HomeCard": {
+                "type": "object",
+                "properties": {
+                    "key": {
+                        "type": "string"
+                    },
+                    "label": {
+                        "type": "string"
+                    },
+                    "labelAr": {
+                        "type": "string"
+                    },
+                    "caption": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "captionAr": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "icon": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "href": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "source": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "value": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "hidden": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "key",
+                    "label",
+                    "labelAr",
+                    "hidden"
+                ]
+            },
+            "HomeCardHiddenRequest": {
+                "type": "object",
+                "properties": {
+                    "hidden": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "hidden"
+                ]
+            },
+            "HomeCardHiddenResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "key": {
+                                "type": "string"
+                            },
+                            "hidden": {
+                                "type": "boolean"
+                            }
+                        },
+                        "required": [
+                            "key",
+                            "hidden"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "HomeCardListResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/HomeCard"
+                        }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
             "IdentityProvider": {
                 "type": "object",
                 "properties": {
@@ -55766,6 +57328,28 @@
                     "resource_id": {
                         "type": "string",
                         "nullable": true
+                    },
+                    "sender": {
+                        "type": "object",
+                        "nullable": true,
+                        "properties": {
+                            "kind": {
+                                "type": "string",
+                                "enum": [
+                                    "person",
+                                    "public"
+                                ]
+                            },
+                            "profile_id": {
+                                "type": "integer"
+                            },
+                            "name": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "kind"
+                        ]
                     },
                     "meta": {
                         "type": "object",
@@ -56936,6 +58520,10 @@
                             },
                             "email": {
                                 "type": "string"
+                            },
+                            "display_name": {
+                                "type": "string",
+                                "nullable": true
                             },
                             "role": {
                                 "type": "string"
@@ -58552,6 +60140,9 @@
                     "ou_type_label": {
                         "type": "string",
                         "nullable": true
+                    },
+                    "member_count": {
+                        "type": "integer"
                     }
                 },
                 "required": [
@@ -58564,7 +60155,8 @@
                     "created_at",
                     "ou_type_id",
                     "ou_type_key",
-                    "ou_type_label"
+                    "ou_type_label",
+                    "member_count"
                 ]
             },
             "OuCreateRequest": {
@@ -59056,6 +60648,11 @@
                     },
                     "password": {
                         "type": "string"
+                    },
+                    "reason": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Optional. Why you are asking, shown to the approver when approval is required. At most 500 characters."
                     }
                 },
                 "required": [
@@ -59238,6 +60835,10 @@
                     "display_name": {
                         "type": "string"
                     },
+                    "reason": {
+                        "type": "string",
+                        "nullable": true
+                    },
                     "created_at": {
                         "type": "string"
                     }
@@ -59258,10 +60859,14 @@
                         "items": {
                             "$ref": "#/components/schemas/PendingPasswordResetItem"
                         }
+                    },
+                    "pagination": {
+                        "$ref": "#/components/schemas/Pagination"
                     }
                 },
                 "required": [
-                    "data"
+                    "data",
+                    "pagination"
                 ]
             },
             "PendingSelectionResponse": {
@@ -59317,6 +60922,10 @@
                     "display_name": {
                         "type": "string"
                     },
+                    "reason": {
+                        "type": "string",
+                        "nullable": true
+                    },
                     "created_at": {
                         "type": "string"
                     }
@@ -59337,10 +60946,14 @@
                         "items": {
                             "$ref": "#/components/schemas/PendingTwoFactorRecoveryItem"
                         }
+                    },
+                    "pagination": {
+                        "$ref": "#/components/schemas/Pagination"
                     }
                 },
                 "required": [
-                    "data"
+                    "data",
+                    "pagination"
                 ]
             },
             "Permission": {
@@ -59378,12 +60991,45 @@
                     },
                     "source": {
                         "type": "string"
+                    },
+                    "area": {
+                        "type": "string"
+                    },
+                    "areaLabel": {
+                        "type": "string"
+                    },
+                    "areaGroup": {
+                        "type": "string",
+                        "enum": [
+                            "people",
+                            "documents",
+                            "ai",
+                            "workspace",
+                            "apps"
+                        ]
+                    },
+                    "actions": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "enum": [
+                                "see",
+                                "create",
+                                "change",
+                                "delete",
+                                "approve"
+                            ]
+                        }
                     }
                 },
                 "required": [
                     "id",
                     "name",
-                    "description"
+                    "description",
+                    "area",
+                    "areaLabel",
+                    "areaGroup",
+                    "actions"
                 ]
             },
             "PermissionCatalogueResponse": {
@@ -60677,6 +62323,61 @@
                     "data"
                 ]
             },
+            "RecentDocument": {
+                "type": "object",
+                "properties": {
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "document",
+                            "draft"
+                        ]
+                    },
+                    "id": {
+                        "type": "integer"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "with",
+                            "issued",
+                            "draft"
+                        ]
+                    },
+                    "waitingWith": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "at": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "kind",
+                    "id",
+                    "title",
+                    "status",
+                    "waitingWith",
+                    "at"
+                ]
+            },
+            "RecentDocumentListResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/RecentDocument"
+                        }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
             "RecordSectionDenial": {
                 "type": "object",
                 "properties": {
@@ -61217,6 +62918,12 @@
                     },
                     "permissionCount": {
                         "type": "integer"
+                    },
+                    "peopleCount": {
+                        "type": "integer"
+                    },
+                    "builtIn": {
+                        "type": "boolean"
                     },
                     "manageable": {
                         "type": "boolean"
@@ -62249,6 +63956,55 @@
                 "properties": {
                     "data": {
                         "$ref": "#/components/schemas/SettingsValueMap"
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "SetupStepsResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "steps": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "key": {
+                                            "type": "string",
+                                            "enum": [
+                                                "branding",
+                                                "team",
+                                                "agent",
+                                                "tax",
+                                                "plan"
+                                            ]
+                                        },
+                                        "done": {
+                                            "type": "boolean"
+                                        }
+                                    },
+                                    "required": [
+                                        "key",
+                                        "done"
+                                    ]
+                                }
+                            },
+                            "done": {
+                                "type": "integer"
+                            },
+                            "total": {
+                                "type": "integer"
+                            }
+                        },
+                        "required": [
+                            "steps",
+                            "done",
+                            "total"
+                        ]
                     }
                 },
                 "required": [
@@ -64349,6 +66105,22 @@
                     "grace_period_days"
                 ]
             },
+            "TwoFactorRecoveryConfirmRequest": {
+                "type": "object",
+                "properties": {
+                    "token": {
+                        "type": "string"
+                    },
+                    "reason": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Optional. Why you are asking, shown to the approver. At most 500 characters."
+                    }
+                },
+                "required": [
+                    "token"
+                ]
+            },
             "TwoFactorRecoveryConfirmResponse": {
                 "type": "object",
                 "properties": {
@@ -64742,11 +66514,18 @@
                     "name": {
                         "type": "string"
                     },
+                    "displayName": {
+                        "type": "string"
+                    },
                     "email": {
                         "type": "string"
                     },
                     "role": {
                         "type": "string"
+                    },
+                    "roleId": {
+                        "type": "integer",
+                        "nullable": true
                     },
                     "tenantId": {
                         "type": "integer"
@@ -64755,9 +66534,36 @@
                         "type": "integer",
                         "nullable": true
                     },
+                    "ouName": {
+                        "type": "string",
+                        "nullable": true
+                    },
                     "createdAt": {
                         "type": "string",
                         "nullable": true
+                    },
+                    "lastActiveAt": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "twoStep": {
+                        "type": "object",
+                        "properties": {
+                            "enabled": {
+                                "type": "boolean"
+                            },
+                            "required": {
+                                "type": "boolean"
+                            },
+                            "requiredDirectly": {
+                                "type": "boolean"
+                            }
+                        },
+                        "required": [
+                            "enabled",
+                            "required",
+                            "requiredDirectly"
+                        ]
                     },
                     "status": {
                         "type": "string"
@@ -65065,6 +66871,53 @@
                     }
                 }
             },
+            "UserGroupUsageResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "id": {
+                                    "type": "integer"
+                                },
+                                "now": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "description": "People in it now, resolved for the caller as a preview is. Null when its rule cannot be resolved at the moment."
+                                },
+                                "route_templates": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "id": {
+                                                "type": "integer"
+                                            },
+                                            "name": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        "required": [
+                                            "id",
+                                            "name"
+                                        ]
+                                    }
+                                }
+                            },
+                            "required": [
+                                "id",
+                                "now",
+                                "route_templates"
+                            ]
+                        }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
             "UserListResponse": {
                 "type": "object",
                 "properties": {
@@ -65094,9 +66947,53 @@
                     "data"
                 ]
             },
+            "UserTwoStepClearedResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "profile_id": {
+                                "type": "integer"
+                            },
+                            "tenant_id": {
+                                "type": "integer"
+                            },
+                            "requiredDirectly": {
+                                "type": "boolean"
+                            }
+                        },
+                        "required": [
+                            "profile_id",
+                            "tenant_id",
+                            "requiredDirectly"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "UserTwoStepRequirementRequest": {
+                "type": "object",
+                "properties": {
+                    "tenant_id": {
+                        "type": "integer",
+                        "description": "Required for a system-tenant caller."
+                    },
+                    "grace_period_days": {
+                        "type": "integer",
+                        "description": "Days before it is enforced. Default 0: from their next sign-in."
+                    }
+                }
+            },
             "UserUpdateRequest": {
                 "type": "object",
                 "properties": {
+                    "displayName": {
+                        "type": "string",
+                        "description": "The name shown for this person. Refused with 409 when they also belong to another workspace, unless the caller is the system tenant."
+                    },
                     "email": {
                         "type": "string",
                         "format": "email",
@@ -65153,6 +67050,108 @@
                         "description": "Required to set `password` on an account that signs in through an identity provider; otherwise that is refused."
                     }
                 }
+            },
+            "UsersBulkPair": {
+                "type": "object",
+                "properties": {
+                    "profile_id": {
+                        "type": "integer"
+                    },
+                    "tenant_id": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "profile_id",
+                    "tenant_id"
+                ]
+            },
+            "UsersBulkResultResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "changed": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/UsersBulkPair"
+                                }
+                            },
+                            "unchanged": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/UsersBulkPair"
+                                }
+                            }
+                        },
+                        "required": [
+                            "changed",
+                            "unchanged"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "UsersBulkRoleRequest": {
+                "type": "object",
+                "properties": {
+                    "role_id": {
+                        "type": "integer",
+                        "description": "The new role, by id. It must be available in every target's workspace, and hold nothing the caller does not."
+                    },
+                    "targets": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/UsersBulkTarget"
+                        },
+                        "minItems": 1,
+                        "maxItems": 200,
+                        "description": "The people to change. If any of them cannot be changed, nobody is."
+                    }
+                },
+                "required": [
+                    "role_id",
+                    "targets"
+                ]
+            },
+            "UsersBulkTarget": {
+                "type": "object",
+                "properties": {
+                    "profile_id": {
+                        "type": "integer"
+                    },
+                    "tenant_id": {
+                        "type": "integer",
+                        "description": "Which workspace. Required for a system-tenant caller, since one person can be in several; anyone else's targets are in their own workspace."
+                    }
+                },
+                "required": [
+                    "profile_id"
+                ]
+            },
+            "UsersBulkTwoStepRequest": {
+                "type": "object",
+                "properties": {
+                    "targets": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/UsersBulkTarget"
+                        },
+                        "minItems": 1,
+                        "maxItems": 200,
+                        "description": "The people who must use two-step. If any of them is not found, nobody changes."
+                    },
+                    "grace_period_days": {
+                        "type": "integer",
+                        "description": "Days before it is enforced. Default 0: from their next sign-in."
+                    }
+                },
+                "required": [
+                    "targets"
+                ]
             },
             "WaitingListResponse": {
                 "type": "object",

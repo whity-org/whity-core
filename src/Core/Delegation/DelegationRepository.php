@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Whity\Core\Delegation;
 
 use PDO;
+use Whity\Core\Identity\PersonName;
 use Whity\Http\ListQuery;
 use Whity\Http\ListSpec;
 
@@ -75,6 +76,7 @@ class DelegationRepository
      * @param int      $granteeId        The role id or profile id receiving the grant.
      * @param string   $permission       The delegated `resource:action` string.
      * @param int|null $ouId             Optional OU-subtree scope (null = tenant-wide).
+     * @param string|null $expiresAt     When it ends, `Y-m-d H:i:s` in UTC (null = no end date).
      * @return int The new delegation id.
      */
     public function insert(
@@ -83,12 +85,13 @@ class DelegationRepository
         string $granteeType,
         int $granteeId,
         string $permission,
-        ?int $ouId
+        ?int $ouId,
+        ?string $expiresAt = null
     ): int {
         $stmt = $this->db->prepare(
             'INSERT INTO permission_delegations
-                (tenant_id, grantor_profile_id, grantee_type, grantee_id, permission, ou_id, granted_at)
-             VALUES (:tenant_id, :grantor, :grantee_type, :grantee_id, :permission, :ou_id, NOW())'
+                (tenant_id, grantor_profile_id, grantee_type, grantee_id, permission, ou_id, granted_at, expires_at)
+             VALUES (:tenant_id, :grantor, :grantee_type, :grantee_id, :permission, :ou_id, NOW(), :expires_at)'
         );
         $stmt->execute([
             ':tenant_id'   => $tenantId,
@@ -97,6 +100,7 @@ class DelegationRepository
             ':grantee_id'  => $granteeId,
             ':permission'  => $permission,
             ':ou_id'       => $ouId,
+            ':expires_at'  => $expiresAt,
         ]);
 
         return (int) $this->db->lastInsertId();
@@ -182,6 +186,9 @@ class DelegationRepository
                 'scope'       => 'COALESCE(ou_id, 0)',
                 'status'      => 'CASE WHEN revoked_at IS NULL THEN 0 ELSE 1 END',
                 'grantedAt'   => 'granted_at',
+                // Text, so "no end date" sorts last on both engines: the same NULL
+                // ordering difference the docblock above describes.
+                'expiresAt'   => "COALESCE(CAST(expires_at AS TEXT), '9999')",
             ],
             tiebreaker: 'id',
             searchable: ['permission'],
@@ -324,8 +331,13 @@ class DelegationRepository
             $params[':grantor'] = $grantorProfileId;
         }
 
+        // "Include revoked" is the screen's All: everything that has ended, for
+        // the record. Without it the list is what is live right now, so a
+        // delegation that has passed its date leaves it as a revoked one does.
         if (!$includeRevoked) {
             $where[] = 'revoked_at IS NULL';
+            $where[] = '(expires_at IS NULL OR expires_at > :now)';
+            $params[':now'] = gmdate('Y-m-d H:i:s');
         }
 
         // The search is the LAST condition, never the only one: it is ANDed onto
@@ -347,7 +359,7 @@ class DelegationRepository
      *
      * This is the resolution-path query {@see DelegationService} uses to feed
      * {@see \Whity\Auth\RoleChecker}. A delegation matches when:
-     *  - it is live (`revoked_at IS NULL`),
+     *  - it is live (`revoked_at IS NULL`, and `expires_at` unset or still ahead),
      *  - it targets this (tenant, grantee_type, grantee_id),
      *  - AND its OU scope is satisfied: either tenant-wide (`ou_id IS NULL`) or
      *    its `ou_id` is one of `$inScopeOuIds` (the grantee's OU + ancestors).
@@ -369,12 +381,17 @@ class DelegationRepository
                 WHERE tenant_id = :tenant_id
                   AND grantee_type = :grantee_type
                   AND grantee_id = :grantee_id
-                  AND revoked_at IS NULL';
+                  AND revoked_at IS NULL
+                  AND (expires_at IS NULL OR expires_at > :now)';
 
+        // The clock comes from PHP, in UTC, because that is how expires_at was
+        // written. A long-running worker cannot keep an expired grant alive:
+        // RoleChecker's cache is cleared at the start of every request.
         $params = [
             ':tenant_id'   => $tenantId,
             ':grantee_type' => $granteeType,
             ':grantee_id'  => $granteeId,
+            ':now'         => gmdate('Y-m-d H:i:s'),
         ];
 
         if ($inScopeOuIds === []) {
@@ -405,28 +422,152 @@ class DelegationRepository
      * Already-revoked rows are left untouched (idempotent). Returns the number of
      * rows updated (0 when not found / not visible / already revoked).
      *
-     * @param int $id       The delegation id.
-     * @param int $tenantId The acting tenant (0 = system, may revoke any).
+     * @param int      $id        The delegation id.
+     * @param int      $tenantId  The acting tenant (0 = system, may revoke any).
+     * @param int|null $revokedBy Who revoked it, which decides who may restore it.
      * @return int Rows affected.
      */
-    public function revoke(int $id, int $tenantId): int
+    public function revoke(int $id, int $tenantId, ?int $revokedBy = null): int
     {
         if ($tenantId === 0) {
             // @tenant-guard-ignore: system-tenant (id 0) branch; scoped else-branch binds tenant_id
             $stmt = $this->db->prepare(
-                'UPDATE permission_delegations SET revoked_at = NOW()
+                'UPDATE permission_delegations SET revoked_at = :now, revoked_by_profile_id = :revoked_by
                  WHERE id = :id AND revoked_at IS NULL'
             );
-            $stmt->execute([':id' => $id]);
+            $stmt->execute([':id' => $id, ':now' => gmdate('Y-m-d H:i:s'), ':revoked_by' => $revokedBy]);
         } else {
             $stmt = $this->db->prepare(
-                'UPDATE permission_delegations SET revoked_at = NOW()
+                'UPDATE permission_delegations SET revoked_at = :now, revoked_by_profile_id = :revoked_by
                  WHERE id = :id AND tenant_id = :tenant_id AND revoked_at IS NULL'
             );
-            $stmt->execute([':id' => $id, ':tenant_id' => $tenantId]);
+            $stmt->execute([
+                ':id' => $id,
+                ':tenant_id' => $tenantId,
+                ':now' => gmdate('Y-m-d H:i:s'),
+                ':revoked_by' => $revokedBy,
+            ]);
         }
 
         return $stmt->rowCount();
+    }
+
+    /**
+     * Put a revoked delegation back. Pinned to the row's own tenant, and a row that
+     * is no longer revoked is left alone, so two Undo clicks restore it once.
+     *
+     * @param int $id       The delegation id.
+     * @param int $tenantId The tenant that owns the row.
+     * @return int Rows affected.
+     */
+    public function restore(int $id, int $tenantId): int
+    {
+        $stmt = $this->db->prepare(
+            'UPDATE permission_delegations SET revoked_at = NULL, revoked_by_profile_id = NULL
+             WHERE id = :id AND tenant_id = :tenant_id AND revoked_at IS NOT NULL'
+        );
+        $stmt->execute([':id' => $id, ':tenant_id' => $tenantId]);
+
+        return $stmt->rowCount();
+    }
+
+    /**
+     * The names a page of delegation rows shows, in one read per kind of name.
+     *
+     * Each name is looked up inside the ROW'S tenant, because for the system tenant
+     * a page mixes tenants. A role is named only if that tenant can see it, a unit
+     * only if it owns it, and a person only if they hold a membership there: a
+     * profile is global, and a name it carries elsewhere is none of this tenant's
+     * business. A name that fails the check is simply absent.
+     *
+     * @param array<int, array<string, mixed>> $rows Normalised rows from {@see self::list()}.
+     * @return array{people: array<string, string>, roles: array<string, string>, units: array<string, string>, permissions: array<string, string>}
+     *         Keyed `tenantId:id`; permissions keyed by slug.
+     */
+    public function namesFor(array $rows): array
+    {
+        $profileIds = [];
+        $roleIds = [];
+        $ouIds = [];
+        $tenantIds = [];
+        $slugs = [];
+        foreach ($rows as $row) {
+            $tenantIds[(int) $row['tenant_id']] = true;
+            $profileIds[(int) $row['grantor_profile_id']] = true;
+            $slugs[(string) $row['permission']] = true;
+            if ($row['grantee_type'] === self::GRANTEE_ROLE) {
+                $roleIds[(int) $row['grantee_id']] = true;
+            } else {
+                $profileIds[(int) $row['grantee_id']] = true;
+            }
+            if ($row['ou_id'] !== null) {
+                $ouIds[(int) $row['ou_id']] = true;
+            }
+        }
+
+        $names = ['people' => [], 'roles' => [], 'units' => [], 'permissions' => []];
+        if ($rows === []) {
+            return $names;
+        }
+
+        $tenants = array_keys($tenantIds);
+        $tenantIn = implode(', ', array_fill(0, count($tenants), '?'));
+
+        $ids = array_keys($profileIds);
+        $idIn = implode(', ', array_fill(0, count($ids), '?'));
+        $stmt = $this->db->prepare(
+            "SELECT DISTINCT m.tenant_id, p.id, p.display_name, pe.email
+               FROM memberships m
+               JOIN profiles p ON p.id = m.profile_id
+               LEFT JOIN profile_emails pe ON pe.profile_id = p.id AND pe.is_primary = true
+              WHERE m.tenant_id IN ({$tenantIn}) AND m.profile_id IN ({$idIn})"
+        );
+        $stmt->execute([...$tenants, ...$ids]);
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $names['people'][$row['tenant_id'] . ':' . $row['id']] = PersonName::of(
+                (string) $row['display_name'],
+                (string) ($row['email'] ?? '')
+            );
+        }
+
+        if ($roleIds !== []) {
+            $ids = array_keys($roleIds);
+            $idIn = implode(', ', array_fill(0, count($ids), '?'));
+            // @tenant-guard-ignore: read by id, and every row is checked against the delegation's own tenant below (owned by it, or global)
+            $stmt = $this->db->prepare("SELECT id, name, tenant_id FROM roles WHERE id IN ({$idIn})");
+            $stmt->execute($ids);
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                foreach ($tenants as $tenant) {
+                    if ($row['tenant_id'] === null || (int) $row['tenant_id'] === $tenant) {
+                        $names['roles'][$tenant . ':' . $row['id']] = (string) $row['name'];
+                    }
+                }
+            }
+        }
+
+        if ($ouIds !== []) {
+            $ids = array_keys($ouIds);
+            $idIn = implode(', ', array_fill(0, count($ids), '?'));
+            $stmt = $this->db->prepare(
+                "SELECT id, name, tenant_id FROM organizational_units
+                  WHERE tenant_id IN ({$tenantIn}) AND id IN ({$idIn})"
+            );
+            $stmt->execute([...$tenants, ...$ids]);
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $names['units'][$row['tenant_id'] . ':' . $row['id']] = (string) $row['name'];
+            }
+        }
+
+        $list = array_keys($slugs);
+        $slugIn = implode(', ', array_fill(0, count($list), '?'));
+        // @tenant-guard-ignore: permissions is a global catalogue
+        $stmt = $this->db->prepare("SELECT name, description FROM permissions WHERE name IN ({$slugIn})");
+        $stmt->execute($list);
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $names['permissions'][(string) $row['name']] = (string) ($row['description'] ?? '');
+        }
+
+        return $names;
     }
 
     /**
@@ -458,6 +599,12 @@ class DelegationRepository
             'granted_at'  => isset($row['granted_at']) ? (string) $row['granted_at'] : null,
             'revoked_at'  => isset($row['revoked_at']) && $row['revoked_at'] !== null
                 ? (string) $row['revoked_at']
+                : null,
+            'expires_at'  => isset($row['expires_at']) && $row['expires_at'] !== null
+                ? (string) $row['expires_at']
+                : null,
+            'revoked_by_profile_id' => isset($row['revoked_by_profile_id']) && $row['revoked_by_profile_id'] !== null
+                ? (int) $row['revoked_by_profile_id']
                 : null,
         ];
     }

@@ -11,6 +11,7 @@ import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { Button } from '@whity/ui/button';
 import { Input } from '@/components/ui/input';
 import { MoneyInput } from '@whity/ui/money/money-input';
+import { AccessDeniedPanel, AreaError } from '@whity/ui/page-states';
 import { parseMoney, toDecimalString } from '@whity/ui/money/currency';
 import { Badge } from '@whity/ui/badge';
 import {
@@ -58,6 +59,9 @@ interface Promotion {
   redemption_count: number;
 }
 
+/** The list route answered 403: a different thing from a failed load or an empty list. */
+const FORBIDDEN = 'forbidden';
+
 export default function PromotionsPage() {
   const { apiClient } = useAuth();
   const { addToast } = useToast();
@@ -67,6 +71,9 @@ export default function PromotionsPage() {
 
   const { data, loading, error, refetch } = useFetch(async () => {
     const res = await apiClient('/api/v1/promotions');
+    if (res.status === 403) {
+      throw new Error(FORBIDDEN);
+    }
     if (!res.ok) {
       throw new Error(t('promotions.error.load', 'Failed to load promotions'));
     }
@@ -171,21 +178,35 @@ export default function PromotionsPage() {
         }
       />
 
-      {error && <p className="text-sm text-destructive">{error}</p>}
-
-      <DataTable
-        columns={columns}
-        data={rows}
-        isLoading={loading}
-        rowActions={rowActions}
-        emptyState={{
-          title: t('promotions.empty.title', 'No promotions yet'),
-          description: t(
-            'promotions.empty.description',
-            'An early bird applies automatically to whoever qualifies; a promo code has to be typed. Both are made here.'
-          ),
-        }}
-      />
+      {error === FORBIDDEN ? (
+        <AccessDeniedPanel
+          title={t('promotions.denied.title', 'You don’t have access to promotions')}
+          description={t(
+            'promotions.denied.description',
+            'Promotions are managed by the people who run this Whity installation. Ask them if you need an offer set up.'
+          )}
+        />
+      ) : error ? (
+        <AreaError
+          message={error}
+          retryLabel={t('promotions.error.retry', 'Try again')}
+          onRetry={refetch}
+        />
+      ) : (
+        <DataTable
+          columns={columns}
+          data={rows}
+          isLoading={loading}
+          rowActions={rowActions}
+          emptyState={{
+            title: t('promotions.empty.title', 'No promotions yet'),
+            description: t(
+              'promotions.empty.description',
+              'An early bird applies automatically to whoever qualifies; a promo code has to be typed. Both are made here.'
+            ),
+          }}
+        />
+      )}
 
       {creating && (
         <CreatePromotionDialog

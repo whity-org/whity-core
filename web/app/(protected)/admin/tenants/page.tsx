@@ -33,14 +33,18 @@ import { DeleteTenantModal } from './delete-modal';
  */
 import type { Tenant } from './record-screen';
 
+const SYSTEM_TENANT_ID = 0;
+
 export type { Tenant };
 
 export default function TenantsPage() {
-  const { apiClient } = useAuth();
+  const { apiClient, user } = useAuth();
   const { hasPermission } = useCapabilities();
   const t = useTranslation('admin');
   const dates = useDateDisplay();
-  const canCreate = hasPermission(TENANTS_WRITE);
+  // The route refuses every other tenant whatever permissions they hold, so the
+  // button would only lead to a 403.
+  const canCreate = user?.tenant_id === SYSTEM_TENANT_ID && hasPermission(TENANTS_WRITE);
   const canEdit = hasPermission(TENANTS_WRITE);
   const canDelete = hasPermission(TENANTS_DELETE);
 
