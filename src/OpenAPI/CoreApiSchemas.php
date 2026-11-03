@@ -4708,6 +4708,11 @@ final class CoreApiSchemas
             'InvoiceDetail' => self::object([
                 'lines' => ['type' => 'array', 'items' => SchemaBuilder::ref('InvoiceLine')],
                 'payments' => ['type' => 'array', 'items' => SchemaBuilder::ref('PaymentTransaction')],
+                // Both null for any currency but JOD.
+                'total_in_words' => self::object([
+                    'en' => self::str(true),
+                    'ar' => self::str(true),
+                ], ['en', 'ar']),
             ], []),
             // What a rail can do, so a client offers only what will work.
             'PaymentMethodOption' => self::object([
@@ -4954,6 +4959,7 @@ final class CoreApiSchemas
             // wrong by a factor of ten.
             'PurchasablePlan' => self::object([
                 'plan_key' => self::str(),
+                'is_current' => self::bool(),
                 'name' => self::str(),
                 'description' => self::str(true),
                 'unit_amount' => self::int(),

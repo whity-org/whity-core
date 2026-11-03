@@ -9665,6 +9665,10 @@ export interface components {
         InvoiceDetail: {
             lines?: components["schemas"]["InvoiceLine"][];
             payments?: components["schemas"]["PaymentTransaction"][];
+            total_in_words?: {
+                en: string | null;
+                ar: string | null;
+            };
         };
         InvoiceLine: {
             id: number;
@@ -10818,6 +10822,7 @@ export interface components {
         };
         PurchasablePlan: {
             plan_key: string;
+            is_current?: boolean;
             name: string;
             description?: string | null;
             unit_amount: number;

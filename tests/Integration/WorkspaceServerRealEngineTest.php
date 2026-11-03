@@ -238,6 +238,24 @@ final class WorkspaceServerRealEngineTest extends TestCase
         self::assertSame([], $actions('no-such-area'), 'An unknown area matches nothing, it does not drop the filter.');
     }
 
+    public function testAnActionEndingInADotAsksForTheFamily(): void
+    {
+        $this->auditRow(self::TENANT_A, self::ADMIN_A, 'notification.sent', null, null);
+        $this->auditRow(self::TENANT_A, self::ADMIN_A, 'notification.failed', null, null);
+        $this->auditRow(self::TENANT_A, self::ADMIN_A, 'notifications.other', null, null);
+        $this->auditRow(self::TENANT_A, self::ADMIN_A, 'role.created', null, null);
+        $this->auditRow(self::TENANT_B, self::ADMIN_B, 'notification.sent', null, null);
+
+        $actions = fn (string $filter): array => array_column($this->auditList(self::TENANT_A, self::ADMIN_A, "action={$filter}")['data'], 'action');
+
+        $family = $actions('notification.');
+        sort($family);
+        self::assertSame(['notification.failed', 'notification.sent'], $family, 'The family, in this tenant only.');
+        self::assertSame(['notification.sent'], $actions('notification.sent'), 'A whole code stays an exact match.');
+        self::assertSame([], $actions('notification'), 'No dot, no family.');
+        self::assertSame([], $actions('%25.'), 'A wildcard in the value is a character, not a wildcard.');
+    }
+
     public function testFacetsListOnlyWhoAppearsInThisWorkspace(): void
     {
         $this->agentToken('jti-a', self::TENANT_A, self::ADMIN_A, 'Billing assistant');

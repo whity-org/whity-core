@@ -57171,6 +57171,23 @@
                         "items": {
                             "$ref": "#/components/schemas/PaymentTransaction"
                         }
+                    },
+                    "total_in_words": {
+                        "type": "object",
+                        "properties": {
+                            "en": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "ar": {
+                                "type": "string",
+                                "nullable": true
+                            }
+                        },
+                        "required": [
+                            "en",
+                            "ar"
+                        ]
                     }
                 }
             },
@@ -61614,6 +61631,9 @@
                 "properties": {
                     "plan_key": {
                         "type": "string"
+                    },
+                    "is_current": {
+                        "type": "boolean"
                     },
                     "name": {
                         "type": "string"

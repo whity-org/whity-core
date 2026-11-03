@@ -544,8 +544,17 @@ final class AuditLogApiHandler
         }
 
         if (isset($query['action']) && $query['action'] !== '') {
-            $conditions[] = 'action = :action';
-            $params[':action'] = (string) $query['action'];
+            // A trailing dot asks for a family (`notification.`), which is how another
+            // page links to its own trail. No action code ends in a dot, so an exact
+            // match could only ever have come back empty.
+            $action = (string) $query['action'];
+            if (str_ends_with($action, '.')) {
+                $conditions[] = "action LIKE :action ESCAPE '\'";
+                $params[':action'] = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $action) . '%';
+            } else {
+                $conditions[] = 'action = :action';
+                $params[':action'] = $action;
+            }
         }
 
         if (isset($query['target_type']) && $query['target_type'] !== '') {
