@@ -385,7 +385,7 @@ describe('sorting', () => {
     await waitFor(() => expect(screen.getByText('Invoice 42')).toBeInTheDocument());
 
     const before = lastListUrl();
-    await userEvent.click(screen.getByRole('columnheader', { name: 'Title' }));
+    await userEvent.click(screen.getByRole('columnheader', { name: 'Document' }));
 
     expect(lastListUrl()).toBe(before);
   });

@@ -159,7 +159,7 @@ export default function InboxPage() {
                   <button
                     type="button"
                     className="text-start font-medium text-primary underline"
-                    onClick={() => router.push(`/admin/document-routing/${meta.document_id}`)}
+                    onClick={() => router.push(`/admin/document-library/${meta.document_id}?tab=routing`)}
                   >
                     {row.title}
                   </button>
