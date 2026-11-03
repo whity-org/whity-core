@@ -28,7 +28,7 @@ test.describe('Core admin areas (role matrix)', () => {
       await page.waitForURL('**/admin/users');
       await expect(page.getByRole('heading', { name: 'Users' })).toBeVisible();
       await expect(
-        page.getByRole('button', { name: 'Create User' })
+        page.getByRole('button', { name: 'Invite people' })
       ).toBeVisible();
       // Named: the users page also renders a pending-invitations table.
       await expect(page.getByRole('table', { name: 'Users' })).toBeVisible();

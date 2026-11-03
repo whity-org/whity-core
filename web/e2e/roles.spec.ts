@@ -235,12 +235,13 @@ test.describe('Roles CRUD (admin)', () => {
 
     // No dialog, and no scroll porthole: every permission group is on the page.
     await expect(page.getByRole('dialog')).toHaveCount(0);
+    await page.getByRole('tab', { name: 'Access' }).click();
     const grid = page.getByTestId('perm-grid');
     await expect(grid).toBeVisible();
     await expect(page.getByTestId('perm-grid-group-roles')).toBeVisible();
     await expect(page.getByTestId('perm-grid-group-users')).toBeVisible();
 
-    const rolesReadLabel = grid.locator('label', { hasText: 'roles:read' });
+    const rolesReadLabel = grid.locator('label[data-permission="roles:read"]');
     await expect(rolesReadLabel).toBeVisible();
     await rolesReadLabel.click();
     await expect(page.getByTestId('perm-grid-summary')).toHaveText(/^1 of \d+ selected$/);

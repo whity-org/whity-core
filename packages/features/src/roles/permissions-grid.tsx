@@ -281,14 +281,17 @@ export function PermissionsGrid({
                       const isOn = selected.has(permission.id);
                       if (readOnly) {
                         return (
-                          <li key={permission.id} className="px-3 py-2">
+                          <li key={permission.id} data-permission={permission.name} className="px-3 py-2">
                             <PermissionLabel permission={permission} />
                           </li>
                         );
                       }
                       return (
                         <li key={permission.id}>
-                          <label className="flex cursor-pointer items-start gap-2 px-3 py-2 hover:bg-muted">
+                          <label
+                            data-permission={permission.name}
+                            className="flex cursor-pointer items-start gap-2 px-3 py-2 hover:bg-muted"
+                          >
                             <input
                               type="checkbox"
                               checked={isOn}
