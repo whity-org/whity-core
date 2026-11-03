@@ -1434,6 +1434,33 @@ final class CoreApiSchemas
                     404 => self::errorResponse('Form not found'),
                 ] + self::authErrors(),
             ]),
+            self::permissionRoute('GET', '/api/forms/{id:\d+}/responses/summary', 'forms:read', [
+                'summary' => 'What a form\'s responses add up to',
+                'description' => 'A count per choice for each choice question, responses per week for the '
+                    . 'last 12 weeks, and where responses are in their routing. Text and file questions are '
+                    . 'not summarised, and staff answers appear nowhere. Reads at most 20,000 responses; '
+                    . '`truncated` says so.',
+                'tags' => ['forms'],
+                'responses' => [
+                    200 => self::jsonResponse('The summary', 'FormResponsesSummaryResponse'),
+                    404 => self::errorResponse('Form not found'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/forms/{id:\d+}/responses/export', 'forms:read', [
+                'summary' => 'Download a form\'s responses as a CSV file',
+                'description' => 'At most 20,000 rows, and `X-Whity-Rows-Truncated` says if it stopped there. '
+                    . 'A text cell that a spreadsheet would run as a formula is made safe with a leading `\'`. '
+                    . 'Staff answers are left out, and a file answer says how many are attached rather than '
+                    . 'giving the storage key. `?language=ar` chooses the wording. Each export is audited.',
+                'tags' => ['forms'],
+                'parameters' => [
+                    self::queryParam('language', 'string', 'en or ar; the wording of labels and choices.'),
+                ],
+                'responses' => [
+                    200 => ['description' => 'The CSV file', 'content' => ['text/csv' => ['schema' => ['type' => 'string']]]],
+                    404 => self::errorResponse('Form not found'),
+                ] + self::authErrors(),
+            ]),
             self::permissionRoute('GET', '/api/forms/{id:\d+}/preview', 'forms:manage', [
                 'summary' => 'See a form as somebody filling it in would, whatever its state',
                 'description' => 'The render, for the author, so a draft can be checked before it is '
@@ -7460,6 +7487,30 @@ final class CoreApiSchemas
                     'ignored_keys' => ['type' => 'array', 'items' => ['type' => 'string']],
                 ], ['routed', 'ignored_keys']),
             ], ['data']),
+            'FormResponsesSummaryResponse' => self::dataEnvelope(self::object([
+                'total' => self::int(),
+                'truncated' => self::bool(),
+                'per_week' => ['type' => 'array', 'items' => self::object([
+                    'week' => self::str(),
+                    'count' => self::int(),
+                ], ['week', 'count'])],
+                'routing' => self::object([
+                    'not_routed' => self::int(),
+                    'in_progress' => self::int(),
+                    'completed' => self::int(),
+                ], ['not_routed', 'in_progress', 'completed']),
+                'questions' => ['type' => 'array', 'items' => self::object([
+                    'field_key' => self::str(),
+                    'field_type' => self::str(),
+                    'label' => self::localizedText(),
+                    'answered' => self::int(),
+                    'options' => ['type' => 'array', 'items' => self::object([
+                        'value' => self::str(),
+                        'label' => self::localizedText() + ['nullable' => true],
+                        'count' => self::int(),
+                    ], ['value', 'count'])],
+                ], ['field_key', 'field_type', 'label', 'answered', 'options'])],
+            ], ['total', 'truncated', 'per_week', 'routing', 'questions'])),
             'MemberForm' => self::object([
                 'id' => self::int(),
                 'name' => self::localizedText(),

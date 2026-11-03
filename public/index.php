@@ -3960,6 +3960,15 @@ $router->register('GET', '/api/form-submissions/{id:\d+}', [$formSubmissionsHand
 // The office's record on a submission (migration 194). Somebody who can read a
 // submission can read what became of it; recording takes `forms:review`.
 $router->register('GET', '/api/form-submissions/{id:\d+}/review', [$formSubmissionReviewsHandler, 'show'], null, null, CorePermissions::FORMS_READ);
+// What the responses add up to, and the export. `forms:read`, which reads these rows anyway.
+$formResponsesHandler = new \Whity\Api\FormResponsesApiHandler(
+    $formRepository,
+    $formFieldRepository,
+    $formSubmissionRepository,
+    $auditLogger
+);
+$router->register('GET', '/api/forms/{id:\d+}/responses/summary', [$formResponsesHandler, 'summary'], null, null, CorePermissions::FORMS_READ);
+$router->register('GET', '/api/forms/{id:\d+}/responses/export', [$formResponsesHandler, 'export'], null, null, CorePermissions::FORMS_READ);
 $router->register('POST', '/api/form-submissions/{id:\d+}/review', [$formSubmissionReviewsHandler, 'record'], null, null, CorePermissions::FORMS_REVIEW);
 // Only ever the caller's own rows — the ROUTE decides whose, not a query param,
 // so no client can widen it. No permission: the rows already name exactly one

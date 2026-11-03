@@ -20774,6 +20774,189 @@
                 ]
             }
         },
+        "/api/v1/forms/{id}/responses/export": {
+            "get": {
+                "operationId": "get_api_v1_forms_id_responses_export",
+                "summary": "Download a form's responses as a CSV file",
+                "tags": [
+                    "forms"
+                ],
+                "description": "At most 20,000 rows, and `X-Whity-Rows-Truncated` says if it stopped there. A text cell that a spreadsheet would run as a formula is made safe with a leading `'`. Staff answers are left out, and a file answer says how many are attached rather than giving the storage key. `?language=ar` chooses the wording. Each export is audited.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "language",
+                        "in": "query",
+                        "required": false,
+                        "description": "en or ar; the wording of labels and choices.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The CSV file",
+                        "content": {
+                            "text/csv": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Form not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/forms/{id}/responses/summary": {
+            "get": {
+                "operationId": "get_api_v1_forms_id_responses_summary",
+                "summary": "What a form's responses add up to",
+                "tags": [
+                    "forms"
+                ],
+                "description": "A count per choice for each choice question, responses per week for the last 12 weeks, and where responses are in their routing. Text and file questions are not summarised, and staff answers appear nowhere. Reads at most 20,000 responses; `truncated` says so.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The summary",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/FormResponsesSummaryResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Form not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/forms/{id}/submissions": {
             "post": {
                 "operationId": "post_api_v1_forms_id_submissions",
@@ -54642,6 +54825,136 @@
                 "properties": {
                     "data": {
                         "$ref": "#/components/schemas/Form"
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "FormResponsesSummaryResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "total": {
+                                "type": "integer"
+                            },
+                            "truncated": {
+                                "type": "boolean"
+                            },
+                            "per_week": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "week": {
+                                            "type": "string"
+                                        },
+                                        "count": {
+                                            "type": "integer"
+                                        }
+                                    },
+                                    "required": [
+                                        "week",
+                                        "count"
+                                    ]
+                                }
+                            },
+                            "routing": {
+                                "type": "object",
+                                "properties": {
+                                    "not_routed": {
+                                        "type": "integer"
+                                    },
+                                    "in_progress": {
+                                        "type": "integer"
+                                    },
+                                    "completed": {
+                                        "type": "integer"
+                                    }
+                                },
+                                "required": [
+                                    "not_routed",
+                                    "in_progress",
+                                    "completed"
+                                ]
+                            },
+                            "questions": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_key": {
+                                            "type": "string"
+                                        },
+                                        "field_type": {
+                                            "type": "string"
+                                        },
+                                        "label": {
+                                            "type": "object",
+                                            "x-whity-localized-text": true,
+                                            "properties": {
+                                                "ar": {
+                                                    "type": "string"
+                                                },
+                                                "en": {
+                                                    "type": "string"
+                                                }
+                                            }
+                                        },
+                                        "answered": {
+                                            "type": "integer"
+                                        },
+                                        "options": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "value": {
+                                                        "type": "string"
+                                                    },
+                                                    "label": {
+                                                        "type": "object",
+                                                        "x-whity-localized-text": true,
+                                                        "properties": {
+                                                            "ar": {
+                                                                "type": "string"
+                                                            },
+                                                            "en": {
+                                                                "type": "string"
+                                                            }
+                                                        },
+                                                        "nullable": true
+                                                    },
+                                                    "count": {
+                                                        "type": "integer"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "value",
+                                                    "count"
+                                                ]
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "field_key",
+                                        "field_type",
+                                        "label",
+                                        "answered",
+                                        "options"
+                                    ]
+                                }
+                            }
+                        },
+                        "required": [
+                            "total",
+                            "truncated",
+                            "per_week",
+                            "routing",
+                            "questions"
+                        ]
                     }
                 },
                 "required": [
