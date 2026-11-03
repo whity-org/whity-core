@@ -43,7 +43,7 @@ final class ManifestValidator
     /** @var list<string> */
     public const TOP_LEVEL_KEYS = [
         'manifest', 'plugin', 'requires', 'permissions', 'roles', 'screens', 'tables', 'dataTypes', 'limits', 'records',
-        'automations', 'tests', 'documents', 'agentPresets',
+        'automations', 'tests', 'documents', 'agentPresets', 'homeCard',
     ];
 
     private const NAME_PATTERN = '/^[A-Za-z][A-Za-z0-9_]{0,63}$/';
@@ -131,6 +131,7 @@ final class ManifestValidator
         );
 
         AgentPresetValidator::check($manifest['agentPresets'] ?? null, $errors);
+        HomeCardValidator::check($manifest['homeCard'] ?? null, $manifest['records'] ?? null, $manifest['screens'] ?? null, $errors);
 
         return ['ok' => $errors === [], 'errors' => $errors];
     }
