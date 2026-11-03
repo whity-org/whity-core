@@ -1,7 +1,7 @@
 import { test, expect } from './support/fixtures';
 
 /**
- * System Statistics page (/admin/stats — the "Dashboard" sidebar target).
+ * System Statistics page (/admin/stats — the "System" sidebar target).
  *
  * Read-only: it renders metric cards, a per-role breakdown, a Growth Trends
  * chart with a Users/Tenants tab switcher, and Database/System/Environment

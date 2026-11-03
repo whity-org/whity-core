@@ -98,24 +98,25 @@ test.describe('Core admin areas (role matrix)', () => {
     }
   });
 
-  test('Stats page loads numbers for admin; the Dashboard link is hidden for user and delegate', async ({
+  test('Stats page loads numbers for admin; the System link is hidden for user and delegate', async ({
     roleSession,
     role,
     page,
   }) => {
     if (role !== 'admin') {
-      // The "Dashboard" nav item is gated on requiredRole 'admin' (it points
-      // at /admin -> System Statistics, backed by GET /api/admin/stats), so it
-      // is filtered out of the sidebar for user and delegate.
-      await expect(roleSession.shell.navLink('Dashboard')).toHaveCount(0);
+      // The "System" nav item is gated on `stats:read` in the system tenant (it
+      // points at /admin/stats, backed by GET /api/admin/stats), so it is filtered
+      // out of the sidebar for user and delegate. Dashboard is everyone's.
+      await expect(roleSession.shell.navLink('System')).toHaveCount(0);
+      await expect(roleSession.shell.navLink('Dashboard')).toBeVisible();
       return;
     }
 
     const statsResponse = page.waitForResponse((res) =>
       res.url().includes('/api/v1/admin/stats')
     );
-    // System statistics are at /admin/stats; the "Dashboard" nav item now opens
-    // the home page instead, and the System nav item arrives with the server work.
+    // System statistics are at /admin/stats, behind the System nav item; the
+    // "Dashboard" nav item opens the home page.
     await page.goto('/admin/stats');
     expect((await statsResponse).status()).toBe(200);
 

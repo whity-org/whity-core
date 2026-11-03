@@ -112,6 +112,33 @@ final class CoreNavigationRegistrationTest extends TestCase
         return $items;
     }
 
+    /**
+     * The home is everyone's (H.1): a gate on this item would leave a member with
+     * no way home. System is the operators' (H.3): the permission alone would show
+     * it to every workspace owner, who hold the same global role.
+     */
+    public function testDashboardIsForEveryoneAndSystemForOperators(): void
+    {
+        $dashboard = $this->itemBody('dashboard');
+        self::assertStringContainsString("'href' => '/dashboard'", $dashboard);
+        self::assertStringNotContainsString("'requiredPermission'", $dashboard);
+        self::assertStringNotContainsString("'requiredRole'", $dashboard);
+
+        $system = $this->itemBody('system');
+        self::assertStringContainsString("'href' => '/admin/stats'", $system);
+        self::assertStringContainsString('CorePermissions::STATS_READ', $system);
+        self::assertStringContainsString("'systemTenantOnly' => true", $system);
+    }
+
+    private function itemBody(string $id): string
+    {
+        $source = (string) file_get_contents(dirname(__DIR__, 2) . '/public/index.php');
+        $pattern = '/\$items\[\] = \[\s+\'id\' => \'' . $id . '\',(.*?)\R    \];/s';
+        self::assertSame(1, preg_match($pattern, $source, $match), "Navigation item {$id} not found.");
+
+        return $match[1];
+    }
+
     public function testEveryItemDeclaresAKnownGroupOrIsDocumentedAsUngrouped(): void
     {
         foreach ($this->registrations() as $id => $item) {

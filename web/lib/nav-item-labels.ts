@@ -17,6 +17,7 @@ export function useNavItemLabels(): Record<string, string> {
   return useMemo<Record<string, string>>(
     () => ({
       dashboard: t('sidebar.item.dashboard', 'Dashboard'),
+      system: t('sidebar.item.system', 'System'),
       inbox: t('sidebar.item.inbox', 'Inbox'),
       approvals: t('sidebar.item.approvals', 'Approvals'),
       users: t('sidebar.item.users', 'Users'),

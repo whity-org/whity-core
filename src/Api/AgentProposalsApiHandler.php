@@ -210,7 +210,7 @@ final class AgentProposalsApiHandler
      * @param array<string, mixed>|null                           $action     the action it ran, when it has run (WHIT-812)
      * @return array<string, mixed>
      */
-    private static function present(array $proposal, array $agentNames = [], ?array $action = null): array
+    public static function present(array $proposal, array $agentNames = [], ?array $action = null): array
     {
         return [
             'id'                => $proposal['id'],
