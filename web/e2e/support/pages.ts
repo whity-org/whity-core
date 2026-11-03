@@ -77,7 +77,7 @@ export class LoginPage {
 
   /** The authenticator-code input shown after a 202 challenge. */
   get twoFactorCodeInput(): Locator {
-    return this.page.locator('#twoFactorCode');
+    return this.page.getByRole('group', { name: /Authenticator Code/ }).locator('input').first();
   }
 
   /** The recovery-code input shown after switching to backup-code mode. */
@@ -101,7 +101,9 @@ export class LoginPage {
 
   /** Enter a 6-digit authenticator code and click Verify. */
   async submitTwoFactorCode(code: string): Promise<void> {
-    await this.twoFactorCodeInput.fill(code);
+    await this.twoFactorCodeInput.click();
+    // Six boxes: typing moves on to the next one.
+    await this.page.keyboard.type(code);
     await this.page.getByRole('button', { name: 'Verify', exact: true }).click();
   }
 

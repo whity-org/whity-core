@@ -1,1 +1,0 @@
-- **Signing in with SSO now shows the workspace picker.** A person in several workspaces who signed in through an SSO provider such as Whity ID came back to the login page with a message to sign in again. An account with no password could not get in at all. The page now lists their workspaces and signs them in to the one they choose (WHIT-848).
