@@ -125,7 +125,6 @@ export default function AgentsPage() {
           icon="robot"
           title={t('agents.empty.title', 'No agents yet')}
           description={t('agents.empty.description', 'Start from a ready-made agent. It asks you before doing anything that matters.')}
-          action={<Button onClick={() => setChoosing(true)}>{t('agents.new.action', 'New agent')}</Button>}
         />
       ) : (
         <>

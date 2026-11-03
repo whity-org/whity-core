@@ -57,6 +57,15 @@ export interface InputProps extends React.ComponentProps<"input"> {
   fileVariant?: "dropzone" | "compact"
   /** Accessible name for a tooltip trigger. Defaults to "More information". */
   tooltipTriggerLabel?: string
+  /** For type="date": the picker's own words, for hosts that translate them. */
+  datePickerLabels?: {
+    placeholder?: string
+    clear?: string
+    today?: string
+    clearButton?: string
+    previousMonth?: string
+    nextMonth?: string
+  }
   /** Accessible name for the password reveal toggle, by state. */
   showPasswordLabel?: string
   hidePasswordLabel?: string
@@ -99,6 +108,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
       showNumberStepper = true,
       fileVariant = "dropzone",
       tooltipTriggerLabel = "More information",
+      datePickerLabels,
       showPasswordLabel = "Show password",
       hidePasswordLabel = "Hide password",
       decrementLabel = "Decrease value",
@@ -303,7 +313,12 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           <DatePicker
             disabled={disabled}
             className={className}
-            placeholder={props.placeholder}
+            placeholder={props.placeholder ?? datePickerLabels?.placeholder}
+            clearLabel={datePickerLabels?.clear}
+            todayLabel={datePickerLabels?.today}
+            clearButtonLabel={datePickerLabels?.clearButton}
+            previousMonthLabel={datePickerLabels?.previousMonth}
+            nextMonthLabel={datePickerLabels?.nextMonth}
             defaultValue={props.defaultValue as string}
             value={props.value as string}
             onChange={(d) => {
