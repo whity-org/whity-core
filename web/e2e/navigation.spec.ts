@@ -61,6 +61,14 @@ test.describe('Sidebar navigation (admin)', () => {
     await expect(page.getByRole('columnheader', { name: 'Slug' })).toBeVisible();
   });
 
+  test('Settings General leads a workspace admin to their workspace record', async ({ adminPage, page }) => {
+    await adminPage.shell.clickNav('Settings');
+    await page.waitForURL('**/admin/settings');
+    await page.getByRole('link', { name: 'Open workspace record' }).click();
+    await page.waitForURL(/\/admin\/tenants\/\d+$/);
+    await expect(page.getByText('This workspace could not be loaded')).toHaveCount(0);
+  });
+
   test('Settings opens the Settings area, whose sub-nav reaches the data pages too', async ({
     adminPage,
     page,
