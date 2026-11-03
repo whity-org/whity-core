@@ -1,6 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 import {
   adminStatePath,
+  systemStatePath,
   delegateStatePath,
   userStatePath,
 } from './e2e/support/storage';
