@@ -9,6 +9,7 @@ use Whity\Sdk\DataType\PluginDataTypesInterface;
 use Whity\Sdk\PluginAgentPresetsInterface;
 use Whity\Sdk\PluginEntitlementsInterface;
 use Whity\Sdk\PluginFrontendInterface;
+use Whity\Sdk\PluginHomeCardInterface;
 use Whity\Sdk\PluginInterface;
 use Whity\Sdk\PluginRequirementsInterface;
 use Whity\Sdk\PluginRolesInterface;
@@ -60,7 +61,8 @@ abstract class ManifestPlugin implements
     PluginTablesInterface,
     PluginDataTypesInterface,
     PluginEntitlementsInterface,
-    PluginAgentPresetsInterface
+    PluginAgentPresetsInterface,
+    PluginHomeCardInterface
 {
     /** The file name the manifest is read from, next to the subclass. */
     public const FILE_NAME = 'plugin.json';
@@ -193,5 +195,16 @@ abstract class ManifestPlugin implements
 
         /** @var list<array<string, mixed>> */
         return $presets;
+    }
+
+    /**
+     * The manifest's `homeCard` (SDK 1.62). JSON declares no routes, so its `source`
+     * must be one a subclass adds in PHP; the host drops it otherwise.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function getHomeCard(): ?array
+    {
+        return $this->manifest->homeCard();
     }
 }

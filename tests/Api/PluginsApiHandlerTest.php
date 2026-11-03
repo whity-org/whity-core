@@ -22,6 +22,8 @@ class PluginsApiHandlerTest extends TestCase
 
     protected function setUp(): void
     {
+        \Whity\Core\Tenant\TenantContext::reset();
+        \Whity\Core\Tenant\TenantContext::setTenantId(0);
         $this->tempDir = sys_get_temp_dir() . '/whity_plugins_api_' . uniqid();
         mkdir($this->tempDir, 0755, true);
         $this->router = new Router('');
@@ -29,6 +31,7 @@ class PluginsApiHandlerTest extends TestCase
 
     protected function tearDown(): void
     {
+        \Whity\Core\Tenant\TenantContext::reset();
         $this->removeDirectory($this->tempDir);
     }
 

@@ -36,6 +36,8 @@ export interface RouteTemplateSummary {
   name: string;
   description: string | null;
   step_count: number;
+  /** How many routes were started from this design. */
+  usage_count: number;
   created_by: number | null;
   created_at: string;
   updated_at: string;

@@ -10,6 +10,8 @@ use Whity\Auth\TwoFactorPoliciesRepository;
 use Whity\Auth\TwoFactorPolicyResolver;
 use Whity\Core\Audit\AuditContext;
 use Whity\Core\Audit\AuditLogger;
+use Whity\Core\Hooks\HookManager;
+use Whity\Core\Notification\NotificationDispatcher;
 use Whity\Core\Request;
 use Whity\Core\Response;
 use Whity\Core\Tenant\TenantContext;
@@ -35,6 +37,10 @@ final class TwoFactorPoliciesApiHandler
 {
     private const SCOPE_TYPES = ['tenant', 'ou', 'user'];
 
+    private const REMIND_EVERY_SECONDS = 86400;
+
+    private const REMINDER_NOTIFICATION = 'security.two_factor_reminder';
+
 
     private PDO $db;
     private TwoFactorPoliciesRepository $repo;
@@ -44,7 +50,8 @@ final class TwoFactorPoliciesApiHandler
     public function __construct(
         PDO $db,
         TwoFactorPolicyResolver $resolver,
-        ?AuditLogger $auditLogger = null
+        ?AuditLogger $auditLogger = null,
+        private readonly ?HookManager $hooks = null,
     ) {
         $this->db = $db;
         $this->repo = new TwoFactorPoliciesRepository($db);
@@ -59,7 +66,38 @@ final class TwoFactorPoliciesApiHandler
             return Response::error('Tenant context is required', 400);
         }
 
-        return Response::json(['data' => $this->repo->listForTenant($tenantId)]);
+        $policies = $this->repo->listForTenant($tenantId);
+
+        return Response::json(['data' => array_map(
+            fn (array $policy): array => $policy + ['scope_name' => $this->scopeName($tenantId, $policy)],
+            $policies
+        )]);
+    }
+
+    /**
+     * The name a rule's scope reads as: a unit's or a person's. Null for a rule on
+     * the whole workspace, and for a scope that no longer exists here.
+     *
+     * @param array<string, mixed> $policy
+     */
+    private function scopeName(int $tenantId, array $policy): ?string
+    {
+        $scopeId = isset($policy['scope_id']) ? (int) $policy['scope_id'] : 0;
+        if ($policy['scope_type'] === 'ou') {
+            $stmt = $this->db->prepare('SELECT name FROM organizational_units WHERE id = ? AND tenant_id = ?');
+        } elseif ($policy['scope_type'] === 'user') {
+            $stmt = $this->db->prepare(
+                'SELECT p.display_name FROM profiles p
+                   JOIN memberships m ON m.profile_id = p.id
+                  WHERE p.id = ? AND m.tenant_id = ?'
+            );
+        } else {
+            return null;
+        }
+        $stmt->execute([$scopeId, $tenantId]);
+        $name = $stmt->fetchColumn();
+
+        return is_string($name) && $name !== '' ? $name : null;
     }
 
     public function create(Request $request): Response
@@ -194,9 +232,147 @@ final class TwoFactorPoliciesApiHandler
             return Response::error('Tenant context is required', 400);
         }
 
+        $inScope = $this->profilesInScope($tenantId);
+        if ($inScope === []) {
+            return Response::json(['data' => []]);
+        }
+
+        $identity = $this->identityRows(array_keys($inScope));
+        $reminded = $this->lastReminders($tenantId, array_keys($inScope));
+
+        $data = [];
+        foreach ($inScope as $profileId => $ouId) {
+            $enrolled = $identity[$profileId]['enabled'] ?? false;
+            $data[] = [
+                'profile_id' => $profileId,
+                'name' => $identity[$profileId]['name'] ?? '',
+                'email' => $identity[$profileId]['email'] ?? '',
+                'enrolled' => $enrolled,
+                'enforcement_deadline' => $enrolled ? null : $this->resolver->enforcementDeadline($tenantId, $profileId, $ouId),
+                'last_reminded_at' => $reminded[$profileId] ?? null,
+            ];
+        }
+
+        return Response::json(['data' => $data]);
+    }
+
+    /**
+     * POST /api/2fa-policies/remind — remind one person to set up two-step sign-in.
+     *
+     * Only somebody a rule in this workspace covers and who hasn't set it up. Once
+     * a day per person, because this lands in their mailbox. The update is what
+     * enforces that, so a double click sends one reminder.
+     */
+    public function remind(Request $request): Response
+    {
+        $tenantId = TenantContext::getTenantId();
+        if ($tenantId === null) {
+            return Response::error('Tenant context is required', 400);
+        }
+
+        $body = JsonBody::parsed($request);
+        $rawId = $body['profile_id'] ?? null;
+        if (!is_int($rawId) && !(is_string($rawId) && ctype_digit($rawId))) {
+            return Response::error('profile_id is required and must be an integer', 422);
+        }
+        $profileId = (int) $rawId;
+
+        // One answer for a stranger and for somebody no rule covers, so this
+        // can't be used to find out who belongs to another workspace.
+        if (!array_key_exists($profileId, $this->profilesInScope($tenantId))) {
+            return Response::error('No two-step rule in this workspace covers that person', 404);
+        }
+
+        $identity = $this->identityRows([$profileId])[$profileId] ?? null;
+        if ($identity === null) {
+            return Response::error('No two-step rule in this workspace covers that person', 404);
+        }
+        if ($identity['enabled']) {
+            return Response::error('That person has already set up two-step sign-in', 409);
+        }
+
+        $now = gmdate('Y-m-d H:i:s');
+        $actorId = AuditContext::getActorUserId();
+        $stmt = $this->db->prepare(
+            'INSERT INTO two_factor_reminders (tenant_id, profile_id, reminded_at, reminded_by)
+             VALUES (:tenant_id, :profile_id, :now, :by)
+             ON CONFLICT (tenant_id, profile_id) DO UPDATE
+                SET reminded_at = EXCLUDED.reminded_at, reminded_by = EXCLUDED.reminded_by
+              WHERE two_factor_reminders.reminded_at < :cutoff'
+        );
+        $stmt->execute([
+            ':tenant_id' => $tenantId,
+            ':profile_id' => $profileId,
+            ':now' => $now,
+            ':by' => $actorId,
+            ':cutoff' => gmdate('Y-m-d H:i:s', time() - self::REMIND_EVERY_SECONDS),
+        ]);
+        if ($stmt->rowCount() === 0) {
+            return Response::error(
+                'That person was already reminded today',
+                429,
+                ['last_reminded_at' => $this->lastReminders($tenantId, [$profileId])[$profileId] ?? null]
+            );
+        }
+
+        // Both languages, as a printed document has: this goes out in the
+        // operator's request, which says nothing about what the recipient reads.
+        $this->hooks?->dispatch(NotificationDispatcher::HOOK_EVENT, [
+            'tenant_id' => $tenantId,
+            'recipient_profile_id' => $profileId,
+            'type' => self::REMINDER_NOTIFICATION,
+            'options' => [
+                'channels' => ['in_app', 'email'],
+                'to' => $identity['email'],
+                'subject' => 'Please set up two-step sign-in / يرجى إعداد التحقق بخطوتين',
+                'body' => "Your workspace asks you to set up two-step sign-in. Open your account, then Sign-in and security.\n\n"
+                    . 'تطلب منك مساحة العمل إعداد التحقق بخطوتين. افتح حسابك، ثم تسجيل الدخول والأمان.',
+                'data' => ['profile_id' => $profileId],
+            ],
+        ]);
+
+        $this->auditLogger?->record('security.2fa_policy.reminded', [
+            'tenant_id' => $tenantId,
+            'target_type' => 'user',
+            'target_id' => $profileId,
+        ]);
+
+        return Response::json(['data' => ['profile_id' => $profileId, 'last_reminded_at' => $now]]);
+    }
+
+    /**
+     * @param list<int> $profileIds
+     * @return array<int, string>
+     */
+    private function lastReminders(int $tenantId, array $profileIds): array
+    {
+        if ($profileIds === []) {
+            return [];
+        }
+        $stmt = $this->db->prepare(
+            'SELECT profile_id, reminded_at FROM two_factor_reminders
+              WHERE tenant_id = ? AND profile_id IN (' . implode(', ', array_fill(0, count($profileIds), '?')) . ')'
+        );
+        $stmt->execute([$tenantId, ...$profileIds]);
+
+        $out = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $out[(int) $row['profile_id']] = (string) $row['reminded_at'];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Everybody a rule in this workspace covers.
+     *
+     * @return array<int, int|null> profileId => ouId
+     */
+    private function profilesInScope(int $tenantId): array
+    {
         $policies = $this->repo->listForTenant($tenantId);
         if ($policies === []) {
-            return Response::json(['data' => []]);
+            return [];
         }
 
         $hasTenantWide = false;
@@ -233,24 +409,7 @@ final class TwoFactorPoliciesApiHandler
             }
         }
 
-        if ($inScope === []) {
-            return Response::json(['data' => []]);
-        }
-
-        $identity = $this->identityRows(array_keys($inScope));
-
-        $data = [];
-        foreach ($inScope as $profileId => $ouId) {
-            $enrolled = $identity[$profileId]['enabled'] ?? false;
-            $data[] = [
-                'profile_id' => $profileId,
-                'email' => $identity[$profileId]['email'] ?? '',
-                'enrolled' => $enrolled,
-                'enforcement_deadline' => $enrolled ? null : $this->resolver->enforcementDeadline($tenantId, $profileId, $ouId),
-            ];
-        }
-
-        return Response::json(['data' => $data]);
+        return $inScope;
     }
 
     private function validateOuExists(int $tenantId, int $ouId): ?string
@@ -313,13 +472,13 @@ final class TwoFactorPoliciesApiHandler
      * Email + two_factor_enabled for a set of profile ids.
      *
      * @param list<int> $profileIds
-     * @return array<int, array{email: string, enabled: bool}>
+     * @return array<int, array{name: string, email: string, enabled: bool}>
      */
     private function identityRows(array $profileIds): array
     {
         $placeholders = implode(', ', array_fill(0, count($profileIds), '?'));
         $stmt = $this->db->prepare(
-            "SELECT p.id, p.two_factor_enabled, pe.email
+            "SELECT p.id, p.display_name, p.two_factor_enabled, pe.email
              FROM profiles p
              JOIN profile_emails pe ON pe.profile_id = p.id AND pe.is_primary = true
              WHERE p.id IN ({$placeholders})"
@@ -329,6 +488,7 @@ final class TwoFactorPoliciesApiHandler
         $out = [];
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
             $out[(int) $row['id']] = [
+                'name' => (string) ($row['display_name'] ?? ''),
                 'email' => (string) $row['email'],
                 'enabled' => self::dbTruthy($row['two_factor_enabled']),
             ];

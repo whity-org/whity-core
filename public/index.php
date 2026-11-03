@@ -865,11 +865,20 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         // the inbox above it, where the entries in `records` are things somebody
         // administers on behalf of the tenant.
         'order' => 4,
-        // Mirrors GET /api/v1/me/form-submissions, gated forms:submit rather than
-        // forms:read — the rows already name exactly one person, so requiring the
-        // tenant-wide read permission would hide this from precisely the people
-        // whose submissions are in it.
-        'requiredPermission' => \Whity\Core\RBAC\CorePermissions::FORMS_SUBMIT,
+        // Not a permission: a member filling in a form opened to them holds none. Shown
+        // to whoever may fill forms in or has already sent one (FormsNavConditions).
+        'visibleIf' => 'forms-own-submissions',
+    ];
+    $items[] = [
+        // The catalogue for a member who can't read it through `forms-catalog`, once
+        // their workspace has opened a form to them. Same page, so never both.
+        'id' => 'member-forms',
+        'label' => 'Forms',
+        'href' => '/admin/x/' . \Whity\Core\Form\FormFrontendFeatures::CATALOG_ID,
+        'icon' => 'forms',
+        'group' => 'overview',
+        'order' => 5,
+        'visibleIf' => 'forms-open-to-member',
     ];
     $items[] = [
         'id' => 'tenants',
@@ -878,6 +887,9 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'icon' => 'building',
         'group' => 'platform',
         'order' => 1,
+        // A workspace admin may hold tenants:read for their own row, but managing
+        // workspaces is the platform's job. /admin/tenants still opens by URL for them.
+        'systemTenantOnly' => true,
         // #990: mirrors GET /api/tenants, now gated on tenants:read (migration
         // 138 grants it to every role that may write or delete a tenant).
         // requiredRole is cleared so the item follows the route it mirrors rather
@@ -1980,7 +1992,11 @@ $router->register('GET', '/api/permissions', [$permissionsHandler, 'list'], null
 // => 403) and filters every item per caller against RoleChecker server-side,
 // mirroring /api/frontend/features. Pass the delegation-aware $roleChecker so a
 // live delegation actually unlocks gated items.
-$navigationHandler = new NavigationApiHandler($hookManager, $roleChecker);
+$formsNavConditions = new \Whity\Core\Form\FormsNavConditions($db->getPdo(), $roleChecker);
+$navigationHandler = new NavigationApiHandler($hookManager, $roleChecker, [
+    'forms-open-to-member' => [$formsNavConditions, 'hasFormsOpenToThem'],
+    'forms-own-submissions' => [$formsNavConditions, 'hasOwnSubmissionsToSee'],
+]);
 $router->register('GET', '/api/navigation', [$navigationHandler, 'list']);
 
 // Caller capabilities (WC-176, #205). Registered with NO required
@@ -2218,7 +2234,8 @@ $statusHandler = new \Whity\Api\StatusApiHandler(
     new \Whity\Core\Health\StatusReport(
         new \Whity\Core\Health\HealthSampleRepository($db->getPdo()),
         $healthProbeRegistry
-    )
+    ),
+    $settingsService
 );
 $router->register('GET', '/api/status', [$statusHandler, 'get'], null);
 
@@ -2451,8 +2468,10 @@ $router->register('DELETE', '/api/delegations/{id:\d+}', [$delegationsHandler, '
 // (6th positional arg; requiredRole stays null so RbacMiddleware enforces the
 // permission). Tenant-scoped in the handler: the SYSTEM tenant (id 0) sees all
 // tenants, every other tenant sees only its own entries.
-$auditLogHandler = new AuditLogApiHandler($db->getPdo(), $roleChecker);
+$auditLogHandler = new AuditLogApiHandler($db->getPdo(), $roleChecker, $serverLabels, $auditLogger);
 $router->register('GET', '/api/audit-logs', [$auditLogHandler, 'list'], null, null, CorePermissions::AUDIT_READ);
+$router->register('GET', '/api/audit-logs/facets', [$auditLogHandler, 'facets'], null, null, CorePermissions::AUDIT_READ);
+$router->register('GET', '/api/audit-logs/export', [$auditLogHandler, 'export'], null, null, CorePermissions::AUDIT_READ);
 
 // 13a. Self-service analogue (no permission gate — every authenticated user
 // may see their OWN activity; requiredPermission stays null and listOwn()
@@ -2632,11 +2651,13 @@ $router->register('DELETE', '/api/storage-config', [$tenantStorageConfigHandler,
 $twoFactorPoliciesHandler = new \Whity\Api\TwoFactorPoliciesApiHandler(
     $db->getPdo(),
     $twoFactorPolicyResolver,
-    $auditLogger
+    $auditLogger,
+    $hookManager
 );
 $router->register('GET',    '/api/2fa-policies',        [$twoFactorPoliciesHandler, 'list'],   null, null, CorePermissions::SECURITY_MANAGE);
 $router->register('POST',   '/api/2fa-policies',        [$twoFactorPoliciesHandler, 'create'], null, null, CorePermissions::SECURITY_MANAGE);
 $router->register('GET',    '/api/2fa-policies/status', [$twoFactorPoliciesHandler, 'status'], null, null, CorePermissions::SECURITY_MANAGE);
+$router->register('POST',   '/api/2fa-policies/remind', [$twoFactorPoliciesHandler, 'remind'], null, null, CorePermissions::SECURITY_MANAGE);
 $router->register('PATCH',  '/api/2fa-policies/{id:\d+}', [$twoFactorPoliciesHandler, 'update'], null, null, CorePermissions::SECURITY_MANAGE);
 $router->register('DELETE', '/api/2fa-policies/{id:\d+}', [$twoFactorPoliciesHandler, 'delete'], null, null, CorePermissions::SECURITY_MANAGE);
 
@@ -2862,7 +2883,8 @@ $externalBillingHandler = new \Whity\Api\ExternalBillingApiHandler(
     $db->getPdo(),
     // The payer returns to a frontend page (/billing, /billing/return).
     $frontendUrls->base(),
-    $logger
+    $logger,
+    $auditLogger
 );
 
 $router->register('POST', '/api/billing/checkout', [$externalBillingHandler, 'checkout'], null, null, CorePermissions::BILLING_PAY);
@@ -2879,6 +2901,8 @@ $router->register('GET',  '/api/billing/receipts', [$externalBillingHandler, 're
 // a PLAN swap would mean cancelling and buying again, which either double-charges
 // or leaves a gap, so it is refused rather than faked.
 $router->register('POST', '/api/billing/quantity', [$externalBillingHandler, 'changeQuantity'], null, null, CorePermissions::BILLING_PAY);
+// A tier change moves the subscription we hold; a second checkout would open another.
+$router->register('POST', '/api/billing/change-plan', [$externalBillingHandler, 'changePlan'], null, null, CorePermissions::BILLING_PAY);
 
 // UNAUTHENTICATED, NECESSARILY: the sender is a server and holds no session.
 // Registering it here is only half the job — EnforceTenantIsolation must also
@@ -3886,6 +3910,9 @@ $router->register('PATCH', '/api/forms/{id:\d+}', [$formsHandler, 'update'], nul
 $router->register('POST', '/api/forms/{id:\d+}/publish', [$formsHandler, 'publish'], null, null, CorePermissions::FORMS_MANAGE);
 $router->register('POST', '/api/forms/{id:\d+}/archive', [$formsHandler, 'archive'], null, null, CorePermissions::FORMS_MANAGE);
 $router->register('GET', '/api/forms/{id:\d+}/render', [$formsHandler, 'render'], null, null, CorePermissions::FORMS_SUBMIT);
+// The author's own look at it, whatever its state, so `forms:manage` and not `forms:submit`.
+$router->register('GET', '/api/forms/{id:\d+}/preview', [$formsHandler, 'preview'], null, null, CorePermissions::FORMS_MANAGE);
+$router->register('DELETE', '/api/forms/{id:\d+}', [$formsHandler, 'delete'], null, null, CorePermissions::FORMS_MANAGE);
 // Opening and closing the PUBLIC LINK (migration 132). Ordinary tenant-scoped
 // routes gated on `forms:manage` — the authoring permission, because opening a
 // form to the entire internet is an act of organisational policy and the single
@@ -4928,7 +4955,7 @@ $mcpToolsCallHandler = new ToolsCallHandler($toolDeriver, $router, $roleChecker,
 // an agent must not be able to approve its own proposal.
 // WHIT-816: a workspace agent's proposal runs under the person's assignment as it is now.
 $agentAssignments = new \Whity\Core\Agent\AgentAssignmentRepository($db->getPdo());
-$agentProposalsHandler = new \Whity\Api\AgentProposalsApiHandler($agentProposals, $mcpToolsCallHandler, $auditLogger, $agentAssignments, $agentActions);
+$agentProposalsHandler = new \Whity\Api\AgentProposalsApiHandler($agentProposals, $mcpToolsCallHandler, $auditLogger, $agentAssignments, $agentActions, $mcpToolCatalogue);
 $router->register('GET',  '/api/me/agent-proposals',                    [$agentProposalsHandler, 'list'],    null);
 $router->register('POST', '/api/me/agent-proposals/{id:\d+}/approve',  [$agentProposalsHandler, 'approve'], null);
 $router->register('POST', '/api/me/agent-proposals/{id:\d+}/decline',  [$agentProposalsHandler, 'decline'], null);
@@ -4936,6 +4963,11 @@ $router->register('POST', '/api/me/agent-proposals/{id:\d+}/decline',  [$agentPr
 // first. Session-gated and self-scoped like the two surfaces it reads.
 $meWaitingHandler = new \Whity\Api\MeWaitingApiHandler($inboxSourceRegistry, $agentProposals, $agentAssignments);
 $router->register('GET', '/api/me/waiting', [$meWaitingHandler, 'list'], null);
+// WHIT-872 (H.4): the cards apps add to the caller's home. The handler lists only
+// what the caller holds the permission for, and each card's data is its own route.
+$homeCardsHandler = new \Whity\Api\HomeCardsApiHandler($db->getPdo(), $roleChecker, $pluginLoader, $tenantManifestHost, $tenantRecordRepository, $router);
+$router->register('GET', '/api/me/home-cards', [$homeCardsHandler, 'list'], null);
+$router->register('PUT', '/api/me/home-cards/{key:[A-Za-z][A-Za-z0-9_]*}/hidden', [$homeCardsHandler, 'setHidden'], null);
 // WHIT-815: workspace agents (persona, toolsets, starting grant) and the
 // presets they start from. Gated on agents:manage, which migration 180 grants
 // to every role holding mcp:tokens:manage. Writes are agentPolicy refuse.
@@ -4992,6 +5024,7 @@ $myAgentsHandler = new \Whity\Api\MyAgentsApiHandler(
     $agentReadableSource,
 );
 $router->register('GET',    '/api/me/agents',                              [$myAgentsHandler, 'list'],        null);
+$router->register('GET',    '/api/me/agent-toolsets',                      [$myAgentsHandler, 'toolsets'],    null);
 $router->register('POST',   '/api/me/agents/{id:\d+}/assignment',          [$myAgentsHandler, 'assign'],      null);
 $router->register('DELETE', '/api/me/agents/{id:\d+}/assignment',          [$myAgentsHandler, 'unassign'],    null);
 $router->register('GET',    '/api/me/agents/{id:\d+}/assignment/grant',    [$myAgentsHandler, 'grant'],       null);
@@ -5361,13 +5394,15 @@ if ($isWorker) {
             } catch (\Throwable $e) {
                 // Handle any uncaught exceptions
                 try {
-                    $errorResponse = Response::error('Internal server error', 500);
+                    $requestId = \Whity\Core\Observability\ErrorReference::mint();
+                    $errorResponse = Response::json(['error' => 'Internal server error', 'reference' => $requestId], 500);
                     // The 500 path is a response a client can receive, so it gets the
                     // hardening headers too (WC-187).
                     $errorHeaders = array_merge(
                         $errorResponse->getHeaders(),
                         Cors::headers($_SERVER['HTTP_ORIGIN'] ?? null),
-                        $securityHeaders
+                        $securityHeaders,
+                        [\Whity\Core\Observability\ErrorReference::HEADER => $requestId]
                     );
                     $errorResponse = new Response(500, $errorResponse->getBody(), $errorHeaders);
                     $errorResponse->send();
@@ -5375,7 +5410,6 @@ if ($isWorker) {
                     // If send also fails, just log it
                     error_log('Failed to send error response: ' . $sendError->getMessage());
                 }
-                $requestId = \Whity\Core\Observability\ErrorContext::newRequestId();
                 try {
                     $errorTracker->captureException(
                         $e,
@@ -5494,13 +5528,15 @@ if ($isWorker) {
     } catch (\Throwable $e) {
         // Handle any uncaught exceptions
         try {
-            $errorResponse = Response::error('Internal server error', 500);
+            $requestId = \Whity\Core\Observability\ErrorReference::mint();
+            $errorResponse = Response::json(['error' => 'Internal server error', 'reference' => $requestId], 500);
             // The 500 path is a response a client can receive, so it gets the
             // hardening headers too (WC-187).
             $errorHeaders = array_merge(
                 $errorResponse->getHeaders(),
                 Cors::headers($_SERVER['HTTP_ORIGIN'] ?? null),
-                $securityHeaders
+                $securityHeaders,
+                [\Whity\Core\Observability\ErrorReference::HEADER => $requestId]
             );
             $errorResponse = new Response(500, $errorResponse->getBody(), $errorHeaders);
             $errorResponse->send();
@@ -5508,7 +5544,6 @@ if ($isWorker) {
             // If send also fails, just log it
             error_log('Failed to send error response: ' . $sendError->getMessage());
         }
-        $requestId = \Whity\Core\Observability\ErrorContext::newRequestId();
         try {
             $errorTracker->captureException(
                 $e,

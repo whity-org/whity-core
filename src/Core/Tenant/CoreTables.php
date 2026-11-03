@@ -114,6 +114,7 @@ final class CoreTables
         'identity_providers' => '048_create_identity_providers.php',
         'invoice_lines' => '142_create_invoices.php',
         'invoices' => '142_create_invoices.php',
+        'home_card_hidden' => '200_add_home_card_hidden.php',
         'invitations' => '096_create_invitations.php',
         'jobs' => '065_create_jobs.php',
         'languages' => '081_create_language_tables.php',

@@ -223,6 +223,15 @@ export default function RouteTemplatesPage() {
       enableSorting: true,
       cell: (row) => row.step_count,
     },
+    {
+      accessorKey: 'usage_count',
+      header: t('routeTemplates.column.used', 'Used'),
+      enableSorting: true,
+      cell: (row) =>
+        row.usage_count === 1
+          ? t('routeTemplates.used.once', 'Once')
+          : t('routeTemplates.used.times', '{count} times', { count: row.usage_count }),
+    },
   ];
 
   return (

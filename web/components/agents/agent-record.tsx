@@ -6,16 +6,14 @@
  * (Overview, Instructions, What it may do, Activity). Edits collect in a save
  * bar and nothing is saved until Save changes (P.3).
  *
- * Left out because no API returns it yet (S6): today's count and since-when in
- * the header, Pause, "On its own" counts, "Works for", last-changed-by on the
- * instructions, and what the agent may read.
+ * "Where it works" holds what it knows: how it writes. The card's apps and
+ * channels are left out, because an agent has no list of them to read.
  */
 
 import { useState } from 'react';
 import Link from 'next/link';
 import { Alert, AlertDescription } from '@whity/ui/alert';
 import { Avatar } from '@whity/ui/avatar';
-import { Badge } from '@whity/ui/badge';
 import { Button } from '@whity/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@whity/ui/dropdown-menu';
 import { Icon } from '@whity/ui/icon';
@@ -25,15 +23,19 @@ import { ScopeGrant, type ScopeGrantMode } from '@whity/ui/scope-grant';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@whity/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@whity/ui/tabs';
 import { Textarea } from '@whity/ui/textarea';
+import { useDateDisplay } from '@whity/features/datetime';
 import { useFormattingLocale, useTranslation } from '@whity/features/i18n';
 import { ToolsetPicker } from '@/components/agents/toolset-picker';
-import { AgentActivityPanel } from '@/components/agents/agent-activity-panel';
+import { AgentStatusBadge } from '@/components/agents/agent-status';
+import { MayReadPicker } from '@/components/agents/may-read-picker';
+import { WorkspaceActivityPanel } from '@/components/agents/workspace-activity-panel';
 import { useFetch } from '@/hooks/useFetch';
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/lib/toast-context';
 import {
   localized,
   refusal,
+  startOfToday,
   templateGroups,
   toolsetsFromSplits,
   type AgentLanguage,
@@ -46,7 +48,9 @@ const NAME_MAX = 60;
 const ROLE_MAX = 200;
 const INSTRUCTIONS_MAX = 4000;
 
-const personaOf = (agent: WorkspaceAgent): AgentPersona => ({
+type AgentDraft = AgentPersona & { mayRead: number[] };
+
+const personaOf = (agent: WorkspaceAgent): AgentDraft => ({
   name: agent.name,
   nameAr: agent.nameAr ?? '',
   role: agent.role ?? '',
@@ -57,6 +61,7 @@ const personaOf = (agent: WorkspaceAgent): AgentPersona => ({
   language: agent.language,
   toolsets: [...agent.toolsets],
   grant: { ...agent.grant },
+  mayRead: agent.mayRead.map((source) => source.id),
 });
 
 const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
@@ -67,8 +72,10 @@ export function AgentRecord({ agent: initial, onChanged }: { agent: WorkspaceAge
   const { apiClient } = useAuth();
   const { addToast } = useToast();
 
-  const [saved, setSaved] = useState<AgentPersona>(() => personaOf(initial));
-  const [draft, setDraft] = useState<AgentPersona>(() => personaOf(initial));
+  const dates = useDateDisplay();
+  const [saved, setSaved] = useState<AgentDraft>(() => personaOf(initial));
+  const [draft, setDraft] = useState<AgentDraft>(() => personaOf(initial));
+  const [today] = useState(() => startOfToday());
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState('overview');
@@ -80,13 +87,13 @@ export function AgentRecord({ agent: initial, onChanged }: { agent: WorkspaceAge
   }, [apiClient]);
   const offered = toolsetsFromSplits(splits.data ?? [], draft.toolsets);
 
-  const set = <K extends keyof AgentPersona>(key: K, value: AgentPersona[K]) => setDraft((current) => ({ ...current, [key]: value }));
-  const changed = (...keys: (keyof AgentPersona)[]) => keys.some((key) => !same(draft[key], saved[key]));
-  const was = (key: keyof AgentPersona) => (typeof saved[key] === 'string' && saved[key] !== '' ? t('agentRecord.was', 'Was {value}', { value: String(saved[key]) }) : undefined);
+  const set = <K extends keyof AgentDraft>(key: K, value: AgentDraft[K]) => setDraft((current) => ({ ...current, [key]: value }));
+  const changed = (...keys: (keyof AgentDraft)[]) => keys.some((key) => !same(draft[key], saved[key]));
+  const was = (key: keyof AgentDraft) => (typeof saved[key] === 'string' && saved[key] !== '' ? t('agentRecord.was', 'Was {value}', { value: String(saved[key]) }) : undefined);
 
   const sections = [
     changed('name', 'nameAr', 'role', 'roleAr') && t('agentRecord.changed.name', 'Name and job'),
-    changed('instructions', 'instructionsAr', 'tone', 'language', 'toolsets') && t('agentRecord.changed.instructions', 'Instructions'),
+    changed('instructions', 'instructionsAr', 'tone', 'language', 'toolsets', 'mayRead') && t('agentRecord.changed.instructions', 'Instructions'),
     changed('grant') && t('agentRecord.changed.grant', 'What it may do'),
   ].filter((name): name is string => typeof name === 'string');
   const dirty = sections.length > 0;
@@ -130,7 +137,28 @@ export function AgentRecord({ agent: initial, onChanged }: { agent: WorkspaceAge
     onChanged();
   };
 
+  const setPaused = async (paused: boolean) => {
+    const response = await apiClient(`/api/v1/agents/${initial.id}/${paused ? 'pause' : 'resume'}`, { method: 'POST' });
+    if (!response.ok) {
+      addToast(await refusal(response, t('agents.error.save', 'This agent could not be saved. Try again.')), 'error');
+      return;
+    }
+    const name = localized(saved.name, saved.nameAr, arabic);
+    addToast(
+      paused
+        ? t('agents.paused', '{name} is paused. It can’t do anything until it is resumed.', { name })
+        : t('agents.resumed', '{name} is working again.', { name }),
+      'success',
+      8000,
+      paused ? { label: t('agents.undo', 'Undo'), onClick: () => void setPaused(false) } : undefined,
+    );
+    onChanged();
+  };
+
   const displayName = localized(saved.name, saved.nameAr, arabic);
+  const people = initial.worksFor.map((who) => who.name ?? t('agents.worksFor.unknown', 'Someone'));
+  const since = dates.date(initial.createdAt);
+  const changedOn = dates.date(initial.updatedAt);
   const toneWords: Record<AgentTone, string> = {
     plain: t('agents.tone.plain', 'Plain'),
     formal: t('agents.tone.formal', 'Formal'),
@@ -160,21 +188,37 @@ export function AgentRecord({ agent: initial, onChanged }: { agent: WorkspaceAge
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-3xl font-semibold">{displayName}</h1>
-            {initial.status === 'archived' ? (
-              <Badge variant="outline">{t('agents.status.archived', 'Archived')}</Badge>
-            ) : (
-              <Badge variant="success">{t('agents.status.active', 'Available')}</Badge>
-            )}
+            <AgentStatusBadge status={initial.status} paused={initial.paused} />
           </div>
-          <p className="mt-1 text-sm text-muted-foreground">{localized(saved.role, saved.roleAr, arabic)}</p>
+          <p className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5">
+              <Icon name="user" size={14} />
+              {people.length > 0 ? t('agentRecord.worksFor', 'Works for {names}', { names: people.join(', ') }) : t('agents.worksFor.nobody', 'Nobody yet')}
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <Icon name="activity" size={14} />
+              {t('agentRecord.today', '{n} actions today', { n: initial.actionsToday })}
+            </span>
+            {since !== null && (
+              <span className="inline-flex items-center gap-1.5">
+                <Icon name="clock" size={14} />
+                {t('agentRecord.since', 'Since {date}', { date: since })}
+              </span>
+            )}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" asChild>
-            <Link href="/admin/agent-activity">
+            <Link href={`/admin/agent-activity?agent=${initial.id}`}>
               <Icon name="activity" size={16} />
               {t('myAgents.seeActivity', 'See activity')}
             </Link>
           </Button>
+          {initial.status === 'active' && (
+            <Button variant="outline" onClick={() => void setPaused(!initial.paused)}>
+              {initial.paused ? t('agents.action.resume', 'Resume') : t('agents.action.pause', 'Pause')}
+            </Button>
+          )}
           {initial.status === 'archived' && (
             <Button variant="outline" onClick={() => void setArchived(false)}>
               {t('agents.action.restore', 'Restore')}
@@ -197,6 +241,16 @@ export function AgentRecord({ agent: initial, onChanged }: { agent: WorkspaceAge
         </div>
       </header>
 
+      {initial.paused && initial.status === 'active' && (
+        <Alert>
+          <AlertDescription>
+            {initial.pausedBy !== null
+              ? t('agentRecord.paused.by', '{name} paused this agent. It is refused on every call, and what it proposed can’t run until it is resumed.', { name: initial.pausedBy })
+              : t('agentRecord.paused', 'This agent is paused. It is refused on every call, and what it proposed can’t run until it is resumed.')}
+          </AlertDescription>
+        </Alert>
+      )}
+
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList aria-label={displayName}>
           <TabsTrigger value="overview">{t('agentRecord.tab.overview', 'Overview')}</TabsTrigger>
@@ -212,6 +266,32 @@ export function AgentRecord({ agent: initial, onChanged }: { agent: WorkspaceAge
           <section className="space-y-3 rounded-card border border-border bg-card p-5">
             <h2 className="text-base font-semibold">{t('agentRecord.does', 'What it does')}</h2>
             <p className="text-sm">{localized(saved.role, saved.roleAr, arabic) || t('agentRecord.does.empty', 'No description yet. Add one in Instructions.')}</p>
+          </section>
+          <section className="space-y-3 rounded-card border border-border bg-card p-5">
+            <h2 className="text-base font-semibold">{t('agentRecord.onItsOwn', 'On its own')}</h2>
+            <dl className="divide-y divide-divider text-sm">
+              <div className="flex justify-between gap-4 py-2">
+                <dt className="text-muted-foreground">{t('agentGrant.mode.allow', 'Allowed')}</dt>
+                <dd>{t('agentRecord.onItsOwn.count', '{n} actions', { n: initial.onItsOwn.allowed })}</dd>
+              </div>
+              <div className="flex justify-between gap-4 py-2">
+                <dt className="text-muted-foreground">{t('agentRecord.onItsOwn.ask', 'Asks first')}</dt>
+                <dd>{t('agentRecord.onItsOwn.count', '{n} actions', { n: initial.onItsOwn.askFirst })}</dd>
+              </div>
+              <div className="flex justify-between gap-4 py-2">
+                <dt className="text-muted-foreground">{t('agentRecord.onItsOwn.never', 'Never')}</dt>
+                <dd>{t('agentRecord.onItsOwn.count', '{n} actions', { n: initial.onItsOwn.off })}</dd>
+              </div>
+            </dl>
+          </section>
+          <section className="space-y-3 rounded-card border border-border bg-card p-5">
+            <div>
+              <h2 className="text-base font-semibold">{t('agentRecord.todayTitle', 'Today')}</h2>
+              <p className="text-sm text-muted-foreground">
+                {t('agentRecord.todaySummary', '{done} done · {waiting} waiting for a person', { done: initial.actionsToday, waiting: initial.waiting })}
+              </p>
+            </div>
+            <WorkspaceActivityPanel agentId={initial.id} since={today} compact />
           </section>
           <section className="space-y-3 rounded-card border border-border bg-card p-5">
             <h2 className="text-base font-semibold">{t('agentRecord.where', 'How it works')}</h2>
@@ -231,6 +311,9 @@ export function AgentRecord({ agent: initial, onChanged }: { agent: WorkspaceAge
         <TabsContent value="instructions" className="mt-6 space-y-6">
           <p className="max-w-prose text-sm text-muted-foreground">
             {t('agentRecord.instructions.help', 'Write as you would to a new colleague. Instructions guide the agent. They never widen what it may do: the What it may do tab decides that.')}
+            {initial.updatedBy !== null && changedOn !== null && (
+              <span className="mt-1 block">{t('agentRecord.changedBy', 'Changed {date} by {name}', { date: changedOn, name: initial.updatedBy })}</span>
+            )}
           </p>
           <div className="grid gap-6 md:grid-cols-2">
             <div className="space-y-4">
@@ -294,6 +377,10 @@ export function AgentRecord({ agent: initial, onChanged }: { agent: WorkspaceAge
             </ChangedField>
           </section>
 
+          <ChangedField changed={changed('mayRead')}>
+            <MayReadPicker chosen={draft.mayRead} known={initial.mayRead} onChange={(ids) => set('mayRead', ids)} />
+          </ChangedField>
+
           <ToolsetPicker offered={offered} chosen={draft.toolsets} onChange={(toolsets) => set('toolsets', toolsets)} />
         </TabsContent>
 
@@ -323,7 +410,7 @@ export function AgentRecord({ agent: initial, onChanged }: { agent: WorkspaceAge
         </TabsContent>
 
         <TabsContent value="activity" className="mt-6">
-          <AgentActivityPanel />
+          <WorkspaceActivityPanel agentId={initial.id} />
         </TabsContent>
       </Tabs>
 
