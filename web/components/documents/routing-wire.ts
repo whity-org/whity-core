@@ -270,6 +270,8 @@ export interface RouteRecipient {
    * caught making that claim.
    */
   closed_by_delivery: boolean;
+  /** S5: closed because the document was withdrawn, so this person did not act. */
+  closed_by_withdrawal?: boolean;
   created_at: string;
 }
 

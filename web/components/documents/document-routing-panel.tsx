@@ -373,7 +373,7 @@ export function DocumentRoutingPanel({ documentId, documentTitle, withdrawn = fa
 
   const recordPeople = useFetch<Map<number, string>>(async () => {
     const response = await apiClient(`/api/v1/documents/${documentId}/people`);
-    if (!response.ok) return new Map<number, string>();
+    if (!response.ok) throw new Error('names');
     const body = (await response.json()) as { data?: Record<string, string> };
     return new Map(Object.entries(body.data ?? {}).map(([id, name]) => [Number(id), name]));
   }, [apiClient, documentId]);
@@ -437,13 +437,12 @@ export function DocumentRoutingPanel({ documentId, documentTitle, withdrawn = fa
         </div>
       </div>
 
-      {peopleResult.data !== null &&
-        (peopleResult.data.unavailable !== null || peopleResult.data.incomplete !== null) && (
+      {recordPeople.error !== null && (
         <Alert className="mb-4">
           <AlertDescription>
             {t(
               'routing.names.partial',
-              'People’s names could not all be loaded, so some recipients are shown by id.'
+              'People’s names could not be loaded just now.'
             )}
           </AlertDescription>
         </Alert>
@@ -583,6 +582,7 @@ export function DocumentRoutingPanel({ documentId, documentTitle, withdrawn = fa
                     />
 
                     <div className="border-t border-border pt-4">
+                      {!withdrawn && (
                       <RouteActPanel
                         documentId={documentId}
                         route={route}
@@ -593,6 +593,7 @@ export function DocumentRoutingPanel({ documentId, documentTitle, withdrawn = fa
                           onChanged?.();
                         }}
                       />
+                      )}
                     </div>
                   </>
                 )}

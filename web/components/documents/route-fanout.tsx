@@ -220,7 +220,8 @@ export function RouteFanout({
    * made only of deliveries was delivered, one made only of acts was acted on,
    * and a mixed route says the one thing true of both.
    */
-  const settledClaim: 'acted' | 'delivered' | 'closed' = useMemo(() => {
+  const settledClaim: 'acted' | 'delivered' | 'closed' | 'withdrawn' = useMemo(() => {
+    if (forRoute.some((r) => r.closed_by_withdrawal === true)) return 'withdrawn';
     const touched = new Set(forRoute.map((r) => r.step_id));
     const kinds = new Set(
       route.steps.filter((s) => touched.has(s.id)).map((s) => s.satisfied_by ?? 'act')
@@ -243,7 +244,12 @@ export function RouteFanout({
       <div className="rounded-md border border-border bg-muted/30 p-4">
         <p className="text-sm text-foreground">
           {openTotal === 0
-            ? settledClaim === 'delivered'
+            ? settledClaim === 'withdrawn'
+              ? t(
+                  'routing.fanout.settledWithdrawn',
+                  'Nobody has this open. The document was withdrawn, which closed anything still waiting on this route.'
+                )
+              : settledClaim === 'delivered'
               ? t(
                   'routing.fanout.settledDelivered',
                   'Nobody has this open. Every chain of this route has been delivered.'
@@ -281,7 +287,8 @@ export function RouteFanout({
           {route.steps.map((step) => {
             const rows = byStep.get(step.id) ?? [];
             const open = rows.filter((r) => r.open);
-            const done = rows.length - open.length;
+            const closedByWithdrawal = rows.filter((r) => r.closed_by_withdrawal === true).length;
+            const done = rows.length - open.length - closedByWithdrawal;
             const sample = open.slice(0, SAMPLE_LIMIT);
 
             return (
@@ -330,6 +337,13 @@ export function RouteFanout({
                       {open.length > 0 && (
                         <Badge variant="warning">
                           {t('routing.fanout.step.open', '{count} awaiting', { count: open.length })}
+                        </Badge>
+                      )}
+                      {closedByWithdrawal > 0 && (
+                        <Badge variant="secondary">
+                          {t('routing.fanout.step.withdrawn', '{count} closed by the withdrawal', {
+                            count: closedByWithdrawal,
+                          })}
                         </Badge>
                       )}
                       {done > 0 && (
@@ -491,6 +505,8 @@ function ChainBranch({
         </span>
         {node.recipient.open ? (
           <Badge variant="warning">{t('routing.fanout.chain.open', 'Has it open')}</Badge>
+        ) : node.recipient.closed_by_withdrawal === true ? (
+          <Badge variant="secondary">{t('routing.fanout.chain.withdrawn', 'Closed by the withdrawal')}</Badge>
         ) : node.recipient.closed_by_delivery ? (
           // A delivery row was closed the moment it was created. Saying "Acted"
           // here told a technician who had merely been SENT a copy that they had

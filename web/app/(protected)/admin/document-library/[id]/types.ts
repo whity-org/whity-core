@@ -83,6 +83,8 @@ export interface TrailEvent {
   from_ou_id: number | null;
   to_ou_id: number | null;
   note: string | null;
+  /** S5: this row closed the route because the document was withdrawn. */
+  withdrawal?: boolean;
   occurred_at: string;
 }
 

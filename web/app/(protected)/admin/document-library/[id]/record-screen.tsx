@@ -739,7 +739,7 @@ export function DocumentRecordScreen({ documentId, onBack }: DocumentRecordScree
                 )
               : t(
                   'record.withdrawn.body',
-                  '{who} withdrew it {when}. The record is kept, but its codes no longer confirm anything and nothing further can happen on its routes.',
+                  '{who} withdrew it on {when}. The record is kept, but its codes no longer confirm anything and nothing further can happen on its routes.',
                   { who: withdrawnBy, when: withdrawnWhen }
                 )}
           </AlertDescription>

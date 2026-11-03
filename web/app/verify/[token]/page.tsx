@@ -257,9 +257,12 @@ export default function VerifyDocumentPage({ params }: { params: Promise<{ token
             </dl>
           )}
 
-          {recordId !== null && recordWithdrawn && (
+          {recordId !== null &&
+            recordWithdrawn &&
+            phase.kind === 'ready' &&
+            phase.data.reason !== 'document_withdrawn' && (
             <p className="text-sm" data-testid="verify-record-withdrawn" dir="auto">
-              {t('verify.recordWithdrawn', 'You can see this document, and it has been withdrawn.')}
+              {t('verify.recordWithdrawn', 'You can open this document, so you can also be told it has been withdrawn.')}
             </p>
           )}
 

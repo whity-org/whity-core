@@ -51239,6 +51239,9 @@
                     "closed_by_delivery": {
                         "type": "boolean"
                     },
+                    "closed_by_withdrawal": {
+                        "type": "boolean"
+                    },
                     "created_at": {
                         "type": "string"
                     }

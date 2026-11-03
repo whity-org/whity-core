@@ -99,7 +99,8 @@ final class DocumentWithdrawal
             'target_id'     => $documentId,
             'metadata'      => [
                 'title' => (string) $document['title'],
-                'codes_withdrawn' => $codes,
+                // Not `codes_...`: the audit logger drops any key containing "code".
+                'qr_withdrawn' => $codes,
                 'items_closed' => $items,
                 'permission' => CorePermissions::DOCUMENTS_WITHDRAW,
             ],

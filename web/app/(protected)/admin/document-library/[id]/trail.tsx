@@ -165,7 +165,11 @@ export function DocumentTrail({ events, pagination, directory, onPageChange }: D
           return (
             <RecordTimelineItem
               key={event.id}
-              title={actionLabel(t, event.action)}
+              title={
+                event.withdrawal === true
+                  ? t('record.trail.action.withdrawal', 'Withdrew the document, closing what was waiting on this route')
+                  : actionLabel(t, event.action)
+              }
               // #1068: the WHO alone when dates are hidden, and the composed
               // sentence otherwise — never "Amal — —". The story survives: the
               // verbs are still here and the rows are still in order, which is
