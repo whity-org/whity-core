@@ -57,7 +57,10 @@
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Badge } from '@whity/ui/badge';
-import { Button } from '@whity/ui/button';
+import { Icon } from '@whity/ui/icon';
+import { Tabs, TabsList, TabsTrigger } from '@whity/ui/tabs';
+import { ToggleGroup } from '@whity/ui/toggle-group';
+import { AreaError } from '@whity/ui/page-states';
 import { useTranslation } from '@whity/features/i18n';
 import { useDateDisplay } from '@whity/features/datetime';
 import { AdminHeader } from '@/components/admin/admin-header';
@@ -97,12 +100,8 @@ export default function InboxPage() {
   const sourceList = useMemo<InboxSource[]>(() => sources.data?.data ?? [], [sources.data]);
 
   /**
-   * Which source is in view.
-   *
-   * Derived rather than defaulted in an effect: a `setState` in an effect to pick
-   * the first source would render one frame with no source, fire a request for
-   * nothing, and re-render — the cascading-render hazard the house hooks avoid.
-   * An explicit choice wins; otherwise the first registered key.
+   * Which source is in view. Derived, not defaulted in an effect: an explicit
+   * choice wins, otherwise the first registered key.
    */
   const activeSource = useMemo<string | null>(() => {
     if (selectedSource !== null && sourceList.some((s) => s.key === selectedSource)) {
@@ -112,9 +111,6 @@ export default function InboxPage() {
   }, [selectedSource, sourceList]);
 
   const items = useFetch<InboxListResponse | null>(async () => {
-    // No registered source means there is nothing to ask for. Sending
-    // `?source=` empty would earn a 422 whose message is about a malformed
-    // request, which is not what is happening.
     if (activeSource === null) return null;
 
     const params = new URLSearchParams({ source: activeSource, page: String(page) });
@@ -123,8 +119,7 @@ export default function InboxPage() {
     const response = await apiClient(`/api/v1/me/inbox?${params.toString()}`);
     if (!response.ok) {
       const body = (await response.json().catch(() => null)) as { error?: string } | null;
-      // Verbatim: a 422 here names the registered source keys, which is the one
-      // thing that makes it fixable.
+      // Verbatim: a 422 names the registered source keys, which makes it fixable.
       throw new Error(body?.error ?? t('inbox.error.list', 'Your inbox could not be loaded.'));
     }
     return (await response.json()) as InboxListResponse;
@@ -134,196 +129,147 @@ export default function InboxPage() {
   const pagination = items.data?.pagination ?? null;
 
   const selectSource = (key: string): void => {
-    // Page reset happens in the SAME handler as the change that invalidates it,
-    // never in an effect watching the source — the document-library records why.
+    // Page reset happens in the SAME handler as the change that invalidates it.
     setSelectedSource(key);
     setPage(1);
   };
 
-  const columns: DataTableColumn<InboxItem>[] = useMemo(
-    () => [
-      {
-        id: 'title',
-        header: t('inbox.column.item', 'Item'),
-        cell: (row) => {
-          const meta = routingMeta(row);
-          return (
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                {meta === null ? (
-                  // An item from a source this screen has no link for. Its title
-                  // is rendered as text rather than as a dead link — a link that
-                  // goes nowhere is worse than no link (#756).
-                  <span className="font-medium text-foreground">{row.title}</span>
-                ) : (
-                  <button
-                    type="button"
-                    className="text-start font-medium text-primary underline"
-                    onClick={() => router.push(`/admin/document-library/${meta.document_id}?tab=routing`)}
-                  >
-                    {row.title}
-                  </button>
-                )}
-                {/*
-                  A DECISION SAYS SO, NEXT TO THE THING YOU CLICK (#1041).
+  const sourceLabel = (source: InboxSource): string =>
+    source.key === DOCUMENT_ROUTING_SOURCE
+      ? t('inbox.source.documentRouting', 'Documents awaiting you')
+      : source.label;
+  const activeSourceLabel = sourceList.find((s) => s.key === activeSource);
 
-                  The server already distinguishes the two: a decision item's
-                  status reads "Awaiting your decision" where a circulation one
-                  reads "Forwarded to you". That sentence is the trail's own word
-                  and is rendered verbatim in the Status column below — but it is
-                  ENGLISH, composed in PHP, and there is no key for a translator
-                  to reach. An Arabic reader got the distinction in a language
-                  they may not read, in a column that is one horizontal scroll
-                  away on a phone.
+  /**
+   * The state is a word the app composes and translates, from the machine
+   * fields the source publishes. The server's own sentence ("Forwarded to you")
+   * is English with no key to translate, so it is not shown.
+   */
+  const stateOf = (row: InboxItem): { label: string; done: boolean } | null => {
+    const meta = routingMeta(row);
+    if (meta === null) return null;
+    if (!meta.open) return { label: t('inbox.state.done', 'Done'), done: true };
+    if (meta.decision) return { label: t('inbox.state.decision', 'Your decision'), done: false };
+    if (meta.arrived_by === 'returned') {
+      return { label: t('inbox.state.returned', 'Returned to you'), done: false };
+    }
+    if (meta.arrived_by === 'noted' || meta.arrived_by === 'acknowledged') {
+      return { label: t('inbox.state.info', 'For your information'), done: false };
+    }
+    return { label: t('inbox.state.review', 'To review'), done: false };
+  };
 
-                  So this chip is driven by `meta.decision`, the MACHINE field
-                  #1030 published for exactly this ("a client needs it before it
-                  renders anything"). It is not a re-keying of the server's
-                  sentence — it is a second, translatable rendering of the same
-                  machine fact, placed where the eye already is.
-
-                  Open items only. On a closed one the status is "Done", and
-                  labelling a finished item "Decision" would read as work still
-                  waiting.
-                */}
-                {meta !== null && meta.decision && meta.open && (
-                  <Badge variant="warning" data-slot="inbox-decision">
-                    {t('inbox.decision.badge', 'Decision')}
-                  </Badge>
-                )}
-              </div>
-              {row.subtitle !== null && row.subtitle !== '' && (
-                <p className="text-xs text-muted-foreground">{row.subtitle}</p>
-              )}
-            </div>
-          );
-        },
+  const columns: DataTableColumn<InboxItem>[] = [
+    {
+      id: 'title',
+      header: t('inbox.column.item', 'Item'),
+      cell: (row) => (
+        <div className="flex items-center gap-3">
+          <span
+            aria-hidden="true"
+            className="grid size-9 shrink-0 place-items-center rounded-card bg-muted text-muted-foreground"
+          >
+            <Icon name="document" size={16} />
+          </span>
+          <div className="min-w-0">
+            <p className="truncate font-medium text-foreground">{row.title}</p>
+            <p className="truncate text-xs text-muted-foreground">
+              {row.subtitle !== null && row.subtitle !== ''
+                ? row.subtitle
+                : activeSourceLabel !== undefined
+                  ? sourceLabel(activeSourceLabel)
+                  : ''}
+            </p>
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: 'status',
+      header: t('inbox.column.status', 'State'),
+      cell: (row) => {
+        const state = stateOf(row);
+        if (state === null) return null;
+        return <Badge variant={state.done ? 'secondary' : 'warning'}>{state.label}</Badge>;
       },
+    },
+    // The "Arrived" column goes when this workspace hides dates (#1068).
+    ...dates.dateColumns<InboxItem>([
       {
-        id: 'status',
-        header: t('inbox.column.status', 'Status'),
-        cell: (row) => {
-          if (row.status === null || row.status === '') return null;
-          const meta = routingMeta(row);
-          // The qualifier is the SERVER's word, read through the trail event
-          // that created the row ("Forwarded to you", "Returned to you",
-          // "Awaiting your decision", "Done"). Never re-derived here, and never
-          // re-keyed: it is the trail's own account of what happened to this
-          // person.
-          //
-          // The TINT is this screen's, and an open decision gets its own (#1041).
-          // Amber-on-amber made "awaiting your decision" and "forwarded to you"
-          // the same object at a glance, and they are not the same object: one
-          // asks for a judgement that routes the document somewhere, the other
-          // asks to be read. An approval step that clears at the speed of a
-          // circulation is the whole failure a sign-off exists to prevent.
-          const variant =
-            meta !== null && !meta.open
-              ? 'secondary'
-              : meta !== null && meta.decision
-                ? 'warning'
-                : 'warning';
-          return <Badge variant={variant}>{row.status}</Badge>;
-        },
+        id: 'timestamp',
+        header: t('inbox.column.arrived', 'Arrived'),
+        value: (row) => row.timestamp,
+        className: 'text-xs text-muted-foreground',
       },
-      // #1068: the "Arrived" column goes when this tenant hides dates. The
-      // inbox still lists what is waiting, from which source, in what state,
-      // newest first — and "why did this sit for three days" is precisely the
-      // question the tenants who asked for this setting want off the screen.
-      ...dates.dateColumns<InboxItem>([
-        {
-          id: 'timestamp',
-          header: t('inbox.column.arrived', 'Arrived'),
-          value: (row) => row.timestamp,
-          className: 'text-xs text-muted-foreground',
-        },
-      ]),
-    ],
-    [t, router, dates]
+    ]),
+  ];
+
+  const header = (
+    <AdminHeader
+      title={t('inbox.title', 'Inbox')}
+      description={t('inbox.description', 'Work awaiting you, from every part of the platform that sends any.')}
+    />
   );
 
   if (sources.error !== null) {
     return (
       <div>
-        <AdminHeader title={t('inbox.title', 'Inbox')} />
-        <p className="rounded-md border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
-          {sources.error}
-        </p>
+        {header}
+        <AreaError
+          message={sources.error}
+          retryLabel={t('inbox.tryAgain', 'Try again')}
+          onRetry={() => sources.refetch()}
+        />
       </div>
     );
   }
 
   return (
     <div>
-      <AdminHeader
-        title={t('inbox.title', 'Inbox')}
-        description={t('inbox.description', 'Work awaiting you, from every part of the platform that sends any.')}
-      />
+      {header}
 
-      {/*
-        The tab strip appears only when there is more than one source. With one,
-        a single tab is chrome that explains nothing; the heading already names
-        what the list is.
-      */}
+      {/* Tabs per source, only when there is more than one. */}
       {sourceList.length > 1 && (
-        <div className="mb-4 flex flex-wrap gap-2" role="tablist" aria-label={t('inbox.sources', 'Inbox sources')}>
-          {sourceList.map((source) => (
-            <Button
-              key={source.key}
-              role="tab"
-              aria-selected={source.key === activeSource}
-              variant={source.key === activeSource ? 'default' : 'outline'}
-              onClick={() => selectSource(source.key)}
-            >
-              {source.key === DOCUMENT_ROUTING_SOURCE
-                ? t('inbox.source.documentRouting', 'Documents awaiting you')
-                : source.label}
-              {/*
-                The count is the source's own, from the same predicate its list
-                uses — so this badge cannot disagree with the page it opens.
-              */}
-              {source.open_count > 0 && (
-                <Badge variant="secondary" className="ms-2">
-                  {source.open_count}
-                </Badge>
-              )}
-            </Button>
-          ))}
-        </div>
+        <Tabs value={activeSource ?? undefined} onValueChange={selectSource} className="mb-4">
+          <TabsList variant="line" aria-label={t('inbox.sources', 'Inbox sources')}>
+            {sourceList.map((source) => (
+              <TabsTrigger key={source.key} value={source.key}>
+                {sourceLabel(source)}
+                {source.open_count > 0 && (
+                  <span className="ms-1.5 text-xs text-muted-foreground tabular-nums">{source.open_count}</span>
+                )}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
       )}
 
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <Button
-          variant={openOnly ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => {
-            setOpenOnly(true);
+      <div className="mb-4">
+        <ToggleGroup
+          label={t('inbox.filter.label', 'Show')}
+          required
+          value={openOnly ? 'open' : 'all'}
+          options={[
+            { value: 'open', label: t('inbox.filter.open', 'Waiting for me') },
+            { value: 'all', label: t('inbox.filter.all', 'Including done') },
+          ]}
+          onChange={(value) => {
+            setOpenOnly(value !== 'all');
             setPage(1);
           }}
-        >
-          {t('inbox.filter.open', 'Awaiting me')}
-        </Button>
-        <Button
-          variant={openOnly ? 'outline' : 'default'}
-          size="sm"
-          onClick={() => {
-            setOpenOnly(false);
-            setPage(1);
-          }}
-        >
-          {t('inbox.filter.all', 'Including what I have done')}
-        </Button>
+        />
       </div>
 
       {items.error !== null ? (
-        <p className="rounded-md border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
-          {items.error}
-        </p>
+        <AreaError
+          message={items.error}
+          retryLabel={t('inbox.tryAgain', 'Try again')}
+          onRetry={() => items.refetch()}
+        />
       ) : sourceList.length === 0 && !sources.loading ? (
-        // No registered sources at all. Distinct from "no items": nothing on this
-        // installation sends work to an inbox, which is a different fact and one
-        // an empty list would misreport as "you are up to date".
-        <p className="rounded-md border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
+        // Nothing on this installation sends work to an inbox: a different fact
+        // from "no items", which an empty list would misreport as "up to date".
+        <p className="rounded-card border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
           {t(
             'inbox.noSources',
             'Nothing on this installation sends work to an inbox yet, so there is nothing to show.'
@@ -336,14 +282,18 @@ export default function InboxPage() {
           getRowId={(row) => row.id}
           isLoading={items.loading || sources.loading}
           ariaLabel={t('inbox.table.label', 'Inbox items')}
+          onRowClick={(row) => {
+            const meta = routingMeta(row);
+            if (meta !== null) router.push(`/admin/document-library/${meta.document_id}?tab=routing`);
+          }}
           emptyState={{
             title: openOnly
-              ? t('inbox.empty.open.title', 'Nothing is awaiting you')
+              ? t('inbox.empty.open.title', 'Nothing is waiting for you')
               : t('inbox.empty.all.title', 'Nothing has reached you yet'),
             description: openOnly
               ? t(
                   'inbox.empty.open.description',
-                  'When a document is routed to you, it appears here. Switch to “Including what I have done” to see items you have already acted on.'
+                  'When a document is routed to you, it appears here. Switch to “Including done” to see items you have already acted on.'
                 )
               : t(
                   'inbox.empty.all.description',
