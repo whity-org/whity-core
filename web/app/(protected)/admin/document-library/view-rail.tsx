@@ -121,6 +121,19 @@ export function groupLabel(
  * shipped. A key that is never extracted is never seeded, never reaches
  * /admin/translations, and is finished by a translator who never saw it.
  */
+/**
+ * The server's reason a folder can't be used. The one it sends for a person with
+ * no unit is English-only, so it is said here in the person's language; any other
+ * reason passes through as the server wrote it.
+ */
+const NO_UNIT_REASON = 'You do not belong to an organizational unit. Select one to use this folder.';
+export function viewReason(t: ReturnType<typeof useTranslation>, reason: string | null): string | null {
+  if (reason === NO_UNIT_REASON) {
+    return t('organizer.view.noUnit', 'You do not belong to an organizational unit. Select one to use this folder.');
+  }
+  return reason;
+}
+
 export function viewLabel(t: ReturnType<typeof useTranslation>, view: DocumentView): string {
   switch (view.key) {
     case 'all':
@@ -305,7 +318,7 @@ export function ViewRail({
                 icon={view.key === 'starred' ? <IconStar size={14} aria-hidden /> : undefined}
                 selected={selectedViewKey === view.key && selectedCollectionId === null}
                 disabled={!view.available}
-                reason={view.unavailable_reason}
+                reason={viewReason(t, view.unavailable_reason)}
                 onClick={() => onSelectView(view.key)}
               />
             ))}
