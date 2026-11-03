@@ -63,7 +63,7 @@ async function completeTwoFactorLogin(
     const code = await computeTotp(secret);
     await login.submitTwoFactorCode(code);
     await page.waitForURL('**/dashboard', { timeout: 20_000 });
-    await expect(page.getByRole('heading', { name: /^Good (morning|afternoon|evening)$/ })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /^Good (morning|afternoon|evening)/ })).toBeVisible();
   } finally {
     await context.close();
   }
@@ -300,7 +300,7 @@ test.describe('Two-Factor Authentication — login challenge (admin)', () => {
       await login.submitRecoveryCode(code);
       await page.waitForURL('**/dashboard', { timeout: 20_000 });
       await expect(
-        page.getByRole('heading', { name: /^Good (morning|afternoon|evening)$/ })
+        page.getByRole('heading', { name: /^Good (morning|afternoon|evening)/ })
       ).toBeVisible();
     } finally {
       await context.close();

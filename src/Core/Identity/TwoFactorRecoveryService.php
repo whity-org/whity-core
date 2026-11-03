@@ -116,7 +116,7 @@ final class TwoFactorRecoveryService
      * @return array{request_id: int, profile_id: int}|null null for an
      *   unknown, expired, or already-consumed token.
      */
-    public function confirm(string $rawToken): ?array
+    public function confirm(string $rawToken, ?string $reason = null): ?array
     {
         if ($rawToken === '') {
             return null;
@@ -154,10 +154,11 @@ final class TwoFactorRecoveryService
             $this->db->prepare(
                 "UPDATE two_factor_recovery_requests
                     SET status = '" . self::STATUS_PENDING . "',
+                        reason = :reason,
                         consumed_at = :now,
                         updated_at = NOW()
                   WHERE id = :id AND consumed_at IS NULL"
-            )->execute([':now' => $now, ':id' => $requestId]);
+            )->execute([':reason' => $reason, ':now' => $now, ':id' => $requestId]);
 
             if ($ownTx) {
                 $this->db->commit();
@@ -180,13 +181,15 @@ final class TwoFactorRecoveryService
      * hold an ACTIVE membership in the given tenant. Mirrors
      * {@see PasswordResetService::listPendingForTenant()}.
      *
-     * @return list<array{id:int, profile_id:int, email:string, display_name:string, created_at:string}>
+     * `$limit` and `$offset` page the queue; {@see self::countPendingForTenant()} is its total.
+     *
+     * @return list<array{id:int, profile_id:int, email:string, display_name:string, reason:string|null, created_at:string}>
      */
-    public function listPendingForTenant(int $tenantId): array
+    public function listPendingForTenant(int $tenantId, int $limit = PHP_INT_MAX, int $offset = 0): array
     {
         // @tenant-guard-ignore: joins the global two_factor_recovery_requests/profiles tables to memberships, scoped by the tenant_id predicate below
         $stmt = $this->db->prepare(
-            "SELECT DISTINCT tfr.id, tfr.profile_id, tfr.created_at,
+            "SELECT DISTINCT tfr.id, tfr.profile_id, tfr.created_at, tfr.reason,
                     p.display_name,
                     pe.email AS email
              FROM two_factor_recovery_requests tfr
@@ -194,9 +197,13 @@ final class TwoFactorRecoveryService
              JOIN profiles p ON p.id = tfr.profile_id
              LEFT JOIN profile_emails pe ON pe.profile_id = tfr.profile_id AND pe.is_primary = TRUE
              WHERE tfr.status = '" . self::STATUS_PENDING . "'
-             ORDER BY tfr.created_at ASC"
+             ORDER BY tfr.created_at ASC, tfr.id ASC
+             LIMIT :limit OFFSET :offset"
         );
-        $stmt->execute([':tenant_id' => $tenantId]);
+        $stmt->bindValue(':tenant_id', $tenantId, PDO::PARAM_INT);
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $stmt->execute();
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         $items = [];
@@ -206,11 +213,29 @@ final class TwoFactorRecoveryService
                 'profile_id'   => (int) $row['profile_id'],
                 'email'        => (string) ($row['email'] ?? ''),
                 'display_name' => (string) ($row['display_name'] ?? ''),
+                'reason'       => isset($row['reason']) ? (string) $row['reason'] : null,
                 'created_at'   => (string) ($row['created_at'] ?? ''),
             ];
         }
 
         return $items;
+    }
+
+    /**
+     * The total behind {@see self::listPendingForTenant()}, with the same scope.
+     */
+    public function countPendingForTenant(int $tenantId): int
+    {
+        // @tenant-guard-ignore: joins the global two_factor_recovery_requests table to memberships, scoped by the tenant_id predicate below
+        $stmt = $this->db->prepare(
+            "SELECT COUNT(DISTINCT tfr.id)
+             FROM two_factor_recovery_requests tfr
+             JOIN memberships m ON m.profile_id = tfr.profile_id AND m.tenant_id = :tenant_id AND m.status = 'active'
+             WHERE tfr.status = '" . self::STATUS_PENDING . "'"
+        );
+        $stmt->execute([':tenant_id' => $tenantId]);
+
+        return (int) $stmt->fetchColumn();
     }
 
     /**

@@ -501,6 +501,9 @@ final class TenantOwnedTables
         // state is unreachable by construction, since the only path that could
         // ever reference it is the claim, which refuses a claimed row.
         'form_uploads' => '133_create_form_uploads.php',
+        // `form_drafts` (migration 210) — one person's unsent answers. Every statement
+        // binds the tenant and the profile.
+        'form_drafts' => '210_create_form_drafts.php',
         // `form_submission_reviews` (migration 194) — the office's record on a
         // submission. Every statement binds `tenant_id`, so a submission id from
         // another tenant reads as not found.

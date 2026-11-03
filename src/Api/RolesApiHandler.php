@@ -452,7 +452,9 @@ class RolesApiHandler
                 // @tenant-guard-ignore: system-tenant (id 0) lists all roles; scoped else-branch binds (r.tenant_id = :tenant_id OR r.tenant_id IS NULL)
                 $stmt = $this->db->prepare(
                     'SELECT r.id, r.name, r.description, r.parent_id, r.created_at, r.tenant_id,
-                            COUNT(rp.id) AS permission_count
+                            COUNT(rp.id) AS permission_count,
+                            (SELECT COUNT(DISTINCT m.profile_id) FROM memberships m
+                              WHERE m.role_id = r.id AND m.status = \'active\') AS people_count
                      FROM roles r
                      LEFT JOIN role_permissions rp ON r.id = rp.role_id'
                     . ($predicate === '' ? '' : ' WHERE ' . $predicate)
@@ -476,7 +478,9 @@ class RolesApiHandler
 
                 $stmt = $this->db->prepare(
                     'SELECT r.id, r.name, r.description, r.parent_id, r.created_at, r.tenant_id,
-                            COUNT(rp.id) AS permission_count
+                            COUNT(rp.id) AS permission_count,
+                            (SELECT COUNT(DISTINCT m.profile_id) FROM memberships m
+                              WHERE m.role_id = r.id AND m.tenant_id = :tenant_id AND m.status = \'active\') AS people_count
                      FROM roles r
                      LEFT JOIN role_permissions rp ON r.id = rp.role_id
                      WHERE (r.tenant_id = :tenant_id OR r.tenant_id IS NULL)' . $search
@@ -516,9 +520,17 @@ class RolesApiHandler
             $roles = array_map(static function (array $role) use ($tenantId): array {
                 $role['permissionCount'] = (int)($role['permission_count'] ?? 0);
                 unset($role['permission_count']);
+                // People in THIS tenant, even on a global role that other tenants
+                // use too: how many hold it elsewhere is not this tenant's to read.
+                $role['peopleCount'] = (int)($role['people_count'] ?? 0);
+                unset($role['people_count']);
 
                 $roleTenantId = isset($role['tenant_id']) ? (int)$role['tenant_id'] : null;
                 $role['global'] = self::roleRowIsGlobal($role);
+                // A built-in role is one Whity ships to every workspace, which is
+                // exactly a global one. It is a fact about the row; whether this
+                // caller may edit it is `manageable`.
+                $role['builtIn'] = $role['global'];
                 if ($tenantId === 0) {
                     $role['manageable'] = true;
                 } elseif ($tenantId === null) {
@@ -597,7 +609,23 @@ class RolesApiHandler
             // from. The raw owning tenant is dropped again afterwards: which
             // OTHER tenant owns a role is not this endpoint's to disclose.
             $role['global'] = self::roleRowIsGlobal($role);
+            $role['builtIn'] = $role['global'];
             unset($role['tenant_id']);
+
+            // Same rule as the list: this tenant's holders, or everyone for system.
+            if ($tenantId === 0) {
+                // @tenant-guard-ignore: system-tenant (id 0) counts holders across all tenants; scoped else-branch binds tenant_id
+                $people = $this->db->prepare(
+                    "SELECT COUNT(DISTINCT profile_id) FROM memberships WHERE role_id = ? AND status = 'active'"
+                );
+                $people->execute([$id]);
+            } else {
+                $people = $this->db->prepare(
+                    "SELECT COUNT(DISTINCT profile_id) FROM memberships WHERE role_id = ? AND tenant_id = ? AND status = 'active'"
+                );
+                $people->execute([$id, $tenantId]);
+            }
+            $role['peopleCount'] = (int) $people->fetchColumn();
 
             // Resolved through the SAME helper the write guards call rather than
             // re-derived from a tenant_id added to the SELECT: two copies of an
