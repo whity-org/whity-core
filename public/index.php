@@ -3002,6 +3002,7 @@ $documentSourcesHandler = new \Whity\Api\DocumentSourcesApiHandler(
     new \Whity\Core\Document\DocumentSourceVersionRepository($db->getPdo()),
     $documentThemeResolver,
     $documentCollab,
+    new \Whity\Core\Document\DocumentPeople($db->getPdo()),
 );
 $router->register('GET',    '/api/document-sources',                [$documentSourcesHandler, 'list'],      null, null, CorePermissions::DOCUMENTS_READ);
 $router->register('POST',   '/api/document-sources',                [$documentSourcesHandler, 'create'],    null, null, CorePermissions::DOCUMENTS_WRITE);
@@ -3417,6 +3418,7 @@ $reportsHandler = new \Whity\Api\ReportsApiHandler(
 $router->register('GET',  '/api/reports',                            [$reportsHandler, 'index'],    null, null, CorePermissions::DOCUMENTS_RENDER);
 $router->register('POST', '/api/reports/{source:[a-z][a-z0-9_]*}/document', [$reportsHandler, 'document'], null, null, CorePermissions::DOCUMENTS_RENDER);
 
+$documentPeople = new \Whity\Core\Document\DocumentPeople($db->getPdo());
 $documentsHandler = new \Whity\Api\DocumentsApiHandler(
     $documentRepository,
     $documentArtifactRepository,
@@ -3458,7 +3460,8 @@ $documentsHandler = new \Whity\Api\DocumentsApiHandler(
     // commits the record first. Also the `qr` record-page region's predicate.
     $documentQrService,
     // WHIT-742: `slot` in the body names the template through the workspace's bindings.
-    $templateSlotRegistry
+    $templateSlotRegistry,
+    $documentPeople
 );
 // The one issuing path (WHIT-742), registered for plugin code and automations
 // running in a request. BaseCommand registers the same for CLI commands, and
@@ -3476,6 +3479,20 @@ $documentsHandler = new \Whity\Api\DocumentsApiHandler(
     \Whity\app(\Whity\Core\Document\Issuing\TemplateIssuing::class),
     $roleChecker,
 ));
+$documentWithdrawalHandler = new \Whity\Api\DocumentWithdrawalApiHandler(
+    $documentRepository,
+    $documentVisibilityPolicy,
+    $roleChecker,
+    new \Whity\Core\Document\DocumentWithdrawal(
+        $db->getPdo(),
+        $documentRepository,
+        $documentQrTokenRepository,
+        $routeRecipientRepository,
+        $routeEventRepository,
+        $auditLogger
+    )
+);
+$router->register('POST', '/api/documents/{id:\d+}/withdraw', [$documentWithdrawalHandler, 'withdraw'], null, null, CorePermissions::DOCUMENTS_WITHDRAW);
 $documentQrHandler = new \Whity\Api\DocumentQrApiHandler(
     $documentRepository,
     $documentVisibilityPolicy,
@@ -3591,7 +3608,8 @@ $documentRoutingHandler = new \Whity\Api\DocumentRoutingApiHandler(
     $documentVisibilityPolicy,
     $roleChecker,
     $routeTemplateRepository,
-    $serverLabels
+    $serverLabels,
+    $documentPeople
 );
 $router->register('GET',  '/api/routing-rules',                                        [$documentRoutingHandler, 'rules'],      null, null, CorePermissions::DOCUMENTS_READ);
 $router->register('POST', '/api/documents/{id:\d+}/routes',                            [$documentRoutingHandler, 'create'],     null, null, CorePermissions::DOCUMENTS_ROUTE);
@@ -3625,6 +3643,7 @@ $router->register('POST', '/api/documents/{id:\d+}/routes/from-template',       
 $router->register('GET',  '/api/documents/{id:\d+}/routes',                            [$documentRoutingHandler, 'list'],       null);
 $router->register('GET',  '/api/documents/{id:\d+}/trail',                             [$documentRoutingHandler, 'trail'],      null);
 $router->register('GET',  '/api/documents/{id:\d+}/recipients',                        [$documentRoutingHandler, 'recipients'], null);
+$router->register('GET',  '/api/documents/{id:\d+}/people',                            [$documentRoutingHandler, 'people'],     null);
 // Deliberately UNPERMISSIONED (null, null): being a recipient IS the
 // authorization — the route named a rule, the rule resolved to you, and the
 // engine wrote the row. Requiring a permission on top would let a route resolve
