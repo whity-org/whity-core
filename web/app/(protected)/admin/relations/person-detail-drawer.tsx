@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
@@ -11,6 +11,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { Button } from '@whity/ui/button';
+import { ConfirmAction } from '@whity/ui/confirm-action';
 import { Badge } from '@whity/ui/badge';
 import { Skeleton } from '@whity/ui/skeleton';
 import { IconEdit, IconPlus, IconTrash, IconUser, IconUserOff, IconX } from '@tabler/icons-react';
@@ -88,6 +89,9 @@ export function PersonDetailDrawer({
       })();
     }
   }, [personId, loadRelations]);
+
+  // Removing a relation can't be taken back from here: ask first (tier 2).
+  const [removing, setRemoving] = useState<(typeof relations)[number] | null>(null);
 
   const handleRemoveRelation = async (relationId: number) => {
     setIsMutating(true);
@@ -226,7 +230,7 @@ export function PersonDetailDrawer({
                             { name: relation.otherPersonName }
                           )}
                           disabled={isMutating}
-                          onClick={() => handleRemoveRelation(relation.relationId)}
+                          onClick={() => setRemoving(relation)}
                         >
                           <IconX />
                         </Button>
@@ -246,6 +250,27 @@ export function PersonDetailDrawer({
           </>
         )}
       </SheetContent>
+      <ConfirmAction
+        open={removing !== null}
+        onOpenChange={(open) => {
+          if (!open) setRemoving(null);
+        }}
+        title={t('relations.detail.remove.title', 'Remove this relation?')}
+        description={t(
+          'relations.detail.remove.description',
+          '{person} will no longer be shown as {type} of {other}. Neither person is deleted.',
+          {
+            person: person?.displayName ?? '',
+            type: removing?.typeName ?? '',
+            other: removing?.otherPersonName ?? '',
+          }
+        )}
+        confirmLabel={t('relations.detail.remove.confirm', 'Remove relation')}
+        cancelLabel={t('relations.detail.remove.cancel', 'Cancel')}
+        onConfirm={async () => {
+          if (removing !== null) await handleRemoveRelation(removing.relationId);
+        }}
+      />
     </Sheet>
   );
 }
