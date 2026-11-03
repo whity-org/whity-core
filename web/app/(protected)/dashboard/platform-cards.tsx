@@ -2,8 +2,8 @@
 
 /**
  * Platform cards for operators: the headline numbers from `/api/admin/stats`.
- * Shown only to people who hold `stats:read`; the full statistics stay on
- * System (H.3).
+ * The page shows them only to operators (the system tenant) who hold
+ * `stats:read`; the full statistics stay on System (H.3).
  */
 
 import Link from 'next/link';
@@ -26,8 +26,9 @@ export function PlatformCards() {
   const stats = useFetch<Totals>(async () => {
     const response = await apiClient('/api/v1/admin/stats');
     if (!response.ok) throw new Error(t('dashboard.platform.error', 'The platform numbers could not be loaded.'));
-    const body = (await response.json()) as { data?: { totals?: Totals }; totals?: Totals };
-    const totals = body.data?.totals ?? body.totals;
+    // The endpoint answers `{ status, timestamp, stats: { totals, ... } }`.
+    const body = (await response.json()) as { stats?: { totals?: Totals } };
+    const totals = body.stats?.totals;
     if (totals === undefined) throw new Error(t('dashboard.platform.error', 'The platform numbers could not be loaded.'));
     return totals;
   }, [apiClient]);
