@@ -44,7 +44,8 @@ jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: jest.fn() }),
 }));
 
-import DocumentRoutingPage from '@/app/(protected)/admin/document-routing/[documentId]/page';
+import { DocumentRoutingPanel } from '@/components/documents/document-routing-panel';
+const DocumentRoutingPage = () => <DocumentRoutingPanel documentId={1} documentTitle="Purchase order" />;
 
 const json = (status: number, body: unknown) =>
   Promise.resolve({ ok: status >= 200 && status < 300, status, json: () => Promise.resolve(body) });

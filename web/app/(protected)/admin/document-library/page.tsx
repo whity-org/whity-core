@@ -165,7 +165,7 @@ function storedLayout(): LibraryLayout {
 }
 
 export default function DocumentLibraryPage() {
-  const { apiClient } = useAuth();
+  const { apiClient, user } = useAuth();
   const { addToast } = useToast();
   const t = useTranslation('documents');
   const dates = useDateDisplay();
@@ -279,6 +279,15 @@ export default function DocumentLibraryPage() {
       throw new Error(t('organizer.error.ous', 'Failed to load the full unit list'));
     }
     return result.items;
+  }, [apiClient]);
+
+  // Names for "Raised by". A viewer who cannot list people gets "Account #id"
+  // for the few rows they can see, until the server returns names (S5).
+  const people = useFetch<Map<number, string>>(async () => {
+    const result = await fetchAllPages<{ id: number; name?: string; email?: string }>(apiClient, '/api/v1/users').catch(
+      () => null
+    );
+    return new Map((result?.items ?? []).map((p) => [p.id, p.name || p.email || '']));
   }, [apiClient]);
 
   const selectedView: DocumentView | null = useMemo(() => {
@@ -561,7 +570,7 @@ export default function DocumentLibraryPage() {
     () => [
       {
         id: 'title',
-        header: t('organizer.table.title', 'Title'),
+        header: t('organizer.table.title', 'Document'),
         // No `enableSorting`. The shared table sorts CLIENT-side, which in
         // server-pagination mode would sort the twenty five rows it was handed
         // and present the result as a sorted library. Sorting is the toolbar's,
@@ -569,25 +578,33 @@ export default function DocumentLibraryPage() {
         cell: (row) => (
           <div className="flex min-w-0 items-center gap-2">
             <StarButton row={row} busy={busy} onToggleStar={toggleStar} />
-            <DocumentTitle row={row} />
+            <div className="min-w-0">
+              <DocumentTitle row={row} />
+              <span dir="auto" className="block truncate text-sm text-muted-foreground">
+                {row.template_name}
+              </span>
+            </div>
           </div>
         ),
       },
       {
-        id: 'template_name',
-        header: t('organizer.table.template', 'Template'),
+        id: 'created_by',
+        header: t('organizer.table.raisedBy', 'Raised by'),
         cell: (row) => (
-          <span dir="auto" className="truncate">
-            {row.template_name}
+          <span dir="auto">
+            {row.created_by === null
+              ? '—'
+              : row.created_by === user?.id
+                ? t('organizer.table.you', 'You')
+                : people.data?.get(row.created_by) ||
+                  t('organizer.table.account', 'Account #{id}', { id: row.created_by })}
           </span>
         ),
       },
       {
         id: 'origin_ou_id',
         header: t('organizer.table.raisedFrom', 'Raised from'),
-        cell: (row) => (
-          <span dir="auto">{ouName(row.origin_ou_id)}</span>
-        ),
+        cell: (row) => <span dir="auto">{ouName(row.origin_ou_id)}</span>,
       },
       // #1068: the "Created" column goes when this tenant hides dates. The
       // organizer is a file manager — title, template, unit and version count
@@ -596,7 +613,7 @@ export default function DocumentLibraryPage() {
       ...dates.dateColumns<DocumentRow>([
         {
           id: 'created_at',
-          header: t('organizer.table.created', 'Created'),
+          header: t('organizer.table.issued', 'Issued'),
           value: (row) => row.created_at,
         },
       ]),
@@ -608,7 +625,7 @@ export default function DocumentLibraryPage() {
         cell: (row) => String(row.artifacts.length),
       },
     ],
-    [busy, dates, ouName, t, toggleStar]
+    [busy, dates, ouName, people.data, t, toggleStar, user?.id]
   );
 
   const listError = documents.error;
@@ -775,6 +792,7 @@ export default function DocumentLibraryPage() {
               getRowId={(row) => String(row.id)}
               isLoading={documents.loading}
               ariaLabel={tableLabel}
+              onRowClick={(row) => router.push(`/admin/document-library/${row.id}`)}
               rowActions={(row) => <DocumentActions row={row} handlers={itemHandlers} />}
               emptyState={{
                 title: emptyState.title,

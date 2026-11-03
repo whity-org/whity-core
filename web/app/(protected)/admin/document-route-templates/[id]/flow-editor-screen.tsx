@@ -79,7 +79,9 @@ import {
   type RouteFlowQuorum,
   type RouteFlowStep,
 } from '@whity/ui/route-flow/model';
-import { IconDeviceFloppy, IconPlus } from '@tabler/icons-react';
+import { IconDeviceFloppy, IconPencil, IconPlus } from '@tabler/icons-react';
+import { useLeaveGuard } from '@whity/ui/save-bar';
+import { routeSentence } from '@/lib/documents/route-sentence';
 import type { RoutingRule } from '@/components/documents/routing-wire';
 import { AudienceGroupPicker, type AudienceGroupPreview } from '@whity/ui/audience-group-picker';
 import {
@@ -233,9 +235,15 @@ function RouteFlowBody({
 
   const [graph, setGraph] = useState<RouteFlowGraph>(() => toFlowGraph(template));
   const [selected, setSelected] = useState<number | null>(null);
-  const [orientation, setOrientation] = useState<RouteFlowOrientation>('vertical');
+  // Top to bottom only (D.2): a route reads like a sentence, so the editor no
+  // longer offers the along-the-text layout.
+  const orientation: RouteFlowOrientation = 'vertical';
+  const [name, setName] = useState(template.name);
+  const [renaming, setRenaming] = useState(false);
+  const [savedName, setSavedName] = useState(template.name);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
+  useLeaveGuard(dirty);
 
   const maxSteps = template.max_steps;
 
@@ -380,6 +388,19 @@ function RouteFlowBody({
   const save = useCallback(async () => {
     setSaving(true);
     try {
+      if (name.trim() !== '' && name !== savedName) {
+        const renamed = await apiClient(`/api/v1/document-route-templates/${templateId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: name.trim() }),
+        });
+        if (!renamed.ok) {
+          const body = (await renamed.json().catch(() => null)) as { error?: string } | null;
+          addToast(body?.error ?? t('routeTemplates.error.rename', 'The route could not be renamed'), 'error');
+          return;
+        }
+        setSavedName(name);
+      }
       const response = await apiClient(`/api/v1/document-route-templates/${templateId}/graph`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -401,11 +422,11 @@ function RouteFlowBody({
       const body = (await response.json()) as { data: RouteTemplateGraphWire };
       setGraph(toFlowGraph(body.data));
       setDirty(false);
-      addToast(t('routeTemplates.saved', 'Flow saved'), 'success');
+      addToast(t('routeTemplates.saved', 'Route saved'), 'success');
     } finally {
       setSaving(false);
     }
-  }, [addToast, apiClient, graph, t, templateId]);
+  }, [addToast, apiClient, graph, name, savedName, t, templateId]);
 
   const selectedStep = useMemo(
     () => graph.steps.find((s) => s.position === selected) ?? null,
@@ -413,38 +434,62 @@ function RouteFlowBody({
   );
 
   const atCeiling = graph.steps.length >= maxSteps;
+  const sentence = routeSentence(
+    graph.steps,
+    (step) => {
+      if (ROLE_KINDS.has(step.ruleKind)) return roles.find((r) => r.id === step.ruleConfig.role_id)?.name ?? null;
+      if (step.ruleKind === GROUP_KIND) return groups.find((g) => g.id === step.ruleConfig.group_id)?.name ?? null;
+      return rules.find((r) => r.kind === step.ruleKind)?.label ?? null;
+    },
+    {
+      unnamed: t('routeTemplates.sentence.unnamed', 'A stage'),
+      empty: t('routeTemplates.sentence.empty', 'No stages drawn yet'),
+      join: (before, next) => t('routeTemplates.sentence.then', '{before}, then {next}', { before, next }),
+    }
+  );
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <h1 className="me-auto text-lg font-semibold">{template.name}</h1>
-
-        <Select
-          value={orientation}
-          onValueChange={(v) => setOrientation(v as RouteFlowOrientation)}
-        >
-          <SelectTrigger className="w-44">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="vertical">
-              {t('routeTemplates.orientation.vertical', 'Top to bottom')}
-            </SelectItem>
-            <SelectItem value="horizontal">
-              {t('routeTemplates.orientation.horizontal', 'Along the text direction')}
-            </SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="me-auto min-w-0">
+          {renaming ? (
+            <Input
+              autoFocus
+              dir="auto"
+              value={name}
+              maxLength={160}
+              aria-label={t('routeTemplates.rename.label', 'Name of the route')}
+              onChange={(e) => {
+                setName(e.target.value);
+                setDirty(true);
+              }}
+              onBlur={() => name.trim() !== '' && setRenaming(false)}
+              onKeyDown={(e) => e.key === 'Enter' && name.trim() !== '' && setRenaming(false)}
+              className="max-w-sm"
+            />
+          ) : (
+            <h1 className="truncate text-lg font-semibold" dir="auto">
+              {name}
+            </h1>
+          )}
+          <p className="text-sm text-muted-foreground" data-testid="route-sentence">
+            {sentence}
+          </p>
+        </div>
 
         {canWrite && (
           <>
+            <Button variant="outline" onClick={() => setRenaming(true)} disabled={renaming}>
+              <IconPencil className="me-1 size-4" />
+              {t('routeTemplates.action.rename', 'Rename')}
+            </Button>
             <Button variant="outline" onClick={addStage} disabled={atCeiling}>
               <IconPlus className="me-1 size-4" />
-              {t('routeTemplates.action.addStage', 'Add stage')}
+              {t('routeTemplates.action.addStage', 'Add a stage')}
             </Button>
             <Button onClick={save} disabled={!dirty || saving}>
               <IconDeviceFloppy className="me-1 size-4" />
-              {t('routeTemplates.action.save', 'Save flow')}
+              {t('routeTemplates.action.save', 'Save route')}
             </Button>
           </>
         )}

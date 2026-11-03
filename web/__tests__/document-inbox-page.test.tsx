@@ -216,7 +216,7 @@ describe('InboxPage', () => {
     await waitFor(() => expect(screen.getByText('Purchase order 9912')).toBeInTheDocument());
 
     fireEvent.click(screen.getByRole('button', { name: 'Purchase order 9912' }));
-    expect(push).toHaveBeenCalledWith('/admin/document-routing/318');
+    expect(push).toHaveBeenCalledWith('/admin/document-library/318?tab=routing');
   });
 
   it('marks a decision item, in a word this build can translate', async () => {
