@@ -43,7 +43,7 @@ use Whity\Http\RbacMiddleware;
 class PluginsApiRbacTest extends TestCase
 {
     private const SECRET = 'test-secret-key-padded-for-hs256-min-32-byte-key';
-    private const TENANT = 1;
+    private const TENANT = 0;
 
     private JwtParser $jwtParser;
     private PermissionRegistry $registry;
@@ -241,9 +241,9 @@ class PluginsApiRbacTest extends TestCase
     {
         $pdo = SchemaFromMigrations::make();
 
-        // Tenant 1 hosts every fixture; seed it so users.tenant_id FK is
+        // The system tenant hosts every fixture; seed it so users.tenant_id FK is
         // satisfied on PostgreSQL (SQLite does not enforce FKs by default).
-        $pdo->exec("INSERT OR IGNORE INTO tenants (id, name) VALUES (1, 'tenant-a')");
+        $pdo->exec("INSERT OR IGNORE INTO tenants (id, name) VALUES (0, 'tenant-a')");
 
         return $pdo;
     }

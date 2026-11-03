@@ -60305,11 +60305,15 @@
                     },
                     "note": {
                         "type": "string"
+                    },
+                    "can_operate": {
+                        "type": "boolean"
                     }
                 },
                 "required": [
                     "worker_local",
-                    "note"
+                    "note",
+                    "can_operate"
                 ]
             },
             "PluginListResponse": {

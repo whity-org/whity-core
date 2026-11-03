@@ -1908,7 +1908,7 @@
         "settings.email.title": "Email",
         "settings.email.transport.log.note": "Emails are written to the server log (dev only) — not delivered.",
         "settings.email.transport.none.note": "Email is disabled — nothing is sent.",
-        "settings.emailDomains.accessDenied": "You need the tenant {role} role to manage email-domain policies.",
+        "settings.emailDomains.accessDeniedPlain": "You need permission to manage email domains to open this page.",
         "settings.emailDomains.add": "Add domain",
         "settings.emailDomains.autoProvision.off": "Auto-provision off",
         "settings.emailDomains.autoProvision.on": "Auto-provision on",

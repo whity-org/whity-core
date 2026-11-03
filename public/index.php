@@ -865,11 +865,20 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         // the inbox above it, where the entries in `records` are things somebody
         // administers on behalf of the tenant.
         'order' => 4,
-        // Mirrors GET /api/v1/me/form-submissions, gated forms:submit rather than
-        // forms:read — the rows already name exactly one person, so requiring the
-        // tenant-wide read permission would hide this from precisely the people
-        // whose submissions are in it.
-        'requiredPermission' => \Whity\Core\RBAC\CorePermissions::FORMS_SUBMIT,
+        // Not a permission: a member filling in a form opened to them holds none. Shown
+        // to whoever may fill forms in or has already sent one (FormsNavConditions).
+        'visibleIf' => 'forms-own-submissions',
+    ];
+    $items[] = [
+        // The catalogue for a member who can't read it through `forms-catalog`, once
+        // their workspace has opened a form to them. Same page, so never both.
+        'id' => 'member-forms',
+        'label' => 'Forms',
+        'href' => '/admin/x/' . \Whity\Core\Form\FormFrontendFeatures::CATALOG_ID,
+        'icon' => 'forms',
+        'group' => 'overview',
+        'order' => 5,
+        'visibleIf' => 'forms-open-to-member',
     ];
     $items[] = [
         'id' => 'tenants',
@@ -1980,7 +1989,11 @@ $router->register('GET', '/api/permissions', [$permissionsHandler, 'list'], null
 // => 403) and filters every item per caller against RoleChecker server-side,
 // mirroring /api/frontend/features. Pass the delegation-aware $roleChecker so a
 // live delegation actually unlocks gated items.
-$navigationHandler = new NavigationApiHandler($hookManager, $roleChecker);
+$formsNavConditions = new \Whity\Core\Form\FormsNavConditions($db->getPdo(), $roleChecker);
+$navigationHandler = new NavigationApiHandler($hookManager, $roleChecker, [
+    'forms-open-to-member' => [$formsNavConditions, 'hasFormsOpenToThem'],
+    'forms-own-submissions' => [$formsNavConditions, 'hasOwnSubmissionsToSee'],
+]);
 $router->register('GET', '/api/navigation', [$navigationHandler, 'list']);
 
 // Caller capabilities (WC-176, #205). Registered with NO required
