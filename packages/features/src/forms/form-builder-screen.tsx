@@ -82,7 +82,7 @@ export function FormBuilderScreen({ env, formId, canManage }: { env: FormsScreen
   const t = useTranslation("forms")
   const { currentLanguage } = useCurrentLanguage()
   const statusLabel = useStatusLabel()
-  const { dateTime } = useDateDisplay()
+  const { dateTime, time } = useDateDisplay()
   const api = useMemo(() => createFormsApi(env.transport), [env.transport])
 
   const [loaded, setLoaded] = useState<Loaded | null>(null)
@@ -395,7 +395,7 @@ export function FormBuilderScreen({ env, formId, canManage }: { env: FormsScreen
                   : t("builder.facts.draft", "Nobody can fill it in yet.")}
             </span>
             <span>{t("builder.facts.changed", "Changed {when}", { when: dateTime(form.updated_at) ?? "" })}</span>
-            {savedAt !== null && !dirty && <span>{t("builder.autosaved", "Saved at {time}", { time: savedAt.toLocaleTimeString() })}</span>}
+            {savedAt !== null && !dirty && <span>{t("builder.autosaved", "Saved at {time}", { time: time(savedAt.toISOString()) ?? "" })}</span>}
           </span>
         }
         action={
