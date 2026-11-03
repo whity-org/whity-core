@@ -917,6 +917,8 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         // 8 — orders are unique within a group, and 7 is billing.
         'order' => 6,
         'requiredPermission' => \Whity\Core\RBAC\CorePermissions::PLANS_MANAGE,
+        // The handler refuses every other tenant, so showing it would only lead to a 403.
+        'systemTenantOnly' => true,
     ];
     $items[] = [
         'id' => 'billing',
@@ -937,6 +939,8 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         // refuses the writes regardless. Showing the catalogue to a tenant admin
         // who cannot change it is better than a link that 403s.
         'requiredPermission' => \Whity\Core\RBAC\CorePermissions::PLANS_MANAGE,
+        // The handler refuses every other tenant, so showing it would only lead to a 403.
+        'systemTenantOnly' => true,
     ];
     $items[] = [
         'id' => 'user-groups',
@@ -978,6 +982,8 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         // (settings:manage + system tenant, enforced in the handler) — so the
         // nav item gates on the same permission. A tenant admin never sees it.
         'requiredPermission' => \Whity\Core\RBAC\CorePermissions::SETTINGS_MANAGE,
+        // The handler refuses every other tenant, so showing it would only lead to a 403.
+        'systemTenantOnly' => true,
     ];
     $items[] = [
         'id' => 'notifications',
@@ -1216,14 +1222,47 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'label' => 'Languages',
         'href' => '/admin/languages',
         'icon' => 'language',
-        'group' => 'settings',
-        'order' => 4,
+        'group' => 'platform',
+        'order' => 10,
         // WC-583: languages are a GLOBAL catalogue (no tenant_id column at
         // all) — create/update/enable/disable is a SYSTEM-TENANT-ONLY
         // PLATFORM capability (mirrors the Feature Flags/Email/Storage
         // settings tabs), so the nav item itself is hidden from every other
         // tenant rather than 403ing on click.
         'requiredPermission' => \Whity\Core\RBAC\CorePermissions::LANGUAGES_MANAGE,
+        'systemTenantOnly' => true,
+    ];
+    // W.2 and the owner's answer to Q1: the install's email, storage and feature flags
+    // live in Platform with Languages. Each page keeps its own address and the same gate
+    // as its settings tab (SettingsApiHandler::TABS).
+    $items[] = [
+        'id' => 'platform-email',
+        'label' => 'Email',
+        'href' => '/admin/settings/email',
+        'icon' => 'mail',
+        'group' => 'platform',
+        'order' => 11,
+        'requiredPermission' => \Whity\Core\RBAC\CorePermissions::SETTINGS_MANAGE,
+        'systemTenantOnly' => true,
+    ];
+    $items[] = [
+        'id' => 'platform-storage',
+        'label' => 'Storage',
+        'href' => '/admin/settings/storage',
+        'icon' => 'database',
+        'group' => 'platform',
+        'order' => 12,
+        'requiredPermission' => \Whity\Core\RBAC\CorePermissions::SETTINGS_MANAGE,
+        'systemTenantOnly' => true,
+    ];
+    $items[] = [
+        'id' => 'platform-feature-flags',
+        'label' => 'Feature flags',
+        'href' => '/admin/settings/feature-flags',
+        'icon' => 'flag',
+        'group' => 'platform',
+        'order' => 13,
+        'requiredPermission' => \Whity\Core\RBAC\CorePermissions::SETTINGS_MANAGE,
         'systemTenantOnly' => true,
     ];
     $items[] = [
