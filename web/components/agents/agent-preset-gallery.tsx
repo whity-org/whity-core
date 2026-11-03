@@ -3,12 +3,12 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Avatar } from '@whity/ui/avatar';
 import { Button } from '@whity/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@whity/ui/dialog';
+import { Icon, type IconName } from '@whity/ui/icon';
 import { AreaError, LoadingRows } from '@whity/ui/page-states';
 import { useFormattingLocale, useTranslation } from '@whity/features/i18n';
-import { localized, refusal, type AgentPreset, type WorkspaceAgent } from '@/components/agents/workspace-agents';
+import { localized, refusal, toolsetLabel, type AgentPreset, type WorkspaceAgent } from '@/components/agents/workspace-agents';
 import { useFetch } from '@/hooks/useFetch';
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/lib/toast-context';
@@ -16,9 +16,9 @@ import { useToast } from '@/lib/toast-context';
 /**
  * New agent (AI.2, TplAgentPresets): a gallery of ready agents with Start from
  * blank last. A new agent from a preset starts with every action on Ask first
- * (the server's rule). How many workspaces use a preset, three things it does
- * and what it needs are not returned by `/api/agent-presets`, so the cards
- * show the name and its job only (S6).
+ * (the server's rule). Each card says what it's for, what it does and what it
+ * needs. How many workspaces use a preset is left out: that is data about other
+ * workspaces, so the card counts this workspace's own agents.
  */
 export function AgentPresetGallery({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const t = useTranslation('admin');
@@ -72,10 +72,31 @@ export function AgentPresetGallery({ open, onOpenChange }: { open: boolean; onOp
             {(presets.data ?? []).map((preset) => (
               <li key={preset.key} className="flex flex-col gap-3 rounded-card border border-border bg-card p-4">
                 <div className="flex items-center gap-3">
-                  <Avatar kind="agent" name={localized(preset.name, preset.nameAr, arabic)} size={40} />
-                  <span className="font-semibold">{localized(preset.name, preset.nameAr, arabic)}</span>
+                  <span aria-hidden="true" className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary-tint text-primary-tint-foreground">
+                    <Icon name={(preset.icon ?? 'robot') as IconName} size={20} />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block font-semibold">{localized(preset.name, preset.nameAr, arabic)}</span>
+                    {preset.agentsFromIt > 0 && (
+                      <span className="block text-sm text-muted-foreground">
+                        {t('agents.new.fromIt', 'You have {n} from this', { n: preset.agentsFromIt })}
+                      </span>
+                    )}
+                  </span>
                 </div>
-                <p className="flex-1 text-sm text-muted-foreground">{localized(preset.role, preset.roleAr, arabic)}</p>
+                <p className="text-sm text-muted-foreground">{localized(preset.role, preset.roleAr, arabic)}</p>
+                {preset.does.length > 0 && (
+                  <ul className="flex-1 list-disc space-y-1 ps-5 text-sm">
+                    {(arabic && preset.doesAr.length > 0 ? preset.doesAr : preset.does).map((thing) => (
+                      <li key={thing}>{thing}</li>
+                    ))}
+                  </ul>
+                )}
+                <p className="text-sm text-muted-foreground">
+                  {preset.needs === null
+                    ? t('agents.new.alone', 'Works with Whity alone')
+                    : t('agents.new.needs', 'Needs {name}', { name: toolsetLabel(preset.needs) })}
+                </p>
                 <Button variant="outline" disabled={busy !== null} loading={busy === preset.key} onClick={() => void use(preset)}>
                   {t('agents.new.usePreset', 'Use this agent')}
                 </Button>

@@ -411,6 +411,34 @@ final class AgentPauseAndActivityRealEngineTest extends TestCase
         self::assertSame([['id' => 5, 'title' => 'Reference 5', 'kind' => 'wiki']], $mine['mayRead'], 'and a member sees only what they can read');
     }
 
+    public function testADocumentAnEditorCantReadStaysWhenTheyEditTheRest(): void
+    {
+        $this->readable = [self::RANA => [5, 6], self::OMAR => [5, 7]];
+        $this->agents->update($this->clerk, self::BAKERY, ['may_read' => [5, 6]], self::RANA);
+
+        // Omar can't read 6, and sends back what the page sent him.
+        $this->ok($this->admin->update($this->as(self::OMAR, '{"mayRead":[5,6],"role":"Prepares invoices"}', 'PATCH'), ['id' => (string) $this->clerk]));
+        self::assertSame([5, 6], $this->agents->find($this->clerk, self::BAKERY)['may_read'] ?? null);
+
+        // He can add what he can read, and remove what he can't.
+        $this->ok($this->admin->update($this->as(self::OMAR, '{"mayRead":[5,7]}', 'PATCH'), ['id' => (string) $this->clerk]));
+        self::assertSame([5, 7], $this->agents->find($this->clerk, self::BAKERY)['may_read'] ?? null);
+
+        // But once removed, he can't put it back.
+        self::assertSame(422, $this->admin->update($this->as(self::OMAR, '{"mayRead":[5,6,7]}', 'PATCH'), ['id' => (string) $this->clerk])->getStatusCode());
+    }
+
+    public function testTheAreasAreNamedInBothLanguages(): void
+    {
+        $areas = [];
+        foreach ($this->list($this->mine->toolsets($this->as(self::RANA, '', 'GET'))) as $area) {
+            $areas[$area['id']] = $area;
+        }
+
+        self::assertSame('People and roles', $areas['core.people']['title']);
+        self::assertSame('الأشخاص والأدوار', $areas['core.people']['titleAr']);
+    }
+
     // ── Presets ─────────────────────────────────────────────────────────────
 
     public function testPresetsSayWhatTheyDoAndCountOnlyThisWorkspace(): void
