@@ -469,6 +469,7 @@ final class DocumentRouterRealEngineTest extends TestCase
             [
                 '__construct',
                 'append',
+            'appendWithdrawal',
                 'countForDocument',
                 'findById',
                 'listForDocument',

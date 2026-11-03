@@ -208,6 +208,13 @@ final class DocumentQrService
             return null;
         }
 
+        // Every path that prints a code ends here, including a queued render that
+        // was already running when the document was withdrawn. A new code on a
+        // withdrawn document would be the one thing the withdrawal ruled out.
+        if ($this->isWithdrawn($tenantId, $documentId)) {
+            return null;
+        }
+
         $ownTransaction = !$this->db->inTransaction();
         if ($ownTransaction) {
             $this->db->beginTransaction();
@@ -237,6 +244,18 @@ final class DocumentQrService
         }
 
         return $this->tokens->findActiveForDocument($tenantId, $documentId);
+    }
+
+    private function isWithdrawn(int $tenantId, int $documentId): bool
+    {
+        $stmt = $this->db->prepare(
+            'SELECT withdrawn_at FROM documents WHERE id = :id AND tenant_id = :tenant_id'
+        );
+        $stmt->execute([':id' => $documentId, ':tenant_id' => $tenantId]);
+
+        $withdrawnAt = $stmt->fetchColumn();
+
+        return $withdrawnAt !== false && $withdrawnAt !== null;
     }
 
     /**

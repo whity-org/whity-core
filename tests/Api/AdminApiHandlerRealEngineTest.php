@@ -15,20 +15,17 @@ use Whity\Database\Database;
 /**
  * Real-engine (in-memory SQLite) tests for {@see AdminApiHandler::stats()} (WC-50).
  *
- * Before this fix every aggregate was an unfiltered global COUNT, so any tenant's
- * admin saw platform-wide totals: every tenant's user count, the total number of
- * tenants, all roles, and the global growth timelines. These tests drive the
- * handler against a genuine SQL engine seeded with two tenants' data and assert:
+ * These tests drive the handler against a genuine SQL engine seeded with two
+ * tenants' data and assert:
  *
- *  - a regular tenant's admin sees ONLY its own figures (tenants fixed at 1, its
- *    own user count, only the roles it can see), and
- *  - the system user (tenant 0) still sees the platform-wide totals.
+ *  - a workspace is refused, however its role is named (H.3, WHIT-872), and
+ *  - the system user (tenant 0) sees the platform-wide totals.
  *
  * The handler issues a few PostgreSQL-only statements for the database-health and
  * growth sections (`NOW()`, `pg_size_pretty(...)`, `SHOW server_version`). A thin
  * PDO subclass rewrites the two health statements to SQLite equivalents and a
  * `NOW()` UDF is registered, so the whole `stats()` body runs unmodified end to
- * end against the real engine — the tenant-scoping branch is what is under test.
+ * end against the real engine.
  */
 final class AdminApiHandlerRealEngineTest extends TestCase
 {
@@ -45,45 +42,19 @@ final class AdminApiHandlerRealEngineTest extends TestCase
     }
 
     /**
-     * A regular tenant's admin sees ONLY its own tenant's figures: the tenant
-     * total is fixed at 1, the user count is scoped to its tenant, and the global
-     * platform totals are never disclosed. This FAILS on pre-fix main, where the
-     * counts are unfiltered platform-wide aggregates.
+     * Server statistics are for the system tenant's operators (H.3, WHIT-872). The
+     * seeded `admin` is one global role, so a workspace owner holds `stats:read`
+     * too: the tenant is what refuses them, and nothing of theirs comes back.
      */
-    public function testRegularTenantSeesOnlyOwnScopedCounts(): void
+    public function testAWorkspaceIsRefused(): void
     {
-        // Tenant 1: 2 users. Tenant 2: 3 users. Platform total = 5 users, 2 tenants.
         $this->seedUser(1, 1, 1);
-        $this->seedUser(2, 1, 1);
-        $this->seedUser(3, 2, 1);
-        $this->seedUser(4, 2, 1);
-        $this->seedUser(5, 2, 1);
 
         MockRequestFactory::setTestTenant(1);
-        $stats = $this->stats();
+        $response = $this->respond();
 
-        $this->assertSame(1, $stats['totals']['tenants'], 'A regular tenant must only ever see itself (1).');
-        $this->assertSame(2, $stats['totals']['users'], "Only the tenant's own users are counted.");
-        $this->assertNotSame(5, $stats['totals']['users'], 'The platform-wide user count must not leak.');
-    }
-
-    /**
-     * Roles are scoped to the tenant's own plus globals (NULL tenant_id), per the
-     * WC-110 visibility model — never another tenant's private roles.
-     */
-    public function testRegularTenantRoleCountExcludesForeignRoles(): void
-    {
-        MockRequestFactory::setTestTenant(1);
-        $stats = $this->stats();
-
-        // Visible to tenant 1: global 'admin' (id 1) + own 'tenant-a-role' (id 100) = 2.
-        // Tenant 2's private 'tenant-b-role' (id 200) is excluded.
-        $this->assertSame(2, $stats['totals']['roles']);
-
-        $roleNames = array_column($stats['breakdown']['users_per_role'], 'name');
-        $this->assertContains('admin', $roleNames);
-        $this->assertContains('tenant-a-role', $roleNames);
-        $this->assertNotContains('tenant-b-role', $roleNames, "Another tenant's role must not appear.");
+        $this->assertSame(403, $response->getStatusCode());
+        $this->assertArrayNotHasKey('stats', json_decode($response->getBody(), true));
     }
 
     /**
@@ -107,18 +78,16 @@ final class AdminApiHandlerRealEngineTest extends TestCase
     }
 
     /**
-     * A null/unresolved tenant context is treated as a regular (non-system) caller
-     * and must not fall through to the global counts.
+     * A null/unresolved tenant context is not the system tenant, so it is refused
+     * rather than falling through to the global counts.
      */
-    public function testUnresolvedContextDoesNotLeakGlobalTotals(): void
+    public function testUnresolvedContextIsRefused(): void
     {
         $this->seedUser(1, 1, 1);
-        $this->seedUser(2, 2, 1);
 
         TenantContext::reset();
-        $stats = $this->stats();
 
-        $this->assertSame(1, $stats['totals']['tenants'], 'An unresolved context must not expose the tenant count.');
+        $this->assertSame(403, $this->respond()->getStatusCode());
     }
 
     // ==================== Helpers ====================
@@ -130,15 +99,19 @@ final class AdminApiHandlerRealEngineTest extends TestCase
      */
     private function stats(): array
     {
-        $pdo = $this->pdo;
-        $database = Database::withFactory(static fn (): PDO => $pdo);
-
-        $handler = new AdminApiHandler($database, sys_get_temp_dir());
-        $response = $handler->stats(new Request('GET', '/api/admin/stats', []));
+        $response = $this->respond();
 
         $this->assertSame(200, $response->getStatusCode(), $response->getBody());
 
         return json_decode($response->getBody(), true)['stats'];
+    }
+
+    private function respond(): \Whity\Core\Response
+    {
+        $pdo = $this->pdo;
+        $database = Database::withFactory(static fn (): PDO => $pdo);
+
+        return (new AdminApiHandler($database, sys_get_temp_dir()))->stats(new Request('GET', '/api/admin/stats', []));
     }
 
     private function seedUser(int $id, int $tenantId, int $roleId): void
