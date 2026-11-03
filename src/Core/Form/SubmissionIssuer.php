@@ -218,6 +218,14 @@ final class SubmissionIssuer
                 $this->referenceFor($tenantId, $form),
             );
 
+            // In this transaction, so the answers are either a draft or a submission,
+            // and a refused submission leaves the person's draft alone.
+            if ($actorProfileId !== null) {
+                $this->db->prepare(
+                    'DELETE FROM form_drafts WHERE tenant_id = :tenant_id AND form_id = :form_id AND profile_id = :profile_id'
+                )->execute([':tenant_id' => $tenantId, ':form_id' => $formId, ':profile_id' => $actorProfileId]);
+            }
+
             // Attachments BEFORE the route: an artifact that could not be
             // claimed must stop the submission, and stopping it before anybody
             // has been sent an inbox entry is the difference between "nothing

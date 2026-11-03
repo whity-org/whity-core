@@ -25778,6 +25778,77 @@
                 }
             }
         },
+        "/api/v1/me/form-drafts": {
+            "get": {
+                "operationId": "get_api_v1_me_form_drafts",
+                "summary": "The caller's unsent answers, on forms still open to them",
+                "tags": [
+                    "forms"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The drafts",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/FormDraftListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/me/form-submissions": {
             "get": {
                 "operationId": "get_api_v1_me_form_submissions",
@@ -25930,6 +26001,271 @@
                     },
                     "405": {
                         "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/me/forms/{id}/draft": {
+            "delete": {
+                "operationId": "delete_api_v1_me_forms_id_draft",
+                "summary": "Throw away the caller's draft",
+                "tags": [
+                    "forms"
+                ],
+                "description": "Idempotent, and works on a form that has since closed.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Deleted"
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "get": {
+                "operationId": "get_api_v1_me_forms_id_draft",
+                "summary": "The caller's draft of a form, or null",
+                "tags": [
+                    "forms"
+                ],
+                "description": "Nobody else can read a draft. The same 404 for a form that does not exist, is not open, or that the caller may not fill in.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The draft, or null",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/FormDraftResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not available to this caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "put": {
+                "operationId": "put_api_v1_me_forms_id_draft",
+                "summary": "Save the caller's unsent answers",
+                "tags": [
+                    "forms"
+                ],
+                "description": "Not validated, because half-finished answers are what a draft is. Staff questions, file answers and unknown keys are dropped. Sending the form deletes the draft.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/FormDraftSaveRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The saved draft",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/FormDraftResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not available to this caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Malformed, or larger than 256 KB",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -54346,6 +54682,103 @@
                                 }
                             }
                         ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "FormDraft": {
+                "type": "object",
+                "properties": {
+                    "form_id": {
+                        "type": "integer"
+                    },
+                    "data": {
+                        "type": "object",
+                        "additionalProperties": true
+                    },
+                    "step": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "updated_at": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "form_id",
+                    "data",
+                    "updated_at"
+                ]
+            },
+            "FormDraftListResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "form_id": {
+                                    "type": "integer"
+                                },
+                                "form_name": {
+                                    "type": "object",
+                                    "x-whity-localized-text": true,
+                                    "properties": {
+                                        "ar": {
+                                            "type": "string"
+                                        },
+                                        "en": {
+                                            "type": "string"
+                                        }
+                                    }
+                                },
+                                "step": {
+                                    "type": "integer",
+                                    "nullable": true
+                                },
+                                "updated_at": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "form_id",
+                                "form_name",
+                                "updated_at"
+                            ]
+                        }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "FormDraftResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/FormDraft",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "FormDraftSaveRequest": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "additionalProperties": true,
+                        "description": "The answers so far, keyed by field key."
+                    },
+                    "step": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "Which step the person is on."
                     }
                 },
                 "required": [
