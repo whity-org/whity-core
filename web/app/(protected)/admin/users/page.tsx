@@ -37,7 +37,6 @@ import { useTranslation } from '@whity/features/i18n';
 import { useDateDisplay } from '@whity/features/datetime';
 import { CreateUserModal } from './create-modal';
 import { DeleteUserModal } from './delete-modal';
-import { BulkRoleDialog } from './bulk-role-dialog';
 import { InvitationsPanel } from './invitations-panel';
 import { MembershipsModal } from './memberships-modal';
 
@@ -81,7 +80,8 @@ export default function UsersPage() {
   const [twoStepFilter, setTwoStepFilter] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState('active');
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [isBulkRoleOpen, setIsBulkRoleOpen] = useState(false);
+  // The role chosen in the bulk bar, waiting on the confirmation that names it.
+  const [bulkRole, setBulkRole] = useState<{ id: number; name: string } | null>(null);
   const [isBulkTwoStepOpen, setIsBulkTwoStepOpen] = useState(false);
 
   /**
@@ -521,9 +521,20 @@ export default function UsersPage() {
                       actions: (
                         <>
                           {canEdit && (roleOptions.data?.length ?? 0) > 0 && (
-                            <Button variant="outline" size="sm" data-testid="users-bulk-role" onClick={() => setIsBulkRoleOpen(true)}>
-                              {t('users.bulk.role', 'Change role')}
-                            </Button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="outline" size="sm" data-testid="users-bulk-role">
+                                  {t('users.bulk.role', 'Change role')}
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="max-h-80 overflow-y-auto">
+                                {(roleOptions.data ?? []).map((role) => (
+                                  <DropdownMenuItem key={role.id} onClick={() => setBulkRole(role)}>
+                                    {roleLabel(role.name)}
+                                  </DropdownMenuItem>
+                                ))}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           )}
                           {canRequireTwoStep && (
                             <Button variant="outline" size="sm" data-testid="users-bulk-two-step" onClick={() => setIsBulkTwoStepOpen(true)}>
@@ -561,7 +572,7 @@ export default function UsersPage() {
                       ),
                     }
               }
-              globalFilterPlaceholder={t('users.searchPlaceholder', 'Search by name or email')}
+              globalFilterPlaceholder={t('users.searchByName', 'Search by name or email')}
               sorting={query.sorting}
               search={query.search}
               pagination={query.pagination({
@@ -587,19 +598,33 @@ export default function UsersPage() {
         }}
       />
 
-      <BulkRoleDialog
-        open={isBulkRoleOpen}
-        onOpenChange={setIsBulkRoleOpen}
-        count={targets.length}
-        roles={roleOptions.data ?? []}
-        onConfirm={handleBulkRole}
+      {/* Hard to undo in one step, so it asks and says how many it reaches (tier 2). */}
+      <ConfirmAction
+        open={bulkRole !== null}
+        onOpenChange={(open) => {
+          if (!open) setBulkRole(null);
+        }}
+        variant="default"
+        title={t('users.bulk.role.ask', 'Change the {count} selected to {role}?', {
+          count: targets.length,
+          role: roleLabel(bulkRole?.name ?? ''),
+        })}
+        description={t(
+          'users.bulk.role.description',
+          'They lose what their current role gives them straight away. If any of them cannot be changed, nobody is.'
+        )}
+        confirmLabel={t('users.bulk.role.confirm', 'Change role')}
+        cancelLabel={t('users.bulk.cancel', 'Cancel')}
+        onConfirm={() => {
+          if (bulkRole !== null) return handleBulkRole(bulkRole.id);
+        }}
       />
 
       <ConfirmAction
         open={isBulkTwoStepOpen}
         onOpenChange={setIsBulkTwoStepOpen}
         variant="default"
-        title={t('users.bulk.twoStep.title', 'Require two-step of {count} people?', { count: targets.length })}
+        title={t('users.bulk.twoStep.title', 'Require two-step of the {count} selected?', { count: targets.length })}
         description={t(
           'users.bulk.twoStep.description',
           'Anyone without it has to set it up the next time they sign in. They stay signed in until then.'

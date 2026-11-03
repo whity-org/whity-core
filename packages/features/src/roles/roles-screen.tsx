@@ -31,7 +31,7 @@
  *   roles.searchPlaceholder = Search roles…
  *   roles.table.description = Description
  *   roles.table.name = Name
- *   roles.table.permissionCount = Permissions
+ *   roles.table.permissions = Permissions
  *   roles.title = Roles
  * @i18n-keys common
  *   ui.pagination.entries = {count} entries
@@ -284,7 +284,7 @@ export function RolesScreen({
       // than a column. A header wired to a key the server does not know would
       // click and reorder nothing.
       accessorKey: 'permissionCount',
-      header: t('roles.table.permissionCount', 'Permissions'),
+      header: t('roles.table.permissions', 'Permissions'),
       enableSorting: false,
       cell: (role) =>
         catalogueSize !== null

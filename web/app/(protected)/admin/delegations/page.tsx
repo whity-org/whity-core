@@ -224,7 +224,7 @@ export default function DelegationsPage() {
       addToast(error?.error ?? t('delegations.revoke.error', 'Failed to revoke delegation'), 'error');
       return;
     }
-    addToast(t('delegations.revoke.success', 'Delegation revoked. They lost this access straight away.'), 'success', 10000, {
+    addToast(t('delegations.revoked', 'Delegation revoked. They lost this access straight away.'), 'success', 10000, {
       label: t('delegations.undo', 'Undo'),
       onClick: () => void handleUndo(delegation),
     });

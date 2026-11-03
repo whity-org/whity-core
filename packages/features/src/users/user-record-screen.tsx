@@ -31,7 +31,7 @@
  *   users.record.memberships.empty = This person belongs to no workspace.
  *   users.record.memberships.error = Failed to load this person's workspaces and roles
  *   users.record.memberships.primary = Primary
- *   users.record.name.hint = The name people see for this person, in every workspace they belong to.
+ *   users.record.name.shared = The name people see for this person, in every workspace they belong to.
  *   users.record.changed.name = name
  *   users.record.fact.lastActive = Active {date}
  *   users.record.fact.neverActive = Not active yet
@@ -674,7 +674,7 @@ export function UserRecordScreen({
           onChange={(event) => setDraft({ ...form, displayName: event.target.value })}
         />
         <p className="text-sm text-muted-foreground">
-          {t('users.record.name.hint', 'The name people see for this person, in every workspace they belong to.')}
+          {t('users.record.name.shared', 'The name people see for this person, in every workspace they belong to.')}
         </p>
       </ChangedField>
     </>

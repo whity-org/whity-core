@@ -183,7 +183,9 @@ function OuTreeItem({
           )}
           <span className="truncate font-medium">{node.name}</span>
           <span className="shrink-0 text-xs text-muted-foreground" data-testid={`ou-member-count-${node.id}`}>
-            {t('ous.tree.memberCount', '{count} people', { count: node.member_count ?? 0 })}
+            {node.member_count === 1
+              ? t('ous.tree.memberCount.one', '1 person')
+              : t('ous.tree.memberCount', '{count} people', { count: node.member_count ?? 0 })}
           </span>
         </button>
 

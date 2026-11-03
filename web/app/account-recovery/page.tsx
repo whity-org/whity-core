@@ -164,7 +164,7 @@ function AccountRecoveryInner() {
           </CardTitle>
           <CardDescription>
             {status === 'confirming'
-              ? t('accountRecovery.subtitle.confirming', 'One more step to send your recovery request')
+              ? t('accountRecovery.subtitle.confirm', 'One more step to send your recovery request')
               : status === 'submitted'
                 ? t('accountRecovery.subtitle.submitted', 'Your request has been submitted')
                 : t(
