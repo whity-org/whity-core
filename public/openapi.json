@@ -26545,6 +26545,154 @@
                 }
             }
         },
+        "/api/v1/me/recent-documents": {
+            "get": {
+                "operationId": "get_api_v1_me_recent_documents",
+                "summary": "The caller's drafts and the documents they sent this week, newest first, at most five",
+                "tags": [
+                    "home"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The rows",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RecentDocumentListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/me/setup-steps": {
+            "get": {
+                "operationId": "get_api_v1_me_setup_steps",
+                "summary": "What still blocks real work in this workspace: branding, team, an agent, the tax number and a plan",
+                "tags": [
+                    "home"
+                ],
+                "description": "A step that does not apply is left out, such as a plan on an install with no plans. The system tenant has none.",
+                "responses": {
+                    "200": {
+                        "description": "The steps and how many are done",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SetupStepsResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/me/waiting": {
             "get": {
                 "operationId": "get_api_v1_me_waiting",
@@ -59649,6 +59797,61 @@
                     "data"
                 ]
             },
+            "RecentDocument": {
+                "type": "object",
+                "properties": {
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "document",
+                            "draft"
+                        ]
+                    },
+                    "id": {
+                        "type": "integer"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "with",
+                            "issued",
+                            "draft"
+                        ]
+                    },
+                    "waitingWith": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "at": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "kind",
+                    "id",
+                    "title",
+                    "status",
+                    "waitingWith",
+                    "at"
+                ]
+            },
+            "RecentDocumentListResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/RecentDocument"
+                        }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
             "RecordSectionDenial": {
                 "type": "object",
                 "properties": {
@@ -61218,6 +61421,55 @@
                 "properties": {
                     "data": {
                         "$ref": "#/components/schemas/SettingsValueMap"
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "SetupStepsResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "steps": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "key": {
+                                            "type": "string",
+                                            "enum": [
+                                                "branding",
+                                                "team",
+                                                "agent",
+                                                "tax",
+                                                "plan"
+                                            ]
+                                        },
+                                        "done": {
+                                            "type": "boolean"
+                                        }
+                                    },
+                                    "required": [
+                                        "key",
+                                        "done"
+                                    ]
+                                }
+                            },
+                            "done": {
+                                "type": "integer"
+                            },
+                            "total": {
+                                "type": "integer"
+                            }
+                        },
+                        "required": [
+                            "steps",
+                            "done",
+                            "total"
+                        ]
                     }
                 },
                 "required": [
