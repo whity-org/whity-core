@@ -1472,7 +1472,7 @@
         "plugins.header.upload": "Upload plugin",
         "plugins.loading": "Loading plugins",
         "plugins.operator.menu": "Operator tools",
-        "plugins.readOnly": "Plugins run for every workspace on this deployment, so the platform operator manages them.",
+        "plugins.readOnly": "Code plugins run for every workspace on this deployment, so the platform operator manages them.",
         "plugins.removed.purgeFailed": "Its data could not be removed. Whity will keep trying.",
         "plugins.removed.reinstall": "Reinstall",
         "plugins.removed.someone": "someone",

@@ -617,7 +617,7 @@ export default function PluginsPage() {
       <PluginsTabs />
 
       {data && !isOperator ? (
-        <ReadOnlyNotice title={t('plugins.readOnly', 'Plugins run for every workspace on this deployment, so the platform operator manages them.')} />
+        <ReadOnlyNotice title={t('plugins.readOnly', 'Code plugins run for every workspace on this deployment, so the platform operator manages them.')} />
       ) : null}
 
       {isOperator && hasPermission(PLUGINS_INSTALL)

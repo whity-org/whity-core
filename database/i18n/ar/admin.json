@@ -1385,7 +1385,7 @@
         "plugins.header.upload": "رفع إضافة",
         "plugins.loading": "جارٍ تحميل الإضافات",
         "plugins.operator.menu": "أدوات المشغّل",
-        "plugins.readOnly": "تعمل الإضافات لكل مساحات العمل في هذا النشر، لذا يديرها مشغّل المنصة.",
+        "plugins.readOnly": "تعمل الإضافات البرمجية لكل مساحات العمل في هذا النشر، لذا يديرها مشغّل المنصة.",
         "plugins.removed.purgeFailed": "تعذرت إزالة بياناتها. ستواصل Whity المحاولة.",
         "plugins.removed.reinstall": "إعادة التثبيت",
         "plugins.removed.someone": "شخص ما",
