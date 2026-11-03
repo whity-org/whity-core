@@ -1,0 +1,1 @@
+- Only the system tenant can install, upload, turn on or off, remove or reload plugins. A plugin runs for every workspace on the deployment, and a workspace administrator could previously upload and run one. Workspaces still see the list, without the deployment's errors and file names.

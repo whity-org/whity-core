@@ -32,6 +32,8 @@ final class InstallFromStoreApiHandlerTest extends TestCase
 
     protected function setUp(): void
     {
+        \Whity\Core\Tenant\TenantContext::reset();
+        \Whity\Core\Tenant\TenantContext::setTenantId(0);
         $this->pluginDir = sys_get_temp_dir() . '/whity_ifs_plugins_' . uniqid();
         $this->workDir = sys_get_temp_dir() . '/whity_ifs_work_' . uniqid();
         mkdir($this->pluginDir, 0775, true);
@@ -40,6 +42,7 @@ final class InstallFromStoreApiHandlerTest extends TestCase
 
     protected function tearDown(): void
     {
+        \Whity\Core\Tenant\TenantContext::reset();
         $this->removeRecursive($this->pluginDir);
         $this->removeRecursive($this->workDir);
     }
