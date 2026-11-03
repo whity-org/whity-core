@@ -4001,6 +4001,17 @@ $memberFormsHandler = new \Whity\Api\MemberFormsApiHandler(
     $submissionIssuer,
     $formUploadsHandler
 );
+$formDraftsHandler = new \Whity\Api\FormDraftsApiHandler(
+    $db->getPdo(),
+    $formRepository,
+    $formFieldRepository,
+    new \Whity\Core\Form\FormDraftRepository($db->getPdo()),
+    $roleChecker
+);
+$router->register('GET', '/api/me/form-drafts', [$formDraftsHandler, 'list'], null);
+$router->register('GET', '/api/me/forms/{id:\d+}/draft', [$formDraftsHandler, 'show'], null);
+$router->register('PUT', '/api/me/forms/{id:\d+}/draft', [$formDraftsHandler, 'save'], null);
+$router->register('DELETE', '/api/me/forms/{id:\d+}/draft', [$formDraftsHandler, 'delete'], null);
 $router->register('GET', '/api/me/forms', [$memberFormsHandler, 'list'], null);
 $router->register('GET', '/api/me/forms/{id:\d+}/render', [$memberFormsHandler, 'render'], null);
 $router->register('POST', '/api/me/forms/{id:\d+}/uploads', [$memberFormsHandler, 'upload'], null);
@@ -4965,6 +4976,11 @@ $router->register('GET', '/api/me/waiting', [$meWaitingHandler, 'list'], null);
 // what the caller holds the permission for, and each card's data is its own route.
 $homeCardsHandler = new \Whity\Api\HomeCardsApiHandler($db->getPdo(), $roleChecker, $pluginLoader, $tenantManifestHost, $tenantRecordRepository, $router);
 $router->register('GET', '/api/me/home-cards', [$homeCardsHandler, 'list'], null);
+// WHIT-872: Your recent documents (the caller's own rows, so no permission) and
+// Finish setting up (for people who can change the workspace).
+$meHomeHandler = new \Whity\Api\MeHomeApiHandler($db->getPdo());
+$router->register('GET', '/api/me/recent-documents', [$meHomeHandler, 'recentDocuments'], null);
+$router->register('GET', '/api/me/setup-steps', [$meHomeHandler, 'setupSteps'], null, null, CorePermissions::SETTINGS_WRITE);
 $router->register('PUT', '/api/me/home-cards/{key:[A-Za-z][A-Za-z0-9_]*}/hidden', [$homeCardsHandler, 'setHidden'], null);
 // WHIT-815: workspace agents (persona, toolsets, starting grant) and the
 // presets they start from. Gated on agents:manage, which migration 180 grants

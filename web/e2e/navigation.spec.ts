@@ -104,7 +104,7 @@ test.describe('Sidebar navigation (admin)', () => {
     await adminPage.shell.clickNav('Dashboard');
     await page.waitForURL('**/dashboard');
     await expect(
-      page.getByRole('heading', { name: /^Good (morning|afternoon|evening)$/ })
+      page.getByRole('heading', { name: /^Good (morning|afternoon|evening)/ })
     ).toBeVisible();
   });
 
