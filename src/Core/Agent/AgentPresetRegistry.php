@@ -21,6 +21,11 @@ use Whity\Sdk\Manifest\PluginManifest;
  * manifests, so one workspace's presets never reach another. Both are keyed
  * `<plugin toolset root>.<key>`. A plugin that is off contributes none.
  *
+ * WHIT-867: a preset also says what it does, for the gallery: three short things
+ * in each language, an icon, and what it needs. Core's are in their files and
+ * all work with Whity alone. A plugin's need that plugin and, until the SDK
+ * carries them, say nothing more than the role.
+ *
  * A preset is never live: creating an agent from one copies it into the
  * workspace's `agents` table, so a new preset version never changes an agent
  * behind the workspace's back.
@@ -40,6 +45,9 @@ use Whity\Sdk\Manifest\PluginManifest;
 final class AgentPresetRegistry implements HostWiredService
 {
     public const CORE_PREFIX = 'core.';
+
+    private const THINGS_IT_DOES = 3;
+    private const THING_MAX      = 120;
 
     /** @var array<string, array<string, mixed>> key => preset */
     private array $presets = [];
@@ -227,6 +235,10 @@ final class AgentPresetRegistry implements HostWiredService
             'language'        => $fields['language'] ?? 'auto',
             'toolsets'        => $fields['toolsets'] ?? [],
             'grant'           => $fields['grant'] ?? [],
+            'does'            => [],
+            'does_ar'         => [],
+            'icon'            => null,
+            'needs'           => $root,
         ], []];
     }
 
@@ -254,6 +266,16 @@ final class AgentPresetRegistry implements HostWiredService
                 $errors[] = "{$required} is required for a core preset";
             }
         }
+        foreach (['does', 'does_ar'] as $list) {
+            $things = $raw[$list] ?? null;
+            if (!is_array($things) || !array_is_list($things) || count($things) !== self::THINGS_IT_DOES
+                || array_filter($things, static fn (mixed $t): bool => !is_string($t) || trim($t) === '' || mb_strlen($t) > self::THING_MAX) !== []) {
+                $errors[] = "{$list} must be " . self::THINGS_IT_DOES . ' short sentences of at most ' . self::THING_MAX . ' characters';
+            }
+        }
+        if (!is_string($raw['icon'] ?? null) || $raw['icon'] === '') {
+            $errors[] = 'icon is required for a core preset';
+        }
         if ($errors !== []) {
             throw new \LogicException("Agent preset {$name}: " . implode('; ', $errors));
         }
@@ -272,6 +294,10 @@ final class AgentPresetRegistry implements HostWiredService
             'language'        => $fields['language'] ?? 'auto',
             'toolsets'        => $fields['toolsets'] ?? [],
             'grant'           => $fields['grant'] ?? [],
+            'does'            => $raw['does'],
+            'does_ar'         => $raw['does_ar'],
+            'icon'            => $raw['icon'],
+            'needs'           => null,
         ];
     }
 }
