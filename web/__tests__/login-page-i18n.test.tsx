@@ -33,7 +33,7 @@ const ARABIC_AUTH = {
   'login.email.label': 'البريد الإلكتروني',
   'login.email.placeholder': 'أدخل بريدك الإلكتروني',
   'login.password.label': 'كلمة المرور',
-  'login.welcome': 'مرحباً بك في {site}',
+  'login.welcome': 'تسجيل الدخول إلى {site}',
 };
 
 function mockApi(bundle: Record<string, string>, language: string) {
@@ -97,7 +97,7 @@ describe('sign-in screen translations', () => {
     // The whole sentence is one translatable unit with a {site} hole in it, so
     // the site name lands wherever Arabic word order puts it.
     await waitFor(() => {
-      expect(screen.getByText(/مرحباً بك في/)).toBeInTheDocument();
+      expect(screen.getByText(/تسجيل الدخول إلى/)).toBeInTheDocument();
     });
   });
 
