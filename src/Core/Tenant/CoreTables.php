@@ -93,6 +93,8 @@ final class CoreTables
         'plugin_installs' => '205_create_plugin_installs.php',
         'plugin_records' => '168_create_plugin_records.php',
         'plugin_removals' => '204_create_plugin_removals.php',
+        'plugin_version_marks' => '212_create_plugin_version_marks.php',
+        'plugin_revocation_state' => '213_create_plugin_revocation_state.php',
         'agent_proposals' => '176_create_agent_proposals.php',
         'plugin_secrets' => '187_create_plugin_secrets.php',
         'agents' => '180_create_agents.php',

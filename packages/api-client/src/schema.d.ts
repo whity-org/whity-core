@@ -12098,6 +12098,11 @@ export interface components {
             version_id: number;
             /** @description The live version */
             version: string;
+            /**
+             * @description Verified only with a mark from a signature checked against a key pinned in core
+             * @enum {string}
+             */
+            trust: "verified" | "unverified";
             /** @description Whether the plugin is switched on */
             enabled: boolean;
             /** @description Whether its automations are switched on */

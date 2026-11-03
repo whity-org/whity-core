@@ -66543,6 +66543,14 @@
                         "type": "string",
                         "description": "The live version"
                     },
+                    "trust": {
+                        "type": "string",
+                        "enum": [
+                            "verified",
+                            "unverified"
+                        ],
+                        "description": "Verified only with a mark from a signature checked against a key pinned in core"
+                    },
                     "enabled": {
                         "type": "boolean",
                         "description": "Whether the plugin is switched on"
@@ -66560,6 +66568,7 @@
                     "plugin",
                     "version_id",
                     "version",
+                    "trust",
                     "enabled",
                     "automations_enabled"
                 ]

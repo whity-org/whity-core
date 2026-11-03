@@ -271,6 +271,8 @@ final class PluginTrustRealEngineTest extends TestCase
     private function sign(string $format, array $body, ?string $secret = null, ?string $public = null): string
     {
         $payload = (string) json_encode(['format' => $body['format'] ?? $format] + $body);
+        /** @var non-empty-string $key */
+        $key = $secret ?? $this->secret;
 
         return (string) json_encode([
             'key' => $public ?? $this->public,

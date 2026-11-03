@@ -227,7 +227,7 @@ final class PluginTrust
         $key = $this->keys->match($decoded['key']);
         $payload = is_string($decoded['payload'] ?? null) ? base64_decode($decoded['payload'], true) : false;
         $signature = is_string($decoded['signature'] ?? null) ? base64_decode($decoded['signature'], true) : false;
-        if ($key === null || $payload === false || $signature === false || strlen($signature) !== SODIUM_CRYPTO_SIGN_BYTES) {
+        if ($key === null || $key === '' || $payload === false || $signature === false || strlen($signature) !== SODIUM_CRYPTO_SIGN_BYTES) {
             return null;
         }
         if (!sodium_crypto_sign_verify_detached($signature, $format . "\n" . $payload, $key)) {
@@ -301,8 +301,9 @@ final class PluginTrust
     /** @return array<string, mixed>|null */
     private function state(): ?array
     {
-        $stmt = $this->pdo->query('SELECT sequence, issued_at, expires_at, body FROM plugin_revocation_state WHERE id = 1');
-        $row = $stmt === false ? false : $stmt->fetch(PDO::FETCH_ASSOC);
+        $stmt = $this->pdo->prepare('SELECT sequence, issued_at, expires_at, body FROM plugin_revocation_state WHERE id = 1');
+        $stmt->execute();
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
         return $row === false ? null : $row;
     }

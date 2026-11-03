@@ -278,7 +278,7 @@ final class InstallFromStoreApiHandler
                 $attestation,
                 $published['plugin'],
                 $published['version'],
-                hash('sha256', $bytes),
+                hash('sha256', (string) $bytes),
                 $published['hash'],
                 $actor,
                 $tenantId
