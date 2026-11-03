@@ -2846,7 +2846,11 @@ export interface paths {
         get: operations["get_api_v1_forms_id"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete a form nobody has answered
+         * @description REFUSED (409) on a published form, and on any form with a submission: archive those instead, because a submission needs its form to say what it answered. `details.reason` says which.
+         */
+        delete: operations["delete_api_v1_forms_id"];
         options?: never;
         head?: never;
         /**
@@ -2947,6 +2951,26 @@ export interface paths {
          * @description Idempotent. Submissions already made are untouched.
          */
         delete: operations["delete_api_v1_forms_id_member_access"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/forms/{id}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * See a form as somebody filling it in would, whatever its state
+         * @description The render, for the author, so a draft can be checked before it is published. `accepts_submissions` is the real answer and `preview` is true. Nothing here can be submitted.
+         */
+        get: operations["get_api_v1_forms_id_preview"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -8804,6 +8828,7 @@ export interface components {
                 en?: string;
             } | null;
             reference_format?: string | null;
+            submission_count?: number;
             open_to_members?: boolean;
             members_opened_at?: string | null;
             members_opened_by_profile_id?: number | null;
@@ -9062,6 +9087,7 @@ export interface components {
         };
         FormSubmission: {
             id: number;
+            submitted_by_name?: string | null;
             reference?: string | null;
             tenant_id: number;
             form_id: number;
@@ -26816,6 +26842,80 @@ export interface operations {
             };
         };
     };
+    delete_api_v1_forms_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Form not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The form is published or has submissions */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     patch_api_v1_forms_id: {
         parameters: {
             query?: never;
@@ -27527,6 +27627,73 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FormResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Form not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_forms_id_preview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The form, drawn for the author */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormRenderResponse"];
                 };
             };
             /** @description Missing or invalid authentication */

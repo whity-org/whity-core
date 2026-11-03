@@ -19112,6 +19112,94 @@
             }
         },
         "/api/v1/forms/{id}": {
+            "delete": {
+                "operationId": "delete_api_v1_forms_id",
+                "summary": "Delete a form nobody has answered",
+                "tags": [
+                    "forms"
+                ],
+                "description": "REFUSED (409) on a published form, and on any form with a submission: archive those instead, because a submission needs its form to say what it answered. `details.reason` says which.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Deleted"
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Form not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The form is published or has submissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
             "get": {
                 "operationId": "get_api_v1_forms_id",
                 "summary": "Get one form, with its fields and its submission count",
@@ -20167,6 +20255,93 @@
                     },
                     "422": {
                         "description": "The form is not published, or asks what members cannot answer",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/forms/{id}/preview": {
+            "get": {
+                "operationId": "get_api_v1_forms_id_preview",
+                "summary": "See a form as somebody filling it in would, whatever its state",
+                "tags": [
+                    "forms"
+                ],
+                "description": "The render, for the author, so a draft can be checked before it is published. `accepts_submissions` is the real answer and `preview` is true. Nothing here can be submitted.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The form, drawn for the author",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/FormRenderResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Form not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -53664,6 +53839,9 @@
                         "type": "string",
                         "nullable": true
                     },
+                    "submission_count": {
+                        "type": "integer"
+                    },
                     "open_to_members": {
                         "type": "boolean"
                     },
@@ -54555,6 +54733,10 @@
                 "properties": {
                     "id": {
                         "type": "integer"
+                    },
+                    "submitted_by_name": {
+                        "type": "string",
+                        "nullable": true
                     },
                     "reference": {
                         "type": "string",
