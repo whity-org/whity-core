@@ -194,7 +194,7 @@ test.describe('Roles CRUD (admin)', () => {
 
   // Edit flow: open a role with no permissions, add one through the RECORD
   // PAGE's in-page permission grid, Save, and assert the new permission count is
-  // reflected in the table (the Permission Count cell) AND persisted
+  // reflected in the table (the Permissions cell) AND persisted
   // server-side. This covers the "edit/reassign permissions" + "count persists"
   // interaction (WC-99) from the editing side, complementing the create-side
   // guard above.
@@ -241,22 +241,23 @@ test.describe('Roles CRUD (admin)', () => {
     await page.getByRole('tab', { name: 'Access' }).click();
     const grid = page.getByTestId('perm-grid');
     await expect(grid).toBeVisible();
-    await expect(page.getByTestId('perm-grid-group-roles')).toBeVisible();
-    await expect(page.getByTestId('perm-grid-group-users')).toBeVisible();
+    await expect(page.getByTestId('perm-grid-area-roles')).toBeVisible();
+    await expect(page.getByTestId('perm-grid-area-users')).toBeVisible();
 
-    const rolesReadLabel = grid.locator('label[data-permission="roles:read"]');
-    await expect(rolesReadLabel).toBeVisible();
-    await rolesReadLabel.click();
-    await expect(page.getByTestId('perm-grid-summary')).toHaveText(/^1 of \d+ selected$/);
+    // See on Roles holds two permissions: seeing roles, and seeing what they grant.
+    const rolesSee = grid.getByRole('checkbox', { name: 'Roles: See' });
+    await expect(rolesSee).toBeVisible();
+    await rolesSee.click();
+    await expect(page.getByTestId('perm-grid-summary')).toHaveText(/^2 of \d+ allowed$/);
 
     await page.getByRole('button', { name: 'Save changes' }).click();
     await expect(page.getByText('Role updated successfully')).toBeVisible();
 
-    // Back to the list: the table's Permission Count cell for this row reads 1...
+    // Back to the list: the table's Permissions cell for this row counts them...
     await page.getByRole('button', { name: 'Back to roles' }).click();
     await page.waitForURL('**/admin/roles');
     const updatedRow = page.getByRole('row', { name: new RegExp(createdRoleName) });
-    await expect(updatedRow.getByRole('cell', { name: '1', exact: true })).toBeVisible();
+    await expect(updatedRow.getByRole('cell', { name: /^2 of \d+$/ })).toBeVisible();
 
     // ...and the assigned permission is persisted server-side.
     const id = await findRoleIdByName(adminApi, createdRoleName);

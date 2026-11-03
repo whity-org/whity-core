@@ -41,7 +41,7 @@ test.describe('Sidebar navigation (admin)', () => {
     await expect(page.getByRole('heading', { name: 'Roles' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Create Role' })).toBeVisible();
     await expect(page.getByRole('table')).toBeVisible();
-    await expect(page.getByRole('columnheader', { name: 'Permission Count' })).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: 'Permissions' })).toBeVisible();
   });
 
   test('Organizational Units section loads its page', async ({ adminPage, page }) => {

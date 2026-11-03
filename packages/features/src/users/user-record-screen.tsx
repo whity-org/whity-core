@@ -677,6 +677,7 @@ export function UserRecordScreen({
           {t('users.record.name.shared', 'The name people see for this person, in every workspace they belong to.')}
         </p>
       </ChangedField>
+      <StaticField label={t('users.record.twoStep.label', 'Two-step')} value={twoStepLabel} />
     </>
   );
 

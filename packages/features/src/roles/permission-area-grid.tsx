@@ -41,10 +41,12 @@
  *   permissions.group.documents = Documents
  *   permissions.group.people = People
  *   permissions.group.workspace = Workspace
+ *   roles.areaGrid.allowed = allowed
  *   roles.areaGrid.area = Area
  *   roles.areaGrid.more = Also in this area
  *   roles.areaGrid.none = No permissions are defined on this installation.
  *   roles.areaGrid.noMatch = No areas match “{query}”.
+ *   roles.areaGrid.notAllowed = not allowed
  *   roles.areaGrid.onlyAllowed = Only allowed
  *   roles.areaGrid.search = Search areas
  *   roles.areaGrid.summary = {selected} of {total} allowed
@@ -53,7 +55,7 @@
 import { useMemo, useState } from 'react';
 import { Input } from '@whity/ui/input';
 import { Switch } from '@whity/ui/switch';
-import { IconSearch } from '@tabler/icons-react';
+import { IconCheck, IconCircle, IconSearch } from '@tabler/icons-react';
 import { TechnicalDetails } from '@whity/ui/display-preferences';
 import { groupOf, titleCase } from './permission-groups';
 import type { Permission, RolesTranslate } from './types';
@@ -114,7 +116,8 @@ interface PermissionAreaGridProps {
  * and Approve. A cell can hold several permissions (the approvals area has three
  * kinds of Approve), and one permission can sit in two cells (`users:write` is what
  * both creating and changing need), so ticking a cell sets everything in it. Codes
- * appear only with Show technical details on (A.3).
+ * appear only with Show technical details on (A.3). Read-only is a state, not a
+ * disabled form: marks instead of inputs.
  */
 export function PermissionAreaGrid({
   permissions,
@@ -155,6 +158,21 @@ export function PermissionAreaGrid({
       </p>
     );
   }
+
+  /** A read-only cell: what the role holds, in a mark and in words for a screen reader. */
+  const mark = (label: string, held: boolean) => (
+    <span
+      role="img"
+      aria-label={`${label}: ${held ? t('roles.areaGrid.allowed', 'allowed') : t('roles.areaGrid.notAllowed', 'not allowed')}`}
+      className="inline-flex"
+    >
+      {held ? (
+        <IconCheck size={16} className="text-primary" aria-hidden="true" />
+      ) : (
+        <IconCircle size={16} className="text-muted-foreground/50" aria-hidden="true" />
+      )}
+    </span>
+  );
 
   const actionLabel = (action: Action): string =>
     t(`permissions.action.${action}`, action.charAt(0).toUpperCase() + action.slice(1));
@@ -227,18 +245,26 @@ export function PermissionAreaGrid({
                           <ul className="mt-2 space-y-1" aria-label={t('roles.areaGrid.more', 'Also in this area')}>
                             {area.other.map((permission) => (
                               <li key={permission.id} data-permission={permission.name}>
-                                <label className={`flex items-start gap-2 ${readOnly ? '' : 'cursor-pointer'}`}>
-                                  <input
-                                    type="checkbox"
-                                    checked={selected.has(permission.id)}
-                                    disabled={readOnly}
-                                    onChange={(event) => setAll([permission], event.target.checked)}
-                                    className="mt-0.5 size-4 rounded border-border text-primary"
-                                  />
-                                  <span className="min-w-0 text-muted-foreground">
-                                    {permission.description || permission.name}
+                                {readOnly ? (
+                                  <span className="flex items-start gap-2">
+                                    {mark(permission.description || permission.name, selected.has(permission.id))}
+                                    <span className="min-w-0 text-muted-foreground">
+                                      {permission.description || permission.name}
+                                    </span>
                                   </span>
-                                </label>
+                                ) : (
+                                  <label className="flex cursor-pointer items-start gap-2">
+                                    <input
+                                      type="checkbox"
+                                      checked={selected.has(permission.id)}
+                                      onChange={(event) => setAll([permission], event.target.checked)}
+                                      className="mt-0.5 size-4 rounded border-border text-primary"
+                                    />
+                                    <span className="min-w-0 text-muted-foreground">
+                                      {permission.description || permission.name}
+                                    </span>
+                                  </label>
+                                )}
                               </li>
                             ))}
                           </ul>
@@ -262,18 +288,21 @@ export function PermissionAreaGrid({
                         const all = held === cell.length;
                         return (
                           <td key={action} className="px-2 py-3 text-center align-top" data-permission={cell.map((p) => p.name).join(' ')}>
-                            <input
-                              type="checkbox"
-                              aria-label={`${area.label}: ${actionLabel(action)}`}
-                              title={cell.map((p) => p.description || p.name).join('; ')}
-                              checked={all}
-                              disabled={readOnly}
-                              ref={(element) => {
-                                if (element) element.indeterminate = held > 0 && !all;
-                              }}
-                              onChange={() => setAll(cell, !all)}
-                              className="size-4 rounded border-border text-primary"
-                            />
+                            {readOnly ? (
+                              mark(`${area.label}: ${actionLabel(action)}`, held > 0)
+                            ) : (
+                              <input
+                                type="checkbox"
+                                aria-label={`${area.label}: ${actionLabel(action)}`}
+                                title={cell.map((p) => p.description || p.name).join('; ')}
+                                checked={all}
+                                ref={(element) => {
+                                  if (element) element.indeterminate = held > 0 && !all;
+                                }}
+                                onChange={() => setAll(cell, !all)}
+                                className="size-4 rounded border-border text-primary"
+                              />
+                            )}
                           </td>
                         );
                       })}

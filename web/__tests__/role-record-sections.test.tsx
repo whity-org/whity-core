@@ -142,10 +142,9 @@ describe('the permissions region — hidden, read-only, editable', () => {
     );
 
     // The whole grid with the role's ticks, and nothing that can change them.
-    const usersSee = screen.getByRole('checkbox', { name: 'Users: See' });
-    expect(usersSee).toBeChecked();
-    expect(usersSee).toBeDisabled();
-    expect(screen.getByRole('checkbox', { name: 'Users: Change' })).not.toBeChecked();
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Users: See: allowed' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Users: Change: not allowed' })).toBeInTheDocument();
     expect(adapter.listPermissions).toHaveBeenCalled();
 
     // The details region is still editable beside it — that is the whole point.

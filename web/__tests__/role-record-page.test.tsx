@@ -465,12 +465,11 @@ describe('RoleRecordScreen — read-only is a state, not a disabled form', () =>
 
     await openTab('Access');
     await screen.findByTestId('perm-grid');
-    const usersSee = screen.getByRole('checkbox', { name: 'Users: See' });
-    expect(usersSee).toBeChecked();
-    expect(usersSee).toBeDisabled();
-    expect(screen.getByRole('checkbox', { name: 'Roles: See' })).toBeChecked();
-    expect(screen.getByRole('checkbox', { name: 'Users: Change' })).not.toBeChecked();
-    expect(screen.getByRole('checkbox', { name: 'Organisational units: See' })).not.toBeChecked();
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Users: See: allowed' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Roles: See: allowed' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Users: Change: not allowed' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Organisational units: See: not allowed' })).toBeInTheDocument();
   });
 });
 

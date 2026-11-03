@@ -33,8 +33,8 @@
  *   roles.record.name.label = Role name
  *   roles.record.name.placeholder = e.g., Editor
  *   roles.record.notManageable = This role can't be modified by your tenant — global base roles are managed by the system tenant.
- *   roles.record.permissions.subtitle = Grouped by the resource each permission acts on.
- *   roles.record.permissions.title = Permissions
+ *   roles.record.permissions.intro = Each person with this role can do what is ticked.
+ *   roles.record.permissions.heading = What this role can do
  *   roles.record.details.readOnly.permission = You don't have permission to change roles, so these details are read-only.
  *   roles.record.permissions.readOnly.permission = You may see what this role grants, but not change it.
  *   roles.record.readOnly.systemRole = This is a global base role. Only the system tenant can change it.
@@ -582,10 +582,10 @@ export function RoleRecordScreen({
 
   const permissionsSection: RecordSectionSpec = {
     key: 'permissions',
-    title: t('roles.record.permissions.title', 'Permissions'),
+    title: t('roles.record.permissions.heading', 'What this role can do'),
     description: t(
-      'roles.record.permissions.subtitle',
-      'Grouped by the resource each permission acts on.'
+      'roles.record.permissions.intro',
+      'Each person with this role can do what is ticked.'
     ),
     access: permissionsAccess,
     // THE ACUTE CASE, in its final form. This grid used to be 53+ checkboxes in
