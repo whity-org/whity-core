@@ -67,7 +67,7 @@ test.describe('Plugin screen: HelloWorld greetings (role matrix)', () => {
     // (#1007). The count-0 branch above needs no such step: navLink is a
     // CSS locator and counts a hidden link, so absence there still means
     // the role genuinely cannot see it.
-    await roleSession.shell.expandAllNavGroups();
+    await roleSession.shell.revealNavLink('Greetings');
     const link = roleSession.shell.navLink('Greetings');
     await expect(link).toBeVisible();
     const listResponse = page.waitForResponse(

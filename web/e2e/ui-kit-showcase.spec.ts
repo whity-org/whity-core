@@ -43,7 +43,7 @@ test.describe('UiKitShowcase: UI-Kit Reference block screen (WC-228)', () => {
     // Plugin-contributed links land in the `plugins` group, which is closed
     // unless the current page is in it (#1007) — open the groups first, or
     // this asserts the disclosure state instead of the RBAC-filtered nav.
-    await adminPage.shell.expandAllNavGroups();
+    await adminPage.shell.revealNavLink(FEATURE_LABEL);
     const link = adminPage.shell.navLink(FEATURE_LABEL);
     await expect(link).toBeVisible();
 

@@ -232,19 +232,18 @@ export function AppSidebar({
   // nav fetch resolves, so the default cannot be computed in useState's
   // initializer — it has to react to the id appearing. Keyed on the id alone:
   // a group the user opened by hand survives navigation within it, and only a
-  // move to a DIFFERENT group re-narrows the sidebar.
+  // move to a DIFFERENT group re-narrows the sidebar to that one.
   React.useEffect(() => {
     if (expandedGroupIds !== undefined) return
     if (openByDefaultGroupId === null) return
-    setExpandedState((prev) =>
-      prev.includes(openByDefaultGroupId) ? prev : [openByDefaultGroupId]
-    )
+    // Only the current group stays open (section 21): moving to another group
+    // folds the rest.
+    setExpandedState([openByDefaultGroupId])
   }, [openByDefaultGroupId, expandedGroupIds])
 
   const toggleGroup = (id: string) => {
-    const next = expanded.includes(id)
-      ? expanded.filter((groupId) => groupId !== id)
-      : [...expanded, id]
+    // Opening a group folds the others; only the current group stays open.
+    const next = expanded.includes(id) ? expanded.filter((groupId) => groupId !== id) : [id]
     if (expandedGroupIds === undefined) setExpandedState(next)
     onExpandedGroupsChange?.(next)
   }
