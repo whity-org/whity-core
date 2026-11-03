@@ -10,6 +10,7 @@ import { AdminHeader } from '@/components/admin/admin-header';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { Button } from '@whity/ui/button';
 import { Badge } from '@whity/ui/badge';
+import { AreaError, ReadOnlyNotice } from '@whity/ui/page-states';
 import {
   Dialog,
   DialogContent,
@@ -200,7 +201,7 @@ export default function BillingPage() {
     },
     {
       accessorKey: 'balance_minor',
-      header: t('billing.invoices.column.balance', 'Outstanding'),
+      header: t('billing.invoices.column.balance', 'Still to pay'),
       cell: (row) => (
         <span className={row.balance_minor > 0 ? 'font-medium' : 'text-muted-foreground'}>
           {money(row.balance_minor, row.currency)}
@@ -256,9 +257,25 @@ export default function BillingPage() {
           read than "we could not fetch them" — so a customer who owes money
           would be told the opposite of the truth. */}
       {error && (
-        <p className="text-sm text-destructive" data-testid="invoices-unreadable">
-          {t('billing.invoices.error.load', 'Failed to load invoices')}
-        </p>
+        <div data-testid="invoices-unreadable">
+          <AreaError
+            message={t('billing.invoices.error.load', 'Failed to load invoices')}
+            retryLabel={t('billing.invoices.error.retry', 'Try again')}
+            onRetry={() => void refetch()}
+          />
+        </div>
+      )}
+
+      {/* Everything is shown to someone who cannot pay; only Pay is missing, and
+          they are told so rather than left to look for it. */}
+      {!canPay && (
+        <ReadOnlyNotice
+          title={t('billing.invoices.readOnly.title', 'You can see billing but not pay')}
+          description={t(
+            'billing.invoices.readOnly.description',
+            'Ask an owner of this workspace to pay an invoice.'
+          )}
+        />
       )}
 
       <DataTable
@@ -266,6 +283,7 @@ export default function BillingPage() {
         data={data ?? []}
         isLoading={loading}
         rowActions={rowActions}
+        onRowClick={(row) => void openDetail(row)}
         emptyState={{
           title: t('billing.invoices.empty', 'No invoices yet'),
           description: t(
