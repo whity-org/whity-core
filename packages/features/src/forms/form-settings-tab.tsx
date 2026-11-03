@@ -8,6 +8,7 @@ import { Input } from "@whity/ui/input"
 import { Switch } from "@whity/ui/switch"
 
 import { useTranslation } from "../i18n"
+import { LanguageBar, useFormLanguages } from "./form-languages"
 import type { FormRow, FormSectionDef, LocalizedMap } from "./types"
 
 /** The parts of a form the Settings tab edits, held together so one save bar covers them. */
@@ -39,6 +40,7 @@ export function FormSettingsTab({
   onMemberAccess: (open: boolean) => void
 }) {
   const t = useTranslation("forms")
+  const { enabled, setEnabled } = useFormLanguages()
 
   function setSection(index: number, patch: Partial<FormSectionDef>) {
     onChange({ ...settings, sections: settings.sections.map((s, i) => (i === index ? { ...s, ...patch } : s)) })
@@ -53,6 +55,34 @@ export function FormSettingsTab({
 
   return (
     <div className="max-w-3xl space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("builder.settings.languages", "Languages")}</CardTitle>
+          <CardDescription>
+            {t(
+              "builder.settings.languages.body",
+              "Choose the languages you write this form in. Switching one off hides its fields here and stops asking for it. Text already written stays on the form, and this choice is kept in this browser only."
+            )}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {(["en", "ar"] as const).map((language) => (
+            <div key={language} className="flex items-center gap-3">
+              <Switch
+                id={`form-language-${language}`}
+                checked={enabled.includes(language)}
+                disabled={readOnly || (enabled.length === 1 && enabled.includes(language))}
+                onCheckedChange={(on) => setEnabled(language, on)}
+              />
+              <label htmlFor={`form-language-${language}`} className="text-sm font-medium">
+                {language === "en" ? t("builder.lang.en", "English") : t("builder.lang.ar", "Arabic")}
+              </label>
+            </div>
+          ))}
+          <LanguageBar />
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>{t("builder.settings.about", "About this form")}</CardTitle>

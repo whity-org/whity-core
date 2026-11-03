@@ -1,6 +1,6 @@
 # Verified plugins: security design
 
-Status: **proposal, waiting for the owner's decisions (section 9).** Nothing here is built. Until it is approved, nothing can become Verified, and third-party plugins keep today's path: installed turned off, by an operator. WHIT-871; S7 in `IMPLEMENTATION-NOTES.md`; answers Q2 and Q4.
+Status: **decided by the owner on 3 Nov 2026, except decision 6 (section 9).** The declaration path may be built; nothing can carry the mark until the root key and signing decisions are made. WHIT-871; S7 in `IMPLEMENTATION-NOTES.md`; answers Q2 and Q4.
 
 ## 1. The recommendation in short
 
@@ -203,19 +203,17 @@ Each runs on real Postgres where data is involved, and each must be seen to fail
 | No remote code | A block with an outside URL or script string: refused. Browser check on a rendered plugin screen: no request leaves the origin |
 | Frame (option C, when built) | Framed page tries `parent.document`, a cookie-bearing API call, and `fetch` out: all fail in a real browser |
 
-## 9. Decisions for the owner
+## 9. The owner's decisions
 
-Asked one at a time, in this order. The first answer shapes the rest.
-
-| # | Decision | Recommendation |
+| # | Decision | Answer (3 Nov 2026) |
 | --- | --- | --- |
-| 1 | What does "runs natively" mean for a Verified plugin: a signed declaration drawn by Whity's blocks, or the publisher's own JavaScript in the app? | Declaration (option B). This narrows Q2 and E.17 |
-| 2 | Code plugins are install-wide, so a workspace can't install one (Q4). Is it right that workspaces install only declarative plugins, and only operators install code plugins? | Yes. It changes how S.1, S.3 and S.9 read |
-| 3 | The mark says "Sandboxed", and the frame and server don't isolate anything today. What do the pages call an unverified plugin? | "Not verified", with a plain warning that it runs on the server once on, until option C and a real boundary exist. Changes S.4 |
-| 4 | Fix the frame now? Removing `allow-same-origin` for third-party screens would break any embed screen that relies on cookies, including first-party ones, until they're moved to the bridge | Yes, for anything not first party, as soon as a mark can tell them apart |
-| 5 | Code plugin updates: by hand only, narrowing S.6? | Yes |
-| 6 | Who holds the root key, and when does the key ceremony happen? Who at Whity reviews? | The owner names them. Nothing can be Whity-Verified before this |
-| 7 | Offline installs: after the list goes stale, keep running with a banner (recommended), or turn Verified plugins off? | Keep running, no new activations |
+| 1 | What "runs natively" means | A signed declaration, drawn by Whity's block renderer, installed per workspace, active on install. Publishers' same-origin JavaScript isn't built |
+| 2 | Who installs what | Workspaces install declarative plugins only. Code plugins are operator-only and install-wide (S.1, S.3, S.9) |
+| 3 | What an unverified plugin is called | "Not verified", with a plain warning that its code runs on the server once it's on (S.4) |
+| 4 | The frame | Remove the app's cookies for every non-first-party screen as soon as the system can tell them apart, and plan the move to a bridge for embed screens that rely on cookies. **Not done yet:** nothing can tell first party from third until a mark exists |
+| 5 | Code plugin updates | By hand only (S.6) |
+| 6 | Root key holder, key ceremony, who reviews | **Not answered.** No signing or key work starts before this |
+| 7 | Offline, stale revocation list | Keeps running Verified plugins, shows a banner, no new activations |
 
 ## 10. Time, and what can't be finished for 0.2.25
 
