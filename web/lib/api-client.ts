@@ -9,35 +9,14 @@
  * 5. On 402 (the payment wall), sends the reader to the page where they can pay
  */
 
+import { refreshSession } from '@/lib/session-refresh';
+
 export interface ApiClientOptions extends RequestInit {
   /**
    * If true, prevents automatic token refresh on 401 response.
    * Used to prevent infinite loops on refresh endpoint itself.
    */
   skipRefresh?: boolean;
-}
-
-/**
- * Attempts to refresh the access token
- * @returns true if refresh succeeded, false otherwise
- */
-async function refreshAccessToken(): Promise<boolean> {
-  try {
-    // Use relative URL to go through Next.js proxy (handles CORS with credentials)
-    const response = await fetch('/api/v1/auth/refresh', {
-      method: 'POST',
-      credentials: 'include',
-      // CSRF defense (WC-160): the backend rejects auth POSTs without this
-      // custom header, which cross-site forms cannot set.
-      headers: { 'X-Requested-With': 'XMLHttpRequest' },
-    });
-
-    // Refresh successful if response is 200-399
-    return response.ok;
-  } catch {
-    // Network errors or other failures - refresh failed
-    return false;
-  }
 }
 
 /**
@@ -161,7 +140,7 @@ export async function apiClient(
   }
 
   // We have a 401 and skipRefresh is false, attempt refresh
-  const refreshSucceeded = await refreshAccessToken();
+  const refreshSucceeded = (await refreshSession()) === 'renewed';
 
   if (!refreshSucceeded) {
     // Refresh failed, return the original 401 response

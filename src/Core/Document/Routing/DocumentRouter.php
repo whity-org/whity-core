@@ -223,6 +223,8 @@ final class DocumentRouter
         }
 
         try {
+            $this->assertNotWithdrawn($tenantId, $documentId);
+
             $routeId = $this->routes->create($tenantId, $documentId, $title, $actorId, $templateId, $templateName);
 
             $stepIds = [];
@@ -406,6 +408,8 @@ final class DocumentRouter
         $routeId = (int) $route['id'];
         $documentId = (int) $route['document_id'];
 
+        $this->assertNotWithdrawn($tenantId, $documentId);
+
         if ($action === RouteAction::NOTED) {
             if ($verdict !== null) {
                 throw RoutingRejectedException::because(
@@ -519,6 +523,8 @@ final class DocumentRouter
         }
 
         try {
+            $this->assertNotWithdrawn($tenantId, $documentId);
+
             $eventId = $this->events->append($tenantId, $documentId, [
                 'route_id' => $routeId,
                 // The step the actor was acting AT, not the one they are sending
@@ -955,6 +961,30 @@ final class DocumentRouter
         $default = SettingsRegistry::defaults()[SettingsRegistry::DOCUMENTS_ROUTING_APPROVAL_QUORUM] ?? null;
 
         return is_string($default) && RouteQuorum::isValid($default) ? $default : RouteQuorum::ALL;
+    }
+
+    /**
+     * Refuse to move a withdrawn document (S5).
+     *
+     * Here rather than in the API handler because convening and plugins reach the
+     * router without passing through it. FOR SHARE on PostgreSQL so that an act
+     * already in flight and a withdrawal wait for each other: otherwise an act
+     * could commit a new open item just after the withdrawal closed them all.
+     */
+    private function assertNotWithdrawn(int $tenantId, int $documentId): void
+    {
+        $lock = $this->db->inTransaction() && $this->db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'pgsql'
+            ? ' FOR SHARE'
+            : '';
+        $stmt = $this->db->prepare(
+            'SELECT withdrawn_at FROM documents WHERE id = :id AND tenant_id = :tenant_id' . $lock
+        );
+        $stmt->execute([':id' => $documentId, ':tenant_id' => $tenantId]);
+
+        $withdrawnAt = $stmt->fetchColumn();
+        if ($withdrawnAt !== false && $withdrawnAt !== null) {
+            throw RoutingRejectedException::because('This document has been withdrawn, so nothing further can happen on its routes.');
+        }
     }
 
     /**

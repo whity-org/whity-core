@@ -48,9 +48,9 @@ test.describe('Sidebar navigation (admin)', () => {
     await adminPage.shell.clickNav('Organizational Units');
     await page.waitForURL('**/admin/ous');
     await expect(
-      page.getByRole('heading', { name: 'Organizational Units' }).first()
+      page.getByRole('heading', { name: 'Organisational units' }).first()
     ).toBeVisible();
-    await expect(page.getByRole('button', { name: /Create (the first )?OU/ }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /New unit|Add the first unit/ }).first()).toBeVisible();
   });
 
   test('Tenants section loads its page with heading and table', async ({ adminPage, page }) => {
@@ -87,12 +87,12 @@ test.describe('Sidebar navigation (admin)', () => {
     await expect(page.getByRole('tab', { name: 'Sign-in and security' })).toBeVisible();
   });
 
-  test('Dashboard section loads the home page (/admin redirects to /dashboard)', async ({
+  test('Dashboard section loads the home page', async ({
     adminPage,
     page,
   }) => {
-    // The "Dashboard" sidebar item points at /admin, which redirects to the one
-    // home (/dashboard). Server statistics live on /admin/stats (System).
+    // The "Dashboard" sidebar item opens the one home. Server statistics live on
+    // /admin/stats (System).
     await adminPage.shell.clickNav('Dashboard');
     await page.waitForURL('**/dashboard');
     await expect(

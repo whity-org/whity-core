@@ -18,6 +18,9 @@ import { PlatformCards } from './platform-cards';
 import { partOfDay } from './relative-time';
 import { WaitingForYou } from './waiting-for-you';
 
+/** The system tenant's id: its people are the platform's operators. */
+const SYSTEM_TENANT_ID = 0;
+
 export default function DashboardPage() {
   const t = useTranslation('common');
   const dates = useDateDisplay();
@@ -48,7 +51,8 @@ export default function DashboardPage() {
         <AgentsToday refreshKey={refreshKey} />
       </div>
 
-      {capabilities.has('stats:read') && <PlatformCards />}
+      {/* Platform cards are for operators: the system tenant, with stats:read. */}
+      {user?.tenant_id === SYSTEM_TENANT_ID && capabilities.has('stats:read') && <PlatformCards />}
     </div>
   );
 }

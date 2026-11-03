@@ -159,7 +159,12 @@ final class OAuthAccessTokenVerifier
         // for the person, under their grant, whichever client holds it. No
         // assignment is a 403 with what to do: signing in again wouldn't help.
         if ($split !== null && str_starts_with($split, self::AGENT_RESOURCE_PREFIX)) {
-            $active = (new AgentAssignmentRepository($this->db))->activeScopeBySlug(substr($split, strlen(self::AGENT_RESOURCE_PREFIX)), $tenantId, $profileId);
+            $assignments = new AgentAssignmentRepository($this->db);
+            $slug        = substr($split, strlen(self::AGENT_RESOURCE_PREFIX));
+            $active      = $assignments->activeScopeBySlug($slug, $tenantId, $profileId);
+            if ($active === null && $assignments->isPausedSlug($slug, $tenantId)) {
+                throw new OAuthTokenRefusedException('This agent is paused in this workspace. Someone who manages agents can resume it.');
+            }
             if ($active === null) {
                 throw new OAuthTokenRefusedException("You don't use this agent in this workspace. Start using it in Whity, then connect again.");
             }

@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { DisplayPreferencesContextProvider } from '@whity/ui/display-preferences';
 import McpToolsPage from '@/app/(protected)/admin/mcp-tools/page';
@@ -32,6 +32,12 @@ function tool(overrides: Partial<McpTool>): McpTool {
   return {
     name: 'get_api_search',
     description: 'Search everything',
+    plainName: 'Search everything',
+    plainNameAr: 'البحث في كل شيء',
+    area: { id: 'core.search', title: 'Search', titleAr: 'البحث' },
+    agentAccess: 'can',
+    readOnly: true,
+    undoWindowSeconds: null,
     requiredPermission: null,
     requiredRole: null,
     toolset: 'core.search',
@@ -56,11 +62,19 @@ function api(enabled: string[] = []) {
         data: [
           tool({ name: 'get_api_search', visibility: 'always-on', alwaysOnEnabled: true }),
           tool({
-            name: 'delete_api_users_id', description: 'Delete a user', toolset: 'core.users',
-            requiredPermission: 'users:manage', agentPolicy: 'propose',
+            name: 'delete_api_users_id', description: 'Delete a user', plainName: 'Delete a user', toolset: 'core.users',
+            requiredPermission: 'users:manage', agentPolicy: 'allow', agentAccess: 'proposes', readOnly: false,
+            area: { id: 'core.people', title: 'People and roles', titleAr: 'الأشخاص والأدوار' },
           }),
           tool({
-            name: 'period_close_status', description: 'Where the close stands', toolset: 'period-close',
+            name: 'post_api_tags', description: 'Create a tag', plainName: 'Create a tag', agentPolicy: 'allow', agentAccess: 'can',
+            readOnly: false, undoWindowSeconds: 600,
+            area: { id: 'core.people', title: 'People and roles', titleAr: 'الأشخاص والأدوار' },
+          }),
+          tool({ name: 'post_api_agents', description: 'Create an agent', plainName: 'Create an agent', agentPolicy: 'refuse', agentAccess: 'never', readOnly: false }),
+          tool({
+            name: 'period_close_status', description: 'Where the close stands', plainName: 'Where the close stands', plainNameAr: null, toolset: 'period-close',
+            area: { id: 'period-close', title: 'Period close', titleAr: null },
             visibility: 'always-on', plugin: 'Plugins\\PeriodClose\\PeriodClosePlugin',
             alwaysOnRequested: true, alwaysOnEnabled: state.enabled.includes('period_close_status'),
           }),
@@ -96,11 +110,32 @@ describe('McpToolsPage', () => {
 
     expect(await screen.findByText('delete_api_users_id')).toBeInTheDocument();
     expect(screen.getByText('core.users')).toBeInTheDocument();
-    expect(screen.getByText('Proposes, a person approves')).toBeInTheDocument();
+    expect(screen.getAllByText('Proposes, a person approves').length).toBeGreaterThan(0);
     expect(screen.getByText('users:manage')).toBeInTheDocument();
     // A core pick is always listed; a plugin's request waits for the admin.
     expect(screen.getAllByText('Always listed')).toHaveLength(1);
     expect(screen.getByRole('switch', { name: 'List period_close_status without searching' })).not.toBeChecked();
+  });
+
+  it('takes what agents can do from the server, not from the ceiling', async () => {
+    api();
+    render(<Page technical={false} />);
+
+    // Its ceiling says allow; the server says it proposes.
+    const row = (await screen.findByText('Delete a user')).closest('tr') as HTMLElement;
+    expect(within(row).getByText('Proposes, a person approves')).toBeInTheDocument();
+    expect(within(row).queryByText('Can do it')).not.toBeInTheDocument();
+    expect(within(row).getByText('Can’t be undone')).toBeInTheDocument();
+    expect(within(row).getByText('People and roles')).toBeInTheDocument();
+  });
+
+  it('says what happens if it goes wrong', async () => {
+    api();
+    render(<Page technical={false} />);
+
+    expect(within((await screen.findByText('Create a tag')).closest('tr') as HTMLElement).getByText('Undo for 10 minutes')).toBeInTheDocument();
+    expect(within(screen.getByText('Search everything').closest('tr') as HTMLElement).getByText('Undo not needed')).toBeInTheDocument();
+    expect(within(screen.getByText('Create an agent').closest('tr') as HTMLElement).getByText('Never')).toBeInTheDocument();
   });
 
   it('keeps names, toolsets and sizes out of the plain view', async () => {
@@ -108,7 +143,7 @@ describe('McpToolsPage', () => {
     render(<Page technical={false} />);
 
     expect(await screen.findByText('Delete a user')).toBeInTheDocument();
-    expect(screen.getByText('Proposes, a person approves')).toBeInTheDocument();
+    expect(screen.getAllByText('Proposes, a person approves').length).toBeGreaterThan(0);
     expect(screen.queryByText('delete_api_users_id')).not.toBeInTheDocument();
     expect(screen.queryByText('core.users')).not.toBeInTheDocument();
     expect(screen.queryByText(/about 2,000 tokens/)).not.toBeInTheDocument();

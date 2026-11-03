@@ -66,7 +66,8 @@ final class AgentAssignmentRepository
     /**
      * What a credential bound to an assignment may use right now: the agent's
      * toolsets and the person's grant, or null when the assignment is revoked,
-     * the agent archived, or either is not the token's person and tenant.
+     * the agent archived or paused, or either is not the token's person and
+     * tenant. Every way an agent runs passes through here or activeScopeBySlug.
      *
      * @return array{principalId: string, agentId: int, slug: string, name: string, entries: list<string>}|null
      */
@@ -77,7 +78,7 @@ final class AgentAssignmentRepository
                FROM agent_assignments a
                JOIN agents g ON g.id = a.agent_id AND g.tenant_id = a.tenant_id
               WHERE a.id = :id AND a.tenant_id = :tenant_id AND a.profile_id = :profile
-                AND a.revoked_at IS NULL AND g.status = :active'
+                AND a.revoked_at IS NULL AND g.status = :active AND g.paused_at IS NULL'
         );
         $stmt->execute([':id' => $assignmentId, ':tenant_id' => $tenantId, ':profile' => $profileId, ':active' => AgentRepository::ACTIVE]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -98,7 +99,7 @@ final class AgentAssignmentRepository
                FROM agents g
                JOIN agent_assignments a ON a.agent_id = g.id AND a.tenant_id = g.tenant_id
               WHERE g.slug = :slug AND g.tenant_id = :tenant_id AND a.profile_id = :profile
-                AND a.revoked_at IS NULL AND g.status = :active'
+                AND a.revoked_at IS NULL AND g.status = :active AND g.paused_at IS NULL'
         );
         $stmt->execute([':slug' => $slug, ':tenant_id' => $tenantId, ':profile' => $profileId, ':active' => AgentRepository::ACTIVE]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -143,7 +144,86 @@ final class AgentAssignmentRepository
         }
         $agent = $agents->find((int) $agentId, $tenantId);
 
-        return $agent !== null && $agent['status'] === AgentRepository::ACTIVE ? $agent : null;
+        return $agent !== null && $agent['status'] === AgentRepository::ACTIVE && $agent['paused_at'] === null ? $agent : null;
+    }
+
+    /** Whether the agent behind an assignment is paused, so a refusal can say so (WHIT-867). */
+    public function isPaused(int $assignmentId, int $tenantId): bool
+    {
+        $stmt = $this->db->prepare(
+            'SELECT g.paused_at
+               FROM agent_assignments a
+               JOIN agents g ON g.id = a.agent_id AND g.tenant_id = a.tenant_id
+              WHERE a.id = :id AND a.tenant_id = :tenant_id'
+        );
+        $stmt->execute([':id' => $assignmentId, ':tenant_id' => $tenantId]);
+        $pausedAt = $stmt->fetchColumn();
+
+        return $pausedAt !== false && $pausedAt !== null;
+    }
+
+    /** The same, by the agent's slug. */
+    public function isPausedSlug(string $slug, int $tenantId): bool
+    {
+        $stmt = $this->db->prepare('SELECT paused_at FROM agents WHERE slug = :slug AND tenant_id = :tenant_id');
+        $stmt->execute([':slug' => $slug, ':tenant_id' => $tenantId]);
+        $pausedAt = $stmt->fetchColumn();
+
+        return $pausedAt !== false && $pausedAt !== null;
+    }
+
+    /**
+     * Which of these principals belong to a paused agent.
+     *
+     * @param list<string> $principalIds
+     * @return list<string>
+     */
+    public function pausedPrincipals(array $principalIds, int $tenantId): array
+    {
+        $ids = [];
+        foreach ($principalIds as $principalId) {
+            $id = self::idFromPrincipal($principalId);
+            if ($id !== null) {
+                $ids[$id] = true;
+            }
+        }
+        if ($ids === []) {
+            return [];
+        }
+        $marks = implode(', ', array_fill(0, count($ids), '?'));
+        $stmt  = $this->db->prepare(
+            "SELECT a.id
+               FROM agent_assignments a
+               JOIN agents g ON g.id = a.agent_id AND g.tenant_id = a.tenant_id
+              WHERE a.tenant_id = ? AND g.paused_at IS NOT NULL AND a.id IN ({$marks})"
+        );
+        $stmt->execute([$tenantId, ...array_keys($ids)]);
+
+        return array_map(static fn (mixed $id): string => self::principalId((int) $id), $stmt->fetchAll(PDO::FETCH_COLUMN));
+    }
+
+    /**
+     * Note that an agent just made a call, reads included (WHIT-867). Throttled
+     * like {@see \Whity\Mcp\Auth\McpTokenService::recordUse()}: a minute's
+     * precision answers "last active", and an agent makes dozens of calls a minute.
+     */
+    public function recordActivity(string $principalId, int $tenantId, ?\DateTimeImmutable $now = null): void
+    {
+        $assignmentId = self::idFromPrincipal($principalId);
+        if ($assignmentId === null) {
+            return;
+        }
+        $now ??= new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
+        $stmt = $this->db->prepare(
+            'UPDATE agent_assignments SET last_active_at = :now
+              WHERE id = :id AND tenant_id = :tenant_id AND (last_active_at IS NULL OR last_active_at < :cutoff)'
+        );
+        $stmt->execute([
+            ':now'       => $now->format('Y-m-d H:i:s'),
+            ':id'        => $assignmentId,
+            ':tenant_id' => $tenantId,
+            ':cutoff'    => $now->modify('-60 seconds')->format('Y-m-d H:i:s'),
+        ]);
     }
 
     /** @return array<string, mixed>|null the person's assignment for an agent, revoked or not */
