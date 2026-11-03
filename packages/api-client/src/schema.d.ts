@@ -10216,6 +10216,7 @@ export interface components {
         PluginListMeta: {
             worker_local: boolean;
             note: string;
+            can_operate: boolean;
         };
         PluginListResponse: {
             data: components["schemas"]["PluginEntry"][];

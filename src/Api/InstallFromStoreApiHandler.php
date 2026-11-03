@@ -11,6 +11,7 @@ use Whity\Core\Exception\PluginIncompatible;
 use Whity\Core\Exception\PluginNameUnsafe;
 use Whity\Core\Exception\PluginPackageInvalid;
 use Whity\Core\Http\HttpFetcher;
+use Whity\Core\Plugin\PluginOperatorGate;
 use Whity\Core\PluginInstaller;
 use Whity\Core\PluginLoader;
 use Whity\Core\Request;
@@ -80,6 +81,11 @@ final class InstallFromStoreApiHandler
      */
     public function install(Request $request, array $params = []): Response
     {
+        $refusal = PluginOperatorGate::refusal();
+        if ($refusal !== null) {
+            return $refusal;
+        }
+
         $body = json_decode($request->getBody(), true);
         if (!is_array($body)) {
             return Response::error('A JSON body is required.', 400);
