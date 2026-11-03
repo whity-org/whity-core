@@ -46,6 +46,7 @@
  */
 
 import { useMemo, useState } from 'react';
+import { IconCheck } from '@tabler/icons-react';
 import { Badge } from '@whity/ui/badge';
 import { useTranslation } from '@whity/features/i18n';
 import type { DocumentRoute, RouteRecipient, RouteStep } from './routing-wire';
@@ -141,7 +142,7 @@ export function describeStepRule(
   const roleName =
     roleId === null
       ? null
-      : (roleNames.get(roleId) ?? t('routing.role.byId', 'Role #{id}', { id: roleId }));
+      : (roleNames.get(roleId) ?? t('routing.role.byId', 'A role', { id: roleId }));
 
   if (roleName === null) {
     // A kind this client does not know how to describe. Its OWN key is the
@@ -168,7 +169,7 @@ function personLabel(
   viewerProfileId: number | null,
   t: (key: string, fallback?: string, vars?: Record<string, string | number>) => string
 ): string {
-  const name = profileNames.get(profileId) ?? t('routing.profile.byId', 'Profile #{id}', { id: profileId });
+  const name = profileNames.get(profileId) ?? t('routing.profile.byId', 'Account #{id}', { id: profileId });
   return profileId === viewerProfileId ? t('routing.profile.you', '{name} (you)', { name }) : name;
 }
 
@@ -287,10 +288,20 @@ export function RouteFanout({
             return (
               <li
                 key={step.id}
-                className="rounded-md border border-border p-3"
+                className={`rounded-md border p-3 ${
+                  open.length > 0
+                    ? 'border-primary bg-primary/5'
+                    : rows.length > 0
+                      ? 'border-success-text/40 bg-success-tint/40'
+                      : 'border-border bg-muted/30'
+                }`}
                 data-slot="route-fanout-step"
+                data-stage={open.length > 0 ? 'current' : rows.length > 0 ? 'done' : 'next'}
               >
                 <div className="flex flex-wrap items-baseline gap-2">
+                  {open.length === 0 && rows.length > 0 && (
+                    <IconCheck className="size-4 self-center text-success-text" aria-hidden />
+                  )}
                   <span className="text-xs font-medium text-muted-foreground">
                     {/*
                       "Step N" is the authoring ordinal — the number the author

@@ -7,6 +7,7 @@
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { DisplayPreferencesContextProvider } from '@whity/ui/display-preferences';
 import McpToolsPage from '@/app/(protected)/admin/mcp-tools/page';
 import type { McpTool, McpToolListResponse } from '@/app/(protected)/admin/mcp-tools/types';
 
@@ -18,6 +19,14 @@ const mockAddToast = jest.fn();
 jest.mock('@/lib/toast-context', () => ({
   useToast: () => ({ addToast: mockAddToast }),
 }));
+
+function Page({ technical = true }: { technical?: boolean }) {
+  return (
+    <DisplayPreferencesContextProvider value={{ textSize: 'standard', showTechnicalDetails: technical, update: () => {} }}>
+      <McpToolsPage />
+    </DisplayPreferencesContextProvider>
+  );
+}
 
 function tool(overrides: Partial<McpTool>): McpTool {
   return {
@@ -83,20 +92,31 @@ beforeEach(() => {
 describe('McpToolsPage', () => {
   it('shows each tool with its toolset, how apps see it and what agents may do', async () => {
     api();
-    render(<McpToolsPage />);
+    render(<Page />);
 
     expect(await screen.findByText('delete_api_users_id')).toBeInTheDocument();
     expect(screen.getByText('core.users')).toBeInTheDocument();
-    expect(screen.getByText('Proposes')).toBeInTheDocument();
+    expect(screen.getByText('Proposes, a person approves')).toBeInTheDocument();
     expect(screen.getByText('users:manage')).toBeInTheDocument();
     // A core pick is always listed; a plugin's request waits for the admin.
     expect(screen.getAllByText('Always listed')).toHaveLength(1);
     expect(screen.getByRole('switch', { name: 'List period_close_status without searching' })).not.toBeChecked();
   });
 
+  it('keeps names, toolsets and sizes out of the plain view', async () => {
+    api();
+    render(<Page technical={false} />);
+
+    expect(await screen.findByText('Delete a user')).toBeInTheDocument();
+    expect(screen.getByText('Proposes, a person approves')).toBeInTheDocument();
+    expect(screen.queryByText('delete_api_users_id')).not.toBeInTheDocument();
+    expect(screen.queryByText('core.users')).not.toBeInTheDocument();
+    expect(screen.queryByText(/about 2,000 tokens/)).not.toBeInTheDocument();
+  });
+
   it('says what each list mode costs an app', async () => {
     api();
-    render(<McpToolsPage />);
+    render(<Page />);
 
     expect(await screen.findByText('7 actions, about 2,000 tokens')).toBeInTheDocument();
     expect(screen.getByText('313 actions, about 100,000 tokens')).toBeInTheDocument();
@@ -105,7 +125,7 @@ describe('McpToolsPage', () => {
   it('turns a plugin tool on and off through the workspace setting', async () => {
     const state = api();
     const user = userEvent.setup();
-    render(<McpToolsPage />);
+    render(<Page />);
 
     await user.click(await screen.findByRole('switch', { name: 'List period_close_status without searching' }));
     await waitFor(() =>
@@ -126,7 +146,7 @@ describe('McpToolsPage', () => {
       path === '/api/v1/settings' ? json({ message: 'Insufficient permissions' }, 403) : base(path, init)
     );
     const user = userEvent.setup();
-    render(<McpToolsPage />);
+    render(<Page />);
 
     await user.click(await screen.findByRole('switch', { name: 'List period_close_status without searching' }));
     await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('Insufficient permissions', 'error'));

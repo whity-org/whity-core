@@ -1,13 +1,20 @@
-﻿'use client';
+'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/lib/toast-context';
 import { AdminHeader } from '@/components/admin/admin-header';
-import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
+import {
+  DataTable,
+  dataTableQueryString,
+  useDataTableQuery,
+  type DataTableColumn,
+} from '@/components/ui/data-table';
+import { useFetch } from '@/hooks/useFetch';
 import { Button } from '@whity/ui/button';
 import { Skeleton } from '@whity/ui/skeleton';
+import { AreaError } from '@whity/ui/page-states';
 import { ErrorState } from '@whity/ui/empty-state';
 import {
   IconBinaryTree2,
@@ -83,6 +90,30 @@ export default function RelationsPage() {
   const [isAddRelationOpen, setIsAddRelationOpen] = useState(false);
   const [actionPerson, setActionPerson] = useState<Person | null>(null);
 
+  // The list asks the server for its page, search and order, so search reaches
+  // everyone, not just the first hundred loaded for the graph. The graph keeps
+  // its own fetch below: it needs the whole set.
+  const query = useDataTableQuery({ sortKeys: { name: 'name', account: 'account' } });
+  const queryString = dataTableQueryString(query.request);
+  const list = useFetch(async () => {
+    const response = await apiClient(`/api/v1/persons?${queryString}`);
+    if (response.status === 403) {
+      return { forbidden: true as const, rows: [] as Person[], total: 0, totalPages: 1 };
+    }
+    if (!response.ok) throw new Error(t('relations.error.loadPersons', 'Failed to fetch persons'));
+    const body = (await response.json()) as {
+      data?: Person[];
+      pagination?: { total: number; totalPages: number };
+    };
+    const rows = body.data ?? [];
+    return {
+      forbidden: false as const,
+      rows,
+      total: body.pagination?.total ?? rows.length,
+      totalPages: body.pagination?.totalPages ?? 1,
+    };
+  }, [queryString, apiClient]);
+
   const selectView = (next: ViewMode) => {
     setView(next);
     window.localStorage.setItem(VIEW_STORAGE_KEY, next);
@@ -133,6 +164,11 @@ export default function RelationsPage() {
     }
   }, [apiClient, addToast, t]);
 
+  const refreshAll = useCallback(() => {
+    void fetchAll();
+    list.refetch();
+  }, [fetchAll, list]);
+
   useEffect(() => {
     void (async () => {
       await fetchAll();
@@ -140,33 +176,36 @@ export default function RelationsPage() {
   }, [fetchAll]);
 
   const selectedPerson = useMemo(
-    () => (selectedId !== null ? persons.find((p) => p.id === selectedId) ?? null : null),
-    [persons, selectedId]
+    () =>
+      selectedId !== null
+        ? ([...(list.data?.rows ?? []), ...persons].find((p) => p.id === selectedId) ?? null)
+        : null,
+    [persons, list.data, selectedId]
   );
 
   const rows: PersonRow[] = useMemo(
     () =>
-      persons.map((p) => ({
+      (list.data?.rows ?? []).map((p) => ({
         id: p.id,
         name: p.displayName,
-        // The em dash is a typographic "no value" marker, not a sentence — it is
-        // left as a literal here exactly as elsewhere in the admin screens.
-        account: p.hasAccount ? t('relations.table.account', 'Account') : '—',
+        account: p.hasAccount
+          ? t('relations.table.account', 'Has an account')
+          : t('relations.table.noAccount', 'No account'),
         relations: p.relationCount,
         source: p,
       })),
-    [persons, t]
+    [list.data, t]
   );
 
   const columns: DataTableColumn<PersonRow>[] = [
+    { id: 'name', accessorKey: 'name', header: t('relations.table.name', 'Person'), enableSorting: true },
     {
-      accessorKey: 'name',
-      header: t('relations.table.name', 'Name'),
+      id: 'account',
+      accessorKey: 'account',
+      header: t('relations.table.hasAccount', 'Account'),
       enableSorting: true,
-      enableColumnFilter: true,
     },
-    { accessorKey: 'account', header: t('relations.table.hasAccount', 'Has account'), enableSorting: true },
-    { accessorKey: 'relations', header: t('relations.table.relations', 'Relations'), enableSorting: true },
+    { accessorKey: 'relations', header: t('relations.table.relations', 'Relations') },
   ];
 
   const handleAction = (action: PersonAction, person: Person) => {
@@ -233,7 +272,9 @@ export default function RelationsPage() {
     />
   );
 
-  const isEmpty = !isLoading && !isForbidden && persons.length === 0;
+  const forbidden = isForbidden || list.data?.forbidden === true;
+  const isEmpty =
+    !isLoading && !list.loading && !forbidden && (list.data?.total ?? 0) === 0 && query.search.value === '';
 
   return (
     <div className="space-y-8">
@@ -258,8 +299,17 @@ export default function RelationsPage() {
         {ViewToggle}
       </div>
 
-      {isLoading ? (
+      {forbidden ? (
+        // Denied in both views, not only the list.
+        accessDeniedContent
+      ) : isLoading && list.data === null ? (
         <Skeleton className="h-64 w-full rounded-lg" />
+      ) : list.error !== null && view === 'list' ? (
+        <AreaError
+          message={list.error}
+          retryLabel={t('relations.tryAgain', 'Try again')}
+          onRetry={() => list.refetch()}
+        />
       ) : isEmpty ? (
         <div className="rounded-lg border border-dashed border-border bg-card p-10 text-center">
           <IconUsersGroup size={32} className="mx-auto mb-3 text-muted-foreground" />
@@ -292,12 +342,17 @@ export default function RelationsPage() {
           columns={columns}
           data={rows}
           getRowId={(row) => String(row.id)}
+          onRowClick={(row) => setSelectedId(row.source.id)}
           rowActions={rowActions}
-          isLoading={isLoading}
-          enableGlobalFilter
+          isLoading={list.loading && list.data === null}
+          ariaLabel={t('relations.table.label', 'People')}
+          sorting={query.sorting}
+          search={query.search}
           globalFilterPlaceholder={t('relations.searchPlaceholder', 'Search by name…')}
-          pagination={{ pageSize: 10 }}
-          overrideContent={isForbidden ? accessDeniedContent : undefined}
+          pagination={query.pagination({
+            total: list.data?.total ?? 0,
+            totalPages: list.data?.totalPages ?? 1,
+          })}
         />
       ) : (
         <RelationsGraph
@@ -314,7 +369,7 @@ export default function RelationsPage() {
         person={selectedPerson}
         onClose={() => setSelectedId(null)}
         onAction={handleAction}
-        onChanged={fetchAll}
+        onChanged={refreshAll}
         canManage={canManage}
       />
 
@@ -324,7 +379,7 @@ export default function RelationsPage() {
         onClose={() => setIsCreateOpen(false)}
         onSuccess={() => {
           setIsCreateOpen(false);
-          void fetchAll();
+          refreshAll();
         }}
       />
 
@@ -341,7 +396,7 @@ export default function RelationsPage() {
           onSuccess={() => {
             setIsEditOpen(false);
             setActionPerson(null);
-            void fetchAll();
+            refreshAll();
           }}
           person={actionPerson}
         />
@@ -358,7 +413,7 @@ export default function RelationsPage() {
             setIsDeleteOpen(false);
             setSelectedId((current) => (current === actionPerson.id ? null : current));
             setActionPerson(null);
-            void fetchAll();
+            refreshAll();
           }}
           person={actionPerson}
         />
@@ -375,7 +430,7 @@ export default function RelationsPage() {
           onSuccess={() => {
             setIsAddRelationOpen(false);
             setActionPerson(null);
-            void fetchAll();
+            refreshAll();
           }}
           fromPerson={actionPerson}
           persons={persons}

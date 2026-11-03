@@ -29,18 +29,19 @@ test.describe('Agents pages', () => {
     await page.goto('/admin/agents');
     await page.getByRole('button', { name: 'New agent' }).click();
     const dialog = page.getByRole('dialog');
-    await dialog.getByRole('button', { name: 'Use this preset' }).first().click();
+    await dialog.getByRole('button', { name: 'Use this agent' }).first().click();
 
     await page.waitForURL(/\/admin\/agents\/\d+$/);
     made.push(Number(page.url().split('/').pop()));
 
     const name = `Clerk ${SUFFIX}`;
+    await page.getByRole('tab', { name: 'Instructions' }).click();
     await page.locator('#agent-name').fill(name);
-    await page.getByRole('button', { name: 'Save' }).click();
+    await page.getByRole('button', { name: 'Save changes' }).click();
     await expect(page.getByText('Saved').first()).toBeVisible();
 
     await page.goto('/admin/agents');
-    await expect(page.getByRole('link', { name })).toBeVisible();
+    await expect(page.getByText(name).first()).toBeVisible();
   });
 
   test('a person starts using it, sees its grant, connects an app and stops', async ({ page }) => {
@@ -64,7 +65,7 @@ test.describe('Agents pages', () => {
 
     await page.goto('/admin/my-agents');
     await card.getByRole('button', { name: 'Stop using' }).click();
-    await page.getByRole('dialog').getByRole('button', { name: 'Stop using' }).click();
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Stop using' }).click();
     await expect(card.getByRole('button', { name: 'Start using' })).toBeVisible();
   });
 });

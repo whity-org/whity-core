@@ -118,6 +118,12 @@ const RUNNERS: { name: string; owns: (file: string) => boolean }[] = [
     name: 'api-client node --test',
     owns: (file) => file.startsWith('packages/api-client/test/'),
   },
+  {
+    // `npm test` in packages/cli (node --test), run by the `Unit tests
+    // (@whity/cli)` step of the frontend job.
+    name: 'cli node --test',
+    owns: (file) => file.startsWith('packages/cli/test/'),
+  },
 ];
 
 describe('test-file reachability', () => {

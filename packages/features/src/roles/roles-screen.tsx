@@ -360,6 +360,7 @@ export function RolesScreen({
         columns={columns}
         data={roles}
         getRowId={(role) => String(role.id)}
+        onRowClick={onOpenRecord}
         rowActions={rowActions}
         rowActionsLabel={t('ui.table.actions', 'Actions')}
         isLoading={isLoading && !everLoaded}

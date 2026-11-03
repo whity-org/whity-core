@@ -96,7 +96,7 @@ export function WaitingForYou({ onChange }: { onChange?: () => void }) {
         title: item.title,
         from: item.subtitle ?? '',
         waited: dates.relative(item.timestamp, ageLabels),
-        href: meta === null ? undefined : `/admin/document-routing/${meta.document_id}`,
+        href: meta === null ? undefined : `/admin/document-library/${meta.document_id}?tab=routing`,
       };
     });
     const agents: WaitingRow[] = data.proposals.map((proposal) => ({

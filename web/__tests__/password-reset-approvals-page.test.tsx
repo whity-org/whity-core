@@ -84,6 +84,9 @@ describe('PasswordResetApprovalsPage — list and actions', () => {
 
     await waitFor(() => expect(screen.getByTestId('password-reset-approve-501')).toBeInTheDocument());
     fireEvent.click(screen.getByTestId('password-reset-approve-501'));
+    // Approving is tier 3: the dialog asks for the email to be typed.
+    fireEvent.change(await screen.findByLabelText('Type their email to confirm'), { target: { value: 'requester@acme.test' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Approve request' }));
 
     await waitFor(() =>
       expect(global.fetch).toHaveBeenCalledWith(

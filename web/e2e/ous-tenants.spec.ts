@@ -166,8 +166,10 @@ test.describe('Tenants (admin)', () => {
     await row.getByRole('button', { name: 'Row actions' }).click();
     await page.getByRole('menuitem', { name: 'Delete' }).click();
 
-    const deleteDialog = page.getByRole('dialog');
-    await expect(deleteDialog.getByRole('heading', { name: 'Delete Tenant' })).toBeVisible();
+    // Tier 3 (design 2.9): an alert dialog that names the consequence and asks
+    // for the workspace's name before the button enables.
+    const deleteDialog = page.getByRole('alertdialog');
+    await expect(deleteDialog.getByRole('heading', { name: 'Delete Default Tenant?' })).toBeVisible();
 
     // WC-122: the modal's "this tenant has N associated users" warning now
     // renders. The list API previously returned the count as `usercount` (the
@@ -180,15 +182,15 @@ test.describe('Tenants (admin)', () => {
       deleteDialog.getByText(/This tenant has \d+ associated users?\. Deleting it may impact those users\./)
     ).toBeVisible();
 
-    await deleteDialog.getByRole('button', { name: 'Delete Tenant' }).click();
+    const confirm = deleteDialog.getByRole('button', { name: 'Delete Tenant' });
+    await expect(confirm).toBeDisabled();
+    await deleteDialog.getByLabel('Type Default Tenant to confirm').fill('Default Tenant');
+    await confirm.click();
 
     // Backend guard: tenant 1 is occupied (and is the caller's own tenant) so
-    // the delete is rejected. The UI must show an error toast; the delete fails
-    // so the dialog stays open. We never actually remove the seeded tenant.
+    // the delete is rejected. The UI must show an error toast; the dialog
+    // closes either way. We never actually remove the seeded tenant.
     await expect(page.getByText(/Failed to delete tenant|forbidden/i)).toBeVisible();
-
-    // Close the (still-open) dialog and confirm the tenant is still listed.
-    await deleteDialog.getByRole('button', { name: 'Cancel' }).click();
     await expect(deleteDialog).toBeHidden();
     await expect(
       page.getByRole('cell', { name: 'Default Tenant', exact: true })

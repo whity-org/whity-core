@@ -284,7 +284,7 @@ export default function InboxPage() {
           ariaLabel={t('inbox.table.label', 'Inbox items')}
           onRowClick={(row) => {
             const meta = routingMeta(row);
-            if (meta !== null) router.push(`/admin/document-routing/${meta.document_id}`);
+            if (meta !== null) router.push(`/admin/document-library/${meta.document_id}?tab=routing`);
           }}
           emptyState={{
             title: openOnly

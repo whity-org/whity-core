@@ -219,7 +219,7 @@ describe('InboxPage', () => {
 
     // Every row opens its item (P.1).
     fireEvent.click(screen.getByText('Purchase order 9912'));
-    expect(push).toHaveBeenCalledWith('/admin/document-routing/318');
+    expect(push).toHaveBeenCalledWith('/admin/document-library/318?tab=routing');
   });
 
   it('marks a decision item, in a word this build can translate', async () => {

@@ -69,7 +69,7 @@ test.describe('Delegations (role matrix)', () => {
       page.getByRole('heading', { name: 'Delegations' })
     ).toBeVisible();
     await expect(
-      page.getByRole('button', { name: 'Create Delegation' })
+      page.getByRole('button', { name: 'Delegate' })
     ).toBeVisible();
     await expect(
       page.getByRole('heading', { name: 'Access denied' })
@@ -102,7 +102,6 @@ test.describe('Delegations (role matrix)', () => {
     } finally {
       await api.dispose();
     }
-    const granteeId = throwawayUserId;
 
     await roleSession.shell.clickNav('Delegations');
     await page.waitForURL('**/admin/delegations');
@@ -112,7 +111,7 @@ test.describe('Delegations (role matrix)', () => {
 
     // Open the create modal; its pickers load from /api/permissions,
     // /api/roles, /api/users and /api/ous before the form renders.
-    await page.getByRole('button', { name: 'Create Delegation' }).click();
+    await page.getByRole('button', { name: 'Delegate' }).click();
     const dialog = page.getByRole('dialog');
     await expect(
       dialog.getByText('Grant a subset of your own permissions')
@@ -140,25 +139,22 @@ test.describe('Delegations (role matrix)', () => {
       toastWithText(page, 'Delegation created successfully')
     ).toBeVisible();
 
-    // The refetched list shows the new row: grantee label, permission, Active.
-    // The grantee id is anchored with a no-digit-follows lookahead — a row's
-    // text content has no separators ("User #815Tenant-wide"), so \b would
-    // not stop "User #81" from also matching "User #815".
-    const row = page
-      .getByRole('row')
-      .filter({ hasText: new RegExp(`User #${granteeId}(?!\\d)`) });
+    // The refetched list shows the new row: the grantee is NAMED (the email's
+    // local part), never "User #id"; the permission is in words; status Active.
+    const granteeName = granteeEmail.split('@')[0];
+    const row = page.getByRole('row').filter({ hasText: granteeName });
     await expect(row).toBeVisible();
-    await expect(row).toContainText('relations:read');
+    await expect(row).toContainText('Relations read');
     await expect(row).toContainText('Active');
 
     // Revoke via the row action + confirmation modal.
     await row.getByRole('button', { name: 'Revoke' }).click();
     const revokeDialog = page.getByRole('dialog');
     await expect(
-      revokeDialog.getByText('Are you sure you want to revoke this delegation?')
+      revokeDialog.getByText('They lose the delegated access straight away.')
     ).toBeVisible();
     await revokeDialog
-      .getByRole('button', { name: 'Revoke Delegation' })
+      .getByRole('button', { name: 'Revoke delegation' })
       .click();
     await expect(
       toastWithText(page, 'Delegation revoked successfully')

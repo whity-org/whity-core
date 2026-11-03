@@ -3,13 +3,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
-import { useToast } from '@/lib/toast-context';
 import { useFetch } from '@/hooks/useFetch';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { TENANTS_WRITE, TENANTS_DELETE } from '@/lib/capabilities';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { Button } from '@whity/ui/button';
+import { SearchField } from '@whity/ui/search-field';
+import { AreaError, EmptyFiltered, EmptyFirstTime } from '@whity/ui/page-states';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,7 +37,6 @@ export type { Tenant };
 
 export default function TenantsPage() {
   const { apiClient } = useAuth();
-  const { addToast } = useToast();
   const { hasPermission } = useCapabilities();
   const t = useTranslation('admin');
   const dates = useDateDisplay();
@@ -50,32 +50,28 @@ export default function TenantsPage() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
 
-  // Sort/filter/pagination all still run CLIENT-side over a single fetch —
-  // fetching the backend's own page-size ceiling (100) rather than its default
-  // fixes the previous silent page-1-only truncation for the common case, and
-  // tenants beyond 100 rows remain capped.
-  //
-  // #1102: the CAP is now the only thing left in the way. `GET /api/v1/tenants`
-  // accepts `sort`/`dir` (name, slug, userCount, createdAt) and `q` (name and
-  // slug) and reports a search-filtered total, so this screen can move to
-  // server-side sort and search whenever the table is wired for it. Until then
-  // the hundredth workspace is still the last one a reader can reach.
+  // Search runs on the server (`q` matches name and slug, and the total it
+  // reports is the filtered one), so the hundredth workspace is reachable by
+  // typing its name. Sorting and paging of what comes back stay in the table.
+  const [query, setQuery] = useState('');
+  const [searched, setSearched] = useState('');
+  useEffect(() => {
+    const timer = setTimeout(() => setSearched(query.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [query]);
+
   const { data, loading: isLoading, error, refetch: fetchTenants } = useFetch(async () => {
-    const response = await apiClient('/api/v1/tenants?per_page=100');
+    const params = new URLSearchParams({ per_page: '100' });
+    if (searched !== '') params.set('q', searched);
+    const response = await apiClient(`/api/v1/tenants?${params.toString()}`);
     if (!response.ok) {
       throw new Error(t('tenants.error.load', 'Failed to fetch tenants'));
     }
     const data = await response.json();
     return (data.data ?? []) as Tenant[];
-  }, [apiClient]);
+  }, [apiClient, searched]);
 
   const tenants = data ?? [];
-
-  useEffect(() => {
-    if (error) {
-      addToast(error, 'error');
-    }
-  }, [error, addToast]);
 
   /**
    * #882: open the workspace's RECORD PAGE.
@@ -194,16 +190,50 @@ export default function TenantsPage() {
         }
       />
 
-      <DataTable
-        columns={columns}
-        data={tenants}
-        getRowId={(tenant) => String(tenant.id)}
-        rowActions={rowActions}
-        isLoading={isLoading}
-        enableGlobalFilter
-        globalFilterPlaceholder={t('tenants.searchPlaceholder', 'Search tenants…')}
-        pagination={{ pageSize: 10 }}
+      <SearchField
+        value={query}
+        onValueChange={setQuery}
+        label={t('tenants.searchLabel', 'Search tenants')}
+        clearLabel={t('tenants.searchClear', 'Clear search')}
+        placeholder={t('tenants.searchPlaceholder', 'Search tenants…')}
+        className="max-w-sm"
       />
+
+      {error ? (
+        <AreaError
+          message={t('tenants.error.load', 'Failed to fetch tenants')}
+          retryLabel={t('tenants.error.retry', 'Try again')}
+          onRetry={fetchTenants}
+        />
+      ) : !isLoading && tenants.length === 0 ? (
+        searched !== '' ? (
+          <EmptyFiltered
+            title={t('tenants.empty.filtered', 'No workspaces match “{query}”', { query: searched })}
+            clearLabel={t('tenants.empty.clear', 'Clear search')}
+            onClear={() => setQuery('')}
+          />
+        ) : (
+          <EmptyFirstTime
+            title={t('tenants.empty.title', 'No workspaces yet')}
+            description={t('tenants.empty.description', 'Create the first workspace to get started.')}
+            action={
+              canCreate ? (
+                <Button onClick={() => setIsCreateModalOpen(true)}>{t('tenants.createButton', 'Create Tenant')}</Button>
+              ) : undefined
+            }
+          />
+        )
+      ) : (
+        <DataTable
+          columns={columns}
+          data={tenants}
+          getRowId={(tenant) => String(tenant.id)}
+          rowActions={rowActions}
+          isLoading={isLoading}
+          onRowClick={openRecord}
+          pagination={{ pageSize: 10 }}
+        />
+      )}
 
       <CreateTenantModal
         isOpen={isCreateModalOpen}

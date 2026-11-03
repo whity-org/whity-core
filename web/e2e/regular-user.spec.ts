@@ -78,8 +78,9 @@ test.describe('Regular user (non-admin)', () => {
     await page.goto('/admin/users');
     await page.waitForURL('**/admin/users');
     await expect(page.getByRole('heading', { name: 'Users' })).toBeVisible();
-    await expect(page.getByText('No data available')).toBeVisible();
+    // The failure is shown in the failed area, with Try again, not as a toast.
     await expect(page.getByText('Failed to fetch users').first()).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible();
   });
 
   test('settings page is accessible and shows the user role', async ({ userPage, page }) => {

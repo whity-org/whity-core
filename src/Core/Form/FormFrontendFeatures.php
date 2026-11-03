@@ -133,6 +133,8 @@ use Whity\Core\RBAC\CorePermissions;
  *   forms.builder.fieldType.number.label = Number
  *   forms.builder.fieldType.ou_ref.label = An organizational unit
  *   forms.builder.fieldType.profile_ref.label = A person
+ *   forms.builder.fieldType.repeating.label = A table with rows
+ *   forms.builder.fieldType.signature.label = Signature
  *   forms.builder.fieldType.select.label = Choose one
  *   forms.builder.fieldType.text.label = Short text
  *   forms.builder.fieldType.textarea.label = Long text
@@ -813,6 +815,8 @@ final class FormFrontendFeatures
             FieldType::FILE => 'File',
             FieldType::PROFILE_REF => 'A person',
             FieldType::OU_REF => 'An organizational unit',
+            FieldType::REPEATING => 'A table with rows',
+            FieldType::SIGNATURE => 'Signature',
         ];
 
         $options = [];

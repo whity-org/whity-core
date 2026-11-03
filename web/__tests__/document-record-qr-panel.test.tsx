@@ -84,6 +84,7 @@ beforeAll(() => {
 });
 
 beforeEach(() => {
+  window.history.replaceState(null, '', '/?tab=verification');
   jest.clearAllMocks();
   params = { id: '5' };
 });
@@ -560,7 +561,7 @@ describe('scan history', () => {
     expect(anonymous).not.toHaveTextContent(/unknown|unidentified|guest/i);
     // A signed-in scanner IS named, so the line above is a statement about what
     // is stored rather than a blanket refusal to name anybody.
-    expect(screen.getByTestId('document-record-qr-scan-2')).toHaveTextContent('amira@example.test');
+    expect(screen.getByTestId('document-record-qr-scan-2')).toHaveTextContent('amira');
   });
 
   it('says the absence of a visitor identity is structural, not a gap', async () => {
@@ -786,7 +787,7 @@ describe('the region is the server’s decision', () => {
 
     render(<DocumentRecordPage />);
 
-    expect(await screen.findByTestId('document-record-section-document')).toBeInTheDocument();
+    expect(await screen.findByTestId('document-record')).toBeInTheDocument();
     expect(screen.queryByTestId('document-record-section-qr')).not.toBeInTheDocument();
     // The second half of the same rule. Here it holds structurally rather than
     // by a flag: the panel owns its request, and a hidden region is never
@@ -826,7 +827,7 @@ describe('the region is the server’s decision', () => {
     // Absent, not empty-and-broken: there is nothing retired to list.
     expect(screen.queryByTestId('document-record-qr-retired')).not.toBeInTheDocument();
     // The rest of the record survived, which is the point.
-    expect(screen.getByTestId('document-record-section-trail')).toBeInTheDocument();
+    expect(screen.getByTestId('document-record')).toBeInTheDocument();
   });
 
   /**
@@ -875,7 +876,7 @@ describe('the region is the server’s decision', () => {
     expect(screen.getByTestId('document-record-qr-scan-total')).toHaveTextContent('4');
     // What is gone is the ability to act.
     expect(screen.queryByTestId('document-record-qr-actions')).not.toBeInTheDocument();
-    const note = screen.getByTestId('document-record-section-qr-readonly');
+    const note = screen.getByTestId('document-record-readonly-notice');
     expect(note).toHaveTextContent(/Issuing a new one, or withdrawing it/i);
     expect(note).toHaveTextContent("documents:render");
   });
@@ -912,7 +913,7 @@ describe('the region is the server’s decision', () => {
     );
     // The region-level sentence commits to no cause, because the server's
     // predicate is false for three of them and naming one would be wrong in two.
-    expect(screen.getByTestId('document-record-section-qr-readonly')).toHaveTextContent(
+    expect(screen.getByTestId('document-record-readonly-notice')).toHaveTextContent(
       /The reason is below/i
     );
   });

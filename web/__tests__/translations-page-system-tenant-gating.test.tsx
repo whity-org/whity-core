@@ -77,7 +77,7 @@ describe('TranslationsPage write-access column gating (WC-583)', () => {
 
     render(<TranslationsPage />);
 
-    await screen.findByText('greeting');
+    await screen.findByText('Hello');
     expect(screen.getByText('Hello')).toBeInTheDocument();
     expect(
       screen.getByText(/system tenant has no per-tenant override layer/i)
@@ -92,7 +92,7 @@ describe('TranslationsPage write-access column gating (WC-583)', () => {
 
     render(<TranslationsPage />);
 
-    await screen.findByText('greeting');
+    await screen.findByText('Hello');
     expect(screen.getByText('Hello')).toBeInTheDocument();
     expect(screen.getByText('A-Hello')).toBeInTheDocument();
     expect(screen.queryByText(/system tenant has no per-tenant override layer/i)).not.toBeInTheDocument();

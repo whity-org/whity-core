@@ -25,6 +25,7 @@ import { useMemo, useState } from 'react';
 import { Button } from '@whity/ui/button';
 import { Input } from '@whity/ui/input';
 import { IconChevronDown, IconSearch } from '@tabler/icons-react';
+import { TechnicalDetails } from '@whity/ui/display-preferences';
 import { groupPermissions, titleCase } from './permission-groups';
 import type { Permission, RolesTranslate } from './types';
 
@@ -42,6 +43,24 @@ interface PermissionsGridProps {
    * change — rather than a form that 403s or 404s on save.
    */
   readOnly?: boolean;
+}
+
+/**
+ * A permission in plain words: its description, or the code read as words
+ * ("users:read" becomes "Users read"). The code itself is a technical detail
+ * (A.3) and shows only when the person turns on Show technical details.
+ */
+function PermissionLabel({ permission }: { permission: Permission }) {
+  const words = (permission.name ?? '').replace(/[:_.-]+/g, ' ').trim();
+  const plain = permission.description || words.charAt(0).toUpperCase() + words.slice(1);
+  return (
+    <>
+      <span className="block text-sm text-foreground">{plain}</span>
+      <TechnicalDetails>
+        <span className="block font-mono text-xs text-muted-foreground">{permission.name}</span>
+      </TechnicalDetails>
+    </>
+  );
 }
 
 /**
@@ -262,21 +281,17 @@ export function PermissionsGrid({
                       const isOn = selected.has(permission.id);
                       if (readOnly) {
                         return (
-                          <li key={permission.id} className="px-3 py-2">
-                            <span className="block font-mono text-sm text-foreground">
-                              {permission.name}
-                            </span>
-                            {permission.description && (
-                              <span className="block text-xs text-muted-foreground">
-                                {permission.description}
-                              </span>
-                            )}
+                          <li key={permission.id} data-permission={permission.name} className="px-3 py-2">
+                            <PermissionLabel permission={permission} />
                           </li>
                         );
                       }
                       return (
                         <li key={permission.id}>
-                          <label className="flex cursor-pointer items-start gap-2 px-3 py-2 hover:bg-muted">
+                          <label
+                            data-permission={permission.name}
+                            className="flex cursor-pointer items-start gap-2 px-3 py-2 hover:bg-muted"
+                          >
                             <input
                               type="checkbox"
                               checked={isOn}
@@ -284,14 +299,7 @@ export function PermissionsGrid({
                               className="mt-0.5 h-4 w-4 rounded border-border text-primary focus:ring-2 focus:ring-ring"
                             />
                             <span className="min-w-0 flex-1">
-                              <span className="block font-mono text-sm text-foreground">
-                                {permission.name}
-                              </span>
-                              {permission.description && (
-                                <span className="block text-xs text-muted-foreground">
-                                  {permission.description}
-                                </span>
-                              )}
+                              <PermissionLabel permission={permission} />
                             </span>
                           </label>
                         </li>

@@ -50,6 +50,7 @@ final class FormRepository
      */
     private const COLUMNS = 'id, tenant_id, form_key, name, description, submit_label, sections, reference_format, status, version,
                              route_template_id, created_by_profile_id, created_at, updated_at,
+                             open_to_members, members_opened_at, members_opened_by_profile_id,
                              public_enabled, public_slug, public_opens_at, public_closes_at,
                              public_enabled_at, public_enabled_by_profile_id,
                              ' . self::WINDOW_OPEN_SQL . ' AS public_window_open';
@@ -222,6 +223,58 @@ final class FormRepository
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
         return $row === false ? null : self::normalizeRow($row);
+    }
+
+    /**
+     * The published forms an author opened to this workspace's members, most
+     * recently changed first.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function listOpenToMembers(int $tenantId): array
+    {
+        $stmt = $this->db->prepare(
+            'SELECT ' . self::COLUMNS . '
+               FROM forms
+              WHERE tenant_id = :tenant_id AND status = :status AND open_to_members = TRUE
+              ORDER BY updated_at DESC, id DESC'
+        );
+        $stmt->execute([':tenant_id' => $tenantId, ':status' => FormStatus::PUBLISHED]);
+
+        return array_map([self::class, 'normalizeRow'], $stmt->fetchAll(PDO::FETCH_ASSOC));
+    }
+
+    /**
+     * Open a form to this workspace's members, or close it again.
+     *
+     * Opening a form that is already open keeps who first opened it and when, and
+     * closing clears both, so the columns always describe the current opening.
+     */
+    public function setOpenToMembers(int $tenantId, int $id, bool $open, ?int $byProfileId): void
+    {
+        $stmt = $open
+            ? $this->db->prepare(
+                'UPDATE forms
+                    SET open_to_members = TRUE,
+                        members_opened_at = NOW(),
+                        members_opened_by_profile_id = :opened_by,
+                        updated_at = NOW()
+                  WHERE tenant_id = :tenant_id AND id = :id AND open_to_members = FALSE'
+            )
+            : $this->db->prepare(
+                'UPDATE forms
+                    SET open_to_members = FALSE,
+                        members_opened_at = NULL,
+                        members_opened_by_profile_id = NULL,
+                        updated_at = NOW()
+                  WHERE tenant_id = :tenant_id AND id = :id AND open_to_members = TRUE'
+            );
+
+        $params = [':tenant_id' => $tenantId, ':id' => $id];
+        if ($open) {
+            $params[':opened_by'] = $byProfileId;
+        }
+        $stmt->execute($params);
     }
 
     /**
@@ -584,6 +637,12 @@ final class FormRepository
                 : (int) $row['created_by_profile_id'],
             'created_at' => (string) $row['created_at'],
             'updated_at' => (string) $row['updated_at'],
+            // ---- opened to the workspace's members (migration 198) ----
+            'open_to_members' => DbBool::of($row['open_to_members'] ?? false),
+            'members_opened_at' => ($row['members_opened_at'] ?? null) === null ? null : (string) $row['members_opened_at'],
+            'members_opened_by_profile_id' => ($row['members_opened_by_profile_id'] ?? null) === null
+                ? null
+                : (int) $row['members_opened_by_profile_id'],
             // ---- the public link (migration 132) ----
             //
             // Read through DbBool rather than a `(bool)` cast: a BOOLEAN column

@@ -12,6 +12,8 @@ import { PLANS_MANAGE } from '@/lib/capabilities';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { Button } from '@whity/ui/button';
 import { Input } from '@/components/ui/input';
+import { MoneyInput } from '@whity/ui/money/money-input';
+import { parseMoney, toDecimalString } from '@whity/ui/money/currency';
 import { Badge } from '@whity/ui/badge';
 import { EmptyState } from '@whity/ui/empty-state';
 import {
@@ -207,8 +209,8 @@ export default function BillingPage() {
                     className={`flex items-center gap-3 text-sm ${price.is_active ? '' : 'text-muted-foreground'}`}
                     data-testid={`price-${price.id}`}
                   >
-                    <span className="font-medium">
-                      {price.unit_amount} {price.currency}
+                    <span className="font-medium" dir="ltr">
+                      {price.currency} {toDecimalString(price.unit_amount, price.currency)}
                     </span>
                     <span className="text-muted-foreground">
                       {t('billing.price.per', 'per {period}', { period: price.billing_period })}
@@ -237,10 +239,33 @@ export default function BillingPage() {
                             );
                             return;
                           }
-                          // "Retired", not "deleted" — the row is still there and
-                          // the list will show it greyed. Saying "deleted" would
-                          // describe something that did not happen.
-                          addToast(t('billing.price.retired.done', 'Price retired.'), 'success');
+                          // Tier 1: it happens at once and can be undone. There is no
+                          // un-retire route, so Undo adds the same price again on the
+                          // same terms (a retired price blocks nothing).
+                          addToast(
+                            t('billing.price.retired.done', 'Price retired.'),
+                            'success',
+                            10000,
+                            {
+                              label: t('billing.price.retired.undo', 'Undo'),
+                              onClick: async () => {
+                                const back = await apiClient(`/api/v1/plans/${plan.id}/prices`, {
+                                  method: 'POST',
+                                  body: JSON.stringify({
+                                    currency: price.currency,
+                                    unit_amount: price.unit_amount,
+                                    billing_period: price.billing_period,
+                                    is_per_seat: price.is_per_seat,
+                                  }),
+                                });
+                                if (!back.ok) {
+                                  addToast(t('billing.price.undoFailed', 'Could not bring this price back.'), 'error');
+                                  return;
+                                }
+                                refetch();
+                              },
+                            }
+                          );
                           refetch();
                         }}
                       >
@@ -304,16 +329,24 @@ function AddPriceDialog({
   const { addToast } = useToast();
   const t = useTranslation('admin');
 
-  const [currency, setCurrency] = useState('SAR');
+  const [currency, setCurrency] = useState('JOD');
   const [amount, setAmount] = useState('');
   const [period, setPeriod] = useState<string>('month');
   const [perSeat, setPerSeat] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const parsed = Number(amount);
-  // Integers only. A decimal here would truncate server-side, and the boundary
-  // refuses it rather than storing a hundredth of the intended price.
-  const amountIsUsable = amount.trim() !== '' && Number.isInteger(parsed) && parsed >= 0;
+  // The field holds normal units ("49.000"); the API takes minor units. More
+  // decimals than the currency has is refused by parseMoney, never rounded.
+  let parsed = 0;
+  let amountIsUsable = false;
+  if (amount.trim() !== '' && /^[A-Z]{3}$/.test(currency)) {
+    try {
+      parsed = parseMoney(amount, currency);
+      amountIsUsable = parsed >= 0;
+    } catch {
+      amountIsUsable = false;
+    }
+  }
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -340,23 +373,22 @@ function AddPriceDialog({
           </label>
 
           <label className="block space-y-1">
-            <span className="text-sm">
-              {t('billing.price.amount', 'Amount in minor units (4900 = 49.00)')}
-            </span>
-            <Input
-              type="number"
-              min={0}
-              step={1}
+            <span className="text-sm">{t('billing.price.amount', 'Price')}</span>
+            <MoneyInput
+              currency={currency}
               value={amount}
               data-testid="price-amount"
-              onChange={(e) => setAmount(e.target.value)}
+              onValueChange={setAmount}
+              tooManyDecimalsLabel={(decimals, code) =>
+                t('billing.price.tooManyDecimals', 'No more than {decimals} decimals for {currency}.', {
+                  decimals,
+                  currency: code,
+                })
+              }
             />
             {amount.trim() !== '' && !amountIsUsable && (
               <span className="text-xs text-destructive" data-testid="price-amount-error">
-                {t(
-                  'billing.price.amountInvalid',
-                  'Whole minor units only — 49.00 is entered as 4900.'
-                )}
+                {t('billing.price.amountInvalid', 'Enter the price as an amount, for example 49.000.')}
               </span>
             )}
           </label>

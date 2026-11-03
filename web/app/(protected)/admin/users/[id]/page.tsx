@@ -104,7 +104,7 @@ export default function Page() {
       userId={userId}
       can={hasPermission}
       t={t}
-      onNotify={addToast}
+      onNotify={(message, type, action) => addToast(message, type, action ? 10000 : type === 'success' ? 3000 : 6000, action)}
       onBack={handleBack}
     />
   );

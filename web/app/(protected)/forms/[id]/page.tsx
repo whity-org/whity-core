@@ -88,6 +88,9 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
   const [reference, setReference] = useState<string | null>(null);
   const [units, setUnits] = useState<ReferenceOption[]>([]);
   const [restored, setRestored] = useState(false);
+  // Where this person fills it in: `/forms` with `forms:submit`, or `/me/forms` when
+  // the form was opened to members and they hold nothing else.
+  const [apiBase, setApiBase] = useState('/api/v1/forms');
 
   // The unit list for any `ou_ref` field. Fetched by the PAGE rather than by the
   // field, because whether this reader may see a list of the tenant's units is a
@@ -125,8 +128,16 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
   useEffect(() => {
     let cancelled = false;
 
-    apiClient(`/api/v1/forms/${encodeURIComponent(id)}/render`, { headers: { Accept: 'application/json' } })
-      .then(async (response) => {
+    const renderAt = (base: string) =>
+      apiClient(`${base}/${encodeURIComponent(id)}/render`, { headers: { Accept: 'application/json' } });
+
+    renderAt('/api/v1/forms')
+      .then(async (first) => {
+        let response = first;
+        if (first.status === 403) {
+          response = await renderAt('/api/v1/me/forms');
+          if (!cancelled && response.ok) setApiBase('/api/v1/me/forms');
+        }
         const body = (await response.json().catch(() => ({}))) as { data?: RenderedForm; error?: string };
         if (cancelled) return;
         if (!response.ok || !body.data) {
@@ -217,7 +228,7 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
     const body = new FormData();
     body.append('file', file);
 
-    const response = await apiClient(`/api/v1/forms/${encodeURIComponent(id)}/uploads`, {
+    const response = await apiClient(`${apiBase}/${encodeURIComponent(id)}/uploads`, {
       method: 'POST',
       headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
       body,
@@ -234,7 +245,7 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
 
   /** Resolves with a refusal, or null once the server has the answers. */
   async function submitAnswers(toSend: Record<string, Answer>): Promise<RefusalBody | null> {
-    const response = await apiClient(`/api/v1/forms/${encodeURIComponent(id)}/submissions`, {
+    const response = await apiClient(`${apiBase}/${encodeURIComponent(id)}/submissions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

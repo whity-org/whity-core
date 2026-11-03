@@ -61,6 +61,15 @@ final class SubmissionValidator
     public const TEXT_MAX = 10000;
 
     /**
+     * Hard ceiling on one repeating question, for the reason {@see TEXT_MAX} has one:
+     * every row lands in the one jsonb column. A field may lower it, not raise it.
+     */
+    public const ROWS_MAX = 200;
+
+    /** A signature is a person's name. */
+    private const SIGNATURE_MAX = 200;
+
+    /**
      * Static helper only — never instantiated.
      */
     private function __construct()
@@ -116,6 +125,15 @@ final class SubmissionValidator
             }
 
             $value = self::normalizeOne($field, $type, $raw, $rules, $options);
+
+            // Every row of the table was blank, so nothing was said. Same two
+            // outcomes as any other blank answer.
+            if ($type === FieldType::REPEATING && $value === []) {
+                if ($required) {
+                    throw self::refuse($field, 'required', ' is required');
+                }
+                continue;
+            }
 
             // Asked after normalizing, because `"0"`, `0` and `"false"` are all
             // the same unticked box by the time they get here.
@@ -202,6 +220,12 @@ final class SubmissionValidator
         if ($type === FieldType::CHECKBOX) {
             return $raw === null;
         }
+        // Sent as an object, so an empty name would otherwise read as an answer.
+        if ($type === FieldType::SIGNATURE && is_array($raw)) {
+            $name = $raw['name'] ?? null;
+
+            return $name === null || (is_string($name) && trim($name) === '');
+        }
 
         return $raw === null
             || (is_string($raw) && trim($raw) === '')
@@ -229,6 +253,8 @@ final class SubmissionValidator
             FieldType::CHECKBOX => self::checkbox($field, $raw),
             FieldType::FILE => self::files($field, $raw, $rules),
             FieldType::PROFILE_REF, FieldType::OU_REF => self::reference($field, $raw),
+            FieldType::REPEATING => self::rows($field, $raw, $rules),
+            FieldType::SIGNATURE => self::signature($field, $raw),
             // Unreachable while the CHECK constraint and FieldType agree, which
             // FieldTypeTest enforces. Refused rather than passed through: a value
             // this class does not understand is a value it cannot promise
@@ -416,6 +442,129 @@ final class SubmissionValidator
         }
 
         throw self::refuse($field, 'not_yes_or_no', ' must be yes or no');
+    }
+
+    /**
+     * A repeating answer: a list of rows, each checked as its own small form against
+     * the columns in `validation.columns`.
+     *
+     * A row with nothing in it is dropped, because a page draws an empty row to type
+     * into and leaving it empty is not an answer. A refusal in a cell keeps the outer
+     * question as `field_key`, since that is what the page can take the reader to,
+     * and says which row and column in `params`.
+     *
+     * @param array<string, mixed> $field
+     * @param array<string, mixed> $rules
+     * @return list<array<string, mixed>>
+     */
+    private static function rows(array $field, mixed $raw, array $rules): array
+    {
+        if (!is_array($raw) || !array_is_list($raw)) {
+            throw self::refuse($field, 'bad_rows', ' must be a list of rows');
+        }
+
+        $columns = self::columnFields($rules);
+
+        $rows = [];
+        foreach ($raw as $index => $row) {
+            if (!is_array($row) || array_is_list($row) && $row !== []) {
+                throw self::refuse($field, 'bad_rows', ' must be a list of rows');
+            }
+
+            /** @var array<string, mixed> $cells */
+            $cells = $row;
+            if (self::rowIsBlank($columns, $cells)) {
+                continue;
+            }
+
+            $number = $index + 1;
+            try {
+                $rows[] = self::validate($columns, $cells)['values'];
+            } catch (FormRejectedException $e) {
+                throw new FormRejectedException(
+                    self::describe($field) . ", row {$number}: " . $e->clientMessage,
+                    '',
+                    $e,
+                    $e->reason,
+                    (string) ($field['field_key'] ?? ''),
+                    ['row' => $number, 'column' => (string) $e->fieldKey] + $e->params,
+                );
+            }
+        }
+
+        $limit = self::intRule($rules, 'maxRows');
+        $max = $limit === null ? self::ROWS_MAX : min($limit, self::ROWS_MAX);
+        if (count($rows) > $max) {
+            throw self::refuse($field, 'too_many_rows', " allows at most {$max} rows", ['max' => $max]);
+        }
+        $min = self::intRule($rules, 'minRows');
+        if ($min !== null && $rows !== [] && count($rows) < $min) {
+            throw self::refuse($field, 'too_few_rows', " needs at least {$min} rows", ['min' => $min]);
+        }
+
+        return $rows;
+    }
+
+    /**
+     * `validation.columns`, in the shape {@see validate()} reads.
+     *
+     * @param array<string, mixed> $rules
+     * @return list<array<string, mixed>>
+     */
+    private static function columnFields(array $rules): array
+    {
+        $columns = is_array($rules['columns'] ?? null) ? $rules['columns'] : [];
+
+        $fields = [];
+        foreach ($columns as $column) {
+            if (!is_array($column)) {
+                continue;
+            }
+            $fields[] = [
+                'field_key' => (string) ($column['key'] ?? ''),
+                'field_type' => (string) ($column['type'] ?? FieldType::TEXT),
+                'label' => $column['label'] ?? [],
+                'is_required' => ($column['required'] ?? false) === true,
+                'options' => $column['options'] ?? [],
+                'validation' => [],
+            ];
+        }
+
+        return $fields;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $columns
+     * @param array<string, mixed>       $cells
+     */
+    private static function rowIsBlank(array $columns, array $cells): bool
+    {
+        foreach ($columns as $column) {
+            $key = (string) $column['field_key'];
+            // An unticked box is what an empty row looks like, so it says nothing here.
+            if (array_key_exists($key, $cells) && $cells[$key] !== false && !self::isBlank($cells[$key], (string) $column['field_type'])) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * A signature: the name as typed, and the time THIS SERVER received it. Whatever
+     * time the body claimed is ignored, so nobody can backdate what they signed.
+     *
+     * @param array<string, mixed> $field
+     * @return array{name: string, signed_at: string}
+     */
+    private static function signature(array $field, mixed $raw): array
+    {
+        $name = is_array($raw) ? ($raw['name'] ?? null) : $raw;
+        if (!is_string($name) || mb_strlen(trim($name)) > self::SIGNATURE_MAX) {
+            throw self::refuse($field, 'bad_signature', ' must be your full name');
+        }
+
+        return ['name' => trim($name), 'signed_at' => gmdate('Y-m-d\TH:i:s\Z')];
     }
 
     /**
