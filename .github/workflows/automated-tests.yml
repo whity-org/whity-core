@@ -194,6 +194,8 @@ jobs:
               # inside every consumer's build — yet a packages-only PR used to
               # skip this job entirely and ship unverified.
               - 'packages/**'
+              # @whity/cli bundles a copy of this file and tests it for drift.
+              - 'docker/production/**'
               # #1050. `web/jest.config.mjs` roots ALREADY reach into this tree
               # (added with #932), so its nine suites — 90 tests, all green —
               # run under the `web` job below. But nothing in this filter
@@ -1786,6 +1788,12 @@ jobs:
         run: |
           npm run typecheck
           npm test
+
+      # The installer and updater. node:test against a scripted Docker, so
+      # every failure path runs without containers.
+      - name: Unit tests (@whity/cli)
+        working-directory: packages/cli
+        run: npm test
 
       # The committed design-token outputs must match the generator (base.json
       # is the single source of truth for styling variables).

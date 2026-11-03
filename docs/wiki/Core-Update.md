@@ -115,6 +115,10 @@ below.
 
 ## Applying an update (operators) — the manual runbook
 
+An install made with `whity install` updates with `whity update`, which automates
+these steps for the published images: see [Whity CLI](Whity-CLI.md). The runbook below
+is for every other deployment.
+
 For a compose-based deployment (the per-product deployment anatomy in
 [Plugin-Distribution.md](./Plugin-Distribution.md)):
 
