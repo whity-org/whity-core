@@ -10,6 +10,7 @@ use Whity\Core\PluginLoader;
 use Whity\Core\PluginInstaller;
 use Whity\Core\PluginMigrationRunner;
 use Whity\Core\Audit\AuditLogger;
+use Whity\Core\Db\DbBool;
 use Whity\Core\Exception\PluginAlreadyInstalled;
 use Whity\Core\Exception\PluginEnableMigrationFailed;
 use Whity\Core\Exception\PluginExtractionUnsafe;
@@ -780,7 +781,7 @@ class PluginsApiHandler
             'metadata' => ['plugin' => $name, 'version' => $removal['version'] ?? null],
         ]);
 
-        if ((bool) $removal['was_active']) {
+        if (DbBool::of($removal['was_active'])) {
             return $this->enable($request, ['name' => (string) $removal['plugin_key']]);
         }
 
