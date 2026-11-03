@@ -426,18 +426,25 @@ final class RouteRecipientRepository
     public function listForDocument(int $documentId, int $tenantId): array
     {
         $stmt = $this->db->prepare(
-            'SELECT id, tenant_id, document_id, route_id, step_id, profile_id, ou_id,
-                    parent_recipient_id, created_by_event_id, closed_by_event_id, created_at
-               FROM document_route_recipients
-              WHERE tenant_id = :tenant_id AND document_id = :document_id
-              ORDER BY id ASC'
+            'SELECT r.id, r.tenant_id, r.document_id, r.route_id, r.step_id, r.profile_id, r.ou_id,
+                    r.parent_recipient_id, r.created_by_event_id, r.closed_by_event_id, r.created_at,
+                    e.withdrawal AS closed_by_withdrawal
+               FROM document_route_recipients r
+               LEFT JOIN document_route_events e
+                 ON e.id = r.closed_by_event_id AND e.tenant_id = :tenant_id
+              WHERE r.tenant_id = :tenant_id AND r.document_id = :document_id
+              ORDER BY r.id ASC'
         );
         $stmt->execute([':tenant_id' => $tenantId, ':document_id' => $documentId]);
 
         /** @var list<array<string, mixed>> $rows */
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        return array_map(self::normalize(...), $rows);
+        return array_map(
+            static fn (array $row): array => self::normalize($row)
+                + ['closed_by_withdrawal' => DbBool::of($row['closed_by_withdrawal'] ?? false)],
+            $rows
+        );
     }
 
     /**

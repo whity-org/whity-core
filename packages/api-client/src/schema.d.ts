@@ -8224,6 +8224,7 @@ export interface components {
             closed_by_event_id?: number | null;
             open: boolean;
             closed_by_delivery: boolean;
+            closed_by_withdrawal?: boolean;
             created_at: string;
         };
         DocumentRouteRecipientListResponse: {
