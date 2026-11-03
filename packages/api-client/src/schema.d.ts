@@ -8481,6 +8481,7 @@ export interface components {
                 ar?: string;
                 en?: string;
             } | null;
+            reference_format?: string | null;
             sections?: components["schemas"]["FormSectionText"][];
             /** @enum {string} */
             status: "draft" | "published" | "archived";
@@ -8718,6 +8719,7 @@ export interface components {
         };
         FormSubmission: {
             id: number;
+            reference?: string | null;
             tenant_id: number;
             form_id: number;
             form_version: number;
@@ -8795,6 +8797,8 @@ export interface components {
             } | null;
             /** @description The title and description of each section, by `section_key`. */
             sections?: components["schemas"]["FormSectionText"][];
+            /** @description The reference each new submission is given, e.g. `BAKE-{YYYY}-{SEQ:4}`. Tokens: {YYYY}, {YY}, {MM}, {SEQ}, {SEQ:n}. {SEQ} is required. Dates are UTC. Null gives none. */
+            reference_format?: string | null;
         };
         FormUploadResponse: {
             data: {
@@ -10152,6 +10156,7 @@ export interface components {
             data: {
                 received: boolean;
                 submitted_at?: string | null;
+                reference?: string | null;
             };
             meta?: {
                 routed: boolean;

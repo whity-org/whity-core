@@ -518,6 +518,9 @@ final class PublicFormsApiHandler
                 'data' => [
                     'received' => true,
                     'submitted_at' => $submission['submitted_at'] ?? null,
+                    // Theirs to quote. It names this form's own sequence and nothing
+                    // about the tenant beyond the wording the office chose to print.
+                    'reference' => $submission['reference'] ?? null,
                 ],
                 'meta' => [
                     // Whether it actually started circulating. A form with no

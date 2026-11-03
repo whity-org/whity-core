@@ -52093,6 +52093,10 @@
                         },
                         "nullable": true
                     },
+                    "reference_format": {
+                        "type": "string",
+                        "nullable": true
+                    },
                     "sections": {
                         "type": "array",
                         "items": {
@@ -52903,6 +52907,10 @@
                     "id": {
                         "type": "integer"
                     },
+                    "reference": {
+                        "type": "string",
+                        "nullable": true
+                    },
                     "tenant_id": {
                         "type": "integer"
                     },
@@ -53171,6 +53179,12 @@
                             "$ref": "#/components/schemas/FormSectionText"
                         },
                         "description": "The title and description of each section, by `section_key`."
+                    },
+                    "reference_format": {
+                        "type": "string",
+                        "maxLength": 64,
+                        "nullable": true,
+                        "description": "The reference each new submission is given, e.g. `BAKE-{YYYY}-{SEQ:4}`. Tokens: {YYYY}, {YY}, {MM}, {SEQ}, {SEQ:n}. {SEQ} is required. Dates are UTC. Null gives none."
                     }
                 },
                 "minProperties": 1
@@ -58380,6 +58394,10 @@
                                 "type": "boolean"
                             },
                             "submitted_at": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "reference": {
                                 "type": "string",
                                 "nullable": true
                             }

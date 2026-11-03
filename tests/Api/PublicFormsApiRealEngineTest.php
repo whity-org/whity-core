@@ -222,6 +222,59 @@ final class PublicFormsApiRealEngineTest extends TestCase
         );
     }
 
+    public function testAPublicReceiptCarriesTheReferenceAndCountsOn(): void
+    {
+        $formId = $this->publishedForm();
+        $this->forms->update(self::TENANT, $formId, ['reference_format' => 'REC-{SEQ:3}']);
+        $slug = $this->openLink($formId);
+
+        $first = self::data($this->submit($slug, ['full_name' => 'Layla Haddad']));
+        $second = self::data($this->submit($slug, ['full_name' => 'Omar Nasser']));
+
+        self::assertSame('REC-001', $first['reference']);
+        self::assertSame('REC-002', $second['reference']);
+    }
+
+    public function testAFormWithNoFormatGivesNoReference(): void
+    {
+        $slug = $this->openLink($this->publishedForm());
+
+        self::assertNull(self::data($this->submit($slug, ['full_name' => 'Layla Haddad']))['reference']);
+    }
+
+    public function testARefusedSubmissionDoesNotSpendANumber(): void
+    {
+        $formId = $this->publishedForm();
+        $this->forms->update(self::TENANT, $formId, ['reference_format' => 'REC-{SEQ:3}']);
+        $slug = $this->openLink($formId);
+
+        self::assertSame(422, $this->submit($slug, [])->getStatusCode());
+
+        self::assertSame('REC-001', self::data($this->submit($slug, ['full_name' => 'Layla Haddad']))['reference']);
+    }
+
+    public function testTwoFormatsThatPrintTheSameTextDoNotCollide(): void
+    {
+        $first = $this->publishedForm();
+        $second = $this->publishedForm();
+        $this->forms->update(self::TENANT, $first, ['reference_format' => 'A{SEQ}']);
+        $this->forms->update(self::TENANT, $second, ['reference_format' => 'A1{SEQ}']);
+        $firstSlug = $this->openLink($first);
+        $secondSlug = $this->openLink($second);
+
+        // The second form prints A11 first, then the first form
+        // reaches its own 11th and has to skip it.
+        $this->submit($secondSlug, ['full_name' => 'Omar Nasser']);
+        $references = [];
+        for ($i = 0; $i < 11; $i++) {
+            $references[] = self::data($this->submit($firstSlug, ['full_name' => 'Layla Haddad']))['reference'];
+        }
+
+        self::assertContains('A10', $references);
+        self::assertNotContains('A11', $references);
+        self::assertContains('A12', $references);
+    }
+
     public function testAPublicSubmissionLeavesOutAQuestionItsConditionHid(): void
     {
         $formId = $this->publishedForm();

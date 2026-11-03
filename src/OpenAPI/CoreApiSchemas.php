@@ -1313,6 +1313,7 @@ final class CoreApiSchemas
                         'name' => '/before/data/name',
                         'description' => '/before/data/description_i18n',
                         'submit_label' => '/before/data/submit_label',
+                        'reference_format' => '/before/data/reference_format',
                         'sections' => '/before/data/sections',
                         'route_template_id' => '/before/data/route_template_id',
                     ],
@@ -6832,6 +6833,7 @@ final class CoreApiSchemas
                 'description' => self::str(true),
                 'description_i18n' => self::localizedText(),
                 'submit_label' => self::localizedText() + ['nullable' => true],
+                'reference_format' => self::str(true),
                 // Titles by section key. Which sections exist is still derived
                 // from the fields.
                 'sections' => ['type' => 'array', 'items' => SchemaBuilder::ref('FormSectionText')],
@@ -7027,6 +7029,7 @@ final class CoreApiSchemas
                 'route_template_id' => self::int(true) + ['description' => 'Route template for approving submissions; null removes it.'],
                 'submit_label' => self::localizedText() + ['nullable' => true, 'description' => 'What the submit button says; null for the default wording.'],
                 'sections' => ['type' => 'array', 'maxItems' => 100, 'items' => SchemaBuilder::ref('FormSectionText'), 'description' => 'The title and description of each section, by `section_key`.'],
+                'reference_format' => ['type' => 'string', 'maxLength' => 64, 'nullable' => true, 'description' => 'The reference each new submission is given, e.g. `BAKE-{YYYY}-{SEQ:4}`. Tokens: {YYYY}, {YY}, {MM}, {SEQ}, {SEQ:n}. {SEQ} is required. Dates are UTC. Null gives none.'],
             ], []) + ['minProperties' => 1],
             'FormFieldCreateRequest' => self::object([
                 'field_key' => [
@@ -7216,6 +7219,7 @@ final class CoreApiSchemas
                 'data' => self::object([
                     'received' => self::bool(),
                     'submitted_at' => self::str(true),
+                    'reference' => self::str(true),
                 ], ['received']),
                 'meta' => self::object([
                     'routed' => self::bool(),
@@ -7224,6 +7228,8 @@ final class CoreApiSchemas
             ], ['data']),
             'FormSubmission' => self::object([
                 'id' => self::int(),
+                // Null when the form gives no references, or was submitted before it did.
+                'reference' => self::str(true),
                 'tenant_id' => self::int(),
                 'form_id' => self::int(),
                 // The version the answers were given against. See the publish
