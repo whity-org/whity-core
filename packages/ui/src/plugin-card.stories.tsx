@@ -1,9 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/react-vite"
 import { fn } from "storybook/test"
 import * as React from "react"
-import { IconCloudUpload, IconDatabase, IconPuzzle, IconShieldCheck } from "@tabler/icons-react"
+import { IconCloudUpload, IconDatabase, IconDownload, IconPuzzle, IconShieldCheck } from "@tabler/icons-react"
 
-import { PluginStoreCard, InstalledPluginCard, type PluginItem } from "./plugin-card"
+import { Button } from "./button"
+import { PluginStoreCard, InstalledPluginCard, PluginTile, type PluginItem } from "./plugin-card"
 
 const SAMPLE_PLUGINS: PluginItem[] = [
   {
@@ -177,4 +178,31 @@ export const InstalledPluginsAllStates: Story = {
       </div>
     )
   },
+}
+
+export const StoreTiles: StoryObj = {
+  render: () => (
+    <div className="grid max-w-5xl grid-cols-1 gap-4 md:grid-cols-3">
+      <PluginTile
+        name="Inventory for Whity"
+        publisher="Example Bakery Software"
+        summary="Track stock levels and reorder points from one screen."
+        version="1.2.0"
+        tags={["operations", "inventory"]}
+        onOpen={fn()}
+        action={<Button><IconDownload />Install</Button>}
+      />
+      <PluginTile
+        name="Delivery Tracker"
+        publisher="Example Logistics"
+        summary="See every delivery and who is driving it."
+        version="0.9.1"
+        tags={["operations"]}
+        verified
+        onOpen={fn()}
+        action={<Button><IconDownload />Install</Button>}
+      />
+      <PluginTile name="Plain" onOpen={fn()} />
+    </div>
+  ),
 }

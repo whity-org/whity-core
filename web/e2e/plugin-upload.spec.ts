@@ -19,12 +19,12 @@ import { zipPluginDir } from './support/plugin-zip';
  *
  * Two journeys against the real backend:
  *
- *  1. ADMIN uploads a fixture .zip through the Upload Plugin dialog -> it lands
- *     `disabled` for review -> Enable -> `active`.
+ *  1. ADMIN uploads a fixture .zip from the operator menu (Upload plugin) ->
+ *     it lands Turned off for review -> Turn on -> Active.
  *
- *  2. A `plugins:read`-ONLY principal sees the console list but with the
- *     destructive Uninstall trigger HIDDEN and the other actions
- *     (Reload / Upload / Enable-Disable) DISABLED with a tooltip reason.
+ *  2. A `plugins:read`-ONLY principal sees the installed list, but the operator
+ *     menu is absent and the row menu offers neither Turn on/off nor Uninstall
+ *     (design 2.9: actions a person cannot use are not drawn).
  *
  * The read-only principal is the existing delegate account narrowed to JUST
  * `plugins:read`: this spec delegates that one permission to it via the admin
@@ -123,14 +123,13 @@ test.describe('Plugin upload + RBAC visibility (WC-221)', () => {
 
     try {
       await page.goto(PLUGINS_URL);
-      await expect(
-        page.getByRole('heading', { name: 'Plugin Management' })
-      ).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Plugins', exact: true })).toBeVisible();
 
-      // Open the Upload dialog and submit the fixture archive.
-      await page.getByRole('button', { name: /Upload Plugin/i }).click();
+      // Open the Upload dialog from the operator menu and submit the archive.
+      await page.getByRole('button', { name: 'Operator tools' }).click();
+      await page.getByRole('menuitem', { name: /Upload plugin/i }).click();
       const dialog = page.getByRole('dialog');
-      await expect(dialog.getByText('Upload Plugin')).toBeVisible();
+      await expect(dialog.getByText('Upload plugin', { exact: true })).toBeVisible();
 
       await dialog.locator('input[type="file"]').setInputFiles(zipPath);
 
@@ -146,12 +145,10 @@ test.describe('Plugin upload + RBAC visibility (WC-221)', () => {
         toastWithText(page, /staged successfully/i)
       ).toBeVisible();
 
-      // The staged plugin appears with status `disabled` for review.
-      const card = page
-        .locator('[data-slot="card"]')
-        .filter({ hasText: FIXTURE_PLUGIN_ID });
-      await expect(card).toBeVisible();
-      await expect(card.getByText('disabled', { exact: false }).first()).toBeVisible();
+      // The staged plugin appears Turned off for review.
+      const row = page.getByRole('row').filter({ hasText: FIXTURE_PLUGIN_ID });
+      await expect(row).toBeVisible();
+      await expect(row.getByText('Turned off')).toBeVisible();
 
       // Enable it -> the lifecycle status flips to active.
       const enableResponse = page.waitForResponse(
@@ -159,22 +156,19 @@ test.describe('Plugin upload + RBAC visibility (WC-221)', () => {
           res.url().includes(`/api/v1/plugins/${FIXTURE_PLUGIN_ID}/enable`) &&
           res.request().method() === 'POST'
       );
-      await card.getByRole('button', { name: /Enable/i }).click();
+      await row.getByRole('button', { name: `More actions for ${FIXTURE_PLUGIN_ID}` }).click();
+      await page.getByRole('menuitem', { name: 'Turn on' }).click();
       expect((await enableResponse).status()).toBe(200);
 
       await expect(toastWithText(page, /successfully enabled/i)).toBeVisible();
-      const refreshedCard = page
-        .locator('[data-slot="card"]')
-        .filter({ hasText: FIXTURE_PLUGIN_ID });
-      await expect(
-        refreshedCard.getByText('active', { exact: false }).first()
-      ).toBeVisible();
+      const refreshedRow = page.getByRole('row').filter({ hasText: FIXTURE_PLUGIN_ID });
+      await expect(refreshedRow.getByText('Active', { exact: true })).toBeVisible();
     } finally {
       await rm(workDir, { recursive: true, force: true });
     }
   });
 
-  test('a plugins:read-only delegate sees the list with Uninstall hidden and other actions disabled', async ({
+  test('a plugins:read-only delegate sees the list with no operator menu, Turn on/off or Uninstall', async ({
     browser,
     baseURL,
   }) => {
@@ -204,31 +198,19 @@ test.describe('Plugin upload + RBAC visibility (WC-221)', () => {
 
       await page.goto(PLUGINS_URL);
       // plugins:read is held, so the console renders (not Access Denied).
-      await expect(
-        page.getByRole('heading', { name: 'Plugin Management' })
-      ).toBeVisible();
-      await expect(
-        page.getByRole('heading', { name: 'Access Denied' })
-      ).toHaveCount(0);
+      await expect(page.getByRole('heading', { name: 'Plugins', exact: true })).toBeVisible();
+      await expect(page.getByText('You cannot manage plugins')).toHaveCount(0);
 
-      // Non-destructive actions are DISABLED (rendered, with a tooltip reason).
-      const reload = page.getByRole('button', { name: /Reload Plugins/i });
-      await expect(reload).toBeVisible();
-      await expect(reload).toBeDisabled();
+      // Actions this person cannot use are not drawn: no operator menu.
+      await expect(page.getByRole('button', { name: 'Operator tools' })).toHaveCount(0);
 
-      const upload = page.getByRole('button', { name: /Upload Plugin/i });
-      await expect(upload).toBeVisible();
-      await expect(upload).toBeDisabled();
-
-      // Open a plugin's detail modal. The destructive Uninstall trigger is
-      // HIDDEN entirely for a caller without plugins:uninstall.
-      const firstDetails = page.getByRole('button', { name: /Details/i }).first();
-      if ((await firstDetails.count()) > 0) {
-        await firstDetails.click();
-        await expect(page.getByText('Status').first()).toBeVisible();
-        await expect(
-          page.getByRole('button', { name: /Uninstall/i })
-        ).toHaveCount(0);
+      // A row's menu offers Details, but neither Turn on/off nor Uninstall.
+      const firstMenu = page.getByRole('button', { name: /^More actions for / }).first();
+      if ((await firstMenu.count()) > 0) {
+        await firstMenu.click();
+        await expect(page.getByRole('menuitem', { name: 'Details' })).toBeVisible();
+        await expect(page.getByRole('menuitem', { name: /^Turn (on|off)$/ })).toHaveCount(0);
+        await expect(page.getByRole('menuitem', { name: 'Uninstall' })).toHaveCount(0);
       }
     } finally {
       await context.close();
