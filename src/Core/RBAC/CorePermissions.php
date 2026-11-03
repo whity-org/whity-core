@@ -26,14 +26,13 @@ final class CorePermissions
     public const SOURCE = 'core';
 
     /**
-     * Read the admin dashboard aggregates (#990).
+     * Read the server statistics (#990, WHIT-872).
      *
-     * Its own slug rather than a reuse of `users:read`, because the Dashboard
-     * NAV ITEM must gate on the same thing as the route it points at, and
-     * `/admin` redirects to `/admin/stats` — so this pair decides whether the
-     * console has a landing page. Migration 157 grants it to whoever already
-     * holds `users:read`, since the endpoint aggregates rows that permission
-     * already exposes one by one.
+     * Holding it isn't enough: `GET /api/admin/stats` and the System nav item
+     * answer only in the system tenant (H.3), because the seeded `admin` is one
+     * global role held in every workspace. Migration 157 granted it to whoever
+     * held `users:read`; it no longer follows that permission, and migration 199
+     * took it off the roles workspaces own.
      */
     public const STATS_READ = 'stats:read';
 
@@ -240,6 +239,9 @@ final class CorePermissions
     // DOCUMENTS_RENDER, which now only previews a PDF and stores nothing.
     // Migration 166 grants it to every role that held render.
     public const DOCUMENTS_ISSUE = 'documents:issue';
+    // Taking an issued document back (S5, migration 201). Its own permission
+    // because issuing is an everyday act and withdrawing is not.
+    public const DOCUMENTS_WITHDRAW = 'documents:withdraw';
     // Workspace document themes (editor M4d, E.44): create, edit and archive
     // them, and set the workspace's default theme. Two segments only
     // (PermissionRegistry). Migration 172 grants it to every role that held
@@ -517,6 +519,7 @@ final class CorePermissions
             self::DOCUMENTS_PUBLISH,
             self::DOCUMENTS_RENDER,
             self::DOCUMENTS_ISSUE,
+            self::DOCUMENTS_WITHDRAW,
             self::DOCUMENTS_THEMES,
             self::DOCUMENTS_SUGGEST,
             self::DOCUMENTS_COMMENT,

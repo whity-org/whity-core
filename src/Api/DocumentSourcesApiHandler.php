@@ -7,6 +7,7 @@ namespace Whity\Api;
 use Whity\Auth\RoleChecker;
 use Whity\Core\Document\Collab\DocumentCollab;
 use Whity\Core\Document\DocumentAccessPolicy;
+use Whity\Core\Document\DocumentPeople;
 use Whity\Core\Document\DocumentSourceFileStore;
 use Whity\Core\Document\DocumentSourceRepository;
 use Whity\Core\Document\DocumentSourceVersionRepository;
@@ -86,6 +87,8 @@ final class DocumentSourcesApiHandler
         private readonly ?DocumentThemeResolver $themes = null,
         // Its open suggestions and comment threads (editor M5), served with it.
         private readonly ?DocumentCollab $collab = null,
+        // S5: names for "Written by", from the rows being served.
+        private readonly ?DocumentPeople $people = null,
     ) {
         $this->repo = $repo;
         $this->policy = $policy;
@@ -113,7 +116,13 @@ final class DocumentSourcesApiHandler
             $this->ouReach->reachFor($tenantId, $callerId),
         );
 
-        return Response::json(['data' => array_values($visible)]);
+        $rows = array_values($visible);
+        $names = $this->people?->names($tenantId, array_values(array_filter(
+            array_map(static fn (array $row): ?int => isset($row['created_by']) ? (int) $row['created_by'] : null, $rows),
+            static fn (?int $id): bool => $id !== null,
+        ))) ?? [];
+
+        return Response::json(['data' => $rows, 'people' => $names === [] ? new \stdClass() : $names]);
     }
 
     /**
