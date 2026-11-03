@@ -24319,6 +24319,77 @@
                 }
             }
         },
+        "/api/v1/me/agent-toolsets": {
+            "get": {
+                "operationId": "get_api_v1_me_agent_toolsets",
+                "summary": "The areas an agent can work with, in both languages",
+                "tags": [
+                    "me"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Core's areas",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AgentToolsetListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/me/agents": {
             "get": {
                 "operationId": "get_api_v1_me_agents",
@@ -48320,6 +48391,15 @@
                     "agentPaused": {
                         "type": "boolean",
                         "description": "The agent is paused, so this can be declined but not approved until it is resumed"
+                    },
+                    "toolInfo": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/AgentToolInfo"
+                            }
+                        ],
+                        "nullable": true,
+                        "description": "What it would run, in plain words"
                     }
                 },
                 "required": [
@@ -48430,6 +48510,40 @@
                     "agentAccess",
                     "readOnly",
                     "undoWindowSeconds"
+                ]
+            },
+            "AgentToolset": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "titleAr": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "id",
+                    "title",
+                    "titleAr"
+                ]
+            },
+            "AgentToolsetListResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/AgentToolset"
+                        }
+                    }
+                },
+                "required": [
+                    "data"
                 ]
             },
             "AgentUnassignResponse": {
