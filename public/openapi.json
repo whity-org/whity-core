@@ -49393,13 +49393,16 @@
                 "type": "object",
                 "properties": {
                     "plan_key": {
-                        "type": "string"
+                        "type": "string",
+                        "description": "The plan to move to, from the list of plans this workspace can buy."
                     },
                     "billing_period": {
-                        "type": "string"
+                        "type": "string",
+                        "description": "month or year. Leave it out to keep the plan's only price."
                     },
                     "idempotency_key": {
-                        "type": "string"
+                        "type": "string",
+                        "description": "8 to 64 characters, new for each confirmed change and the same on a retry of it."
                     }
                 },
                 "required": [
@@ -65444,7 +65447,8 @@
                 "type": "object",
                 "properties": {
                     "profile_id": {
-                        "type": "integer"
+                        "type": "integer",
+                        "description": "The person to remind, from the two-step status list."
                     }
                 },
                 "required": [

@@ -4398,7 +4398,11 @@ final class CoreApiSchemas
                 'last_reminded_at' => self::str(true),
             ], ['profile_id', 'name', 'email', 'enrolled', 'enforcement_deadline', 'last_reminded_at']),
             'TwoFactorPolicyStatusResponse' => self::listEnvelope('TwoFactorPolicyStatusEntry'),
-            'TwoFactorRemindRequest' => self::object(['profile_id' => self::int()], ['profile_id']),
+            'TwoFactorRemindRequest' => self::object([
+                'profile_id' => self::int() + [
+                    'description' => 'The person to remind, from the two-step status list.',
+                ],
+            ], ['profile_id']),
             'TwoFactorRemindResponse' => self::dataEnvelope(self::object([
                 'profile_id' => self::int(),
                 'last_reminded_at' => self::str(),
@@ -4739,9 +4743,15 @@ final class CoreApiSchemas
                 'return_url' => self::str(true),
             ], ['provider']),
             'BillingChangePlanRequest' => self::object([
-                'plan_key' => self::str(),
-                'billing_period' => self::str(),
-                'idempotency_key' => self::str(),
+                'plan_key' => self::str() + [
+                    'description' => 'The plan to move to, from the list of plans this workspace can buy.',
+                ],
+                'billing_period' => self::str() + [
+                    'description' => 'month or year. Leave it out to keep the plan\'s only price.',
+                ],
+                'idempotency_key' => self::str() + [
+                    'description' => '8 to 64 characters, new for each confirmed change and the same on a retry of it.',
+                ],
             ], ['plan_key', 'idempotency_key']),
             'BillingChangePlanResponse' => self::dataEnvelope(self::object([
                 'plan_key' => self::str(),

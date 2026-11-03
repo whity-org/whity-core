@@ -474,6 +474,9 @@ final class WorkspaceServerRealEngineTest extends TestCase
         $member = array_values(array_filter($status, static fn (array $r): bool => $r['profile_id'] === self::MEMBER_A))[0];
         self::assertNotNull($member['last_reminded_at']);
         self::assertSame('Omar Khalil', $member['name']);
+        $by = $this->pdo->prepare('SELECT reminded_by FROM two_factor_reminders WHERE profile_id = ?');
+        $by->execute([self::MEMBER_A]);
+        self::assertSame(self::ADMIN_A, (int) $by->fetchColumn(), 'Who reminded is the signed-in caller.');
     }
 
     public function testASecondReminderTheSameDayIsRefusedAndSendsNothing(): void

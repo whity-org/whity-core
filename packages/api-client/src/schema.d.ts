@@ -7444,8 +7444,11 @@ export interface components {
             };
         };
         BillingChangePlanRequest: {
+            /** @description The plan to move to, from the list of plans this workspace can buy. */
             plan_key: string;
+            /** @description month or year. Leave it out to keep the plan's only price. */
             billing_period?: string;
+            /** @description 8 to 64 characters, new for each confirmed change and the same on a retry of it. */
             idempotency_key: string;
         };
         BillingChangePlanResponse: {
@@ -11800,6 +11803,7 @@ export interface components {
             };
         };
         TwoFactorRemindRequest: {
+            /** @description The person to remind, from the two-step status list. */
             profile_id: number;
         };
         TwoFactorRemindResponse: {

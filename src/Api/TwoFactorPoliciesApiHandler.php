@@ -292,7 +292,7 @@ final class TwoFactorPoliciesApiHandler
         }
 
         $now = gmdate('Y-m-d H:i:s');
-        $actorId = AuditContext::getActorUserId();
+        $actorId = isset($request->user->profile_id) ? (int) $request->user->profile_id : null;
         $stmt = $this->db->prepare(
             'INSERT INTO two_factor_reminders (tenant_id, profile_id, reminded_at, reminded_by)
              VALUES (:tenant_id, :profile_id, :now, :by)
