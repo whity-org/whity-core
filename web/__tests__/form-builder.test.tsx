@@ -9,6 +9,7 @@ import { userEvent } from '@testing-library/user-event';
 import { FormBuilderScreen, FormsListScreen } from '@whity/features/forms';
 import type { FormsScreenEnv } from '@whity/features/forms';
 import {
+  reorder,
   duplicateField,
   groupBySection,
   moveField,
@@ -68,6 +69,13 @@ describe('builder model', () => {
     const copy = duplicateField(fields, 0);
     expect(copy[1].id).toBeUndefined();
     expect(copy[1].field_key).toBe('imports_copy');
+  });
+
+  it('drops a dragged question into the place and section of the one it lands on', () => {
+    const fields = [draft('a', { section_key: 's1' }), draft('b', { section_key: 's1' }), draft('c', { section_key: 's2' })];
+    const next = reorder(fields, 0, 2);
+    expect(next.map((f) => f.field_key)).toEqual(['b', 'c', 'a']);
+    expect(next[2].section_key).toBe('s2');
   });
 
   it('groups questions under their sections, unsectioned first', () => {
@@ -156,8 +164,8 @@ describe('FormBuilderScreen', () => {
     render(<FormBuilderScreen env={fakeEnv([])} formId={7} canManage />);
     await screen.findByText(/Supplier name/);
     await userEvent.click(screen.getByRole('button', { name: /Add question/ }));
-    expect(await screen.findByRole('menuitem', { name: 'Choose one' })).toBeInTheDocument();
-    expect(screen.queryByRole('menuitem', { name: 'Signature' })).not.toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Choose one' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Signature' })).not.toBeInTheDocument();
   });
 
   it('is read-only without permission to manage', async () => {
@@ -165,5 +173,13 @@ describe('FormBuilderScreen', () => {
     await screen.findByText(/Supplier name/);
     expect(screen.getByText('You can look, not change')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Add question/ })).not.toBeInTheDocument();
+  });
+
+  it('puts the cursor in the wording of a question just added', async () => {
+    render(<FormBuilderScreen env={fakeEnv([])} formId={7} canManage />);
+    await screen.findByText(/Supplier name/);
+    await userEvent.click(screen.getByRole('button', { name: /Add question/ }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Short text' }));
+    await waitFor(() => expect(document.activeElement?.id).toBe('q-label-en'));
   });
 });

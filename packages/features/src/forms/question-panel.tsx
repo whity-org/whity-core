@@ -145,6 +145,7 @@ export function QuestionPanel({
 
       <BilingualInput
         id="q-label"
+        className="sm:[&>.grid]:grid-cols-1"
         label={t("builder.panel.wording", "Question")}
         value={asMap(field.label)}
         onChange={onRelabel}
@@ -155,6 +156,7 @@ export function QuestionPanel({
 
       <BilingualInput
         id="q-help"
+        className="sm:[&>.grid]:grid-cols-1"
         label={t("builder.panel.help", "Help under the question")}
         value={asMap(field.help_text_i18n)}
         onChange={(help) => onChange({ ...field, help_text_i18n: help })}
@@ -171,6 +173,7 @@ export function QuestionPanel({
               <div className="min-w-0 flex-1">
                 <BilingualInput
                   id={`q-option-${i}`}
+                  className="sm:[&>.grid]:grid-cols-1"
                   value={asMap(option.label)}
                   onChange={(label) => setOptionLabel(i, label)}
                   enLabel={t("builder.lang.en", "English")}

@@ -12,6 +12,7 @@ import type { BilingualValue } from "@whity/ui/bilingual-input"
 
 import { useTranslation } from "../i18n"
 import { useCurrentLanguage } from "./language"
+import { useDateDisplay } from "../datetime"
 import { createFormsApi, fieldBody } from "./api"
 import { BuilderCanvas } from "./builder-canvas"
 import {
@@ -21,6 +22,7 @@ import {
   newField,
   relabel,
   removeField,
+  reorder,
   snapshot,
 } from "./builder-model"
 import { FormSettingsTab, type FormSettings } from "./form-settings-tab"
@@ -75,6 +77,7 @@ export function FormBuilderScreen({ env, formId, canManage }: { env: FormsScreen
   const t = useTranslation("forms")
   const { currentLanguage } = useCurrentLanguage()
   const statusLabel = useStatusLabel()
+  const { dateTime } = useDateDisplay()
   const api = useMemo(() => createFormsApi(env.transport), [env.transport])
 
   const [loaded, setLoaded] = useState<Loaded | null>(null)
@@ -85,6 +88,17 @@ export function FormBuilderScreen({ env, formId, canManage }: { env: FormsScreen
   const [saving, setSaving] = useState(false)
   const [publicBusy, setPublicBusy] = useState(false)
   const [tab, setTab] = useState("questions")
+  // Bumped when a question is added, so the cursor lands in its wording.
+  const [focusWording, setFocusWording] = useState(0)
+
+  useEffect(() => {
+    if (focusWording === 0) return
+    const id = window.setTimeout(() => {
+      document.getElementById("q-label-en")?.focus()
+      document.getElementById("q-label-en")?.scrollIntoView({ block: "nearest" })
+    }, 0)
+    return () => window.clearTimeout(id)
+  }, [focusWording])
 
   const load = useCallback(async () => {
     setFailure(null)
@@ -275,19 +289,30 @@ export function FormBuilderScreen({ env, formId, canManage }: { env: FormsScreen
     <div className="space-y-6">
       <PageHeader
         breadcrumb={
-          <Button variant="link" className="px-0" onClick={() => env.navigate("/admin/x/forms-builder")}>
-            {t("builder.back", "Back to forms")}
-          </Button>
+          <nav aria-label={t("builder.breadcrumb", "Where you are")} className="flex items-center gap-1 text-sm text-muted-foreground">
+            <Button variant="link" className="h-auto px-0" onClick={() => env.navigate("/admin/x/forms-builder")}>
+              {t("builder.title", "Form builder")}
+            </Button>
+            <Icon name="chevron-right" size={14} className="rtl:rotate-180" aria-hidden />
+            <span aria-current="page" className="text-foreground">
+              {title}
+            </span>
+          </nav>
         }
         title={title}
         icon={<Icon name="form" size={20} />}
         badge={<Badge variant={statusVariant(form.status)}>{statusLabel(form.status)}</Badge>}
         description={
-          form.public_enabled
-            ? t("builder.facts.link", "Anyone with the link can fill it in.")
-            : form.status === "published"
-              ? t("builder.facts.members", "People who may fill in forms can fill it in.")
-              : t("builder.facts.draft", "Nobody can fill it in yet.")
+          <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            <span>
+              {form.public_enabled
+                ? t("builder.facts.link", "Anyone with the link can fill it in.")
+                : form.status === "published"
+                  ? t("builder.facts.members", "People who may fill in forms can fill it in.")
+                  : t("builder.facts.draft", "Nobody can fill it in yet.")}
+            </span>
+            <span>{t("builder.facts.changed", "Changed {when}", { when: dateTime(form.updated_at) ?? "" })}</span>
+          </span>
         }
         action={
           canManage ? (
@@ -317,14 +342,14 @@ export function FormBuilderScreen({ env, formId, canManage }: { env: FormsScreen
       )}
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
+        <TabsList className="overflow-visible">
           <TabsTrigger value="questions">{t("builder.tab.questions", "Questions")}</TabsTrigger>
           <TabsTrigger value="responses">{t("builder.tab.responses", "Responses")}</TabsTrigger>
           <TabsTrigger value="settings">{t("builder.tab.settings", "Settings")}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="questions" className="pt-4">
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_24rem]">
+          <div className="grid overflow-hidden rounded-card border border-border bg-muted lg:grid-cols-[minmax(0,1fr)_26rem]">
             <BuilderCanvas
               title={title}
               description={description}
@@ -337,6 +362,7 @@ export function FormBuilderScreen({ env, formId, canManage }: { env: FormsScreen
               onAdd={(kind, sectionKey) => {
                 setFields((current) => [...current, newField(kind, current, sectionKey)])
                 setSelected(fields.length)
+                setFocusWording((n) => n + 1)
               }}
               onMove={(index, direction) => {
                 const next = moveField(fields, index, direction)
@@ -347,12 +373,17 @@ export function FormBuilderScreen({ env, formId, canManage }: { env: FormsScreen
                 setFields(duplicateField(fields, index))
                 setSelected(index + 1)
               }}
+              onReorder={(from, to) => {
+                setFields(reorder(fields, from, to))
+                setSelected(to)
+              }}
               onDelete={(index) => {
                 setFields(removeField(fields, index))
                 setSelected(null)
               }}
             />
-            <aside className="h-fit rounded-card border border-border bg-card p-4 lg:sticky lg:top-4">
+            <aside className="border-t border-border bg-card p-5 lg:border-s lg:border-t-0">
+              <div className="lg:sticky lg:top-4">
               {selectedField === undefined || selected === null ? (
                 <p className="text-sm text-muted-foreground">
                   {t("builder.panel.empty", "Choose a question to change it, or add one. The form's own settings are in the Settings tab.")}
@@ -370,6 +401,7 @@ export function FormBuilderScreen({ env, formId, canManage }: { env: FormsScreen
                   onRelabel={(label: BilingualValue) => setFields((current) => relabel(current, selected, label))}
                 />
               )}
+              </div>
             </aside>
           </div>
         </TabsContent>
