@@ -3547,18 +3547,19 @@ $documentsHandler = new \Whity\Api\DocumentsApiHandler(
     \Whity\app(\Whity\Core\Document\Issuing\TemplateIssuing::class),
     $roleChecker,
 ));
+$documentWithdrawal = new \Whity\Core\Document\DocumentWithdrawal(
+    $db->getPdo(),
+    $documentRepository,
+    $documentQrTokenRepository,
+    $routeRecipientRepository,
+    $routeEventRepository,
+    $auditLogger
+);
 $documentWithdrawalHandler = new \Whity\Api\DocumentWithdrawalApiHandler(
     $documentRepository,
     $documentVisibilityPolicy,
     $roleChecker,
-    new \Whity\Core\Document\DocumentWithdrawal(
-        $db->getPdo(),
-        $documentRepository,
-        $documentQrTokenRepository,
-        $routeRecipientRepository,
-        $routeEventRepository,
-        $auditLogger
-    )
+    $documentWithdrawal
 );
 $router->register('POST', '/api/documents/{id:\d+}/withdraw', [$documentWithdrawalHandler, 'withdraw'], null, null, CorePermissions::DOCUMENTS_WITHDRAW);
 $documentQrHandler = new \Whity\Api\DocumentQrApiHandler(
@@ -3998,6 +3999,14 @@ $router->register('POST', '/api/form-submissions/{id:\d+}/review', [$formSubmiss
 // "being a recipient IS the authorization"), and a member who filled in a form
 // opened to them holds none.
 $router->register('GET', '/api/me/form-submissions', [$formSubmissionsHandler, 'listMine'], null);
+$formSubmissionWithdrawalHandler = new \Whity\Api\FormSubmissionWithdrawalApiHandler(
+    $db->getPdo(),
+    $formSubmissionRepository,
+    $documentRepository,
+    $documentWithdrawal,
+    $auditLogger
+);
+$router->register('POST', '/api/me/form-submissions/{id:\d+}/withdraw', [$formSubmissionWithdrawalHandler, 'withdraw'], null);
 
 // A FORM OPENED TO THE WORKSPACE'S MEMBERS (migration 198). No permission, like the
 // inbox: being an active member, on a form somebody with `forms:manage` opened, is the
