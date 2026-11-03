@@ -41,7 +41,7 @@ function SettingsPageInner() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">{t('settings.title', 'Your account')}</h1>
+        <h1 className="text-2xl font-semibold">{t('settings.title', 'Settings')}</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {t('settings.subtitle', 'Manage your account and security preferences')}
         </p>
