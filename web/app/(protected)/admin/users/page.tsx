@@ -25,6 +25,7 @@ import {
   DropdownMenuTrigger,
 } from '@whity/ui/dropdown-menu';
 import { Avatar } from '@whity/ui/avatar';
+import { roleLabel } from '@whity/features/roles';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@whity/ui/tabs';
 import { AreaError } from '@whity/ui/page-states';
 import { IconMenu2, IconPlus } from '@tabler/icons-react';
@@ -204,7 +205,12 @@ export default function UsersPage() {
         </div>
       ),
     },
-    { accessorKey: 'role', header: t('users.table.role', 'Role'), enableSorting: true },
+    {
+      accessorKey: 'role',
+      header: t('users.table.role', 'Role'),
+      enableSorting: true,
+      cell: (user) => roleLabel(user.role),
+    },
     {
       accessorKey: 'accountStatus',
       header: t('users.table.status', 'Status'),
@@ -334,6 +340,21 @@ export default function UsersPage() {
               onRowClick={openRecord}
               rowActions={rowActions}
               isLoading={isLoading}
+              emptyState={
+                query.search.value !== ''
+                  ? {
+                      title: t('users.empty.filtered', 'No one matches “{term}”', {
+                        term: query.search.value,
+                      }),
+                    }
+                  : {
+                      title: t('users.empty.title', 'No one here yet'),
+                      description: t(
+                        'users.empty.description',
+                        'Invite people by email, and they appear here once they join.'
+                      ),
+                    }
+              }
               globalFilterPlaceholder={t('users.searchPlaceholder', 'Search by email or role')}
               sorting={query.sorting}
               search={query.search}

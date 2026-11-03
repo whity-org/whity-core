@@ -49,7 +49,10 @@ final class FormRepository
      * cannot reach one caller and not another.
      */
     private const COLUMNS = 'id, tenant_id, form_key, name, description, submit_label, sections, reference_format, status, version,
-                             route_template_id, created_by_profile_id, created_at, updated_at,
+                             route_template_id,
+                             (SELECT t.name FROM document_route_templates t
+                               WHERE t.id = forms.route_template_id AND t.tenant_id = forms.tenant_id) AS route_template_name,
+                             created_by_profile_id, created_at, updated_at,
                              open_to_members, members_opened_at, members_opened_by_profile_id,
                              public_enabled, public_slug, public_opens_at, public_closes_at,
                              public_enabled_at, public_enabled_by_profile_id,
@@ -632,6 +635,8 @@ final class FormRepository
             'status' => $status,
             'version' => (int) $row['version'],
             'route_template_id' => $row['route_template_id'] === null ? null : (int) $row['route_template_id'],
+            // S5: so the builder can say "Routed to" without `route_templates:read`.
+            'route_template_name' => isset($row['route_template_name']) ? (string) $row['route_template_name'] : null,
             'created_by_profile_id' => $row['created_by_profile_id'] === null
                 ? null
                 : (int) $row['created_by_profile_id'],

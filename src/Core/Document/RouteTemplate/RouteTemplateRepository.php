@@ -88,7 +88,10 @@ final class RouteTemplateRepository
             'SELECT t.id, t.tenant_id, t.name, t.description, t.created_by, t.created_at, t.updated_at,
                     (SELECT COUNT(*)
                        FROM document_route_template_steps s
-                      WHERE s.template_id = t.id AND s.tenant_id = t.tenant_id) AS step_count
+                      WHERE s.template_id = t.id AND s.tenant_id = t.tenant_id) AS step_count,
+                    (SELECT COUNT(*)
+                       FROM document_routes r
+                      WHERE r.template_id = t.id AND r.tenant_id = t.tenant_id) AS usage_count
                FROM document_route_templates t
               WHERE t.tenant_id = :tenant_id
               ORDER BY t.name ASC, t.id ASC
@@ -135,7 +138,10 @@ final class RouteTemplateRepository
             'SELECT t.id, t.tenant_id, t.name, t.description, t.created_by, t.created_at, t.updated_at,
                     (SELECT COUNT(*)
                        FROM document_route_template_steps s
-                      WHERE s.template_id = t.id AND s.tenant_id = t.tenant_id) AS step_count
+                      WHERE s.template_id = t.id AND s.tenant_id = t.tenant_id) AS step_count,
+                    (SELECT COUNT(*)
+                       FROM document_routes r
+                      WHERE r.template_id = t.id AND r.tenant_id = t.tenant_id) AS usage_count
                FROM document_route_templates t
               WHERE t.id = :id AND t.tenant_id = :tenant_id'
         );
@@ -412,6 +418,7 @@ final class RouteTemplateRepository
             'name' => (string) $row['name'],
             'description' => $row['description'] !== null ? (string) $row['description'] : null,
             'step_count' => isset($row['step_count']) ? (int) $row['step_count'] : 0,
+            'usage_count' => isset($row['usage_count']) ? (int) $row['usage_count'] : 0,
             'created_by' => $row['created_by'] !== null ? (int) $row['created_by'] : null,
             'created_at' => (string) $row['created_at'],
             'updated_at' => (string) $row['updated_at'],

@@ -66,12 +66,15 @@ final class AgentProposalsApiHandler
             AgentProposalRepository::EXPIRED, AgentProposalRepository::UNDONE,
         ], true) ? $status : null;
 
-        $rows    = $this->proposals->listFor($tenantId, $profileId, $status);
-        $names   = $this->proposals->agentNames($tenantId, array_map(static fn (array $row): string => (string) $row['agent_principal_id'], $rows));
-        $actions = $this->actions?->forProposals($tenantId, array_map(static fn (array $row): int => (int) $row['id'], $rows)) ?? [];
+        $principal = $query['principal'] ?? $_GET['principal'] ?? null;
+        $rows      = $this->proposals->listFor($tenantId, $profileId, $status, principalId: is_string($principal) && $principal !== '' ? $principal : null);
+        $principals = array_map(static fn (array $row): string => (string) $row['agent_principal_id'], $rows);
+        $names      = $this->proposals->agentNames($tenantId, $principals);
+        $actions    = $this->actions?->forProposals($tenantId, array_map(static fn (array $row): int => (int) $row['id'], $rows)) ?? [];
+        $paused     = $this->assignments?->pausedPrincipals($principals, $tenantId) ?? [];
 
         return Response::json(['data' => array_map(
-            static fn (array $row): array => self::present($row, $names, $actions[(int) $row['id']] ?? null),
+            static fn (array $row): array => self::present($row, $names, $actions[(int) $row['id']] ?? null, in_array((string) $row['agent_principal_id'], $paused, true)),
             $rows,
         )], 200);
     }
@@ -99,11 +102,16 @@ final class AgentProposalsApiHandler
 
         // WHIT-816: a workspace agent's proposal runs under the person's
         // assignment as it is NOW (its toolsets and grant), not as it was when
-        // the agent asked; a revoked assignment or an archived agent can't run.
+        // the agent asked; a revoked assignment or an archived or paused agent
+        // can't run. A paused agent's proposal keeps waiting: it can be declined
+        // now, and approved once the agent is resumed, unless it expires first.
         $scope        = $proposal['scope'];
         $assignmentId = AgentAssignmentRepository::idFromPrincipal($proposal['agent_principal_id']);
         if ($assignmentId !== null) {
             $active = $this->assignments?->activeScope($assignmentId, $tenantId, $profileId);
+            if ($active === null && $this->assignments?->isPaused($assignmentId, $tenantId) === true) {
+                return Response::error('This agent is paused, so nothing can run. Resume the agent, then approve this.', 409);
+            }
             if ($active === null) {
                 return Response::error('This agent is no longer granted for you, so nothing can run', 409);
             }
@@ -210,11 +218,13 @@ final class AgentProposalsApiHandler
      * @param array<string, mixed>|null                           $action     the action it ran, when it has run (WHIT-812)
      * @return array<string, mixed>
      */
-    private static function present(array $proposal, array $agentNames = [], ?array $action = null): array
+    public static function present(array $proposal, array $agentNames = [], ?array $action = null, bool $agentPaused = false): array
     {
         return [
             'id'                => $proposal['id'],
             'agent'             => $agentNames[(string) $proposal['agent_principal_id']] ?? ['name' => null, 'nameAr' => null],
+            // WHIT-867: it can't run until the agent is resumed.
+            'agentPaused'       => $agentPaused,
             'status'            => $proposal['status'],
             'tool'              => $proposal['tool'],
             'summary'           => $proposal['summary'],

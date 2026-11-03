@@ -91,3 +91,14 @@ export async function refusal(response: Response, fallback: string): Promise<str
 export function toolsetsFromSplits(splits: { toolsets: string[] }[], alreadyChosen: string[]): string[] {
   return [...new Set([...splits.flatMap((split) => split.toolsets), ...alreadyChosen])].sort();
 }
+
+/**
+ * A toolset's name for a person: `core.agents` is "Agents", `hello-world` is
+ * "Hello world". The id itself is a technical detail. Toolsets carry no display
+ * name of their own yet, so this reads the id.
+ */
+export function toolsetLabel(id: string): string {
+  const parts = id.split('.');
+  const rest = parts[0] === 'core' && parts.length > 1 ? parts.slice(1) : parts;
+  return humanizeKey(rest.join(' '));
+}

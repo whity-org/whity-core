@@ -6,8 +6,8 @@ import { REGULAR_USER } from './support/constants';
  *
  * Verified live against the new RBAC-filtered navigation (WC-175 #191):
  * `GET /api/navigation` is now filtered server-side per caller, so the regular
- * user's sidebar shows ONLY "Settings" (every other section is gated on a
- * permission/role the plain user lacks). The admin-only data pages are no
+ * user's sidebar shows only what needs no permission, such as Dashboard (every
+ * other section is gated on a permission/role the plain user lacks). The admin-only data pages are no
  * longer reachable from the sidebar at all — there is no link to click — so
  * this flow asserts the NAV-LEVEL difference (gated links absent) instead of
  * the old data-layer 403 surface.
@@ -30,7 +30,7 @@ test.describe('Regular user (non-admin)', () => {
     // Every gated nav link is filtered out server-side for the plain user
     // (no role grant, no delegated permission), so none render in the sidebar.
     const hidden = [
-      'Dashboard',
+      'System',
       'Users',
       'Roles',
       'Organizational Units',
@@ -43,6 +43,9 @@ test.describe('Regular user (non-admin)', () => {
     for (const label of hidden) {
       await expect(userPage.shell.navLink(label)).toHaveCount(0);
     }
+
+    // The home is everyone's (H.1), so its link is always there.
+    await expect(userPage.shell.navLink('Dashboard')).toBeVisible();
 
     // The workspace Settings area is gated, so a plain user has no Settings
     // entry; their own account is always reachable from the user row.
@@ -70,7 +73,6 @@ test.describe('Regular user (non-admin)', () => {
     await page.goto('/admin/roles');
     await page.waitForURL('**/admin/roles');
     await expect(page.getByRole('heading', { name: 'Roles' })).toBeVisible();
-    await expect(page.getByText('No data available')).toBeVisible();
     await expect(page.getByText('Failed to fetch roles').first()).toBeVisible();
 
     // A second admin page proves the screen-layer 403 handling is not specific

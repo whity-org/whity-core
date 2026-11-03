@@ -331,6 +331,45 @@ final class RouteRecipientRepository
     }
 
     /**
+     * The routes of a document that still have an open item (S5).
+     *
+     * @return list<int>
+     */
+    public function routesWithOpenItems(int $documentId, int $tenantId): array
+    {
+        $stmt = $this->db->prepare(
+            'SELECT DISTINCT route_id
+               FROM document_route_recipients
+              WHERE tenant_id = :tenant_id
+                AND document_id = :document_id
+                AND closed_by_event_id IS NULL
+              ORDER BY route_id ASC'
+        );
+        $stmt->execute([':tenant_id' => $tenantId, ':document_id' => $documentId]);
+
+        return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+    }
+
+    /**
+     * Close every open item on a route, pointing at the trail row that did it.
+     *
+     * @return int How many rows were closed.
+     */
+    public function closeOpenOnRoute(int $tenantId, int $routeId, int $eventId): int
+    {
+        $stmt = $this->db->prepare(
+            'UPDATE document_route_recipients
+                SET closed_by_event_id = :event_id
+              WHERE tenant_id = :tenant_id
+                AND route_id = :route_id
+                AND closed_by_event_id IS NULL'
+        );
+        $stmt->execute([':event_id' => $eventId, ':tenant_id' => $tenantId, ':route_id' => $routeId]);
+
+        return $stmt->rowCount();
+    }
+
+    /**
      * How many COHORTS each step of a route has opened (#1140).
      *
      * A cohort is "the rows one act opened", keyed by `created_by_event_id`, so
@@ -434,6 +473,7 @@ final class RouteRecipientRepository
                 'SELECT r.id, r.tenant_id, r.document_id, r.route_id, r.step_id, r.profile_id, r.ou_id,
                         r.parent_recipient_id, r.created_by_event_id, r.closed_by_event_id, r.created_at,
                         d.title AS document_title, d.template_name AS document_template_name,
+                        d.withdrawn_at AS document_withdrawn_at,
                         e.action AS arrived_by, e.actor_profile_id AS arrived_from,
                         s.decision AS step_decision, s.satisfied_by AS step_satisfied_by,
                         ce.action AS closed_by_action,
@@ -463,6 +503,7 @@ final class RouteRecipientRepository
                 'SELECT r.id, r.tenant_id, r.document_id, r.route_id, r.step_id, r.profile_id, r.ou_id,
                         r.parent_recipient_id, r.created_by_event_id, r.closed_by_event_id, r.created_at,
                         d.title AS document_title, d.template_name AS document_template_name,
+                        d.withdrawn_at AS document_withdrawn_at,
                         e.action AS arrived_by, e.actor_profile_id AS arrived_from,
                         s.decision AS step_decision, s.satisfied_by AS step_satisfied_by,
                         ce.action AS closed_by_action,
@@ -624,6 +665,7 @@ final class RouteRecipientRepository
         return self::normalize($row) + [
             'document_title' => (string) $row['document_title'],
             'document_template_name' => (string) $row['document_template_name'],
+            'document_withdrawn' => ($row['document_withdrawn_at'] ?? null) !== null,
             // The ACTION of the creating trail event — how this reached you.
             // Read through the pointer rather than stored beside it, so it can
             // never disagree with the trail.

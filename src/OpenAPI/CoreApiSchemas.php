@@ -2994,11 +2994,11 @@ final class CoreApiSchemas
                 ],
             ]),
             self::adminRoute('GET', '/api/admin/stats', [
-                'summary' => 'Platform-wide aggregate statistics',
+                'summary' => 'Platform-wide aggregate statistics, for the system tenant only',
                 'tags' => ['platform-ops'],
                 'responses' => [
                     200 => self::jsonResponse('Aggregate stats', 'AdminStatsResponse'),
-                    403 => self::errorResponse('Insufficient permissions'),
+                    403 => self::errorResponse('Insufficient permissions, or not the system tenant'),
                     500 => self::errorResponse('Internal error'),
                 ],
             ]),
@@ -5140,6 +5140,9 @@ final class CoreApiSchemas
                 'origin_ou_id' => self::int(true),
                 'created_by' => self::int(true),
                 'created_at' => self::str(),
+                // S5: null unless the document was withdrawn. The record is kept.
+                'withdrawn_at' => self::str(true),
+                'withdrawn_by' => self::int(true),
                 // The CURRENT artifact's bytes; null only for a record whose
                 // artifact rows are gone (a partial restore), since the issuer
                 // never commits a document without one.
@@ -5178,6 +5181,9 @@ final class CoreApiSchemas
             // none was supplied) is visible rather than assumed.
             'DocumentListResponse' => self::object([
                 'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('Document')],
+                // S5: display names of the people these rows name, keyed by profile
+                // id. An id with no entry is somebody no longer in this workspace.
+                'people' => ['type' => 'object', 'additionalProperties' => ['type' => 'string']],
                 'pagination' => SchemaBuilder::ref('Pagination'),
                 'view' => self::object([
                     'key' => self::str(),
@@ -5459,6 +5465,8 @@ final class CoreApiSchemas
                 // act on a circulation step, every note, and every event recorded
                 // before migration 119. It never means "not approved".
                 'verdict' => ['type' => 'string', 'enum' => ['approved', 'rejected'], 'nullable' => true],
+                // S5: this row closed the route because the document was withdrawn.
+                'withdrawal' => self::bool(),
                 'occurred_at' => self::str(),
             ], ['id', 'document_id', 'route_id', 'action', 'occurred_at']),
             'DocumentTrailListResponse' => self::paginatedListEnvelope('DocumentTrailEvent'),
@@ -5552,6 +5560,24 @@ final class CoreApiSchemas
                 'pagination' => SchemaBuilder::ref('Pagination'),
                 'source' => self::str(),
             ], ['data', 'pagination', 'source']),
+            // One row of GET /api/me/waiting: an inbox item or an agent proposal.
+            'WaitingRow' => self::object([
+                'key' => self::str(),
+                'kind' => ['type' => 'string', 'enum' => ['inbox', 'proposal']],
+                'at' => self::str(),
+                'source' => self::str(),
+                'item' => SchemaBuilder::ref('InboxItem'),
+                'proposal' => SchemaBuilder::ref('AgentProposal'),
+            ], ['key', 'kind', 'at']),
+            'WaitingListResponse' => self::object([
+                'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('WaitingRow')],
+                'counts' => self::object([
+                    'inbox' => self::int(),
+                    'proposals' => self::int(),
+                    'total' => self::int(),
+                ], ['inbox', 'proposals', 'total']),
+                'unavailable' => ['type' => 'array', 'items' => self::str()],
+            ], ['data', 'counts', 'unavailable']),
             'InboxSource' => self::object([
                 'key' => self::str(),
                 'label' => self::str(),
@@ -5603,6 +5629,7 @@ final class CoreApiSchemas
                 'createdAt' => self::str(),
                             // WHIT-812: once approved and run, what can be undone and until when.
                 'action' => ['allOf' => [SchemaBuilder::ref('AgentAction')], 'nullable' => true],
+                'agentPaused' => ['type' => 'boolean', 'description' => 'The agent is paused, so this can be declined but not approved until it is resumed'],
             ], ['id', 'agent', 'status', 'tool', 'summary', 'arguments', 'diff', 'permissions', 'undoWindowSeconds', 'result', 'decidedAt', 'expiresAt', 'createdAt', 'action']),
             'AgentProposalListResponse' => self::listEnvelope('AgentProposal'),
             // ── Agent actions and undo (WHIT-812) ─────────────────────────────
@@ -5621,7 +5648,34 @@ final class CoreApiSchemas
                 'undoneBy' => self::object(['id' => self::int(), 'name' => self::str(true)], ['id', 'name']) + ['nullable' => true],
                 'undoneAt' => self::str(true),
                 'createdAt' => self::str(),
+                'toolInfo' => ['allOf' => [SchemaBuilder::ref('AgentToolInfo')], 'nullable' => true, 'description' => 'What ran, in plain words; null for a tool no longer offered'],
             ], ['id', 'status', 'tool', 'summary', 'agent', 'permissions', 'arguments', 'proposalId', 'undoWindowSeconds', 'undoableUntil', 'undoneBy', 'undoneAt', 'createdAt']),
+            'AgentToolInfo' => self::object([
+                'plainName' => self::str(),
+                'plainNameAr' => self::str(true),
+                'area' => self::object(['id' => self::str(), 'title' => self::str(), 'titleAr' => self::str(true)], ['id', 'title', 'titleAr']),
+                'agentAccess' => ['type' => 'string', 'enum' => ['can', 'proposes', 'suggests', 'never'], 'description' => 'The most an agent can ever do with it, whatever a person grants'],
+                'readOnly' => ['type' => 'boolean'],
+                'undoWindowSeconds' => self::int(true),
+            ], ['plainName', 'plainNameAr', 'area', 'agentAccess', 'readOnly', 'undoWindowSeconds']),
+            'AgentActivityItem' => self::object([
+                'id' => self::str(),
+                'kind' => ['type' => 'string', 'enum' => ['action', 'proposal']],
+                'status' => ['type' => 'string', 'enum' => ['done', 'undone', 'waiting', 'declined', 'expired', 'failed'], 'description' => 'failed: approved, and a check refused it when it ran'],
+                'agent' => self::object(['id' => self::int(true), 'name' => self::str(true), 'nameAr' => self::str(true)], ['id', 'name', 'nameAr']),
+                'person' => self::object(['id' => self::int(), 'name' => self::str(true)], ['id', 'name']),
+                'tool' => self::str(),
+                'toolInfo' => ['allOf' => [SchemaBuilder::ref('AgentToolInfo')], 'nullable' => true],
+                'summary' => self::str(),
+                'permissions' => ['type' => 'array', 'items' => self::str()],
+                'undoWindowSeconds' => self::int(true),
+                'undoableUntil' => self::str(true),
+                'createdAt' => self::str(),
+            ], ['id', 'kind', 'status', 'agent', 'person', 'tool', 'toolInfo', 'summary', 'permissions', 'undoWindowSeconds', 'undoableUntil', 'createdAt']),
+            'AgentActivityListResponse' => self::object([
+                'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('AgentActivityItem')],
+                'hasMore' => ['type' => 'boolean'],
+            ], ['data', 'hasMore']),
             'AgentActionListResponse' => self::listEnvelope('AgentAction'),
             'AgentActionResponse' => self::dataEnvelope(SchemaBuilder::ref('AgentAction')),
             'AgentProposalResponse' => self::dataEnvelope(SchemaBuilder::ref('AgentProposal')),
@@ -5647,7 +5701,28 @@ final class CoreApiSchemas
                 'status' => ['type' => 'string', 'enum' => ['active', 'archived']],
                 'createdAt' => self::str(),
                 'updatedAt' => self::str(),
-            ], ['id', 'slug', 'name', 'nameAr', 'role', 'roleAr', 'instructions', 'instructionsAr', 'tone', 'language', 'toolsets', 'grant', 'preset', 'status', 'createdAt', 'updatedAt']),
+                'paused' => ['type' => 'boolean', 'description' => 'Refused on every call until it is resumed'],
+                'pausedAt' => self::str(true),
+                'pausedBy' => self::str(true) + ['description' => 'Who paused it'],
+                'updatedBy' => self::str(true) + ['description' => 'Who changed it last'],
+                'worksFor' => ['type' => 'array', 'items' => self::object(['id' => self::int(), 'name' => self::str(true)], ['id', 'name']), 'description' => 'The people using it, from their assignments'],
+                'actionsToday' => self::int(),
+                'proposalsToday' => self::int(),
+                'waiting' => self::int(),
+                'lastActiveAt' => self::str(true) + ['description' => 'UTC, ISO 8601; null when it has never been active'],
+                'onItsOwn' => SchemaBuilder::ref('AgentOnItsOwn'),
+                'mayRead' => ['type' => 'array', 'items' => self::object([
+                    'id' => self::int(),
+                    'title' => self::str(true),
+                    'kind' => self::str(true),
+                    'readable' => ['type' => 'boolean', 'description' => 'False when you cannot read this document yourself, so its name is withheld'],
+                ], ['id', 'title', 'kind', 'readable'])],
+            ], ['id', 'slug', 'name', 'nameAr', 'role', 'roleAr', 'instructions', 'instructionsAr', 'tone', 'language', 'toolsets', 'grant', 'preset', 'status', 'createdAt', 'updatedAt', 'paused', 'pausedAt', 'pausedBy', 'updatedBy', 'worksFor', 'actionsToday', 'proposalsToday', 'waiting', 'lastActiveAt', 'onItsOwn', 'mayRead']),
+            'AgentOnItsOwn' => self::object([
+                'allowed' => self::int(),
+                'askFirst' => self::int(),
+                'off' => self::int(),
+            ], ['allowed', 'askFirst', 'off']),
             'AgentListResponse' => self::listEnvelope('Agent'),
             'AgentResponse' => self::dataEnvelope(SchemaBuilder::ref('Agent')),
             'AgentPreset' => self::object([
@@ -5663,7 +5738,12 @@ final class CoreApiSchemas
                 'language' => ['type' => 'string', 'enum' => ['auto', 'en', 'ar']],
                 'toolsets' => ['type' => 'array', 'items' => self::str()],
                 'grant' => ['type' => 'object', 'additionalProperties' => ['type' => 'string', 'enum' => ['off', 'ask', 'allow']]],
-            ], ['key', 'version', 'name', 'nameAr', 'role', 'roleAr', 'instructions', 'instructionsAr', 'tone', 'language', 'toolsets', 'grant']),
+                'does' => ['type' => 'array', 'items' => self::str(), 'description' => 'Three things it does; empty for a plugin\'s preset'],
+                'doesAr' => ['type' => 'array', 'items' => self::str()],
+                'icon' => self::str(true),
+                'needs' => self::str(true) + ['description' => 'The plugin it comes with; null when it works with Whity alone'],
+                'agentsFromIt' => self::int() + ['description' => 'How many of this workspace\'s agents came from it'],
+            ], ['key', 'version', 'name', 'nameAr', 'role', 'roleAr', 'instructions', 'instructionsAr', 'tone', 'language', 'toolsets', 'grant', 'does', 'doesAr', 'icon', 'needs', 'agentsFromIt']),
             'AgentPresetListResponse' => self::listEnvelope('AgentPreset'),
             // ── A person's use of the workspace's agents (WHIT-816) ──────────
             'MyAgent' => self::object([
@@ -5682,7 +5762,14 @@ final class CoreApiSchemas
                     'description' => 'Your use of this agent; null when you don\'t use it',
                     'properties' => ['id' => self::int(), 'principalId' => self::str(), 'createdAt' => self::str()],
                 ],
-            ], ['id', 'slug', 'name', 'nameAr', 'role', 'roleAr', 'tone', 'language', 'preset', 'assignment']),
+                'paused' => ['type' => 'boolean'],
+                'actionsToday' => self::int(),
+                'proposalsToday' => self::int(),
+                'waiting' => self::int(),
+                'lastActiveAt' => self::str(true) + ['description' => 'UTC, ISO 8601; null when it has never been active'],
+                'onItsOwn' => ['allOf' => [SchemaBuilder::ref('AgentOnItsOwn')], 'nullable' => true, 'description' => 'Under your grant; null when you don\'t use it'],
+                'mayRead' => ['type' => 'array', 'description' => 'What it keeps for reference that you can read', 'items' => self::object(['id' => self::int(), 'title' => self::str(), 'kind' => self::str()], ['id', 'title', 'kind'])],
+            ], ['id', 'slug', 'name', 'nameAr', 'role', 'roleAr', 'tone', 'language', 'preset', 'assignment', 'paused', 'actionsToday', 'proposalsToday', 'waiting', 'lastActiveAt', 'onItsOwn', 'mayRead']),
             'MyAgentListResponse' => self::listEnvelope('MyAgent'),
             'AgentGrantRow' => self::object([
                 'permission' => self::str(),
@@ -5890,6 +5977,8 @@ final class CoreApiSchemas
                 'name' => self::str(),
                 'description' => self::str(true),
                 'step_count' => self::int(),
+                // S5: how many routes were started from this design, finished or not.
+                'usage_count' => self::int(),
                 // Null once the person who designed it has been deleted. The
                 // design survives them: it is the institution's process, not that
                 // person's private filing.
@@ -6118,7 +6207,11 @@ final class CoreApiSchemas
                 'published_by' => self::int(true),
                 'published_at' => self::str(),
             ], ['version', 'title', 'blocks', 'own_fields', 'published_at'])),
-            'DocumentSourceListResponse' => self::listEnvelope('DocumentSource'),
+            'DocumentSourceListResponse' => self::object([
+                'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('DocumentSource')],
+                // S5: display names of who wrote these rows, keyed by profile id.
+                'people' => ['type' => 'object', 'additionalProperties' => ['type' => 'string']],
+            ], ['data']),
             'DocumentSourceFileResponse' => self::object([
                 'data' => self::object([
                     'id' => self::int(),
@@ -7080,6 +7173,7 @@ final class CoreApiSchemas
                 // Null means "collect only, do not circulate" — a legitimate
                 // configuration, not an unset field.
                 'route_template_id' => self::int(true),
+                'route_template_name' => self::str(true),
                 'created_by_profile_id' => self::int(true),
                 'created_at' => self::str(),
                 'updated_at' => self::str(),
@@ -11234,6 +11328,52 @@ final class CoreApiSchemas
                     404 => self::errorResponse('Document not found or not visible to the caller'),
                 ] + self::authErrors(),
             ]),
+            [
+                'method' => 'GET',
+                'path' => '/api/documents/{id:\\d+}/people',
+                'requiredRole' => null,
+                // Unpermissioned like the actions route below: a person the document
+                // was routed to may read it. The row gate is the visibility policy.
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'The names of the people on this document',
+                    'description' => 'Display names, keyed by profile id, of who raised and withdrew the document, '
+                        . 'who took part in its routes and, for a caller holding documents:read, who issued and '
+                        . 'retired its codes. It takes no ids and returns no email addresses. An id with no entry is '
+                        . 'somebody no longer in this workspace.',
+                    'tags' => ['documents'],
+                    'responses' => [
+                        200 => self::jsonResponse('Names keyed by profile id', self::object([
+                            'data' => ['type' => 'object', 'additionalProperties' => ['type' => 'string']],
+                        ], ['data'])),
+                        404 => self::errorResponse('Document not found or not visible to the caller'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            self::permissionRoute('POST', '/api/documents/{id:\\d+}/withdraw', 'documents:withdraw', [
+                'summary' => 'Withdraw an issued document',
+                // It cannot be undone, so an agent only ever proposes it, whatever its
+                // grant says (MCP-TOOL-SURFACE.md 5.11).
+                'mcp' => ['agentPolicy' => 'propose'],
+                'description' => 'Keeps the record and its history. Every live code stops being honoured, open items on '
+                    . 'its routes close, and it can no longer be routed, corrected or given a new code. Recorded in the '
+                    . 'audit log. There is no way to undo it.',
+                'tags' => ['documents'],
+                'responses' => [
+                    200 => self::jsonResponse('What the withdrawal did', self::object([
+                        'data' => self::object([
+                            'id' => self::int(),
+                            'withdrawn_at' => self::str(),
+                            'withdrawn_by' => self::int(true),
+                            'codes_withdrawn' => self::int(),
+                            'items_closed' => self::int(),
+                        ], ['id', 'withdrawn_at', 'codes_withdrawn', 'items_closed']),
+                    ], ['data'])),
+                    404 => self::errorResponse('Document not found or not visible to the caller'),
+                    409 => self::errorResponse('The document has already been withdrawn'),
+                    503 => self::errorResponse('The document could not be withdrawn'),
+                ] + self::authErrors(),
+            ]),
             self::permissionRoute('GET', '/api/documents/{id:\\d+}/recipients', 'documents:read', [
                 'summary' => 'Who the document\'s routes reached, and what became of each item',
                 'tags' => ['documents'],
@@ -11598,6 +11738,24 @@ final class CoreApiSchemas
                     ] + self::authErrors(),
                 ],
             ],
+            [
+                'method' => 'GET',
+                'path' => '/api/me/waiting',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => "What is waiting for the caller: every inbox source and their agent proposals, oldest first",
+                    'description' => 'At most `limit` rows, with the real totals in `counts`. A source that fails is named in '
+                        . '`unavailable` and the rest is still served. There are no pages: the rest is on Inbox and Approvals.',
+                    'tags' => ['inbox'],
+                    'parameters' => [
+                        self::queryParam('limit', 'integer', 'How many rows (default 6, max 50)'),
+                    ],
+                    'responses' => [
+                        200 => self::jsonResponse('The oldest rows and the totals', 'WaitingListResponse'),
+                    ] + self::authErrors(),
+                ],
+            ],
         ];
     }
 
@@ -11670,6 +11828,7 @@ final class CoreApiSchemas
             'language' => ['type' => 'string', 'enum' => ['auto', 'en', 'ar'], 'description' => 'auto follows the person; en or ar fixes it'],
             'toolsets' => ['type' => 'array', 'items' => self::str(), 'description' => 'Toolset ids or prefix.*; empty means every toolset'],
             'grant' => ['type' => 'object', 'additionalProperties' => ['type' => 'string', 'enum' => ['off', 'ask', 'allow']], 'description' => 'Where a new assignment starts, per permission'],
+            'mayRead' => ['type' => 'array', 'maxItems' => 20, 'items' => self::int(), 'description' => 'Documents it keeps for reference, which you must be able to read. Never widens what it may read: that stays within each person\'s own access.'],
         ];
     }
 
@@ -11738,6 +11897,35 @@ final class CoreApiSchemas
                 'mcp' => $refuse,
                 'parameters' => $id,
                 'responses' => [200 => self::jsonResponse('The restored agent', 'AgentResponse'), 404 => self::errorResponse('Agent not found')] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/agents/{id:\d+}/pause', 'agents:manage', [
+                'summary' => 'Pause a workspace agent, refusing it on every call until it is resumed',
+                'description' => 'Applies at once to every person using it and every credential. Its waiting proposals can be declined, and can\'t be approved until it is resumed. Nothing is revoked.',
+                'tags' => ['agents'],
+                'mcp' => $refuse,
+                'parameters' => $id,
+                'responses' => [200 => self::jsonResponse('The paused agent', 'AgentResponse'), 404 => self::errorResponse('Agent not found')] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/agents/{id:\d+}/resume', 'agents:manage', [
+                'summary' => 'Resume a paused workspace agent',
+                'tags' => ['agents'],
+                'mcp' => $refuse,
+                'parameters' => $id,
+                'responses' => [200 => self::jsonResponse('The resumed agent', 'AgentResponse'), 404 => self::errorResponse('Agent not found')] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/agent-activity', 'agents:manage', [
+                'summary' => 'What the workspace\'s agents did and proposed',
+                'description' => 'Newest first. Says what happened, for whom and with which permission, never the arguments. Only the person an action was for can undo it.',
+                'tags' => ['agents'],
+                'mcp' => ['expose' => false],
+                'parameters' => [
+                    self::queryParam('agent', 'integer', 'Only this workspace agent'),
+                    self::queryParam('status', 'string', 'done, undone, waiting, declined, expired or failed; all when omitted'),
+                    self::queryParam('since', 'string', 'Only from this time on (UTC, ISO 8601)'),
+                    self::queryParam('limit', 'integer', 'At most 200; 50 when omitted'),
+                    self::queryParam('offset', 'integer', 'How many to skip'),
+                ],
+                'responses' => [200 => self::jsonResponse('The activity, newest first', 'AgentActivityListResponse')] + self::authErrors(),
             ]),
             self::permissionRoute('GET', '/api/agent-presets', 'agents:manage', [
                 'summary' => 'List the presets a workspace agent can start from',
@@ -11845,6 +12033,7 @@ final class CoreApiSchemas
                     'parameters' => [
                         self::queryParam('since', 'string', 'Only actions from this time on (UTC, ISO 8601)'),
                         self::queryParam('status', 'string', 'done, undone or expired; all when omitted'),
+                        self::queryParam('principal', 'string', 'Only this agent: its assignment\'s principalId'),
                     ],
                     'responses' => [200 => self::jsonResponse('Your agents\' actions, newest first', 'AgentActionListResponse')] + self::authErrors(),
                 ],
@@ -12063,8 +12252,9 @@ final class CoreApiSchemas
                                                 'description' =>
                                                     'Present only when verified is false. `unrecognised` '
                                                     . 'covers unknown, malformed, withdrawn and superseded '
-                                                    . 'at the default disclosure level.',
-                                                'enum' => ['unrecognised', 'withdrawn', 'superseded'],
+                                                    . 'at the default disclosure level, and a withdrawn document too. '
+                                                    . '`document_withdrawn` means the whole document was taken back.',
+                                                'enum' => ['unrecognised', 'withdrawn', 'superseded', 'document_withdrawn'],
                                             ],
                                             'revoked_on' => [
                                                 'type' => 'string',
@@ -12128,8 +12318,9 @@ final class CoreApiSchemas
                                 'properties' => [
                                     'id' => ['type' => 'integer'],
                                     'code_honoured' => ['type' => 'boolean'],
+                                    'document_withdrawn' => ['type' => 'boolean'],
                                 ],
-                                'required' => ['id', 'code_honoured'],
+                                'required' => ['id', 'code_honoured', 'document_withdrawn'],
                             ],
                         ],
                     ]),
@@ -12161,6 +12352,7 @@ final class CoreApiSchemas
                                 'properties' => [
                                     'enabled' => ['type' => 'boolean'],
                                     'configured' => ['type' => 'boolean'],
+                                    'document_withdrawn' => ['type' => 'boolean'],
                                     'token' => [
                                         'type' => 'object',
                                         'nullable' => true,
