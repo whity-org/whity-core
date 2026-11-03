@@ -69,6 +69,9 @@
     "en": "Remove all tags from an item",
     "ar": "إزالة كل الوسوم من عنصر"
   },
+  "delete_api_forms_id": {
+    "ar": "حذف نموذج لم يُجب عنه أحد"
+  },
   "delete_api_forms_id_fields_fieldid": {
     "ar": "إزالة حقل من نموذج"
   },
@@ -442,6 +445,10 @@
   "get_api_forms_id_fields": {
     "en": "See a form's fields in order",
     "ar": "عرض حقول نموذج بترتيبها"
+  },
+  "get_api_forms_id_preview": {
+    "en": "Preview a form",
+    "ar": "معاينة نموذج"
   },
   "get_api_forms_id_render": {
     "en": "Show a form ready to fill in",
