@@ -170,6 +170,8 @@ final class DocumentQrApiHandler
                     // with different fixes, and one flag for both would send
                     // somebody to the wrong settings page.
                     'configured' => $this->qr->isConfigured(),
+                    // S5: why no new code can be issued, whatever the two above say.
+                    'document_withdrawn' => ($document['withdrawn_at'] ?? null) !== null,
                     'token' => $token === null ? null : [
                         'reference' => $this->qr->reference((string) $token['token']),
                         'verification_url' => $this->qr->verificationUrl((string) $token['token']),
@@ -222,6 +224,10 @@ final class DocumentQrApiHandler
             return $resolved;
         }
         [$tenantId, $callerId, $document] = $resolved;
+
+        if (($document['withdrawn_at'] ?? null) !== null) {
+            return Response::error('This document has been withdrawn, so it cannot be given a new code', 409);
+        }
 
         if (!$this->qr->isConfigured()) {
             return Response::error(
@@ -361,6 +367,9 @@ final class DocumentQrApiHandler
                     // so even though they can read the record — otherwise they
                     // walk away believing the paper in their hand is current.
                     'code_honoured' => $tokenRow !== null && ($tokenRow['revoked_at'] ?? null) === null,
+                    // S5: this caller may read the record, so may be told. The
+                    // public page says it only at the `stage` level.
+                    'document_withdrawn' => ($document['withdrawn_at'] ?? null) !== null,
                 ],
             ]);
         } catch (\Throwable $e) {

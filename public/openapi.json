@@ -14723,11 +14723,12 @@
                                                 },
                                                 "reason": {
                                                     "type": "string",
-                                                    "description": "Present only when verified is false. `unrecognised` covers unknown, malformed, withdrawn and superseded at the default disclosure level.",
+                                                    "description": "Present only when verified is false. `unrecognised` covers unknown, malformed, withdrawn and superseded at the default disclosure level, and a withdrawn document too. `document_withdrawn` means the whole document was taken back.",
                                                     "enum": [
                                                         "unrecognised",
                                                         "withdrawn",
-                                                        "superseded"
+                                                        "superseded",
+                                                        "document_withdrawn"
                                                     ]
                                                 },
                                                 "revoked_on": {
@@ -15167,11 +15168,15 @@
                                                 },
                                                 "code_honoured": {
                                                     "type": "boolean"
+                                                },
+                                                "document_withdrawn": {
+                                                    "type": "boolean"
                                                 }
                                             },
                                             "required": [
                                                 "id",
-                                                "code_honoured"
+                                                "code_honoured",
+                                                "document_withdrawn"
                                             ]
                                         }
                                     }
@@ -15690,6 +15695,99 @@
                 ]
             }
         },
+        "/api/v1/documents/{id}/people": {
+            "get": {
+                "operationId": "get_api_v1_documents_id_people",
+                "summary": "The names of the people on this document",
+                "tags": [
+                    "documents"
+                ],
+                "description": "Display names, keyed by profile id, of who raised and withdrew the document, who took part in its routes and, for a caller holding documents:read, who issued and retired its codes. It takes no ids and returns no email addresses. An id with no entry is somebody no longer in this workspace.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Names keyed by profile id",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "additionalProperties": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Document not found or not visible to the caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/documents/{id}/qr": {
             "delete": {
                 "operationId": "delete_api_v1_documents_id_qr",
@@ -15801,6 +15899,9 @@
                                                     "type": "boolean"
                                                 },
                                                 "configured": {
+                                                    "type": "boolean"
+                                                },
+                                                "document_withdrawn": {
                                                     "type": "boolean"
                                                 },
                                                 "token": {
@@ -16998,6 +17099,145 @@
                     },
                     "500": {
                         "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/documents/{id}/withdraw": {
+            "post": {
+                "operationId": "post_api_v1_documents_id_withdraw",
+                "summary": "Withdraw an issued document",
+                "tags": [
+                    "documents"
+                ],
+                "description": "Keeps the record and its history. Every live code stops being honoured, open items on its routes close, and it can no longer be routed, corrected or given a new code. Recorded in the audit log. There is no way to undo it.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "What the withdrawal did",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer"
+                                                },
+                                                "withdrawn_at": {
+                                                    "type": "string"
+                                                },
+                                                "withdrawn_by": {
+                                                    "type": "integer",
+                                                    "nullable": true
+                                                },
+                                                "codes_withdrawn": {
+                                                    "type": "integer"
+                                                },
+                                                "items_closed": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "required": [
+                                                "id",
+                                                "withdrawn_at",
+                                                "codes_withdrawn",
+                                                "items_closed"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Document not found or not visible to the caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The document has already been withdrawn",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "The document could not be withdrawn",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -49443,6 +49683,14 @@
                     "created_at": {
                         "type": "string"
                     },
+                    "withdrawn_at": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "withdrawn_by": {
+                        "type": "integer",
+                        "nullable": true
+                    },
                     "content_url": {
                         "type": "string",
                         "nullable": true
@@ -50391,6 +50639,12 @@
                         "type": "array",
                         "items": {
                             "$ref": "#/components/schemas/Document"
+                        }
+                    },
+                    "people": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "string"
                         }
                     },
                     "pagination": {
@@ -51430,6 +51684,12 @@
                         "type": "array",
                         "items": {
                             "$ref": "#/components/schemas/DocumentSource"
+                        }
+                    },
+                    "people": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "string"
                         }
                     }
                 },
@@ -52812,6 +53072,9 @@
                         ],
                         "nullable": true
                     },
+                    "withdrawal": {
+                        "type": "boolean"
+                    },
                     "occurred_at": {
                         "type": "string"
                     }
@@ -53348,6 +53611,10 @@
                     },
                     "route_template_id": {
                         "type": "integer",
+                        "nullable": true
+                    },
+                    "route_template_name": {
+                        "type": "string",
                         "nullable": true
                     },
                     "created_by_profile_id": {
@@ -60969,6 +61236,9 @@
                         "nullable": true
                     },
                     "step_count": {
+                        "type": "integer"
+                    },
+                    "usage_count": {
                         "type": "integer"
                     },
                     "created_by": {

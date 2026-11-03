@@ -122,6 +122,16 @@ final class VerificationPresenter
      */
     public const REASON_UNRECOGNISED = 'unrecognised';
 
+    /**
+     * The whole document was taken back (S5), as opposed to one code retired.
+     *
+     * Not a {@see QrRevocationReason}, which is about a code. An older printing
+     * keeps its `superseded` row after the document is withdrawn, and telling its
+     * holder "a newer version has been issued" would send them looking for a
+     * current copy of a document the organisation no longer stands behind.
+     */
+    public const REASON_DOCUMENT_WITHDRAWN = 'document_withdrawn';
+
     private function __construct()
     {
     }
@@ -215,15 +225,26 @@ final class VerificationPresenter
      *
      * `revoked_on` is a DATE for the reason `issued_on` is.
      *
+     * A withdrawn document follows the same rule: at `minimal` it collapses with
+     * the other three, and `$documentWithdrawnAt` is heard only at `stage`.
+     *
      * @param array<string, mixed>|null $tokenRow Null when nothing resolved.
      * @return array{verified: false, reason: string, revoked_on?: string|null}
      */
-    public static function refusal(?array $tokenRow, string $detailLevel): array
+    public static function refusal(?array $tokenRow, string $detailLevel, ?string $documentWithdrawnAt = null): array
     {
         if ($detailLevel !== self::DETAIL_STAGE
             || $tokenRow === null
             || !isset($tokenRow['revoked_at'])) {
             return ['verified' => false, 'reason' => self::REASON_UNRECOGNISED];
+        }
+
+        if ($documentWithdrawnAt !== null) {
+            return [
+                'verified' => false,
+                'reason' => self::REASON_DOCUMENT_WITHDRAWN,
+                'revoked_on' => self::dateOnly($documentWithdrawnAt),
+            ];
         }
 
         $reason = (string) ($tokenRow['revoked_reason'] ?? '');
