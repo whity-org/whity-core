@@ -46,6 +46,9 @@ export interface BilingualInputProps {
   enLabel?: string
   disabled?: boolean
   required?: boolean
+  /** The words on the badge beside a language that has text, and one that has none. */
+  presentLabel?: string
+  emptyLabel?: string
   className?: string
 }
 
@@ -67,6 +70,8 @@ export function BilingualInput({
   enLabel,
   disabled = false,
   required = false,
+  presentLabel = "Set",
+  emptyLabel = "Empty",
   className,
 }: BilingualInputProps) {
   const pCode = primaryLang?.code ?? "ar"
@@ -121,7 +126,7 @@ export function BilingualInput({
                 {pLang.label}
               </label>
             </div>
-            <PresenceIndicator present={Boolean(pVal.trim())} testId="bilingual-presence-ar" />
+            <PresenceIndicator present={Boolean(pVal.trim())} testId="bilingual-presence-ar" presentLabel={presentLabel} emptyLabel={emptyLabel} />
           </div>
           <Input
             id={pId}
@@ -149,7 +154,7 @@ export function BilingualInput({
                 {sLang.label}
               </label>
             </div>
-            <PresenceIndicator present={Boolean(sVal.trim())} testId="bilingual-presence-en" />
+            <PresenceIndicator present={Boolean(sVal.trim())} testId="bilingual-presence-en" presentLabel={presentLabel} emptyLabel={emptyLabel} />
           </div>
           <Input
             id={sId}
@@ -170,14 +175,14 @@ export function BilingualInput({
   )
 }
 
-function PresenceIndicator({ present, testId }: { present: boolean; testId: string }) {
+function PresenceIndicator({ present, testId, presentLabel, emptyLabel }: { present: boolean; testId: string; presentLabel: string; emptyLabel: string }) {
   return (
     <Badge
       variant={present ? "secondary" : "outline"}
       className="text-xs uppercase"
       data-testid={testId}
     >
-      {present ? "Set" : "Empty"}
+      {present ? presentLabel : emptyLabel}
     </Badge>
   )
 }

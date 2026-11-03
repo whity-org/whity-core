@@ -426,18 +426,25 @@ final class RouteRecipientRepository
     public function listForDocument(int $documentId, int $tenantId): array
     {
         $stmt = $this->db->prepare(
-            'SELECT id, tenant_id, document_id, route_id, step_id, profile_id, ou_id,
-                    parent_recipient_id, created_by_event_id, closed_by_event_id, created_at
-               FROM document_route_recipients
-              WHERE tenant_id = :tenant_id AND document_id = :document_id
-              ORDER BY id ASC'
+            'SELECT r.id, r.tenant_id, r.document_id, r.route_id, r.step_id, r.profile_id, r.ou_id,
+                    r.parent_recipient_id, r.created_by_event_id, r.closed_by_event_id, r.created_at,
+                    e.withdrawal AS closed_by_withdrawal
+               FROM document_route_recipients r
+               LEFT JOIN document_route_events e
+                 ON e.id = r.closed_by_event_id AND e.tenant_id = :tenant_id
+              WHERE r.tenant_id = :tenant_id AND r.document_id = :document_id
+              ORDER BY r.id ASC'
         );
         $stmt->execute([':tenant_id' => $tenantId, ':document_id' => $documentId]);
 
         /** @var list<array<string, mixed>> $rows */
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        return array_map(self::normalize(...), $rows);
+        return array_map(
+            static fn (array $row): array => self::normalize($row)
+                + ['closed_by_withdrawal' => DbBool::of($row['closed_by_withdrawal'] ?? false)],
+            $rows
+        );
     }
 
     /**
@@ -475,7 +482,9 @@ final class RouteRecipientRepository
                         d.title AS document_title, d.template_name AS document_template_name,
                         d.withdrawn_at AS document_withdrawn_at,
                         e.action AS arrived_by, e.actor_profile_id AS arrived_from,
-                        s.decision AS step_decision, s.satisfied_by AS step_satisfied_by
+                        s.decision AS step_decision, s.satisfied_by AS step_satisfied_by,
+                        ce.action AS closed_by_action,
+                        sp.id AS sender_profile_id, sp.display_name AS sender_display_name, spe.email AS sender_email
                    FROM document_route_recipients r
                    JOIN documents d
                      ON d.id = r.document_id AND d.tenant_id = :tenant_id
@@ -483,6 +492,13 @@ final class RouteRecipientRepository
                      ON e.id = r.created_by_event_id AND e.tenant_id = :tenant_id
                    JOIN document_route_steps s
                      ON s.id = r.step_id AND s.tenant_id = :tenant_id
+                   LEFT JOIN document_route_events ce
+                     ON ce.id = r.closed_by_event_id AND ce.tenant_id = :tenant_id
+                   LEFT JOIN profiles sp
+                     ON sp.id = e.actor_profile_id
+                    AND EXISTS (SELECT 1 FROM memberships sm WHERE sm.profile_id = e.actor_profile_id AND sm.tenant_id = :tenant_id)
+                   LEFT JOIN profile_emails spe
+                     ON spe.profile_id = sp.id AND spe.is_primary = true
                   WHERE r.tenant_id = :tenant_id
                     AND r.profile_id = :profile_id
                     AND r.closed_by_event_id IS NULL
@@ -496,7 +512,9 @@ final class RouteRecipientRepository
                         d.title AS document_title, d.template_name AS document_template_name,
                         d.withdrawn_at AS document_withdrawn_at,
                         e.action AS arrived_by, e.actor_profile_id AS arrived_from,
-                        s.decision AS step_decision, s.satisfied_by AS step_satisfied_by
+                        s.decision AS step_decision, s.satisfied_by AS step_satisfied_by,
+                        ce.action AS closed_by_action,
+                        sp.id AS sender_profile_id, sp.display_name AS sender_display_name, spe.email AS sender_email
                    FROM document_route_recipients r
                    JOIN documents d
                      ON d.id = r.document_id AND d.tenant_id = :tenant_id
@@ -504,6 +522,13 @@ final class RouteRecipientRepository
                      ON e.id = r.created_by_event_id AND e.tenant_id = :tenant_id
                    JOIN document_route_steps s
                      ON s.id = r.step_id AND s.tenant_id = :tenant_id
+                   LEFT JOIN document_route_events ce
+                     ON ce.id = r.closed_by_event_id AND ce.tenant_id = :tenant_id
+                   LEFT JOIN profiles sp
+                     ON sp.id = e.actor_profile_id
+                    AND EXISTS (SELECT 1 FROM memberships sm WHERE sm.profile_id = e.actor_profile_id AND sm.tenant_id = :tenant_id)
+                   LEFT JOIN profile_emails spe
+                     ON spe.profile_id = sp.id AND spe.is_primary = true
                   WHERE r.tenant_id = :tenant_id
                     AND r.profile_id = :profile_id
                   ORDER BY r.id DESC
@@ -658,6 +683,10 @@ final class RouteRecipientRepository
             // and carried here because an inbox that cannot tell an approval
             // apart from a circulation offers the wrong buttons, and the person
             // then discovers the difference from a 422 after clicking.
+            'closed_by_action' => isset($row['closed_by_action']) ? (string) $row['closed_by_action'] : null,
+            'sender_profile_id' => isset($row['sender_profile_id']) ? (int) $row['sender_profile_id'] : null,
+            'sender_display_name' => $row['sender_display_name'] ?? null,
+            'sender_email' => $row['sender_email'] ?? null,
             'step_decision' => DbBool::of($row['step_decision'] ?? false),
             // #1054: WHAT SETTLED THIS ITEM. Joined from the step for the same
             // reason `arrived_by` is read through the creating event — the row

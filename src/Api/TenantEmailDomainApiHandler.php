@@ -17,8 +17,8 @@ use Whity\Http\JsonBody;
  * Tenant Email-Domain API Handler (WC-9b87, WC-628738f5).
  *
  * Provides the admin CRUD surface for managing a tenant's email-domain policy
- * registrations. All routes are gated on the `admin` role and tenant-scoped via
- * TenantContext so a tenant can only manage its own domain registrations.
+ * registrations. All routes are gated on `email_domains:manage` and tenant-scoped
+ * via TenantContext so a tenant can only manage its own domain registrations.
  *
  * A registered domain does NOT auto-provision memberships until the tenant proves
  * it controls the domain via the DNS TXT challenge (verify()); this closes the

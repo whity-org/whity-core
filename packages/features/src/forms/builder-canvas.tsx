@@ -158,6 +158,7 @@ export function BuilderCanvas({
   invalid: ReadonlySet<number>
 }) {
   const [dragFrom, setDragFrom] = useState<number | null>(null)
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set())
   const t = useTranslation("forms")
   const { currentLanguage } = useCurrentLanguage()
   const kindLabel = useKindLabel()
@@ -173,10 +174,23 @@ export function BuilderCanvas({
         {description !== "" && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
       </div>
 
+      {sections.length > 0 && (
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setCollapsed(new Set(sections.map((s) => s.key)))}>
+            {t("builder.sections.collapseAll", "Collapse sections")}
+          </Button>
+          <Button variant="outline" onClick={() => setCollapsed(new Set())}>
+            {t("builder.sections.expandAll", "Expand sections")}
+          </Button>
+        </div>
+      )}
+
       {fields.length > 8 && (
         <JumpTo
           fields={fields}
           onJump={(index) => {
+            const key = fields[index].section_key
+            if (key !== null) setCollapsed((current) => new Set([...current].filter((k) => k !== key)))
             onSelect(index)
             scrollToQuestion(index)
           }}
@@ -189,17 +203,33 @@ export function BuilderCanvas({
         return (
           <div key={group.key ?? "none"} className="space-y-3">
             {section !== undefined && (
-              <div className="rounded-card border border-border border-t-4 border-t-primary bg-card px-4 py-3">
-                <div className="text-sm font-semibold">
-                  {t("builder.section.bar", "Section {number}", { number: sectionNumber })}
-                  {pickText(section.title, currentLanguage) !== "" && ` · ${pickText(section.title, currentLanguage)}`}
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  {t("builder.section.count", "{count} questions", { count: group.items.length })}
-                </div>
-              </div>
+              <button
+                type="button"
+                aria-expanded={!collapsed.has(section.key)}
+                onClick={() =>
+                  setCollapsed((current) => {
+                    const next = new Set(current)
+                    if (next.has(section.key)) next.delete(section.key)
+                    else next.add(section.key)
+                    return next
+                  })
+                }
+                className="flex w-full items-center justify-between gap-3 rounded-card border border-border border-t-4 border-t-primary bg-card px-4 py-3 text-start outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <span>
+                  <span className="block text-sm font-semibold">
+                    {t("builder.section.bar", "Section {number}", { number: sectionNumber })}
+                    {pickText(section.title, currentLanguage) !== "" && ` · ${pickText(section.title, currentLanguage)}`}
+                  </span>
+                  <span className="block text-xs text-muted-foreground">
+                    {t("builder.section.count", "{count} questions", { count: group.items.length })}
+                  </span>
+                </span>
+                <Icon name={collapsed.has(section.key) ? "chevron-right" : "chevron-down"} size={16} className="rtl:rotate-180" aria-hidden />
+              </button>
             )}
-            {group.items.map(({ field, index }, position) => {
+            {(section !== undefined && collapsed.has(section.key) && !group.items.some((i) => i.index === selected) ? [] : group.items).map(({ field, index }) => {
+              const position = group.items.findIndex((i) => i.index === index)
               const isSelected = selected === index
               const label = pickText(field.label, currentLanguage)
               const help = pickText(field.help_text_i18n, currentLanguage)

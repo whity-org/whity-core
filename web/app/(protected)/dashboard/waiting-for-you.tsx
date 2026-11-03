@@ -2,8 +2,8 @@
 
 /**
  * Waiting for you (H.2): inbox documents and agent proposals in one list,
- * oldest first, with the decision inline. Until a merged route exists (S2) the
- * list is merged here from each inbox source and the person's proposals.
+ * oldest first, with the decision inline. The server merges them
+ * (`/api/me/waiting`), and names any source it couldn't read.
  *
  * Proposals are dashed until a person decides. The home has no filled main
  * button, so every decision is an outline button.
@@ -23,12 +23,7 @@ import { useFetch } from '@/hooks/useFetch';
 import { useToast } from '@/lib/toast-context';
 import { WAITING_CHANGED_EVENT } from '@/lib/waiting-changed';
 import type { AgentAction, AgentProposal } from '@/components/agents/proposals';
-import {
-  routingMeta,
-  type InboxItem,
-  type InboxListResponse,
-  type InboxSourcesResponse,
-} from '@/components/documents/routing-wire';
+import { routingMeta, type InboxItem } from '@/components/documents/routing-wire';
 
 /** At most this many rows show; the rest are "and N more". */
 const MAX_ROWS = 6;
@@ -45,6 +40,13 @@ interface WaitingRow {
   href?: string;
 }
 
+/** The body of `GET /api/me/waiting`. */
+interface WaitingResponse {
+  data: Array<{ key: string; kind: 'inbox' | 'proposal'; at: string; item?: InboxItem; proposal?: AgentProposal }>;
+  counts: { inbox: number; proposals: number; total: number };
+  unavailable: string[];
+}
+
 export function WaitingForYou({ onChange }: { onChange?: () => void }) {
   const t = useTranslation('common');
   const locale = useFormattingLocale();
@@ -55,26 +57,10 @@ export function WaitingForYou({ onChange }: { onChange?: () => void }) {
 
   const failed = t('dashboard.waiting.error', 'What is waiting for you could not be loaded.');
 
-  const waiting = useFetch<{ items: InboxItem[]; proposals: AgentProposal[]; inboxCount: number }>(async () => {
-    const [sourcesResponse, proposalsResponse] = await Promise.all([
-      apiClient('/api/v1/me/inbox/sources'),
-      apiClient('/api/v1/me/agent-proposals'),
-    ]);
-    if (!sourcesResponse.ok || !proposalsResponse.ok) throw new Error(failed);
-    const sources = ((await sourcesResponse.json()) as InboxSourcesResponse).data ?? [];
-    const proposals = ((await proposalsResponse.json()) as { data?: AgentProposal[] }).data ?? [];
-    const lists = await Promise.all(
-      sources.map(async (source) => {
-        const response = await apiClient(`/api/v1/me/inbox?source=${encodeURIComponent(source.key)}`);
-        if (!response.ok) throw new Error(failed);
-        return ((await response.json()) as InboxListResponse).data ?? [];
-      })
-    );
-    return {
-      items: lists.flat(),
-      proposals: proposals.filter((p) => p.status === 'waiting'),
-      inboxCount: sources.reduce((sum, s) => sum + s.open_count, 0),
-    };
+  const waiting = useFetch<WaitingResponse>(async () => {
+    const response = await apiClient(`/api/v1/me/waiting?limit=${MAX_ROWS}`);
+    if (!response.ok) throw new Error(failed);
+    return (await response.json()) as WaitingResponse;
   }, [apiClient]);
 
   const unknownAgent = t('dashboard.agent.unknown', 'An agent');
@@ -87,28 +73,31 @@ export function WaitingForYou({ onChange }: { onChange?: () => void }) {
   const rows = useMemo<WaitingRow[]>(() => {
     const data = waiting.data;
     if (data === null) return [];
-    const documents: WaitingRow[] = data.items.map((item) => {
-      const meta = routingMeta(item);
-      return {
-        key: `document-${item.id}`,
-        at: parseWireDate(item.timestamp)?.getTime() ?? 0,
+    return data.data.flatMap((row): WaitingRow[] => {
+      if (row.proposal !== undefined) {
+        const proposal = row.proposal;
+        return [{
+          key: row.key,
+          at: parseWireDate(row.at)?.getTime() ?? 0,
+          kind: 'proposal',
+          title: proposal.summary,
+          from: (locale === 'ar' && proposal.agent?.nameAr) || proposal.agent?.name || unknownAgent,
+          waited: dates.relative(row.at, ageLabels),
+          proposal,
+        }];
+      }
+      if (row.item === undefined) return [];
+      const meta = routingMeta(row.item);
+      return [{
+        key: row.key,
+        at: parseWireDate(row.at)?.getTime() ?? 0,
         kind: 'document',
-        title: item.title,
-        from: item.subtitle ?? '',
-        waited: dates.relative(item.timestamp, ageLabels),
+        title: row.item.title,
+        from: row.item.subtitle ?? '',
+        waited: dates.relative(row.at, ageLabels),
         href: meta === null ? undefined : `/admin/document-library/${meta.document_id}?tab=routing`,
-      };
+      }];
     });
-    const agents: WaitingRow[] = data.proposals.map((proposal) => ({
-      key: `proposal-${proposal.id}`,
-      at: parseWireDate(proposal.createdAt)?.getTime() ?? 0,
-      kind: 'proposal',
-      title: proposal.summary,
-      from: (locale === 'ar' && proposal.agent?.nameAr) || proposal.agent?.name || unknownAgent,
-      waited: dates.relative(proposal.createdAt, ageLabels),
-      proposal,
-    }));
-    return [...documents, ...agents].sort((a, b) => a.at - b.at);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [waiting.data, locale, unknownAgent, dates.hidden]);
 
@@ -186,8 +175,19 @@ export function WaitingForYou({ onChange }: { onChange?: () => void }) {
     );
   }
 
-  const proposalCount = waiting.data?.proposals.length ?? 0;
-  const inboxCount = waiting.data?.inboxCount ?? 0;
+  const proposalCount = waiting.data?.counts.proposals ?? 0;
+  const inboxCount = waiting.data?.counts.inbox ?? 0;
+  const total = waiting.data?.counts.total ?? 0;
+  const incomplete = (waiting.data?.unavailable.length ?? 0) > 0;
+
+  // Nothing to show because a source failed is not "nothing is waiting".
+  if (rows.length === 0 && incomplete) {
+    return (
+      <Card className="p-4">
+        <AreaError message={failed} retryLabel={t('dashboard.tryAgain', 'Try again')} onRetry={() => waiting.refetch()} />
+      </Card>
+    );
+  }
 
   // Nothing waiting: one line, never an empty box (H.2).
   if (rows.length === 0) {
@@ -203,8 +203,8 @@ export function WaitingForYou({ onChange }: { onChange?: () => void }) {
     );
   }
 
-  const shown = rows.slice(0, MAX_ROWS);
-  const more = rows.length - shown.length;
+  const shown = rows;
+  const more = total - shown.length;
 
   return (
     <Card className="gap-4 p-4">
@@ -212,7 +212,7 @@ export function WaitingForYou({ onChange }: { onChange?: () => void }) {
         <h2 className="flex items-center gap-2 text-lg font-semibold">
           {t('dashboard.waiting.title', 'Waiting for you')}
           <span className="rounded-full bg-muted px-2 text-sm font-medium text-muted-foreground tabular-nums">
-            {rows.length}
+            {total}
           </span>
         </h2>
         <p className="text-sm text-muted-foreground">
@@ -275,6 +275,14 @@ export function WaitingForYou({ onChange }: { onChange?: () => void }) {
         <p className="text-sm text-muted-foreground">
           {t('dashboard.waiting.more', 'and {count} more').replace('{count}', String(more))}
         </p>
+      )}
+      {incomplete && (
+        <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+          <span>{t('dashboard.waiting.incomplete', 'Some of what is waiting could not be loaded.')}</span>
+          <Button variant="ghost" size="sm" onClick={() => waiting.refetch()}>
+            {t('dashboard.tryAgain', 'Try again')}
+          </Button>
+        </div>
       )}
       <div className="flex flex-wrap gap-4 text-sm font-medium">
         <Link href="/admin/inbox" className="text-primary underline-offset-2 hover:underline">

@@ -18,9 +18,9 @@ import { useFetch } from '@/hooks/useFetch';
 import { fetchAllPages } from '@/lib/api/fetch-all-pages';
 import { DOCUMENTS_WRITE } from '@/lib/capabilities';
 import { useToast } from '@/lib/toast-context';
-import { createDocumentSource, listDocumentSources } from '@/lib/documents/sources';
+import { createDocumentSource, listDocumentSourcesWithPeople } from '@/lib/documents/sources';
 
-type Page = Awaited<ReturnType<typeof listDocumentSources>>[number];
+type Page = Awaited<ReturnType<typeof listDocumentSourcesWithPeople>>['rows'][number];
 type Filter = 'all' | 'wiki' | 'mine';
 
 /**
@@ -41,18 +41,16 @@ export default function DocumentSourcesPage() {
   const [filter, setFilter] = useState<Filter>('all');
   const viewerId = typeof user?.id === 'number' ? user.id : null;
 
-  const load = useCallback(() => listDocumentSources(), []);
-  const { data: rows, loading, error, refetch } = useFetch(load);
+  const load = useCallback(() => listDocumentSourcesWithPeople(), []);
+  const { data: listed, loading, error, refetch } = useFetch(load);
+  const rows = listed?.rows ?? null;
+  const people = listed?.people;
 
-  // Names for "Written by" and "Shared with". A viewer who cannot list people or
-  // units gets the fallback wording instead of ids.
+  // Names for "Shared with". A viewer who cannot list units gets the fallback
+  // wording instead of ids. "Written by" comes with the list.
   const directory = useFetch(async () => {
-    const [people, units] = await Promise.all([
-      fetchAllPages<{ id: number; name?: string; email?: string }>(apiClient, '/api/v1/users').catch(() => null),
-      fetchAllPages<{ id: number; name: string }>(apiClient, '/api/v1/ous').catch(() => null),
-    ]);
+    const units = await fetchAllPages<{ id: number; name: string }>(apiClient, '/api/v1/ous').catch(() => null);
     return {
-      people: new Map((people?.items ?? []).map((p) => [p.id, p.name || p.email || ''])),
       units: new Map((units?.items ?? []).map((u) => [u.id, u.name])),
     };
   }, [apiClient]);
@@ -71,12 +69,9 @@ export default function DocumentSourcesPage() {
     (row: Page): string => {
       if (row.created_by === null || row.created_by === undefined) return '—';
       if (row.created_by === viewerId) return t('blockEditor.list.you', 'You');
-      return (
-        directory.data?.people.get(row.created_by) ||
-        t('blockEditor.list.account', 'Account #{id}', { id: row.created_by })
-      );
+      return people?.[String(row.created_by)] ?? t('blockEditor.list.former', 'A former member');
     },
-    [directory.data, t, viewerId]
+    [people, t, viewerId]
   );
 
   const sharedWith = useCallback(

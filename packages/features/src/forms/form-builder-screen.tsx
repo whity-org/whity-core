@@ -82,7 +82,7 @@ export function FormBuilderScreen({ env, formId, canManage }: { env: FormsScreen
   const t = useTranslation("forms")
   const { currentLanguage } = useCurrentLanguage()
   const statusLabel = useStatusLabel()
-  const { dateTime } = useDateDisplay()
+  const { dateTime, time } = useDateDisplay()
   const api = useMemo(() => createFormsApi(env.transport), [env.transport])
 
   const [loaded, setLoaded] = useState<Loaded | null>(null)
@@ -138,6 +138,7 @@ export function FormBuilderScreen({ env, formId, canManage }: { env: FormsScreen
   const dirty = fieldsChanged || settingsChanged
 
   const [showProblems, setShowProblems] = useState(false)
+  const [savedAt, setSavedAt] = useState<Date | null>(null)
   const [publishOpen, setPublishOpen] = useState(false)
   const [wide, setWide] = useState(true)
   useEffect(() => {
@@ -166,9 +167,10 @@ export function FormBuilderScreen({ env, formId, canManage }: { env: FormsScreen
     return values
   }, [loaded])
 
-  const save = useCallback(async (): Promise<boolean> => {
+  const save = useCallback(async (quiet = false): Promise<boolean> => {
     if (loaded === null || settings === null) return false
     if (blocking.length > 0) {
+      if (quiet) return false
       setShowProblems(true)
       const first = blocking.find((p) => p.index !== null)
       if (first?.index != null) jump(first.index)
@@ -226,10 +228,31 @@ export function FormBuilderScreen({ env, formId, canManage }: { env: FormsScreen
 
     setSaving(false)
     setLoaded({ ...loaded, form, fields: savedFields, settings: savedSettings })
-    setFields(nextFields === fields ? fields : nextFields)
-    env.notify(t("builder.save.done", "Your changes were saved."), "success")
+    // Not `setFields(fields)`: that is the list as it was when the save began, and
+    // whatever was typed since would be thrown away. Saved questions only gain
+    // their ids, so their keys are locked from here on.
+    const idOf = new Map(savedFields.map((f) => [f.field_key, f.id]))
+    const keptSections = new Set(settings.sections.map((section) => section.key))
+    setFields((current) =>
+      current.map((f) => ({
+        ...f,
+        id: f.id ?? idOf.get(f.field_key),
+        section_key: f.section_key !== null && !keptSections.has(f.section_key) ? null : f.section_key,
+      }))
+    )
+    if (quiet) setSavedAt(new Date())
+    else env.notify(t("builder.save.done", "Your changes were saved."), "success")
     return true
   }, [api, blocking, env, fields, fieldsChanged, jump, loaded, problemText, settings, settingsChanged, t])
+
+  // A draft is not live, so it saves itself a moment after you pause. An open form
+  // does not: its questions are in front of people the moment they are saved.
+  const autosaveReady = canManage && loaded !== null && loaded.form.status === "draft" && dirty && !saving && blocking.length === 0
+  useEffect(() => {
+    if (!autosaveReady) return
+    const id = window.setTimeout(() => void save(true), 2500)
+    return () => window.clearTimeout(id)
+  }, [autosaveReady, fields, settings, save])
 
   function discard() {
     if (loaded === null) return
@@ -372,6 +395,7 @@ export function FormBuilderScreen({ env, formId, canManage }: { env: FormsScreen
                   : t("builder.facts.draft", "Nobody can fill it in yet.")}
             </span>
             <span>{t("builder.facts.changed", "Changed {when}", { when: dateTime(form.updated_at) ?? "" })}</span>
+            {savedAt !== null && !dirty && <span>{t("builder.autosaved", "Saved at {time}", { time: time(savedAt.toISOString()) ?? "" })}</span>}
           </span>
         }
         action={
@@ -526,7 +550,11 @@ export function FormBuilderScreen({ env, formId, canManage }: { env: FormsScreen
       <SaveBar
         dirty={dirty}
         saving={saving}
-        summary={t("builder.save.summary", "You have changes that are not saved yet.")}
+        summary={
+          loaded.form.status === "draft"
+            ? t("builder.save.summary.draft", "Saving by itself when you pause.")
+            : t("builder.save.summary", "You have changes that are not saved yet.")
+        }
         discardLabel={t("builder.save.discard", "Discard changes")}
         saveLabel={t("builder.save.save", "Save changes")}
         onDiscard={discard}

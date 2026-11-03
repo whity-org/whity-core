@@ -174,6 +174,7 @@ function serve(options: {
   trail?: unknown[];
   recipients?: unknown[];
   directoryStatus?: number;
+  peopleStatus?: number;
   /** Extra fields on the record itself (what it was issued from, M4c). */
   record?: Record<string, unknown>;
 }) {
@@ -183,6 +184,7 @@ function serve(options: {
     trail = [TRAIL_EVENT],
     recipients = [OPEN_RECIPIENT],
     directoryStatus = 200,
+    peopleStatus = 200,
     record = {},
   } = options;
 
@@ -197,17 +199,11 @@ function serve(options: {
       );
     }
     if (url.includes('/recipients')) return Promise.resolve(jsonResponse({ data: recipients }));
-    if (url.startsWith('/api/v1/users')) {
+    if (url.includes('/people')) {
       return Promise.resolve(
-        directoryStatus === 200
-          ? jsonResponse({
-              data: [
-                { id: 10, name: 'amira', email: 'amira@example.test' },
-                { id: 11, name: 'yusuf', email: 'yusuf@example.test' },
-              ],
-              pagination: { page: 1, perPage: 100, total: 2, totalPages: 1 },
-            })
-          : jsonResponse({ error: 'nope' }, directoryStatus)
+        peopleStatus === 200
+          ? jsonResponse({ data: { 10: 'amira', 11: 'yusuf' } })
+          : jsonResponse({ error: 'nope' }, peopleStatus)
       );
     }
     if (url.startsWith('/api/v1/ous')) {
@@ -528,22 +524,28 @@ describe('the trail and the recipients render the ids they were given', () => {
     expect(trail).toHaveTextContent('Please check the totals.');
   });
 
-  it('shows ids WITH THE REASON when the directory is refused, never a bare number', async () => {
+  it('names people without the directory, and says so when names could not load', async () => {
     params = { id: '5' };
     openTab('history');
     serve({ directoryStatus: 403 });
 
-    render(<DocumentRecordPage />);
+    const first = render(<DocumentRecordPage />);
 
-    const trail = await screen.findByTestId('document-record-trail');
-    expect(trail).toHaveTextContent('Account #10');
-    // #951: a screen that degrades silently makes a permission boundary
-    // indistinguishable from a data bug, and the person who cannot tell them
-    // apart is usually the one who could have granted it.
-    expect(screen.getAllByTestId('document-record-directory-people')[0]).toHaveTextContent(
-      'users:read'
-    );
+    // S5: a viewer who cannot read the directory still reads names, and is not
+    // told about a permission.
+    const named = await screen.findByTestId('document-record-trail');
+    expect(named).toHaveTextContent('amira');
+    expect(screen.queryByTestId('document-record-directory-people')).not.toBeInTheDocument();
     expect(screen.getByTestId('document-record-directory-units')).toHaveTextContent('ous:read');
+    first.unmount();
+
+    // Names that failed to load are unknown, not "a former member".
+    serve({ peopleStatus: 503 });
+    render(<DocumentRecordPage />);
+    const trail = await screen.findByTestId('document-record-trail');
+    await screen.findAllByTestId('document-record-directory-people');
+    expect(trail).toHaveTextContent('Someone in this workspace');
+    expect(trail).not.toHaveTextContent('#10');
   });
 
   it('says the document is awaiting YOU only when the server said the region is editable', async () => {
