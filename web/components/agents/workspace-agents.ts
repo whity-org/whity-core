@@ -1,4 +1,5 @@
 import type { ScopeGrantGroup, ScopeGrantMode } from '@whity/ui/scope-grant';
+import { humanizeKey } from './proposals';
 
 /**
  * Workspace agents on the wire (WHIT-815, WHIT-816): `/api/agents`,
@@ -66,11 +67,11 @@ export function templateGroups(grant: Record<string, ScopeGrantMode>, writeHint:
   const groups = new Map<string, ScopeGrantGroup>();
   for (const permission of Object.keys(grant).sort()) {
     const resource = permission.split(':')[0] ?? permission;
-    const group = groups.get(resource) ?? { key: resource, label: resource, actions: [] };
+    const group = groups.get(resource) ?? { key: resource, label: humanizeKey(resource), actions: [] };
     const read = isReadPermission(permission);
     group.actions.push({
       key: permission,
-      label: permission,
+      label: humanizeKey(permission.split(':').slice(1).join(' ') || permission),
       modes: read ? ['off', 'ask', 'allow'] : ['off', 'ask'],
       hint: read ? undefined : writeHint,
     });
