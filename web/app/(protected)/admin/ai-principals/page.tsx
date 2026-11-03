@@ -187,7 +187,6 @@ export default function AiPrincipalsPage() {
           icon="link"
           title={t('aiPrincipals.empty.title', 'No AI apps connected')}
           description={t('aiPrincipals.empty.description', 'Connect Claude, ChatGPT, Cursor or another app so it can work with your data, asking you first for changes.')}
-          action={canManage ? connect : undefined}
         />
       ) : (
         <>
