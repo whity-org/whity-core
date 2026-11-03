@@ -73,6 +73,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/2fa-policies/remind": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Remind one person to set up two-step sign-in
+         * @description Only somebody a rule in this workspace covers and who has not set it up, and once a day per person.
+         */
+        post: operations["post_api_v1_2fa_policies_remind"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/2fa-policies/status": {
         parameters: {
             query?: never;
@@ -429,6 +449,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/audit-logs/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The matching audit entries as a CSV
+         * @description The same rows, tenant scope and filters as GET /api/audit-logs, newest first. A cell a spreadsheet would run as a formula starts with an apostrophe. `technical=1` adds event codes, ids and IP addresses. More than 50000 rows is refused with 422 rather than cut short; choose a shorter period.
+         */
+        get: operations["get_api_v1_audit_logs_export"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/audit-logs/facets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Who, which agents and which areas the audit filters can offer, by name
+         * @description Only people and agents in rows the caller could already read. The system tenant reads every workspace, so it sees all of them.
+         */
+        get: operations["get_api_v1_audit_logs_facets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/2fa-recovery/confirm": {
         parameters: {
             query?: never;
@@ -662,6 +722,26 @@ export interface paths {
         put?: never;
         /** Switch the active tenant for an already-logged-in profile */
         post: operations["post_api_v1_auth_switch_tenant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/billing/change-plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Move this workspace's subscription to another plan
+         * @description A second checkout would open a second subscription, so a tier change moves the one this deployment already holds. A dearer plan is charged now for the rest of the period; a cheaper one starts at renewal with nothing refunded. Either way the amount is the billing service's, so none is quoted here. `idempotency_key` is one per confirmed change, and makes a retry after a timeout safe.
+         */
+        post: operations["post_api_v1_billing_change_plan"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6962,6 +7042,37 @@ export interface components {
             metadata: Record<string, never>;
             ipAddress: string | null;
             createdAt: string | null;
+            actor: {
+                /** @enum {string} */
+                kind: "person" | "agent" | "system";
+                name: string;
+                agent: string | null;
+                forPerson: string | null;
+            };
+            target: {
+                type: string;
+                name: string;
+            } | null;
+            sentence: string;
+            sentenceTemplate: string;
+            area: string;
+            how: string | null;
+        };
+        AuditLogFacetsResponse: {
+            data: {
+                people: {
+                    id: number;
+                    name: string;
+                }[];
+                agents: {
+                    id: string;
+                    name: string;
+                }[];
+                areas: {
+                    id: string;
+                    name: string;
+                }[];
+            };
         };
         AuditLogListResponse: {
             data: components["schemas"]["AuditLogEntry"][];
@@ -7033,6 +7144,18 @@ export interface components {
                 access_until?: string | null;
                 cancel_at_period_end?: boolean;
                 checkout_status?: string | null;
+            };
+        };
+        BillingChangePlanRequest: {
+            plan_key: string;
+            billing_period?: string;
+            idempotency_key: string;
+        };
+        BillingChangePlanResponse: {
+            data: {
+                plan_key: string;
+                /** @enum {string} */
+                takes_effect: "now" | "renewal";
             };
         };
         BillingQuantityRequest: {
@@ -9173,6 +9296,8 @@ export interface components {
                 email: string;
                 tenant_name: string;
                 requires_password: boolean;
+                inviter_name: string | null;
+                role_name: string | null;
             };
         };
         InvitationRevokedResponse: {
@@ -10919,6 +11044,15 @@ export interface components {
             slug: string | null;
             userCount: number;
             createdAt: string | null;
+            plan: {
+                key: string;
+                name: string;
+            } | null;
+            status: {
+                /** @enum {string} */
+                state: "active" | "trial" | "overdue" | "suspended";
+                daysLeft: number | null;
+            };
         };
         TenantCreateRequest: {
             /** @description Display name of the new tenant (workspace). */
@@ -11272,6 +11406,7 @@ export interface components {
             scope_type: "tenant" | "ou" | "user";
             scope_id: number | null;
             grace_period_days: number;
+            scope_name?: string | null;
             created_by?: number | null;
             created_at: string;
             updated_at: string;
@@ -11290,9 +11425,11 @@ export interface components {
         };
         TwoFactorPolicyStatusEntry: {
             profile_id: number;
+            name: string;
             email: string;
             enrolled: boolean;
             enforcement_deadline: number | null;
+            last_reminded_at: string | null;
         };
         TwoFactorPolicyStatusResponse: {
             data: components["schemas"]["TwoFactorPolicyStatusEntry"][];
@@ -11305,6 +11442,15 @@ export interface components {
                 /** @enum {string} */
                 status: "pending";
                 message: string;
+            };
+        };
+        TwoFactorRemindRequest: {
+            profile_id: number;
+        };
+        TwoFactorRemindResponse: {
+            data: {
+                profile_id: number;
+                last_reminded_at: string;
             };
         };
         UiKitDemoChartRow: {
@@ -11888,6 +12034,111 @@ export interface operations {
             };
             /** @description Validation failed */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_2fa_policies_remind: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TwoFactorRemindRequest"];
+            };
+        };
+        responses: {
+            /** @description Reminder sent */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TwoFactorRemindResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No rule in this workspace covers that person */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description That person has already set it up */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description profile_id is required */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Already reminded today */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -13764,6 +14015,10 @@ export interface operations {
                 action?: string;
                 /** @description Filter by actor user id */
                 actor?: number;
+                /** @description Filter by agent principal, as listed by /api/audit-logs/facets */
+                agent?: string;
+                /** @description Filter by area, as listed by /api/audit-logs/facets. An unknown area matches nothing. */
+                area?: string;
                 /** @description Filter by target type */
                 target_type?: string;
                 /** @description Filter by target id — the history of ONE record. Normally paired with target_type; alone it matches that id across every target type. */
@@ -13790,6 +14045,164 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuditLogListResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_audit_logs_export: {
+        parameters: {
+            query?: {
+                /** @description Filter by actor user id */
+                actor?: number;
+                /** @description Filter by agent principal */
+                agent?: string;
+                /** @description Filter by area */
+                area?: string;
+                /** @description Exact action match */
+                action?: string;
+                /** @description Filter by target type */
+                target_type?: string;
+                /** @description Filter by target id */
+                target_id?: number;
+                /** @description Inclusive ISO-8601 lower bound */
+                from?: string;
+                /** @description Inclusive ISO-8601 upper bound */
+                to?: string;
+                /** @description 1 adds event codes, ids and IP addresses */
+                technical?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The CSV, UTF-8 with a byte order mark */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too many entries to export at once */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_audit_logs_facets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The filter options */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditLogFacetsResponse"];
                 };
             };
             /** @description Missing or invalid authentication */
@@ -14797,6 +15210,111 @@ export interface operations {
             };
             /** @description Internal server error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_billing_change_plan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BillingChangePlanRequest"];
+            };
+        };
+        responses: {
+            /** @description The change was accepted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BillingChangePlanResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description This deployment does not sell subscriptions */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Already on that plan, or no active subscription to change */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unknown plan, an add-on, or a bad idempotency key */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The billing service refused or could not be reached */
+            502: {
                 headers: {
                     [name: string]: unknown;
                 };

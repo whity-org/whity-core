@@ -8,6 +8,8 @@ use Throwable;
 use Whity\Core\Health\StatusReport;
 use Whity\Core\Request;
 use Whity\Core\Response;
+use Whity\Core\Settings\SettingsRegistry;
+use Whity\Core\Settings\SettingsService;
 
 /**
  * Public service-status endpoint backing the /status page (WC-status-page).
@@ -37,8 +39,10 @@ final class StatusApiHandler
     private const MAX_WINDOW_DAYS = 90;
     private const DEFAULT_WINDOW_DAYS = 90;
 
-    public function __construct(private readonly StatusReport $report)
-    {
+    public function __construct(
+        private readonly StatusReport $report,
+        private readonly ?SettingsService $settings = null,
+    ) {
     }
 
     public function get(Request $request): Response
@@ -50,7 +54,7 @@ final class StatusApiHandler
         }
 
         try {
-            return Response::json($this->report->build($days), 200);
+            return Response::json($this->report->build($days) + ['maintenance' => $this->maintenance()], 200);
         } catch (Throwable $e) {
             error_log('[StatusApiHandler] status build failed: ' . $e->getMessage());
 
@@ -63,8 +67,32 @@ final class StatusApiHandler
                 'incidents' => [],
                 'window_days' => $days,
                 'generated_at' => gmdate('c'),
+                'maintenance' => $this->maintenance(),
             ], 200);
         }
+    }
+
+    /**
+     * Whether the operator has announced a maintenance window, and until when.
+     * Public like the rest of this page, and it says nothing more than that. A
+     * database that can't answer is not an announcement.
+     *
+     * @return array{active: bool, until: string|null}
+     */
+    private function maintenance(): array
+    {
+        try {
+            $global = $this->settings?->getGlobal() ?? [];
+        } catch (Throwable) {
+            return ['active' => false, 'until' => null];
+        }
+
+        $until = (string) ($global[SettingsRegistry::MAINTENANCE_UNTIL] ?? '');
+
+        return [
+            'active' => ($global[SettingsRegistry::MAINTENANCE_ACTIVE] ?? 'false') === 'true',
+            'until' => $until === '' ? null : $until,
+        ];
     }
 
     /**
