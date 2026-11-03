@@ -20,6 +20,7 @@ import { useState } from 'react';
 import { Input } from '@whity/ui/input';
 import { Textarea } from '@whity/ui/textarea';
 import { Checkbox } from '@whity/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@whity/ui/select';
 import { useTranslation } from '@whity/features/i18n';
 import {
   RepeatingField,
@@ -29,6 +30,38 @@ import {
   type TableColumn,
   type TableRow,
 } from '@/components/forms/form-field-kinds';
+
+/** Radix selects cannot hold an empty value, so "nothing chosen" has its own. */
+const NO_CHOICE = '__none__';
+
+/** One Whity select for every single-choice question, so none is a native dropdown. */
+function ChoiceSelect({
+  id,
+  value,
+  options,
+  onChange,
+}: {
+  id: string;
+  value: string;
+  options: Array<{ value: string; label: string }>;
+  onChange: (next: string) => void;
+}) {
+  return (
+    <Select value={value === '' ? NO_CHOICE : value} onValueChange={(next) => onChange(next === NO_CHOICE ? '' : next)}>
+      <SelectTrigger id={id} className="w-full">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value={NO_CHOICE}>—</SelectItem>
+        {options.map((option) => (
+          <SelectItem key={option.value} value={option.value}>
+            {option.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
 
 export interface LocalizedText {
   ar?: string;
@@ -382,7 +415,7 @@ export function FormField({
           <span className="text-sm text-muted-foreground">{t('field.yes', 'Yes')}</span>
         </div>
       ) : multiple ? (
-        // CHECKBOXES, not `<select multiple>`. A native multi-select is a list
+        // CHECKBOXES, not a multiple-choice dropdown. A native multi-select is a list
         // box you operate by ctrl-clicking: on a phone it is barely usable, and
         // on a desktop most people never discover that more than one choice was
         // possible — they pick one and move on, and the form quietly collects a
@@ -425,15 +458,11 @@ export function FormField({
         // person typed. Free text here produced "Civil Eng.", "civil", and
         // "Dept of Civil Engineering" for one department, none of which a
         // report can group by.
-        <select
+        <ChoiceSelect
           id={id}
-          required={field.is_required}
-          className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           value={typeof value === 'string' ? value : ''}
-          onChange={(e) => onChange(e.target.value)}
-        >
-          <option value="">—</option>
-          {(references?.[field.field_type] ?? [])
+          onChange={onChange}
+          options={(references?.[field.field_type] ?? [])
             // A department picker offers departments. Filtering here rather
             // than at the fetch keeps ONE list serving every reference field on
             // the form; a field that names no type still sees everything.
@@ -442,30 +471,18 @@ export function FormField({
 
               return wanted === undefined || wanted === null || option.type === wanted;
             })
-            .map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
+            .map((option) => ({ value: option.value, label: option.label }))}
+        />
       ) : field.field_type === 'select' ? (
-        // A NATIVE select for the single-choice case. This page is opened by
-        // strangers on devices nobody chose, and a custom picker assumes a
-        // pointer, a viewport and script behaviour a public form may not.
-        <select
+        <ChoiceSelect
           id={id}
-          required={field.is_required}
-          className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           value={typeof value === 'string' ? value : ''}
-          onChange={(e) => onChange(e.target.value)}
-        >
-          <option value="">—</option>
-          {field.options.map((option, index) => (
-            <option key={index} value={optionValue(option)}>
-              {optionLabel(option, preferArabic)}
-            </option>
-          ))}
-        </select>
+          onChange={onChange}
+          options={field.options.map((option) => ({
+            value: optionValue(option),
+            label: optionLabel(option, preferArabic),
+          }))}
+        />
       ) : field.field_type === 'date' ? (
         // A PLAIN native date input, not the shared one.
         //
