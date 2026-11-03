@@ -53,12 +53,20 @@ test.describe('Sidebar navigation (admin)', () => {
     await expect(page.getByRole('button', { name: /New unit|Add the first unit/ }).first()).toBeVisible();
   });
 
-  test('Tenants section loads its page with heading and table', async ({ adminPage, page }) => {
-    await adminPage.shell.clickNav('Tenants');
-    await page.waitForURL('**/admin/tenants');
+  test('Tenants is not in a workspace admin\'s sidebar, and still opens by URL', async ({ adminPage, page }) => {
+    await page.goto('/admin/tenants');
+    await expect(adminPage.shell.navLink('Tenants')).toHaveCount(0);
     await expect(page.getByRole('heading', { name: 'Tenants' })).toBeVisible();
     await expect(page.getByRole('table')).toBeVisible();
     await expect(page.getByRole('columnheader', { name: 'Slug' })).toBeVisible();
+  });
+
+  test('Settings General leads a workspace admin to their workspace record', async ({ adminPage, page }) => {
+    await adminPage.shell.clickNav('Settings');
+    await page.waitForURL('**/admin/settings');
+    await page.getByRole('link', { name: 'Open workspace record' }).click();
+    await page.waitForURL(/\/admin\/tenants\/\d+$/);
+    await expect(page.getByText('This workspace could not be loaded')).toHaveCount(0);
   });
 
   test('Settings opens the Settings area, whose sub-nav reaches the data pages too', async ({
@@ -96,7 +104,7 @@ test.describe('Sidebar navigation (admin)', () => {
     await adminPage.shell.clickNav('Dashboard');
     await page.waitForURL('**/dashboard');
     await expect(
-      page.getByRole('heading', { name: /^Good (morning|afternoon|evening)$/ })
+      page.getByRole('heading', { name: /^Good (morning|afternoon|evening)/ })
     ).toBeVisible();
   });
 

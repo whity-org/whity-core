@@ -57,23 +57,19 @@ test.describe('Core admin areas (role matrix)', () => {
     }
   });
 
-  test('Tenants page renders for admin; the nav link is hidden for user and delegate', async ({
+  test('Tenants opens by URL for a workspace admin, with no way to create one; no role here has the nav link', async ({
     roleSession,
     role,
     page,
   }) => {
     if (role === 'admin') {
-      await roleSession.shell.clickNav('Tenants');
-      await page.waitForURL('**/admin/tenants');
+      await page.goto('/admin/tenants');
       await expect(page.getByRole('heading', { name: 'Tenants' })).toBeVisible();
-      await expect(
-        page.getByRole('button', { name: 'Create Tenant' })
-      ).toBeVisible();
       await expect(page.getByRole('table')).toBeVisible();
-    } else {
-      // requiredRole 'admin' — the link is filtered out server-side.
-      await expect(roleSession.shell.navLink('Tenants')).toHaveCount(0);
+      await expect(page.getByRole('button', { name: 'Create Tenant' })).toHaveCount(0);
     }
+    // systemTenantOnly — the link is filtered out server-side.
+    await expect(roleSession.shell.navLink('Tenants')).toHaveCount(0);
   });
 
   test('Organizational Units page renders for admin; the nav link is hidden for user and delegate', async ({

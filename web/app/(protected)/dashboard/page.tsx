@@ -4,8 +4,8 @@
  * Home (A01; TplHome, TplHomeMember, TplAdminDashboard). One home, built per
  * person (H.1): each card appears only when the person can see what it shows.
  *
- * Left out until a server item returns them, never faked: Finish setting up,
- * From your apps (S2), and Your recent documents.
+ * Each part decides for itself whether it appears, except where the page has to
+ * lay it out around another part.
  */
 
 import { useState } from 'react';
@@ -14,7 +14,10 @@ import { useTranslation } from '@whity/features/i18n';
 import { useAuth } from '@/lib/auth-context';
 import { useCapabilitiesContext } from '@/lib/capabilities-context';
 import { AgentsToday } from './agents-today';
+import { FinishSettingUp } from './finish-setting-up';
+import { HomeApps } from './home-apps';
 import { PlatformCards } from './platform-cards';
+import { RecentDocuments } from './recent-documents';
 import { partOfDay } from './relative-time';
 import { WaitingForYou } from './waiting-for-you';
 
@@ -29,11 +32,19 @@ export default function DashboardPage() {
   // Bumped when a decision is made so Agents today follows Waiting for you.
   const [refreshKey, setRefreshKey] = useState(0);
 
-  const greeting = {
-    morning: t('dashboard.greeting.morning', 'Good morning'),
-    afternoon: t('dashboard.greeting.afternoon', 'Good afternoon'),
-    evening: t('dashboard.greeting.evening', 'Good evening'),
-  }[partOfDay()];
+  // The first name, as the card greets: "Good morning, Rana".
+  const name = user?.display_name?.trim().split(/\s+/)[0];
+  const greeting = name
+    ? {
+        morning: t('dashboard.greeting.morningName', 'Good morning, {name}', { name }),
+        afternoon: t('dashboard.greeting.afternoonName', 'Good afternoon, {name}', { name }),
+        evening: t('dashboard.greeting.eveningName', 'Good evening, {name}', { name }),
+      }[partOfDay()]
+    : {
+        morning: t('dashboard.greeting.morning', 'Good morning'),
+        afternoon: t('dashboard.greeting.afternoon', 'Good afternoon'),
+        evening: t('dashboard.greeting.evening', 'Good evening'),
+      }[partOfDay()];
 
   const workspace = memberships.find((m) => m.tenant_id === user?.tenant_id)?.tenant_name;
   // Through the shared date display, so a workspace that hides dates shows none.
@@ -47,12 +58,20 @@ export default function DashboardPage() {
       </header>
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
-        <WaitingForYou onChange={() => setRefreshKey((key) => key + 1)} />
-        <AgentsToday refreshKey={refreshKey} />
+        <div className="grid gap-6">
+          <WaitingForYou onChange={() => setRefreshKey((key) => key + 1)} />
+          <RecentDocuments />
+        </div>
+        <div className="grid gap-6">
+          <AgentsToday refreshKey={refreshKey} />
+          {capabilities.has('settings:write') && <FinishSettingUp />}
+        </div>
       </div>
 
       {/* Platform cards are for operators: the system tenant, with stats:read. */}
       {user?.tenant_id === SYSTEM_TENANT_ID && capabilities.has('stats:read') && <PlatformCards />}
+
+      <HomeApps />
     </div>
   );
 }

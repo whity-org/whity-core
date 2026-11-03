@@ -8,6 +8,8 @@ import { refreshSession } from '@/lib/session-refresh';
 interface User {
   id: number;
   email: string;
+  /** Absent until `/api/me` has answered (login responses don't carry it). */
+  display_name?: string | null;
   role: string;
   tenant_id: number;
 }

@@ -202,6 +202,27 @@ describe('AdminSettingsPage (General) — RBAC gating', () => {
     expect(screen.queryByLabelText(/^locale$/i)).not.toBeInTheDocument();
   });
 
+  it('links a workspace admin to their own workspace record', async () => {
+    mockTenantId = 5;
+    grant('settings:read', 'tenants:read');
+    render(<AdminSettingsPage />);
+    expect(await screen.findByRole('link', { name: 'Open workspace record' })).toHaveAttribute('href', '/admin/tenants/5');
+  });
+
+  it('gives no workspace record link to the system tenant or without tenants:read', async () => {
+    grant('settings:read', 'tenants:read');
+    const { unmount } = render(<AdminSettingsPage />);
+    await screen.findByLabelText(/^site name$/i).catch(() => undefined);
+    expect(screen.queryByRole('link', { name: 'Open workspace record' })).not.toBeInTheDocument();
+    unmount();
+
+    mockTenantId = 5;
+    grant('settings:read');
+    render(<AdminSettingsPage />);
+    expect(await screen.findByLabelText(/^site name$/i)).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Open workspace record' })).not.toBeInTheDocument();
+  });
+
   it('makes the tenant form read-only without settings:write', async () => {
     grant('settings:read');
     render(<AdminSettingsPage />);
