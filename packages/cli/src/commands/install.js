@@ -1,8 +1,9 @@
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { CliError } from '../errors.js';
 import { m } from '../messages.js';
 import { newEnvFile, parseEnv } from '../envfile.js';
+import { readIfPresent } from '../files.js';
 import { assertSupported, composeFor, latestVersion, normalizeVersion } from '../release.js';
 import { smoke } from '../smoke.js';
 import { checkDocker, outputOf, stack } from '../stack.js';
@@ -44,8 +45,9 @@ export async function install(options, deps) {
   const { dir } = options;
   if (options.url) assertUsableUrl(options.url);
   const envPath = join(dir, '.env');
-  const resuming = existsSync(join(dir, MARKER));
-  if (existsSync(envPath) && !resuming) {
+  const existingEnv = readIfPresent(envPath);
+  const resuming = existingEnv !== null && readIfPresent(join(dir, MARKER)) !== null;
+  if (existingEnv !== null && !resuming) {
     throw new CliError(m.alreadyInstalled(dir));
   }
 
@@ -56,7 +58,7 @@ export async function install(options, deps) {
   let version;
   if (resuming) {
     // The database may already use these secrets, so an earlier attempt's stay.
-    envText = readFileSync(envPath, 'utf8');
+    envText = existingEnv;
     version = parseEnv(envText).WHITY_VERSION;
     deps.log(m.installContinuing(version));
   } else {
@@ -84,12 +86,19 @@ export async function install(options, deps) {
   deps.log(m.installStep2(dir));
   const composeText = await composeFor(version, deps);
   mkdirSync(dir, { recursive: true });
-  writeFileSync(join(dir, MARKER), '');
-  writeFileSync(join(dir, 'docker-compose.yml'), composeText);
   if (!resuming) {
-    writeFileSync(envPath, envText, { mode: 0o600 });
+    // Exclusive: another install that got here first keeps its secrets, because
+    // replacing them would lock it out of a database it already set up.
+    try {
+      writeFileSync(envPath, envText, { mode: 0o600, flag: 'wx' });
+    } catch (error) {
+      if (error.code === 'EEXIST') throw new CliError(m.alreadyInstalled(dir));
+      throw error;
+    }
     writeFileSync(join(dir, '.gitignore'), '.env\nbackups/\n');
   }
+  writeFileSync(join(dir, MARKER), '');
+  writeFileSync(join(dir, 'docker-compose.yml'), composeText);
 
   const env = parseEnv(envText);
   const run = stack(dir, envText, deps);

@@ -1,8 +1,9 @@
-import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { backup, restoreSteps } from '../backup.js';
 import { CliError } from '../errors.js';
 import { parseEnv, setEnvValue } from '../envfile.js';
+import { readIfPresent } from '../files.js';
 import { m } from '../messages.js';
 import { assertSupported, compareVersions, composeFor, latestVersion, normalizeVersion } from '../release.js';
 import { localOrigin, smoke } from '../smoke.js';
@@ -35,12 +36,14 @@ export async function update(options, deps) {
   const envPath = join(dir, '.env');
   const composePath = join(dir, 'docker-compose.yml');
   const markerPath = join(dir, MARKER);
-  if (!existsSync(envPath) || !existsSync(composePath)) {
+  const envText = readIfPresent(envPath);
+  if (envText === null || readIfPresent(composePath) === null) {
     throw new CliError(m.noInstall(dir));
   }
 
-  if (existsSync(markerPath) && !options.force) {
-    const earlier = JSON.parse(readFileSync(markerPath, 'utf8'));
+  const unfinished = readIfPresent(markerPath);
+  if (unfinished !== null && !options.force) {
+    const earlier = JSON.parse(unfinished);
     throw new CliError(m.restore({
       reason: m.earlierUnfinished(earlier.from, earlier.to),
       ...earlier,
@@ -49,7 +52,6 @@ export async function update(options, deps) {
 
   deps.log(m.updateStep1());
   await checkDocker(deps);
-  const envText = readFileSync(envPath, 'utf8');
   const env = parseEnv(envText);
   const from = env.WHITY_VERSION;
   if (!from) throw new CliError(m.noVersionInEnv(envPath));

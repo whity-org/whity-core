@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -60,6 +60,32 @@ test('a finished install is not overwritten', async (t) => {
 
   await assert.rejects(install({ dir, version: 'v0.2.22' }, fakeDeps()), /already holds an install/);
   assert.equal(readFileSync(join(dir, '.env'), 'utf8'), before);
+});
+
+test('an install that loses a race keeps the winner\'s secrets and touches nothing', async (t) => {
+  const dir = tempDir(t);
+  const deps = fakeDeps({ running: '0.2.22' });
+  // Another install writes .env after this one has checked for it.
+  deps.portIsFree = async () => {
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, '.env'), 'WINNER=1\n');
+    return true;
+  };
+
+  await assert.rejects(install({ dir, version: 'v0.2.22' }, deps), /already holds an install/);
+  assert.equal(readFileSync(join(dir, '.env'), 'utf8'), 'WINNER=1\n');
+  assert.equal(existsSync(join(dir, MARKER)), false);
+  assert.equal(existsSync(join(dir, 'docker-compose.yml')), false);
+  assert.equal(deps.calls.some((line) => line.includes('pull')), false);
+});
+
+test('an install that stopped before writing .env starts over', async (t) => {
+  const dir = tempDir(t);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, MARKER), '');
+
+  await install({ dir, version: 'v0.2.22' }, fakeDeps({ running: '0.2.22' }));
+  assert.equal(parseEnv(readFileSync(join(dir, '.env'), 'utf8')).WHITY_VERSION, 'v0.2.22');
 });
 
 test('an address that could never sign in is refused before anything is written', async (t) => {
