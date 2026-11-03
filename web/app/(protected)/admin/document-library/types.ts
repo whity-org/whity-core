@@ -107,6 +107,8 @@ export interface DocumentRow {
   origin_ou_id: number | null;
   created_by: number | null;
   created_at: string;
+  /** Null unless the document was withdrawn. It stays in the library either way. */
+  withdrawn_at?: string | null;
   content_url: string | null;
   artifacts: DocumentArtifact[];
   /**
@@ -158,6 +160,8 @@ export interface AppliedSort {
 
 export interface DocumentListResponse {
   data: DocumentRow[];
+  /** Names of the people these rows name, by profile id. No entry: no longer in this workspace. */
+  people?: Record<string, string>;
   pagination: Pagination;
   /** Which folder ran, and the anchor the SERVER resolved (not the one we guessed). */
   view: { key: string; ou_id: number | null; collection_id: number | null };

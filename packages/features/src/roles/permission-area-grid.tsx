@@ -41,7 +41,6 @@
  *   permissions.group.documents = Documents
  *   permissions.group.people = People
  *   permissions.group.workspace = Workspace
- *   roles.areaGrid.action = What it can do
  *   roles.areaGrid.area = Area
  *   roles.areaGrid.more = Also in this area
  *   roles.areaGrid.none = No permissions are defined on this installation.
@@ -49,7 +48,6 @@
  *   roles.areaGrid.onlyAllowed = Only allowed
  *   roles.areaGrid.search = Search areas
  *   roles.areaGrid.summary = {selected} of {total} allowed
- *   roles.areaGrid.title = What this role can do
  */
 
 import { useMemo, useState } from 'react';
