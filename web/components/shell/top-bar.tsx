@@ -33,7 +33,7 @@ export function TopBar() {
         aria-label={t('topBar.search', 'Search')}
         aria-keyshortcuts="Control+K Meta+K"
         data-testid="top-bar-search"
-        className="flex h-9 w-full max-w-[360px] items-center gap-2 rounded-control border border-input bg-background px-2.5 text-sm text-muted-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        className="flex h-10 w-full max-w-[360px] items-center gap-2 rounded-control border border-input bg-background px-2.5 text-sm text-muted-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
       >
         <Icon name="search" size={16} />
         <span className="flex-1 text-start">{t('topBar.search', 'Search')}</span>

@@ -59,8 +59,15 @@ describe('parseWireDate', () => {
 
 describe('formatDate / formatDateTime', () => {
   it('formats in the locale it is given, not the runtime default', () => {
-    expect(formatDate('2026-08-25 14:02:11', 'en-GB')).toBe('25/08/2026')
-    expect(formatDate('2026-08-25 14:02:11', 'en-US')).toBe('8/25/2026')
+    expect(formatDate('2026-08-25 14:02:11', 'en-GB')).toBe('25 Aug 2026')
+    expect(formatDate('2026-08-25 14:02:11', 'en-US')).toBe('25 Aug 2026')
+  })
+
+  it('writes the month as a word, the time in 24 hours, and digits as Western digits', () => {
+    expect(formatDateTime('2026-08-25 14:02:11', 'en-GB')).toMatch(/^2[56] Aug 2026, \d{2}:\d{2}$/)
+    // Arabic keeps Arabic month names but never Arabic-Indic digits (register 3.7).
+    expect(formatDate('2026-08-25 14:02:11', 'ar')).toMatch(/^25 .+ 2026$/)
+    expect(formatDate('2026-08-25 14:02:11', 'ar')).not.toMatch(/[٠-٩]/)
   })
 
   it('returns null rather than the raw value it could not parse', () => {
