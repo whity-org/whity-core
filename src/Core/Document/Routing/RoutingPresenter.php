@@ -213,6 +213,9 @@ final class RoutingPresenter
             // circulation step, every note, and every event recorded before
             // migration 119. It never means "not approved".
             'verdict' => $event['verdict'] ?? null,
+            // S5: this row closed the route because the document was withdrawn.
+            // Nobody wrote it as a note, so a screen does not show it as one.
+            'withdrawal' => DbBool::of($event['withdrawal'] ?? false),
             'occurred_at' => (string) $event['occurred_at'],
         ];
     }

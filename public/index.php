@@ -716,16 +716,13 @@ $hookManager->listen('navigation.register', function ($data, $context) {
     $items[] = [
         'id' => 'dashboard',
         'label' => 'Dashboard',
-        'href' => '/admin',
+        'href' => '/dashboard',
         'icon' => 'dashboard',
         'group' => 'overview',
         'order' => 1,
-        // WC-175 (#191): mirrors the dashboard's primary API (GET /api/admin/stats).
-        // #990: that route now gates on `stats:read`, so this moves with it. The two
-        // must agree or the nav either hides a page that works or offers one that
-        // 403s — which is why they are re-gated in the same commit rather than one
-        // at a time.
-        'requiredPermission' => \Whity\Core\RBAC\CorePermissions::STATS_READ,
+        // WHIT-872 (H.1): one home for everyone, built per person. Deliberately
+        // ungated: the page holds nothing beyond what each card's own route allows,
+        // and the plain member's sidebar would otherwise have no way home.
     ];
     $items[] = [
         'id' => 'users',
@@ -1216,6 +1213,19 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         // Gated on mcp:tokens:manage so only admins who manage AI credentials
         // can see which tools those credentials expose.
         'requiredPermission' => \Whity\Core\RBAC\CorePermissions::MCP_TOKENS_MANAGE,
+    ];
+    $items[] = [
+        'id' => 'system',
+        'label' => 'System',
+        'href' => '/admin/stats',
+        'icon' => 'activity',
+        'group' => 'platform',
+        'order' => 14,
+        // WHIT-872 (H.3): server statistics, for the platform's operators only.
+        // Mirrors GET /api/admin/stats, which takes the same permission and answers
+        // only in the system tenant.
+        'requiredPermission' => \Whity\Core\RBAC\CorePermissions::STATS_READ,
+        'systemTenantOnly' => true,
     ];
     $items[] = [
         'id' => 'languages',
@@ -2328,11 +2338,9 @@ $router->register('GET', '/api/migrations', [$migrationsHandler, 'list'], 'admin
 
 $adminHandler = new AdminApiHandler($db, __DIR__ . '/../database/migrations');
 // #990: gated on `stats:read` (6th positional arg; requiredRole stays null so
-// RbacMiddleware enforces the permission). Migration 157 grants it to every role
-// already holding `users:read` — this endpoint returns an AGGREGATE of rows that
-// permission already exposes one by one, so the grant confers nothing new. The
-// platform-wide tenant count stays restricted by the handler's own $isSystemUser
-// branch, which this does not touch.
+// RbacMiddleware enforces the permission). WHIT-872 (H.3): the handler also refuses
+// every tenant but the system tenant, because the seeded `admin` is one global role
+// held by operators and workspace owners alike, so no grant can tell them apart.
 $router->register('GET', '/api/admin/stats', [$adminHandler, 'stats'], null, null, \Whity\Core\RBAC\CorePermissions::STATS_READ);
 
 // 12. Register OUs API handler. Gated on the seeded ous:* PERMISSIONS (6th
@@ -3041,6 +3049,7 @@ $documentSourcesHandler = new \Whity\Api\DocumentSourcesApiHandler(
     new \Whity\Core\Document\DocumentSourceVersionRepository($db->getPdo()),
     $documentThemeResolver,
     $documentCollab,
+    new \Whity\Core\Document\DocumentPeople($db->getPdo()),
 );
 $router->register('GET',    '/api/document-sources',                [$documentSourcesHandler, 'list'],      null, null, CorePermissions::DOCUMENTS_READ);
 $router->register('POST',   '/api/document-sources',                [$documentSourcesHandler, 'create'],    null, null, CorePermissions::DOCUMENTS_WRITE);
@@ -3456,6 +3465,7 @@ $reportsHandler = new \Whity\Api\ReportsApiHandler(
 $router->register('GET',  '/api/reports',                            [$reportsHandler, 'index'],    null, null, CorePermissions::DOCUMENTS_RENDER);
 $router->register('POST', '/api/reports/{source:[a-z][a-z0-9_]*}/document', [$reportsHandler, 'document'], null, null, CorePermissions::DOCUMENTS_RENDER);
 
+$documentPeople = new \Whity\Core\Document\DocumentPeople($db->getPdo());
 $documentsHandler = new \Whity\Api\DocumentsApiHandler(
     $documentRepository,
     $documentArtifactRepository,
@@ -3497,7 +3507,8 @@ $documentsHandler = new \Whity\Api\DocumentsApiHandler(
     // commits the record first. Also the `qr` record-page region's predicate.
     $documentQrService,
     // WHIT-742: `slot` in the body names the template through the workspace's bindings.
-    $templateSlotRegistry
+    $templateSlotRegistry,
+    $documentPeople
 );
 // The one issuing path (WHIT-742), registered for plugin code and automations
 // running in a request. BaseCommand registers the same for CLI commands, and
@@ -3515,6 +3526,20 @@ $documentsHandler = new \Whity\Api\DocumentsApiHandler(
     \Whity\app(\Whity\Core\Document\Issuing\TemplateIssuing::class),
     $roleChecker,
 ));
+$documentWithdrawalHandler = new \Whity\Api\DocumentWithdrawalApiHandler(
+    $documentRepository,
+    $documentVisibilityPolicy,
+    $roleChecker,
+    new \Whity\Core\Document\DocumentWithdrawal(
+        $db->getPdo(),
+        $documentRepository,
+        $documentQrTokenRepository,
+        $routeRecipientRepository,
+        $routeEventRepository,
+        $auditLogger
+    )
+);
+$router->register('POST', '/api/documents/{id:\d+}/withdraw', [$documentWithdrawalHandler, 'withdraw'], null, null, CorePermissions::DOCUMENTS_WITHDRAW);
 $documentQrHandler = new \Whity\Api\DocumentQrApiHandler(
     $documentRepository,
     $documentVisibilityPolicy,
@@ -3630,7 +3655,8 @@ $documentRoutingHandler = new \Whity\Api\DocumentRoutingApiHandler(
     $documentVisibilityPolicy,
     $roleChecker,
     $routeTemplateRepository,
-    $serverLabels
+    $serverLabels,
+    $documentPeople
 );
 $router->register('GET',  '/api/routing-rules',                                        [$documentRoutingHandler, 'rules'],      null, null, CorePermissions::DOCUMENTS_READ);
 $router->register('POST', '/api/documents/{id:\d+}/routes',                            [$documentRoutingHandler, 'create'],     null, null, CorePermissions::DOCUMENTS_ROUTE);
@@ -3664,6 +3690,7 @@ $router->register('POST', '/api/documents/{id:\d+}/routes/from-template',       
 $router->register('GET',  '/api/documents/{id:\d+}/routes',                            [$documentRoutingHandler, 'list'],       null);
 $router->register('GET',  '/api/documents/{id:\d+}/trail',                             [$documentRoutingHandler, 'trail'],      null);
 $router->register('GET',  '/api/documents/{id:\d+}/recipients',                        [$documentRoutingHandler, 'recipients'], null);
+$router->register('GET',  '/api/documents/{id:\d+}/people',                            [$documentRoutingHandler, 'people'],     null);
 // Deliberately UNPERMISSIONED (null, null): being a recipient IS the
 // authorization — the route named a rule, the rule resolved to you, and the
 // engine wrote the row. Requiring a permission on top would let a route resolve
@@ -4905,6 +4932,10 @@ $agentProposalsHandler = new \Whity\Api\AgentProposalsApiHandler($agentProposals
 $router->register('GET',  '/api/me/agent-proposals',                    [$agentProposalsHandler, 'list'],    null);
 $router->register('POST', '/api/me/agent-proposals/{id:\d+}/approve',  [$agentProposalsHandler, 'approve'], null);
 $router->register('POST', '/api/me/agent-proposals/{id:\d+}/decline',  [$agentProposalsHandler, 'decline'], null);
+// WHIT-872 (H.2): every inbox source and the caller's proposals in one list, oldest
+// first. Session-gated and self-scoped like the two surfaces it reads.
+$meWaitingHandler = new \Whity\Api\MeWaitingApiHandler($inboxSourceRegistry, $agentProposals, $agentAssignments);
+$router->register('GET', '/api/me/waiting', [$meWaitingHandler, 'list'], null);
 // WHIT-815: workspace agents (persona, toolsets, starting grant) and the
 // presets they start from. Gated on agents:manage, which migration 180 grants
 // to every role holding mcp:tokens:manage. Writes are agentPolicy refuse.

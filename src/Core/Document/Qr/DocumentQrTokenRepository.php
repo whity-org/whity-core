@@ -210,6 +210,31 @@ final class DocumentQrTokenRepository
     }
 
     /**
+     * Retire every live code on a document. Returns how many.
+     *
+     * Every one rather than the newest: migration 120 records why two can be live
+     * for a moment, and a withdrawal must not leave the other one verifying.
+     */
+    public function revokeAllLive(int $tenantId, int $documentId, ?int $revokedBy, string $reason): int
+    {
+        $stmt = $this->db->prepare(
+            'UPDATE document_qr_tokens
+                SET revoked_at = NOW(), revoked_by = :revoked_by, revoked_reason = :reason
+              WHERE tenant_id = :tenant_id
+                AND document_id = :document_id
+                AND revoked_at IS NULL'
+        );
+        $stmt->execute([
+            ':tenant_id' => $tenantId,
+            ':document_id' => $documentId,
+            ':revoked_by' => $revokedBy,
+            ':reason' => $reason,
+        ]);
+
+        return $stmt->rowCount();
+    }
+
+    /**
      * Ints as ints and the nullable columns as null, so callers never compare a
      * PostgreSQL string id against an int and get false — the normalisation
      * every repository in this subsystem does at its edge.

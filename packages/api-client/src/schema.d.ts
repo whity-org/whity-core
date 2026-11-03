@@ -200,7 +200,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Platform-wide aggregate statistics */
+        /** Platform-wide aggregate statistics, for the system tenant only */
         get: operations["get_api_v1_admin_stats"];
         put?: never;
         post?: never;
@@ -2380,6 +2380,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/documents/{id}/people": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The names of the people on this document
+         * @description Display names, keyed by profile id, of who raised and withdrew the document, who took part in its routes and, for a caller holding documents:read, who issued and retired its codes. It takes no ids and returns no email addresses. An id with no entry is somebody no longer in this workspace.
+         */
+        get: operations["get_api_v1_documents_id_people"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/documents/{id}/qr": {
         parameters: {
             query?: never;
@@ -2532,6 +2552,26 @@ export interface paths {
         get: operations["get_api_v1_documents_id_trail"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/{id}/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Withdraw an issued document
+         * @description Keeps the record and its history. Every live code stops being honoured, open items on its routes close, and it can no longer be routed, corrected or given a new code. Recorded in the audit log. There is no way to undo it.
+         */
+        post: operations["post_api_v1_documents_id_withdraw"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3990,6 +4030,26 @@ export interface paths {
         put?: never;
         /** Resolve which of a batch of requests the caller is permitted to make */
         post: operations["post_api_v1_me_permitted_actions"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/waiting": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What is waiting for the caller: every inbox source and their agent proposals, oldest first
+         * @description At most `limit` rows, with the real totals in `counts`. A source that fails is named in `unavailable` and the rest is still served. There are no pages: the rest is on Inbox and Approvals.
+         */
+        get: operations["get_api_v1_me_waiting"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -7589,6 +7649,8 @@ export interface components {
             origin_ou_id?: number | null;
             created_by?: number | null;
             created_at: string;
+            withdrawn_at?: string | null;
+            withdrawn_by?: number | null;
             content_url?: string | null;
             artifacts: components["schemas"]["DocumentArtifact"][];
             collection_ids?: number[];
@@ -7852,6 +7914,9 @@ export interface components {
         };
         DocumentListResponse: {
             data: components["schemas"]["Document"][];
+            people?: {
+                [key: string]: string;
+            };
             pagination: components["schemas"]["Pagination"];
             view: {
                 key: string;
@@ -8184,6 +8249,9 @@ export interface components {
         };
         DocumentSourceListResponse: {
             data: components["schemas"]["DocumentSource"][];
+            people?: {
+                [key: string]: string;
+            };
         };
         DocumentSourcePrintLabelsRequest: {
             /** @description One label per record, each as `type:id` (at most 500). Send this or csv. */
@@ -8633,6 +8701,7 @@ export interface components {
             note?: string | null;
             /** @enum {string|null} */
             verdict?: "approved" | "rejected" | null;
+            withdrawal?: boolean;
             occurred_at: string;
         };
         DocumentTrailListResponse: {
@@ -8770,6 +8839,7 @@ export interface components {
             status: "draft" | "published" | "archived";
             version: number;
             route_template_id?: number | null;
+            route_template_name?: string | null;
             created_by_profile_id?: number | null;
             created_at?: string;
             updated_at?: string;
@@ -10797,6 +10867,7 @@ export interface components {
             name: string;
             description?: string | null;
             step_count: number;
+            usage_count?: number;
             created_by?: number | null;
             created_at: string;
             updated_at: string;
@@ -11713,6 +11784,24 @@ export interface components {
             accountStatus?: "active" | "inactive";
             /** @description Required to set `password` on an account that signs in through an identity provider; otherwise that is refused. */
             allowLocalPasswordOnIdpAccount?: boolean;
+        };
+        WaitingListResponse: {
+            data: components["schemas"]["WaitingRow"][];
+            counts: {
+                inbox: number;
+                proposals: number;
+                total: number;
+            };
+            unavailable: string[];
+        };
+        WaitingRow: {
+            key: string;
+            /** @enum {string} */
+            kind: "inbox" | "proposal";
+            at: string;
+            source?: string;
+            item?: components["schemas"]["InboxItem"];
+            proposal?: components["schemas"]["AgentProposal"];
         };
         WebhookAckResponse: {
             data: {
@@ -12711,7 +12800,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Insufficient permissions */
+            /** @description Insufficient permissions, or not the system tenant */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -23370,10 +23459,10 @@ export interface operations {
                         data?: {
                             verified: boolean;
                             /**
-                             * @description Present only when verified is false. `unrecognised` covers unknown, malformed, withdrawn and superseded at the default disclosure level.
+                             * @description Present only when verified is false. `unrecognised` covers unknown, malformed, withdrawn and superseded at the default disclosure level, and a withdrawn document too. `document_withdrawn` means the whole document was taken back.
                              * @enum {string}
                              */
-                            reason?: "unrecognised" | "withdrawn" | "superseded";
+                            reason?: "unrecognised" | "withdrawn" | "superseded" | "document_withdrawn";
                             /** @description Date only, and only at the `stage` level */
                             revoked_on?: string | null;
                             /** @description The short reference printed beneath the code */
@@ -23675,6 +23764,7 @@ export interface operations {
                         data?: {
                             id: number;
                             code_honoured: boolean;
+                            document_withdrawn: boolean;
                         };
                     };
                 };
@@ -24078,6 +24168,77 @@ export interface operations {
             };
         };
     };
+    get_api_v1_documents_id_people: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Names keyed by profile id */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            [key: string]: string;
+                        };
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Document not found or not visible to the caller */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     get_api_v1_documents_id_qr: {
         parameters: {
             query?: never;
@@ -24099,6 +24260,7 @@ export interface operations {
                         data?: {
                             enabled?: boolean;
                             configured?: boolean;
+                            document_withdrawn?: boolean;
                             token?: {
                                 reference?: string;
                                 verification_url?: string;
@@ -25038,6 +25200,99 @@ export interface operations {
             };
             /** @description Internal server error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_documents_id_withdraw: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description What the withdrawal did */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            id: number;
+                            withdrawn_at: string;
+                            withdrawn_by?: number | null;
+                            codes_withdrawn: number;
+                            items_closed: number;
+                        };
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Document not found or not visible to the caller */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The document has already been withdrawn */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The document could not be withdrawn */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -32903,6 +33158,74 @@ export interface operations {
             };
             /** @description Missing 'checks' list, or more than 200 checks */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_me_waiting: {
+        parameters: {
+            query?: {
+                /** @description How many rows (default 6, max 50) */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The oldest rows and the totals */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WaitingListResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
                 headers: {
                     [name: string]: unknown;
                 };

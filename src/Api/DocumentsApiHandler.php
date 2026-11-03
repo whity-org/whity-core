@@ -9,6 +9,7 @@ use Whity\Auth\RoleChecker;
 use Whity\Core\Document\DocumentArtifactRepository;
 use Whity\Core\Document\DocumentArtifactStore;
 use Whity\Core\Document\DocumentCollectionRepository;
+use Whity\Core\Document\DocumentPeople;
 use Whity\Core\Document\DocumentPresenter;
 use Whity\Core\Document\DocumentRepository;
 use Whity\Core\Document\DocumentVisibilityPolicy;
@@ -200,6 +201,8 @@ final class DocumentsApiHandler
         // ── WHIT-742: issuing by template slot ───────────────────────────────
         // Without it, `slot` in the body is refused and callers name a template.
         private readonly ?TemplateSlotRegistry $slots = null,
+        // S5: names for the library's "Raised by", from the page being served.
+        private readonly ?DocumentPeople $people = null,
     ) {
     }
 
@@ -442,8 +445,16 @@ final class DocumentsApiHandler
             $rows
         );
 
+        // S5: who these rows name, in one statement, and only the rows this caller
+        // was just served. See DocumentPeople for why ids never come from a client.
+        $names = $this->people?->names($tenantId, array_values(array_filter(array_merge(
+            array_column($rows, 'created_by'),
+            array_column($rows, 'withdrawn_by'),
+        ), static fn ($id): bool => $id !== null))) ?? [];
+
         return Response::json([
             'data' => $data,
+            'people' => $names === [] ? new \stdClass() : $names,
             'pagination' => $p->meta($total),
             // Echoed so a client rendering a rail can tell which entry is
             // selected without re-parsing its own URL, and so the anchor the
@@ -587,6 +598,10 @@ final class DocumentsApiHandler
             return $resolved;
         }
         [$tenantId, $callerId, $document] = $resolved;
+
+        if (($document['withdrawn_at'] ?? null) !== null) {
+            return Response::error('This document has been withdrawn, so it cannot be corrected', 409);
+        }
 
         $effective = $this->settings->effective($tenantId);
         if (($effective[SettingsRegistry::DOCUMENTS_RENDER_ENABLED] ?? 'false') !== 'true') {
@@ -914,6 +929,10 @@ final class DocumentsApiHandler
      */
     private function documentIsReissuable(int $tenantId, int $callerId, array $document): bool
     {
+        if (($document['withdrawn_at'] ?? null) !== null) {
+            return false;
+        }
+
         $effective = $this->settings->effective($tenantId);
         if (($effective[SettingsRegistry::DOCUMENTS_RENDER_ENABLED] ?? 'false') !== 'true') {
             return false;
