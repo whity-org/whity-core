@@ -14,12 +14,14 @@ import { classifyPluginVersion, type PluginVersionTier } from '@/lib/plugin-vers
 import { useRichTranslation, useTranslation } from '@whity/features/i18n';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { PluginsTabs } from '@/components/plugins/plugins-tabs';
+import { PluginUpdateDialog, type PluginUpdateTarget } from '@/components/plugins/plugin-update-dialog';
+import { useDateDisplay } from '@whity/features/datetime';
 import { Button } from '@whity/ui/button';
 import { Badge } from '@whity/ui/badge';
 import { DataTable, type DataTableColumn } from '@whity/ui/data-table';
 import { ConfirmAction } from '@whity/ui/confirm-action';
 import { TechnicalDetails } from '@whity/ui/display-preferences';
-import { AccessDeniedPanel, AreaError, EmptyFirstTime, LoadingRows } from '@whity/ui/page-states';
+import { AccessDeniedPanel, AreaError, EmptyFirstTime, LoadingRows, ReadOnlyNotice } from '@whity/ui/page-states';
 import { Skeleton } from '@whity/ui/skeleton';
 import {
   Dialog,
@@ -48,6 +50,7 @@ const PLUGINS_ENABLE = 'plugins:enable';
 const PLUGINS_DISABLE = 'plugins:disable';
 const PLUGINS_UNINSTALL = 'plugins:uninstall';
 const PLUGINS_UPLOAD = 'plugins:upload';
+const PLUGINS_INSTALL = 'plugins:install';
 
 // Reject client-side anything above this cap before hitting the network. The
 // backend has its own limit; this is a fast-fail UX guard, not the authority.
@@ -103,10 +106,47 @@ export default function PluginsPage() {
     if (responseData === undefined) {
       throw new Error(t('plugins.error.fetch', 'Failed to fetch plugins'));
     }
-    return responseData.data;
+    return { plugins: responseData.data, canOperate: responseData.meta.can_operate };
   }, []);
 
-  const plugins = data ?? [];
+  const plugins = data?.plugins ?? [];
+  // A code plugin is install-wide, so changing one is the operator's (Q4). The
+  // server decides; this only stops offering what it would refuse.
+  const isOperator = data?.canOperate ?? false;
+  const dates = useDateDisplay();
+
+  // What the operator sees beyond the list: kept plugins (S.7) and updates (S.6).
+  const { data: removed, refetch: refetchRemoved } = useFetch(async () => {
+    const { data: responseData } = await api.GET('/api/v1/plugins/removed');
+    return responseData?.data ?? [];
+  }, []);
+  const { data: updates, refetch: refetchUpdates } = useFetch(async () => {
+    const { data: responseData } = await api.GET('/api/v1/plugins/updates');
+    return responseData?.data ?? [];
+  }, []);
+  const [updateTarget, setUpdateTarget] = useState<PluginUpdateTarget | null>(null);
+  const waitingUpdates = plugins.filter((plugin) => plugin.install?.update_waiting);
+  const availableUpdateFor = (plugin: PluginEntry) =>
+    (updates ?? []).find((update) => update.plugin === plugin.name || update.plugin === plugin.id);
+
+  const refetchAll = () => {
+    fetchPlugins();
+    refetchRemoved();
+    refetchUpdates();
+  };
+
+  const reinstall = async (name: string) => {
+    const { error: reinstallError } = await api.POST('/api/v1/plugins/{name}/reinstall', {
+      params: { path: { name } },
+    });
+    if (reinstallError) {
+      addToast(reinstallError.error || t('plugins.error.reinstall', 'Failed to reinstall plugin'), 'error');
+      return;
+    }
+    addToast(t('plugins.toast.reinstalled', '{name} is back, with everything it had.', { name }), 'success');
+    refetchAll();
+    void refreshNavigation();
+  };
 
   useEffect(() => {
     if (error) {
@@ -117,7 +157,6 @@ export default function PluginsPage() {
   // Modals & Dialogs
   const [detailPlugin, setDetailPlugin] = useState<PluginEntry | null>(null);
   const [uninstallTarget, setUninstallTarget] = useState<PluginEntry | null>(null);
-  const [forceUninstall, setForceUninstall] = useState(false);
   const [, setUninstalling] = useState(false);
   const [reloadPending, setReloadPending] = useState(false);
 
@@ -356,7 +395,6 @@ export default function PluginsPage() {
   // Trigger Uninstall Dialog
   const confirmUninstall = (target: PluginEntry) => {
     setUninstallTarget(target);
-    setForceUninstall(false);
   };
 
   // Execute Uninstall
@@ -372,33 +410,26 @@ export default function PluginsPage() {
         }),
         'info'
       );
-      const postUninstall = api.POST as unknown as (
-        url: string,
-        options: { params: { path: { id: string } }; body: { force: boolean } }
-      ) => Promise<{ error?: { error?: string; message?: string } }>;
-
-      const { error: uninstallError } = await postUninstall('/api/v1/plugins/{id}/uninstall', {
+      const { error: uninstallError } = await api.POST('/api/v1/plugins/{id}/uninstall', {
         params: { path: { id: uninstallTarget.id } },
-        body: { force: forceUninstall },
       });
 
       if (uninstallError) {
         throw new Error(
-          uninstallError.error ||
-            uninstallError.message ||
+          ('error' in uninstallError ? uninstallError.error : uninstallError.message) ||
             t('plugins.error.uninstall', 'Failed to uninstall plugin')
         );
       }
 
       addToast(
-        t('plugins.toast.uninstalled', 'Plugin {name} uninstalled successfully.', {
+        t('plugins.toast.uninstalledKept', '{name} is uninstalled. You can reinstall it for 30 days.', {
           name: uninstallTarget.name,
         }),
         'success'
       );
       setUninstallTarget(null);
       if (detailPlugin) setDetailPlugin(null);
-      fetchPlugins();
+      refetchAll();
       // Uninstalling removes the plugin's nav links — drop them optimistically
       // then refresh the authoritative server-filtered nav.
       syncSidebar(hrefs);
@@ -424,7 +455,7 @@ export default function PluginsPage() {
     }
   };
 
-  const canOperate = hasPermission(PLUGINS_UPLOAD) || hasPermission(PLUGINS_RELOAD);
+  const canOperate = isOperator && (hasPermission(PLUGINS_UPLOAD) || hasPermission(PLUGINS_RELOAD));
 
   const columns: DataTableColumn<PluginEntry>[] = [
     {
@@ -471,6 +502,9 @@ export default function PluginsPage() {
                 {versionBadge.label}
               </Badge>
             )}
+            {plugin.install?.update_waiting ? (
+              <Badge variant="warning">{t('plugins.state.updateWaiting', 'Update waiting')}</Badge>
+            ) : null}
           </span>
         );
       },
@@ -479,7 +513,9 @@ export default function PluginsPage() {
 
   const rowActions = (plugin: PluginEntry) => {
     const isActive = plugin.status === 'active';
-    const toggleAllowed = hasPermission(isActive ? PLUGINS_DISABLE : PLUGINS_ENABLE);
+    const toggleAllowed = isOperator && hasPermission(isActive ? PLUGINS_DISABLE : PLUGINS_ENABLE);
+    const available = availableUpdateFor(plugin);
+    const waiting = plugin.install?.update_waiting;
     return (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -491,7 +527,14 @@ export default function PluginsPage() {
           <DropdownMenuItem onClick={() => setDetailPlugin(plugin)}>
             {t('plugins.card.details', 'Details')}
           </DropdownMenuItem>
-          {plugin.status === 'failed' && hasPermission(PLUGINS_ENABLE) && (
+          {isOperator && hasPermission(PLUGINS_INSTALL) && available && !waiting && (
+            <DropdownMenuItem
+              onClick={() => setUpdateTarget({ kind: 'fetch', plugin: plugin.name, version: available.latest_version })}
+            >
+              {t('plugins.action.update', 'Update to {version}', { version: available.latest_version })}
+            </DropdownMenuItem>
+          )}
+          {plugin.status === 'failed' && isOperator && hasPermission(PLUGINS_ENABLE) && (
             <DropdownMenuItem onClick={() => handleReEnable(plugin.id)}>
               {t('plugins.action.tryAgain', 'Try again')}
             </DropdownMenuItem>
@@ -501,7 +544,7 @@ export default function PluginsPage() {
               {isActive ? t('plugins.action.turnOff', 'Turn off') : t('plugins.action.turnOn', 'Turn on')}
             </DropdownMenuItem>
           )}
-          {hasPermission(PLUGINS_UNINSTALL) && (
+          {isOperator && hasPermission(PLUGINS_UNINSTALL) && (
             <>
               <DropdownMenuSeparator />
               <DropdownMenuItem
@@ -552,6 +595,46 @@ export default function PluginsPage() {
       />
       <PluginsTabs />
 
+      {data && !isOperator ? (
+        <ReadOnlyNotice title={t('plugins.readOnly', 'Plugins run for every workspace on this deployment, so the platform operator manages them.')} />
+      ) : null}
+
+      {isOperator && hasPermission(PLUGINS_INSTALL)
+        ? waitingUpdates.map((plugin) => {
+            const waiting = plugin.install?.update_waiting;
+            if (!waiting) return null;
+            return (
+              <div
+                key={plugin.id}
+                role="status"
+                className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-warning/30 bg-warning-tint p-4 text-sm text-warning-text"
+              >
+                <p className="flex items-center gap-2">
+                  <IconAlertTriangle size={16} className="shrink-0" />
+                  {t('plugins.updateWaiting', '{name} {version} asks for more access. The current version keeps running.', {
+                    name: plugin.name,
+                    version: waiting.version,
+                  })}
+                </p>
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    setUpdateTarget({
+                      kind: 'review',
+                      plugin: plugin.name,
+                      version: waiting.version,
+                      newPermissions: waiting.new_permissions,
+                      newDomains: waiting.new_domains,
+                    })
+                  }
+                >
+                  {t('plugins.reviewAccess', 'Review access')}
+                </Button>
+              </div>
+            );
+          })
+        : null}
+
       {error ? (
         <AreaError
           message={error}
@@ -589,6 +672,49 @@ export default function PluginsPage() {
           rowActionsLabel={t('plugins.col.actions', 'Actions')}
         />
       )}
+
+      {isOperator && (removed ?? []).length > 0 ? (
+        <section className="space-y-3" aria-labelledby="plugins-recently-removed">
+          <h2 id="plugins-recently-removed" className="text-base font-semibold text-foreground">
+            {t('plugins.removed.title', 'Recently removed')}
+          </h2>
+          <ul className="divide-y divide-border rounded-card border border-border">
+            {(removed ?? []).map((entry) => (
+              <li key={entry.name} className="flex flex-wrap items-center justify-between gap-3 p-4 text-sm">
+                <div className="min-w-0 space-y-0.5">
+                  <p className="font-medium text-foreground">{entry.name}</p>
+                  <p className="text-muted-foreground">
+                    {entry.purge_failed
+                      ? t('plugins.removed.purgeFailed', 'Its data could not be removed. Whity will keep trying.')
+                      : dates.date(entry.purge_after)
+                        ? t('plugins.removed.until', 'Removed by {person}. Its data goes on {date}.', {
+                            person: entry.removed_by ?? t('plugins.removed.someone', 'someone'),
+                            date: dates.date(entry.purge_after) ?? '',
+                          })
+                        : t('plugins.removed.untilNoDate', 'Removed by {person}. Its data goes after 30 days.', {
+                            person: entry.removed_by ?? t('plugins.removed.someone', 'someone'),
+                          })}
+                  </p>
+                </div>
+                {hasPermission(PLUGINS_INSTALL) ? (
+                  <Button variant="outline" onClick={() => void reinstall(entry.name)}>
+                    {t('plugins.removed.reinstall', 'Reinstall')}
+                  </Button>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      <PluginUpdateDialog
+        target={updateTarget}
+        onClose={() => setUpdateTarget(null)}
+        onChanged={() => {
+          refetchAll();
+          void refreshNavigation();
+        }}
+      />
 
       {/* Upload Plugin Dialog */}
       <Dialog open={uploadOpen} onOpenChange={(open) => (open ? setUploadOpen(true) : closeUploadDialog())}>
@@ -666,6 +792,23 @@ export default function PluginsPage() {
                   <p className="mt-1 font-medium">{detailPlugin.version || '1.0.0'}</p>
                 </div>
 
+                {detailPlugin.install ? (
+                  <div>
+                    <h4 className="font-semibold text-muted-foreground">{t('plugins.detail.installedBy', 'Installed by')}</h4>
+                    <p className="mt-1 font-medium">
+                      {detailPlugin.install.installed_by ?? t('plugins.removed.someone', 'someone')}
+                      {dates.date(detailPlugin.install.installed_at) ? ` · ${dates.date(detailPlugin.install.installed_at)}` : ''}
+                    </p>
+                  </div>
+                ) : null}
+
+                {(detailPlugin.install?.outside_domains ?? []).length > 0 ? (
+                  <div>
+                    <h4 className="font-semibold text-muted-foreground">{t('plugins.detail.domains', 'Outside domains the store lists')}</h4>
+                    <p className="mt-1 break-all font-medium">{(detailPlugin.install?.outside_domains ?? []).join(', ')}</p>
+                  </div>
+                ) : null}
+
                 {detailPlugin.status === 'failed' && (
                   <div className="space-y-2 rounded-card border border-destructive/30 bg-destructive/5 p-3">
                     <p className="flex items-center gap-1.5 font-semibold text-destructive">
@@ -696,7 +839,7 @@ export default function PluginsPage() {
                         </div>
                       )}
                     </TechnicalDetails>
-                    {hasPermission(PLUGINS_ENABLE) && (
+                    {isOperator && hasPermission(PLUGINS_ENABLE) && (
                       <Button variant="outline" onClick={() => handleReEnable(detailPlugin.id)}>
                         {t('plugins.action.tryAgain', 'Try again')}
                       </Button>
@@ -784,33 +927,10 @@ export default function PluginsPage() {
         open={uninstallTarget !== null}
         onOpenChange={(open) => !open && setUninstallTarget(null)}
         title={t('plugins.uninstall.question', 'Uninstall {name}?', { name: uninstallTarget?.name ?? '' })}
-        description={
-          <span className="block space-y-3">
-            <span className="block">
-              {t(
-                'plugins.uninstall.consequence',
-                'The plugin and the screens, blocks and tools it added are removed from this instance.'
-              )}
-            </span>
-            <label className="flex cursor-pointer items-start gap-2">
-              <input
-                type="checkbox"
-                checked={forceUninstall}
-                onChange={(e) => setForceUninstall(e.target.checked)}
-                className="mt-1 size-4 rounded border-border"
-              />
-              <span className="select-none">
-                {rt(
-                  'plugins.uninstall.force',
-                  '<0>Force deletion:</0> Remove the plugin directory even if database ' +
-                    'migration rollback fails. Use with caution.',
-                  undefined,
-                  [<strong key="label" />]
-                )}
-              </span>
-            </label>
-          </span>
-        }
+        description={t(
+          'plugins.uninstall.keeps',
+          'It turns off now and its screens, blocks and tools go away, for every workspace. Its data is kept for 30 days, and reinstalling in that time restores everything. After that the data is deleted.',
+        )}
         confirmLabel={t('plugins.uninstall.submit', 'Uninstall plugin')}
         cancelLabel={t('plugins.uninstall.cancel', 'Cancel')}
         onConfirm={handleUninstall}

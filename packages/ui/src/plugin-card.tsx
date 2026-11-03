@@ -853,6 +853,10 @@ export interface PluginTileProps extends Omit<React.ComponentProps<"div">, "titl
   summary?: string
   version?: string | null
   tags?: string[]
+  /** What it adds, as chips (section 19). */
+  adds?: string[]
+  /** One line of facts: price, usage, last update. Already formatted by the caller. */
+  facts?: string[]
   /** Draw the Verified mark. Only ever set from what the server returns. */
   verified?: boolean
   verifiedLabel?: string
@@ -875,6 +879,8 @@ export function PluginTile({
   summary,
   version,
   tags,
+  adds,
+  facts,
   verified,
   verifiedLabel = "Verified",
   icon,
@@ -909,7 +915,11 @@ export function PluginTile({
           {(tags ?? []).map((tag) => (
             <Badge key={tag} variant="outline" className="text-xs">{tag}</Badge>
           ))}
+          {(adds ?? []).map((label) => (
+            <Badge key={label} variant="secondary" className="text-xs">{label}</Badge>
+          ))}
         </div>
+        {facts && facts.length > 0 ? <p className="text-xs text-muted-foreground">{facts.join(" · ")}</p> : null}
       </CardContent>
       {action ? <CardFooter className="relative justify-end border-t border-border/40 pt-3">{action}</CardFooter> : null}
     </Card>

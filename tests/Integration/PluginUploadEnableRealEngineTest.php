@@ -69,6 +69,10 @@ final class PluginUploadEnableRealEngineTest extends TestCase
     {
         $pdo = new PDO('sqlite::memory:');
         $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        foreach (['plugin_installs', 'plugin_removals'] as $table) {
+            // The handler's own records (migrations 204, 205); this test is about migrations on enable.
+            $pdo->exec("CREATE TABLE {$table} (plugin_name TEXT, plugin_key TEXT, version TEXT, was_active INTEGER, removed_by_profile_id INTEGER, removed_at TEXT, purge_after TEXT, purge_error TEXT, source TEXT, store_host TEXT, store_slug TEXT, package_sha256 TEXT, permissions TEXT, outside_domains TEXT, installed_by_profile_id INTEGER, installed_at TEXT, updated_at TEXT)");
+        }
         $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
         $pdo->sqliteCreateFunction('NOW', static fn(): string => date('Y-m-d H:i:s'), 0);
         $pdo->exec(

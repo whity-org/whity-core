@@ -77,6 +77,9 @@ interface PluginRow {
   version?: string;
   routes_count?: number;
   permissions_count?: number;
+  install?: {
+    update_waiting: { version: string; new_permissions: string[]; new_domains: string[] } | null;
+  };
 }
 
 const ACTIVE_PLUGIN: PluginRow = {
@@ -100,8 +103,16 @@ const DISABLED_PLUGIN: PluginRow = {
 };
 
 /** A jest mock that resolves the typed-client `{ data }` plugin-list shape. */
-function mockPluginList(plugins: PluginRow[]): void {
-  mockApiGet.mockResolvedValue({ data: { data: plugins } });
+function mockPluginList(plugins: PluginRow[], canOperate = true, removed: unknown[] = []): void {
+  mockApiGet.mockImplementation((path: string) => {
+    if (path === '/api/v1/plugins') {
+      return Promise.resolve({ data: { data: plugins, meta: { can_operate: canOperate } } });
+    }
+    if (path === '/api/v1/plugins/removed') {
+      return Promise.resolve({ data: { data: removed } });
+    }
+    return Promise.resolve({ data: { data: [] } });
+  });
 }
 
 function setCapabilities(perms: string[]): void {
@@ -261,7 +272,8 @@ describe('PluginsPage upload dialog', () => {
 
     render(<PluginsPage />);
     await screen.findByText('HelloWorld');
-    expect(mockApiGet).toHaveBeenCalledTimes(1);
+    const listCalls = () => mockApiGet.mock.calls.filter(([path]) => path === '/api/v1/plugins').length;
+    expect(listCalls()).toBe(1);
 
     await user.click(screen.getByRole('button', { name: 'Operator tools' }));
     await user.click(await screen.findByRole('menuitem', { name: /Upload plugin/i }));
@@ -282,7 +294,7 @@ describe('PluginsPage upload dialog', () => {
     await waitFor(() => expect(mockUpload).toHaveBeenCalledTimes(1));
     expect(mockUpload).toHaveBeenCalledWith(file);
     // Success refetches the plugin list (the staged plugin lands disabled).
-    await waitFor(() => expect(mockApiGet).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(listCalls()).toBe(2));
   });
 
   it('rejects an oversized file before uploading', async () => {
@@ -424,5 +436,85 @@ describe('PluginsPage rejected screens (#953)', () => {
     await screen.findByText('HelloWorld');
 
     expect(screen.queryByText(/rejected screen/i)).toBeNull();
+  });
+
+  describe('install-wide lifecycle (Q4)', () => {
+    it('offers a workspace no changes, whatever its role holds', async () => {
+      const user = userEvent.setup();
+      setCapabilities(['plugins:read', 'plugins:upload', 'plugins:reload', 'plugins:uninstall', 'plugins:disable']);
+      mockPluginList([ACTIVE_PLUGIN], false);
+
+      render(<PluginsPage />);
+      await screen.findByText('HelloWorld');
+
+      expect(screen.getByText(/the platform operator manages them/)).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Operator tools' })).not.toBeInTheDocument();
+      const menu = await openRowMenu(user, 'HelloWorld');
+      expect(within(menu).queryByRole('menuitem', { name: 'Uninstall' })).not.toBeInTheDocument();
+      expect(within(menu).queryByRole('menuitem', { name: 'Turn off' })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('recently removed (S.7)', () => {
+    it('lists a kept plugin and reinstalls it', async () => {
+      const user = userEvent.setup();
+      setCapabilities(['plugins:read', 'plugins:install']);
+      mockPluginList([], true, [
+        { name: 'CakeOrders', version: '1.0.0', removed_by: 'Rana', removed_at: '2026-11-01 10:00:00', purge_after: '2026-12-01 10:00:00', purge_failed: false },
+      ]);
+      mockApiPost.mockResolvedValue({ data: { data: { message: 'ok' } } });
+
+      render(<PluginsPage />);
+      await screen.findByText('CakeOrders');
+      expect(screen.getByText(/Removed by Rana/)).toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: 'Reinstall' }));
+
+      await waitFor(() =>
+        expect(mockApiPost).toHaveBeenCalledWith('/api/v1/plugins/{name}/reinstall', {
+          params: { path: { name: 'CakeOrders' } },
+        }),
+      );
+    });
+
+    it('shows a workspace nothing removed', async () => {
+      setCapabilities(['plugins:read', 'plugins:install']);
+      mockPluginList([ACTIVE_PLUGIN], false, [
+        { name: 'CakeOrders', version: null, removed_by: null, removed_at: 'x', purge_after: 'y', purge_failed: false },
+      ]);
+
+      render(<PluginsPage />);
+      await screen.findByText('HelloWorld');
+
+      expect(screen.queryByText('CakeOrders')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('update approval (S.6)', () => {
+    it('names what is new and approves only when asked', async () => {
+      const user = userEvent.setup();
+      setCapabilities(['plugins:read', 'plugins:install']);
+      mockPluginList([
+        { ...ACTIVE_PLUGIN, install: { update_waiting: { version: '2.0.0', new_permissions: ['hello:delete'], new_domains: ['api.example.com'] } } },
+      ]);
+      mockApiPost.mockResolvedValue({ data: { data: { status: 'updated' } } });
+
+      render(<PluginsPage />);
+      await screen.findByText(/HelloWorld 2\.0\.0 asks for more access/);
+      expect(mockApiPost).not.toHaveBeenCalled();
+
+      await user.click(screen.getByRole('button', { name: 'Review access' }));
+      const dialog = await screen.findByRole('dialog');
+      expect(within(dialog).getByText(/sends data to api\.example\.com/)).toBeInTheDocument();
+      expect(within(dialog).getByText('It adds 1 new permissions')).toBeInTheDocument();
+
+      await user.click(within(dialog).getByRole('button', { name: 'Allow and update' }));
+
+      await waitFor(() =>
+        expect(mockApiPost).toHaveBeenCalledWith('/api/v1/plugins/{name}/update/approve', {
+          params: { path: { name: 'HelloWorld' } },
+        }),
+      );
+    });
   });
 });

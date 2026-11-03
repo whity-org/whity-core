@@ -19,6 +19,8 @@ use Whity\Core\Exception\PluginNameUnsafe;
 use Whity\Core\Exception\PluginPackageInvalid;
 use Whity\Core\Exception\PluginPersistenceException;
 use Whity\Core\Plugin\PluginOperatorGate;
+use Whity\Core\Plugin\PluginRecords;
+use Whity\Core\Plugin\StoreCatalogueEntry;
 
 /**
  * Plugins API Handler
@@ -68,6 +70,9 @@ class PluginsApiHandler
      */
     private readonly ?AuditLogger $auditLogger;
 
+    /** The deployment's record of its plugins (S.6, S.7); needs the PDO. */
+    private readonly ?PluginRecords $records;
+
     /**
      * @param string $pluginDir Directory containing plugin files.
      * @param PluginLoader|null $pluginLoader Optional live loader for lifecycle state.
@@ -83,6 +88,7 @@ class PluginsApiHandler
         $this->pluginDir = $pluginDir;
         $this->pluginLoader = $pluginLoader;
         $this->auditLogger = $auditLogger;
+        $this->records = $pdo !== null ? new PluginRecords($pdo) : null;
     }
 
     /**
@@ -132,6 +138,21 @@ class PluginsApiHandler
         } catch (\Throwable $e) {
             error_log('[PluginsApiHandler] upload failed: ' . $e->getMessage());
             return Response::error('Failed to install plugin', 500);
+        }
+
+        $inspected = $installer->lastInspected();
+        if ($inspected !== null) {
+            $this->records?->recordInstall(
+                $inspected['name'],
+                'upload',
+                null,
+                null,
+                $inspected['version'],
+                $inspected['sha256'],
+                $inspected['permissions'],
+                [],
+                PluginOperatorGate::actorProfile($request)
+            );
         }
 
         return Response::json(['data' => $entry], 200);
@@ -255,13 +276,15 @@ class PluginsApiHandler
                 }
             }
 
+            $plugins = $this->withRecords($plugins);
+
             // Errors and file names describe the deployment, not the workspace
             // asking: a stack trace can carry paths and other workspaces' data.
             $operator = PluginOperatorGate::isOperator();
             if (!$operator) {
                 $plugins = array_map(
                     static function (array $plugin): array {
-                        unset($plugin['last_error'], $plugin['consecutive_errors']);
+                        unset($plugin['last_error'], $plugin['consecutive_errors'], $plugin['install']);
                         $plugin['file'] = null;
 
                         return $plugin;
@@ -303,6 +326,9 @@ class PluginsApiHandler
         $identifier = $this->identifier($params);
         if ($identifier === null) {
             return Response::error('Plugin identifier required', 400);
+        }
+        if ($this->isRemoved($identifier)) {
+            return Response::error('This plugin was uninstalled. Reinstall it to turn it on.', 409);
         }
 
         // Prefer the live loader: re-enable a runtime-disabled/failed plugin.
@@ -476,6 +502,9 @@ class PluginsApiHandler
         if ($this->pluginLoader === null) {
             return Response::error('Plugin lifecycle management is unavailable', 503);
         }
+        if ($this->isRemoved($id)) {
+            return Response::error('This plugin was uninstalled. Reinstall it to turn it on.', 409);
+        }
 
         try {
             if (!$this->pluginLoader->reEnablePlugin($id)) {
@@ -580,9 +609,16 @@ class PluginsApiHandler
 
         $dryRun = (bool) ($body['dry_run'] ?? false);
         $force = (bool) ($body['force'] ?? false);
+        $now = (bool) ($body['now'] ?? false);
 
         if ($this->pdo === null) {
             return Response::error('Database connection unavailable for migration rollback', 503);
+        }
+
+        // S.7: uninstalling keeps everything for 30 days. Removing at once is an
+        // operator's CLI decision (`plugins uninstall --now`), never the pages'.
+        if (!$dryRun && !$now) {
+            return $this->keepForThirtyDays($request, $identifier);
         }
 
         // Resolve the plugin's stable FQCN key if a loader is wired.
@@ -691,6 +727,198 @@ class PluginsApiHandler
         }
 
         return Response::json(['data' => $result], 200);
+    }
+
+    /**
+     * GET /api/plugins/removed - Plugins kept after uninstalling (S.7).
+     *
+     * An operator's list: who removed what describes the deployment, so a
+     * workspace gets an empty one rather than a 403 on a page it can open.
+     */
+    public function removed(Request $request): Response
+    {
+        if ($this->records === null || !PluginOperatorGate::isOperator()) {
+            return Response::json(['data' => []], 200);
+        }
+
+        $rows = array_map(static fn (array $row): array => [
+            'name' => (string) $row['plugin_name'],
+            'version' => $row['version'] !== null ? (string) $row['version'] : null,
+            'removed_by' => $row['removed_by_name'] !== null ? (string) $row['removed_by_name'] : null,
+            'removed_at' => (string) $row['removed_at'],
+            'purge_after' => (string) $row['purge_after'],
+            'purge_failed' => $row['purge_error'] !== null,
+        ], $this->records->removals());
+
+        return Response::json(['data' => $rows], 200);
+    }
+
+    /**
+     * POST /api/plugins/{name}/reinstall - Restore a plugin within its 30 days.
+     *
+     * Its files and tables were never touched, so this is forgetting the removal
+     * and returning it to the state it was uninstalled in.
+     *
+     * @param array<string, string> $params Route parameters (expects 'name').
+     */
+    public function reinstall(Request $request, array $params): Response
+    {
+        $refusal = PluginOperatorGate::refusal();
+        if ($refusal !== null) {
+            return $refusal;
+        }
+
+        $name = $params['name'] ?? '';
+        $removal = $this->records?->removal($name);
+        if ($this->records === null || $removal === null) {
+            return Response::error('Plugin not found', 404);
+        }
+
+        $this->records->forgetRemoval($name);
+        $this->auditLogger?->record('plugin.reinstalled', [
+            'target_type' => 'plugin',
+            'metadata' => ['plugin' => $name, 'version' => $removal['version'] ?? null],
+        ]);
+
+        if ((bool) $removal['was_active']) {
+            return $this->enable($request, ['name' => (string) $removal['plugin_key']]);
+        }
+
+        return Response::json(['data' => ['message' => "Plugin {$name} reinstalled", 'state' => 'disabled']], 200);
+    }
+
+    private function keepForThirtyDays(Request $request, string $identifier): Response
+    {
+        if ($this->records === null) {
+            return Response::error('Database connection unavailable', 503);
+        }
+
+        $key = $this->pluginLoader !== null ? $this->resolvePluginKey($identifier) : null;
+        $name = $identifier;
+        $version = null;
+        $wasActive = false;
+
+        if ($key !== null) {
+            foreach ($this->loaderMetadata() as $meta) {
+                if ($meta['id'] === $key) {
+                    $name = $meta['name'];
+                    $version = $meta['version'] !== '' ? $meta['version'] : null;
+                    $wasActive = $meta['status'] === 'active';
+                }
+            }
+        } elseif (
+            $this->safePluginPath($identifier, '.php') === null
+            && $this->safePluginPath($identifier, '.php.disabled') === null
+            && $this->safePluginPath($identifier) === null
+        ) {
+            return Response::error('Plugin not found', 404);
+        }
+
+        if ($this->records->removal($name) !== null) {
+            return Response::error('This plugin was already uninstalled.', 409);
+        }
+
+        if ($key !== null && $this->pluginLoader !== null) {
+            try {
+                $this->pluginLoader->disablePlugin($key);
+            } catch (PluginPersistenceException $e) {
+                return $this->persistenceFailed('disabled', $e);
+            }
+        } elseif ($this->safePluginPath($identifier, '.php') !== null) {
+            $wasActive = true;
+            $this->disableOnDisk($identifier);
+        }
+
+        $this->records->markRemoved($name, $key ?? $identifier, $version, $wasActive, PluginOperatorGate::actorProfile($request));
+        $this->auditLogger?->record('plugin.uninstalled', [
+            'target_type' => 'plugin',
+            'metadata' => ['plugin' => $name, 'version' => $version, 'kept_days' => PluginRecords::KEEP_DAYS],
+        ]);
+
+        return Response::json(['data' => [
+            'plugin' => $name,
+            'disabled' => true,
+            'kept_days' => PluginRecords::KEEP_DAYS,
+            'migrations_rolled_back' => [],
+            'directory_removed' => false,
+            'errors' => [],
+        ]], 200);
+    }
+
+    private function isRemoved(string $identifier): bool
+    {
+        if ($this->records === null) {
+            return false;
+        }
+        foreach ($this->records->removals() as $row) {
+            if ($row['plugin_name'] === $identifier || $row['plugin_key'] === $identifier) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Hide what's been uninstalled and add what the deployment knows about each
+     * plugin. Trust is always "unverified" until the Verified design is approved
+     * (docs/design/VERIFIED-PLUGINS-SECURITY.md); nothing here can raise it.
+     *
+     * @param list<array<string, mixed>> $plugins
+     * @return list<array<string, mixed>>
+     */
+    private function withRecords(array $plugins): array
+    {
+        $installs = $this->records?->installs() ?? [];
+        $removed = [];
+        foreach ($this->records?->removals() ?? [] as $row) {
+            $removed[(string) $row['plugin_name']] = true;
+            $removed[(string) $row['plugin_key']] = true;
+        }
+
+        $out = [];
+        foreach ($plugins as $plugin) {
+            $id = (string) $plugin['id'];
+            $name = (string) $plugin['name'];
+            $lifecycleId = (string) ($plugin['lifecycle_id'] ?? '');
+            if (isset($removed[$id]) || isset($removed[$name]) || isset($removed[$lifecycleId])) {
+                continue;
+            }
+
+            $plugin['trust'] = StoreCatalogueEntry::TRUST_UNVERIFIED;
+            $install = $installs[$name] ?? $installs[$id] ?? null;
+            if ($install !== null) {
+                $plugin['install'] = self::installFacts($install);
+            }
+            $out[] = $plugin;
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param array<string, mixed> $install
+     * @return array<string, mixed>
+     */
+    private static function installFacts(array $install): array
+    {
+        $permissions = PluginRecords::decodeList($install['permissions'] ?? null);
+        $domains = PluginRecords::decodeList($install['outside_domains'] ?? null);
+        $waiting = $install['pending_version'] ?? null;
+
+        return [
+            'source' => (string) $install['source'],
+            'store_host' => $install['store_host'] ?? null,
+            'installed_by' => $install['installed_by_name'] ?? null,
+            'installed_at' => (string) $install['installed_at'],
+            'permissions' => $permissions,
+            'outside_domains' => $domains,
+            'update_waiting' => $waiting === null ? null : [
+                'version' => (string) $waiting,
+                'new_permissions' => array_values(array_diff(PluginRecords::decodeList($install['pending_permissions'] ?? null), $permissions)),
+                'new_domains' => array_values(array_diff(PluginRecords::decodeList($install['pending_domains'] ?? null), $domains)),
+            ],
+        ];
     }
 
     /**

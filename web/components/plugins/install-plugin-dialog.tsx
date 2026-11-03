@@ -13,7 +13,7 @@ import { Badge } from '@whity/ui/badge';
 import { Stepper } from '@whity/ui/stepper';
 import { TechnicalDetails } from '@whity/ui/display-preferences';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@whity/ui/dialog';
-import { IconKey } from '@tabler/icons-react';
+import { IconAlertTriangle, IconKey } from '@tabler/icons-react';
 
 type CataloguePlugin = components['schemas']['StoreCataloguePlugin'];
 type PluginEntry = components['schemas']['PluginEntry'];
@@ -166,21 +166,41 @@ export function InstallPluginDialog({ plugin, storeUrl, onOpenChange }: InstallP
                 <ul className="list-disc space-y-1.5 ps-5 text-muted-foreground">
                   <li>
                     {t(
-                      'pluginInstall.access.isolated',
-                      'It runs in an isolated frame, apart from the rest of your workspace.',
+                      'pluginInstall.access.server',
+                      'Once turned on, it runs on this server for every workspace, with full access to the data here. Whity has not reviewed it. Only install it if you trust who made it.',
                     )}
                   </li>
                   <li>
                     {t(
-                      'pluginInstall.access.off',
-                      'It is installed turned off. You decide when to turn it on.',
+                      'pluginInstall.access.turnedOff',
+                      'It is installed turned off, and you decide when to turn it on. A small part of it does run once now, to read its name and version.',
                     )}
                   </li>
+                  {(plugin.permissions ?? []).length > 0 ? (
+                    <li>
+                      {t('pluginInstall.access.permissions', 'It asks for {count} permissions.', {
+                        count: (plugin.permissions ?? []).length,
+                      })}
+                    </li>
+                  ) : null}
                 </ul>
+                {(plugin.outside_domains ?? []).map((domain) => (
+                  <p key={domain} className="flex items-start gap-2 rounded-md border border-warning/30 bg-warning-tint p-3 text-warning-text">
+                    <IconAlertTriangle className="mt-0.5 size-4 shrink-0" />
+                    {t('pluginInstall.access.domain', 'The store says it sends data to {domain}', { domain })}
+                  </p>
+                ))}
                 <TechnicalDetails>
                   <p className="font-mono text-xs text-muted-foreground">
                     {plugin.slug} v{plugin.latest_version ?? '-'} · {storeUrl}
                   </p>
+                  {(plugin.permissions ?? []).length > 0 ? (
+                    <ul className="mt-1 space-y-0.5 font-mono text-xs text-muted-foreground">
+                      {(plugin.permissions ?? []).map((slug) => (
+                        <li key={slug}>{slug}</li>
+                      ))}
+                    </ul>
+                  ) : null}
                 </TechnicalDetails>
 
                 <div className="space-y-1.5">

@@ -30,7 +30,6 @@ export function useNavItemLabels(): Record<string, string> {
       'audit-logs': t('sidebar.item.auditLogs', 'Audit Logs'),
       errors: t('sidebar.item.errors', 'Errors'),
       plugins: t('sidebar.item.plugins', 'Plugins'),
-      'plugin-store': t('sidebar.item.pluginStore', 'Plugin Store'),
       'website-settings': t('sidebar.item.websiteSettings', 'Website Settings'),
       'document-library': t('sidebar.item.documentLibrary', 'Documents'),
       'document-templates': t('sidebar.item.documentTemplates', 'Document templates'),

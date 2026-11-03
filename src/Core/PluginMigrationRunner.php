@@ -71,6 +71,54 @@ final class PluginMigrationRunner
     }
 
     /**
+     * Run down() for every recorded migration a plugin declares, newest first,
+     * each in its own transaction with its tracking row, so a failure leaves the
+     * ones still applied still recorded (S.7).
+     *
+     * @param PluginInterface $plugin The plugin instance.
+     * @return list<string> The tracking names rolled back.
+     * @throws \RuntimeException When a migration's down() fails.
+     */
+    public function rollBackForPlugin(PluginInterface $plugin): array
+    {
+        $this->ensureMigrationTable();
+
+        $rolledBack = [];
+        foreach (array_reverse($this->collect($plugin)) as $entry) {
+            if (!$this->trackingRowVisible($entry['record'])) {
+                continue;
+            }
+
+            $fqcn = $entry['fqcn'];
+            /** @var MigrationInterface $migration */
+            $migration = new $fqcn();
+
+            $this->pdo->beginTransaction();
+            try {
+                $migration->down($this->pdo);
+                if (!$this->pdo->inTransaction()) {
+                    throw new \RuntimeException('the migration ended the host transaction itself');
+                }
+                $del = $this->pdo->prepare('DELETE FROM core_schema_migrations WHERE migration_name = ?');
+                $del->execute([$entry['record']]);
+                $this->pdo->commit();
+            } catch (Throwable $e) {
+                if ($this->pdo->inTransaction()) {
+                    $this->pdo->rollBack();
+                }
+                throw new \RuntimeException(
+                    "Plugin migration {$entry['record']} failed (down): " . $e->getMessage(),
+                    0,
+                    $e
+                );
+            }
+            $rolledBack[] = $entry['record'];
+        }
+
+        return $rolledBack;
+    }
+
+    /**
      * Collect a plugin's valid, de-duplicated migration declarations.
      *
      * @param PluginInterface $plugin The plugin instance.

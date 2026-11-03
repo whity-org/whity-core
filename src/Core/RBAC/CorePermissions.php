@@ -76,6 +76,8 @@ final class CorePermissions
     public const PLUGINS_ENABLE = 'plugins:enable';
     public const PLUGINS_DISABLE = 'plugins:disable';
     public const PLUGINS_UPLOAD = 'plugins:upload';
+    // S.9: installing from a trusted store, apart from uploading unreviewed code.
+    public const PLUGINS_INSTALL = 'plugins:install';
     public const PLUGINS_UNINSTALL = 'plugins:uninstall';
     public const PLUGINS_RELOAD = 'plugins:reload';
 
@@ -486,6 +488,7 @@ final class CorePermissions
             self::PLUGINS_ENABLE,
             self::PLUGINS_DISABLE,
             self::PLUGINS_UPLOAD,
+            self::PLUGINS_INSTALL,
             self::PLUGINS_UNINSTALL,
             self::PLUGINS_RELOAD,
             self::PLUGINS_BUILD,
