@@ -180,7 +180,7 @@ final class FormUploadsApiHandler
             // ->clientMessage, never ->getMessage() (WC-186). These name the
             // limit or the accepted kinds — sentences written for whoever is
             // looking at the form.
-            return Response::error($e->clientMessage, 422);
+            return Response::error($e->clientMessage, 422, $e->details());
         } catch (StorageException $e) {
             error_log('[FormUploadsApiHandler] storage write failed: ' . $e->getMessage());
 

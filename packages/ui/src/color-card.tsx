@@ -237,7 +237,7 @@ export function ColorCard({
               {shade.isMain && (
                 <span
                   aria-label={mainShadeLabel}
-                  className="absolute -top-2.5 left-1/2 -translate-x-1/2 z-30 text-[7.5px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-full border-2 border-card shadow-2xs whitespace-nowrap leading-none select-none"
+                  className="absolute -top-2.5 left-1/2 -translate-x-1/2 z-30 text-xs font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-full border-2 border-card shadow-2xs whitespace-nowrap leading-none select-none"
                   style={{
                     backgroundColor: shade.hex,
                     color: shade.textColor,
@@ -248,16 +248,16 @@ export function ColorCard({
               )}
 
               <div className="flex items-center justify-between w-full">
-                <span className="text-[10px] font-semibold font-mono tracking-tight">{shade.shade}</span>
+                <span className="text-xs font-semibold font-mono tracking-tight">{shade.shade}</span>
               </div>
 
               {isCopied ? (
-                <div className="flex items-center justify-center gap-0.5 text-[8px] font-semibold text-emerald-400 bg-slate-950 px-1 py-0.5 rounded-xs animate-pulse ring-1 ring-emerald-500/50">
+                <div className="flex items-center justify-center gap-0.5 text-xs font-semibold text-emerald-400 bg-slate-950 px-1 py-0.5 rounded-xs animate-pulse ring-1 ring-emerald-500/50">
                   <IconCheck className="size-2.5 shrink-0" />
                   <span>{copiedLabel}</span>
                 </div>
               ) : (
-                <span className="text-[8.5px] font-mono uppercase opacity-90 font-semibold truncate">
+                <span className="text-xs font-mono uppercase opacity-90 font-semibold truncate">
                   {shade.hex}
                 </span>
               )}

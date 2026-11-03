@@ -85,6 +85,30 @@ describe('theme', () => {
   });
 });
 
+describe('tables (6.6)', () => {
+  test('a column can be end-aligned, for numbers', () => {
+    const payload = doc([{ type: 'table', columns: ['Item', 'Amount'], rows: [['Tray', '85.000']], align: ['start', 'end'] }]);
+    expect(validateFlowPayload(payload)).toBeNull();
+    const html = buildFlowHtml(normaliseFlowDocument(payload));
+    expect(html).toContain('<th scope="col" class="flow-cell-end">Amount</th>');
+    expect(html).toContain('<td class="flow-cell-end">85.000</td>');
+    expect(html).toContain('<td>Tray</td>');
+  });
+
+  test('refuses an alignment that is not start or end', () => {
+    const payload = doc([{ type: 'table', columns: ['A'], rows: [['1']], align: ['left'] }]);
+    expect(validateFlowPayload(payload)).toMatch(/align/);
+  });
+
+  test('rules only: no grid and no tinted header', () => {
+    const html = buildFlowHtml(normaliseFlowDocument(doc([{ type: 'paragraph', text: 'x' }])));
+    const rule = /\.flow-table th,\s*\.flow-table td \{([^}]*)\}/.exec(html);
+    expect(rule[1]).toContain('border-block-end');
+    expect(rule[1]).not.toMatch(/border:/);
+    expect(/\.flow-table th \{([^}]*)\}/.exec(html)[1]).not.toContain('background');
+  });
+});
+
 describe('running head and foot slots', () => {
   test('a slot may still be a plain string', () => {
     expect(validateFlowPayload(doc([{ type: 'paragraph', text: 'x' }], { header: { start: 'Uni', end: '{{page}}' } }))).toBeNull();

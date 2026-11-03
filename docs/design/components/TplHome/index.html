@@ -1,0 +1,86 @@
+<!-- @dsCard group="Templates · Home" height=1312 width=1280 subtitle="H.1–H.4: an owner’s home, led by what waits for her, then what agents did today and the cards her apps add" -->
+<!doctype html>
+<html>
+<head><link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../bundle.css"><script src="../../preview-runtime/react.production.min.js"></script><script src="../../preview-runtime/react-dom.production.min.js"></script><script src="../bundle.js"></script><script>(function(){var t=(location.hash.match(/theme=(dark|light)/)||[])[1]||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',t);})();</script><style>body{margin:0;background:var(--background);color:var(--foreground);font-family:var(--font-sans);width:1280px;min-height:1312px}</style><meta charset="utf-8"><title>Home</title><style>html,body{height:100%} #root{min-height:100%} </style></head>
+<body>
+<div id="root"></div>
+<script>
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 16 }); }
+  function nav(active, L) { L = L || {}; function it(icon, label, key) { return { icon: icon, label: L[key || label] || label, active: (key || label) === active }; }
+    return [{ items: [it('dashboard', 'Dashboard'), it('inbox', 'Inbox'), it('approval', 'Approvals')] },
+      { label: L.People || 'People', items: [it('users', 'Users'), it('role', 'Roles'), it('delegation', 'Delegations')] },
+      { label: L.AI || 'AI', items: [it('robot', 'Agents'), it('link', 'Connected AI apps'), it('tool', 'What AI can do')] },
+      { label: L.Documents || 'Documents', items: [it('document', 'Library'), it('routing', 'Routing')] },
+      { label: L.Platform || 'Platform', items: [it('tenant', 'Tenants'), it('plugin', 'Plugins'), it('branding', 'Branding'), it('audit', 'Audit log')] }]; }
+  var topBar = h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' }));
+  function shell(kids, o) { o = o || {}; return h(W.AppShell, { tenant: 'Example Bakery', user: 'Rana Haddad', role: 'Owner', nav: nav('Plugins', o.L), topActions: topBar, labels: o.shellLabels }, kids); }
+  function logo(p, size) { return h('span', { className: size === 'lg' ? 'wy-pdetail__ic' : 'wy-ptile__ic', style: { background: p.color }, 'aria-hidden': 'true' }, p.whity ? h(W.Mark, { size: size === 'lg' ? 34 : 22, tone: 'onbrand', label: '' }) : p.initial || p.name.charAt(0)); }
+  function trust(p, L) { L = L || {}; return p.whity ? h('span', { className: 'wy-trust wy-trust--whity' }, I('success', 12), L.byWhity || 'By Whity') : p.verified ? h('span', { className: 'wy-trust wy-trust--verified' }, I('success', 12), L.verified || 'Verified') : h('span', { className: 'wy-trust wy-trust--sandbox' }, I('lock', 12), L.sandboxed || 'Sandboxed'); }
+  function adds(p, L) { L = L || {}; return h('div', { className: 'wy-adds' }, (p.adds || []).map(function (a) { var m = { screens: ['dashboard', L.screens || 'Screens'], blocks: ['page', L.blocks || 'Document blocks'], agent: ['robot', L.agent || 'Agent tools'], fields: ['field', L.fields || 'Fields'], connect: ['link', L.connect || 'Connects out'] }[a];
+    return h('span', { key: a, className: 'wy-add' + (a === 'agent' ? ' wy-add--agent' : '') }, I(m[0], 12), m[1]); })); }
+  function tile(p, L) { L = L || {}; return h('a', { className: 'wy-ptile', href: '#', key: p.name },
+      h('div', { className: 'wy-ptile__top' }, logo(p), h('div', { style: { minWidth: 0 } }, h('div', { className: 'wy-ptile__name' }, p.name), h('div', { className: 'wy-ptile__by' }, p.by, h('span', null, '·'), trust(p, L)))),
+      h('p', { className: 'wy-ptile__desc' }, p.line), adds(p, L),
+      h('div', { className: 'wy-ptile__foot' }, h('span', null, p.used), h('span', { className: 'wy-ptile__price' }, p.price))); }
+  var P = {
+    front: { name: 'Front Office', by: 'Whity', whity: true, color: '#0961bb', line: 'Leads, quotes and JoFotara-compliant invoices, with the Billing assistant.', adds: ['screens', 'blocks', 'agent'], used: 'New', price: '[price] / month' },
+    render: { name: 'Whity Render', by: 'Whity', whity: true, color: '#0961bb', line: 'Pixel-exact PDFs of your documents and templates, in Arabic and English.', adds: ['blocks'], used: 'Used by 210 workspaces', price: '[price] / month' },
+    id: { name: 'Whity ID', by: 'Whity', whity: true, color: '#0961bb', line: 'Single sign-on for your team and customers.', adds: ['screens'], used: 'Coming soon', price: '[price]' },
+    inv: { name: 'Inventory for Whity', by: 'Example Labs', verified: true, color: '#35aa76', initial: 'I', line: 'Stock levels, transfers between branches and reorder alerts.', adds: ['screens', 'blocks', 'agent'], used: 'Used by 140 workspaces', price: '[price] / month' },
+    del: { name: 'Delivery Tracker', by: 'Example Logistics', verified: true, color: '#3a3a3a', initial: 'D', line: 'Track orders from packed to delivered, with live status in documents.', adds: ['screens', 'blocks'], used: 'Used by 86 workspaces', price: 'Free' },
+    pay: { name: 'Payroll for Whity', by: 'Example Payroll Co.', verified: true, color: '#9d2398', initial: 'P', line: 'Monthly payroll, payslips and social security reports for Jordan.', adds: ['screens', 'fields', 'agent'], used: 'Used by 64 workspaces', price: '[price] / month' },
+    maps: { name: 'Route Maps', by: 'Example Labs', verified: false, color: '#5a5a5a', initial: 'R', line: 'Delivery routes on a map, for notes and wiki pages.', adds: ['blocks', 'connect'], used: 'Used by 12 workspaces', price: 'Free' },
+    msg: { name: 'Messaging for Whity', by: 'Example Messaging', verified: true, color: '#f7a224', initial: 'M', line: 'Send receipts and reminders by SMS and chat apps, with approval.', adds: ['agent', 'connect'], used: 'Used by 97 workspaces', price: '[price] / month' },
+    sup: { name: 'Support Desk for Whity', by: 'Example Support', verified: true, color: '#1a8a8a', initial: 'S', line: 'Customer questions in one inbox; agents draft replies for you to send.', adds: ['screens', 'agent'], used: 'Used by 38 workspaces', price: '[price] / month' },
+    cal: { name: 'Calendar Sync', by: 'Example Labs', verified: false, color: '#5a5a5a', initial: 'C', line: 'Lets agents book deliveries and meetings in your shared calendars.', adds: ['agent', 'connect'], used: 'Used by 22 workspaces', price: 'Free' },
+    books: { name: 'Bookkeeping for Whity', by: 'Example Accounts', verified: true, color: '#0b4c92', initial: 'B', line: 'Ledger, VAT returns and month-end close, linked to your invoices.', adds: ['screens', 'agent'], used: 'Used by 51 workspaces', price: '[price] / month' }
+  };
+  function navH(groups, counts) { counts = counts || {}; function it(icon, label) { return { icon: icon, label: label, active: label === 'Dashboard', count: counts[label] }; }
+    return groups.map(function (g) { return { label: g[0], items: g[1].map(function (x) { return it(x[0], x[1]); }) }; }); }
+  function waitRow(o) { return h('li', { className: 'wy-wait__row' + (o.agent ? ' is-agent' : ''), key: o.title },
+    h('span', { className: 'wy-wait__ic', 'aria-hidden': 'true' }, I(o.agent ? 'robot' : o.icon || 'document')),
+    h('div', { style: { minWidth: 0 } }, h('div', { className: 'wy-wait__title' }, o.title, o.amt ? h('span', { className: 'wy-wait__amt' }, ' · ' + o.amt) : null),
+      h('div', { className: 'wy-wait__meta' }, o.agent ? h(W.ActorChip, { kind: 'agent', name: o.agent, onBehalfOf: 'you', forLabel: 'for' }) : h(W.ActorChip, { name: o.from }), h('span', null, o.what), h('span', null, '·'), h('span', null, o.age))),
+    h('div', { className: 'wy-wait__act' }, (o.actions || []).map(function (a, i) { return h(W.Button, { key: i, size: 'sm', variant: a[1] || 'outline' }, a[0]); }))); }
+  function appCard(p, kids, label) { return h(W.Card, null, h('div', { style: { display: 'grid', gap: 12 } },
+    h('div', { className: 'wy-appcard__src' }, logo(p), h('span', null, label || p.name), h(W.Menu, { label: 'Card options', items: [{ icon: 'hide', label: 'Hide from home' }, { icon: 'external', label: 'Open ' + p.name }] })), kids)); }
+
+  var groups = [[null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox'], ['approval', 'Approvals']]], ['People', [['users', 'Users'], ['role', 'Roles']]], ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps']]], ['Documents', [['document', 'Library'], ['template', 'Templates']]], ['Apps', [['invoice', 'Front Office'], ['table', 'Stock'], ['routing', 'Deliveries']]], ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['settings', 'Settings']]]];
+  var wait = [
+    { agent: 'Billing assistant', title: 'Send a payment reminder to Example Café', amt: 'JOD 312.000', what: 'overdue 12 days', age: '2 days ago', actions: [['Decline', 'ghost'], ['Approve']] },
+    { from: 'Omar Khalil', icon: 'document', title: 'Purchase order PO-0142 · Example Mills', amt: 'JOD 1,240.000', what: 'sent for your decision', age: 'yesterday', actions: [['Open']] },
+    { agent: 'Stock assistant', title: 'Reorder flour and butter from Example Mills', amt: 'JOD 412.500', what: 'orders from your usual supplier', age: '5 h ago', actions: [['Decline', 'ghost'], ['Approve']] },
+    { agent: 'Billing assistant', title: 'Issue credit note CN-0031 to Example Hotel', amt: 'JOD 48.000', what: 'for a returned order', age: '3 h ago', actions: [['Decline', 'ghost'], ['Approve']] },
+    { from: 'Lina Saad', icon: 'calendar', title: 'Leave request · 3–5 November', what: 'asks for 3 days', age: '2 h ago', actions: [['Reject', 'ghost'], ['Approve']] }];
+  var today = [
+    { actor: 'Billing assistant', onBehalfOf: 'Rana', text: 'sent 4 receipts by WhatsApp', time: '09:12', kind: 'act' },
+    { actor: 'Stock assistant', onBehalfOf: 'Rana', text: 'proposed a reorder from Example Mills', time: '08:40', kind: 'propose' },
+    { actor: 'Rana Haddad', actorKind: 'person', text: 'undid a price change on Croissant, box of 6', time: '08:31', kind: 'undo' }];
+  ReactDOM.createRoot(document.getElementById('root')).render(h(W.AppShell, { tenant: 'Example Bakery', user: 'Rana Haddad', role: 'Owner', nav: navH(groups, { Inbox: 2, Approvals: 3 }), topActions: topBar },
+    h(W.PageHeader, { title: 'Good morning, Rana', description: 'Monday 2 November · Example Bakery' }),
+    h('div', { className: 'wy-home' },
+      h(W.Card, { title: h('span', null, 'Waiting for you ', h(W.Badge, { variant: 'secondary' }, '5')), description: 'Oldest first. Agent proposals are dashed until you decide.' },
+        h('div', { style: { display: 'grid', gap: 12 } }, h('ul', { className: 'wy-wait' }, wait.map(waitRow)),
+          h('div', { className: 'wy-wait__foot' }, h('a', { href: '#' }, 'Open Inbox (2)'), h('a', { href: '#' }, 'Open Approvals (3)')))),
+      h('div', { className: 'wy-home__side' },
+        h(W.Card, { title: 'Agents today', description: '14 done · 3 waiting · 1 undone' }, h(W.AgentActivity, { items: today, label: 'Agent activity today' })),
+        h(W.Card, { title: 'Finish setting up', description: '3 of 5 done' }, h('div', { style: { display: 'grid', gap: 10 } }, h('div', { className: 'wy-meter', role: 'img', 'aria-label': '3 of 5 done' }, h('i', { style: { width: '60%' } })),
+          h('ul', { className: 'wy-setup' },
+            h('li', { className: 'is-done' }, I('success'), h('span', null, 'Add your logo and colour'), null),
+            h('li', { className: 'is-done' }, I('success'), h('span', null, 'Invite your team'), null),
+            h('li', { className: 'is-done' }, I('success'), h('span', null, 'Connect an agent'), null),
+            h('li', null, I('receipt'), h('div', null, 'Add your tax number', h('small', null, 'Invoices can’t be issued without it')), h(W.Button, { size: 'sm', variant: 'outline' }, 'Add')),
+            h('li', null, I('billing'), h('div', null, 'Choose a plan', h('small', null, 'Your trial ends on 9 November')), h(W.Button, { size: 'sm', variant: 'outline' }, 'Choose'))))))),
+    h('div', { className: 'wy-home__h' }, h('h2', null, 'From your apps'), h('span', null, 'Each app can add one card. Hide any from its ⋯ menu.')),
+    h('div', { className: 'wy-home__apps' },
+      appCard(P.front, h(F, null, h('div', { className: 'wy-appcard__big' }, 'JOD 18,240.500', h('small', null, 'sales this month')),
+        h(W.BarChart, { height: 92, data: [{ label: 'W1', value: 4120 }, { label: 'W2', value: 5310 }, { label: 'W3', value: 4870 }, { label: 'W4', value: 3940 }], format: function (v) { return 'JOD ' + v.toLocaleString('en-US'); } }),
+        h('a', { href: '#', className: 'wy-lnk', style: { color: 'var(--warning-text)', fontSize: 14 } }, '6 invoices overdue · JOD 2,115.000'))),
+      appCard(P.inv, h(F, null, h('div', { className: 'wy-appcard__big' }, '3', h('small', null, 'items below reorder level')),
+        h('ul', { className: 'wy-appcard__list' }, h('li', null, h('span', null, 'Flour, 25 kg · Abdoun'), h('b', null, '4 / 6')), h('li', null, h('span', null, 'Butter, 10 kg · Abdoun'), h('b', null, '2 / 3')), h('li', null, h('span', null, 'Yeast, 1 kg · Sweifieh'), h('b', null, '1 / 4')))), 'Stock'),
+      appCard(P.del, h(F, null, h('div', { className: 'wy-appcard__big' }, '12', h('small', null, 'deliveries today')),
+        h('ul', { className: 'wy-appcard__list' }, h('li', null, h('span', null, 'Delivered'), h('b', null, '7')), h('li', null, h('span', null, 'On the way'), h('b', null, '3')), h('li', null, h('span', { style: { color: 'var(--warning-text)' } }, 'Late'), h('b', null, '2')))), 'Deliveries'))));
+</script>
+</body>
+</html>

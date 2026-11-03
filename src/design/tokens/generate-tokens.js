@@ -171,6 +171,19 @@ function validateBase(base) {
       );
     }
   }
+  // Nothing a person reads below 13px (decision A.1). Print and the editor sheet
+  // have their own scale under `document`.
+  for (const [name, def] of Object.entries(typo.fontSize)) {
+    if (def.px < 13) {
+      throw new TokenValidationError(`base.json: typography.fontSize.${name} is ${def.px}px; nothing may be below 13px (decision A.1).`);
+    }
+  }
+  // Larger text (W.3) sets every size one step up, so every size needs a step.
+  for (const name of Object.keys(typo.fontSize)) {
+    if (typeof typo.fontSizeLarger?.[name] !== 'string') {
+      throw new TokenValidationError(`base.json: typography.fontSizeLarger.${name} must be a rem string.`);
+    }
+  }
   for (const group of ['fontWeight', 'lineHeight', 'letterSpacing']) {
     if (!typo[group] || Object.keys(typo[group]).length === 0) {
       throw new TokenValidationError(`base.json: typography.${group} must be a non-empty object.`);
@@ -540,6 +553,19 @@ function pushDocumentProperties(lines, base) {
   for (const [name, value] of Object.entries(base.document.lineHeight)) lines.push(`  --doc-leading-${name}: ${value};`);
 }
 
+/**
+ * Larger text (W.3): every size one step up, set per person on <html>. Only the
+ * product scale moves. The `--doc-text-*` sizes of print and the editor sheet
+ * stay (A.1), and spacing stays because it isn't derived from these.
+ */
+function pushLargerTextScope(lines, base) {
+  lines.push(':root[data-text-size="larger"] {');
+  for (const [name, value] of Object.entries(base.typography.fontSizeLarger)) {
+    lines.push(`  --text-${name}: ${value};`);
+  }
+  lines.push('}');
+}
+
 function pushShadowProperties(lines, base, mode) {
   for (const [name, value] of Object.entries(base.shadow[mode])) lines.push(`  --${name}: ${value};`);
 }
@@ -608,6 +634,8 @@ function generateTokensPackageCss(base) {
   }
   pushShadowProperties(lines, base, 'dark');
   lines.push('}');
+  lines.push('');
+  pushLargerTextScope(lines, base);
   lines.push('');
   pushLightScope(lines, base);
   lines.push('');
@@ -690,7 +718,7 @@ function generateBaseCss() {
   lines.push('  }');
   lines.push('  body {');
   lines.push('    @apply bg-background text-foreground;');
-  lines.push('    /* Decision 3.5a/3.6: 14px text at line height 1.5 (Arabic 1.7) is the product default. */');
+  lines.push('    /* Decision A.1/3.6: 15px text at line height 1.5 (Arabic 1.7) is the product default. */');
   lines.push('    font-size: var(--text-sm);');
   lines.push('    line-height: var(--leading-normal);');
   lines.push('  }');
@@ -768,6 +796,8 @@ function generateCssRegion(base) {
   }
   pushShadowProperties(lines, base, 'dark');
   lines.push('}');
+  lines.push('');
+  pushLargerTextScope(lines, base);
   lines.push('');
   pushLightScope(lines, base);
   lines.push('');

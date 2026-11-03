@@ -249,7 +249,7 @@ const ColorPicker = React.forwardRef<HTMLDivElement, ColorPickerProps>(
                 type="button"
                 onClick={handleCopy}
                 title={copyHexLabel}
-                className="flex items-center gap-1 text-[0.6875rem] font-medium text-muted-foreground transition-colors hover:text-foreground"
+                className="flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
               >
                 {copied ? (
                   <>
@@ -289,7 +289,7 @@ const ColorPicker = React.forwardRef<HTMLDivElement, ColorPickerProps>(
 
           {/* Swatch Presets Grid */}
           <div className="flex flex-col gap-1.5">
-            <span className="text-[0.625rem] font-semibold text-muted-foreground uppercase">{presetsLabel}</span>
+            <span className="text-xs font-semibold text-muted-foreground uppercase">{presetsLabel}</span>
             <div className="grid grid-cols-6 gap-1.5">
               {presets.map((presetHex) => {
                 const isSelected = selectedColor?.toLowerCase() === presetHex.toLowerCase()
@@ -329,7 +329,7 @@ const ColorPicker = React.forwardRef<HTMLDivElement, ColorPickerProps>(
                   onChange?.(null)
                   setOpen(false)
                 }}
-                className="text-[0.6875rem] text-muted-foreground hover:text-foreground transition-colors"
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
               >
                 {clearSelectionLabel}
               </button>
@@ -371,9 +371,9 @@ const ColorPicker = React.forwardRef<HTMLDivElement, ColorPickerProps>(
               )}
               {triggerButton}
               {errorText ? (
-                <p className="text-[0.6875rem] font-medium text-destructive">{errorText}</p>
+                <p className="text-xs font-medium text-destructive">{errorText}</p>
               ) : (
-                helperText && <p className="text-[0.6875rem] text-muted-foreground">{helperText}</p>
+                helperText && <p className="text-xs text-muted-foreground">{helperText}</p>
               )}
             </div>
           )}
@@ -411,9 +411,9 @@ const ColorPicker = React.forwardRef<HTMLDivElement, ColorPickerProps>(
         )}
         {triggerButton}
         {errorText ? (
-          <p className="text-[0.6875rem] font-medium text-destructive">{errorText}</p>
+          <p className="text-xs font-medium text-destructive">{errorText}</p>
         ) : (
-          helperText && <p className="text-[0.6875rem] text-muted-foreground">{helperText}</p>
+          helperText && <p className="text-xs text-muted-foreground">{helperText}</p>
         )}
       </div>
     )

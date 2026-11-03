@@ -6,7 +6,7 @@
 
 | Size | Stroke | Where |
 | --- | --- | --- |
-| 16px | 2.25 (renders 1.5px) | The default, beside 14px text: buttons, navigation, table rows, menus |
+| 16px | 2.25 (renders 1.5px) | The default, beside 15px text: buttons, navigation, table rows, menus |
 | 20px | 2 | Touch navigation, cards |
 | 24px | 2 | Page headers, empty states |
 | 12–14px | 2.25 | Inside badges, chips and metadata |

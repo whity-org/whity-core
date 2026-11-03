@@ -835,7 +835,7 @@ export function SettingsField({
           <Badge
             data-testid={`status-${settingKey}`}
             variant={status === 'overridden' ? 'default' : 'secondary'}
-            className="text-[10px] font-medium capitalize"
+            className="text-xs font-medium capitalize"
           >
             {statusLabel(status, t)}
           </Badge>
@@ -914,7 +914,7 @@ export function RegistrySettingControl({
     <Badge
       data-testid={`setting-source-${key}`}
       variant="outline"
-      className="text-[10px] font-medium"
+      className="text-xs font-medium"
     >
       {entry.source}
     </Badge>
@@ -943,7 +943,7 @@ export function RegistrySettingControl({
               <Badge
                 data-testid={`status-${key}`}
                 variant={status === 'overridden' ? 'default' : 'secondary'}
-                className="text-[10px] font-medium capitalize"
+                className="text-xs font-medium capitalize"
               >
                 {statusLabel(status, t)}
               </Badge>
@@ -978,7 +978,7 @@ export function RegistrySettingControl({
           <Badge
             data-testid={`status-${key}`}
             variant={status === 'overridden' ? 'default' : 'secondary'}
-            className="text-[10px] font-medium capitalize"
+            className="text-xs font-medium capitalize"
           >
             {statusLabel(status, t)}
           </Badge>

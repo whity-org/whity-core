@@ -1,0 +1,42 @@
+<!-- @dsCard group="Templates · AI and agents" height=557 width=1680 subtitle="Pick the app, choose what it may do, follow the setup while Whity waits for it" -->
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Connect an AI app</title><style>html,body{height:100%} #root{min-height:100%} body{background:var(--muted)}</style></head>
+<body>
+<div id="root"></div>
+<script>
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 16 }); }
+  var NAVL = {};
+  function L(s) { return NAVL[s] || s; }
+  /* The sidebar as built (inventory, 1 Nov 2026), in sentence case; only the current group is open (2.5). */
+  var GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['approval', 'Approvals', 3], ['form', 'My submissions']]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations'], ['user', 'Family relations'], ['two-step', 'Approval gating']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['routing', 'Route templates'], ['page', 'Notes and wiki'], ['form', 'Form builder'], ['list-todo', 'Forms']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]],
+    ['Platform', [['tenant', 'Tenants'], ['money', 'Plans and pricing'], ['receipt', 'Promotions'], ['chart', 'System'], ['error', 'Errors'], ['notification', 'Notification delivery']]]];
+  function appNav(active, o) { o = o || {};
+    return GROUPS.filter(function (g) { return g[0] !== 'Platform' || o.operator; }).map(function (g) {
+      var has = g[1].some(function (x) { return x[1] === active; });
+      return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
+  var topBar = h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' }));
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: o.tenant || 'Example Bakery', user: o.user || 'Rana Haddad', role: o.role || 'Owner', nav: appNav(active, o), topActions: topBar, searchLabel: o.search, dir: o.dir }, kids); }
+  function person(name, sub, o) { o = o || {}; return h('div', { className: 'wy-person' }, h(W.Avatar, { name: name, size: o.size || 28, kind: o.kind }), h('div', { style: { minWidth: 0 } }, h('b', null, name), sub ? h('small', null, sub) : null)); }
+  function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
+  function recHead(o) { return h('div', { className: 'wy-rech' }, o.avatar || h('span', { className: 'wy-rech__ic', 'aria-hidden': 'true' }, I(o.icon || 'document', 26)),
+      h('div', { style: { minWidth: 0 } }, h('h1', null, o.title, o.badges || null), h('div', { className: 'wy-rech__facts' }, (o.facts || []).map(function (f, i) { return h('span', { key: i }, f[0] ? I(f[0], 14) : null, f[1]); }))),
+      h('div', { className: 'wy-rech__acts' }, o.actions || null)); }
+  function saveBar(text, L2) { L2 = L2 || {}; return h('div', { className: 'wy-savebar', role: 'region', 'aria-label': L2.label || 'Unsaved changes' }, I('edit'), h('span', null, text), h(W.Button, { variant: 'ghost' }, L2.discard || 'Discard'), h(W.Button, null, L2.save || 'Save changes')); }
+  function steps(n) { return h(W.Stepper, { label: 'Connect steps', current: n, steps: [{ label: 'App' }, { label: 'What it may do' }, { label: 'Set up' }] }); }
+  function dlg(n, title, desc, body, foot, label) { return h('div', { className: 'wy-flow__item' }, h('div', { className: 'wy-flow__label' }, label), h(W.Dialog, { inline: true, title: title, description: desc, onClose: function () {}, footer: foot }, h('div', { style: { display: 'grid', gap: 16 } }, steps(n), body))); }
+  function app(n, on) { return h('button', { type: 'button', className: 'wy-appbtn' + (on ? ' is-on' : '') }, h('span', { className: 'wy-appbtn__ic' }, n.charAt(0)), n); }
+  ReactDOM.createRoot(document.getElementById('root')).render(h('div', { className: 'wy-flow', style: { gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' } },
+    dlg(0, 'Connect an AI app', 'Which app do you want to use with Whity?', h('div', { className: 'wy-apps', style: { gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' } }, app('Claude', true), app('ChatGPT'), app('Cursor'), app('VS Code'), app('n8n'), app('Other')), h(F, null, h(W.Button, { variant: 'outline' }, 'Cancel'), h(W.Button, null, 'Continue')), '1 · App'),
+    dlg(1, 'What may Claude do?', 'It works for you and can never do more than you can.', h(W.RadioGroup, { variant: 'cards', defaultValue: 'ask', options: [{ value: 'ask', label: 'Everything I can do, asking me first for changes' }, { value: 'read', label: 'Only look things up' }, { value: 'pick', label: 'Choose area by area' }] }), h(F, null, h(W.Button, { variant: 'outline' }, 'Back'), h(W.Button, null, 'Continue')), '2 · What it may do'),
+    dlg(2, 'Set up Claude', 'Do this in Claude. This window waits and closes by itself.', h(F, null, h('ol', { className: 'wy-steps' }, h('li', null, h('span', null, 'In Claude, open Settings, then Connectors.')), h('li', null, h('span', null, 'Choose Add, and paste this address: ', h('code', null, 'mcp.examplebakery.whity.dev'))), h('li', null, h('span', null, 'Sign in with your Whity account when Claude asks.'))),
+      h('div', { className: 'wy-waiting' }, I('clock'), 'Waiting for Claude to connect…')), h(F, null, h(W.Button, { variant: 'outline', icon: 'copy' }, 'Copy address'), h(W.Button, { variant: 'outline' }, 'Back')), '3 · Set up')));
+</script>
+</body>
+</html>

@@ -75,7 +75,7 @@ final class SubmissionValidator
      *
      * @return array{values: array<string, mixed>, ignored: list<string>}
      *         `values` is what to store; `ignored` names answer keys that match no
-     *         field on the form.
+     *         field on the form, and answers to questions a condition hid.
      *
      * @throws FormRejectedException On the first field that fails, naming that field.
      */
@@ -83,10 +83,16 @@ final class SubmissionValidator
     {
         $values = [];
         $known = [];
+        $visible = FieldCondition::visibility($fields, $data);
 
         foreach ($fields as $field) {
             $key = (string) ($field['field_key'] ?? '');
             if ($key === '') {
+                continue;
+            }
+            // A hidden question is left out of `$known` so an answer sent for it
+            // is reported as ignored, like any other answer nobody asked for.
+            if (($visible[$key] ?? true) === false) {
                 continue;
             }
             $known[$key] = true;
@@ -101,9 +107,7 @@ final class SubmissionValidator
 
             if (self::isBlank($raw, $type)) {
                 if ($required) {
-                    throw new FormRejectedException(
-                        self::describe($field) . ' is required',
-                    );
+                    throw self::refuse($field, 'required', ' is required');
                 }
                 // An absent optional answer is ABSENT from the stored object, not
                 // stored as null. `data ? 'notes'` then answers "did they say
@@ -111,7 +115,15 @@ final class SubmissionValidator
                 continue;
             }
 
-            $values[$key] = self::normalizeOne($field, $type, $raw, $rules, $options);
+            $value = self::normalizeOne($field, $type, $raw, $rules, $options);
+
+            // Asked after normalizing, because `"0"`, `0` and `"false"` are all
+            // the same unticked box by the time they get here.
+            if ($required && $type === FieldType::CHECKBOX && $value !== true) {
+                throw self::refuse($field, 'must_be_ticked', ' must be ticked');
+            }
+
+            $values[$key] = $value;
         }
 
         $ignored = [];
@@ -167,10 +179,16 @@ final class SubmissionValidator
     /**
      * Whether an answer counts as "not given".
      *
-     * A `checkbox` is the exception that makes the rule worth writing down: a
-     * false checkbox is an ANSWER — "no, I do not consent" — and treating it as
-     * blank would make a required consent box impossible to decline and, worse,
-     * would store nothing where the form promised to store a decision.
+     * A `checkbox` is the exception that makes the rule worth writing down: on an
+     * OPTIONAL box, false is an ANSWER — "no" — and is stored as one, so a reader
+     * can tell "they left it unticked" from "they were never sent this question".
+     *
+     * A REQUIRED box is different and {@see validate()} refuses it unticked.
+     * Required on a single checkbox means it must be ticked, which is what HTML's
+     * `required` means and what an author writing "I confirm the above" means. The
+     * rule used to be that false satisfied it, so a declaration nobody had made
+     * was stored and reported as submitted. A question whose honest answer may be
+     * no is a `select` with two choices.
      *
      * A WHITESPACE-ONLY STRING IS BLANK. The check trims before deciding rather
      * than after, because the per-kind normalizers trim too and a required field
@@ -209,7 +227,7 @@ final class SubmissionValidator
             FieldType::SELECT => self::choice($field, $raw, $options),
             FieldType::MULTISELECT => self::choices($field, $raw, $options, $rules),
             FieldType::CHECKBOX => self::checkbox($field, $raw),
-            FieldType::FILE => self::storageReference($field, $raw),
+            FieldType::FILE => self::files($field, $raw, $rules),
             FieldType::PROFILE_REF, FieldType::OU_REF => self::reference($field, $raw),
             // Unreachable while the CHECK constraint and FieldType agree, which
             // FieldTypeTest enforces. Refused rather than passed through: a value
@@ -229,7 +247,7 @@ final class SubmissionValidator
     private static function text(array $field, mixed $raw, array $rules): string
     {
         if (!is_string($raw)) {
-            throw new FormRejectedException(self::describe($field) . ' must be text');
+            throw self::refuse($field, 'not_text', ' must be text');
         }
         $value = trim($raw);
 
@@ -237,17 +255,13 @@ final class SubmissionValidator
         // The field may only TIGHTEN the platform ceiling — see TEXT_MAX.
         $limit = $max === null ? self::TEXT_MAX : min($max, self::TEXT_MAX);
         if (strlen($value) > $limit) {
-            throw new FormRejectedException(
-                self::describe($field) . " must be {$limit} characters or fewer"
-            );
+            throw self::refuse($field, 'too_long', " must be {$limit} characters or fewer", ['limit' => $limit]);
         }
 
         $pattern = $rules['pattern'] ?? null;
         if (is_string($pattern) && $pattern !== '') {
             if (!self::matchesPattern($pattern, $value)) {
-                throw new FormRejectedException(
-                    self::describe($field) . ' is not in the expected format'
-                );
+                throw self::refuse($field, 'bad_format', ' is not in the expected format');
             }
         }
 
@@ -292,16 +306,16 @@ final class SubmissionValidator
             // API does not turn 3 into 3.0 for every consumer downstream.
             $value = (string) (int) $trimmed === $trimmed ? (int) $trimmed : (float) $trimmed;
         } else {
-            throw new FormRejectedException(self::describe($field) . ' must be a number');
+            throw self::refuse($field, 'not_a_number', ' must be a number');
         }
 
         $min = self::numericRule($rules, 'min');
         if ($min !== null && $value < $min) {
-            throw new FormRejectedException(self::describe($field) . " must be at least {$min}");
+            throw self::refuse($field, 'below_min', " must be at least {$min}", ['min' => $min]);
         }
         $max = self::numericRule($rules, 'max');
         if ($max !== null && $value > $max) {
-            throw new FormRejectedException(self::describe($field) . " must be at most {$max}");
+            throw self::refuse($field, 'above_max', " must be at most {$max}", ['max' => $max]);
         }
 
         return $value;
@@ -320,10 +334,10 @@ final class SubmissionValidator
     private static function date(array $field, mixed $raw): string
     {
         if (!is_string($raw) || preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', trim($raw), $m) !== 1) {
-            throw new FormRejectedException(self::describe($field) . ' must be a date, as YYYY-MM-DD');
+            throw self::refuse($field, 'not_a_date', ' must be a date, as YYYY-MM-DD');
         }
         if (!checkdate((int) $m[2], (int) $m[3], (int) $m[1])) {
-            throw new FormRejectedException(self::describe($field) . ' is not a real date');
+            throw self::refuse($field, 'not_a_date', ' is not a real date');
         }
 
         return trim($raw);
@@ -336,11 +350,11 @@ final class SubmissionValidator
     private static function choice(array $field, mixed $raw, array $options): string
     {
         if (!is_string($raw)) {
-            throw new FormRejectedException(self::describe($field) . ' must be one of the offered choices');
+            throw self::refuse($field, 'not_a_choice', ' must be one of the offered choices');
         }
         $allowed = self::optionValues($options);
         if (!in_array($raw, $allowed, true)) {
-            throw new FormRejectedException(self::describe($field) . ' must be one of the offered choices');
+            throw self::refuse($field, 'not_a_choice', ' must be one of the offered choices');
         }
 
         return $raw;
@@ -355,16 +369,14 @@ final class SubmissionValidator
     private static function choices(array $field, mixed $raw, array $options, array $rules): array
     {
         if (!is_array($raw)) {
-            throw new FormRejectedException(self::describe($field) . ' must be a list of choices');
+            throw self::refuse($field, 'not_a_choice', ' must be a list of choices');
         }
         $allowed = self::optionValues($options);
 
         $chosen = [];
         foreach ($raw as $one) {
             if (!is_string($one) || !in_array($one, $allowed, true)) {
-                throw new FormRejectedException(
-                    self::describe($field) . ' must contain only the offered choices'
-                );
+                throw self::refuse($field, 'not_a_choice', ' must contain only the offered choices');
             }
             // De-duplicated: the same choice twice is one choice, and storing it
             // twice would make a count of selections wrong for no benefit.
@@ -374,11 +386,11 @@ final class SubmissionValidator
 
         $min = self::intRule($rules, 'min');
         if ($min !== null && count($values) < $min) {
-            throw new FormRejectedException(self::describe($field) . " needs at least {$min} choices");
+            throw self::refuse($field, 'too_few_choices', " needs at least {$min} choices", ['min' => $min]);
         }
         $max = self::intRule($rules, 'max');
         if ($max !== null && count($values) > $max) {
-            throw new FormRejectedException(self::describe($field) . " allows at most {$max} choices");
+            throw self::refuse($field, 'too_many_choices', " allows at most {$max} choices", ['max' => $max]);
         }
 
         return $values;
@@ -403,11 +415,43 @@ final class SubmissionValidator
             return $raw === 1;
         }
 
-        throw new FormRejectedException(self::describe($field) . ' must be yes or no');
+        throw self::refuse($field, 'not_yes_or_no', ' must be yes or no');
     }
 
     /**
-     * A `file` answer: the storage key of an already-uploaded object.
+     * A `file` answer: one reference, or a list when the field allows several.
+     *
+     * A field with `validation.maxFiles` above 1 always stores a LIST, even of one,
+     * so a reader of the column never has to guess. Without it the answer stays the
+     * single string it has always been, and old submissions read unchanged.
+     *
+     * Repeats are removed here: an upload is single-use, so the same one twice would
+     * otherwise fail at the claim with a sentence that says the file is missing.
+     *
+     * @param array<string, mixed> $field
+     * @param array<string, mixed> $rules
+     * @return string|list<string>
+     */
+    private static function files(array $field, mixed $raw, array $rules): string|array
+    {
+        $max = self::intRule($rules, 'maxFiles') ?? 1;
+        if ($max <= 1) {
+            return self::storageReference($field, $raw);
+        }
+
+        $references = [];
+        foreach (is_array($raw) ? array_values($raw) : [$raw] as $one) {
+            $references[self::storageReference($field, $one)] = true;
+        }
+        if (count($references) > $max) {
+            throw self::refuse($field, 'too_many_files', " allows at most {$max} files", ['max' => $max]);
+        }
+
+        return array_map('strval', array_keys($references));
+    }
+
+    /**
+     * One `file` reference: the storage key of an already-uploaded object.
      *
      * Shape only. Whether the object EXISTS, and whether this caller may point at
      * it, is the storage subsystem's question and is deliberately not answered
@@ -418,11 +462,11 @@ final class SubmissionValidator
     private static function storageReference(array $field, mixed $raw): string
     {
         if (!is_string($raw) || trim($raw) === '') {
-            throw new FormRejectedException(self::describe($field) . ' must be an uploaded file reference');
+            throw self::refuse($field, 'bad_file_reference', ' must be an uploaded file reference');
         }
         $value = trim($raw);
         if (strlen($value) > 512) {
-            throw new FormRejectedException(self::describe($field) . ' has an unusable file reference');
+            throw self::refuse($field, 'bad_file_reference', ' has an unusable file reference');
         }
 
         return $value;
@@ -444,7 +488,7 @@ final class SubmissionValidator
             return (int) $raw;
         }
 
-        throw new FormRejectedException(self::describe($field) . ' must name a record in this tenant');
+        throw self::refuse($field, 'bad_reference', ' must name a record in this tenant');
     }
 
     /**
@@ -500,6 +544,25 @@ final class SubmissionValidator
         }
 
         return null;
+    }
+
+    /**
+     * A refusal about one answer: the English sentence, and the code and question
+     * a page needs to say it in the reader's language.
+     *
+     * @param array<string, mixed> $field
+     * @param array<string, int|float|string> $params
+     */
+    private static function refuse(array $field, string $reason, string $predicate, array $params = []): FormRejectedException
+    {
+        return new FormRejectedException(
+            self::describe($field) . $predicate,
+            '',
+            null,
+            $reason,
+            (string) ($field['field_key'] ?? ''),
+            $params,
+        );
     }
 
     /**

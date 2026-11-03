@@ -1,0 +1,56 @@
+<!-- @dsCard group="Templates · AI and agents" height=1029 width=1280 subtitle="Plain-language instructions, what it may read, and how it writes" -->
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Agent instructions</title><style>html,body{height:100%} #root{min-height:100%} </style></head>
+<body>
+<div id="root"></div>
+<script>
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 16 }); }
+  var NAVL = {};
+  function L(s) { return NAVL[s] || s; }
+  /* The sidebar as built (inventory, 1 Nov 2026), in sentence case; only the current group is open (2.5). */
+  var GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['approval', 'Approvals', 3], ['form', 'My submissions']]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations'], ['user', 'Family relations'], ['two-step', 'Approval gating']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['routing', 'Route templates'], ['page', 'Notes and wiki'], ['form', 'Form builder'], ['list-todo', 'Forms']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]],
+    ['Platform', [['tenant', 'Tenants'], ['money', 'Plans and pricing'], ['receipt', 'Promotions'], ['chart', 'System'], ['error', 'Errors'], ['notification', 'Notification delivery']]]];
+  function appNav(active, o) { o = o || {};
+    return GROUPS.filter(function (g) { return g[0] !== 'Platform' || o.operator; }).map(function (g) {
+      var has = g[1].some(function (x) { return x[1] === active; });
+      return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
+  var topBar = h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' }));
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: o.tenant || 'Example Bakery', user: o.user || 'Rana Haddad', role: o.role || 'Owner', nav: appNav(active, o), topActions: topBar, searchLabel: o.search, dir: o.dir }, kids); }
+  function person(name, sub, o) { o = o || {}; return h('div', { className: 'wy-person' }, h(W.Avatar, { name: name, size: o.size || 28, kind: o.kind }), h('div', { style: { minWidth: 0 } }, h('b', null, name), sub ? h('small', null, sub) : null)); }
+  function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
+  function recHead(o) { return h('div', { className: 'wy-rech' }, o.avatar || h('span', { className: 'wy-rech__ic', 'aria-hidden': 'true' }, I(o.icon || 'document', 26)),
+      h('div', { style: { minWidth: 0 } }, h('h1', null, o.title, o.badges || null), h('div', { className: 'wy-rech__facts' }, (o.facts || []).map(function (f, i) { return h('span', { key: i }, f[0] ? I(f[0], 14) : null, f[1]); }))),
+      h('div', { className: 'wy-rech__acts' }, o.actions || null)); }
+  function saveBar(text, L2) { L2 = L2 || {}; return h('div', { className: 'wy-savebar', role: 'region', 'aria-label': L2.label || 'Unsaved changes' }, I('edit'), h('span', null, text), h(W.Button, { variant: 'ghost' }, L2.discard || 'Discard'), h(W.Button, null, L2.save || 'Save changes')); }
+  function agentHead(T, tab) { return h(F, null, h(W.Breadcrumb, { items: [{ label: T.agents }, { label: T.name }] }),
+    recHead({ avatar: h(W.Avatar, { kind: 'agent', name: T.name, size: 56 }), title: T.name, badges: h(W.Badge, { variant: 'success' }, T.working), facts: [['user', T.for], ['activity', T.today], ['clock', T.since]],
+      actions: h(F, null, h(W.Button, { variant: 'outline', icon: 'activity' }, T.seeAct), h(W.Button, { variant: 'outline' }, T.pause), h(W.Menu, { label: T.more, items: [{ icon: 'delete', label: T.del, danger: true }] })) }),
+    h('div', { className: 'wy-rectabs' }, h(W.Tabs, { items: [{ value: 'o', label: T.tO }, { value: 'i', label: T.tI }, { value: 'p', label: T.tP, count: 10 }, { value: 'a', label: T.tA }], defaultValue: tab }))); }
+  function overview(T) { return h('div', { className: 'wy-recbody' },
+    h('div', { style: { display: 'grid', gap: 16 } },
+      h(W.Card, { title: T.job }, h('p', { style: { margin: 0, lineHeight: 1.6 } }, T.jobText)),
+      h(W.Card, { title: T.todayT, description: T.todayD }, h(W.AgentActivity, { items: T.items }))),
+    h('div', { style: { display: 'grid', gap: 16 } },
+      h(W.Card, { title: T.onOwn }, h(W.DescriptionList, { items: [{ label: T.allowed, value: T.allowedV }, { label: T.ask, value: T.askV }, { label: T.off, value: T.offV }] })),
+      h(W.Card, { title: T.where }, h(W.DescriptionList, { items: [{ label: T.wApps, value: 'Front Office' }, { label: T.wCh, value: T.wChV }, { label: T.wLang, value: T.wLangV }] })))); }
+
+  var T = { agents: 'Agents', name: 'Billing assistant', working: 'Working', for: 'Works for Rana Haddad', today: '14 actions today', since: 'Since 12 March 2026', seeAct: 'See activity', pause: 'Pause', more: 'More', del: 'Delete agent', tO: 'Overview', tI: 'Instructions', tP: 'What it may do', tA: 'Activity', job: 'What it does', jobText: 'Keeps Example Bakery’s invoices paid. It finds overdue invoices every morning, drafts reminders for Rana to approve, and sends receipts when customers pay. It never changes amounts or voids invoices.', todayT: 'Today', todayD: '14 done · 2 waiting for Rana', items: [{ actor: 'Billing assistant', onBehalfOf: 'Rana', text: 'sent 4 receipts by WhatsApp', time: '09:12', kind: 'act' }, { actor: 'Billing assistant', onBehalfOf: 'Rana', text: 'proposed a reminder to Example Café', time: '08:20', kind: 'propose' }, { actor: 'Billing assistant', onBehalfOf: 'Rana', text: 'read 32 invoices to find overdue ones', time: '08:05', kind: 'read' }], onOwn: 'On its own', allowed: 'Allowed', allowedV: '6 actions, such as reading invoices and sending receipts', ask: 'Asks first', askV: '4 actions, such as sending reminders', off: 'Never', offV: 'Voiding invoices, changing prices', where: 'Where it works', wApps: 'Apps', wCh: 'Sends by', wChV: 'Email and WhatsApp', wLang: 'Writes in', wLangV: 'Arabic and English, like the customer' };
+  ReactDOM.createRoot(document.getElementById('root')).render(shell('Agents', h(F, null, agentHead(T, 'i'),
+    h('div', { className: 'wy-recbody' },
+      h(W.Card, { title: 'Instructions', description: 'Write to the agent as you would to a new colleague. It follows these within what it may do.' },
+        h('div', { style: { display: 'grid', gap: 12 } }, h('textarea', { className: 'wy-input wy-instr', 'aria-label': 'Instructions', defaultValue: 'Every morning at 8, look for invoices more than 7 days overdue.\n\nFor each one, draft a polite reminder in the customer’s language. Mention the invoice number, the amount and how to pay by bank transfer. Don’t send it: ask Rana first.\n\nWhen a payment arrives, send the receipt by WhatsApp if we have a mobile number, otherwise by email.\n\nNever change amounts, never void invoices, and never promise discounts.' }),
+          h('div', { className: 'wy-muted', style: { fontSize: 14 } }, 'Changed 3 Oct by Rana Haddad'))),
+      h('div', { style: { display: 'grid', gap: 16 } },
+        h(W.Card, { title: 'What it may read', description: 'Besides the records its permissions allow.' }, h('div', { className: 'wy-know' }, h('div', { className: 'wy-know__row' }, I('page'), h('span', null, 'How we write to customers'), h(W.IconButton, { icon: 'close', label: 'Remove', size: 'sm' })), h('div', { className: 'wy-know__row' }, I('template'), h('span', null, 'Payment reminder (template)'), h(W.IconButton, { icon: 'close', label: 'Remove', size: 'sm' })), h(W.Button, { variant: 'outline', icon: 'plus' }, 'Add a page or template'))),
+        h(W.Card, { title: 'How it writes' }, h('div', { style: { display: 'grid', gap: 12 } }, h(W.Select, { label: 'Tone', defaultValue: 'p', options: [{ value: 'p', label: 'Polite and short' }, { value: 'f', label: 'Formal' }] }), h(W.Select, { label: 'Language', defaultValue: 'c', options: [{ value: 'c', label: 'The customer’s language' }, { value: 'a', label: 'Arabic' }, { value: 'e', label: 'English' }] }))))),
+    saveBar(h(F, null, h('b', null, '1 change'), ' · Instructions')))));
+</script>
+</body>
+</html>

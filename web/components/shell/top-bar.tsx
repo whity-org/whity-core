@@ -37,7 +37,7 @@ export function TopBar() {
       >
         <Icon name="search" size={16} />
         <span className="flex-1 text-start">{t('topBar.search', 'Search')}</span>
-        <kbd className="rounded border border-border px-1 font-mono text-[0.6875rem]" dir="ltr">
+        <kbd className="rounded border border-border px-1 font-mono text-xs" dir="ltr">
           {shortcut}
         </kbd>
       </button>

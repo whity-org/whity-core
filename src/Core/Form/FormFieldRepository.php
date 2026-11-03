@@ -33,7 +33,11 @@ final class FormFieldRepository
 {
     private const COLUMNS = 'id, tenant_id, form_id, field_key, field_type, label, help_text,
                              is_required, options, validation, prefill_source, section_key, position,
-                             created_at, updated_at';
+                             visible_when, audience, created_at, updated_at';
+
+    /** Who answers a question (migration 194). */
+    public const AUDIENCE_APPLICANT = 'applicant';
+    public const AUDIENCE_STAFF = 'staff';
 
     /** Matches `VARCHAR(128)` in migration 127. */
     public const KEY_MAX = 128;
@@ -51,6 +55,38 @@ final class FormFieldRepository
 
     public function __construct(private readonly PDO $db)
     {
+    }
+
+    /**
+     * The questions an applicant is asked.
+     *
+     * The one filter every applicant surface goes through, so what a form shows and
+     * what a submission is checked against cannot differ. An answer sent for a staff
+     * question falls out as an unknown key and is dropped.
+     *
+     * @param list<array<string, mixed>> $fields
+     * @return list<array<string, mixed>>
+     */
+    public static function applicantFields(array $fields): array
+    {
+        return array_values(array_filter(
+            $fields,
+            static fn (array $field): bool => ($field['audience'] ?? self::AUDIENCE_APPLICANT) !== self::AUDIENCE_STAFF,
+        ));
+    }
+
+    /**
+     * The questions the office answers.
+     *
+     * @param list<array<string, mixed>> $fields
+     * @return list<array<string, mixed>>
+     */
+    public static function staffFields(array $fields): array
+    {
+        return array_values(array_filter(
+            $fields,
+            static fn (array $field): bool => ($field['audience'] ?? self::AUDIENCE_APPLICANT) === self::AUDIENCE_STAFF,
+        ));
     }
 
     /**
@@ -152,6 +188,8 @@ final class FormFieldRepository
                     $field['prefill_source'] === null ? null : (string) $field['prefill_source'],
                     $field['section_key'] === null ? null : (string) $field['section_key'],
                     $position,
+                    /** @var array<string, mixed>|null */ $field['visible_when'] ?? null,
+                    (string) ($field['audience'] ?? self::AUDIENCE_APPLICANT),
                 );
             }
 
@@ -209,6 +247,7 @@ final class FormFieldRepository
      * @param array<string, string> $label      A `{ar?, en?}` label.
      * @param list<array{value: string, label: array<string, string>}> $options
      * @param array<string, mixed>  $validation
+     * @param array<string, mixed>|null $visibleWhen See {@see FieldCondition}.
      *
      * @throws FormRejectedException When the form already holds the key.
      */
@@ -225,15 +264,19 @@ final class FormFieldRepository
         ?string $prefillSource,
         ?string $sectionKey,
         ?int $position,
+        ?array $visibleWhen = null,
+        string $audience = self::AUDIENCE_APPLICANT,
     ): int {
         try {
             $stmt = $this->db->prepare(
                 'INSERT INTO form_fields
                      (tenant_id, form_id, field_key, field_type, label, help_text, is_required,
-                      options, validation, prefill_source, section_key, position, created_at, updated_at)
+                      options, validation, prefill_source, section_key, position, visible_when,
+                      audience, created_at, updated_at)
                  VALUES
                      (:tenant_id, :form_id, :field_key, :field_type, :label, :help_text, :is_required,
-                      :options, :validation, :prefill_source, :section_key, :position, NOW(), NOW())'
+                      :options, :validation, :prefill_source, :section_key, :position, :visible_when,
+                      :audience, NOW(), NOW())'
             );
             $stmt->execute([
                 ':tenant_id' => $tenantId,
@@ -251,6 +294,8 @@ final class FormFieldRepository
                 ':prefill_source' => $prefillSource,
                 ':section_key' => $sectionKey,
                 ':position' => $position ?? $this->nextPosition($tenantId, $formId),
+                ':visible_when' => $visibleWhen === null ? null : self::encodeJson($visibleWhen, '{}'),
+                ':audience' => $audience,
             ]);
         } catch (PDOException $e) {
             throw new FormRejectedException(
@@ -290,6 +335,7 @@ final class FormFieldRepository
             'prefill_source' => ':prefill_source',
             'section_key' => ':section_key',
             'position' => ':position',
+            'audience' => ':audience',
         ];
         foreach ($simple as $column => $placeholder) {
             if (array_key_exists($column, $changes)) {
@@ -319,6 +365,12 @@ final class FormFieldRepository
             $validation = $changes['validation'];
             $sets[] = 'validation = :validation';
             $params[':validation'] = self::encodeJson($validation, '{}');
+        }
+        if (array_key_exists('visible_when', $changes)) {
+            /** @var array<string, mixed>|null $visibleWhen */
+            $visibleWhen = $changes['visible_when'];
+            $sets[] = 'visible_when = :visible_when';
+            $params[':visible_when'] = $visibleWhen === null ? null : self::encodeJson($visibleWhen, '{}');
         }
 
         $stmt = $this->db->prepare(
@@ -401,7 +453,12 @@ final class FormFieldRepository
             'field_key' => (string) $row['field_key'],
             'field_type' => $type,
             'label' => LocalizedLabel::decode(isset($row['label']) ? (string) $row['label'] : null),
-            'help_text' => $row['help_text'] === null ? null : (string) $row['help_text'],
+            // The string stays the one existing clients read, and the map is the
+            // whole text: see {@see LocalizedLabel::preferred()}.
+            'help_text' => self::preferredOrNull($row['help_text'] ?? null),
+            'help_text_i18n' => LocalizedLabel::decode(
+                isset($row['help_text']) ? (string) $row['help_text'] : null
+            ) ?: new \stdClass(),
             // PostgreSQL hands a BOOLEAN back as the string 't'/'f' through PDO
             // on some driver builds and as a PHP bool on others; SQLite hands
             // back 0/1. Normalising here is what stops a client from having to
@@ -425,11 +482,15 @@ final class FormFieldRepository
             'prefill_backed' => $prefill !== null && PrefillSource::isBacked($prefill),
             'section_key' => $row['section_key'] === null ? null : (string) $row['section_key'],
             'position' => (int) $row['position'],
+            'visible_when' => ($row['visible_when'] ?? null) === null
+                ? null
+                : self::decodeJsonMap($row['visible_when']),
+            'audience' => (string) ($row['audience'] ?? self::AUDIENCE_APPLICANT),
             'created_at' => (string) $row['created_at'],
             'updated_at' => (string) $row['updated_at'],
             // Derived from the type, so a renderer does not carry a second copy
             // of the vocabulary's rules.
-            'multi_valued' => FieldType::isMultiValued($type),
+            'multi_valued' => FieldType::isMultiValued($type) || self::allowsSeveralFiles($type, $row['validation'] ?? null),
         ];
     }
 
@@ -442,6 +503,26 @@ final class FormFieldRepository
     private static function emptyMapAsObject(array $map): array|\stdClass
     {
         return $map === [] ? new \stdClass() : $map;
+    }
+
+    private static function allowsSeveralFiles(string $type, mixed $validation): bool
+    {
+        if ($type !== FieldType::FILE) {
+            return false;
+        }
+        $max = self::decodeJsonMap($validation)['maxFiles'] ?? 1;
+
+        return is_int($max) && $max > 1;
+    }
+
+    private static function preferredOrNull(mixed $stored): ?string
+    {
+        if ($stored === null) {
+            return null;
+        }
+        $text = LocalizedLabel::preferred(LocalizedLabel::decode((string) $stored));
+
+        return $text === '' ? null : $text;
     }
 
     private static function toBool(mixed $value): bool

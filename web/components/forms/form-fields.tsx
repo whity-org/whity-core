@@ -20,6 +20,15 @@ import { useState } from 'react';
 import { Input } from '@whity/ui/input';
 import { Textarea } from '@whity/ui/textarea';
 import { Checkbox } from '@whity/ui/checkbox';
+import { useTranslation } from '@whity/features/i18n';
+import {
+  RepeatingField,
+  SeveralFilesField,
+  SignatureField,
+  humanSize,
+  type TableColumn,
+  type TableRow,
+} from '@/components/forms/form-field-kinds';
 
 export interface LocalizedText {
   ar?: string;
@@ -32,15 +41,24 @@ export interface FormFieldSpec {
   field_type: string;
   label: LocalizedText | string | null;
   help_text: string | null;
+  /** The help text in each language; `help_text` is one of these for older clients. */
+  help_text_i18n?: LocalizedText | [] | null;
   is_required: boolean;
   options: Array<{ value?: string; label?: LocalizedText | string } | string>;
   multi_valued: boolean;
   position: number;
   /** Constraints on the answer. `ou_type` narrows which KIND of unit an `ou_ref` accepts. */
-  validation?: { ou_type?: string } | null;
+  validation?: {
+    ou_type?: string;
+    /** How many files a `file` question takes. Above 1 the answer is a list. */
+    maxFiles?: number;
+    /** A `repeating` question's columns and row limit. */
+    columns?: TableColumn[];
+    maxRows?: number;
+  } | null;
 }
 
-export type Answer = string | string[] | boolean;
+export type Answer = string | string[] | boolean | TableRow[] | { name: string };
 
 /** Prefer the reading direction's language, then anything that is actually set. */
 export function localized(
@@ -125,15 +143,11 @@ export type FileUploader = (file: File) => Promise<UploadedFileRef>;
  * load-bearing, and it is worth having only because a file picker that offers
  * the whole disk makes people choose a file that is then rejected.
  */
-const ACCEPTED_FILE_TYPES = 'application/pdf,image/png,image/jpeg';
+const ACCEPTED_FILE_TYPES =
+  'application/pdf,image/png,image/jpeg,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
-/** A byte count as a person would read it. */
-function humanSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
+/** Mirrors the server's ceiling, for a form that sets no limit of its own. */
+const ROWS_MAX = 200;
 
 /**
  * A `file` field: a file input that UPLOADS, then holds the reference it got
@@ -172,6 +186,7 @@ function FileField({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [attached, setAttached] = useState<{ name: string; size: number } | null>(null);
+  const t = useTranslation('forms');
 
   if (upload === undefined) {
     // No uploader means this surface cannot accept files. Say so rather than
@@ -179,7 +194,7 @@ function FileField({
     // worse than an absent one.
     return (
       <p className="text-sm text-muted-foreground" role="note">
-        Files cannot be attached here.
+        {t('field.noFiles', 'Files cannot be attached here.')}
       </p>
     );
   }
@@ -212,17 +227,24 @@ function FileField({
               // The answer is cleared, not left pointing at whatever was
               // attached before — see the component docblock.
               onChange('');
-              setError(cause instanceof Error ? cause.message : 'That file could not be uploaded.');
+              setError(
+                cause instanceof Error
+                  ? cause.message
+                  : t('field.uploadFailed', 'That file could not be uploaded. Please try again.')
+              );
             })
             .finally(() => setBusy(false));
         }}
       />
 
-      {busy && <p className="text-xs text-muted-foreground">Uploading…</p>}
+      {busy && <p className="text-xs text-muted-foreground">{t('field.uploading', 'Uploading…')}</p>}
 
       {!busy && attached !== null && (
         <p className="text-xs text-muted-foreground">
-          Attached: {attached.name} ({humanSize(attached.size)})
+          {t('field.attached', 'Attached: {name} ({size})', {
+            name: attached.name,
+            size: humanSize(attached.size),
+          })}
         </p>
       )}
 
@@ -267,7 +289,11 @@ export function FormField({
    */
   upload?: FileUploader;
 }) {
+  const t = useTranslation('forms');
   const label = localized(field.label, preferArabic) || field.field_key;
+  // Empty translations come back from the server as `{}`, or `[]` from an older one.
+  const translatedHelp = Array.isArray(field.help_text_i18n) ? null : field.help_text_i18n;
+  const help = localized(translatedHelp, preferArabic) || field.help_text;
   const id = `field-${field.field_key}`;
   const multiple = field.field_type === 'multiselect' || field.multi_valued;
 
@@ -282,11 +308,51 @@ export function FormField({
         )}
       </label>
 
-      {field.help_text !== null && field.help_text !== '' && (
-        <p className="text-xs text-muted-foreground">{field.help_text}</p>
-      )}
+      {help !== null && help !== '' && <p className="text-xs text-muted-foreground">{help}</p>}
 
-      {field.field_type === 'file' ? (
+      {field.field_type === 'repeating' ? (
+        <RepeatingField
+          value={Array.isArray(value) ? (value as TableRow[]) : []}
+          maxRows={field.validation?.maxRows ?? ROWS_MAX}
+          onChange={onChange}
+          renderCell={(row, onCell, rowIndex) =>
+            (field.validation?.columns ?? []).map((column) => (
+              <FormField
+                key={column.key}
+                field={{
+                  field_key: `${field.field_key}-${rowIndex}-${column.key}`,
+                  field_type: column.type,
+                  label: column.label,
+                  help_text: null,
+                  is_required: column.required === true,
+                  options: column.options ?? [],
+                  multi_valued: false,
+                  position: 0,
+                }}
+                value={row[column.key]}
+                preferArabic={preferArabic}
+                onChange={(cell) => onCell({ ...row, [column.key]: cell })}
+              />
+            ))
+          }
+        />
+      ) : field.field_type === 'signature' ? (
+        <SignatureField
+          id={id}
+          required={field.is_required}
+          value={typeof value === 'object' && value !== null && 'name' in value ? value.name : ''}
+          onChange={(name) => onChange({ name })}
+        />
+      ) : field.field_type === 'file' && (field.validation?.maxFiles ?? 1) > 1 ? (
+        <SeveralFilesField
+          id={id}
+          accept={ACCEPTED_FILE_TYPES}
+          max={field.validation?.maxFiles ?? 1}
+          value={Array.isArray(value) ? (value as string[]) : []}
+          upload={upload}
+          onChange={onChange}
+        />
+      ) : field.field_type === 'file' ? (
         // AN UPLOAD, not a text box. Before this branch existed a `file` field
         // fell through to the `<Input type="text">` at the bottom, so the form
         // asked somebody to "upload your paper" and gave them a place to type a
@@ -313,7 +379,7 @@ export function FormField({
             checked={value === true}
             onCheckedChange={(checked) => onChange(checked === true)}
           />
-          <span className="text-sm text-muted-foreground">Yes</span>
+          <span className="text-sm text-muted-foreground">{t('field.yes', 'Yes')}</span>
         </div>
       ) : multiple ? (
         // CHECKBOXES, not `<select multiple>`. A native multi-select is a list
@@ -324,7 +390,7 @@ export function FormField({
         <div className="space-y-2 rounded-xl border border-border/60 bg-card p-3 shadow-2xs">
           {field.options.map((option, index) => {
             const optValue = optionValue(option);
-            const selected = Array.isArray(value) ? value : [];
+            const selected = Array.isArray(value) ? (value as string[]) : [];
             const checked = selected.includes(optValue);
             const optId = `${id}-${index}`;
 
@@ -425,7 +491,9 @@ export function FormField({
         <Input
           id={id}
           type={field.field_type === 'number' ? 'number' : 'text'}
-          required={field.is_required}
+          // Not `required`: Input draws its own star for that, and the label above
+          // already has one.
+          aria-required={field.is_required}
           value={typeof value === 'string' ? value : ''}
           onChange={(e) => onChange(e.target.value)}
         />

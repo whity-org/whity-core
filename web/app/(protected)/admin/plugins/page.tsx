@@ -601,7 +601,7 @@ export default function PluginsPage() {
                       file: plugin.file,
                     })}
                 </p>
-                <div className="flex flex-wrap gap-2 text-[10px] text-muted-foreground">
+                <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
                   <span className="px-2 py-1 bg-muted rounded-full">
                     {t('plugins.card.version', 'Version: {version}', {
                       version: plugin.version || '1.0.0',
@@ -701,7 +701,7 @@ export default function PluginsPage() {
               />
             </label>
             {uploadFile && (
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 {rt(
                   'plugins.upload.selected',
                   'Selected: <0>{name}</0> ({size} KiB)',
@@ -710,7 +710,7 @@ export default function PluginsPage() {
                 )}
               </p>
             )}
-            <p className="text-[10px] text-muted-foreground/80">
+            <p className="text-xs text-muted-foreground/80">
               {t('plugins.upload.maxSize', 'Maximum size {max} MiB.', {
                 max: MAX_UPLOAD_BYTES / (1024 * 1024),
               })}
@@ -800,7 +800,7 @@ export default function PluginsPage() {
                     {t('plugins.detail.failedTitle', 'Failed State Details')}
                   </div>
                   {(detailPlugin as ExtendedPluginEntry).consecutive_errors !== undefined && (
-                    <p className="text-[11px]">
+                    <p className="text-xs">
                       {rt(
                         'plugins.detail.consecutiveFailures',
                         'Consecutive failures: <0>{count}</0>',
@@ -811,11 +811,11 @@ export default function PluginsPage() {
                   )}
                   {(detailPlugin as ExtendedPluginEntry).last_error && (
                     <div className="space-y-1">
-                      <p className="text-[11px] font-semibold">
+                      <p className="text-xs font-semibold">
                         {(detailPlugin as ExtendedPluginEntry).last_error?.type}: {(detailPlugin as ExtendedPluginEntry).last_error?.message}
                       </p>
                       {(detailPlugin as ExtendedPluginEntry).last_error?.trace && (
-                        <pre className="text-[9px] bg-background/50 p-2 rounded max-h-32 overflow-auto font-mono whitespace-pre-wrap">
+                        <pre className="text-xs bg-background/50 p-2 rounded max-h-32 overflow-auto font-mono whitespace-pre-wrap">
                           {(detailPlugin as ExtendedPluginEntry).last_error?.trace}
                         </pre>
                       )}
@@ -948,7 +948,7 @@ export default function PluginsPage() {
                   </p>
 
                   <div className="pt-2 p-3 bg-muted/40 rounded-lg space-y-2 border border-border">
-                    <p className="text-[11px] font-semibold text-foreground/90">
+                    <p className="text-xs font-semibold text-foreground/90">
                       {t('plugins.uninstall.cleanupTitle', 'Database Cleanup Options')}
                     </p>
                     <label className="flex items-start gap-2 cursor-pointer">
@@ -958,7 +958,7 @@ export default function PluginsPage() {
                         onChange={(e) => setForceUninstall(e.target.checked)}
                         className="mt-0.5 rounded border-border text-primary focus:ring-primary h-3.5 w-3.5"
                       />
-                      <span className="text-[10px] text-muted-foreground select-none leading-tight">
+                      <span className="text-xs text-muted-foreground select-none leading-tight">
                         {rt(
                           'plugins.uninstall.force',
                           '<0>Force deletion:</0> Remove the plugin directory even if database ' +

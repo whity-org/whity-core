@@ -136,7 +136,7 @@ export const FullFeaturedWithProfileIcon: Story = {
             {!collapsed && (
               <div className="flex flex-col">
                 <span className="text-sm font-semibold tracking-tight text-sidebar-foreground">Whity Engine</span>
-                <span className="text-[0.625rem] text-sidebar-foreground/70 font-mono">v2.4.0</span>
+                <span className="text-xs text-sidebar-foreground/70 font-mono">v2.4.0</span>
               </div>
             )}
           </div>
@@ -176,7 +176,7 @@ export const FullFeaturedWithProfileIcon: Story = {
                 </div>
                 <div className="flex flex-col min-w-0 text-start">
                   <span className="truncate text-xs font-semibold text-sidebar-foreground">Amro K. Saleh</span>
-                  <span className="truncate text-[0.625rem] text-sidebar-foreground/70 font-mono">amro@example.com</span>
+                  <span className="truncate text-xs text-sidebar-foreground/70 font-mono">amro@example.com</span>
                 </div>
               </div>
               <button

@@ -366,7 +366,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
                 .filter(Boolean)
                 .join(" ") || undefined}
               className={cn(
-                "h-7 w-full min-w-0 rounded-md border border-input bg-card ps-2.5 pe-8 py-0.5 text-xs font-medium transition-colors outline-none placeholder:text-muted-foreground placeholder:text-xs focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive/20 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0",
+                "h-10 w-full min-w-0 rounded-control border border-input bg-card ps-2.5 pe-8 py-0.5 text-sm transition-colors outline-none placeholder:text-muted-foreground placeholder:text-xs focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive/20 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0",
                 className
               )}
               {...props}
@@ -412,7 +412,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
                 .filter(Boolean)
                 .join(" ") || undefined}
               className={cn(
-                "h-7 w-full min-w-0 rounded-md border border-input bg-card ps-8 pe-2.5 py-0.5 text-xs font-medium transition-colors outline-none placeholder:text-muted-foreground placeholder:text-xs focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive/20 [&::-webkit-search-cancel-button]:cursor-pointer",
+                "h-10 w-full min-w-0 rounded-control border border-input bg-card ps-8 pe-2.5 py-0.5 text-sm transition-colors outline-none placeholder:text-muted-foreground placeholder:text-xs focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive/20 [&::-webkit-search-cancel-button]:cursor-pointer",
                 className
               )}
               {...props}
@@ -439,7 +439,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
                 .filter(Boolean)
                 .join(" ") || undefined}
               className={cn(
-                "h-7 w-full min-w-0 rounded-md border border-input bg-card ps-2.5 pe-8 py-0.5 text-xs font-medium transition-colors outline-none placeholder:text-muted-foreground placeholder:text-xs focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive/20",
+                "h-10 w-full min-w-0 rounded-control border border-input bg-card ps-2.5 pe-8 py-0.5 text-sm transition-colors outline-none placeholder:text-muted-foreground placeholder:text-xs focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive/20",
                 className
               )}
               {...props}
@@ -490,7 +490,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
                 .filter(Boolean)
                 .join(" ") || undefined}
               className={cn(
-                "h-7 w-full min-w-0 rounded-md border border-input bg-card px-8 py-0.5 text-center text-xs font-medium transition-colors outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none placeholder:text-muted-foreground placeholder:text-xs focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive/20",
+                "h-10 w-full min-w-0 rounded-control border border-input bg-card px-8 py-0.5 text-center text-sm transition-colors outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none placeholder:text-muted-foreground placeholder:text-xs focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive/20",
                 className
               )}
               {...props}
@@ -568,7 +568,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
                   </>
                 )}
               </p>
-              <p className="mt-0.5 text-[0.6875rem] text-muted-foreground">
+              <p className="mt-0.5 text-xs text-muted-foreground">
                 {props.multiple ? multipleFilesHint : singleFileHint}
               </p>
             </div>
@@ -588,7 +588,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
                         <span className="truncate text-xs font-semibold text-foreground" title={file.name}>
                           {file.name}
                         </span>
-                        <span className="text-[0.625rem] text-muted-foreground font-mono">
+                        <span className="text-xs text-muted-foreground font-mono">
                           {formatBytes(file.size)}
                         </span>
                       </div>
@@ -617,7 +617,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
         return (
           <div
             className={cn(
-              "flex min-h-7 w-full flex-wrap items-center gap-1.5 rounded-md border border-input bg-card p-1 text-xs font-medium transition-colors focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/30",
+              "flex min-h-10 w-full flex-wrap items-center gap-1.5 rounded-control border border-input bg-card p-1 text-sm transition-colors focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/30",
               disabled && "pointer-events-none opacity-50",
               className
             )}
@@ -698,7 +698,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
             .filter(Boolean)
             .join(" ") || undefined}
           className={cn(
-            "h-7 w-full min-w-0 rounded-md border border-input bg-card px-2.5 py-0.5 text-xs font-medium transition-colors outline-none file:inline-flex file:h-full file:items-center file:border-0 file:border-e file:border-input/40 file:bg-muted file:px-2.5 file:text-xs file:font-semibold file:text-foreground hover:file:bg-muted/80 file:transition-colors file:cursor-pointer file:me-2 placeholder:text-muted-foreground placeholder:text-xs focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive/20",
+            "h-10 w-full min-w-0 rounded-control border border-input bg-card px-2.5 py-0.5 text-sm transition-colors outline-none file:inline-flex file:h-full file:items-center file:border-0 file:border-e file:border-input/40 file:bg-muted file:px-2.5 file:text-xs file:font-semibold file:text-foreground hover:file:bg-muted/80 file:transition-colors file:cursor-pointer file:me-2 placeholder:text-muted-foreground placeholder:text-xs focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive/20",
             className
           )}
           {...props}
@@ -745,9 +745,9 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
         )}
         {renderInputControl()}
         {errorText ? (
-          <p id={inputId ? `${inputId}-error` : undefined} className="text-[0.6875rem] font-medium text-destructive">{errorText}</p>
+          <p id={inputId ? `${inputId}-error` : undefined} className="text-xs font-medium text-destructive">{errorText}</p>
         ) : (
-          helperText && <p id={inputId ? `${inputId}-helper` : undefined} className="text-[0.6875rem] text-muted-foreground">{helperText}</p>
+          helperText && <p id={inputId ? `${inputId}-helper` : undefined} className="text-xs text-muted-foreground">{helperText}</p>
         )}
       </div>
     )

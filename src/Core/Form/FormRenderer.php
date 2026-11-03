@@ -33,6 +33,10 @@ namespace Whity\Core\Form;
  * it means the two can never disagree, and reordering fields reorders sections
  * for free.
  *
+ * What a section is CALLED is stored ({@see FormRepository}, migration 193), as a
+ * lookup by key: an entry no field uses is not drawn, and a section with no entry
+ * has no title rather than being an error.
+ *
  * Fields with no `section_key` come FIRST, under a null section, because a form
  * that grew sections later has its original fields at the top and moving them
  * below the new sections would silently reorder somebody's form.
@@ -55,7 +59,7 @@ final class FormRenderer
      * @return array{
      *     form: array<string, mixed>,
      *     fields: list<array<string, mixed>>,
-     *     sections: list<array{key: ?string, field_keys: list<string>}>,
+     *     sections: list<array{key: ?string, field_keys: list<string>, title: array<string, string>|null, description: array<string, string>|null}>,
      *     prefill: array<string, string>,
      *     unresolved_prefill: list<array{field_key: string, source: string, reason: string}>,
      *     accepts_submissions: bool
@@ -64,12 +68,14 @@ final class FormRenderer
     public function render(int $tenantId, ?int $profileId, array $form): array
     {
         $formId = (int) $form['id'];
-        $fields = $this->fields->listForForm($tenantId, $formId);
+        // Rendering is what an applicant is shown. Staff fields are read through
+        // the fields API (`forms:read`) and answered through the review route.
+        $fields = FormFieldRepository::applicantFields($this->fields->listForForm($tenantId, $formId));
 
         return [
             'form' => $form,
             'fields' => $fields,
-            'sections' => self::sectionsOf($fields),
+            'sections' => self::sectionsOf($fields, self::sectionMeta($form)),
             'prefill' => $this->prefill->forFields($tenantId, $profileId, $fields),
             // Reported rather than swallowed. A field naming a source this
             // install cannot resolve renders as an empty box, which is correct
@@ -99,9 +105,10 @@ final class FormRenderer
      * REDUCED field rows the public view emits.
      *
      * @param list<array<string, mixed>> $fields
-     * @return list<array{key: ?string, field_keys: list<string>}>
+     * @param list<array<string, mixed>> $meta   `forms.sections`: titles by key.
+     * @return list<array{key: ?string, field_keys: list<string>, title: array<string, string>|null, description: array<string, string>|null}>
      */
-    public static function sectionsOf(array $fields): array
+    public static function sectionsOf(array $fields, array $meta = []): array
     {
         /** @var array<string, list<string>> $grouped Keyed by section, '' for none. */
         $grouped = [];
@@ -121,15 +128,44 @@ final class FormRenderer
         // see the class docblock.
         usort($order, static fn (string $a, string $b): int => ($a === '' ? 0 : 1) <=> ($b === '' ? 0 : 1));
 
+        $byKey = [];
+        foreach ($meta as $entry) {
+            if (is_string($entry['key'] ?? null)) {
+                $byKey[$entry['key']] = $entry;
+            }
+        }
+
         $sections = [];
         foreach ($order as $bucket) {
+            $entry = $byKey[$bucket] ?? [];
+            /** @var array<string, string> $title */
+            $title = is_array($entry['title'] ?? null) ? $entry['title'] : [];
+            /** @var array<string, string> $description */
+            $description = is_array($entry['description'] ?? null) ? $entry['description'] : [];
             $sections[] = [
                 'key' => $bucket === '' ? null : $bucket,
                 'field_keys' => $grouped[$bucket],
+                'title' => $title === [] ? null : $title,
+                'description' => $description === [] ? null : $description,
             ];
         }
 
         return $sections;
+    }
+
+    /**
+     * The form's stored section titles.
+     *
+     * PUBLIC so {@see PublicFormView::form()} reads them the same way.
+     *
+     * @param array<string, mixed> $form
+     * @return list<array<string, mixed>>
+     */
+    public static function sectionMeta(array $form): array
+    {
+        $sections = $form['sections'] ?? [];
+
+        return is_array($sections) ? array_values(array_filter($sections, 'is_array')) : [];
     }
 
     /**

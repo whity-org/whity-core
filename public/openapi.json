@@ -2,7 +2,7 @@
     "openapi": "3.0.0",
     "info": {
         "title": "Whity Core API",
-        "version": "0.2.23",
+        "version": "0.2.24",
         "description": "Request bodies are declared, not implied: where an operation accepts one, it is described here. An operation with no `requestBody` accepts none \u2014 a reviewed contract, not a gap in this document. The exception is an operation marked `x-whity-undocumented: true`: that one carries no authored contract at all, its summary and responses are generated defaults, and it may well take a body. Every CORE operation in the published `public/openapi.json` is authored, so the marker appears there only on plugin routes that declare no schema of their own; a document served live by a running instance may mark core routes too."
     },
     "servers": [
@@ -18133,6 +18133,208 @@
                 ]
             }
         },
+        "/api/v1/form-submissions/{id}/review": {
+            "get": {
+                "operationId": "get_api_v1_form_submissions_id_review",
+                "summary": "What the office recorded about a submission",
+                "tags": [
+                    "forms"
+                ],
+                "description": "The current review, every earlier one, and the staff fields they answer. The applicant has no route to this.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The review and its history",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/FormSubmissionReviewDetailResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Submission not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "operationId": "post_api_v1_form_submissions_id_review",
+                "summary": "Record the office's decision on a submission",
+                "tags": [
+                    "forms"
+                ],
+                "description": "Checked against the form's staff fields as a submission is checked against its own, and sent whole. Each save is a new row and the newest is current, so changing a decision leaves the old one readable. The submission itself is never changed. Works on a closed form. `meta.ignored_keys` names answers that matched no staff field.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/FormSubmissionCreateRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The recorded review",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/FormSubmissionReviewResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Submission not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "The form has no staff fields, or an answer failed validation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/forms": {
             "get": {
                 "operationId": "get_api_v1_forms",
@@ -19784,7 +19986,7 @@
                 "tags": [
                     "forms"
                 ],
-                "description": "MULTIPART, one part named `file`. Returns the `reference` a `file` answer carries, plus the filename, the SNIFFED content type, the byte size and the server's SHA-256 of what it stored. Gated `forms:submit` \u2014 the same permission as the submit itself, because uploading is half of answering. ACCEPTS application/pdf, image/png and image/jpeg ONLY, decided by the LEADING BYTES: a declared Content-Type that contradicts the bytes is a 422, and a declared type is never what gets stored. Office formats are absent on purpose \u2014 a .docx is indistinguishable from any other ZIP by magic bytes. MAXIMUM 10 MiB. REFUSED (422) on a form that is not accepting submissions, and on a form with no `file` field \u2014 so a broad permission cannot be aimed at arbitrary form ids as a way into a tenant's storage. THROTTLED to 20 uploads per caller per hour. THE UPLOAD IS SINGLE-USE and expires: it is spent by the first submission that names it, and anything never submitted is deleted by the `form-uploads:sweep` retention job (24 h by default).",
+                "description": "MULTIPART, one part named `file`. Returns the `reference` a `file` answer carries, plus the filename, the SNIFFED content type, the byte size and the server's SHA-256 of what it stored. Gated `forms:submit` \u2014 the same permission as the submit itself, because uploading is half of answering. ACCEPTS application/pdf, image/png, image/jpeg and Word (.docx) ONLY, decided by the BYTES: a declared Content-Type that contradicts them is a 422, and a declared type is never what gets stored. A .docx is checked by reading the archive's index without unpacking it, and a macro-enabled one is refused; legacy .doc and other office formats are refused. MAXIMUM 10 MiB. REFUSED (422) on a form that is not accepting submissions, and on a form with no `file` field \u2014 so a broad permission cannot be aimed at arbitrary form ids as a way into a tenant's storage. THROTTLED to 20 uploads per caller per hour. THE UPLOAD IS SINGLE-USE and expires: it is spent by the first submission that names it, and anything never submitted is deleted by the `form-uploads:sweep` retention job (24 h by default).",
                 "parameters": [
                     {
                         "name": "id",
@@ -23994,6 +24196,176 @@
                     },
                     "405": {
                         "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/me/display-preferences": {
+            "get": {
+                "operationId": "get_api_v1_me_display_preferences",
+                "summary": "The caller's text size and Show technical details",
+                "tags": [
+                    "profile"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The caller's display preferences",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DisplayPreferencesResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "put": {
+                "operationId": "put_api_v1_me_display_preferences",
+                "summary": "Change the caller's text size, Show technical details, or both",
+                "tags": [
+                    "profile"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DisplayPreferencesUpdateRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The caller's updated display preferences",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DisplayPreferencesResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Nothing to change, or a value that isn't allowed",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -33271,7 +33643,7 @@
                         }
                     },
                     "422": {
-                        "description": "An answer failed validation, or the form is outside its submission window",
+                        "description": "An answer failed validation, or the form is outside its submission window. A refused answer carries `details.reason`, `details.field_key` and sometimes `details.params`, so a page can word it in the reader's language.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -47763,6 +48135,51 @@
                     "rejected"
                 ]
             },
+            "DisplayPreferences": {
+                "type": "object",
+                "properties": {
+                    "textSize": {
+                        "type": "string",
+                        "enum": [
+                            "standard",
+                            "larger"
+                        ]
+                    },
+                    "showTechnicalDetails": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "textSize",
+                    "showTechnicalDetails"
+                ]
+            },
+            "DisplayPreferencesResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/DisplayPreferences"
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "DisplayPreferencesUpdateRequest": {
+                "type": "object",
+                "properties": {
+                    "textSize": {
+                        "type": "string",
+                        "enum": [
+                            "standard",
+                            "larger"
+                        ]
+                    },
+                    "showTechnicalDetails": {
+                        "type": "boolean"
+                    }
+                }
+            },
             "Document": {
                 "type": "object",
                 "properties": {
@@ -51651,6 +52068,41 @@
                         "type": "string",
                         "nullable": true
                     },
+                    "description_i18n": {
+                        "type": "object",
+                        "x-whity-localized-text": true,
+                        "properties": {
+                            "ar": {
+                                "type": "string"
+                            },
+                            "en": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "submit_label": {
+                        "type": "object",
+                        "x-whity-localized-text": true,
+                        "properties": {
+                            "ar": {
+                                "type": "string"
+                            },
+                            "en": {
+                                "type": "string"
+                            }
+                        },
+                        "nullable": true
+                    },
+                    "reference_format": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "sections": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/FormSectionText"
+                        }
+                    },
                     "status": {
                         "type": "string",
                         "enum": [
@@ -51795,9 +52247,7 @@
                         "description": "Form name as `{\"en\": ..., \"ar\": ...}`; a plain string is read as English."
                     },
                     "description": {
-                        "type": "string",
-                        "maxLength": 10000,
-                        "description": "What the form is for."
+                        "description": "What the form is for: text, or `{\"en\": ..., \"ar\": ...}`."
                     },
                     "route_template_id": {
                         "type": "integer",
@@ -51891,6 +52341,18 @@
                         "type": "string",
                         "nullable": true
                     },
+                    "help_text_i18n": {
+                        "type": "object",
+                        "x-whity-localized-text": true,
+                        "properties": {
+                            "ar": {
+                                "type": "string"
+                            },
+                            "en": {
+                                "type": "string"
+                            }
+                        }
+                    },
                     "is_required": {
                         "type": "boolean"
                     },
@@ -51917,6 +52379,16 @@
                     "position": {
                         "type": "integer"
                     },
+                    "visible_when": {
+                        "$ref": "#/components/schemas/FormFieldCondition"
+                    },
+                    "audience": {
+                        "type": "string",
+                        "enum": [
+                            "applicant",
+                            "staff"
+                        ]
+                    },
                     "multi_valued": {
                         "type": "boolean"
                     },
@@ -51937,6 +52409,29 @@
                     "is_required",
                     "position"
                 ]
+            },
+            "FormFieldCondition": {
+                "type": "object",
+                "nullable": true,
+                "properties": {
+                    "field": {
+                        "type": "string"
+                    },
+                    "equals": {
+                        "description": "Text, a number, or true or false, compared with the answer."
+                    },
+                    "in": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "maxItems": 100
+                    }
+                },
+                "required": [
+                    "field"
+                ],
+                "additionalProperties": false
             },
             "FormFieldCreateRequest": {
                 "type": "object",
@@ -51978,9 +52473,7 @@
                         "description": "Field label as `{\"en\": ..., \"ar\": ...}`; a plain string is read as English."
                     },
                     "help_text": {
-                        "type": "string",
-                        "maxLength": 10000,
-                        "description": "Hint shown under the field."
+                        "description": "Hint shown under the field: text, or `{\"en\": ..., \"ar\": ...}`."
                     },
                     "is_required": {
                         "type": "boolean",
@@ -52006,6 +52499,18 @@
                         "type": "string",
                         "maxLength": 255,
                         "description": "Section to group the field under; fields sharing a key form one section."
+                    },
+                    "visible_when": {
+                        "$ref": "#/components/schemas/FormFieldCondition",
+                        "description": "Show this question only when another answer matches; null means always."
+                    },
+                    "audience": {
+                        "type": "string",
+                        "enum": [
+                            "applicant",
+                            "staff"
+                        ],
+                        "description": "Who answers it. A staff field is never shown to the applicant; the office answers it when recording a review."
                     },
                     "position": {
                         "type": "integer",
@@ -52120,9 +52625,7 @@
                         "description": "New label as `{\"en\": ..., \"ar\": ...}`; a plain string is read as English."
                     },
                     "help_text": {
-                        "type": "string",
-                        "maxLength": 10000,
-                        "description": "New hint shown under the field."
+                        "description": "New hint: text, or `{\"en\": ..., \"ar\": ...}`. Plain text sets the English and keeps the Arabic."
                     },
                     "is_required": {
                         "type": "boolean",
@@ -52149,6 +52652,18 @@
                         "maxLength": 255,
                         "description": "Section to group the field under."
                     },
+                    "visible_when": {
+                        "$ref": "#/components/schemas/FormFieldCondition",
+                        "description": "Show this question only when another answer matches; null means always."
+                    },
+                    "audience": {
+                        "type": "string",
+                        "enum": [
+                            "applicant",
+                            "staff"
+                        ],
+                        "description": "Who answers it. A staff field is never shown to the applicant."
+                    },
                     "position": {
                         "type": "integer",
                         "description": "New position in the form."
@@ -52171,6 +52686,10 @@
                     "pattern": {
                         "type": "string",
                         "maxLength": 512
+                    },
+                    "maxFiles": {
+                        "type": "integer",
+                        "description": "How many files a file question takes, 1 to 20. Above 1 the answer is a list."
                     }
                 }
             },
@@ -52314,6 +52833,32 @@
                         "items": {
                             "type": "string"
                         }
+                    },
+                    "title": {
+                        "type": "object",
+                        "x-whity-localized-text": true,
+                        "properties": {
+                            "ar": {
+                                "type": "string"
+                            },
+                            "en": {
+                                "type": "string"
+                            }
+                        },
+                        "nullable": true
+                    },
+                    "description": {
+                        "type": "object",
+                        "x-whity-localized-text": true,
+                        "properties": {
+                            "ar": {
+                                "type": "string"
+                            },
+                            "en": {
+                                "type": "string"
+                            }
+                        },
+                        "nullable": true
                     }
                 },
                 "required": [
@@ -52321,11 +52866,50 @@
                     "field_keys"
                 ]
             },
+            "FormSectionText": {
+                "type": "object",
+                "properties": {
+                    "key": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "object",
+                        "x-whity-localized-text": true,
+                        "properties": {
+                            "ar": {
+                                "type": "string"
+                            },
+                            "en": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "description": {
+                        "type": "object",
+                        "x-whity-localized-text": true,
+                        "properties": {
+                            "ar": {
+                                "type": "string"
+                            },
+                            "en": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "required": [
+                    "key"
+                ]
+            },
             "FormSubmission": {
                 "type": "object",
                 "properties": {
                     "id": {
                         "type": "integer"
+                    },
+                    "reference": {
+                        "type": "string",
+                        "nullable": true
                     },
                     "tenant_id": {
                         "type": "integer"
@@ -52466,6 +53050,90 @@
                     "data"
                 ]
             },
+            "FormSubmissionReview": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "submission_id": {
+                        "type": "integer"
+                    },
+                    "data": {
+                        "type": "object",
+                        "additionalProperties": true
+                    },
+                    "recorded_by_profile_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "recorded_at": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "submission_id",
+                    "data",
+                    "recorded_at"
+                ]
+            },
+            "FormSubmissionReviewDetailResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "current": {
+                                "$ref": "#/components/schemas/FormSubmissionReview",
+                                "nullable": true
+                            },
+                            "history": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/FormSubmissionReview"
+                                }
+                            },
+                            "fields": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/FormField"
+                                }
+                            }
+                        },
+                        "required": [
+                            "current",
+                            "history",
+                            "fields"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "FormSubmissionReviewResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/FormSubmissionReview"
+                    },
+                    "meta": {
+                        "type": "object",
+                        "properties": {
+                            "ignored_keys": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
             "FormUpdateRequest": {
                 "type": "object",
                 "properties": {
@@ -52483,14 +53151,40 @@
                         "description": "New name as `{\"en\": ..., \"ar\": ...}`; a plain string is read as English."
                     },
                     "description": {
-                        "type": "string",
-                        "maxLength": 10000,
-                        "description": "New description."
+                        "description": "New description: text, or `{\"en\": ..., \"ar\": ...}`. Plain text sets the English and keeps the Arabic."
                     },
                     "route_template_id": {
                         "type": "integer",
                         "nullable": true,
                         "description": "Route template for approving submissions; null removes it."
+                    },
+                    "submit_label": {
+                        "type": "object",
+                        "x-whity-localized-text": true,
+                        "properties": {
+                            "ar": {
+                                "type": "string"
+                            },
+                            "en": {
+                                "type": "string"
+                            }
+                        },
+                        "nullable": true,
+                        "description": "What the submit button says; null for the default wording."
+                    },
+                    "sections": {
+                        "type": "array",
+                        "maxItems": 100,
+                        "items": {
+                            "$ref": "#/components/schemas/FormSectionText"
+                        },
+                        "description": "The title and description of each section, by `section_key`."
+                    },
+                    "reference_format": {
+                        "type": "string",
+                        "maxLength": 64,
+                        "nullable": true,
+                        "description": "The reference each new submission is given, e.g. `BAKE-{YYYY}-{SEQ:4}`. Tokens: {YYYY}, {YY}, {MM}, {SEQ}, {SEQ:n}. {SEQ} is required. Dates are UTC. Null gives none."
                     }
                 },
                 "minProperties": 1
@@ -57555,6 +58249,18 @@
                         "type": "string",
                         "nullable": true
                     },
+                    "help_text_i18n": {
+                        "type": "object",
+                        "x-whity-localized-text": true,
+                        "properties": {
+                            "ar": {
+                                "type": "string"
+                            },
+                            "en": {
+                                "type": "string"
+                            }
+                        }
+                    },
                     "is_required": {
                         "type": "boolean"
                     },
@@ -57575,6 +58281,9 @@
                     },
                     "position": {
                         "type": "integer"
+                    },
+                    "visible_when": {
+                        "$ref": "#/components/schemas/FormFieldCondition"
                     },
                     "multi_valued": {
                         "type": "boolean"
@@ -57611,6 +58320,31 @@
                             },
                             "description": {
                                 "type": "string",
+                                "nullable": true
+                            },
+                            "description_i18n": {
+                                "type": "object",
+                                "x-whity-localized-text": true,
+                                "properties": {
+                                    "ar": {
+                                        "type": "string"
+                                    },
+                                    "en": {
+                                        "type": "string"
+                                    }
+                                }
+                            },
+                            "submit_label": {
+                                "type": "object",
+                                "x-whity-localized-text": true,
+                                "properties": {
+                                    "ar": {
+                                        "type": "string"
+                                    },
+                                    "en": {
+                                        "type": "string"
+                                    }
+                                },
                                 "nullable": true
                             },
                             "fields": {
@@ -57660,6 +58394,10 @@
                                 "type": "boolean"
                             },
                             "submitted_at": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "reference": {
                                 "type": "string",
                                 "nullable": true
                             }

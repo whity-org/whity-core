@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whit
 import { TwoFactorSettings } from '@/components/TwoFactorSettings';
 import { SessionsSettings } from '@/components/SessionsSettings';
 import { DevicesSettings } from '@/components/DevicesSettings';
+import { DisplayPreferencesSettings } from '@/components/display-preferences-settings';
 import { EmailAddressesSettings } from '@/components/EmailAddressesSettings';
 import { LanguageSwitcher, useI18nEnabled, useTranslation } from '@whity/features/i18n';
 import { ProfileForm } from './profile-form';
@@ -44,6 +45,8 @@ export default function SettingsPage() {
           <ProfileForm />
         </CardContent>
       </Card>
+
+      <DisplayPreferencesSettings />
 
       {/* Language. This also sets the interface DIRECTION: each language
           carries its own 'ltr'/'rtl', so choosing Arabic mirrors the interface.

@@ -1,7 +1,7 @@
-<!-- @dsCard group="Document editor" height=720 width=1280 subtitle="Ask an agent, writing, a suggested section, a rewrite and an agent comment" -->
+<!-- @dsCard group="Document editor" height=768 width=1280 subtitle="Ask an agent, writing, a suggested section, a rewrite and an agent comment" -->
 <!doctype html>
 <html>
-<head><link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../bundle.css"><script src="../../preview-runtime/react.production.min.js"></script><script src="../../preview-runtime/react-dom.production.min.js"></script><script src="../bundle.js"></script><script>(function(){var t=(location.hash.match(/theme=(dark|light)/)||[])[1]||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',t);})();</script><style>body{margin:0;background:var(--background);color:var(--foreground);font-family:var(--font-sans);width:1280px;min-height:720px}</style><meta charset="utf-8"><title>Agents in the editor</title><style>html,body{height:100%} #root{height:100%} .cap{font-size:.75rem;color:var(--muted-foreground);margin:0 0 6px} #root{padding:24px;box-sizing:border-box;height:auto}</style></head>
+<head><link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../bundle.css"><script src="../../preview-runtime/react.production.min.js"></script><script src="../../preview-runtime/react-dom.production.min.js"></script><script src="../bundle.js"></script><script>(function(){var t=(location.hash.match(/theme=(dark|light)/)||[])[1]||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',t);})();</script><style>body{margin:0;background:var(--background);color:var(--foreground);font-family:var(--font-sans);width:1280px;min-height:768px}</style><meta charset="utf-8"><title>Agents in the editor</title><style>html,body{height:100%} #root{height:100%} .cap{font-size:.75rem;color:var(--muted-foreground);margin:0 0 6px} #root{padding:24px;box-sizing:border-box;height:auto}</style></head>
 <body>
 <div id="root"></div>
 <script>
@@ -77,7 +77,7 @@
         h('div', null, 'This date is typed in, so every letter will say 14 October. Use the ', mf('Due date', ''), ' field instead?'),
         h('div', { className: 'wy-rc__foot', style: { justifyContent: 'flex-start' } }, h(W.Button, { variant: 'outline', size: 'sm' }, 'Suggest the fix'), h(W.Button, { variant: 'ghost', size: 'sm' }, 'Dismiss'))),
       cap('Where agents are named', '24px 0 10px'),
-      h('ul', { style: { margin: 0, paddingInlineStart: 18, fontSize: 14, lineHeight: 1.6, color: 'var(--muted-foreground)' } },
+      h('ul', { style: { margin: 0, paddingInlineStart: 18, fontSize: 15, lineHeight: 1.6, color: 'var(--muted-foreground)' } },
         h('li', null, 'Every suggestion and comment: the actor chip, the person it acts for, the permission it used.'),
         h('li', null, 'The document history and the audit log: “Billing assistant for Rana suggested 2 blocks”.'),
         h('li', null, 'A printed document an agent made or sent says so in its footer (stage 6).')))));

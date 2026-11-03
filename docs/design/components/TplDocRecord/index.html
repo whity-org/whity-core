@@ -1,0 +1,45 @@
+<!-- @dsCard group="Templates · Documents and routing" height=1085 width=1280 subtitle="D.3: a document’s page: the document itself, with its facts and versions beside it" -->
+<!doctype html>
+<html>
+<head><link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../bundle.css"><script src="../../preview-runtime/react.production.min.js"></script><script src="../../preview-runtime/react-dom.production.min.js"></script><script src="../bundle.js"></script><script>(function(){var t=(location.hash.match(/theme=(dark|light)/)||[])[1]||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',t);})();</script><style>body{margin:0;background:var(--background);color:var(--foreground);font-family:var(--font-sans);width:1280px;min-height:1085px}</style><meta charset="utf-8"><title>Document record</title><style>html,body{height:100%} #root{min-height:100%} </style></head>
+<body>
+<div id="root"></div>
+<script>
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 16 }); }
+  var NAVL = {};
+  function L(s) { return NAVL[s] || s; }
+  /* The sidebar as built (inventory, 1 Nov 2026), in sentence case; only the current group is open (2.5). */
+  var GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['approval', 'Approvals', 3], ['form', 'My submissions']]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations'], ['user', 'Family relations'], ['two-step', 'Approval gating']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['routing', 'Route templates'], ['page', 'Notes and wiki'], ['form', 'Form builder'], ['list-todo', 'Forms']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]],
+    ['Platform', [['tenant', 'Tenants'], ['money', 'Plans and pricing'], ['receipt', 'Promotions'], ['chart', 'System'], ['error', 'Errors'], ['notification', 'Notification delivery']]]];
+  function appNav(active, o) { o = o || {};
+    return GROUPS.filter(function (g) { return g[0] !== 'Platform' || o.operator; }).map(function (g) {
+      var has = g[1].some(function (x) { return x[1] === active; });
+      return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
+  var topBar = h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' }));
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: o.tenant || 'Example Bakery', user: o.user || 'Rana Haddad', role: o.role || 'Owner', nav: appNav(active, o), topActions: topBar, searchLabel: o.search, dir: o.dir }, kids); }
+  function person(name, sub, o) { o = o || {}; return h('div', { className: 'wy-person' }, h(W.Avatar, { name: name, size: o.size || 28, kind: o.kind }), h('div', { style: { minWidth: 0 } }, h('b', null, name), sub ? h('small', null, sub) : null)); }
+  function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
+  function recHead(o) { return h('div', { className: 'wy-rech' }, o.avatar || h('span', { className: 'wy-rech__ic', 'aria-hidden': 'true' }, I(o.icon || 'document', 26)),
+      h('div', { style: { minWidth: 0 } }, h('h1', null, o.title, o.badges || null), h('div', { className: 'wy-rech__facts' }, (o.facts || []).map(function (f, i) { return h('span', { key: i }, f[0] ? I(f[0], 14) : null, f[1]); }))),
+      h('div', { className: 'wy-rech__acts' }, o.actions || null)); }
+  function saveBar(text, L2) { L2 = L2 || {}; return h('div', { className: 'wy-savebar', role: 'region', 'aria-label': L2.label || 'Unsaved changes' }, I('edit'), h('span', null, text), h(W.Button, { variant: 'ghost' }, L2.discard || 'Discard'), h(W.Button, null, L2.save || 'Save changes')); }
+  var PO = h(W.Doc, {"lead": "en", "title": {"en": "Purchase order", "ar": "أمر شراء"}, "number": "PO-0057", "date": "24 Oct 2026", "tenant": {"name": {"en": "Example Bakery", "ar": "مخبز المثال"}, "initial": "E", "lines": {"en": ["[Street], Amman, Jordan", "Tax no. [000000000] · CR [00000]", "+962 6 000 0000 · hello@example.jo"], "ar": ["[الشارع]، عمّان، الأردن", "الرقم الضريبي [000000000] · سجل تجاري [00000]", "+962 6 000 0000 · hello@example.jo"]}}, "parties": [{"label": {"en": "Supplier", "ar": "المورِّد"}, "value": "Example Mills", "lines": ["[Address], Zarqa", "Tax no. [000000000]"]}, {"label": {"en": "Deliver to", "ar": "التسليم إلى"}, "value": "Example Bakery", "lines": ["[Street], Amman", "Back door, before 08:00"]}, {"label": {"en": "Deliver by", "ar": "التسليم قبل"}, "value": "27 Oct 2026", "lines": ["Payment 30 days after invoice"]}], "columns": [{"key": "desc", "label": "desc"}, {"key": "qty", "label": "qty", "align": "end", "width": "14mm"}, {"key": "unit", "label": "unit", "type": "money", "width": "26mm"}, {"key": "amt", "label": "amount", "type": "money", "width": "28mm"}], "rows": [{"desc": {"en": "Flour, type 1 (50 kg bag)", "ar": "طحين نوع أول (كيس 50 كغ)"}, "qty": 20, "unit": 18.5, "amt": 370.0}, {"desc": {"en": "Butter, unsalted (10 kg)", "ar": "زبدة غير مملحة (10 كغ)"}, "qty": 6, "unit": 42, "amt": 252}, {"desc": {"en": "Sugar (50 kg bag)", "ar": "سكر (كيس 50 كغ)"}, "qty": 4, "unit": 31, "amt": 124}, {"desc": {"en": "Pistachio, ground (1 kg)", "ar": "فستق حلبي مطحون (1 كغ)"}, "qty": 10, "unit": 14.75, "amt": 147.5}, {"desc": {"en": "Date paste (5 kg)", "ar": "عجوة (5 كغ)"}, "qty": 8, "unit": 9.5, "amt": 76.0}], "totals": [{"label": "subtotal", "value": 969.5}, {"label": "tax16", "value": 155.12}], "grand": {"label": "total", "value": 1124.62}, "footNote": "Raised by Omar Saleh; approved by Rana Haddad in Whity on 24 Oct 2026."}, h(W.DocNote, { lead: 'en', label: 'termsBlock' }, ["Quote PO-0057 on your delivery note and invoice.", "Tell us by 25 Oct if you can't deliver the full quantity.", "We check quantities and best-before dates on delivery."].map(function (t, i) { return h('p', { key: i }, t); })), h(W.DocSign, { lead: 'en', fields: [{ l: {"en": "Approved by", "ar": "اعتمده"}, value: 'Rana Haddad' }, 'signature', 'date'] }));
+  function docHead(T, tab) { return h(F, null, h(W.Breadcrumb, { items: [{ label: T.lib }, { label: 'PO-0142' }] }),
+    recHead({ icon: 'document', title: T.title, badges: h(W.Badge, { variant: 'warning' }, T.waiting), facts: [['user', T.raised], ['calendar', T.issued], ['routing', T.stage], ['qr', T.code]],
+      actions: h(F, null, h(W.Button, { variant: 'outline', icon: 'download' }, T.pdf), h(W.Button, { variant: 'outline', icon: 'print' }, T.print), h(W.Menu, { label: T.more, items: [{ icon: 'form', label: T.coll }, { icon: 'lock', label: T.withdraw, danger: true }] })) }),
+    h('div', { className: 'wy-rectabs' }, h(W.Tabs, { items: [{ value: 'd', label: T.tDoc }, { value: 'r', label: T.tRoute, count: 1 }, { value: 'h', label: T.tHist }, { value: 'v', label: T.tVer }], defaultValue: tab }))); }
+
+  ReactDOM.createRoot(document.getElementById('root')).render(shell('Library', h(F, null, docHead({ lib: 'Library', title: 'Purchase order PO-0142', waiting: 'Waiting for your decision', raised: 'Raised by Omar Khalil', issued: 'Issued yesterday, 16:20', stage: 'Stage 2 of 3: Owner approval', code: 'Verification code active', pdf: 'Download PDF', print: 'Print', more: 'More', coll: 'Add to collection', withdraw: 'Withdraw this document', tDoc: 'Document', tRoute: 'Routing', tHist: 'History', tVer: 'Verification' }, 'd'),
+    h('div', { className: 'wy-docrec' }, h(W.DocPreview, { title: 'PO-0142 · version 1', meta: 'Example Mills · JOD 1,240.000', height: 640, zoom: 0.62, onSend: false }, PO),
+      h('div', { style: { display: 'grid', gap: 16 } },
+        h(W.Card, { title: 'About this document' }, h(W.DescriptionList, { items: [{ label: 'Template', value: 'Purchase order' }, { label: 'Supplier', value: 'Example Mills' }, { label: 'Amount', value: 'JOD 1,240.000' }, { label: 'Raised from', value: 'Stock › Reorder list' }, { label: 'Unit', value: 'Sweifieh' }] })),
+        h(W.Card, { title: 'Versions', description: 'Each issue is kept; the newest is current.' }, h('div', { style: { display: 'grid', gap: 8, fontSize: 14 } }, h('div', { className: 'wy-person' }, h(W.Badge, { variant: 'success' }, 'Current'), h('span', null, 'Version 1 · yesterday, 16:20')))))))));
+</script>
+</body>
+</html>

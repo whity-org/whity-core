@@ -1177,12 +1177,31 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'requiredRole' => 'admin',
     ];
     $items[] = [
+        // WHIT-820: every member may use an agent for themselves, so this is
+        // ungated, like the routes behind it (GET /api/me/agents).
+        'id' => 'my-agents',
+        'label' => 'My agents',
+        'href' => '/admin/my-agents',
+        'icon' => 'robot',
+        'group' => 'ai',
+        'order' => 1,
+    ];
+    $items[] = [
+        'id' => 'agents',
+        'label' => 'Agents',
+        'href' => '/admin/agents',
+        'icon' => 'robot',
+        'group' => 'ai',
+        'order' => 2,
+        'requiredPermission' => \Whity\Core\RBAC\CorePermissions::AGENTS_MANAGE,
+    ];
+    $items[] = [
         'id' => 'ai-principals',
         'label' => 'AI Principals',
         'href' => '/admin/ai-principals',
         'icon' => 'robot',
         'group' => 'ai',
-        'order' => 1,
+        'order' => 3,
         // WC-0208ce4d: mirrors GET /api/v1/admin/mcp/tokens, gated on the
         // mcp:tokens:manage permission. Nav item carries the same requirement so
         // permission-aware clients can hide it; the page enforces it server-side.
@@ -1194,7 +1213,7 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'href' => '/admin/mcp-tools',
         'icon' => 'tools',
         'group' => 'ai',
-        'order' => 2,
+        'order' => 4,
         // WC-0208ce4d: read-only view of MCP tools available in this tenant.
         // Gated on mcp:tokens:manage so only admins who manage AI credentials
         // can see which tools those credentials expose.
@@ -3845,28 +3864,39 @@ $formUploadsHandler = new \Whity\Api\FormUploadsApiHandler(
 );
 $router->register('POST', '/api/forms/{id:\d+}/uploads', [$formUploadsHandler, 'upload'], null, null, CorePermissions::FORMS_SUBMIT);
 
+$submissionIssuer = new \Whity\Core\Form\SubmissionIssuer(
+    $db->getPdo(),
+    $formSubmissionRepository,
+    $documentIssuer,
+    $routeTemplateRepository,
+    $documentRouter,
+    // The two collaborators that turn a `file` answer into evidence: the
+    // upload repository CLAIMS the staged upload (the check that stops a key
+    // from another tenant becoming an artifact on this one), and the artifact
+    // repository records the row that makes the bytes reachable through the
+    // ordinary document-artifact download route.
+    $formUploadRepository,
+    $documentArtifactRepository
+);
 $formSubmissionsHandler = new \Whity\Api\FormSubmissionsApiHandler(
     $formRepository,
     $formFieldRepository,
     $formSubmissionRepository,
-    new \Whity\Core\Form\SubmissionIssuer(
-        $db->getPdo(),
-        $formSubmissionRepository,
-        $documentIssuer,
-        $routeTemplateRepository,
-        $documentRouter,
-        // The two collaborators that turn a `file` answer into evidence: the
-        // upload repository CLAIMS the staged upload (the check that stops a key
-        // from another tenant becoming an artifact on this one), and the artifact
-        // repository records the row that makes the bytes reachable through the
-        // ordinary document-artifact download route.
-        $formUploadRepository,
-        $documentArtifactRepository
-    )
+    $submissionIssuer
+);
+$formSubmissionReviewsHandler = new \Whity\Api\FormSubmissionReviewsApiHandler(
+    $formFieldRepository,
+    $formSubmissionRepository,
+    new \Whity\Core\Form\FormSubmissionReviewRepository($db->getPdo()),
+    $submissionIssuer
 );
 $router->register('POST', '/api/forms/{id:\d+}/submissions', [$formSubmissionsHandler, 'submit'], null, null, CorePermissions::FORMS_SUBMIT);
 $router->register('GET', '/api/form-submissions', [$formSubmissionsHandler, 'list'], null, null, CorePermissions::FORMS_READ);
 $router->register('GET', '/api/form-submissions/{id:\d+}', [$formSubmissionsHandler, 'show'], null, null, CorePermissions::FORMS_READ);
+// The office's record on a submission (migration 194). Somebody who can read a
+// submission can read what became of it; recording takes `forms:review`.
+$router->register('GET', '/api/form-submissions/{id:\d+}/review', [$formSubmissionReviewsHandler, 'show'], null, null, CorePermissions::FORMS_READ);
+$router->register('POST', '/api/form-submissions/{id:\d+}/review', [$formSubmissionReviewsHandler, 'record'], null, null, CorePermissions::FORMS_REVIEW);
 // Only ever the caller's own rows — the ROUTE decides whose, not a query param,
 // so no client can widen it. `forms:submit` rather than `forms:read`: the rows
 // already name exactly one person, so a tenant-wide permission has nothing left
@@ -4421,6 +4451,12 @@ $notificationPreferencesHandler = new \Whity\Api\NotificationPreferencesApiHandl
 $router->register('GET', '/api/me/notification-preferences', [$notificationPreferencesHandler, 'list'],   null);
 $router->register('PUT', '/api/me/notification-preferences', [$notificationPreferencesHandler, 'update'], null);
 
+// A person's text size and Show technical details (design decisions W.3, A.3).
+// Self-scoped, session-gated, no RBAC permission.
+$displayPreferencesHandler = new \Whity\Api\DisplayPreferencesApiHandler($tokenValidator, $db->getPdo());
+$router->register('GET', '/api/me/display-preferences', [$displayPreferencesHandler, 'get'], null);
+$router->register('PUT', '/api/me/display-preferences', [$displayPreferencesHandler, 'update'], null);
+
 // Per-tenant notification SENDER configuration (WC-notifications, d70c6083). A
 // tenant admin manages their OWN tenant's per-channel sender (from/reply-to,
 // transport, encrypted creds). settings:manage gated; creds are write-only.
@@ -4915,6 +4951,14 @@ $mcpDiscovery = new DiscoveryTools(
             $tenantId,
             new \Whity\Core\Agent\AgentRepository($mcpBriefingPdo),
         ),
+        // WHIT-824: a person's own connection names the agents they granted.
+        static function (int $profileId, int $tenantId) use ($agentAssignments, $mcpBriefingPdo): array {
+            $mine = $agentAssignments->activeForPerson($profileId, $tenantId);
+            return $mine === [] ? [] : array_values(array_filter(
+                (new \Whity\Core\Agent\AgentRepository($mcpBriefingPdo))->list($tenantId),
+                static fn (array $agent): bool => isset($mine[$agent['id']]),
+            ));
+        },
     ),
     // WHIT-754: a plugin's always-on tool is listed only once this workspace's
     // admin turned it on (the mcp.always_on_plugin_tools setting).

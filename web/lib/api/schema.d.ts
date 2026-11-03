@@ -2687,6 +2687,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/form-submissions/{id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What the office recorded about a submission
+         * @description The current review, every earlier one, and the staff fields they answer. The applicant has no route to this.
+         */
+        get: operations["get_api_v1_form_submissions_id_review"];
+        put?: never;
+        /**
+         * Record the office's decision on a submission
+         * @description Checked against the form's staff fields as a submission is checked against its own, and sent whole. Each save is a new row and the newest is current, so changing a decision leaves the old one readable. The submission itself is never changed. Works on a closed form. `meta.ignored_keys` names answers that matched no staff field.
+         */
+        post: operations["post_api_v1_form_submissions_id_review"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/forms": {
         parameters: {
             query?: never;
@@ -2902,7 +2926,7 @@ export interface paths {
         put?: never;
         /**
          * Attach a file to a form you are filling in
-         * @description MULTIPART, one part named `file`. Returns the `reference` a `file` answer carries, plus the filename, the SNIFFED content type, the byte size and the server's SHA-256 of what it stored. Gated `forms:submit` — the same permission as the submit itself, because uploading is half of answering. ACCEPTS application/pdf, image/png and image/jpeg ONLY, decided by the LEADING BYTES: a declared Content-Type that contradicts the bytes is a 422, and a declared type is never what gets stored. Office formats are absent on purpose — a .docx is indistinguishable from any other ZIP by magic bytes. MAXIMUM 10 MiB. REFUSED (422) on a form that is not accepting submissions, and on a form with no `file` field — so a broad permission cannot be aimed at arbitrary form ids as a way into a tenant's storage. THROTTLED to 20 uploads per caller per hour. THE UPLOAD IS SINGLE-USE and expires: it is spent by the first submission that names it, and anything never submitted is deleted by the `form-uploads:sweep` retention job (24 h by default).
+         * @description MULTIPART, one part named `file`. Returns the `reference` a `file` answer carries, plus the filename, the SNIFFED content type, the byte size and the server's SHA-256 of what it stored. Gated `forms:submit` — the same permission as the submit itself, because uploading is half of answering. ACCEPTS application/pdf, image/png, image/jpeg and Word (.docx) ONLY, decided by the BYTES: a declared Content-Type that contradicts them is a 422, and a declared type is never what gets stored. A .docx is checked by reading the archive's index without unpacking it, and a macro-enabled one is refused; legacy .doc and other office formats are refused. MAXIMUM 10 MiB. REFUSED (422) on a form that is not accepting submissions, and on a form with no `file` field — so a broad permission cannot be aimed at arbitrary form ids as a way into a tenant's storage. THROTTLED to 20 uploads per caller per hour. THE UPLOAD IS SINGLE-USE and expires: it is spent by the first submission that names it, and anything never submitted is deleted by the `form-uploads:sweep` retention job (24 h by default).
          */
         post: operations["post_api_v1_forms_id_uploads"];
         delete?: never;
@@ -3509,6 +3533,24 @@ export interface paths {
         /** List the caller's effective permission slugs */
         get: operations["get_api_v1_me_capabilities"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/display-preferences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The caller's text size and Show technical details */
+        get: operations["get_api_v1_me_display_preferences"];
+        /** Change the caller's text size, Show technical details, or both */
+        put: operations["put_api_v1_me_display_preferences"];
         post?: never;
         delete?: never;
         options?: never;
@@ -7242,6 +7284,19 @@ export interface components {
                 reason: string;
             }[];
         };
+        DisplayPreferences: {
+            /** @enum {string} */
+            textSize: "standard" | "larger";
+            showTechnicalDetails: boolean;
+        };
+        DisplayPreferencesResponse: {
+            data: components["schemas"]["DisplayPreferences"];
+        };
+        DisplayPreferencesUpdateRequest: {
+            /** @enum {string} */
+            textSize?: "standard" | "larger";
+            showTechnicalDetails?: boolean;
+        };
         Document: {
             id: number;
             tenant_id: number;
@@ -8418,6 +8473,16 @@ export interface components {
                 en?: string;
             };
             description?: string | null;
+            description_i18n?: {
+                ar?: string;
+                en?: string;
+            };
+            submit_label?: {
+                ar?: string;
+                en?: string;
+            } | null;
+            reference_format?: string | null;
+            sections?: components["schemas"]["FormSectionText"][];
             /** @enum {string} */
             status: "draft" | "published" | "archived";
             version: number;
@@ -8453,8 +8518,8 @@ export interface components {
                 ar?: string;
                 en?: string;
             };
-            /** @description What the form is for. */
-            description?: string;
+            /** @description What the form is for: text, or `{"en": ..., "ar": ...}`. */
+            description?: unknown;
             /** @description Route template that circulates each submission for approval (see GET /api/document-route-templates); null for none. */
             route_template_id?: number | null;
         };
@@ -8477,6 +8542,10 @@ export interface components {
                 en?: string;
             };
             help_text?: string | null;
+            help_text_i18n?: {
+                ar?: string;
+                en?: string;
+            };
             is_required: boolean;
             options?: components["schemas"]["FormFieldOption"][];
             validation?: components["schemas"]["FormFieldValidation"];
@@ -8484,10 +8553,19 @@ export interface components {
             prefill_backed?: boolean;
             section_key?: string | null;
             position: number;
+            visible_when?: components["schemas"]["FormFieldCondition"];
+            /** @enum {string} */
+            audience?: "applicant" | "staff";
             multi_valued?: boolean;
             created_at?: string;
             updated_at?: string;
         };
+        FormFieldCondition: {
+            field: string;
+            /** @description Text, a number, or true or false, compared with the answer. */
+            equals?: unknown;
+            in?: string[];
+        } | null;
         FormFieldCreateRequest: {
             /** @description Permanent key the answers are stored under: a lower-case letter, then letters, digits or `_`. */
             field_key: string;
@@ -8501,8 +8579,8 @@ export interface components {
                 ar?: string;
                 en?: string;
             };
-            /** @description Hint shown under the field. */
-            help_text?: string;
+            /** @description Hint shown under the field: text, or `{"en": ..., "ar": ...}`. */
+            help_text?: unknown;
             /** @description Whether a submission must answer this field. */
             is_required?: boolean;
             /** @description Choices for select and multiselect fields. */
@@ -8513,6 +8591,13 @@ export interface components {
             prefill_source?: string | null;
             /** @description Section to group the field under; fields sharing a key form one section. */
             section_key?: string;
+            /** @description Show this question only when another answer matches; null means always. */
+            visible_when?: components["schemas"]["FormFieldCondition"];
+            /**
+             * @description Who answers it. A staff field is never shown to the applicant; the office answers it when recording a review.
+             * @enum {string}
+             */
+            audience?: "applicant" | "staff";
             /** @description Position in the form; omitted appends it at the end. */
             position?: number;
         };
@@ -8545,8 +8630,8 @@ export interface components {
                 ar?: string;
                 en?: string;
             };
-            /** @description New hint shown under the field. */
-            help_text?: string;
+            /** @description New hint: text, or `{"en": ..., "ar": ...}`. Plain text sets the English and keeps the Arabic. */
+            help_text?: unknown;
             /** @description Whether a submission must answer this field. */
             is_required?: boolean;
             /** @description Replacement choices for select and multiselect fields. */
@@ -8557,6 +8642,13 @@ export interface components {
             prefill_source?: string | null;
             /** @description Section to group the field under. */
             section_key?: string;
+            /** @description Show this question only when another answer matches; null means always. */
+            visible_when?: components["schemas"]["FormFieldCondition"];
+            /**
+             * @description Who answers it. A staff field is never shown to the applicant.
+             * @enum {string}
+             */
+            audience?: "applicant" | "staff";
             /** @description New position in the form. */
             position?: number;
         };
@@ -8565,6 +8657,8 @@ export interface components {
             max?: number;
             maxLength?: number;
             pattern?: string;
+            /** @description How many files a file question takes, 1 to 20. Above 1 the answer is a list. */
+            maxFiles?: number;
         };
         FormListResponse: {
             data: components["schemas"]["Form"][];
@@ -8603,9 +8697,29 @@ export interface components {
         FormSection: {
             key: string | null;
             field_keys: string[];
+            title?: {
+                ar?: string;
+                en?: string;
+            } | null;
+            description?: {
+                ar?: string;
+                en?: string;
+            } | null;
+        };
+        FormSectionText: {
+            key: string;
+            title?: {
+                ar?: string;
+                en?: string;
+            };
+            description?: {
+                ar?: string;
+                en?: string;
+            };
         };
         FormSubmission: {
             id: number;
+            reference?: string | null;
             tenant_id: number;
             form_id: number;
             form_version: number;
@@ -8644,16 +8758,47 @@ export interface components {
         FormSubmissionListResponse: {
             data: components["schemas"]["FormSubmission"][];
         };
+        FormSubmissionReview: {
+            id: number;
+            submission_id: number;
+            data: {
+                [key: string]: unknown;
+            };
+            recorded_by_profile_id?: number | null;
+            recorded_at: string;
+        };
+        FormSubmissionReviewDetailResponse: {
+            data: {
+                current: components["schemas"]["FormSubmissionReview"];
+                history: components["schemas"]["FormSubmissionReview"][];
+                fields: components["schemas"]["FormField"][];
+            };
+        };
+        FormSubmissionReviewResponse: {
+            data: components["schemas"]["FormSubmissionReview"];
+            meta?: {
+                ignored_keys?: string[];
+            };
+        };
         FormUpdateRequest: {
             /** @description New name as `{"en": ..., "ar": ...}`; a plain string is read as English. */
             name?: {
                 ar?: string;
                 en?: string;
             };
-            /** @description New description. */
-            description?: string;
+            /** @description New description: text, or `{"en": ..., "ar": ...}`. Plain text sets the English and keeps the Arabic. */
+            description?: unknown;
             /** @description Route template for approving submissions; null removes it. */
             route_template_id?: number | null;
+            /** @description What the submit button says; null for the default wording. */
+            submit_label?: {
+                ar?: string;
+                en?: string;
+            } | null;
+            /** @description The title and description of each section, by `section_key`. */
+            sections?: components["schemas"]["FormSectionText"][];
+            /** @description The reference each new submission is given, e.g. `BAKE-{YYYY}-{SEQ:4}`. Tokens: {YYYY}, {YY}, {MM}, {SEQ}, {SEQ:n}. {SEQ} is required. Dates are UTC. Null gives none. */
+            reference_format?: string | null;
         };
         FormUploadResponse: {
             data: {
@@ -9968,6 +10113,10 @@ export interface components {
                 en?: string;
             };
             help_text?: string | null;
+            help_text_i18n?: {
+                ar?: string;
+                en?: string;
+            };
             is_required: boolean;
             options?: {
                 [key: string]: unknown;
@@ -9977,6 +10126,7 @@ export interface components {
             };
             section_key?: string | null;
             position: number;
+            visible_when?: components["schemas"]["FormFieldCondition"];
             multi_valued?: boolean;
         };
         PublicFormResponse: {
@@ -9987,6 +10137,14 @@ export interface components {
                     en?: string;
                 };
                 description?: string | null;
+                description_i18n?: {
+                    ar?: string;
+                    en?: string;
+                };
+                submit_label?: {
+                    ar?: string;
+                    en?: string;
+                } | null;
                 fields: components["schemas"]["PublicFormField"][];
                 sections: components["schemas"]["FormSection"][];
                 accepts_submissions: boolean;
@@ -9998,6 +10156,7 @@ export interface components {
             data: {
                 received: boolean;
                 submitted_at?: string | null;
+                reference?: string | null;
             };
             meta?: {
                 routed: boolean;
@@ -25478,6 +25637,162 @@ export interface operations {
             };
         };
     };
+    get_api_v1_form_submissions_id_review: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The review and its history */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormSubmissionReviewDetailResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Submission not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_form_submissions_id_review: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FormSubmissionCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description The recorded review */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormSubmissionReviewResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Submission not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The form has no staff fields, or an answer failed validation */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     get_api_v1_forms: {
         parameters: {
             query?: {
@@ -30148,6 +30463,158 @@ export interface operations {
             };
             /** @description Method not allowed */
             405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_me_display_preferences: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The caller's display preferences */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DisplayPreferencesResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    put_api_v1_me_display_preferences: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DisplayPreferencesUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description The caller's updated display preferences */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DisplayPreferencesResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Nothing to change, or a value that isn't allowed */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -37565,7 +38032,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description An answer failed validation, or the form is outside its submission window */
+            /** @description An answer failed validation, or the form is outside its submission window. A refused answer carries `details.reason`, `details.field_key` and sometimes `details.params`, so a page can word it in the reader's language. */
             422: {
                 headers: {
                     [name: string]: unknown;

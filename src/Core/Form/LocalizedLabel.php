@@ -6,7 +6,9 @@ namespace Whity\Core\Form;
 
 /**
  * The `{ar?, en?}` bilingual label carried by `forms.name` and
- * `form_fields.label` (migration 127).
+ * `form_fields.label` (migration 127), and since migration 193 by
+ * `forms.description`, `forms.submit_label`, `form_fields.help_text` and each
+ * section's title and description.
  *
  * Encoding and decoding live here rather than in each repository because the two
  * halves of a round trip have to agree about three things — what an absent
@@ -104,6 +106,41 @@ final class LocalizedLabel
         }
 
         return $label;
+    }
+
+    /**
+     * Normalize text that may be left out, into what the column stores.
+     *
+     * Null or blank clears it. An object replaces it. A BARE STRING SETS ONLY THE
+     * ENGLISH and keeps the Arabic in `$existing`, because a client that knows only
+     * one language (the descriptor builder sends a plain string) must not erase a
+     * translation it never saw.
+     *
+     * @param array<string, string> $existing What the column holds now.
+     *
+     * @throws FormRejectedException On a wrong type, or text longer than `$maxLength`.
+     */
+    public static function optionalForStorage(mixed $value, string $field, int $maxLength, array $existing = []): ?string
+    {
+        if ($value === null || (is_string($value) && trim($value) === '')) {
+            return null;
+        }
+        if (is_array($value) && $value === []) {
+            return null;
+        }
+
+        $label = self::fromInput($value, $field);
+        if (is_string($value)) {
+            $label += $existing;
+        }
+
+        foreach ($label as $text) {
+            if (mb_strlen($text) > $maxLength) {
+                throw new FormRejectedException("{$field} must be {$maxLength} characters or fewer");
+            }
+        }
+
+        return self::encode($label);
     }
 
     /**

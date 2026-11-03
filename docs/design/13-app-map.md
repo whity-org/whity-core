@@ -1,4 +1,4 @@
-# App map (v2.2)
+# App map (v2.9)
 
 The screens of whity-core's web app as they exist in `web/app`, grouped as the sidebar groups them, with IDs for design work. **Template** names the template in this system; **Needs** marks server work for the agent features.
 
@@ -13,49 +13,49 @@ Sidebar groups: (top) Dashboard · Inbox · Approvals — People — AI — Docu
 | ID | Screen | Route | Template | Needs |
 | --- | --- | --- | --- | --- |
 | **Overview** | | | | |
-| A01 | Dashboard | `/admin`, `/dashboard` | `TplAdminDashboard`; shell states `AppShellCollapsed`, `AppShellMobile` | |
-| A02 | Inbox (documents awaiting a decision) | `/admin/inbox` | | |
+| A01 | Dashboard (home) | `/dashboard`; `/admin` redirects here | `TplHome`, `TplHomeMember`; operators' platform cards from `TplAdminDashboard`; shell states `AppShellCollapsed`, `AppShellMobile` | section 20; one merged waiting list (Inbox and Approvals), app home cards in the plugin manifest |
+| A02 | Inbox (documents awaiting a decision) | `/admin/inbox` | `TplInbox` | section 21; states composed by the app |
 | A03 | Approvals (agent proposals) | new: `/admin/approvals` | `TplAgentApprovals`, `TplAgentApprovalsAr`, `ApprovalQueue` | server 10 |
 | **People** | | | | |
-| A10 | Users · user | `/admin/users`, `/admin/users/[id]` | | |
-| A11 | User groups | `/admin/user-groups` | | |
-| A12 | Roles · role | `/admin/roles`, `/admin/roles/[id]` | | |
-| A13 | Organisational units | `/admin/ous` | | |
-| A14 | Delegations | `/admin/delegations` | | |
-| A15 | Relations | `/admin/relations` | | |
-| A16 | Registrations · invitations | `/admin/registrations` | | |
+| A10 | Users · user | `/admin/users`, `/admin/users/[id]` | `TplUsers`, `TplUserRecord`, `TplUserRecordAr` | section 21 |
+| A11 | User groups | `/admin/user-groups` | `TplUserGroups` | section 21 |
+| A12 | Roles · role | `/admin/roles`, `/admin/roles/[id]` | `TplRoles`, `TplRoleRecord` | section 21 |
+| A13 | Organisational units | `/admin/ous` | `TplOrgUnits` | section 21 |
+| A14 | Delegations | `/admin/delegations` | `TplDelegations` | section 21 |
+| A15 | Relations | `/admin/relations` | `TplRelations` | section 21 |
+| A16 | Registrations · invitations | `/admin/registrations` | `TplApprovalGating` | section 21; request dates |
 | **AI** | | | | |
-| A20 | AI principals | `/admin/ai-principals` | | |
-| A21 | AI principal (scope, credential) | new: `/admin/ai-principals/[id]` | `TplAgentScope` | server 11 |
-| A22 | MCP tools | `/admin/mcp-tools` | | |
+| A20 | Agents · connected AI apps | `/admin/ai-principals` | `TplAgents`, `TplAgentPresets`, `TplConnectedApps`, `TplConnectWizard` | section 24; agents API exists, pages new; AI principals renamed |
+| A21 | Agent · connected app (what it may do) | new: `/admin/ai-principals/[id]` | `TplAgentRecord`, `TplAgentRecordAr`, `TplAgentInstructions`, `TplAgentScope` | section 24 |
+| A22 | What AI can do (was MCP tools) | `/admin/mcp-tools` | `TplWhatAICanDo` | section 24; technical columns behind Show technical details |
 | A23 | Agent activity | new (from audit logs) | `AgentActivity` (filter by agent), `Timeline`, `UndoBar` | |
 | **Documents** | | | | |
-| A30 | Document library · document | `/admin/document-library`, `/[id]` | `DocPreview`, `Drawer` | |
-| A31 | Document templates | `/admin/document-templates` | | |
-| A32 | Route templates · routing | `/admin/document-route-templates`, `/admin/document-routing/[documentId]` | | |
+| A30 | Document library · document | `/admin/document-library`, `/[id]` | `TplLibrary`, `TplDocRecord`; notes and wiki: `TplNotesWiki` | section 23; record tabs Document, Routing, History, Verification |
+| A31 | Document templates | `/admin/document-templates` | `TplDocTemplates` | section 23 |
+| A32 | Route templates · routing | `/admin/document-route-templates`, `/admin/document-routing/[documentId]` | `TplRouteTemplates`, `TplFlowEditor`, `TplDocRouting`, `TplDocRoutingAr` | section 23; circulation is the record's Routing tab |
 | A33 | Document designer | `/admin/documents` (editor) | `TplDocDesigner`; the Document editor cards (section 18) | the editor, built from `handoff/editor/` |
-| A34 | Forms · public form | `/forms/[id]`, `/f/[slug]` | | |
+| A34 | Forms · form builder · public form · my submissions | `/admin/x/forms-builder`, `/admin/x/forms-catalog`, `/forms/[id]`, `/f/[slug]`, `/admin/x/my-form-submissions` | `TplFormsManage`, `TplFormBuilder`, `TplFormBuilderAr`, `TplFormResponses`, `TplFormsCatalog`, `TplFormFill`, `TplFormPublic`, `TplFormPublicStates`, `TplMySubmissions` | section 22; server-side drafts; translatable form text |
 | **Platform** | | | | |
-| A40 | Tenants · tenant | `/admin/tenants`, `/[id]` | (table in `TplAdminDashboard`), `TenantSwitcher` | |
-| A41 | Plugins · store | `/admin/plugins`, `/admin/plugins/store` | `PluginCard` | |
-| A42 | Billing · plans | `/admin/billing`, `/billing` | | |
-| A43 | Promotions | `/admin/promotions` | | |
-| A44 | Audit logs · errors · stats | `/admin/audit-logs`, `/admin/errors`, `/admin/stats` | | |
-| A45 | Languages · translations | `/admin/languages`, `/admin/translations` | | |
-| A46 | Tags · tag groups | `/admin/tags`, `/admin/tag-groups` | | |
-| A47 | Notifications | `/admin/notifications` | | |
-| A48 | Approval gating | `/admin/approval-gating/*` | | |
+| A40 | Tenants · tenant | `/admin/tenants`, `/[id]` | `TplTenants` | section 25; server-side search; "workspace" in the interface |
+| A41 | Plugins: Store and Installed tabs (one sidebar item) | `/admin/plugins`, `/admin/plugins/store`, `/admin/plugins/store/<plugin>` | `TplPluginStore`, `TplPluginDetail`, `TplPluginInstall`, `TplPluginsInstalled`; `PluginCard` | section 19 |
+| A42 | Billing · plans | `/admin/billing`, `/billing` | `TplBilling`, `TplBillingAr`, `TplPlans` | section 25; money in normal units |
+| A43 | Promotions | `/admin/promotions` | `TplPromotions` | section 25; JOD default |
+| A44 | Audit logs · errors · System | `/admin/audit-logs`, `/admin/errors`, `/admin/stats` (System, operators only, H.3) | `TplAuditLog`, `TplErrors`, `TplSystem` | section 25 |
+| A45 | Languages · translations | `/admin/languages`, `/admin/translations` | `TplSettingsTranslations`; languages in `TplPlatformSettings` | section 25 |
+| A46 | Tags · tag groups | `/admin/tags`, `/admin/tag-groups` | `TplSettingsTags` | section 25 |
+| A47 | Notifications | `/admin/notifications` | `TplNotificationDelivery` | section 25 |
+| A48 | Approval gating | `/admin/approval-gating/*` | `TplApprovalGating` | section 21; tier-3 confirmation |
 | **Settings** | | | | |
-| A50 | Branding | `/admin/settings/branding` | `TplAdminBranding` | |
-| A51 | Email · email domains | `/admin/settings/email`, `/email-domains` | | |
-| A52 | Security · SSO · sign-up | `/admin/settings/security`, `/sso`, `/signup` | | |
-| A53 | Storage · feature flags · error tracking | `/admin/settings/storage`, `/feature-flags`, `/error-tracking` | | |
+| A50 | Branding | `/admin/settings/branding` | `TplSettingsGeneral`, `TplAdminBranding` | section 25; settings sub-nav |
+| A51 | Email · email domains | `/admin/settings/email`, `/email-domains` | `TplSettingsEmailDomains`; email in `TplPlatformSettings` | section 25 |
+| A52 | Security · SSO · sign-up | `/admin/settings/security`, `/sso`, `/signup` | `TplSettingsSecurity`, `TplSettingsSSO` | section 25 |
+| A53 | Storage · feature flags · error tracking | `/admin/settings/storage`, `/feature-flags`, `/error-tracking` | `TplPlatformSettings` | section 25 |
 | **Account** | | | | |
 | U01 | Sign in · register · verify email | `/login`, `/register`, `/verify-email` | `TplAuthSignIn` | |
 | U01b | Two-step code · turn on · recovery codes | `/login` (step 2), `/settings` | `TplAuthTwoStep` | |
 | U02 | Forgot · reset password · recovery | `/forgot-password`, `/reset-password`, `/account-recovery` | `TplAuthReset` | |
 | U03 | Accept invitation · onboarding | `/accept-invitation`, `/onboarding` | `TplAuthInvite` | |
-| U04 | Settings · licensing | `/settings`, `/licensing` | | |
+| U04 | Settings · licensing | `/settings`, `/licensing` | `TplAccountPrefs`, `TplAccountSecurity`, `TplLicensing` | section 25; text size preference |
 | U05 | Status | `/status` | `TplSystemStates` | |
 | U06 | 404 · 403 · 500 · offline · maintenance · rate limit | `not-found`, `error`, middleware | `TplSystemStates` | |
 | **Partner apps (built on Whity)** | | | | |
@@ -75,4 +75,4 @@ Sidebar groups: (top) Dashboard · Inbox · Approvals — People — AI — Docu
 | R12 | Letter | Whity Render | `TplDocLetter` | |
 | R13 | Purchase order | Whity Render | `TplDocPurchaseOrder` | |
 
-Next templates to draw: agent notifications (email, push, WhatsApp), the tenant table (A40), the plugins store (A41), the mobile approval screen, and the 80 mm thermal receipt. The P2 components exist since 2.1 (section 17), so the dashboard, onboarding (stepper), import (file upload) and plan screens can be drawn from them.
+Every screen in the built app (inventory of 1 November 2026) now has a design. Still to draw: agent notifications (email, push, WhatsApp), the mobile approval screen, the 80 mm thermal receipt, the publisher's page and the public marketplace.

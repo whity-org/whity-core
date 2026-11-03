@@ -36,7 +36,7 @@ use PDO;
 final class FormSubmissionRepository
 {
     private const COLUMNS = 's.id, s.tenant_id, s.form_id, s.form_version, s.submitted_by_profile_id,
-                             s.document_id, s.data, s.submitted_at, s.created_at';
+                             s.document_id, s.data, s.reference, s.submitted_at, s.created_at';
 
     public function __construct(private readonly PDO $db)
     {
@@ -97,14 +97,15 @@ final class FormSubmissionRepository
         ?int $submittedByProfileId,
         ?int $documentId,
         array $values,
+        ?string $reference = null,
     ): int {
         $stmt = $this->db->prepare(
             'INSERT INTO form_submissions
                  (tenant_id, form_id, form_version, submitted_by_profile_id, document_id,
-                  data, submitted_at, created_at)
+                  data, reference, submitted_at, created_at)
              VALUES
                  (:tenant_id, :form_id, :form_version, :submitted_by, :document_id,
-                  :data, NOW(), NOW())'
+                  :data, :reference, NOW(), NOW())'
         );
         $stmt->execute([
             ':tenant_id' => $tenantId,
@@ -119,9 +120,24 @@ final class FormSubmissionRepository
             // running a query against it — and Arabic content is a first-class
             // requirement here, not an edge case.
             ':data' => self::encode($values),
+            ':reference' => $reference,
         ]);
 
         return (int) $this->db->lastInsertId();
+    }
+
+    /**
+     * Whether this tenant has already issued this reference. See
+     * {@see SubmissionIssuer::referenceFor()} for how that can happen.
+     */
+    public function referenceExists(int $tenantId, string $reference): bool
+    {
+        $stmt = $this->db->prepare(
+            'SELECT 1 FROM form_submissions WHERE tenant_id = :tenant_id AND reference = :reference LIMIT 1'
+        );
+        $stmt->execute([':tenant_id' => $tenantId, ':reference' => $reference]);
+
+        return $stmt->fetch(PDO::FETCH_ASSOC) !== false;
     }
 
     /**
@@ -267,6 +283,7 @@ final class FormSubmissionRepository
             // whose document was later deleted keeps the answers. See migration
             // 127 for both cases.
             'document_id' => $row['document_id'] === null ? null : (int) $row['document_id'],
+            'reference' => ($row['reference'] ?? null) === null ? null : (string) $row['reference'],
             // `{}` rather than `[]` for a submission with no answers (every field
             // optional, none filled in). Same reason as
             // {@see FormFieldRepository}'s `validation`: PHP cannot tell an empty

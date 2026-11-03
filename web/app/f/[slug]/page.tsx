@@ -24,25 +24,28 @@
  * a more specific reason and undoing that.
  */
 
-import { use, useEffect, useMemo, useState } from 'react';
+import { use, useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
-import { Button } from '@whity/ui/button';
 import { useDirection } from '@/lib/direction-context';
 import { useDateDisplay } from '@whity/features/datetime';
+import { useTranslation } from '@whity/features/i18n';
 import {
-  FormField,
   localized,
   type Answer,
-  type FormFieldSpec,
   type LocalizedText,
   type UploadedFileRef,
 } from '@/components/forms/form-fields';
+import { FormFill, type FillableField, type FormSectionSpec } from '@/components/forms/form-fill';
+import { useRefusalMessage, type RefusalBody } from '@/components/forms/form-refusals';
 
 interface PublicForm {
   slug: string;
   name: LocalizedText | string | null;
   description: string | null;
-  fields: FormFieldSpec[];
+  description_i18n?: LocalizedText | [] | null;
+  submit_label?: LocalizedText | null;
+  fields: FillableField[];
+  sections: FormSectionSpec[];
   accepts_submissions: boolean;
   opens_at: string | null;
   closes_at: string | null;
@@ -56,14 +59,17 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
   // falls back to "dates are shown", which is what a page a stranger opens has
   // always done. Nothing here reads a session.
   const { dateTime } = useDateDisplay();
+  const t = useTranslation('forms');
+  const refusalMessage = useRefusalMessage();
 
   const [form, setForm] = useState<PublicForm | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  // Which failure, not its wording: the words are chosen when they are drawn, so a
+  // language loading late can't restart the fetch below.
+  const [loadError, setLoadError] = useState<'notValid' | 'loadFailed' | null>(null);
   const [loading, setLoading] = useState(true);
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
-  const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [reference, setReference] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -73,14 +79,16 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
         const body = (await response.json().catch(() => ({}))) as { data?: PublicForm; error?: string };
         if (cancelled) return;
         if (!response.ok || !body.data) {
-          setLoadError(body.error ?? 'This form link is not valid, or is no longer open.');
+          // A wrong slug, a withdrawn link and an unpublished form are one
+          // refusal by design, so this page's wording can stand in for the server's.
+          setLoadError('notValid');
 
           return;
         }
         setForm(body.data);
       })
       .catch(() => {
-        if (!cancelled) setLoadError('This form could not be loaded. Check your connection and try again.');
+        if (!cancelled) setLoadError('loadFailed');
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -91,10 +99,11 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
     };
   }, [slug]);
 
-  const ordered = useMemo(
-    () => (form?.fields ?? []).slice().sort((a, b) => a.position - b.position),
-    [form]
-  );
+  function labelOf(fieldKey: string): string {
+    const field = form?.fields.find((candidate) => candidate.field_key === fieldKey);
+
+    return (field !== undefined ? localized(field.label, preferArabic) : '') || fieldKey;
+  }
 
   /**
    * Upload one file against the PUBLIC form, and hand back the reference the
@@ -123,50 +132,39 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
       headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
       body,
     });
-    const payload = (await response.json().catch(() => ({}))) as {
-      data?: UploadedFileRef;
-      error?: string;
-    };
+    const payload = (await response.json().catch(() => ({}))) as RefusalBody & { data?: UploadedFileRef };
     if (!response.ok || payload.data === undefined) {
-      throw new Error(payload.error ?? 'That file could not be uploaded. Please try again.');
+      throw new Error(
+        refusalMessage(payload, labelOf, t('field.uploadFailed', 'That file could not be uploaded. Please try again.'))
+      );
     }
 
     return payload.data;
   }
 
-  async function handleSubmit(event: React.FormEvent) {
-    event.preventDefault();
-    if (submitting || form === null) return;
+  /** Resolves with a refusal, or null once the server has the answers. */
+  async function submitAnswers(toSend: Record<string, Answer>): Promise<RefusalBody | null> {
+    const response = await fetch(`/api/v1/public/forms/${encodeURIComponent(slug)}/submissions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        // The CSRF guard requires this on a cookie-authenticated write. It is
+        // NOT optional here: a bearer token is exempt from the guard, so every
+        // curl check of this endpoint passed while the browser — which has a
+        // session cookie and no token — was refused with "cross-site request
+        // rejected". The uploader already sent it; the submit did not.
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+      body: JSON.stringify({ data: toSend }),
+    });
+    const body = (await response.json().catch(() => ({}))) as RefusalBody & { data?: { reference?: string | null } };
+    if (!response.ok) return body;
 
-    setSubmitting(true);
-    setSubmitError(null);
-    try {
-      const response = await fetch(`/api/v1/public/forms/${encodeURIComponent(slug)}/submissions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-          // The CSRF guard requires this on a cookie-authenticated write. It is
-          // NOT optional here: a bearer token is exempt from the guard, so every
-          // curl check of this endpoint passed while the browser — which has a
-          // session cookie and no token — was refused with "cross-site request
-          // rejected". The uploader already sent it; the submit did not.
-          'X-Requested-With': 'XMLHttpRequest',
-        },
-        body: JSON.stringify({ data: answers }),
-      });
-      const body = (await response.json().catch(() => ({}))) as { error?: string };
-      if (!response.ok) {
-        setSubmitError(body.error ?? 'This could not be submitted. Please check your answers and try again.');
+    setReference(body.data?.reference ?? null);
+    setSubmitted(true);
 
-        return;
-      }
-      setSubmitted(true);
-    } catch {
-      setSubmitError('This could not be submitted. Check your connection and try again.');
-    } finally {
-      setSubmitting(false);
-    }
+    return null;
   }
 
   const shell = (children: React.ReactNode) => (
@@ -178,7 +176,7 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
   if (loading) {
     return shell(
       <Card>
-        <CardContent className="py-10 text-center text-sm text-muted-foreground">Loading…</CardContent>
+        <CardContent className="py-10 text-center text-sm text-muted-foreground">{t('fill.loading', 'Loading…')}</CardContent>
       </Card>
     );
   }
@@ -187,22 +185,34 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
     return shell(
       <Card>
         <CardHeader>
-          <CardTitle>This form is not available</CardTitle>
-          <CardDescription>{loadError}</CardDescription>
+          <CardTitle>{t('fill.notAvailable', 'This form is not available')}</CardTitle>
+          <CardDescription>
+            {loadError === 'loadFailed'
+              ? t('fill.loadFailed', 'This form could not be loaded. Check your connection and try again.')
+              : t('fill.notValid', 'This form link is not valid, or is no longer open.')}
+          </CardDescription>
         </CardHeader>
       </Card>
     );
   }
 
-  const title = localized(form.name, preferArabic) || 'Form';
+  const title = localized(form.name, preferArabic) || t('fill.untitled', 'Form');
   const closedOn = dateTime(form.closes_at);
+  const translatedDescription = Array.isArray(form.description_i18n) ? null : form.description_i18n;
+  const description = localized(translatedDescription, preferArabic) || form.description;
+  const submitLabel = localized(form.submit_label, preferArabic) || t('fill.submit', 'Submit');
 
   if (submitted) {
     return shell(
       <Card>
         <CardHeader>
-          <CardTitle>Thank you — your response has been recorded</CardTitle>
-          <CardDescription>{title} was submitted successfully. You may close this page.</CardDescription>
+          <CardTitle>{t('fill.sentPublicTitle', 'Thank you, your response has been recorded')}</CardTitle>
+          <CardDescription>
+            {t('fill.sentPublic', '{title} was submitted successfully. You may close this page.', { title })}
+          </CardDescription>
+          {reference !== null && (
+            <p className="text-sm font-medium">{t('fill.reference', 'Your reference: {reference}', { reference })}</p>
+          )}
         </CardHeader>
       </Card>
     );
@@ -212,47 +222,32 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
     <Card>
       <CardHeader>
         <CardTitle>{title}</CardTitle>
-        {form.description !== null && form.description !== '' && (
-          <CardDescription>{form.description}</CardDescription>
-        )}
+        {description !== null && description !== '' && <CardDescription>{description}</CardDescription>}
       </CardHeader>
 
       <CardContent>
         {!form.accepts_submissions ? (
           <p className="py-6 text-sm text-muted-foreground">
-            This form is not accepting responses
             {/*
               No `?? form.closes_at` fallback: when the formatter declines, the
-              whole clause goes, rather than printing the wire timestamp in the
-              browser's locale. "This form is not accepting responses." is a
-              complete answer on its own — the closing date was only ever the
-              courtesy half.
+              date goes, rather than printing the wire timestamp in the browser's
+              locale. The form being closed is a complete answer on its own.
             */}
-            {closedOn !== null ? ` (it closed on ${closedOn})` : ''}.
+            {closedOn !== null
+              ? t('fill.closedOn', 'This form is not accepting responses. It closed on {date}.', { date: closedOn })
+              : t('fill.closed', 'This form is not accepting responses.')}
           </p>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-6" noValidate>
-            {ordered.map((field) => (
-              <FormField
-                key={field.field_key}
-                field={field}
-                value={answers[field.field_key]}
-                preferArabic={preferArabic}
-                upload={uploadAttachment}
-                onChange={(v) => setAnswers((prev) => ({ ...prev, [field.field_key]: v }))}
-              />
-            ))}
-
-            {submitError !== null && (
-              <p className="text-sm text-destructive" role="alert">
-                {submitError}
-              </p>
-            )}
-
-            <Button type="submit" disabled={submitting}>
-              {submitting ? 'Submitting…' : 'Submit'}
-            </Button>
-          </form>
+          <FormFill
+            fields={form.fields}
+            sections={form.sections ?? []}
+            answers={answers}
+            onAnswersChange={setAnswers}
+            preferArabic={preferArabic}
+            upload={uploadAttachment}
+            submitLabel={submitLabel}
+            submit={submitAnswers}
+          />
         )}
       </CardContent>
     </Card>

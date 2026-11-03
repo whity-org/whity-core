@@ -222,6 +222,96 @@ final class PublicFormsApiRealEngineTest extends TestCase
         );
     }
 
+    public function testAPublicReceiptCarriesTheReferenceAndCountsOn(): void
+    {
+        $formId = $this->publishedForm();
+        $this->forms->update(self::TENANT, $formId, ['reference_format' => 'REC-{SEQ:3}']);
+        $slug = $this->openLink($formId);
+
+        $first = self::data($this->submit($slug, ['full_name' => 'Layla Haddad']));
+        $second = self::data($this->submit($slug, ['full_name' => 'Omar Nasser']));
+
+        self::assertSame('REC-001', $first['reference']);
+        self::assertSame('REC-002', $second['reference']);
+    }
+
+    public function testAFormWithNoFormatGivesNoReference(): void
+    {
+        $slug = $this->openLink($this->publishedForm());
+
+        self::assertNull(self::data($this->submit($slug, ['full_name' => 'Layla Haddad']))['reference']);
+    }
+
+    public function testARefusedSubmissionDoesNotSpendANumber(): void
+    {
+        $formId = $this->publishedForm();
+        $this->forms->update(self::TENANT, $formId, ['reference_format' => 'REC-{SEQ:3}']);
+        $slug = $this->openLink($formId);
+
+        self::assertSame(422, $this->submit($slug, [])->getStatusCode());
+
+        self::assertSame('REC-001', self::data($this->submit($slug, ['full_name' => 'Layla Haddad']))['reference']);
+    }
+
+    public function testTwoFormatsThatPrintTheSameTextDoNotCollide(): void
+    {
+        $first = $this->publishedForm();
+        $second = $this->publishedForm();
+        $this->forms->update(self::TENANT, $first, ['reference_format' => 'A{SEQ}']);
+        $this->forms->update(self::TENANT, $second, ['reference_format' => 'A1{SEQ}']);
+        $firstSlug = $this->openLink($first);
+        $secondSlug = $this->openLink($second);
+
+        // The second form prints A11 first, then the first form
+        // reaches its own 11th and has to skip it.
+        $this->submit($secondSlug, ['full_name' => 'Omar Nasser']);
+        $references = [];
+        for ($i = 0; $i < 11; $i++) {
+            $references[] = self::data($this->submit($firstSlug, ['full_name' => 'Layla Haddad']))['reference'];
+        }
+
+        self::assertContains('A10', $references);
+        self::assertNotContains('A11', $references);
+        self::assertContains('A12', $references);
+    }
+
+    public function testAPublicSubmissionLeavesOutAQuestionItsConditionHid(): void
+    {
+        $formId = $this->publishedForm();
+        $this->fields->create(self::TENANT, $formId, 'has_minors', 'checkbox', ['en' => 'Minors involved?'], null, false, [], [], null, null, null);
+        $this->fields->create(
+            self::TENANT,
+            $formId,
+            'minor_count',
+            'number',
+            ['en' => 'How many?'],
+            null,
+            true,
+            [],
+            [],
+            null,
+            null,
+            null,
+            ['field' => 'has_minors', 'equals' => true],
+        );
+        $slug = $this->openLink($formId);
+
+        $rendered = self::asList(self::data($this->render($slug))['fields']);
+        self::assertSame(['field' => 'has_minors', 'equals' => true], $rendered[count($rendered) - 1]['visible_when']);
+
+        // Required, and hidden, so it blocks nothing and nothing is kept for it.
+        $hidden = $this->submit($slug, ['full_name' => 'Layla Haddad', 'has_minors' => false, 'minor_count' => 4]);
+        self::assertSame(201, $hidden->getStatusCode());
+        self::assertEqualsCanonicalizing(
+            ['full_name' => 'Layla Haddad', 'has_minors' => false],
+            json_decode((string) $this->onlySubmission()['data'], true)
+        );
+
+        // Asked once the box is ticked, so now it is required.
+        $shown = $this->submit($slug, ['full_name' => 'Layla Haddad', 'has_minors' => true]);
+        self::assertSame(422, $shown->getStatusCode());
+    }
+
     /**
      * A public submission CIRCULATES, and the person it reaches was chosen by
      * the organisation rather than by the caller.
@@ -339,13 +429,16 @@ final class PublicFormsApiRealEngineTest extends TestCase
         $data = self::data($this->render($slug));
 
         self::assertSame(
-            ['slug', 'name', 'description', 'fields', 'sections', 'accepts_submissions', 'opens_at', 'closes_at'],
+            [
+                'slug', 'name', 'description', 'description_i18n', 'submit_label', 'fields', 'sections',
+                'accepts_submissions', 'opens_at', 'closes_at',
+            ],
             array_keys($data)
         );
         self::assertSame(
             [
-                'field_key', 'field_type', 'label', 'help_text', 'is_required',
-                'options', 'validation', 'section_key', 'position', 'multi_valued',
+                'field_key', 'field_type', 'label', 'help_text', 'help_text_i18n', 'is_required',
+                'options', 'validation', 'section_key', 'position', 'visible_when', 'multi_valued',
             ],
             array_keys(self::asList($data['fields'])[0])
         );

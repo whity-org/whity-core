@@ -166,10 +166,27 @@ export default function LoginPage() {
     if (ssoError) {
       addToast(ssoErrorMessage(t, ssoError), 'error');
     } else {
-      addToast(
-        t('sso.multipleWorkspaces', 'Your account has multiple workspaces — sign in to choose one.'),
-        'info'
-      );
+      // The sign-in already happened at the provider, and an SSO-only account
+      // has no password to retry with: read the pending selection from its
+      // cookie and show the same picker a password sign-in gets. Not cancelled
+      // on cleanup, because the marker is stripped below, so a Strict Mode
+      // re-run would never fetch again.
+      const showBounce = () =>
+        addToast(
+          t('sso.multipleWorkspaces', 'Your account has multiple workspaces — sign in to choose one.'),
+          'info'
+        );
+      fetch('/api/v1/auth/select-tenant', { credentials: 'include' })
+        .then(async (response) => {
+          const body = response.ok ? await response.json().catch(() => null) : null;
+          const memberships = body?.data?.memberships;
+          if (Array.isArray(memberships) && memberships.length > 0) {
+            setPendingMemberships(memberships);
+          } else {
+            showBounce();
+          }
+        })
+        .catch(showBounce);
     }
     params.delete('sso_error');
     params.delete('sso');

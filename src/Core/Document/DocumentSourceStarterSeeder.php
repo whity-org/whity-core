@@ -10,9 +10,9 @@ use Whity\Core\Tenant\TenantProvisioningStep;
 /**
  * The editor's starters (editor M4b): ready templates and label sheets a
  * tenant can open and adapt, so a printed document never starts from a blank
- * page. They replace the old designer's canvas starters, the same set plus a
- * letter and a certificate: Letter, Invoice, Exam sheet, Production note,
- * Shipping labels and Certificate.
+ * page: the 13 document templates of the guideline, each in English and Arabic
+ * ({@see GuidelineStarters}, WHIT-843), plus the Exam sheet, Production note,
+ * Shipping labels and Certificate that replaced the old designer's starters.
  *
  * Each is seeded once per tenant (`starter_key`, which nothing but this class
  * writes), as a system document every member can see, and never updated
@@ -47,15 +47,19 @@ final class DocumentSourceStarterSeeder implements TenantProvisioningStep
      * passes `$strict`: there a failure has to stop the upgrade, or every
      * workspace ends up with no starters and nobody is told (WHIT-803).
      *
+     * `$only` limits it to those keys, so an upgrade that ships new starters
+     * doesn't bring back an older one a workspace deleted on purpose.
+     *
+     * @param list<string>|null $only
      * @return int How many starters were added.
      */
-    public function seedForTenant(int $tenantId, bool $strict = false): int
+    public function seedForTenant(int $tenantId, bool $strict = false, ?array $only = null): int
     {
         $added = 0;
         try {
             $existing = $this->sources->starterKeys($tenantId);
             foreach ($this->starters() as $key => $starter) {
-                if (isset($existing[$key])) {
+                if (isset($existing[$key]) || ($only !== null && !in_array($key, $only, true))) {
                     continue;
                 }
                 $this->sources->create($tenantId, $starter + [
@@ -82,9 +86,30 @@ final class DocumentSourceStarterSeeder implements TenantProvisioningStep
     }
 
     /**
+     * Bring older copies of these starters up to the guideline, where the
+     * workspace never touched them: a saved or published copy is its own and
+     * stays exactly as it is.
+     *
+     * @param list<string> $keys
+     * @return int How many were brought up to date.
+     */
+    public function refreshUntouched(int $tenantId, array $keys): int
+    {
+        $starters = $this->starters();
+        $refreshed = 0;
+        foreach ($keys as $key) {
+            if (isset($starters[$key]) && $this->sources->replaceUntouchedStarter($tenantId, $key, $starters[$key] + ['lang' => 'en'])) {
+                $refreshed++;
+            }
+        }
+
+        return $refreshed;
+    }
+
+    /**
      * The starters by key. Example data follows the design system's (Example Bakery and friends).
      *
-     * @return array<string, array{kind: string, title: string, page: array<string, mixed>,
+     * @return array<string, array{kind: string, title: string, lang?: string, page: array<string, mixed>,
      *                             own_fields: list<array<string, string>>, blocks: list<array<string, mixed>>}>
      */
     public function starters(): array
@@ -92,47 +117,7 @@ final class DocumentSourceStarterSeeder implements TenantProvisioningStep
         $this->ids = 0;
         $a4 = ['size' => 'A4', 'marginMm' => 16, 'letterhead' => true];
 
-        return [
-            'editor.letter' => [
-                'kind' => 'letter',
-                'title' => 'Letter',
-                'page' => $a4,
-                'own_fields' => [
-                    ['key' => 'recipient', 'label' => 'Recipient', 'sample' => 'Example Clinic'],
-                    ['key' => 'recipient_address', 'label' => 'Recipient address', 'sample' => 'Rainbow Street 21, Amman'],
-                    ['key' => 'subject', 'label' => 'Subject', 'sample' => 'Your order for November'],
-                ],
-                'blocks' => [
-                    $this->para($this->field('recipient', 'Recipient'), ['type' => 'break'], $this->field('recipient_address', 'Recipient address')),
-                    $this->para($this->field('subject', 'Subject', true)),
-                    $this->para($this->text('Dear '), $this->field('recipient', 'Recipient'), $this->text(',')),
-                    $this->para($this->text('Thank you for your order. This letter confirms what we agreed and when we will deliver.')),
-                    $this->para($this->text('Please reply to this letter if anything needs to change before then.')),
-                    $this->para($this->text('Kind regards,')),
-                    ['id' => $this->id(), 'type' => 'signature', 'signers' => [['name' => [$this->companyField('company.name', 'Company name')], 'role' => [$this->text('Manager')]]], 'date' => [], 'stamp' => false],
-                ],
-            ],
-            'editor.invoice' => [
-                'kind' => 'template',
-                'title' => 'Invoice',
-                'page' => $a4,
-                'own_fields' => [
-                    ['key' => 'invoice_no', 'label' => 'Invoice number', 'sample' => 'INV-1042'],
-                    ['key' => 'bill_to', 'label' => 'Bill to', 'sample' => 'Example Clinic'],
-                    ['key' => 'due_date', 'label' => 'Due date', 'sample' => '30 November 2026'],
-                    ['key' => 'total', 'label' => 'Total', 'sample' => '1,250.00'],
-                ],
-                'blocks' => [
-                    $this->para($this->text('Invoice ', true), $this->field('invoice_no', 'Invoice number', true)),
-                    $this->para($this->text('Bill to: '), $this->field('bill_to', 'Bill to'), ['type' => 'break'], $this->text('Due: '), $this->field('due_date', 'Due date')),
-                    $this->table(
-                        ['Item', 'Qty', 'Price', 'Amount'],
-                        [['Sourdough loaves', '50', '4.00', '200.00'], ['Pastry tray', '10', '105.00', '1,050.00']],
-                    ),
-                    $this->para($this->text('Total ', true), $this->field('total', 'Total', true)),
-                    ['id' => $this->id(), 'type' => 'callout', 'kind' => 'note', 'content' => [$this->text('Payment within 30 days. Thank you for your business.')]],
-                ],
-            ],
+        return (new GuidelineStarters($this->id(...)))->all() + [
             'editor.exam' => [
                 'kind' => 'template',
                 'title' => 'Exam sheet',

@@ -193,7 +193,7 @@ export function TopNav({
               <IconSearch className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
               <span className="truncate">{searchPlaceholder}</span>
             </div>
-            <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-0.5 rounded border border-border/80 bg-muted px-1.5 font-mono text-[0.625rem] font-semibold text-muted-foreground">
+            <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-0.5 rounded border border-border/80 bg-muted px-1.5 font-mono text-xs font-semibold text-muted-foreground">
               <IconCommand className="size-2.5" />K
             </kbd>
           </button>
@@ -292,7 +292,7 @@ export function TopNav({
               <DropdownMenuLabel className="font-normal p-2">
                 <div className="flex flex-col gap-0.5">
                   <p className="text-xs font-semibold text-foreground truncate">{user.name}</p>
-                  {user.email && <p className="text-[0.6875rem] text-muted-foreground truncate">{user.email}</p>}
+                  {user.email && <p className="text-xs text-muted-foreground truncate">{user.email}</p>}
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />

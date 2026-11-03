@@ -1,0 +1,45 @@
+<!-- @dsCard group="Templates · Settings" height=921 width=1280 subtitle="Who must use two-step sign-in, by when, and who hasn’t yet" -->
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Settings: Security</title><style>html,body{height:100%} #root{min-height:100%} </style></head>
+<body>
+<div id="root"></div>
+<script>
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 16 }); }
+  var NAVL = {};
+  function L(s) { return NAVL[s] || s; }
+  /* The sidebar as built (inventory, 1 Nov 2026), in sentence case; only the current group is open (2.5). */
+  var GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['approval', 'Approvals', 3], ['form', 'My submissions']]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations'], ['user', 'Family relations'], ['two-step', 'Approval gating']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['routing', 'Route templates'], ['page', 'Notes and wiki'], ['form', 'Form builder'], ['list-todo', 'Forms']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]],
+    ['Platform', [['tenant', 'Tenants'], ['money', 'Plans and pricing'], ['receipt', 'Promotions'], ['chart', 'System'], ['error', 'Errors'], ['notification', 'Notification delivery']]]];
+  function appNav(active, o) { o = o || {};
+    return GROUPS.filter(function (g) { return g[0] !== 'Platform' || o.operator; }).map(function (g) {
+      var has = g[1].some(function (x) { return x[1] === active; });
+      return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
+  var topBar = h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' }));
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: o.tenant || 'Example Bakery', user: o.user || 'Rana Haddad', role: o.role || 'Owner', nav: appNav(active, o), topActions: topBar, searchLabel: o.search, dir: o.dir }, kids); }
+  function person(name, sub, o) { o = o || {}; return h('div', { className: 'wy-person' }, h(W.Avatar, { name: name, size: o.size || 28, kind: o.kind }), h('div', { style: { minWidth: 0 } }, h('b', null, name), sub ? h('small', null, sub) : null)); }
+  function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
+  function recHead(o) { return h('div', { className: 'wy-rech' }, o.avatar || h('span', { className: 'wy-rech__ic', 'aria-hidden': 'true' }, I(o.icon || 'document', 26)),
+      h('div', { style: { minWidth: 0 } }, h('h1', null, o.title, o.badges || null), h('div', { className: 'wy-rech__facts' }, (o.facts || []).map(function (f, i) { return h('span', { key: i }, f[0] ? I(f[0], 14) : null, f[1]); }))),
+      h('div', { className: 'wy-rech__acts' }, o.actions || null)); }
+  function saveBar(text, L2) { L2 = L2 || {}; return h('div', { className: 'wy-savebar', role: 'region', 'aria-label': L2.label || 'Unsaved changes' }, I('edit'), h('span', null, text), h(W.Button, { variant: 'ghost' }, L2.discard || 'Discard'), h(W.Button, null, L2.save || 'Save changes')); }
+  var SUBNAV = [['Workspace', ['General', 'Branding']], ['Sign-in and security', ['Security', 'Single sign-on', 'Sign-up']], ['Email', ['Email domains']], ['Data', ['Tags', 'Translations']], ['Advanced', ['Error tracking']]];
+  function setPage(active, title, desc, kids, actions) { return shell('Settings', h(F, null, h(W.PageHeader, { breadcrumb: [{ label: 'Settings' }, { label: active }], title: title, description: desc, actions: actions }),
+    h('div', { className: 'wy-set' }, h('nav', { className: 'wy-subnav', 'aria-label': 'Settings' }, SUBNAV.map(function (g) { return h(F, { key: g[0] }, h('h4', null, g[0]), g[1].map(function (x) { return h('a', { key: x, href: '#', className: x === active ? 'is-on' : '' }, x); })); })), h('div', { className: 'wy-set__main' }, kids)))); }
+
+  var rows = [{ id: 1, p: 'Omar Khalil', u: 'Sweifieh', s: ['warning', 'Not set up'], d: '9 Nov 2026' }, { id: 2, p: 'Sami Nasser', u: 'Abdoun', s: ['warning', 'Not set up'], d: '9 Nov 2026' }, { id: 3, p: 'Karim Aziz', u: 'Sweifieh', s: ['outline', 'Deactivated'], d: '—' }, { id: 4, p: 'Dana Yousef', u: 'Abdoun', s: ['success', 'Set up'], d: '—' }];
+  ReactDOM.createRoot(document.getElementById('root')).render(setPage('Security', 'Security', 'Two-step sign-in protects accounts if a password leaks.', h(F, null,
+    h(W.Card, { title: 'Who must use two-step sign-in' }, h('div', { style: { display: 'grid', gap: 12 } },
+      h('div', { className: 'wy-flag' }, h('div', null, h('b', null, 'Everyone in Example Bakery'), h('span', null, 'Required from 9 November 2026. Until then they’re reminded each time they sign in.')), h(W.Button, { variant: 'outline' }, 'Change')),
+      h('div', { className: 'wy-flag' }, h('div', null, h('b', null, 'Finance'), h('span', null, 'Required now, with no grace period.')), h(W.Button, { variant: 'outline' }, 'Change')),
+      h('div', null, h(W.Button, { variant: 'outline', icon: 'plus' }, 'Add a rule')))),
+    h(W.Card, { title: 'Who hasn’t set it up', description: '2 of 7 people' }, h(W.DataTable, { label: 'Two-step status', rows: rows, columns: [{ key: 'p', label: 'Person', render: function (r) { return person(r.p, r.u); } }, { key: 's', label: 'Two-step', render: function (r) { return h(W.Badge, { variant: r.s[0] }, r.s[1]); } }, { key: 'd', label: 'Must set up by' }, { key: 'x', label: '', align: 'end', render: function (r) { return r.s[1] === 'Not set up' ? h(W.Button, { size: 'sm', variant: 'outline', icon: 'send' }, 'Remind') : null; } }] })))));
+</script>
+</body>
+</html>

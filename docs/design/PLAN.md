@@ -1,6 +1,8 @@
-# Document editor: build plan
+# Build plan
 
-The editor is designed (section 18, decisions E.1–E.39, the Document editor cards, `handoff/editor/`). This plan turns it into code in whity-core, one milestone at a time. Each milestone is a branch and a pull request; don't start the next until the owner has approved the last.
+## Document editor
+
+The editor is designed (section 18, decisions E.1–E.39, the Document editor cards, `handoff/editor/`). This plan turns it into code in whity-core, one milestone at a time. Each milestone is a branch and a pull request; pull requests merge on green CI, and only a release into main needs the owner (owner, 2 Nov 2026).
 
 **Visual check for every milestone:** render the built screen at the card's size (see `cards.html`) in light and dark, and in Arabic where there's an Arabic card, and compare with `screenshots/`. Differences in spacing, colour, type or state are bugs unless the register says otherwise.
 
@@ -72,3 +74,29 @@ Arabic labels throughout, the mirrored shell, per-block direction, Readex Pro Ar
 Done when: EditorArabic and EditorType match; an axe check passes on the editor; every toolbar and menu action works from the keyboard.
 
 Live collaboration (cursors, presence, version history) comes after M8 (E.3).
+
+
+# App screens: build plan (2.3–2.9)
+
+Every screen in the inventory now has cards (`13-app-map.md`). Build them after the foundation (editor M1) is in, one milestone per branch and pull request, comparing with `screenshots/` in both themes and in Arabic where there's an Arabic card.
+
+## A0 · Ease-of-use foundation
+Tokens 2.9 (15px text, 13px floor, 40px controls, 48px rows), the collapsible sidebar groups, Show technical details and text size as per-person preferences (W.3), the page states and confirmation tiers (section 21) as shared components. Done when: `PatternStates` and `PatternConfirm` match; no text below 13px; no native dropdowns.
+
+## A1 · Home, People and Inbox (sections 20, 21)
+Done when: `TplHome`, `TplInbox`, `TplUsers`, `TplUserRecord`, `TplRoles`, `TplRoleRecord`, the drawers and Approval gating match; no ids where names belong; every risky action uses its tier.
+
+## A2 · Forms (section 22)
+Done when: the builder, filling in with server drafts, the public form in the workspace brand, responses and My submissions match; all form text is translatable.
+
+## A3 · Documents and routing (section 23)
+Done when: the library, the document record with Document, Routing, History and Verification tabs, templates, notes and wiki, route templates and the top-down flow editor match; the old circulation address redirects.
+
+## A4 · AI and agents (section 24)
+Needs section 12 items 10 and 11. Done when: Agents, presets, an agent's page, Connected AI apps with the connect wizard, and What AI can do match.
+
+## A5 · Plugin store (section 19)
+Done when: store, plugin page, install dialog and Installed tab match; `plugins:install` and `plugins:upload` are separate.
+
+## A6 · Workspace, billing and settings (section 25)
+Done when: the Settings sub-nav and its pages, your account with text size, billing, the audit log in sentences, and the Platform pages for operators match; money in normal units; Promotions default to JOD.

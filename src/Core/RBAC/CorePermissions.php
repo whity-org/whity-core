@@ -433,6 +433,10 @@ final class CorePermissions
     public const FORMS_READ = 'forms:read';
     public const FORMS_MANAGE = 'forms:manage';
     public const FORMS_SUBMIT = 'forms:submit';
+    // Record the office's decision on a submission (migration 195). Separate from
+    // `forms:read`, because reading a submission must not be enough to change its
+    // outcome, and from `forms:manage`, because recording decisions is not authoring.
+    public const FORMS_REVIEW = 'forms:review';
     // CONVENING (migrations 130/131). Deliberative BODIES that meet, minute a
     // numbered decision, and — where the agenda item carried a document — drive
     // that document's existing approval route with the decision.
@@ -540,6 +544,7 @@ final class CorePermissions
             self::FORMS_READ,
             self::FORMS_MANAGE,
             self::FORMS_SUBMIT,
+            self::FORMS_REVIEW,
             self::CONVENING_READ,
             self::CONVENING_MANAGE,
             self::CONVENING_DECIDE,

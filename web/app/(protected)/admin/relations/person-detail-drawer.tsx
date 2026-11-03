@@ -131,7 +131,7 @@ export function PersonDetailDrawer({
                   ? t('relations.detail.hasAccount', 'Linked to a platform account.')
                   : t('relations.detail.noAccount', 'A relative without a platform account.')}
               </SheetDescription>
-              <div className="mt-1 flex flex-wrap gap-2 text-[0.625rem] text-muted-foreground">
+              <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
                 {/*
                   #1068. A date of birth is a date on a screen, so it is
                   covered — a tenant that turned this on and then read "Born
@@ -208,7 +208,7 @@ export function PersonDetailDrawer({
                           {relation.otherPersonName}
                         </span>
                         {!relation.otherPersonHasAccount && (
-                          <span className="ms-1 text-[0.625rem] text-muted-foreground">
+                          <span className="ms-1 text-xs text-muted-foreground">
                             {t('relations.detail.relations.relativeTag', '(relative)')}
                           </span>
                         )}
@@ -235,7 +235,7 @@ export function PersonDetailDrawer({
                   ))}
                 </ul>
               )}
-              <p className="text-[0.625rem] text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 {t(
                   'relations.detail.relations.perspective',
                   'Relations are shown from {name}’s perspective; the reciprocal is derived automatically.',

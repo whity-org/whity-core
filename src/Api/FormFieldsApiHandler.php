@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Whity\Api;
 
+use Whity\Core\Form\FieldCondition;
 use Whity\Core\Form\FieldType;
 use Whity\Core\Form\FormFieldRepository;
 use Whity\Core\Form\FormRejectedException;
@@ -65,6 +66,8 @@ use Whity\Http\JsonBody;
  */
 final class FormFieldsApiHandler
 {
+    private const MAX_FILES_PER_QUESTION = 20;
+
     public function __construct(
         private readonly FormRepository $forms,
         private readonly FormFieldRepository $fields,
@@ -187,14 +190,21 @@ final class FormFieldsApiHandler
                 return $prefill;
             }
 
-            $helpText = self::optionalText($body, 'help_text');
-            if ($helpText instanceof Response) {
-                return $helpText;
-            }
+            $helpText = LocalizedLabel::optionalForStorage($body['help_text'] ?? null, 'help_text', InputLimits::TEXT_MAX);
             $sectionKey = self::optionalName($body, 'section_key');
             if ($sectionKey instanceof Response) {
                 return $sectionKey;
             }
+
+            $visibleWhen = FieldCondition::parse($body['visible_when'] ?? null);
+            $audience = self::audience($body);
+            if ($audience instanceof Response) {
+                return $audience;
+            }
+            FieldCondition::assertAuthorable([
+                ...$this->fields->listForForm($tenantId, (int) $form['id']),
+                ['field_key' => $fieldKey, 'field_type' => $fieldType, 'visible_when' => $visibleWhen, 'audience' => $audience],
+            ]);
 
             $id = $this->fields->create(
                 $tenantId,
@@ -209,6 +219,8 @@ final class FormFieldsApiHandler
                 $prefill,
                 $sectionKey,
                 self::intField($body, 'position'),
+                $visibleWhen,
+                $audience,
             );
 
             return Response::json([
@@ -252,6 +264,14 @@ final class FormFieldsApiHandler
             $incoming = $body['fields'] ?? null;
             if (!is_array($incoming) || !array_is_list($incoming)) {
                 return Response::error("'fields' must be a list of field definitions", 422);
+            }
+
+            /** @var array<string, array<string, string>> $existingHelp */
+            $existingHelp = [];
+            foreach ($this->fields->listForForm($tenantId, (int) $form['id']) as $row) {
+                if (is_array($row['help_text_i18n'])) {
+                    $existingHelp[(string) $row['field_key']] = $row['help_text_i18n'];
+                }
             }
 
             /** @var list<array<string, mixed>> $normalised */
@@ -302,13 +322,19 @@ final class FormFieldsApiHandler
                 if ($prefill instanceof Response) {
                     return $prefill;
                 }
-                $helpText = self::optionalText($entry, 'help_text');
-                if ($helpText instanceof Response) {
-                    return $helpText;
-                }
+                $helpText = LocalizedLabel::optionalForStorage(
+                    $entry['help_text'] ?? null,
+                    "fields[{$index}].help_text",
+                    InputLimits::TEXT_MAX,
+                    $existingHelp[$fieldKey] ?? [],
+                );
                 $sectionKey = self::optionalName($entry, 'section_key');
                 if ($sectionKey instanceof Response) {
                     return $sectionKey;
+                }
+                $audience = self::audience($entry);
+                if ($audience instanceof Response) {
+                    return $audience;
                 }
 
                 $normalised[] = [
@@ -321,8 +347,12 @@ final class FormFieldsApiHandler
                     'validation' => $validation,
                     'prefill_source' => $prefill,
                     'section_key' => $sectionKey,
+                    'visible_when' => FieldCondition::parse($entry['visible_when'] ?? null),
+                    'audience' => $audience,
                 ];
             }
+
+            FieldCondition::assertAuthorable($normalised);
 
             return Response::json([
                 'data' => $this->fields->replaceAll($tenantId, (int) $form['id'], $normalised),
@@ -399,11 +429,14 @@ final class FormFieldsApiHandler
                 $changes['is_required'] = $body['is_required'] === true;
             }
             if (array_key_exists('help_text', $body)) {
-                $helpText = self::optionalText($body, 'help_text');
-                if ($helpText instanceof Response) {
-                    return $helpText;
-                }
-                $changes['help_text'] = $helpText;
+                /** @var array<string, string> $existingHelpText */
+                $existingHelpText = is_array($field['help_text_i18n']) ? $field['help_text_i18n'] : [];
+                $changes['help_text'] = LocalizedLabel::optionalForStorage(
+                    $body['help_text'],
+                    'help_text',
+                    InputLimits::TEXT_MAX,
+                    $existingHelpText,
+                );
             }
             if (array_key_exists('section_key', $body)) {
                 $sectionKey = self::optionalName($body, 'section_key');
@@ -447,6 +480,30 @@ final class FormFieldsApiHandler
                 $changes['options'] = $options;
             }
 
+            if (array_key_exists('visible_when', $body)) {
+                $changes['visible_when'] = FieldCondition::parse($body['visible_when']);
+            }
+            if (array_key_exists('audience', $body)) {
+                $audience = self::audience($body);
+                if ($audience instanceof Response) {
+                    return $audience;
+                }
+                $changes['audience'] = $audience;
+            }
+            // Asked of the set as it would be, because a change of TYPE or AUDIENCE
+            // can break another question's rule as surely as a change of rule can.
+            if (
+                array_key_exists('visible_when', $changes)
+                || array_key_exists('field_type', $changes)
+                || array_key_exists('audience', $changes)
+            ) {
+                $after = [];
+                foreach ($this->fields->listForForm($tenantId, $formId) as $row) {
+                    $after[] = (int) $row['id'] === $fieldId ? array_merge($row, $changes) : $row;
+                }
+                FieldCondition::assertAuthorable($after);
+            }
+
             if ($changes === []) {
                 return Response::error('No updatable fields supplied', 422);
             }
@@ -488,6 +545,23 @@ final class FormFieldsApiHandler
 
             $formId = (int) $form['id'];
             $fieldId = (int) ($params['fieldId'] ?? 0);
+
+            // Refused rather than left dangling: a question whose condition names
+            // a field that has gone would start being asked of everybody.
+            $field = $this->fields->find($tenantId, $formId, $fieldId);
+            if ($field !== null) {
+                $dependants = FieldCondition::dependantsOf(
+                    $this->fields->listForForm($tenantId, $formId),
+                    (string) $field['field_key'],
+                );
+                if ($dependants !== []) {
+                    return Response::error(
+                        'Other questions are shown based on this answer: ' . implode(', ', $dependants)
+                        . '. Change their conditions first.',
+                        422
+                    );
+                }
+            }
 
             if (!$this->fields->delete($tenantId, $formId, $fieldId)) {
                 return Response::error('Form field not found', 404);
@@ -539,6 +613,19 @@ final class FormFieldsApiHandler
             . 'of what its submissions answered. Republish the form first.',
             409
         );
+    }
+
+    /**
+     * @param array<string, mixed> $body
+     */
+    private static function audience(array $body): string|Response
+    {
+        $audience = $body['audience'] ?? FormFieldRepository::AUDIENCE_APPLICANT;
+        if ($audience !== FormFieldRepository::AUDIENCE_APPLICANT && $audience !== FormFieldRepository::AUDIENCE_STAFF) {
+            return Response::error("audience must be 'applicant' or 'staff'", 422);
+        }
+
+        return $audience;
     }
 
     private static function validateKey(string $key): ?Response
@@ -692,6 +779,18 @@ final class FormFieldsApiHandler
             $rules['pattern'] = $pattern;
         }
 
+        // HOW MANY files a `file` question takes. The ceiling is a stop on one
+        // question spending a tenant's storage, not a modelling opinion.
+        if (isset($raw['maxFiles'])) {
+            if (!is_int($raw['maxFiles']) || $raw['maxFiles'] < 1 || $raw['maxFiles'] > self::MAX_FILES_PER_QUESTION) {
+                return Response::error(
+                    'validation.maxFiles must be a whole number from 1 to ' . self::MAX_FILES_PER_QUESTION,
+                    422
+                );
+            }
+            $rules['maxFiles'] = $raw['maxFiles'];
+        }
+
         // WHICH KIND of unit an `ou_ref` accepts.
         //
         // Without it a department picker can only offer the whole org chart —
@@ -768,28 +867,6 @@ final class FormFieldsApiHandler
             )),
             'prefill_sources' => $sources,
         ];
-    }
-
-    /**
-     * @param array<string, mixed> $body
-     */
-    private static function optionalText(array $body, string $field): string|null|Response
-    {
-        if (!array_key_exists($field, $body) || $body[$field] === null) {
-            return null;
-        }
-        if (!is_string($body[$field])) {
-            return Response::error("{$field} must be text or null", 422);
-        }
-        $value = trim($body[$field]);
-        if ($value === '') {
-            return null;
-        }
-        if ($violation = InputLimits::firstViolation([$field => [$value, InputLimits::TEXT_MAX]])) {
-            return $violation;
-        }
-
-        return $value;
     }
 
     /**

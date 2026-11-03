@@ -1,6 +1,6 @@
 {
   "name": "Whity Core Design Tokens",
-  "description": "Master design token definitions for web, mobile, and desktop platforms, at tokens v3 (docs/design/tokens.json, design system 2.2). This file is the single source of truth for code — run `npm run tokens:generate` to regenerate all platform outputs (web globals.css, tokens.json, tokens.dart). Every value traces to docs/design/00-decision-register.md; change the register first.",
+  "description": "Master design token definitions for web, mobile, and desktop platforms, at tokens v3 (docs/design/tokens.json, design system 2.9). This file is the single source of truth for code — run `npm run tokens:generate` to regenerate all platform outputs (web globals.css, tokens.json, tokens.dart). Every value traces to docs/design/00-decision-register.md; change the register first.",
   "version": "3.0.0",
   "platforms": {
     "web": {
@@ -172,21 +172,21 @@
       "arabic": "Noto Sans Arabic",
       "display": "Readex Pro"
     },
-    "scaleRationale": "Product scale (decision 3.5a): 12 caption, 14 text (the default), 16 large, 18 card title, 20 section, 24 page title; 11px (2xs) is the floor, for counters and badges only. Sizes in rem for web, px for Dart/Flutter. Line heights (decision 3.6): 1.5 for text and captions, 1.25 for titles, 1.1 for the largest display size.",
+    "scaleRationale": "Product scale (decision A.1, was 3.5a): 13 caption and the floor, 15 text (the default), 16 large, 18 card title, 20 section, 24 page title. Larger text (W.3) is every size one step up. Sizes in rem for web, px for Dart/Flutter. Line heights (decision 3.6): 1.5 for text and captions, 1.25 for titles, 1.1 for the largest display size.",
     "fontSize": {
       "2xs": {
-        "rem": "0.6875rem",
-        "px": 11,
+        "rem": "0.8125rem",
+        "px": 13,
         "lineHeight": 1.5
       },
       "xs": {
-        "rem": "0.75rem",
-        "px": 12,
+        "rem": "0.8125rem",
+        "px": 13,
         "lineHeight": 1.5
       },
       "sm": {
-        "rem": "0.875rem",
-        "px": 14,
+        "rem": "0.9375rem",
+        "px": 15,
         "lineHeight": 1.5
       },
       "base": {
@@ -219,6 +219,17 @@
         "px": 36,
         "lineHeight": 1.1
       }
+    },
+    "fontSizeLarger": {
+      "2xs": "0.9375rem",
+      "xs": "0.9375rem",
+      "sm": "1.0625rem",
+      "base": "1.125rem",
+      "lg": "1.25rem",
+      "xl": "1.5rem",
+      "2xl": "1.875rem",
+      "3xl": "2.25rem",
+      "4xl": "2.625rem"
     },
     "fontWeight": {
       "normal": 400,
@@ -283,9 +294,9 @@
     "lg": "10px",
     "xl": "12px",
     "2xl": "16px",
-    "control-sm": "7px",
-    "control": "9px",
-    "control-lg": "10px",
+    "control-sm": "8px",
+    "control": "10px",
+    "control-lg": "11px",
     "card": "12px",
     "dialog": "16px",
     "full": "999px"
@@ -312,10 +323,10 @@
     "plane-lift": "0.3125rem"
   },
   "size": {
-    "control-h-sm": "28px",
-    "control-h": "36px",
-    "control-h-lg": "40px",
-    "row-h": "44px",
+    "control-h-sm": "32px",
+    "control-h": "40px",
+    "control-h-lg": "44px",
+    "row-h": "48px",
     "icon": "16px",
     "sidebar-w": "240px",
     "sidebar-w-collapsed": "56px",

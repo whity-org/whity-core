@@ -62,16 +62,51 @@ final class SubmissionValidatorTest extends TestCase
         SubmissionValidator::validate($fields, []);
     }
 
-    public function testAFalseCheckboxIsAnAnswerAndNotABlank(): void
+    public function testAFalseOptionalCheckboxIsAnAnswerAndNotABlank(): void
+    {
+        $fields = [self::field('wants_newsletter', FieldType::CHECKBOX)];
+
+        // Stored rather than dropped: "left unticked" and "never asked" are
+        // different things to whoever reads the submission.
+        $result = SubmissionValidator::validate($fields, ['wants_newsletter' => false]);
+
+        self::assertSame(['wants_newsletter' => false], $result['values']);
+    }
+
+    /**
+     * Every spelling of "unticked" the checkbox normalizer accepts, so a client
+     * sending a form-encoded `0` cannot get past what a JSON `false` cannot.
+     *
+     * @return array<string, array{0: mixed}>
+     */
+    public static function untickedSpellings(): array
+    {
+        return [
+            'bool' => [false],
+            'string false' => ['false'],
+            'string zero' => ['0'],
+            'int zero' => [0],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('untickedSpellings')]
+    public function testARequiredCheckboxLeftUntickedIsRefused(mixed $unticked): void
     {
         $fields = [self::field('accepts_terms', FieldType::CHECKBOX, ['is_required' => true])];
 
-        // The exception that makes the blank rule worth writing down: treating
-        // `false` as blank would make a required consent box impossible to
-        // DECLINE, and would store nothing where the form promised a decision.
-        $result = SubmissionValidator::validate($fields, ['accepts_terms' => false]);
+        $this->expectException(FormRejectedException::class);
+        $this->expectExceptionMessage('Accepts terms must be ticked');
 
-        self::assertSame(['accepts_terms' => false], $result['values']);
+        SubmissionValidator::validate($fields, ['accepts_terms' => $unticked]);
+    }
+
+    public function testARequiredCheckboxThatIsTickedIsStored(): void
+    {
+        $fields = [self::field('accepts_terms', FieldType::CHECKBOX, ['is_required' => true])];
+
+        $result = SubmissionValidator::validate($fields, ['accepts_terms' => true]);
+
+        self::assertSame(['accepts_terms' => true], $result['values']);
     }
 
     public function testARequiredCheckboxStillRefusesAnAnswerThatWasNeverGiven(): void
@@ -80,6 +115,48 @@ final class SubmissionValidatorTest extends TestCase
 
         $this->expectException(FormRejectedException::class);
         SubmissionValidator::validate($fields, []);
+    }
+
+    public function testAFileQuestionWithoutMaxFilesStaysOneString(): void
+    {
+        $fields = [self::field('paper', FieldType::FILE)];
+
+        self::assertSame(['paper' => 'k/1.pdf'], SubmissionValidator::validate($fields, ['paper' => 'k/1.pdf'])['values']);
+
+        $this->expectException(FormRejectedException::class);
+        SubmissionValidator::validate($fields, ['paper' => ['k/1.pdf', 'k/2.pdf']]);
+    }
+
+    public function testAFileQuestionTakingSeveralAlwaysStoresAList(): void
+    {
+        $fields = [self::field('papers', FieldType::FILE, ['validation' => ['maxFiles' => 2]])];
+
+        self::assertSame(['papers' => ['k/1.pdf']], SubmissionValidator::validate($fields, ['papers' => 'k/1.pdf'])['values']);
+        self::assertSame(
+            ['papers' => ['k/1.pdf', 'k/2.pdf']],
+            SubmissionValidator::validate($fields, ['papers' => ['k/1.pdf', 'k/2.pdf', 'k/1.pdf']])['values'],
+        );
+    }
+
+    public function testAFileQuestionRefusesMoreThanItTakes(): void
+    {
+        $fields = [self::field('papers', FieldType::FILE, ['validation' => ['maxFiles' => 2]])];
+
+        try {
+            SubmissionValidator::validate($fields, ['papers' => ['k/1.pdf', 'k/2.pdf', 'k/3.pdf']]);
+            self::fail('expected a refusal');
+        } catch (FormRejectedException $e) {
+            self::assertSame(['reason' => 'too_many_files', 'field_key' => 'papers', 'params' => ['max' => 2]], $e->details());
+        }
+    }
+
+    public function testARequiredFileQuestionTakingSeveralRefusesAnEmptyList(): void
+    {
+        $fields = [self::field('papers', FieldType::FILE, ['is_required' => true, 'validation' => ['maxFiles' => 2]])];
+
+        $this->expectException(FormRejectedException::class);
+        $this->expectExceptionMessage('Papers is required');
+        SubmissionValidator::validate($fields, ['papers' => []]);
     }
 
     public function testACheckboxRefusesAStringItCannotMeanAndDoesNotCoerceIt(): void

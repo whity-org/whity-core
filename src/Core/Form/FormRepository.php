@@ -48,7 +48,7 @@ final class FormRepository
      * Written once and shared by every read, so a column added to the table
      * cannot reach one caller and not another.
      */
-    private const COLUMNS = 'id, tenant_id, form_key, name, description, status, version,
+    private const COLUMNS = 'id, tenant_id, form_key, name, description, submit_label, sections, reference_format, status, version,
                              route_template_id, created_by_profile_id, created_at, updated_at,
                              public_enabled, public_slug, public_opens_at, public_closes_at,
                              public_enabled_at, public_enabled_by_profile_id,
@@ -392,7 +392,8 @@ final class FormRepository
      *
      * Returns false when the form does not exist in this tenant.
      *
-     * @param array<string, mixed> $changes Any of: name, description, route_template_id.
+     * @param array<string, mixed> $changes Any of: name, description, route_template_id,
+     *                                     submit_label, sections, reference_format.
      */
     public function update(int $tenantId, int $id, array $changes): bool
     {
@@ -412,6 +413,21 @@ final class FormRepository
         if (array_key_exists('route_template_id', $changes)) {
             $sets[] = 'route_template_id = :route_template_id';
             $params[':route_template_id'] = $changes['route_template_id'];
+        }
+        if (array_key_exists('reference_format', $changes)) {
+            $sets[] = 'reference_format = :reference_format';
+            $params[':reference_format'] = $changes['reference_format'];
+        }
+        if (array_key_exists('submit_label', $changes)) {
+            $sets[] = 'submit_label = :submit_label';
+            $params[':submit_label'] = $changes['submit_label'];
+        }
+        if (array_key_exists('sections', $changes)) {
+            /** @var list<array<string, mixed>> $sections */
+            $sections = $changes['sections'];
+            $json = json_encode($sections, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            $sets[] = 'sections = :sections';
+            $params[':sections'] = $json === false ? '[]' : $json;
         }
 
         $stmt = $this->db->prepare(
@@ -482,6 +498,56 @@ final class FormRepository
         return $stmt->fetch(PDO::FETCH_ASSOC) !== false;
     }
 
+    private static function preferredOrNull(mixed $stored): ?string
+    {
+        if ($stored === null) {
+            return null;
+        }
+        $text = LocalizedLabel::preferred(LocalizedLabel::decode((string) $stored));
+        if ($text !== '') {
+            return $text;
+        }
+
+        // An Arabic-only row reads as `preferred()` too, so reaching here means
+        // the column held nothing usable.
+        return null;
+    }
+
+    /**
+     * @return list<array{key: string, title: array<string, string>, description: array<string, string>}>
+     */
+    private static function decodeSections(mixed $stored): array
+    {
+        $decoded = is_string($stored) ? json_decode($stored, true) : null;
+        if (!is_array($decoded)) {
+            return [];
+        }
+
+        $sections = [];
+        foreach ($decoded as $entry) {
+            if (!is_array($entry) || !is_string($entry['key'] ?? null)) {
+                continue;
+            }
+            $sections[] = [
+                'key' => $entry['key'],
+                'title' => self::labelFrom($entry['title'] ?? null),
+                'description' => self::labelFrom($entry['description'] ?? null),
+            ];
+        }
+
+        return $sections;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private static function labelFrom(mixed $value): array
+    {
+        $encoded = is_array($value) ? json_encode($value) : false;
+
+        return LocalizedLabel::decode($encoded === false ? null : $encoded);
+    }
+
     /**
      * Shape a raw row for every consumer.
      *
@@ -501,7 +567,15 @@ final class FormRepository
             'tenant_id' => (int) $row['tenant_id'],
             'form_key' => (string) $row['form_key'],
             'name' => LocalizedLabel::decode(isset($row['name']) ? (string) $row['name'] : null),
-            'description' => $row['description'] === null ? null : (string) $row['description'],
+            // The string stays the one existing clients read, and the map is the
+            // whole text: see {@see LocalizedLabel::preferred()}.
+            'description' => self::preferredOrNull($row['description'] ?? null),
+            'description_i18n' => LocalizedLabel::decode(
+                isset($row['description']) ? (string) $row['description'] : null
+            ) ?: new \stdClass(),
+            'submit_label' => isset($row['submit_label']) ? LocalizedLabel::decode((string) $row['submit_label']) : null,
+            'reference_format' => isset($row['reference_format']) ? (string) $row['reference_format'] : null,
+            'sections' => self::decodeSections($row['sections'] ?? null),
             'status' => $status,
             'version' => (int) $row['version'],
             'route_template_id' => $row['route_template_id'] === null ? null : (int) $row['route_template_id'],

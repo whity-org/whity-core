@@ -244,7 +244,7 @@ export function PermissionsGrid({
                     <span className="text-xs font-semibold uppercase tracking-wide text-foreground">
                       {titleCase(group)}
                     </span>
-                    <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
                       {inGroup}/{perms.length}
                       {/* `-rotate-90` is direction-agnostic here on purpose: the
                           chevron reads as "closed" pointing at the label in

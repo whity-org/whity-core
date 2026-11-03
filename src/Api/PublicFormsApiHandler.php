@@ -408,7 +408,7 @@ final class PublicFormsApiHandler
 
             return Response::error($e->clientMessage, $e->status);
         } catch (FormRejectedException $e) {
-            return Response::error($e->clientMessage, 422);
+            return Response::error($e->clientMessage, 422, $e->details());
         } catch (StorageException $e) {
             error_log('[PublicFormsApiHandler] upload storage write failed: ' . $e->getMessage());
 
@@ -518,6 +518,9 @@ final class PublicFormsApiHandler
                 'data' => [
                     'received' => true,
                     'submitted_at' => $submission['submitted_at'] ?? null,
+                    // Theirs to quote. It names this form's own sequence and nothing
+                    // about the tenant beyond the wording the office chose to print.
+                    'reference' => $submission['reference'] ?? null,
                 ],
                 'meta' => [
                     // Whether it actually started circulating. A form with no
@@ -539,7 +542,7 @@ final class PublicFormsApiHandler
             // the person's OWN field label — "Contact number is required" — which
             // is written for whoever is looking at the form. They disclose only
             // labels the caller was already shown.
-            return Response::error($e->clientMessage, 422);
+            return Response::error($e->clientMessage, 422, $e->details());
         } catch (\Throwable $e) {
             error_log('[PublicFormsApiHandler] submit failed: ' . $e->getMessage());
 

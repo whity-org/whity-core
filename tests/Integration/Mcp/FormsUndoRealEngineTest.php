@@ -112,7 +112,26 @@ final class FormsUndoRealEngineTest extends TestCase
         $stmt->execute([$form['data']['id']]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         self::assertEquals(['en' => 'Leave request'], json_decode((string) $row['name'], true));
-        self::assertSame('For time off', $row['description']);
+        self::assertEquals(['en' => 'For time off'], json_decode((string) $row['description'], true));
+    }
+
+    public function testUndoingAnEditKeepsBothLanguagesOfTheText(): void
+    {
+        $form = $this->call('post_api_forms', [
+            'form_key' => 'leave_request',
+            'name' => ['en' => 'Leave request'],
+            'description' => ['en' => 'For time off', 'ar' => 'للإجازات'],
+        ]);
+
+        $edit = $this->call('patch_api_forms_id', ['id' => $form['data']['id'], 'description' => null]);
+
+        $this->undo($edit['undo']);
+        $stmt = $this->pdo->prepare('SELECT description FROM forms WHERE id = ?');
+        $stmt->execute([$form['data']['id']]);
+        self::assertEquals(
+            ['en' => 'For time off', 'ar' => 'للإجازات'],
+            json_decode((string) $stmt->fetchColumn(), true)
+        );
     }
 
     /**

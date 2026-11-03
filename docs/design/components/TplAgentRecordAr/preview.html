@@ -1,0 +1,49 @@
+<!-- @dsCard group="Templates · AI and agents" height=840 width=1280 subtitle="V.3: the 2.8 Arabic card: an agent’s page mirrored" -->
+<!doctype html>
+<html dir="rtl" lang="ar">
+<head><meta charset="utf-8"><title>Agent Arabic</title><style>html,body{height:100%} #root{min-height:100%} body{font-family:var(--font-arabic)} .wy-shell__brand{direction:ltr}</style></head>
+<body>
+<div id="root"></div>
+<script>
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 16 }); }
+  var NAVL = {};
+  function L(s) { return NAVL[s] || s; }
+  /* The sidebar as built (inventory, 1 Nov 2026), in sentence case; only the current group is open (2.5). */
+  var GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['approval', 'Approvals', 3], ['form', 'My submissions']]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations'], ['user', 'Family relations'], ['two-step', 'Approval gating']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['routing', 'Route templates'], ['page', 'Notes and wiki'], ['form', 'Form builder'], ['list-todo', 'Forms']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]],
+    ['Platform', [['tenant', 'Tenants'], ['money', 'Plans and pricing'], ['receipt', 'Promotions'], ['chart', 'System'], ['error', 'Errors'], ['notification', 'Notification delivery']]]];
+  function appNav(active, o) { o = o || {};
+    return GROUPS.filter(function (g) { return g[0] !== 'Platform' || o.operator; }).map(function (g) {
+      var has = g[1].some(function (x) { return x[1] === active; });
+      return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
+  var topBar = h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' }));
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: o.tenant || 'Example Bakery', user: o.user || 'Rana Haddad', role: o.role || 'Owner', nav: appNav(active, o), topActions: topBar, searchLabel: o.search, dir: o.dir }, kids); }
+  function person(name, sub, o) { o = o || {}; return h('div', { className: 'wy-person' }, h(W.Avatar, { name: name, size: o.size || 28, kind: o.kind }), h('div', { style: { minWidth: 0 } }, h('b', null, name), sub ? h('small', null, sub) : null)); }
+  function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
+  function recHead(o) { return h('div', { className: 'wy-rech' }, o.avatar || h('span', { className: 'wy-rech__ic', 'aria-hidden': 'true' }, I(o.icon || 'document', 26)),
+      h('div', { style: { minWidth: 0 } }, h('h1', null, o.title, o.badges || null), h('div', { className: 'wy-rech__facts' }, (o.facts || []).map(function (f, i) { return h('span', { key: i }, f[0] ? I(f[0], 14) : null, f[1]); }))),
+      h('div', { className: 'wy-rech__acts' }, o.actions || null)); }
+  function saveBar(text, L2) { L2 = L2 || {}; return h('div', { className: 'wy-savebar', role: 'region', 'aria-label': L2.label || 'Unsaved changes' }, I('edit'), h('span', null, text), h(W.Button, { variant: 'ghost' }, L2.discard || 'Discard'), h(W.Button, null, L2.save || 'Save changes')); }
+  function agentHead(T, tab) { return h(F, null, h(W.Breadcrumb, { items: [{ label: T.agents }, { label: T.name }] }),
+    recHead({ avatar: h(W.Avatar, { kind: 'agent', name: T.name, size: 56 }), title: T.name, badges: h(W.Badge, { variant: 'success' }, T.working), facts: [['user', T.for], ['activity', T.today], ['clock', T.since]],
+      actions: h(F, null, h(W.Button, { variant: 'outline', icon: 'activity' }, T.seeAct), h(W.Button, { variant: 'outline' }, T.pause), h(W.Menu, { label: T.more, items: [{ icon: 'delete', label: T.del, danger: true }] })) }),
+    h('div', { className: 'wy-rectabs' }, h(W.Tabs, { items: [{ value: 'o', label: T.tO }, { value: 'i', label: T.tI }, { value: 'p', label: T.tP, count: 10 }, { value: 'a', label: T.tA }], defaultValue: tab }))); }
+  function overview(T) { return h('div', { className: 'wy-recbody' },
+    h('div', { style: { display: 'grid', gap: 16 } },
+      h(W.Card, { title: T.job }, h('p', { style: { margin: 0, lineHeight: 1.6 } }, T.jobText)),
+      h(W.Card, { title: T.todayT, description: T.todayD }, h(W.AgentActivity, { items: T.items }))),
+    h('div', { style: { display: 'grid', gap: 16 } },
+      h(W.Card, { title: T.onOwn }, h(W.DescriptionList, { items: [{ label: T.allowed, value: T.allowedV }, { label: T.ask, value: T.askV }, { label: T.off, value: T.offV }] })),
+      h(W.Card, { title: T.where }, h(W.DescriptionList, { items: [{ label: T.wApps, value: 'Front Office' }, { label: T.wCh, value: T.wChV }, { label: T.wLang, value: T.wLangV }] })))); }
+
+  NAVL = { 'Dashboard': 'لوحة المتابعة', 'Inbox': 'الوارد', 'Approvals': 'الموافقات', 'My submissions': 'ما أرسلتُه', 'People': 'الأشخاص', 'AI': 'الذكاء الاصطناعي', 'Agents': 'الوكلاء', 'Connected AI apps': 'تطبيقات ذكاء اصطناعي متصلة', 'What AI can do': 'ما يمكن للذكاء الاصطناعي فعله', 'Documents': 'المستندات', 'Workspace': 'مساحة العمل' };
+  var T = { agents: 'الوكلاء', name: 'مساعد الفوترة', working: 'يعمل', for: 'يعمل لرنا حداد', today: '14 إجراءً اليوم', since: 'منذ 12 آذار 2026', seeAct: 'عرض النشاط', pause: 'إيقاف مؤقت', more: 'المزيد', del: 'حذف الوكيل', tO: 'نظرة عامة', tI: 'التعليمات', tP: 'ما يمكنه فعله', tA: 'النشاط', job: 'ماذا يفعل', jobText: 'يحرص على تحصيل فواتير Example Bakery. يبحث كل صباح عن الفواتير المتأخرة، ويُعدّ تذكيرات لتوافق عليها رنا، ويرسل الإيصالات عند الدفع. لا يغيّر المبالغ ولا يلغي الفواتير أبداً.', todayT: 'اليوم', todayD: '14 منجزة · 2 بانتظار رنا', items: [{ actor: 'مساعد الفوترة', onBehalfOf: 'رنا', text: 'أرسل 4 إيصالات عبر واتساب', time: '09:12', kind: 'act' }, { actor: 'مساعد الفوترة', onBehalfOf: 'رنا', text: 'اقترح تذكيراً لـ Example Café', time: '08:20', kind: 'propose' }, { actor: 'مساعد الفوترة', onBehalfOf: 'رنا', text: 'قرأ 32 فاتورة ليجد المتأخرة', time: '08:05', kind: 'read' }], onOwn: 'بمفرده', allowed: 'مسموح', allowedV: '6 إجراءات، مثل قراءة الفواتير وإرسال الإيصالات', ask: 'يسأل أولاً', askV: '4 إجراءات، مثل إرسال التذكيرات', off: 'أبداً', offV: 'إلغاء الفواتير، تغيير الأسعار', where: 'أين يعمل', wApps: 'التطبيقات', wCh: 'يرسل عبر', wChV: 'البريد الإلكتروني وواتساب', wLang: 'يكتب بـ', wLangV: 'العربية والإنجليزية، كما يكتب العميل' };
+  ReactDOM.createRoot(document.getElementById('root')).render(shell('Agents', h(F, null, agentHead(T, 'o'), overview(T)), { user: 'رنا حداد', role: 'المالكة', search: 'بحث', dir: 'rtl' }));
+</script>
+</body>
+</html>

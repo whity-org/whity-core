@@ -104,7 +104,7 @@ export function BilingualInput({
             {label}
             {required && <span className="ms-0.5 text-destructive">*</span>}
           </label>
-          {description && <p className="text-[0.6875rem] text-muted-foreground">{description}</p>}
+          {description && <p className="text-xs text-muted-foreground">{description}</p>}
         </div>
       )}
 
@@ -114,7 +114,7 @@ export function BilingualInput({
         <div className="space-y-1.5">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-1.5 min-w-0">
-              <Badge variant="outline" className="font-mono font-semibold text-[9px] uppercase px-1.5 py-0 bg-muted/60 text-foreground shrink-0">
+              <Badge variant="outline" className="font-mono font-semibold text-xs uppercase px-1.5 py-0 bg-muted/60 text-foreground shrink-0">
                 {pLang.badge}
               </Badge>
               <label htmlFor={pId} className="text-xs font-medium text-muted-foreground truncate">
@@ -142,7 +142,7 @@ export function BilingualInput({
         <div className="space-y-1.5">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-1.5 min-w-0">
-              <Badge variant="outline" className="font-mono font-semibold text-[9px] uppercase px-1.5 py-0 bg-muted/60 text-foreground shrink-0">
+              <Badge variant="outline" className="font-mono font-semibold text-xs uppercase px-1.5 py-0 bg-muted/60 text-foreground shrink-0">
                 {sLang.badge}
               </Badge>
               <label htmlFor={sId} className="text-xs font-medium text-muted-foreground truncate">
@@ -174,7 +174,7 @@ function PresenceIndicator({ present, testId }: { present: boolean; testId: stri
   return (
     <Badge
       variant={present ? "secondary" : "outline"}
-      className="text-[9px] uppercase"
+      className="text-xs uppercase"
       data-testid={testId}
     >
       {present ? "Set" : "Empty"}

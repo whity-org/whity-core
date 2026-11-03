@@ -78,6 +78,18 @@ staging runs `APP_ENV=staging`, the `*@example.com` demo accounts are **not**
 created; append `--with-fixtures` if this particular staging box is meant to
 carry them (the load-test scripts expect `admin@example.com`).
 
+### Uploaded files
+
+Uploads and rendered PDFs live in the `storage_data_staging` volume, mounted at
+`/app/storage`, so they survive an image update. Any worker you run beside this
+file has to mount the same volume and set `STORAGE_ROOT: /app/storage`, or it
+reads and writes files the API never sees.
+
+A host that deployed before this volume existed (WHIT-844) keeps its files
+inside the app container, and the next `up` removes that container. Copy them
+out first with `docker cp <app container>:/app/storage/. <folder>`, then copy
+them into the new volume after the `up`.
+
 ## Running without the bundled UI
 
 The `web` service in `docker-compose.staging-remote.yml` sits behind the `web`

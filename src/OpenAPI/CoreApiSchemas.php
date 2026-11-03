@@ -1302,7 +1302,8 @@ final class CoreApiSchemas
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('PATCH', '/api/forms/{id:\d+}', 'forms:manage', [
-                // WHIT-812: undone by restoring its name, description and route, unless they changed again since.
+                // WHIT-812: undone by restoring its text and route, unless they changed again since.
+                // The `_i18n` map, because restoring the string would lose the Arabic.
                 'mcp' => ['undo' => [
                     'windowSeconds' => self::UNDO_WINDOW_SECONDS,
                     'read' => ['operation' => 'get_api_forms_id', 'arguments' => ['id' => '/arguments/id']],
@@ -1310,7 +1311,10 @@ final class CoreApiSchemas
                     'arguments' => [
                         'id' => '/arguments/id',
                         'name' => '/before/data/name',
-                        'description' => '/before/data/description',
+                        'description' => '/before/data/description_i18n',
+                        'submit_label' => '/before/data/submit_label',
+                        'reference_format' => '/before/data/reference_format',
+                        'sections' => '/before/data/sections',
                         'route_template_id' => '/before/data/route_template_id',
                     ],
                 ]],
@@ -1433,10 +1437,11 @@ final class CoreApiSchemas
                     . 'server\'s SHA-256 of what it stored. '
                     . 'Gated `forms:submit` — the same permission as the submit itself, because '
                     . 'uploading is half of answering. '
-                    . 'ACCEPTS application/pdf, image/png and image/jpeg ONLY, decided by the LEADING '
-                    . 'BYTES: a declared Content-Type that contradicts the bytes is a 422, and a '
-                    . 'declared type is never what gets stored. Office formats are absent on purpose — '
-                    . 'a .docx is indistinguishable from any other ZIP by magic bytes. '
+                    . 'ACCEPTS application/pdf, image/png, image/jpeg and Word (.docx) ONLY, decided by the '
+                    . 'BYTES: a declared Content-Type that contradicts them is a 422, and a declared type '
+                    . 'is never what gets stored. A .docx is checked by reading the archive\'s index without '
+                    . 'unpacking it, and a macro-enabled one is refused; legacy .doc and other office '
+                    . 'formats are refused. '
                     . 'MAXIMUM 10 MiB. '
                     . 'REFUSED (422) on a form that is not accepting submissions, and on a form with '
                     . 'no `file` field — so a broad permission cannot be aimed at arbitrary form ids '
@@ -1570,7 +1575,9 @@ final class CoreApiSchemas
                         201 => self::jsonResponse('Received', 'PublicFormSubmissionResponse'),
                         404 => self::errorResponse('No publicly-open form is served at this address'),
                         422 => self::errorResponse(
-                            'An answer failed validation, or the form is outside its submission window'
+                            'An answer failed validation, or the form is outside its submission window. '
+                            . 'A refused answer carries `details.reason`, `details.field_key` and sometimes '
+                            . '`details.params`, so a page can word it in the reader\'s language.'
                         ),
                         429 => self::errorResponse('Too many attempts from this address, or for this form'),
                         503 => self::errorResponse('Temporarily unavailable'),
@@ -1742,6 +1749,30 @@ final class CoreApiSchemas
                 'responses' => [
                     200 => self::jsonResponse('The submission and its fields', 'FormSubmissionDetailResponse'),
                     404 => self::errorResponse('Submission not found'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/form-submissions/{id:\d+}/review', 'forms:read', [
+                'summary' => 'What the office recorded about a submission',
+                'description' => 'The current review, every earlier one, and the staff fields they answer. '
+                    . 'The applicant has no route to this.',
+                'tags' => ['forms'],
+                'responses' => [
+                    200 => self::jsonResponse('The review and its history', 'FormSubmissionReviewDetailResponse'),
+                    404 => self::errorResponse('Submission not found'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/form-submissions/{id:\d+}/review', 'forms:review', [
+                'summary' => 'Record the office\'s decision on a submission',
+                'description' => 'Checked against the form\'s staff fields as a submission is checked against '
+                    . 'its own, and sent whole. Each save is a new row and the newest is current, so changing '
+                    . 'a decision leaves the old one readable. The submission itself is never changed. Works '
+                    . 'on a closed form. `meta.ignored_keys` names answers that matched no staff field.',
+                'tags' => ['forms'],
+                'request' => 'FormSubmissionCreateRequest',
+                'responses' => [
+                    201 => self::jsonResponse('The recorded review', 'FormSubmissionReviewResponse'),
+                    404 => self::errorResponse('Submission not found'),
+                    422 => self::errorResponse('The form has no staff fields, or an answer failed validation'),
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('GET', '/api/me/form-submissions', 'forms:submit', [
@@ -2584,6 +2615,34 @@ final class CoreApiSchemas
                     'responses' => [
                         200 => self::jsonResponse('The caller\'s updated preferences', 'NotificationPreferencesResponse'),
                         422 => self::errorResponse('Invalid preferences, or an attempt to disable a transactional type'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'GET',
+                'path' => '/api/me/display-preferences',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'The caller\'s text size and Show technical details',
+                    'tags' => ['profile'],
+                    'responses' => [
+                        200 => self::jsonResponse('The caller\'s display preferences', 'DisplayPreferencesResponse'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'PUT',
+                'path' => '/api/me/display-preferences',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Change the caller\'s text size, Show technical details, or both',
+                    'tags' => ['profile'],
+                    'request' => 'DisplayPreferencesUpdateRequest',
+                    'responses' => [
+                        200 => self::jsonResponse('The caller\'s updated display preferences', 'DisplayPreferencesResponse'),
+                        422 => self::errorResponse('Nothing to change, or a value that isn\'t allowed'),
                     ] + self::authErrors(),
                 ],
             ],
@@ -6772,6 +6831,12 @@ final class CoreApiSchemas
                 'form_key' => self::str(),
                 'name' => self::localizedText(),
                 'description' => self::str(true),
+                'description_i18n' => self::localizedText(),
+                'submit_label' => self::localizedText() + ['nullable' => true],
+                'reference_format' => self::str(true),
+                // Titles by section key. Which sections exist is still derived
+                // from the fields.
+                'sections' => ['type' => 'array', 'items' => SchemaBuilder::ref('FormSectionText')],
                 'status' => ['type' => 'string', 'enum' => ['draft', 'published', 'archived']],
                 'version' => self::int(),
                 // Null means "collect only, do not circulate" — a legitimate
@@ -6846,6 +6911,7 @@ final class CoreApiSchemas
                 ]],
                 'label' => self::localizedText(),
                 'help_text' => self::str(true),
+                'help_text_i18n' => self::localizedText(),
                 'is_required' => self::bool(),
                 'options' => ['type' => 'array', 'items' => SchemaBuilder::ref('FormFieldOption')],
                 'validation' => SchemaBuilder::ref('FormFieldValidation'),
@@ -6853,10 +6919,25 @@ final class CoreApiSchemas
                 'prefill_backed' => self::bool(),
                 'section_key' => self::str(true),
                 'position' => self::int(),
+                'visible_when' => SchemaBuilder::ref('FormFieldCondition'),
+                'audience' => ['type' => 'string', 'enum' => ['applicant', 'staff']],
                 'multi_valued' => self::bool(),
                 'created_at' => self::str(),
                 'updated_at' => self::str(),
             ], ['id', 'tenant_id', 'form_id', 'field_key', 'field_type', 'label', 'is_required', 'position']),
+            // Null means always shown. Exactly one of `equals` and `in` is set.
+            // A hidden question is not required and an answer to it is not stored.
+            'FormFieldCondition' => [
+                'type' => 'object',
+                'nullable' => true,
+                'properties' => [
+                    'field' => self::str(),
+                    'equals' => ['description' => 'Text, a number, or true or false, compared with the answer.'],
+                    'in' => ['type' => 'array', 'items' => self::str(), 'maxItems' => 100],
+                ],
+                'required' => ['field'],
+                'additionalProperties' => false,
+            ],
             'FormFieldOption' => self::object([
                 'value' => self::name(nonEmpty: true),
                 'label' => self::localizedText(),
@@ -6869,6 +6950,7 @@ final class CoreApiSchemas
                 'max' => ['type' => 'number'],
                 'maxLength' => self::int(),
                 'pattern' => ['type' => 'string', 'maxLength' => 512],
+                'maxFiles' => self::int() + ['description' => 'How many files a file question takes, 1 to 20. Above 1 the answer is a list.'],
             ], []),
             // DERIVED from the fields' `section_key`, never stored. There is no
             // `form_sections` table, so a section cannot exist with no fields and
@@ -6876,7 +6958,30 @@ final class CoreApiSchemas
             'FormSection' => self::object([
                 'key' => self::str(true),
                 'field_keys' => ['type' => 'array', 'items' => ['type' => 'string']],
+                'title' => self::localizedText() + ['nullable' => true],
+                'description' => self::localizedText() + ['nullable' => true],
             ], ['key', 'field_keys']),
+            'FormSubmissionReview' => self::object([
+                'id' => self::int(),
+                'submission_id' => self::int(),
+                'data' => ['type' => 'object', 'additionalProperties' => true],
+                'recorded_by_profile_id' => self::int(true),
+                'recorded_at' => self::str(),
+            ], ['id', 'submission_id', 'data', 'recorded_at']),
+            'FormSubmissionReviewResponse' => self::object([
+                'data' => SchemaBuilder::ref('FormSubmissionReview'),
+                'meta' => self::object(['ignored_keys' => ['type' => 'array', 'items' => ['type' => 'string']]], []),
+            ], ['data']),
+            'FormSubmissionReviewDetailResponse' => self::dataEnvelope(self::object([
+                'current' => SchemaBuilder::ref('FormSubmissionReview') + ['nullable' => true],
+                'history' => ['type' => 'array', 'items' => SchemaBuilder::ref('FormSubmissionReview')],
+                'fields' => ['type' => 'array', 'items' => SchemaBuilder::ref('FormField')],
+            ], ['current', 'history', 'fields'])),
+            'FormSectionText' => self::object([
+                'key' => self::str(),
+                'title' => self::localizedText(),
+                'description' => self::localizedText(),
+            ], ['key']),
             'FormFieldResponse' => self::dataEnvelope(SchemaBuilder::ref('FormField')),
             'FormFieldListResponse' => self::object([
                 'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('FormField')],
@@ -6912,7 +7017,7 @@ final class CoreApiSchemas
                 // one language only is the ordinary case, and demanding the object
                 // shape would 422 a request that meant something perfectly clear.
                 'name' => self::localizedText() + ['description' => 'Form name as `{"en": ..., "ar": ...}`; a plain string is read as English.'],
-                'description' => self::text() + ['description' => 'What the form is for.'],
+                'description' => ['description' => 'What the form is for: text, or `{"en": ..., "ar": ...}`.'],
                 'route_template_id' => self::int(true) + ['description' => 'Route template that circulates each submission for approval (see GET /api/document-route-templates); null for none.'],
             ], ['form_key', 'name']),
             // `form_key` and `status` are absent because both are REFUSED with a
@@ -6920,8 +7025,11 @@ final class CoreApiSchemas
             // dropping it silently would leave them believing a change happened.
             'FormUpdateRequest' => self::object([
                 'name' => self::localizedText() + ['description' => 'New name as `{"en": ..., "ar": ...}`; a plain string is read as English.'],
-                'description' => self::text() + ['description' => 'New description.'],
+                'description' => ['description' => 'New description: text, or `{"en": ..., "ar": ...}`. Plain text sets the English and keeps the Arabic.'],
                 'route_template_id' => self::int(true) + ['description' => 'Route template for approving submissions; null removes it.'],
+                'submit_label' => self::localizedText() + ['nullable' => true, 'description' => 'What the submit button says; null for the default wording.'],
+                'sections' => ['type' => 'array', 'maxItems' => 100, 'items' => SchemaBuilder::ref('FormSectionText'), 'description' => 'The title and description of each section, by `section_key`.'],
+                'reference_format' => ['type' => 'string', 'maxLength' => 64, 'nullable' => true, 'description' => 'The reference each new submission is given, e.g. `BAKE-{YYYY}-{SEQ:4}`. Tokens: {YYYY}, {YY}, {MM}, {SEQ}, {SEQ:n}. {SEQ} is required. Dates are UTC. Null gives none.'],
             ], []) + ['minProperties' => 1],
             'FormFieldCreateRequest' => self::object([
                 'field_key' => [
@@ -6938,12 +7046,14 @@ final class CoreApiSchemas
                     'description' => 'Kind of input: text, textarea, number, date, select, multiselect, checkbox, file, profile_ref (a person) or ou_ref (a unit).',
                 ],
                 'label' => self::localizedText() + ['description' => 'Field label as `{"en": ..., "ar": ...}`; a plain string is read as English.'],
-                'help_text' => self::text() + ['description' => 'Hint shown under the field.'],
+                'help_text' => ['description' => 'Hint shown under the field: text, or `{"en": ..., "ar": ...}`.'],
                 'is_required' => self::bool() + ['description' => 'Whether a submission must answer this field.'],
                 'options' => ['type' => 'array', 'items' => SchemaBuilder::ref('FormFieldOption'), 'description' => 'Choices for select and multiselect fields.'],
                 'validation' => SchemaBuilder::ref('FormFieldValidation') + ['description' => 'Extra checks on the answer (length, range, pattern).'],
                 'prefill_source' => self::str(true) + ['description' => 'Fill the field in advance from the submitter\'s profile; sources are listed in the field list\'s `meta.prefill_sources`.'],
                 'section_key' => self::name() + ['description' => 'Section to group the field under; fields sharing a key form one section.'],
+                'visible_when' => SchemaBuilder::ref('FormFieldCondition') + ['description' => 'Show this question only when another answer matches; null means always.'],
+                'audience' => ['type' => 'string', 'enum' => ['applicant', 'staff'], 'description' => 'Who answers it. A staff field is never shown to the applicant; the office answers it when recording a review.'],
                 // Absent means the server appends it after the current maximum.
                 'position' => self::int() + ['description' => 'Position in the form; omitted appends it at the end.'],
             ], ['field_key', 'field_type', 'label']),
@@ -6967,12 +7077,14 @@ final class CoreApiSchemas
                     'description' => 'Kind of input: text, textarea, number, date, select, multiselect, checkbox, file, profile_ref (a person) or ou_ref (a unit).',
                 ],
                 'label' => self::localizedText() + ['description' => 'New label as `{"en": ..., "ar": ...}`; a plain string is read as English.'],
-                'help_text' => self::text() + ['description' => 'New hint shown under the field.'],
+                'help_text' => ['description' => 'New hint: text, or `{"en": ..., "ar": ...}`. Plain text sets the English and keeps the Arabic.'],
                 'is_required' => self::bool() + ['description' => 'Whether a submission must answer this field.'],
                 'options' => ['type' => 'array', 'items' => SchemaBuilder::ref('FormFieldOption'), 'description' => 'Replacement choices for select and multiselect fields.'],
                 'validation' => SchemaBuilder::ref('FormFieldValidation') + ['description' => 'Replacement checks on the answer.'],
                 'prefill_source' => self::str(true) + ['description' => 'Profile detail to prefill from; null for none.'],
                 'section_key' => self::name() + ['description' => 'Section to group the field under.'],
+                'visible_when' => SchemaBuilder::ref('FormFieldCondition') + ['description' => 'Show this question only when another answer matches; null means always.'],
+                'audience' => ['type' => 'string', 'enum' => ['applicant', 'staff'], 'description' => 'Who answers it. A staff field is never shown to the applicant.'],
                 'position' => self::int() + ['description' => 'New position in the form.'],
             ], []) + ['minProperties' => 1],
             // `prefill` is keyed by FIELD KEY, not by source: two fields may name
@@ -7039,6 +7151,8 @@ final class CoreApiSchemas
                 'slug' => self::str(),
                 'name' => self::localizedText(),
                 'description' => self::str(true),
+                'description_i18n' => self::localizedText(),
+                'submit_label' => self::localizedText() + ['nullable' => true],
                 'fields' => ['type' => 'array', 'items' => SchemaBuilder::ref('PublicFormField')],
                 'sections' => ['type' => 'array', 'items' => SchemaBuilder::ref('FormSection')],
                 'accepts_submissions' => self::bool(),
@@ -7063,11 +7177,13 @@ final class CoreApiSchemas
                 ]],
                 'label' => self::localizedText(),
                 'help_text' => self::str(true),
+                'help_text_i18n' => self::localizedText(),
                 'is_required' => self::bool(),
                 'options' => ['type' => 'array', 'items' => ['type' => 'object', 'additionalProperties' => true]],
                 'validation' => ['type' => 'object', 'additionalProperties' => true],
                 'section_key' => self::str(true),
                 'position' => self::int(),
+                'visible_when' => SchemaBuilder::ref('FormFieldCondition'),
                 'multi_valued' => self::bool(),
             ], ['field_key', 'field_type', 'label', 'is_required', 'position']),
             // A RECEIPT, not the submission row. An anonymous caller gets
@@ -7103,6 +7219,7 @@ final class CoreApiSchemas
                 'data' => self::object([
                     'received' => self::bool(),
                     'submitted_at' => self::str(true),
+                    'reference' => self::str(true),
                 ], ['received']),
                 'meta' => self::object([
                     'routed' => self::bool(),
@@ -7111,6 +7228,8 @@ final class CoreApiSchemas
             ], ['data']),
             'FormSubmission' => self::object([
                 'id' => self::int(),
+                // Null when the form gives no references, or was submitted before it did.
+                'reference' => self::str(true),
                 'tenant_id' => self::int(),
                 'form_id' => self::int(),
                 // The version the answers were given against. See the publish
@@ -7894,6 +8013,17 @@ final class CoreApiSchemas
                 'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('NotificationPreferenceEntry')],
                 'transactional_prefixes' => ['type' => 'array', 'items' => self::str()],
             ], ['data', 'transactional_prefixes']),
+            'DisplayPreferences' => self::object([
+                'textSize' => ['type' => 'string', 'enum' => ['standard', 'larger']],
+                'showTechnicalDetails' => self::bool(),
+            ], ['textSize', 'showTechnicalDetails']),
+            'DisplayPreferencesResponse' => self::object([
+                'data' => SchemaBuilder::ref('DisplayPreferences'),
+            ], ['data']),
+            'DisplayPreferencesUpdateRequest' => self::object([
+                'textSize' => ['type' => 'string', 'enum' => ['standard', 'larger']],
+                'showTechnicalDetails' => self::bool(),
+            ], []),
             'NotificationPreferencesUpdateRequest' => self::object([
                 'preferences' => ['type' => 'array', 'items' => SchemaBuilder::ref('NotificationPreferenceEntry'), 'description' => 'Entries of `{type, channel, enabled}` to set for the signed-in user. Transactional notification types cannot be turned off.'],
             ], ['preferences']),

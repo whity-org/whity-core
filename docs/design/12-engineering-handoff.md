@@ -1,4 +1,4 @@
-# Engineering handoff (v2.2)
+# Engineering handoff (v2.9)
 
 Everything a web or Flutter team, or a coding agent, needs to build Whity screens and bring whity-core in line with the brand. `tokens.json` is the source of truth for this system; if this page and `tokens.json` ever differ, `tokens.json` wins. Every value traces back to `00-decision-register.md`.
 
@@ -35,8 +35,8 @@ Add `whity_brand.dart` next to `whity_tokens`, register `WhityBrand.light` / `.d
 | # | Where | Change | Decision |
 | --- | --- | --- | --- |
 | 1 | `src/design/tokens/base.json` | Adopt tokens v3: `muted-foreground` oklch(0.52), `input` oklch(0.66) / dark oklch(0.52), the status triplets, `primary-tint`, `divider`, `table-header`, `chart-2…6`, `plane-deep`, `mark-sheet`, the blueprint colours; regenerate CSS, JSON and Dart | 2.5, 2.6, 2.7 |
-| 2 | Type | 14px default (`text-sm`), titles 24 / 20 / 18 at 600, no 700; Readex Pro only for brand headlines and document titles | 3.1–3.6 |
-| 3 | `button`, `input`, `select` | Heights 36 (28 small, 40 large), corners ¼ of the height; the outline secondary button; the plane on the default button only | 4.1, 4.2, 7.1 |
+| 2 | Type | 15px default (`text`, A.1), titles 24 / 20 / 18 at 600, no 700; Readex Pro only for brand headlines and document titles | 3.1–3.6 |
+| 3 | `button`, `input`, `select` | Heights 40 (32 small, 44 large), corners ¼ of the height, table rows 48 (A.1); the outline secondary button; the plane on the default button only | 4.1, 4.2, 7.1 |
 | 4 | `badge`, `alert`, nav, tabs | Tinted badges and alerts from the status tints; selected nav and rows on the tint; tabs underlined. Remove Tailwind palette classes (`blue-500`, `emerald-600`, `purple-…`) | 7.3, 7.4 |
 | 5 | `card`, menus, dialogs | Cards: 1px border, no shadow. Floating layers: `shadow-float`. | 4.4, 4.6 |
 | 6 | `data-table.tsx` | Checkbox selection with the bulk bar (count, money total, actions), sort, sticky header, row menu, totals row, loading/empty/error | 7.6 |
@@ -47,6 +47,8 @@ Add `whity_brand.dart` next to `whity_tokens`, register `WhityBrand.light` / `.d
 | 11 | Server | Per-permission mode (off · ask · allow) on AI principals, stored with the credential's scope | 7.5 |
 | 12 | Whity Render | The `Doc` rules and the 13 templates; amount in words; JoFotara QR and reference on fiscal documents | 6 |
 | 13 | npm, GitHub | Move `@amroksaleh/*` packages and repos to a Whity organisation | |
+| 14 | Every screen | Build each screen from its card (sections 19–25, app map): the patterns of section 21 (list, record, states, confirming), plain words, names never ids, money in normal units | P, A, F, D, AI, W |
+| 15 | Preferences | Text size (Standard 15px, Larger 17px) and Show technical details, stored per person | W.3, A.3 |
 
 ## Component map
 
@@ -74,4 +76,4 @@ Add `whity_brand.dart` next to `whity_tokens`, register `WhityBrand.light` / `.d
 
 ## Agent brief
 
-When you build a Whity screen: read `README.md` first; use the tokens, never raw colours; Noto Sans at 14px, never below 11px, never 700; one filled main button per view, and the plane only under it, approved agent work and hovered clickable cards; controls 36px with ¼ corners; cards bordered, floating layers with `shadow-float`; Tabler icons by the names in `icons.json`; every agent action attributed with `ActorChip` and either allowed by its scope or shown as an `ActionProposal`; Undo instead of "Are you sure?" where it can be undone; Western digits and JOD to 3 decimals; the name always "Whity" in Latin letters; fictional names or placeholders for companies, plans and prices.
+When you build a Whity screen: read `README.md` first; use the tokens, never raw colours; Noto Sans at 15px, never below 13px, never 700; plain words, with codes only behind Show technical details; common actions as labelled buttons; one filled main button per view, and the plane only under it, approved agent work and hovered clickable cards; controls 40px with ¼ corners; cards bordered, floating layers with `shadow-float`; Tabler icons by the names in `icons.json`; every agent action attributed with `ActorChip` and either allowed by its scope or shown as an `ActionProposal`; Undo instead of "Are you sure?" where it can be undone; Western digits and JOD to 3 decimals; the name always "Whity" in Latin letters; fictional names or placeholders for companies, plans and prices.

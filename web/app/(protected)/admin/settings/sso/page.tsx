@@ -316,19 +316,19 @@ export default function SsoProvidersPage() {
                 <div className="min-w-0 space-y-1.5">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-medium text-foreground">{p.display_name}</span>
-                    <Badge variant="secondary" className="text-[10px] uppercase">
+                    <Badge variant="secondary" className="text-xs uppercase">
                       {p.provider_key}
                     </Badge>
                     <Badge
                       data-testid={`sso-status-${p.id}`}
                       variant={p.enabled ? 'default' : 'outline'}
-                      className="text-[10px]"
+                      className="text-xs"
                     >
                       {p.enabled
                         ? t('settings.sso.status.enabled', 'Enabled')
                         : t('settings.sso.status.disabled', 'Disabled')}
                     </Badge>
-                    <Badge variant={p.has_secret ? 'secondary' : 'destructive'} className="text-[10px]">
+                    <Badge variant={p.has_secret ? 'secondary' : 'destructive'} className="text-xs">
                       {p.has_secret
                         ? t('settings.sso.secret.set', 'Secret set')
                         : t('settings.sso.secret.none', 'No secret')}

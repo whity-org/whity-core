@@ -1,0 +1,67 @@
+<!-- @dsCard group="Templates · Plugin store" height=1304 width=1280 subtitle="Access, plan and trial, set up, done: every step of installing Inventory for Whity" -->
+<!doctype html>
+<html>
+<head><link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../bundle.css"><script src="../../preview-runtime/react.production.min.js"></script><script src="../../preview-runtime/react-dom.production.min.js"></script><script src="../bundle.js"></script><script>(function(){var t=(location.hash.match(/theme=(dark|light)/)||[])[1]||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',t);})();</script><style>body{margin:0;background:var(--background);color:var(--foreground);font-family:var(--font-sans);width:1280px;min-height:1304px}</style><meta charset="utf-8"><title>Install a plugin</title><style>html,body{height:100%} #root{min-height:100%} body{background:var(--muted)}</style></head>
+<body>
+<div id="root"></div>
+<script>
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 16 }); }
+  function nav(active, L) { L = L || {}; function it(icon, label, key) { return { icon: icon, label: L[key || label] || label, active: (key || label) === active }; }
+    return [{ items: [it('dashboard', 'Dashboard'), it('inbox', 'Inbox'), it('approval', 'Approvals')] },
+      { label: L.People || 'People', items: [it('users', 'Users'), it('role', 'Roles'), it('delegation', 'Delegations')] },
+      { label: L.AI || 'AI', items: [it('robot', 'Agents'), it('link', 'Connected AI apps'), it('tool', 'What AI can do')] },
+      { label: L.Documents || 'Documents', items: [it('document', 'Library'), it('routing', 'Routing')] },
+      { label: L.Platform || 'Platform', items: [it('tenant', 'Tenants'), it('plugin', 'Plugins'), it('branding', 'Branding'), it('audit', 'Audit log')] }]; }
+  var topBar = h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' }));
+  function shell(kids, o) { o = o || {}; return h(W.AppShell, { tenant: 'Example Bakery', user: 'Rana Haddad', role: 'Owner', nav: nav('Plugins', o.L), topActions: topBar, labels: o.shellLabels }, kids); }
+  function logo(p, size) { return h('span', { className: size === 'lg' ? 'wy-pdetail__ic' : 'wy-ptile__ic', style: { background: p.color }, 'aria-hidden': 'true' }, p.whity ? h(W.Mark, { size: size === 'lg' ? 34 : 22, tone: 'onbrand', label: '' }) : p.initial || p.name.charAt(0)); }
+  function trust(p, L) { L = L || {}; return p.whity ? h('span', { className: 'wy-trust wy-trust--whity' }, I('success', 12), L.byWhity || 'By Whity') : p.verified ? h('span', { className: 'wy-trust wy-trust--verified' }, I('success', 12), L.verified || 'Verified') : h('span', { className: 'wy-trust wy-trust--sandbox' }, I('lock', 12), L.sandboxed || 'Sandboxed'); }
+  function adds(p, L) { L = L || {}; return h('div', { className: 'wy-adds' }, (p.adds || []).map(function (a) { var m = { screens: ['dashboard', L.screens || 'Screens'], blocks: ['page', L.blocks || 'Document blocks'], agent: ['robot', L.agent || 'Agent tools'], fields: ['field', L.fields || 'Fields'], connect: ['link', L.connect || 'Connects out'] }[a];
+    return h('span', { key: a, className: 'wy-add' + (a === 'agent' ? ' wy-add--agent' : '') }, I(m[0], 12), m[1]); })); }
+  function tile(p, L) { L = L || {}; return h('a', { className: 'wy-ptile', href: '#', key: p.name },
+      h('div', { className: 'wy-ptile__top' }, logo(p), h('div', { style: { minWidth: 0 } }, h('div', { className: 'wy-ptile__name' }, p.name), h('div', { className: 'wy-ptile__by' }, p.by, h('span', null, '·'), trust(p, L)))),
+      h('p', { className: 'wy-ptile__desc' }, p.line), adds(p, L),
+      h('div', { className: 'wy-ptile__foot' }, h('span', null, p.used), h('span', { className: 'wy-ptile__price' }, p.price))); }
+  var P = {
+    front: { name: 'Front Office', by: 'Whity', whity: true, color: '#0961bb', line: 'Leads, quotes and JoFotara-compliant invoices, with the Billing assistant.', adds: ['screens', 'blocks', 'agent'], used: 'New', price: '[price] / month' },
+    render: { name: 'Whity Render', by: 'Whity', whity: true, color: '#0961bb', line: 'Pixel-exact PDFs of your documents and templates, in Arabic and English.', adds: ['blocks'], used: 'Used by 210 workspaces', price: '[price] / month' },
+    id: { name: 'Whity ID', by: 'Whity', whity: true, color: '#0961bb', line: 'Single sign-on for your team and customers.', adds: ['screens'], used: 'Coming soon', price: '[price]' },
+    inv: { name: 'Inventory for Whity', by: 'Example Labs', verified: true, color: '#35aa76', initial: 'I', line: 'Stock levels, transfers between branches and reorder alerts.', adds: ['screens', 'blocks', 'agent'], used: 'Used by 140 workspaces', price: '[price] / month' },
+    del: { name: 'Delivery Tracker', by: 'Example Logistics', verified: true, color: '#3a3a3a', initial: 'D', line: 'Track orders from packed to delivered, with live status in documents.', adds: ['screens', 'blocks'], used: 'Used by 86 workspaces', price: 'Free' },
+    pay: { name: 'Payroll for Whity', by: 'Example Payroll Co.', verified: true, color: '#9d2398', initial: 'P', line: 'Monthly payroll, payslips and social security reports for Jordan.', adds: ['screens', 'fields', 'agent'], used: 'Used by 64 workspaces', price: '[price] / month' },
+    maps: { name: 'Route Maps', by: 'Example Labs', verified: false, color: '#5a5a5a', initial: 'R', line: 'Delivery routes on a map, for notes and wiki pages.', adds: ['blocks', 'connect'], used: 'Used by 12 workspaces', price: 'Free' },
+    msg: { name: 'Messaging for Whity', by: 'Example Messaging', verified: true, color: '#f7a224', initial: 'M', line: 'Send receipts and reminders by SMS and chat apps, with approval.', adds: ['agent', 'connect'], used: 'Used by 97 workspaces', price: '[price] / month' },
+    sup: { name: 'Support Desk for Whity', by: 'Example Support', verified: true, color: '#1a8a8a', initial: 'S', line: 'Customer questions in one inbox; agents draft replies for you to send.', adds: ['screens', 'agent'], used: 'Used by 38 workspaces', price: '[price] / month' },
+    cal: { name: 'Calendar Sync', by: 'Example Labs', verified: false, color: '#5a5a5a', initial: 'C', line: 'Lets agents book deliveries and meetings in your shared calendars.', adds: ['agent', 'connect'], used: 'Used by 22 workspaces', price: 'Free' },
+    books: { name: 'Bookkeeping for Whity', by: 'Example Accounts', verified: true, color: '#0b4c92', initial: 'B', line: 'Ledger, VAT returns and month-end close, linked to your invoices.', adds: ['screens', 'agent'], used: 'Used by 51 workspaces', price: '[price] / month' }
+  };
+  var p = P.inv;
+  function steps(n) { return h(W.Stepper, { label: 'Install steps', current: n, steps: [{ label: 'Access' }, { label: 'Plan' }, { label: 'Set up' }, { label: 'Done' }] }); }
+  function dlg(n, title, desc, body, foot, label) { return h('div', { className: 'wy-flow__item' }, h('div', { className: 'wy-flow__label' }, label), h(W.Dialog, { inline: true, title: title, description: desc, onClose: function () {}, footer: foot }, h('div', { style: { display: 'grid', gap: 16 } }, steps(n), body))); }
+  function li(icon, t, d, extra, cls) { return h('li', { className: cls }, I(icon), h('div', null, h('b', null, t), d), extra || h('span')); }
+  ReactDOM.createRoot(document.getElementById('root')).render(h('div', { className: 'wy-flow' },
+    dlg(0, 'Install Inventory for Whity?', 'It will be able to do the following in Example Bakery. You can remove it at any time.',
+      h('ul', { className: 'wy-perm' },
+        li('table', 'See and change stock', 'Stock levels, transfers and suppliers in every branch'),
+        li('invoice', 'Read your sales invoices', 'To take sold items out of stock'),
+        li('dashboard', 'Add 3 screens and 2 document blocks', 'Stock, Transfers, Suppliers; Stock level, Reorder list'),
+        li('robot', 'Add 2 agent tools', 'Look up stock; order from suppliers', h(W.Badge, { variant: 'warning' }, 'Ask first'), 'is-agent'),
+        li('world', 'Send stock levels to api.labs.example.jo', 'To suggest reorders. Nothing else leaves your workspace.', null, 'is-out')),
+      h(F, null, h(W.Button, { variant: 'outline' }, 'Cancel'), h(W.Button, null, 'Allow and continue')), '1 · Access'),
+    dlg(1, 'Choose a plan', 'Billed on your Whity invoice with the rest of your plan.',
+      h(F, null, h(W.RadioGroup, { variant: 'cards', label: 'Billing', defaultValue: 'm', options: [{ value: 'm', label: '[price] per month' }, { value: 'y', label: '[price] per year' }] }),
+        h('div', { className: 'wy-trial' }, I('calendar'), h('span', null, h('b', null, '14 days free. '), 'Billing starts on 14 Nov 2026. We’ll remind you before it does, and you can uninstall before then at no cost.'))),
+      h(F, null, h(W.Button, { variant: 'outline' }, 'Back'), h(W.Button, null, 'Start free trial')), '2 · Plan (paid plugins only)'),
+    dlg(2, 'Set up Inventory', 'The publisher asks for these. You can change them later in the plugin’s settings.',
+      h(F, null, h('div', { style: { display: 'grid', gap: 8 } }, h('div', { className: 'wy-field__label' }, 'Branches to track'), h(W.Checkbox, { label: 'Abdoun', defaultChecked: true }), h(W.Checkbox, { label: 'Sweifieh', defaultChecked: true }), h(W.Checkbox, { label: 'Khalda' })),
+        h(W.Select, { label: 'Usual supplier', options: [{ value: 'a', label: 'Example Mills' }, { value: 'b', label: 'Example Dairy' }] }),
+        h(W.Switch, { label: 'Warn me when an item falls below its reorder level', defaultChecked: true })),
+      h(F, null, h(W.Button, { variant: 'ghost' }, 'Skip for now'), h(W.Button, null, 'Finish')), '3 · Set up (only if the plugin has settings)'),
+    dlg(3, 'Installed', null,
+      h('div', { className: 'wy-done' }, I('success', 40), h('h3', null, 'Inventory for Whity is ready'), h('p', null, 'Your free trial runs until 14 Nov. Here’s where to find what it added.'),
+        h('div', { className: 'wy-done__next' }, h('a', { href: '#' }, I('dashboard'), 'Stock, in the sidebar', I('chevron-right')), h('a', { href: '#' }, I('page'), 'Stock level and Reorder list, in the / menu of any document', I('chevron-right')), h('a', { href: '#' }, I('robot'), 'Stock assistant, in AI principals, on Ask first', I('chevron-right')))),
+      h(F, null, h(W.Button, { variant: 'outline' }, 'Done'), h(W.Button, null, 'Open Stock')), '4 · Done')));
+</script>
+</body>
+</html>

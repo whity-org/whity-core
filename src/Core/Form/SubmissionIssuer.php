@@ -12,6 +12,7 @@ use Whity\Core\Document\RouteTemplate\RouteTemplateRejectedException;
 use Whity\Core\Document\RouteTemplate\RouteTemplateRepository;
 use Whity\Core\Document\Routing\DocumentRouter;
 use Whity\Core\Document\Routing\RoutingRejectedException;
+use Whity\Database\SequenceCounters;
 
 /**
  * Turns a validated answer set into a SUBMISSION, a DOCUMENT, and — when the
@@ -214,6 +215,7 @@ final class SubmissionIssuer
                 $actorProfileId,
                 (int) $document['id'],
                 $values,
+                $this->referenceFor($tenantId, $form),
             );
 
             // Attachments BEFORE the route: an artifact that could not be
@@ -303,34 +305,40 @@ final class SubmissionIssuer
             }
             $key = (string) ($field['field_key'] ?? '');
             $answer = $values[$key] ?? null;
-            if (!is_string($answer) || $answer === '') {
-                // An optional `file` field nobody filled in. The validator has
-                // already refused a blank REQUIRED one, so there is nothing to
-                // decide here.
-                continue;
-            }
 
-            $upload = $this->uploads->claim($tenantId, $formId, $answer, $actorProfileId, $submissionId);
-            if ($upload === null) {
-                /** @var array<string, string> $label */
-                $label = is_array($field['label'] ?? null) ? $field['label'] : [];
-                $name = LocalizedLabel::preferred($label);
-                throw new FormRejectedException(
-                    'We could not find the file attached to '
-                        . ($name !== '' ? $name : $key)
-                        . ' — please attach it again.',
-                    'form upload claim failed on field ' . $key . ' in tenant ' . $tenantId,
-                );
-            }
+            // One string, or a list when the field allows several. An optional
+            // `file` field nobody filled in has nothing here, and the validator
+            // has already refused a blank REQUIRED one.
+            foreach (is_array($answer) ? $answer : [$answer] as $reference) {
+                if (!is_string($reference) || $reference === '') {
+                    continue;
+                }
 
-            $this->artifacts->create($tenantId, [
-                'document_id'     => $documentId,
-                'storage_key'     => $upload['storage_key'],
-                'content_type'    => $upload['content_type'],
-                'byte_size'       => $upload['byte_size'],
-                'checksum_sha256' => $upload['checksum_sha256'],
-                'rendered_by'     => $actorProfileId,
-            ]);
+                $upload = $this->uploads->claim($tenantId, $formId, $reference, $actorProfileId, $submissionId);
+                if ($upload === null) {
+                    /** @var array<string, string> $label */
+                    $label = is_array($field['label'] ?? null) ? $field['label'] : [];
+                    $name = LocalizedLabel::preferred($label);
+                    throw new FormRejectedException(
+                        'We could not find the file attached to '
+                            . ($name !== '' ? $name : $key)
+                            . ' — please attach it again.',
+                        'form upload claim failed on field ' . $key . ' in tenant ' . $tenantId,
+                        null,
+                        'file_not_found',
+                        $key,
+                    );
+                }
+
+                $this->artifacts->create($tenantId, [
+                    'document_id'     => $documentId,
+                    'storage_key'     => $upload['storage_key'],
+                    'content_type'    => $upload['content_type'],
+                    'byte_size'       => $upload['byte_size'],
+                    'checksum_sha256' => $upload['checksum_sha256'],
+                    'rendered_by'     => $actorProfileId,
+                ]);
+            }
         }
     }
 
@@ -383,6 +391,46 @@ final class SubmissionIssuer
     }
 
     /**
+     * The form's next reference, or null when it gives none.
+     *
+     * In the submission's transaction, so a refused submission does not spend a
+     * number. A sequence gives each format unique values, but two DIFFERENT formats
+     * can still print the same text (`A{SEQ}` at 15 and `A1{SEQ}` at 5), so a value
+     * already issued is skipped rather than left to fail on the unique index. The
+     * limit only guards against looping forever on a broken counter.
+     *
+     * @param array<string, mixed> $form
+     *
+     * @throws FormRejectedException When no free reference can be found.
+     */
+    private function referenceFor(int $tenantId, array $form): ?string
+    {
+        $format = $form['reference_format'] ?? null;
+        if (!is_string($format) || $format === '') {
+            return null;
+        }
+
+        $at = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
+        $counters = new SequenceCounters($this->db);
+
+        for ($attempt = 0; $attempt < 20; $attempt++) {
+            $reference = FormReferenceFormat::render(
+                $format,
+                $counters->next($tenantId, FormReferenceFormat::counterName($format, $at)),
+                $at,
+            );
+            if (!$this->submissions->referenceExists($tenantId, $reference)) {
+                return $reference;
+            }
+        }
+
+        throw new FormRejectedException(
+            'This form could not give your submission a reference. Please try again.',
+            'no free form reference for format on form ' . (string) ($form['id'] ?? '?'),
+        );
+    }
+
+    /**
      * What the resulting document is CALLED.
      *
      * The form's own name, which is what a reader scanning a document list or an
@@ -427,7 +475,7 @@ final class SubmissionIssuer
      *
      * @throws FormRejectedException
      */
-    private function assertReferencesExist(int $tenantId, array $fields, array $values): void
+    public function assertReferencesExist(int $tenantId, array $fields, array $values): void
     {
         foreach ($fields as $field) {
             $type = (string) ($field['field_type'] ?? '');
@@ -449,7 +497,11 @@ final class SubmissionIssuer
                 $label = is_array($field['label'] ?? null) ? $field['label'] : [];
                 $name = LocalizedLabel::preferred($label);
                 throw new FormRejectedException(
-                    ($name !== '' ? $name : $key) . ' must name a record in this tenant'
+                    ($name !== '' ? $name : $key) . ' must name a record in this tenant',
+                    '',
+                    null,
+                    'bad_reference',
+                    $key,
                 );
             }
         }

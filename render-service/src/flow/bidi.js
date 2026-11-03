@@ -56,11 +56,36 @@ const RTL_CLASS = '\\u0590-\\u08FF\\uFB1D-\\uFDFF\\uFE70-\\uFEFF';
  * the slowest thing in the render. One class matches the same runs in linear
  * time. The trailing space it now also swallows is put back outside the
  * isolate below, which the caller-facing behaviour already required. */
-const LTR_RUN = /[A-Za-z0-9][A-Za-z0-9._\-\/+:#() ]*/g;
+const LTR_RUN = /[A-Za-z0-9][A-Za-z0-9._,\-–\/+:#() ]*/g;
 
 /* Also one class, also linear — see the note on LTR_RUN. */
 function rtlRun() {
   return new RegExp('[' + RTL_CLASS + '][' + RTL_CLASS + '\\s.,()\\-]*', 'g');
+}
+
+/**
+ * A run without what it swallowed at its end: whitespace, a comma, and a closing
+ * bracket it never opened. Linear: each pass removes at least one character.
+ */
+function withoutTrailingNeutrals(run) {
+  let end = run.length;
+  let open = 0;
+  for (let i = 0; i < end; i += 1) {
+    if (run[i] === '(') open += 1;
+    if (run[i] === ')') open -= 1;
+  }
+  while (end > 0) {
+    const ch = run[end - 1];
+    if (ch === ' ' || ch === ',') {
+      end -= 1;
+    } else if (ch === ')' && open < 0) {
+      open += 1;
+      end -= 1;
+    } else {
+      break;
+    }
+  }
+  return run.slice(0, end);
 }
 
 /**
@@ -85,11 +110,13 @@ function isolateForeignRuns(text, direction) {
   while (match !== null) {
     out += escapeHtml(source.slice(last, match.index));
     const run = match[0];
-    const trimmed = run.trimEnd();
+    const trimmed = withoutTrailingNeutrals(run);
     out += '<bdi>' + escapeHtml(trimmed) + '</bdi>';
     // Trailing whitespace the run happened to swallow belongs OUTSIDE the
     // isolate; inside it, the gap between the isolated run and the next word
-    // collapses and the spacing reads wrong in RTL.
+    // collapses and the spacing reads wrong in RTL. So does a comma that ends a
+    // clause, and a closing bracket opened before the run: "(CliQ)" would
+    // otherwise isolate "CliQ)" and print "CliQ))".
     if (trimmed.length !== run.length) {
       out += escapeHtml(run.slice(trimmed.length));
     }

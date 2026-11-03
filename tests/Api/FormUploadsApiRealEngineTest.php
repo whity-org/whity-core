@@ -266,6 +266,49 @@ final class FormUploadsApiRealEngineTest extends TestCase
         self::assertSame($reference, $data['paper']);
     }
 
+    public function testSeveralFilesOnOneQuestionEachBecomeEvidence(): void
+    {
+        $formId = $this->publishedFormWithFileField();
+        $this->addField($formId, 'annexes', FieldType::FILE, self::TENANT, false);
+        $this->pdo->exec(
+            "UPDATE form_fields SET validation = '{\"maxFiles\":3}' WHERE field_key = 'annexes' AND form_id = " . $formId
+        );
+        $paper = $this->upload($formId, self::PAPER);
+        $first = $this->upload($formId, self::PAPER);
+        $second = $this->upload($formId, self::PAPER);
+
+        $response = $this->submit($formId, ['title' => 'On sandstone', 'paper' => $paper, 'annexes' => [$first, $second]]);
+
+        self::assertSame(201, $response->getStatusCode());
+        self::assertSame(3, $this->countRows('document_artifacts', self::TENANT));
+        /** @var array<string, mixed> $data */
+        $data = json_decode((string) $this->onlySubmission()['data'], true);
+        self::assertSame([$first, $second], $data['annexes']);
+
+        $annexes = array_values(array_filter(
+            $this->fields->listForForm(self::TENANT, $formId),
+            static fn (array $field): bool => $field['field_key'] === 'annexes',
+        ));
+        self::assertTrue($annexes[0]['multi_valued']);
+    }
+
+    public function testOneBadFileAmongSeveralStopsTheWholeSubmission(): void
+    {
+        $formId = $this->publishedFormWithFileField();
+        $this->addField($formId, 'annexes', FieldType::FILE, self::TENANT, false);
+        $this->pdo->exec(
+            "UPDATE form_fields SET validation = '{\"maxFiles\":3}' WHERE field_key = 'annexes' AND form_id = " . $formId
+        );
+        $paper = $this->upload($formId, self::PAPER);
+        $good = $this->upload($formId, self::PAPER);
+
+        $response = $this->submit($formId, ['title' => 'x', 'paper' => $paper, 'annexes' => [$good, 'tenants/9/invented.pdf']]);
+
+        self::assertSame(422, $response->getStatusCode());
+        self::assertSame(0, $this->countRows('form_submissions', self::TENANT));
+        self::assertSame(0, $this->countRows('document_artifacts', self::TENANT));
+    }
+
     // ── a storage key is not a capability ────────────────────────────────────
 
     /**
@@ -454,7 +497,7 @@ final class FormUploadsApiRealEngineTest extends TestCase
         );
 
         self::assertSame(422, $response->getStatusCode());
-        self::assertStringContainsString('PDF, PNG or JPEG', (string) $response->getBody());
+        self::assertStringContainsString('PDF, Word (.docx), PNG or JPEG', (string) $response->getBody());
         self::assertSame(0, $this->countRows('form_uploads', self::TENANT));
     }
 
