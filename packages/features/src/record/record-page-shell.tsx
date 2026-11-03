@@ -44,6 +44,7 @@ import { Button } from '@whity/ui/button';
 import { ErrorState } from '@whity/ui/empty-state';
 import { PageHeader } from '@whity/ui/page-header';
 import { Skeleton } from '@whity/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@whity/ui/tabs';
 import { IconArrowLeft } from '@tabler/icons-react';
 
 import { useDateDisplay } from '../datetime';
@@ -249,6 +250,8 @@ export function RecordPageShell<TFields extends object>({
   main,
   sections,
   side,
+  tabs,
+  saveBar,
   className,
 }: RecordPageShellProps<TFields>) {
   // #1068: resolved HERE, once, and handed to the projection below. A facts
@@ -275,8 +278,28 @@ export function RecordPageShell<TFields extends object>({
   // access, a `sections` page has it derived from the regions. Everything below
   // this line reads one `access`, so the header, the notice and the body cannot
   // be looking at different answers.
-  const derived = sections !== undefined ? accessFromSections(sections) : null;
+  const tabSections = (tabs?.items ?? []).flatMap((tab) => tab.sections ?? []);
+  const derived =
+    sections !== undefined ? accessFromSections([...sections, ...tabSections]) : null;
   const access = derived?.access ?? (pageAccess as RecordAccess);
+
+  // Two DISTINCT renderings, never one form wearing `disabled`.
+  const renderBody = () => (
+    <>
+          {sections !== undefined
+            ? sections.map((section) => (
+                <RecordSection
+                  key={section.key}
+                  section={section}
+                  testId={testId}
+                  reasonHoisted={derived?.hoistReason}
+                />
+              ))
+            : access.editable
+            ? main!.editor
+            : main!.readOnly}
+    </>
+  );
 
   return (
     <div className={className ?? 'space-y-6'} data-testid={testId}>
@@ -318,7 +341,7 @@ export function RecordPageShell<TFields extends object>({
 
       {notices}
 
-      {stats.length > 0 && (
+      {tabs === undefined && stats.length > 0 && (
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" data-testid={`${testId}-stats`}>
           {stats.map((fact) => (
             <Stat key={fact.key} fact={fact} testId={`${testId}-stat-${fact.key}`} />
@@ -326,27 +349,41 @@ export function RecordPageShell<TFields extends object>({
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-        <div className="space-y-6 xl:col-span-2">
-          {/* Two DISTINCT renderings, never one form wearing `disabled`. The
-              shell picks; the screen cannot accidentally ship the other — at
-              page scope for `main`, and per region for `sections`, where a
-              third state (absent entirely) joins them. */}
-          {sections !== undefined
-            ? sections.map((section) => (
+      {tabs !== undefined ? (
+        <Tabs defaultValue="overview">
+          <TabsList variant="line">
+            <TabsTrigger value="overview">{tabs.overviewLabel}</TabsTrigger>
+            {tabs.items.map((tab) => (
+              <TabsTrigger key={tab.key} value={tab.key}>
+                {tab.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          <TabsContent value="overview" className="mt-6 space-y-6">
+            {renderBody()}
+          </TabsContent>
+          {tabs.items.map((tab) => (
+            <TabsContent key={tab.key} value={tab.key} className="mt-6 space-y-6">
+              {tab.sections?.map((section) => (
                 <RecordSection
                   key={section.key}
                   section={section}
                   testId={testId}
                   reasonHoisted={derived?.hoistReason}
                 />
-              ))
-            : access.editable
-            ? main!.editor
-            : main!.readOnly}
+              ))}
+              {tab.content}
+            </TabsContent>
+          ))}
+        </Tabs>
+      ) : (
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+          <div className="space-y-6 xl:col-span-2">{renderBody()}</div>
+          {side !== undefined && <div className="space-y-6">{side}</div>}
         </div>
-        {side !== undefined && <div className="space-y-6">{side}</div>}
-      </div>
+      )}
+
+      {access.editable && saveBar}
     </div>
   );
 }

@@ -1,53 +1,72 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/lib/toast-context';
 import { useFetch } from '@/hooks/useFetch';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { Badge } from '@whity/ui/badge';
 import { Card, CardContent } from '@whity/ui/card';
+import { TechnicalDetails, useDisplayPreferences } from '@whity/ui/display-preferences';
+import { AreaError, EmptyFiltered, LoadingRows } from '@whity/ui/page-states';
+import { SearchField } from '@whity/ui/search-field';
 import { Switch } from '@whity/ui/switch';
+import { ToggleGroup } from '@whity/ui/toggle-group';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
-import { IconLock, IconLockOpen } from '@tabler/icons-react';
-import { useTranslation } from '@whity/features/i18n';
+import { useFormattingLocale, useTranslation } from '@whity/features/i18n';
 import type { McpAgentPolicy, McpListSize, McpTool, McpToolListResponse, McpToolVisibility } from './types';
 
 /** The setting that holds the plugin tools this workspace lists directly (WHIT-754). */
 const ALWAYS_ON_SETTING = 'mcp.always_on_plugin_tools';
 
+type PolicyFilter = 'all' | McpAgentPolicy;
+
 /**
- * MCP Tools admin page (WC-0208ce4d, WHIT-754).
- *
- * Every operation an MCP client can be offered in this workspace, core and
- * plugin, with the permission it needs, the toolset it belongs to, how it
- * reaches a client and what an AI agent may do with it on its own. A plugin
- * tool that asks to be listed directly is listed only once an administrator
- * turns it on here (docs/design/MCP-TOOL-SURFACE.md §5.10, owner decision 5).
- * The sizes say what each list mode costs an app before it does anything.
+ * What AI can do (A22, TplWhatAICanDo; was MCP tools): every action AI can
+ * take in this workspace and how agents may use it (can do it, proposes and a
+ * person approves, suggests only, never), from `agentPolicy`. Tool names,
+ * toolsets, how apps discover each one, what it needs and the list sizes show
+ * only with Show technical details (A.3). A plain name and area per action,
+ * and how long Undo lasts ("If it goes wrong"), are not returned by the API
+ * yet (S6), so the action reads from its description. A plugin tool that asks
+ * to be listed directly is listed only once an administrator turns it on, in
+ * the technical view (docs/design/MCP-TOOL-SURFACE.md §5.10, owner decision 5).
  */
 export default function McpToolsPage() {
   const { apiClient } = useAuth();
   const { addToast } = useToast();
   const t = useTranslation('admin');
+  const language = useFormattingLocale();
+  const { showTechnicalDetails } = useDisplayPreferences();
   const [saving, setSaving] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+  const [policy, setPolicy] = useState<PolicyFilter>('all');
 
   const { data, loading: isLoading, error, refetch } = useFetch(async () => {
     const response = await apiClient('/api/v1/admin/mcp/tools');
     if (!response.ok) {
-      throw new Error(t('mcpTools.error.load', 'Failed to fetch MCP tools'));
+      throw new Error(t('mcpTools.error.load', 'What AI can do could not be loaded.'));
     }
     return (await response.json()) as McpToolListResponse;
   }, [apiClient]);
 
-  const tools = data?.data ?? [];
+  const tools = useMemo(() => data?.data ?? [], [data]);
   const sizes = data?.sizes;
 
   useEffect(() => {
-    if (error) {
-      addToast(error, 'error');
-    }
+    if (error) addToast(error, 'error');
   }, [error, addToast]);
+
+  const shown = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return tools.filter((tool) => {
+      if (policy !== 'all' && tool.agentPolicy !== policy) return false;
+      if (needle === '') return true;
+      return [tool.description, showTechnicalDetails ? tool.name : '', showTechnicalDetails ? tool.toolset : ''].some((text) =>
+        text.toLowerCase().includes(needle),
+      );
+    });
+  }, [tools, query, policy, showTechnicalDetails]);
 
   const setAlwaysOn = async (tool: McpTool, on: boolean) => {
     const enabled = tools
@@ -69,13 +88,13 @@ export default function McpToolsPage() {
         on
           ? t('mcpTools.alwaysOn.turnedOn', 'Apps now see {name} without searching.', { name: tool.name })
           : t('mcpTools.alwaysOn.turnedOff', 'Apps now find {name} through search.', { name: tool.name }),
-        'success'
+        'success',
       );
       refetch();
     } catch (err) {
       addToast(
         err instanceof Error ? err.message : t('mcpTools.alwaysOn.saveFailed', 'Could not change how {name} is listed', { name: tool.name }),
-        'error'
+        'error',
       );
     } finally {
       setSaving(null);
@@ -84,14 +103,9 @@ export default function McpToolsPage() {
 
   const accessLabel = (tool: McpTool): string => {
     if (tool.requiredPermission) return tool.requiredPermission;
-    if (tool.requiredRole) {
-      return t('mcpTools.access.role', 'role: {role}', { role: tool.requiredRole });
-    }
+    if (tool.requiredRole) return t('mcpTools.access.role', 'role: {role}', { role: tool.requiredRole });
     return t('mcpTools.access.open', 'open');
   };
-
-  const isRestricted = (tool: McpTool): boolean =>
-    tool.requiredPermission !== null || tool.requiredRole !== null;
 
   const visibilityLabel = (visibility: McpToolVisibility): string =>
     ({
@@ -100,34 +114,20 @@ export default function McpToolsPage() {
       off: t('mcpTools.visibility.off', 'Not offered'),
     })[visibility] ?? visibility;
 
-  const policyLabel = (policy: McpAgentPolicy): string =>
+  const policyLabel = (value: McpAgentPolicy): string =>
     ({
-      allow: t('mcpTools.agentPolicy.allow', 'Can run'),
-      propose: t('mcpTools.agentPolicy.propose', 'Proposes'),
+      allow: t('mcpTools.agentPolicy.allow', 'Can do it'),
+      propose: t('mcpTools.agentPolicy.propose', 'Proposes, a person approves'),
       'suggest-only': t('mcpTools.agentPolicy.suggestOnly', 'Suggests only'),
       refuse: t('mcpTools.agentPolicy.refuse', 'Never'),
-    })[policy] ?? policy;
+    })[value] ?? value;
 
-  const columns: DataTableColumn<McpTool>[] = [
+  const policyVariant = (value: McpAgentPolicy) => (value === 'allow' ? 'success' : value === 'refuse' ? 'outline' : 'warning');
+
+  const technicalColumns: DataTableColumn<McpTool>[] = [
     {
-      accessorKey: 'name',
-      header: t('mcpTools.table.tool', 'Tool'),
-      enableSorting: true,
-      enableColumnFilter: true,
-      cell: (tool) => (
-        <span className="space-y-0.5">
-          <code className="block text-sm font-medium text-foreground">{tool.name}</code>
-          {tool.description !== '' && (
-            <span className="block max-w-md text-xs text-muted-foreground">{tool.description}</span>
-          )}
-        </span>
-      ),
-    },
-    {
-      accessorKey: 'toolset',
+      id: 'toolset',
       header: t('mcpTools.table.toolset', 'Toolset'),
-      enableSorting: true,
-      enableColumnFilter: true,
       cell: (tool) => <code className="text-xs">{tool.toolset || '-'}</code>,
     },
     {
@@ -142,9 +142,7 @@ export default function McpToolsPage() {
               onCheckedChange={(checked) => void setAlwaysOn(tool, checked)}
               aria-label={t('mcpTools.alwaysOn.toggle', 'List {name} without searching', { name: tool.name })}
             />
-            <span className="text-sm">
-              {tool.alwaysOnEnabled ? visibilityLabel('always-on') : visibilityLabel('discoverable')}
-            </span>
+            <span className="text-sm">{tool.alwaysOnEnabled ? visibilityLabel('always-on') : visibilityLabel('discoverable')}</span>
           </span>
         ) : (
           <span className="text-sm">
@@ -153,95 +151,129 @@ export default function McpToolsPage() {
         ),
     },
     {
-      accessorKey: 'agentPolicy',
-      header: t('mcpTools.table.agentPolicy', 'Agents'),
-      enableSorting: true,
-      cell: (tool) => <span className="text-sm">{policyLabel(tool.agentPolicy)}</span>,
-    },
-    {
       id: 'access',
-      header: t('mcpTools.table.access', 'Access'),
+      header: t('mcpTools.table.access', 'Needs'),
       cell: (tool) => (
-        <span className="inline-flex items-center gap-1.5">
-          {isRestricted(tool) ? (
-            <IconLock size={14} className="text-muted-foreground" />
-          ) : (
-            <IconLockOpen size={14} className="text-muted-foreground" />
-          )}
-          <Badge
-            variant={isRestricted(tool) ? 'secondary' : 'outline'}
-            className="text-xs font-mono"
-          >
-            {accessLabel(tool)}
-          </Badge>
-        </span>
+        <Badge variant={tool.requiredPermission !== null || tool.requiredRole !== null ? 'secondary' : 'outline'} className="font-mono">
+          {accessLabel(tool)}
+        </Badge>
       ),
     },
   ];
 
+  const columns: DataTableColumn<McpTool>[] = [
+    {
+      accessorKey: 'description',
+      header: t('mcpTools.table.action', 'Action'),
+      enableSorting: true,
+      cell: (tool) => (
+        <span className="block max-w-xl space-y-0.5">
+          <span className="block text-sm font-medium text-foreground">{tool.description || tool.name}</span>
+          <TechnicalDetails>
+            <code dir="ltr" className="block text-xs text-muted-foreground">
+              {tool.name}
+            </code>
+          </TechnicalDetails>
+        </span>
+      ),
+    },
+    {
+      accessorKey: 'agentPolicy',
+      header: t('mcpTools.table.agentPolicy', 'Agents'),
+      enableSorting: true,
+      cell: (tool) => <Badge variant={policyVariant(tool.agentPolicy)}>{policyLabel(tool.agentPolicy)}</Badge>,
+    },
+    ...(showTechnicalDetails ? technicalColumns : []),
+  ];
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <AdminHeader
-        title={t('mcpTools.title', 'MCP Tools')}
+        title={t('mcpTools.title', 'What AI can do')}
         description={t(
           'mcpTools.description',
-          'What AI apps can be offered here, what each action needs, and how apps find it'
+          'Every action AI can take here, and how agents may use it. An app never does more than the person who connected it can.',
         )}
       />
 
-      {sizes !== undefined && (
-        <div className="grid gap-3 sm:grid-cols-3">
-          <SizeCard
-            title={t('mcpTools.sizes.default', 'Standard connection')}
-            help={t('mcpTools.sizes.defaultHelp', 'A few everyday actions, plus search for the rest. What the connect wizard hands out.')}
-            size={sizes.default}
-          />
-          <SizeCard
-            title={t('mcpTools.sizes.full', 'Every action at once')}
-            help={t('mcpTools.sizes.fullHelp', 'Only for apps that need the whole list (?tools=full). Slower, and some apps drop actions past a limit.')}
-            size={sizes.full}
-          />
-          <SizeCard
-            title={t('mcpTools.sizes.discover', 'Search only')}
-            help={t('mcpTools.sizes.discoverHelp', 'Search and use, nothing else (?tools=discover).')}
-            size={sizes.discover}
-          />
-        </div>
+      <TechnicalDetails>
+        {sizes !== undefined && (
+          <div className="grid gap-3 sm:grid-cols-3">
+            <SizeCard
+              title={t('mcpTools.sizes.default', 'Standard connection')}
+              help={t('mcpTools.sizes.defaultHelp', 'A few everyday actions, plus search for the rest. What the connect wizard hands out.')}
+              size={sizes.default}
+              language={language ?? 'en'}
+            />
+            <SizeCard
+              title={t('mcpTools.sizes.full', 'Every action at once')}
+              help={t('mcpTools.sizes.fullHelp', 'Only for apps that need the whole list (?tools=full). Slower, and some apps drop actions past a limit.')}
+              size={sizes.full}
+              language={language ?? 'en'}
+            />
+            <SizeCard
+              title={t('mcpTools.sizes.discover', 'Search only')}
+              help={t('mcpTools.sizes.discoverHelp', 'Search and use, nothing else (?tools=discover).')}
+              size={sizes.discover}
+              language={language ?? 'en'}
+            />
+          </div>
+        )}
+      </TechnicalDetails>
+
+      {error !== null ? (
+        <AreaError message={error} retryLabel={t('agents.retry', 'Try again')} onRetry={refetch} />
+      ) : isLoading ? (
+        <LoadingRows
+          headers={[t('mcpTools.table.action', 'Action'), t('mcpTools.table.agentPolicy', 'Agents')]}
+          label={t('agents.loading', 'Loading…')}
+        />
+      ) : (
+        <>
+          <div className="flex flex-wrap items-center gap-3">
+            <SearchField
+              className="w-full max-w-sm"
+              value={query}
+              onValueChange={setQuery}
+              label={t('mcpTools.searchPlaceholder', 'Search actions')}
+              placeholder={t('mcpTools.searchPlaceholder', 'Search actions')}
+              clearLabel={t('agents.search.clear', 'Clear search')}
+            />
+            <ToggleGroup
+              label={t('mcpTools.filter.label', 'Agents may')}
+              value={policy}
+              required
+              onChange={(value) => typeof value === 'string' && setPolicy(value as PolicyFilter)}
+              options={[
+                { value: 'all', label: t('mcpTools.filter.all', 'All') },
+                { value: 'allow', label: t('mcpTools.filter.allow', 'Do it') },
+                { value: 'propose', label: t('mcpTools.filter.propose', 'Propose') },
+                { value: 'suggest-only', label: t('mcpTools.filter.suggest', 'Suggest') },
+                { value: 'refuse', label: t('mcpTools.filter.refuse', 'Never') },
+              ]}
+            />
+          </div>
+          {shown.length === 0 ? (
+            <EmptyFiltered
+              title={t('mcpTools.empty.title', 'No actions match')}
+              description={t('mcpTools.empty.description', 'Try another search or show all actions.')}
+              clearLabel={t('agents.filtered.clear', 'Clear filters')}
+              onClear={() => {
+                setQuery('');
+                setPolicy('all');
+              }}
+            />
+          ) : (
+            <DataTable columns={columns} data={shown} getRowId={(tool) => tool.name} pagination={{ pageSize: 15 }} />
+          )}
+        </>
       )}
-
-      <DataTable
-        columns={columns}
-        data={tools}
-        getRowId={(tool) => tool.name}
-        isLoading={isLoading}
-        emptyState={{ title: t('mcpTools.empty.title', 'No MCP tools found') }}
-        enableGlobalFilter
-        globalFilterPlaceholder={t('mcpTools.searchPlaceholder', 'Search tools…')}
-        pagination={{ pageSize: 15 }}
-      />
-
-      {/* One whole sentence per plural form, with the count as a hole in it —
-          rather than a count glued to a bare "tool"/"tools" fragment, which a
-          translator cannot decline and cannot reorder. */}
-      <p className="text-xs text-muted-foreground">
-        {tools.length === 1
-          ? t(
-              'mcpTools.summary.one',
-              '{count} tool. An app never gets more than the person who connected it can do, and only the permissions its connection allows.',
-              { count: tools.length }
-            )
-          : t(
-              'mcpTools.summary.other',
-              '{count} tools. An app never gets more than the person who connected it can do, and only the permissions its connection allows.',
-              { count: tools.length }
-            )}
-      </p>
     </div>
   );
 }
 
 /** What one list mode costs an app before it does anything; tokens are roughly bytes / 4. */
-function SizeCard({ title, help, size }: { title: string; help: string; size: McpListSize }) {
+function SizeCard({ title, help, size, language }: { title: string; help: string; size: McpListSize; language: string }) {
   const t = useTranslation('admin');
   return (
     <Card>
@@ -250,7 +282,7 @@ function SizeCard({ title, help, size }: { title: string; help: string; size: Mc
         <p className="text-sm">
           {t('mcpTools.sizes.value', '{tools} actions, about {tokens} tokens', {
             tools: size.tools,
-            tokens: Math.round(size.bytes / 4).toLocaleString('en'),
+            tokens: Math.round(size.bytes / 4).toLocaleString(language === 'ar' ? 'ar-u-nu-latn' : 'en'),
           })}
         </p>
         <p className="text-xs text-muted-foreground">{help}</p>

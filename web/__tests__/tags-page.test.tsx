@@ -1,13 +1,13 @@
 /**
- * WC-621 — Tags admin page (bespoke) tests.
- *
- * Mocks useAuth (apiClient), useToast, useCapabilities. Verifies list render
- * with group-id → label resolution, capability/empty-state gating, and that the
- * create dialog renders real fields (name + group picker).
+ * A46 — the one Tags page: groups with their tags in a line, and a drawer to
+ * rename a group and add, rename or remove its tags.
  */
 
 import React from 'react';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+
+jest.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams() }));
 
 const mockApiClient = jest.fn();
 jest.mock('@/lib/auth-context', () => ({
@@ -37,14 +37,17 @@ function jsonResponse(status: number, body: unknown) {
   return Promise.resolve({ ok: status >= 200 && status < 300, status, json: () => Promise.resolve(body) });
 }
 
-const TAGS = [{ id: 1, group_id: 5, name: 'high' }];
+const TAGS = [
+  { id: 1, group_id: 5, name: 'Urgent' },
+  { id: 2, group_id: 5, name: 'Normal' },
+];
 const GROUPS = [{ id: 5, key: 'priority', display_name: { en: 'Priority' } }];
 
 function wire(tags: unknown[], groups: unknown[]) {
   mockApiClient.mockImplementation((url: string) => {
     if (url === '/api/v1/tags') return jsonResponse(200, { data: tags });
     if (url === '/api/v1/tag-groups') return jsonResponse(200, { data: groups });
-    return jsonResponse(404, {});
+    return jsonResponse(200, { data: {} });
   });
 }
 
@@ -54,45 +57,63 @@ beforeEach(() => {
 });
 
 describe('TagsPage', () => {
-  it('renders tags and resolves group_id to a readable label', async () => {
+  it('lists each group with its tags in a line', async () => {
     wire(TAGS, GROUPS);
-
     render(<TagsPage />);
-
-    await waitFor(() => expect(screen.getByText('high')).toBeInTheDocument());
-    // group_id 5 → its group's display label, not a raw number.
-    expect(screen.getByText('Priority')).toBeInTheDocument();
+    expect(await screen.findByText('Priority')).toBeInTheDocument();
+    expect(screen.getByText('Urgent, Normal')).toBeInTheDocument();
+    expect(screen.queryByText('#5')).toBeNull();
   });
 
-  it('disables Create Tag until at least one group exists', async () => {
-    wire(TAGS, []); // no groups
-
+  it('says there are no groups yet, and offers New tag group to someone who can manage', async () => {
+    wire([], []);
     render(<TagsPage />);
-
-    await waitFor(() => expect(screen.getByText('high')).toBeInTheDocument());
-    expect(screen.getByRole('button', { name: /create tag/i })).toBeDisabled();
+    expect(await screen.findByText('No tag groups yet')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'New tag group' }).length).toBeGreaterThan(0);
   });
 
   it('hides write controls without tags:manage', async () => {
     hasPermission.mockReturnValue(false);
     wire(TAGS, GROUPS);
-
     render(<TagsPage />);
-
-    await waitFor(() => expect(screen.getByText('high')).toBeInTheDocument());
-    expect(screen.queryByRole('button', { name: /create tag/i })).not.toBeInTheDocument();
+    await screen.findByText('Priority');
+    expect(screen.queryByRole('button', { name: 'New tag group' })).toBeNull();
+    await userEvent.click(screen.getByText('Priority'));
+    expect(await screen.findByText('Urgent')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add tag' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Remove' })).toBeNull();
   });
 
-  it('opens the create dialog with a name field and a group picker', async () => {
+  it('a row opens the drawer, where a tag can be added', async () => {
     wire(TAGS, GROUPS);
-
     render(<TagsPage />);
-    await waitFor(() => expect(screen.getByText('high')).toBeInTheDocument());
+    await userEvent.click(await screen.findByText('Priority'));
+    await userEvent.type(await screen.findByLabelText('New tag'), 'Later');
+    await userEvent.click(screen.getByRole('button', { name: 'Add tag' }));
+    await waitFor(() =>
+      expect(mockApiClient).toHaveBeenCalledWith(
+        '/api/v1/tags',
+        expect.objectContaining({ method: 'POST', body: JSON.stringify({ group_id: 5, name: 'Later' }) })
+      )
+    );
+  });
 
-    fireEvent.click(screen.getByRole('button', { name: /create tag/i }));
+  it('removing a tag asks first, then deletes it', async () => {
+    wire(TAGS, GROUPS);
+    render(<TagsPage />);
+    await userEvent.click(await screen.findByText('Priority'));
+    await userEvent.click((await screen.findAllByRole('button', { name: 'Remove' }))[0]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Remove tag' }));
+    await waitFor(() =>
+      expect(mockApiClient).toHaveBeenCalledWith('/api/v1/tags/1', { method: 'DELETE' })
+    );
+  });
 
-    expect(await screen.findByLabelText('Name')).toBeInTheDocument();
-    // The group picker (a real dropdown, not a raw numeric input) is present.
-    expect(screen.getByLabelText('Group')).toBeInTheDocument();
+  it('keeps the technical key out of the drawer by default', async () => {
+    wire(TAGS, GROUPS);
+    render(<TagsPage />);
+    await userEvent.click(await screen.findByText('Priority'));
+    await screen.findByLabelText('New tag');
+    expect(screen.queryByLabelText('Key')).toBeNull();
   });
 });

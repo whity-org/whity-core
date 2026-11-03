@@ -222,9 +222,9 @@ describe('User Groups admin', () => {
       rule_kind: 'role',
       rule_config: { role_id: 6 },
     });
-    // Everybody, said so — and the id where a name could not be read.
+    // Everybody, said so — and a plain word, never an id, where a name could not be read.
     expect(screen.getByText(/that is everybody/i)).toBeInTheDocument();
-    expect(screen.getByText('Profile #12')).toBeInTheDocument();
+    expect(screen.getByText('Someone without a name')).toBeInTheDocument();
     // The caveat that stops the sample reading as a stored membership.
     expect(screen.getByText(/a group is a rule, not a saved list of people/i)).toBeInTheDocument();
   });

@@ -27,6 +27,7 @@ import {
   SelectValue,
 } from '@whity/ui/select';
 import { IconAlertCircle, IconCircleCheck, IconPlugConnected } from '@tabler/icons-react';
+import { Stepper } from '@whity/ui/stepper';
 import { useTranslation } from '@whity/features/i18n';
 import { titleCase } from '@whity/features/roles';
 import {
@@ -301,6 +302,17 @@ export function ConnectWizard({
           </DialogDescription>
         </DialogHeader>
 
+        <Stepper
+          label={t('aiPrincipals.connect.steps', 'Steps to connect an AI app')}
+          current={step === 'app' ? 0 : step === 'access' ? 1 : 2}
+          stepOfLabel={(n, total) => t('aiPrincipals.connect.stepOf', 'Step {n} of {total}', { n, total })}
+          steps={[
+            { label: t('aiPrincipals.connect.step.app', 'App') },
+            { label: t('aiPrincipals.connect.step.access', 'What it may do') },
+            { label: t('aiPrincipals.connect.step.setup', 'Set up') },
+          ]}
+        />
+
         <Preflight info={info} infoError={infoError} />
 
         {step === 'app' && (
@@ -315,7 +327,7 @@ export function ConnectWizard({
               >
                 <span>{c.id === 'other' ? otherLabel : c.name}</span>
                 {c.requiresSignIn === true && (
-                  <Badge variant="secondary">{t('aiPrincipals.connect.app.comingSoon', 'Coming with sign-in')}</Badge>
+                  <Badge variant="secondary">{t('aiPrincipals.connect.app.comingSoon', 'Coming soon')}</Badge>
                 )}
               </button>
             ))}
@@ -450,7 +462,7 @@ export function ConnectWizard({
             </>
           )}
           {step === 'connect' && (
-            <Button type="button" onClick={() => close(false)}>
+            <Button type="button" variant={connected ? 'default' : 'outline'} onClick={() => close(false)}>
               {connected ? t('aiPrincipals.connect.done', 'Done') : t('aiPrincipals.connect.finishLater', 'Close')}
             </Button>
           )}

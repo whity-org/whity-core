@@ -204,7 +204,7 @@ describe('RouteComposer — naming a user group', () => {
     // A sample, said to be a sample, with the id standing in for the name the
     // caller may not read.
     expect(screen.getByText(/a sample, not the whole set/i)).toBeInTheDocument();
-    expect(screen.getByText('Profile #12')).toBeInTheDocument();
+    expect(screen.getByText('Account #12')).toBeInTheDocument();
     // And the membership-is-not-stored caveat, on screen and not behind a click.
     expect(
       screen.getByText(/a group is a rule, not a saved list of people/i)

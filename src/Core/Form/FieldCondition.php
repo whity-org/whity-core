@@ -143,8 +143,9 @@ final class FieldCondition
             if ((string) ($byKey[$controller]['audience'] ?? FormFieldRepository::AUDIENCE_APPLICANT) !== $audience) {
                 throw new FormRejectedException("Field '{$key}' depends on '{$controller}', which is answered by another audience");
             }
-            if ((string) ($byKey[$controller]['field_type'] ?? '') === FieldType::FILE) {
-                throw new FormRejectedException("Field '{$key}' cannot depend on a file question");
+            $controllerType = (string) ($byKey[$controller]['field_type'] ?? '');
+            if (in_array($controllerType, [FieldType::FILE, FieldType::REPEATING, FieldType::SIGNATURE], true)) {
+                throw new FormRejectedException("Field '{$key}' cannot depend on a {$controllerType} question");
             }
 
             $seen = [$key => true];

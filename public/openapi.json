@@ -19456,6 +19456,188 @@
                 ]
             }
         },
+        "/api/v1/forms/{id}/member-access": {
+            "delete": {
+                "operationId": "delete_api_v1_forms_id_member_access",
+                "summary": "Stop members filling in this form",
+                "tags": [
+                    "forms"
+                ],
+                "description": "Idempotent. Submissions already made are untouched.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The form",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/FormResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Form not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "operationId": "post_api_v1_forms_id_member_access",
+                "summary": "Let this workspace's members fill in this form",
+                "tags": [
+                    "forms"
+                ],
+                "description": "OFF BY DEFAULT on every form. Active members of the workspace can then list, open and submit this form through /api/me/forms, with no permission of their own. Records who opened it and when. Idempotent. REFUSED (422) on a form that is not published, on one asking for a person or unit, and on one with nothing a member can answer.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The form",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/FormResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Form not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "The form is not published, or asks what members cannot answer",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/forms/{id}/public-link": {
             "delete": {
                 "operationId": "delete_api_v1_forms_id_public_link",
@@ -24793,7 +24975,7 @@
                 "tags": [
                     "forms"
                 ],
-                "description": "Only ever the caller's rows \u2014 the ROUTE decides whose, not a query param, so nothing a client omits or changes can widen it. Gated on `forms:submit` rather than `forms:read` because the rows already name exactly one person, so a tenant-wide permission has nothing left to decide; requiring the read permission would hide this from precisely the people whose submissions are in it. A caller with no profile (a service principal) gets an empty list, which is true rather than an authorization failure somebody has to investigate.",
+                "description": "Only ever the caller's rows \u2014 the ROUTE decides whose, not a query param, so nothing a client omits or changes can widen it. It needs no permission, because the rows already name exactly one person: somebody who has submitted nothing gets an empty list, and so does a service principal, which is true rather than an authorization failure somebody has to investigate.",
                 "parameters": [
                     {
                         "name": "form_id",
@@ -24884,12 +25066,368 @@
                             }
                         }
                     }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
+                }
+            }
+        },
+        "/api/v1/me/forms": {
+            "get": {
+                "operationId": "get_api_v1_me_forms",
+                "summary": "The forms the caller may fill in as a member of this workspace",
+                "tags": [
+                    "forms"
+                ],
+                "description": "Published forms an author opened to members. Empty for somebody who is not an active member. Holders of `forms:submit` can fill in other published forms through /api/forms too.",
+                "responses": {
+                    "200": {
+                        "description": "The forms",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MemberFormListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
                     }
-                ]
+                }
+            }
+        },
+        "/api/v1/me/forms/{id}/render": {
+            "get": {
+                "operationId": "get_api_v1_me_forms_id_render",
+                "summary": "What drawing a form opened to members needs",
+                "tags": [
+                    "forms"
+                ],
+                "description": "The same 404 for a form that does not exist, is not published or not open, and for a caller who is not an active member. Person and unit questions are left out, and staff questions never appear.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The form, its questions and the caller's prefill",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MemberFormRenderResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not available to this caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/me/forms/{id}/submissions": {
+            "post": {
+                "operationId": "post_api_v1_me_forms_id_submissions",
+                "summary": "Submit a form opened to members, under the caller's own name",
+                "tags": [
+                    "forms"
+                ],
+                "description": "Answers arrive under `data`, keyed by field key. A refused answer carries `details.reason` and `details.field_key`.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/FormSubmissionCreateRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The recorded submission",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/FormSubmissionCreateResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not available to this caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "An answer failed validation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/me/forms/{id}/uploads": {
+            "post": {
+                "operationId": "post_api_v1_me_forms_id_uploads",
+                "summary": "Attach a file to a form opened to members",
+                "tags": [
+                    "forms"
+                ],
+                "description": "The ordinary form upload, with its limits and single-use reference, once the caller may fill in this form. MULTIPART, one part named `file`.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "The stored upload"
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not available to this caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "The file was refused, or the form asks for no file",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many uploads",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
             }
         },
         "/api/v1/me/identities": {
@@ -52097,6 +52635,17 @@
                         "type": "string",
                         "nullable": true
                     },
+                    "open_to_members": {
+                        "type": "boolean"
+                    },
+                    "members_opened_at": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "members_opened_by_profile_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
                     "sections": {
                         "type": "array",
                         "items": {
@@ -52322,7 +52871,9 @@
                             "checkbox",
                             "file",
                             "profile_ref",
-                            "ou_ref"
+                            "ou_ref",
+                            "repeating",
+                            "signature"
                         ]
                     },
                     "label": {
@@ -52410,6 +52961,51 @@
                     "position"
                 ]
             },
+            "FormFieldColumn": {
+                "type": "object",
+                "properties": {
+                    "key": {
+                        "type": "string"
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "text",
+                            "textarea",
+                            "number",
+                            "date",
+                            "select",
+                            "checkbox"
+                        ]
+                    },
+                    "label": {
+                        "type": "object",
+                        "x-whity-localized-text": true,
+                        "properties": {
+                            "ar": {
+                                "type": "string"
+                            },
+                            "en": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "required": {
+                        "type": "boolean"
+                    },
+                    "options": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/FormFieldOption"
+                        }
+                    }
+                },
+                "required": [
+                    "key",
+                    "type",
+                    "label"
+                ]
+            },
             "FormFieldCondition": {
                 "type": "object",
                 "nullable": true,
@@ -52455,7 +53051,9 @@
                             "checkbox",
                             "file",
                             "profile_ref",
-                            "ou_ref"
+                            "ou_ref",
+                            "repeating",
+                            "signature"
                         ],
                         "description": "Kind of input: text, textarea, number, date, select, multiselect, checkbox, file, profile_ref (a person) or ou_ref (a unit)."
                     },
@@ -52607,7 +53205,9 @@
                             "checkbox",
                             "file",
                             "profile_ref",
-                            "ou_ref"
+                            "ou_ref",
+                            "repeating",
+                            "signature"
                         ],
                         "description": "Kind of input: text, textarea, number, date, select, multiselect, checkbox, file, profile_ref (a person) or ou_ref (a unit)."
                     },
@@ -52690,6 +53290,22 @@
                     "maxFiles": {
                         "type": "integer",
                         "description": "How many files a file question takes, 1 to 20. Above 1 the answer is a list."
+                    },
+                    "columns": {
+                        "type": "array",
+                        "maxItems": 20,
+                        "items": {
+                            "$ref": "#/components/schemas/FormFieldColumn"
+                        },
+                        "description": "The columns of a repeating question. Required on one."
+                    },
+                    "minRows": {
+                        "type": "integer",
+                        "description": "Fewest rows a repeating question takes when it has any."
+                    },
+                    "maxRows": {
+                        "type": "integer",
+                        "description": "Most rows a repeating question takes, up to 200."
                     }
                 }
             },
@@ -55793,6 +56409,125 @@
                     "notified"
                 ]
             },
+            "MemberForm": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "object",
+                        "x-whity-localized-text": true,
+                        "properties": {
+                            "ar": {
+                                "type": "string"
+                            },
+                            "en": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "description": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "description_i18n": {
+                        "type": "object",
+                        "x-whity-localized-text": true,
+                        "properties": {
+                            "ar": {
+                                "type": "string"
+                            },
+                            "en": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "submit_label": {
+                        "type": "object",
+                        "x-whity-localized-text": true,
+                        "properties": {
+                            "ar": {
+                                "type": "string"
+                            },
+                            "en": {
+                                "type": "string"
+                            }
+                        },
+                        "nullable": true
+                    },
+                    "status": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "name",
+                    "status"
+                ]
+            },
+            "MemberFormListResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/MemberForm"
+                        }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "MemberFormRenderResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "form": {
+                                "$ref": "#/components/schemas/MemberForm"
+                            },
+                            "fields": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/FormField"
+                                }
+                            },
+                            "sections": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/FormSection"
+                                }
+                            },
+                            "prefill": {
+                                "type": "object",
+                                "additionalProperties": true
+                            },
+                            "unresolved_prefill": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "additionalProperties": true
+                                }
+                            },
+                            "accepts_submissions": {
+                                "type": "boolean"
+                            }
+                        },
+                        "required": [
+                            "form",
+                            "fields",
+                            "sections",
+                            "accepts_submissions"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
             "Membership": {
                 "type": "object",
                 "properties": {
@@ -58230,7 +58965,10 @@
                             "date",
                             "select",
                             "multiselect",
-                            "checkbox"
+                            "checkbox",
+                            "file",
+                            "repeating",
+                            "signature"
                         ]
                     },
                     "label": {

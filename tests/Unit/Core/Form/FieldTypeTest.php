@@ -20,9 +20,9 @@ use Whity\Core\Form\FieldType;
  */
 final class FieldTypeTest extends TestCase
 {
-    public function testWhitelistMatchesTheCheckConstraintInMigration127(): void
+    public function testWhitelistMatchesTheCheckConstraintInMigration197(): void
     {
-        $migration = dirname(__DIR__, 4) . '/database/migrations/127_create_forms.php';
+        $migration = dirname(__DIR__, 4) . '/database/migrations/197_add_repeating_and_signature_field_kinds.php';
         self::assertFileExists($migration);
 
         $source = (string) file_get_contents($migration);
@@ -31,7 +31,7 @@ final class FieldTypeTest extends TestCase
         self::assertSame(
             1,
             preg_match('/CHECK\s*\(field_type\s+IN\s*\((.*?)\)\s*\)/s', $source, $m),
-            'Migration 127 must constrain field_type with a CHECK ... IN (...) list.'
+            'Migration 197 must constrain field_type with a CHECK ... IN (...) list.'
         );
         $body = $m[1] ?? '';
         self::assertNotSame('', $body, 'The CHECK must capture its IN (...) body.');
@@ -49,7 +49,7 @@ final class FieldTypeTest extends TestCase
         self::assertSame(
             $inMigration,
             $inCode,
-            'FieldType::all() drifted from migration 127\'s CHECK constraint. A kind in one and not '
+            'FieldType::all() drifted from migration 197\'s CHECK constraint. A kind in one and not '
             . 'the other means either the database refuses something the builder offers, or it '
             . 'accepts something no validator or renderer understands.'
         );
@@ -84,12 +84,13 @@ final class FieldTypeTest extends TestCase
         self::assertFalse(FieldType::requiresOptions(FieldType::CHECKBOX));
     }
 
-    public function testOnlyMultiselectIsMultiValued(): void
+    public function testOnlyMultiselectAndRepeatingAreMultiValued(): void
     {
         self::assertTrue(FieldType::isMultiValued(FieldType::MULTISELECT));
+        self::assertTrue(FieldType::isMultiValued(FieldType::REPEATING));
 
         foreach (FieldType::all() as $type) {
-            if ($type === FieldType::MULTISELECT) {
+            if ($type === FieldType::MULTISELECT || $type === FieldType::REPEATING) {
                 continue;
             }
             self::assertFalse(

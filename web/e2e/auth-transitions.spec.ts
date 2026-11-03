@@ -87,7 +87,7 @@ test.describe('Auth transitions', () => {
     await shell.clickNav('Delegations');
     await page.waitForURL('**/admin/delegations');
     await expect(
-      page.getByRole('button', { name: 'Create Delegation' })
+      page.getByRole('button', { name: 'Delegate' })
     ).toBeVisible();
     await expect(
       page.getByRole('heading', { name: 'Access denied' })

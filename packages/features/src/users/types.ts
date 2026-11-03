@@ -136,6 +136,10 @@ export interface UsersAdapter {
    * password in an administrator's hands.
    */
   sendPasswordResetLink(id: number): Promise<void>;
+  /** Switch the account on or off. Optional: a host that omits it gets no Deactivate. */
+  setAccountStatus?(id: number, status: 'active' | 'inactive'): Promise<void>;
+  /** Remove the person from this workspace. Optional: a host that omits it gets no Delete. */
+  deleteUser?(id: number): Promise<void>;
   /** GET /me/capabilities — the caller's effective permission slugs. */
   getCapabilities(): Promise<string[]>;
 }
@@ -165,7 +169,12 @@ export interface UserRecordScreenProps {
   /** Optional translator; defaults to identity (keys render as literals). */
   t?: UsersTranslate;
   /** Optional notifier; web wires ToastProvider. */
-  onNotify?: (message: string, type: 'success' | 'error') => void;
+  /** `action` is an Undo the toast offers for a few seconds. */
+  onNotify?: (
+    message: string,
+    type: 'success' | 'error',
+    action?: { label: string; onClick: () => void }
+  ) => void;
   /** Navigate back to the users list (host-supplied, same seam as the roles page). */
   onBack: () => void;
   className?: string;

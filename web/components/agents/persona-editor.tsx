@@ -103,7 +103,7 @@ export function PersonaEditor({ agent }: { agent: WorkspaceAgent | null }) {
     brief: t('agents.tone.brief', 'Brief'),
   };
   const languageWords: Record<AgentLanguage, string> = {
-    auto: t('agents.language.auto', "The person's language"),
+    auto: t('agents.language.auto', 'The language of the person using it'),
     en: t('agents.language.en', 'English'),
     ar: t('agents.language.ar', 'Arabic'),
   };

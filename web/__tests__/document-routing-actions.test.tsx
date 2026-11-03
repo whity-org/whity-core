@@ -238,7 +238,7 @@ describe('RouteFanout', () => {
       />
     );
 
-    expect(screen.getAllByText('Profile #42').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Account #42').length).toBeGreaterThan(0);
   });
 });
 

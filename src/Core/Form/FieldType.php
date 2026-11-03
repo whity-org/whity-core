@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Core\Form;
 
 /**
- * The kinds of field a form may carry (migration 127).
+ * The kinds of field a form may carry (migrations 127 and 197).
  *
  * A CLOSED vocabulary, and deliberately a small one. Every entry here is
  * something a renderer has to draw, a validator has to check and a submission
@@ -15,7 +15,7 @@ namespace Whity\Core\Form;
  *
  * The list is mirrored by a CHECK constraint on `form_fields.field_type`. That
  * duplication is real and is checked rather than trusted:
- * {@see \Tests\Unit\Core\Form\FieldTypeTest} reads migration 127 and fails the
+ * {@see \Tests\Unit\Core\Form\FieldTypeTest} reads migration 197 and fails the
  * moment the two disagree, the same way
  * {@see \Tests\Unit\Core\Document\RouteTemplate\RouteTemplateVocabularyTest}
  * polices the routing vocabulary across two migrations.
@@ -44,6 +44,19 @@ final class FieldType
     public const FILE = 'file';
     public const PROFILE_REF = 'profile_ref';
     public const OU_REF = 'ou_ref';
+    /** A table the person adds rows to. Its columns are in `validation.columns`. */
+    public const REPEATING = 'repeating';
+    /** A typed full name, stored with the time the server received it. */
+    public const SIGNATURE = 'signature';
+
+    /**
+     * What a repeating question's column may be: the kinds a table cell can draw
+     * and check on its own. No files or pickers in a cell, because neither has a
+     * single value a row can hold on its own, and no table inside a table.
+     *
+     * @var list<string>
+     */
+    public const COLUMN_KINDS = [self::TEXT, self::TEXTAREA, self::NUMBER, self::DATE, self::SELECT, self::CHECKBOX];
 
     /**
      * The kinds whose choices the AUTHOR writes down, and which therefore
@@ -63,7 +76,7 @@ final class FieldType
      *
      * @var list<string>
      */
-    private const MULTI_VALUED = [self::MULTISELECT];
+    private const MULTI_VALUED = [self::MULTISELECT, self::REPEATING];
 
     /**
      * Static vocabulary only — never instantiated.
@@ -91,6 +104,8 @@ final class FieldType
             self::FILE,
             self::PROFILE_REF,
             self::OU_REF,
+            self::REPEATING,
+            self::SIGNATURE,
         ];
     }
 

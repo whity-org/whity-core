@@ -10,12 +10,14 @@
 
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { isReadPermission, localized, templateGroups, toolsetsFromSplits, type WorkspaceAgent } from '@/components/agents/workspace-agents';
 
 const mockApiClient = jest.fn();
 jest.mock('@/lib/auth-context', () => ({ useAuth: () => ({ apiClient: mockApiClient }) }));
 const addToast = jest.fn();
 jest.mock('@/lib/toast-context', () => ({ useToast: () => ({ addToast }) }));
+jest.mock('@/hooks/useCapabilities', () => ({ useCapabilities: () => ({ hasPermission: () => true }) }));
 const push = jest.fn();
 jest.mock('next/navigation', () => ({ useParams: () => ({ id: '3' }), useRouter: () => ({ push }) }));
 jest.mock('next/link', () => ({
@@ -30,6 +32,7 @@ jest.mock('next/link', () => ({
 import AgentsPage from '@/app/(protected)/admin/agents/page';
 import MyAgentsPage from '@/app/(protected)/admin/my-agents/page';
 import { PersonaEditor } from '@/components/agents/persona-editor';
+import { AgentRecord } from '@/components/agents/agent-record';
 
 const json = (status: number, body: unknown) =>
   Promise.resolve({ ok: status >= 200 && status < 300, status, json: () => Promise.resolve(body) });
@@ -107,7 +110,7 @@ describe('Agents page', () => {
     render(<AgentsPage />);
 
     fireEvent.click(await screen.findByRole('button', { name: 'New agent' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Use this preset' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Use this agent' }));
 
     await waitFor(() => expect(push).toHaveBeenCalledWith('/admin/agents/3'));
     expect(sent('POST /api/v1/agents')).toEqual({ presetKey: 'core.finance-clerk' });
@@ -120,10 +123,17 @@ describe('Agents page', () => {
     });
     render(<AgentsPage />);
 
-    expect(await screen.findByRole('button', { name: 'Restore' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Archive' }));
+    const user = userEvent.setup();
+    const menus = await screen.findAllByRole('button', { name: 'More actions' });
+    await user.click(menus[0]);
+    await user.click(await screen.findByRole('menuitem', { name: 'Archive' }));
 
-    await waitFor(() => expect(addToast).toHaveBeenCalledWith(expect.stringContaining('archived'), 'success'));
+    // Tier 1: it acts at once and the toast carries Undo.
+    await waitFor(() =>
+      expect(addToast).toHaveBeenCalledWith(expect.stringContaining('archived'), 'success', 8000, expect.objectContaining({ label: 'Undo' })),
+    );
+    await user.click((await screen.findAllByRole('button', { name: 'More actions' }))[1]);
+    expect(await screen.findByRole('menuitem', { name: 'Restore' })).toBeInTheDocument();
   });
 });
 
@@ -162,6 +172,27 @@ describe('Persona editor', () => {
 
     expect(await screen.findByText(/can start at off or ask/)).toBeInTheDocument();
     expect(push).not.toHaveBeenCalled();
+  });
+});
+
+describe('Agent record', () => {
+  it('collects edits in a save bar and saves them together', async () => {
+    route({
+      'GET /api/v1/mcp/splits': () => json(200, { data: [] }),
+      'PATCH /api/v1/agents/3': () => json(200, { data: clerk }),
+    });
+    const user = userEvent.setup();
+    render(<AgentRecord agent={clerk} onChanged={() => {}} />);
+
+    expect(screen.queryByRole('button', { name: 'Save changes' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('tab', { name: 'Instructions' }));
+    fireEvent.change(screen.getByLabelText('What it does', { selector: '#agent-role' }), { target: { value: 'Prepares and chases invoices.' } });
+
+    expect(await screen.findByText('Name and job changed')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    await waitFor(() => expect(sent('PATCH /api/v1/agents/3')).toMatchObject({ role: 'Prepares and chases invoices.', name: 'Finance clerk' }));
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Save changes' })).not.toBeInTheDocument());
   });
 });
 

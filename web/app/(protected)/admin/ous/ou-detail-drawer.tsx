@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
@@ -11,6 +11,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { Button } from '@whity/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@whity/ui/tabs';
 import { Badge } from '@whity/ui/badge';
 import { Skeleton } from '@whity/ui/skeleton';
 import { Alert, AlertDescription } from '@whity/ui/alert';
@@ -57,6 +58,10 @@ interface OuDetailDrawerProps {
   onAction: (action: OuAction, ou: OU) => void;
   /** Notify the page that the OU changed (e.g. a role was added/removed). */
   onChanged: () => void;
+  /** Holds `ous:write`: add a unit, edit, and change which roles apply here. */
+  canWrite: boolean;
+  /** Holds `ous:delete`. */
+  canDelete: boolean;
 }
 
 /**
@@ -67,7 +72,14 @@ interface OuDetailDrawerProps {
  * up via `onAction`), a Roles section that lists and mutates the OU's role
  * assignments in place, and a read-only Members section.
  */
-export function OuDetailDrawer({ ou, onClose, onAction, onChanged }: OuDetailDrawerProps) {
+export function OuDetailDrawer({
+  ou,
+  onClose,
+  onAction,
+  onChanged,
+  canWrite,
+  canDelete,
+}: OuDetailDrawerProps) {
   const { apiClient } = useAuth();
   const { addToast } = useToast();
   const t = useTranslation('admin');
@@ -187,31 +199,47 @@ export function OuDetailDrawer({ ou, onClose, onAction, onChanged }: OuDetailDra
               <SheetDescription>
                 {ou.description ? ou.description : t('ous.detail.noDescription', 'No description.')}
               </SheetDescription>
-              <p className="mt-1 font-mono text-xs text-muted-foreground">
-                {t('ous.detail.slug', 'slug: {slug}', { slug: ou.slug })}
-              </p>
             </SheetHeader>
 
-            <div className="flex flex-wrap gap-2">
-              <Button size="sm" variant="outline" onClick={() => onAction('create-child', ou)}>
-                <IconPlus />
-                {t('ous.detail.action.addChild', 'Add child')}
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => onAction('edit', ou)}>
-                <IconEdit />
-                {t('ous.detail.action.edit', 'Edit')}
-              </Button>
-              <Button size="sm" variant="destructive" onClick={() => onAction('delete', ou)}>
-                <IconTrash />
-                {t('ous.detail.action.delete', 'Delete')}
-              </Button>
-            </div>
+            {/* Only people who may change units see the actions (the unit's own
+                permissions, not the page's: a read-only viewer gets none). */}
+            {(canWrite || canDelete) && (
+              <div className="flex flex-wrap gap-2">
+                {canWrite && (
+                  <Button variant="outline" onClick={() => onAction('create-child', ou)}>
+                    <IconPlus />
+                    {t('ous.detail.action.addChild', 'Add a unit inside')}
+                  </Button>
+                )}
+                {canWrite && (
+                  <Button variant="outline" onClick={() => onAction('edit', ou)}>
+                    <IconEdit />
+                    {t('ous.detail.action.edit', 'Edit')}
+                  </Button>
+                )}
+                {canDelete && (
+                  <Button variant="outline" onClick={() => onAction('delete', ou)}>
+                    <IconTrash />
+                    {t('ous.detail.action.delete', 'Delete unit')}
+                  </Button>
+                )}
+              </div>
+            )}
 
+            <Tabs defaultValue="members">
+              <TabsList variant="line">
+                <TabsTrigger value="members">{t('ous.detail.tab.members', 'Members')}</TabsTrigger>
+                <TabsTrigger value="roles">{t('ous.detail.tab.roles', 'Roles here')}</TabsTrigger>
+                <TabsTrigger value="details">{t('ous.detail.tab.details', 'Details')}</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="roles" className="mt-4">
             <section aria-labelledby="ou-roles-heading" className="space-y-2">
               <h3 id="ou-roles-heading" className="font-heading text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 {t('ous.detail.roles.heading', 'Roles')}
               </h3>
 
+              {canWrite && (
               <div className="flex gap-2">
                 <Select
                   value={pendingRoleId}
@@ -246,6 +274,7 @@ export function OuDetailDrawer({ ou, onClose, onAction, onChanged }: OuDetailDra
                   {t('ous.detail.roles.assign', 'Assign')}
                 </Button>
               </div>
+              )}
 
               {isLoading ? (
                 <Skeleton className="h-8 w-full" />
@@ -268,23 +297,27 @@ export function OuDetailDrawer({ ou, onClose, onAction, onChanged }: OuDetailDra
                           </span>
                         )}
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label={t('ous.detail.roles.remove', 'Remove role {name}', {
-                          name: role.name,
-                        })}
-                        disabled={isMutating}
-                        onClick={() => handleRemoveRole(role.id)}
-                      >
-                        <IconX />
-                      </Button>
+                      {canWrite && (
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label={t('ous.detail.roles.remove', 'Remove role {name}', {
+                            name: role.name,
+                          })}
+                          disabled={isMutating}
+                          onClick={() => handleRemoveRole(role.id)}
+                        >
+                          <IconX />
+                        </Button>
+                      )}
                     </li>
                   ))}
                 </ul>
               )}
             </section>
+              </TabsContent>
 
+              <TabsContent value="members" className="mt-4">
             <section aria-labelledby="ou-members-heading" className="space-y-2">
               <h3 id="ou-members-heading" className="flex items-center gap-1.5 font-heading text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 <IconUsers className="size-3.5" />
@@ -318,6 +351,27 @@ export function OuDetailDrawer({ ou, onClose, onAction, onChanged }: OuDetailDra
                 </AlertDescription>
               </Alert>
             </section>
+              </TabsContent>
+
+              <TabsContent value="details" className="mt-4">
+                <dl className="space-y-3 text-sm">
+                  <div>
+                    <dt className="font-medium text-foreground">{t('ous.detail.details.name', 'Name')}</dt>
+                    <dd className="text-muted-foreground">{ou.name}</dd>
+                  </div>
+                  <div>
+                    <dt className="font-medium text-foreground">{t('ous.detail.details.code', 'Short code')}</dt>
+                    <dd className="text-muted-foreground">{ou.slug}</dd>
+                  </div>
+                  <div>
+                    <dt className="font-medium text-foreground">{t('ous.detail.details.description', 'Description')}</dt>
+                    <dd className="text-muted-foreground">
+                      {ou.description ? ou.description : t('ous.detail.noDescription', 'No description.')}
+                    </dd>
+                  </div>
+                </dl>
+              </TabsContent>
+            </Tabs>
           </>
         )}
       </SheetContent>

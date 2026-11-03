@@ -162,7 +162,7 @@ describe('ConnectWizard', () => {
     api();
     renderWizard();
 
-    expect(await screen.findByRole('button', { name: /Claude Coming with sign-in/ })).toBeDisabled();
+    expect(await screen.findByRole('button', { name: /Claude Coming soon/ })).toBeDisabled();
     expect(screen.getByRole('button', { name: /ChatGPT/ })).toBeDisabled();
   });
 

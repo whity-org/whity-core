@@ -121,6 +121,8 @@ export function SettingsArea({ children }: { children: ReactNode }) {
       links.push({ id: tab.id, href: tab.href, label: tab.label, group: GROUP_OF[tab.id] ?? 'advanced' });
     }
     for (const id of SETTINGS_AREA_NAV_IDS) {
+      // Tag groups are on the Tags page now, so they get no link of their own.
+      if (id === 'tag-groups') continue;
       const item = navItems.find((nav) => nav.id === id);
       if (item) links.push({ id, href: item.href, label: dataLabels[id] ?? item.label, group: 'data' });
     }

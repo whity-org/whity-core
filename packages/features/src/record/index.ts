@@ -79,6 +79,8 @@ export type {
   RecordFields,
   RecordGate,
   RecordMain,
+  RecordTab,
+  RecordTabs,
   RecordPageBody,
   RecordPageShellBaseProps,
   RecordPageShellProps,

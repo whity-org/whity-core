@@ -2831,6 +2831,30 @@ export interface paths {
         patch: operations["patch_api_v1_forms_id_fields_fieldid"];
         trace?: never;
     };
+    "/api/v1/forms/{id}/member-access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Let this workspace's members fill in this form
+         * @description OFF BY DEFAULT on every form. Active members of the workspace can then list, open and submit this form through /api/me/forms, with no permission of their own. Records who opened it and when. Idempotent. REFUSED (422) on a form that is not published, on one asking for a person or unit, and on one with nothing a member can answer.
+         */
+        post: operations["post_api_v1_forms_id_member_access"];
+        /**
+         * Stop members filling in this form
+         * @description Idempotent. Submissions already made are untouched.
+         */
+        delete: operations["delete_api_v1_forms_id_member_access"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/forms/{id}/public-link": {
         parameters: {
             query?: never;
@@ -3636,11 +3660,91 @@ export interface paths {
         };
         /**
          * The caller's own submissions
-         * @description Only ever the caller's rows — the ROUTE decides whose, not a query param, so nothing a client omits or changes can widen it. Gated on `forms:submit` rather than `forms:read` because the rows already name exactly one person, so a tenant-wide permission has nothing left to decide; requiring the read permission would hide this from precisely the people whose submissions are in it. A caller with no profile (a service principal) gets an empty list, which is true rather than an authorization failure somebody has to investigate.
+         * @description Only ever the caller's rows — the ROUTE decides whose, not a query param, so nothing a client omits or changes can widen it. It needs no permission, because the rows already name exactly one person: somebody who has submitted nothing gets an empty list, and so does a service principal, which is true rather than an authorization failure somebody has to investigate.
          */
         get: operations["get_api_v1_me_form_submissions"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/forms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The forms the caller may fill in as a member of this workspace
+         * @description Published forms an author opened to members. Empty for somebody who is not an active member. Holders of `forms:submit` can fill in other published forms through /api/forms too.
+         */
+        get: operations["get_api_v1_me_forms"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/forms/{id}/render": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What drawing a form opened to members needs
+         * @description The same 404 for a form that does not exist, is not published or not open, and for a caller who is not an active member. Person and unit questions are left out, and staff questions never appear.
+         */
+        get: operations["get_api_v1_me_forms_id_render"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/forms/{id}/submissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Submit a form opened to members, under the caller's own name
+         * @description Answers arrive under `data`, keyed by field key. A refused answer carries `details.reason` and `details.field_key`.
+         */
+        post: operations["post_api_v1_me_forms_id_submissions"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/forms/{id}/uploads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Attach a file to a form opened to members
+         * @description The ordinary form upload, with its limits and single-use reference, once the caller may fill in this form. MULTIPART, one part named `file`.
+         */
+        post: operations["post_api_v1_me_forms_id_uploads"];
         delete?: never;
         options?: never;
         head?: never;
@@ -8482,6 +8586,9 @@ export interface components {
                 en?: string;
             } | null;
             reference_format?: string | null;
+            open_to_members?: boolean;
+            members_opened_at?: string | null;
+            members_opened_by_profile_id?: number | null;
             sections?: components["schemas"]["FormSectionText"][];
             /** @enum {string} */
             status: "draft" | "published" | "archived";
@@ -8536,7 +8643,7 @@ export interface components {
             form_id: number;
             field_key: string;
             /** @enum {string} */
-            field_type: "text" | "textarea" | "number" | "date" | "select" | "multiselect" | "checkbox" | "file" | "profile_ref" | "ou_ref";
+            field_type: "text" | "textarea" | "number" | "date" | "select" | "multiselect" | "checkbox" | "file" | "profile_ref" | "ou_ref" | "repeating" | "signature";
             label: {
                 ar?: string;
                 en?: string;
@@ -8560,6 +8667,17 @@ export interface components {
             created_at?: string;
             updated_at?: string;
         };
+        FormFieldColumn: {
+            key: string;
+            /** @enum {string} */
+            type: "text" | "textarea" | "number" | "date" | "select" | "checkbox";
+            label: {
+                ar?: string;
+                en?: string;
+            };
+            required?: boolean;
+            options?: components["schemas"]["FormFieldOption"][];
+        };
         FormFieldCondition: {
             field: string;
             /** @description Text, a number, or true or false, compared with the answer. */
@@ -8573,7 +8691,7 @@ export interface components {
              * @description Kind of input: text, textarea, number, date, select, multiselect, checkbox, file, profile_ref (a person) or ou_ref (a unit).
              * @enum {string}
              */
-            field_type: "text" | "textarea" | "number" | "date" | "select" | "multiselect" | "checkbox" | "file" | "profile_ref" | "ou_ref";
+            field_type: "text" | "textarea" | "number" | "date" | "select" | "multiselect" | "checkbox" | "file" | "profile_ref" | "ou_ref" | "repeating" | "signature";
             /** @description Field label as `{"en": ..., "ar": ...}`; a plain string is read as English. */
             label: {
                 ar?: string;
@@ -8624,7 +8742,7 @@ export interface components {
              * @description Kind of input: text, textarea, number, date, select, multiselect, checkbox, file, profile_ref (a person) or ou_ref (a unit).
              * @enum {string}
              */
-            field_type?: "text" | "textarea" | "number" | "date" | "select" | "multiselect" | "checkbox" | "file" | "profile_ref" | "ou_ref";
+            field_type?: "text" | "textarea" | "number" | "date" | "select" | "multiselect" | "checkbox" | "file" | "profile_ref" | "ou_ref" | "repeating" | "signature";
             /** @description New label as `{"en": ..., "ar": ...}`; a plain string is read as English. */
             label?: {
                 ar?: string;
@@ -8659,6 +8777,12 @@ export interface components {
             pattern?: string;
             /** @description How many files a file question takes, 1 to 20. Above 1 the answer is a list. */
             maxFiles?: number;
+            /** @description The columns of a repeating question. Required on one. */
+            columns?: components["schemas"]["FormFieldColumn"][];
+            /** @description Fewest rows a repeating question takes when it has any. */
+            minRows?: number;
+            /** @description Most rows a repeating question takes, up to 200. */
+            maxRows?: number;
         };
         FormListResponse: {
             data: components["schemas"]["Form"][];
@@ -9497,6 +9621,40 @@ export interface components {
             data: components["schemas"]["Meeting"];
             notified: number;
         };
+        MemberForm: {
+            id: number;
+            name: {
+                ar?: string;
+                en?: string;
+            };
+            description?: string | null;
+            description_i18n?: {
+                ar?: string;
+                en?: string;
+            };
+            submit_label?: {
+                ar?: string;
+                en?: string;
+            } | null;
+            status: string;
+        };
+        MemberFormListResponse: {
+            data: components["schemas"]["MemberForm"][];
+        };
+        MemberFormRenderResponse: {
+            data: {
+                form: components["schemas"]["MemberForm"];
+                fields: components["schemas"]["FormField"][];
+                sections: components["schemas"]["FormSection"][];
+                prefill?: {
+                    [key: string]: unknown;
+                };
+                unresolved_prefill?: {
+                    [key: string]: unknown;
+                }[];
+                accepts_submissions: boolean;
+            };
+        };
         Membership: {
             id: number;
             tenantId: number;
@@ -10107,7 +10265,7 @@ export interface components {
         PublicFormField: {
             field_key: string;
             /** @enum {string} */
-            field_type: "text" | "textarea" | "number" | "date" | "select" | "multiselect" | "checkbox";
+            field_type: "text" | "textarea" | "number" | "date" | "select" | "multiselect" | "checkbox" | "file" | "repeating" | "signature";
             label: {
                 ar?: string;
                 en?: string;
@@ -26645,6 +26803,149 @@ export interface operations {
             };
         };
     };
+    post_api_v1_forms_id_member_access: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The form */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Form not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The form is not published, or asks what members cannot answer */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    delete_api_v1_forms_id_member_access: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The form */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Form not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     post_api_v1_forms_id_public_link: {
         parameters: {
             query?: never;
@@ -31036,6 +31337,310 @@ export interface operations {
             };
             /** @description Method not allowed */
             405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_me_forms: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The forms */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberFormListResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_me_forms_id_render: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The form, its questions and the caller's prefill */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberFormRenderResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not available to this caller */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_me_forms_id_submissions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FormSubmissionCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description The recorded submission */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormSubmissionCreateResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not available to this caller */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description An answer failed validation */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_me_forms_id_uploads: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The stored upload */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not available to this caller */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The file was refused, or the form asks for no file */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too many uploads */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };
