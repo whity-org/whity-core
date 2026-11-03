@@ -1,0 +1,1 @@
+- **Sign-in and system pages follow design 2.9.** Sign-in puts single sign-on first (including Whity ID as "Continue with Whity ID"), asks for the two-step code in six boxes you can paste into, and the new-password page ticks the password rules as you type. Pages that don't exist and unexpected errors now say what happened and what to do next, with a reference to copy.

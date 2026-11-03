@@ -10,6 +10,7 @@ import { AdminHeader } from '@/components/admin/admin-header';
 import { Button } from '@whity/ui/button';
 import { Input } from '@/components/ui/input';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
+import { TechnicalDetails, useDisplayPreferences } from '@whity/ui/display-preferences';
 import { IconRefresh } from '@tabler/icons-react';
 import type {
   AuditLogEntry,
@@ -41,6 +42,7 @@ export default function AuditLogsPage() {
   const { addToast } = useToast();
   const t = useTranslation('admin');
   const dates = useDateDisplay();
+  const { showTechnicalDetails } = useDisplayPreferences();
 
   const [entries, setEntries] = useState<AuditLogEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -147,7 +149,7 @@ export default function AuditLogsPage() {
 
   const formatTarget = (entry: AuditLogEntry): string => {
     if (!entry.targetType) return '-';
-    return entry.targetId !== null
+    return showTechnicalDetails && entry.targetId !== null
       ? `${entry.targetType} #${entry.targetId}`
       : entry.targetType;
   };
@@ -183,19 +185,28 @@ export default function AuditLogsPage() {
     {
       id: 'actor',
       header: t('auditLogs.table.actor', 'Actor'),
+      // The API returns the actor's id only, never a name. A person is not
+      // shown as a number: the id appears only with Show technical details.
       cell: (entry) =>
-        entry.actorUserId !== null
-          ? `#${entry.actorUserId}`
-          : t('auditLogs.table.actorSystem', 'system'),
+        entry.actorUserId === null
+          ? t('auditLogs.table.actorSystem', 'system')
+          : showTechnicalDetails
+            ? t('auditLogs.table.actorPersonId', 'A person (#{id})', { id: entry.actorUserId })
+            : t('auditLogs.table.actorPerson', 'A person'),
     },
     { id: 'target', header: t('auditLogs.table.target', 'Target'), cell: formatTarget },
-    { accessorKey: 'ipAddress', header: t('auditLogs.table.ip', 'IP') },
-    {
-      id: 'details',
-      header: t('auditLogs.table.details', 'Details'),
-      cell: (entry) => formatMetadata(entry.metadata),
-      className: 'max-w-md truncate',
-    },
+    // Addresses and the raw detail blob are for people who turned technical details on.
+    ...(showTechnicalDetails
+      ? ([
+          { accessorKey: 'ipAddress', header: t('auditLogs.table.ip', 'IP') },
+          {
+            id: 'details',
+            header: t('auditLogs.table.details', 'Details'),
+            cell: (entry) => formatMetadata(entry.metadata),
+            className: 'max-w-md truncate',
+          },
+        ] as DataTableColumn<AuditLogEntry>[])
+      : []),
   ];
 
   return (
@@ -221,7 +232,7 @@ export default function AuditLogsPage() {
       {/* Filters */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
         <div className="flex flex-col gap-1">
-          <label className="text-xs font-medium text-muted-foreground">
+          <label className="text-sm font-medium text-muted-foreground">
             {t('auditLogs.filter.action', 'Action')}
           </label>
           <Input
@@ -231,7 +242,7 @@ export default function AuditLogsPage() {
           />
         </div>
         <div className="flex flex-col gap-1">
-          <label className="text-xs font-medium text-muted-foreground">
+          <label className="text-sm font-medium text-muted-foreground">
             {t('auditLogs.filter.targetType', 'Target Type')}
           </label>
           <Input
@@ -240,19 +251,21 @@ export default function AuditLogsPage() {
             placeholder={t('auditLogs.filter.targetTypePlaceholder', 'e.g. role')}
           />
         </div>
+        <TechnicalDetails>
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-muted-foreground">
+              {t('auditLogs.filter.actor', 'Actor (User ID)')}
+            </label>
+            <Input
+              type="number"
+              value={draftFilters.actor}
+              onChange={(e) => updateDraft('actor', e.target.value)}
+              placeholder={t('auditLogs.filter.actorPlaceholder', 'e.g. 42')}
+            />
+          </div>
+        </TechnicalDetails>
         <div className="flex flex-col gap-1">
-          <label className="text-xs font-medium text-muted-foreground">
-            {t('auditLogs.filter.actor', 'Actor (User ID)')}
-          </label>
-          <Input
-            type="number"
-            value={draftFilters.actor}
-            onChange={(e) => updateDraft('actor', e.target.value)}
-            placeholder={t('auditLogs.filter.actorPlaceholder', 'e.g. 42')}
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-xs font-medium text-muted-foreground">
+          <label className="text-sm font-medium text-muted-foreground">
             {t('auditLogs.filter.from', 'From')}
           </label>
           <Input
@@ -262,7 +275,7 @@ export default function AuditLogsPage() {
           />
         </div>
         <div className="flex flex-col gap-1">
-          <label className="text-xs font-medium text-muted-foreground">
+          <label className="text-sm font-medium text-muted-foreground">
             {t('auditLogs.filter.to', 'To')}
           </label>
           <Input

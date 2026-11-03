@@ -6,7 +6,7 @@
  * THIS ONE IS A GAP, NOT A REFACTOR. #884's audit found the languages screen was
  * the clearest hole in the set: it could create a language and never rename one.
  * `PATCH /api/v1/languages/{id}` has accepted `{name, enabled, direction}` since
- * migration 090; the UI reached only two of the three, through a `<select>` and
+ * migration 090; the UI reached only two of the three, through a native select element and
  * a `<Switch>` wedged into table cells, because there was nowhere else to put
  * them. A language's NAME — the word every person on the instance picks it by in
  * the language switcher — was simply not editable anywhere in the product, and a
