@@ -1,0 +1,1406 @@
+{
+  "delete_api_2fa_policies_id": {
+    "en": "Remove a two-step sign-in rule",
+    "ar": "حذف قاعدة التحقق بخطوتين"
+  },
+  "delete_api_affiliate_payouts_id": {
+    "en": "Cancel a draft payout",
+    "ar": "إلغاء مسودة دفعة"
+  },
+  "delete_api_branding_assets_key": {
+    "en": "Remove your workspace's own logo or brand image",
+    "ar": "إزالة شعار أو صورة خاصة بمساحة العمل"
+  },
+  "delete_api_branding_global_assets_key": {
+    "en": "Remove the default logo or brand image for all workspaces",
+    "ar": "إزالة شعار أو صورة افتراضية لكل المساحات"
+  },
+  "delete_api_convening_bodies_id": {
+    "en": "Delete a body that holds meetings",
+    "ar": "حذف هيئة"
+  },
+  "delete_api_convening_bodies_id_members_profileid": {
+    "en": "End a member's place on a body",
+    "ar": "إنهاء عضوية شخص في هيئة"
+  },
+  "delete_api_data_types_type_id": {
+    "en": "Permanently delete a record, if nothing still uses it",
+    "ar": "حذف سجل نهائيًا"
+  },
+  "delete_api_delegations_id": {
+    "en": "Revoke a delegation",
+    "ar": "سحب تفويض"
+  },
+  "delete_api_document_collections_id": {
+    "en": "Delete one of your document collections, keeping its documents",
+    "ar": "حذف مجموعة مستندات"
+  },
+  "delete_api_document_collections_id_documents_documentid": {
+    "en": "Remove a document from one of your collections",
+    "ar": "إزالة مستند من مجموعة"
+  },
+  "delete_api_document_route_templates_id": {
+    "en": "Delete a route template",
+    "ar": "حذف قالب مسار"
+  },
+  "delete_api_document_sources_id": {
+    "en": "Delete a document from the editor",
+    "ar": "حذف مستند من المحرر"
+  },
+  "delete_api_document_themes_ref": {
+    "ar": "حذف سمة مستندات غير مستخدمة"
+  },
+  "delete_api_documents_id_qr": {
+    "ar": "إيقاف رمز التحقق من مستند"
+  },
+  "delete_api_documents_id_star": {
+    "en": "Remove the star from a document",
+    "ar": "إزالة النجمة من مستند"
+  },
+  "delete_api_email_domains_id": {
+    "en": "Remove an email domain",
+    "ar": "حذف نطاق بريد"
+  },
+  "delete_api_entity_tags": {
+    "en": "Remove a tag from an item",
+    "ar": "إزالة وسم من عنصر"
+  },
+  "delete_api_entity_tags_all": {
+    "en": "Remove all tags from an item",
+    "ar": "إزالة كل الوسوم من عنصر"
+  },
+  "delete_api_forms_id_fields_fieldid": {
+    "ar": "إزالة حقل من نموذج"
+  },
+  "delete_api_forms_id_member_access": {
+    "ar": "منع الأعضاء من تعبئة نموذج"
+  },
+  "delete_api_forms_id_public_link": {
+    "en": "Close a form's public link",
+    "ar": "إغلاق الرابط العام لنموذج"
+  },
+  "delete_api_identity_providers_id": {
+    "en": "Delete a sign-in provider",
+    "ar": "حذف مزود تسجيل دخول"
+  },
+  "delete_api_invitations_id": {
+    "ar": "سحب دعوة معلقة"
+  },
+  "delete_api_meetings_id_agenda_itemid": {
+    "en": "Remove an item from a meeting's agenda",
+    "ar": "حذف بند من جدول أعمال اجتماع"
+  },
+  "delete_api_notification_settings_channel": {
+    "en": "Remove a notification channel's settings",
+    "ar": "حذف إعدادات قناة إشعارات"
+  },
+  "delete_api_ou_types_id": {
+    "en": "Delete a unit type",
+    "ar": "حذف نوع وحدة"
+  },
+  "delete_api_ous_id": {
+    "ar": "حذف وحدة تنظيمية"
+  },
+  "delete_api_ous_ouid_roles_roleid": {
+    "ar": "إزالة دور من وحدة تنظيمية"
+  },
+  "delete_api_persons_id": {
+    "ar": "حذف شخص"
+  },
+  "delete_api_plans_id": {
+    "en": "Delete a plan",
+    "ar": "حذف باقة"
+  },
+  "delete_api_plans_id_prices_priceid": {
+    "en": "Retire a plan price",
+    "ar": "إنهاء سعر باقة"
+  },
+  "delete_api_promotions_id": {
+    "en": "Retire a promotion",
+    "ar": "إنهاء عرض ترويجي"
+  },
+  "delete_api_relations_id": {
+    "en": "Delete a relationship",
+    "ar": "حذف علاقة بين شخصين"
+  },
+  "delete_api_resource_role_grants_all": {
+    "en": "Remove every role given on an item",
+    "ar": "سحب كل الأدوار الممنوحة على عنصر"
+  },
+  "delete_api_resource_role_grants_id": {
+    "en": "Remove one role given on an item",
+    "ar": "سحب دور ممنوح على عنصر"
+  },
+  "delete_api_roles_id": {
+    "ar": "حذف دور"
+  },
+  "delete_api_roles_id_permissions": {
+    "en": "Remove permissions from a role",
+    "ar": "سحب صلاحيات من دور"
+  },
+  "delete_api_storage_config": {
+    "en": "Remove your storage setup and use the default",
+    "ar": "إزالة إعداد التخزين والعودة للافتراضي"
+  },
+  "delete_api_tag_groups_id": {
+    "en": "Delete a tag group and all its tags",
+    "ar": "حذف مجموعة وسوم مع وسومها"
+  },
+  "delete_api_tags_id": {
+    "en": "Delete a tag and remove it from everything",
+    "ar": "حذف وسم من كل مكان"
+  },
+  "delete_api_tenants_id": {
+    "en": "Delete a workspace",
+    "ar": "حذف مساحة عمل"
+  },
+  "delete_api_time_window_types_id": {
+    "ar": "حذف نوع فترة"
+  },
+  "delete_api_translations_id": {
+    "en": "Delete a translated text",
+    "ar": "حذف نص مترجم"
+  },
+  "delete_api_user_groups_id": {
+    "en": "Delete a user group",
+    "ar": "حذف مجموعة مستخدمين"
+  },
+  "delete_api_users_id": {
+    "ar": "حذف مستخدم"
+  },
+  "delete_api_users_id_memberships_membershipid": {
+    "ar": "سحب دور إضافي من مستخدم"
+  },
+  "get_api_2fa_policies": {
+    "en": "List your workspace's two-step sign-in rules",
+    "ar": "عرض قواعد التحقق بخطوتين"
+  },
+  "get_api_2fa_policies_status": {
+    "en": "See who has set up two-step sign-in",
+    "ar": "عرض من فعّل التحقق بخطوتين"
+  },
+  "get_api_2fa_recovery_pending": {
+    "en": "List two-step sign-in recovery requests waiting for approval",
+    "ar": "عرض طلبات استعادة التحقق بخطوتين المعلقة"
+  },
+  "get_api_admin_languages": {
+    "en": "List every language, including switched-off ones",
+    "ar": "عرض كل اللغات"
+  },
+  "get_api_admin_stats": {
+    "en": "See statistics for the whole platform",
+    "ar": "عرض إحصاءات المنصة كاملة"
+  },
+  "get_api_affiliates": {
+    "en": "See affiliates and what they are owed",
+    "ar": "عرض المسوّقين بالعمولة وما يستحقونه"
+  },
+  "get_api_affiliates_id_payouts": {
+    "en": "See what an affiliate was paid and what is drafted",
+    "ar": "عرض دفعات مسوّق"
+  },
+  "get_api_agenda_items": {
+    "en": "See a meeting's agenda",
+    "ar": "عرض جدول أعمال اجتماع"
+  },
+  "get_api_agent_presets": {
+    "ar": "عرض نماذج الوكلاء الجاهزة"
+  },
+  "get_api_agents": {
+    "ar": "عرض وكلاء مساحة العمل"
+  },
+  "get_api_agents_id": {
+    "ar": "عرض وكيل"
+  },
+  "get_api_audit_logs": {
+    "en": "See the audit log of your workspace",
+    "ar": "عرض سجل التدقيق"
+  },
+  "get_api_billing_invoices": {
+    "en": "List your workspace's invoices",
+    "ar": "عرض الفواتير"
+  },
+  "get_api_billing_invoices_id": {
+    "en": "See one invoice, its lines and its payments",
+    "ar": "عرض فاتورة وبنودها ومدفوعاتها"
+  },
+  "get_api_billing_methods": {
+    "en": "See which ways of paying are available",
+    "ar": "عرض طرق الدفع المتاحة"
+  },
+  "get_api_billing_plans": {
+    "en": "See the plans you can buy",
+    "ar": "عرض الباقات المتاحة للشراء"
+  },
+  "get_api_billing_receipts": {
+    "en": "See what your workspace has paid",
+    "ar": "عرض إيصالات الدفع"
+  },
+  "get_api_billing_return": {
+    "en": "Check the result of a payment",
+    "ar": "التحقق من نتيجة عملية دفع"
+  },
+  "get_api_convening_bodies": {
+    "en": "List the bodies that hold meetings",
+    "ar": "عرض الهيئات"
+  },
+  "get_api_convening_bodies_id": {
+    "en": "See one body and its members",
+    "ar": "عرض هيئة وأعضائها"
+  },
+  "get_api_convening_bodies_id_members": {
+    "en": "List a body's members",
+    "ar": "عرض أعضاء هيئة"
+  },
+  "get_api_data_types": {
+    "en": "List the kinds of plugin records you can manage",
+    "ar": "عرض أنواع سجلات الإضافات التي تديرها"
+  },
+  "get_api_data_types_type_id": {
+    "en": "See a record's status and what stops it being deleted",
+    "ar": "عرض حالة سجل وما يمنع حذفه"
+  },
+  "get_api_delegations": {
+    "en": "List permission delegations in your workspace",
+    "ar": "عرض التفويضات"
+  },
+  "get_api_deployments_status": {
+    "ar": "عرض حالة التثبيت الحالية"
+  },
+  "get_api_document_background_issuing": {
+    "en": "See which plugins can issue documents on their own",
+    "ar": "عرض الإضافات التي تصدر مستندات من تلقاء نفسها"
+  },
+  "get_api_document_collections": {
+    "en": "List your own document collections",
+    "ar": "عرض مجموعات مستنداتك"
+  },
+  "get_api_document_embeds": {
+    "en": "List what a document's record and chart blocks can show",
+    "ar": "عرض ما تعرضه كتل السجلات والرسوم"
+  },
+  "get_api_document_embeds_charts_key": {
+    "en": "Load the figures for a chart in a document",
+    "ar": "تحميل أرقام رسم بياني في مستند"
+  },
+  "get_api_document_embeds_records_type_id": {
+    "en": "Show one record inside a document",
+    "ar": "عرض سجل داخل مستند"
+  },
+  "get_api_document_fields": {
+    "en": "List the fields a template can fill in automatically",
+    "ar": "عرض الحقول التلقائية المتاحة للقالب"
+  },
+  "get_api_document_fields_records": {
+    "ar": "البحث عن سجلات لمعاينة قالب"
+  },
+  "get_api_document_route_templates": {
+    "en": "List the route templates in your workspace",
+    "ar": "عرض قوالب المسارات"
+  },
+  "get_api_document_route_templates_id": {
+    "en": "See a route template with its steps",
+    "ar": "عرض قالب مسار وخطواته"
+  },
+  "get_api_document_sources": {
+    "en": "List templates, letters, reports, notes and other documents you can see",
+    "ar": "عرض القوالب والرسائل والتقارير في المحرر"
+  },
+  "get_api_document_sources_id": {
+    "en": "Open a document in the editor",
+    "ar": "فتح مستند في المحرر"
+  },
+  "get_api_document_sources_id_changes": {
+    "en": "See what changed in a document",
+    "ar": "عرض ما تغيّر في مستند"
+  },
+  "get_api_document_sources_id_comments": {
+    "en": "List the comments on a document",
+    "ar": "عرض التعليقات على مستند"
+  },
+  "get_api_document_sources_id_files_fileid_content": {
+    "en": "Download a file from a document",
+    "ar": "تنزيل ملف من مستند"
+  },
+  "get_api_document_sources_id_mentionable": {
+    "ar": "البحث عن أشخاص للإشارة إليهم في تعليق"
+  },
+  "get_api_document_sources_id_preview": {
+    "en": "Preview a template filled in from a record",
+    "ar": "معاينة قالب ببيانات سجل"
+  },
+  "get_api_document_sources_id_publish_check": {
+    "en": "See what is stopping a template from being published",
+    "ar": "عرض ما يمنع نشر قالب"
+  },
+  "get_api_document_sources_id_suggestions": {
+    "en": "List the suggested changes on a document",
+    "ar": "عرض التعديلات المقترحة على مستند"
+  },
+  "get_api_document_sources_id_versions": {
+    "en": "List a template's published versions",
+    "ar": "عرض الإصدارات المنشورة لقالب"
+  },
+  "get_api_document_sources_id_versions_version": {
+    "en": "See one published version of a template",
+    "ar": "عرض إصدار منشور من قالب"
+  },
+  "get_api_document_template_slots": {
+    "en": "See which templates the plugins use for each purpose",
+    "ar": "عرض القوالب التي تستخدمها الإضافات"
+  },
+  "get_api_document_themes": {
+    "ar": "عرض سمات المستندات"
+  },
+  "get_api_document_themes_ref": {
+    "en": "See one document theme",
+    "ar": "عرض سمة مستندات"
+  },
+  "get_api_document_themes_ref_usage": {
+    "ar": "عرض أماكن استخدام سمة مستندات"
+  },
+  "get_api_document_themes_schema": {
+    "ar": "عرض خيارات سمة المستند"
+  },
+  "get_api_documents": {
+    "en": "List the issued documents you can see",
+    "ar": "عرض المستندات الصادرة"
+  },
+  "get_api_documents_by_verification_token": {
+    "en": "Open the record behind a scanned QR code",
+    "ar": "فتح السجل المرتبط برمز QR"
+  },
+  "get_api_documents_id": {
+    "en": "See an issued document and its history",
+    "ar": "عرض مستند صادر وسجل نسخه"
+  },
+  "get_api_documents_id_artifacts_artifactid_content": {
+    "en": "Download one earlier or current file of a document",
+    "ar": "تنزيل نسخة محددة من مستند"
+  },
+  "get_api_documents_id_content": {
+    "en": "Download a document's current file",
+    "ar": "تنزيل المستند"
+  },
+  "get_api_documents_id_convening": {
+    "en": "See which bodies reviewed a document and what they decided",
+    "ar": "عرض الهيئات التي نظرت في مستند وقراراتها"
+  },
+  "get_api_documents_id_qr": {
+    "en": "See a document's verification code and its scans",
+    "ar": "عرض رمز التحقق من مستند ومرات مسحه"
+  },
+  "get_api_documents_id_recipients": {
+    "en": "See who a document reached and what they did",
+    "ar": "عرض من وصل إليهم المستند وما فعلوه"
+  },
+  "get_api_documents_id_routes": {
+    "en": "List a document's routes and their steps",
+    "ar": "عرض مسارات مستند وخطواتها"
+  },
+  "get_api_documents_id_trail": {
+    "en": "See the history of a document's route",
+    "ar": "عرض سجل مسار المستند"
+  },
+  "get_api_documents_views": {
+    "en": "List the document folders you can open",
+    "ar": "عرض مجلدات المستندات"
+  },
+  "get_api_email_domains": {
+    "en": "List the email domains of your workspace",
+    "ar": "عرض نطاقات البريد"
+  },
+  "get_api_entity_tags": {
+    "en": "See an item's tags, or the items with a tag",
+    "ar": "عرض وسوم عنصر أو العناصر الحاملة لوسم"
+  },
+  "get_api_features": {
+    "en": "See which features your workspace can use",
+    "ar": "عرض الميزات التي تستطيع استخدامها"
+  },
+  "get_api_form_fields": {
+    "en": "See a form's fields",
+    "ar": "عرض حقول نموذج"
+  },
+  "get_api_form_submissions": {
+    "en": "List the form submissions in your workspace",
+    "ar": "عرض الإجابات المرسلة على النماذج"
+  },
+  "get_api_form_submissions_id": {
+    "ar": "عرض إجابة نموذج وحقولها"
+  },
+  "get_api_form_submissions_id_review": {
+    "ar": "عرض ما سجّله المكتب عن إجابة"
+  },
+  "get_api_forms": {
+    "en": "List the forms in your workspace",
+    "ar": "عرض النماذج"
+  },
+  "get_api_forms_id": {
+    "ar": "عرض نموذج وحقوله"
+  },
+  "get_api_forms_id_fields": {
+    "en": "See a form's fields in order",
+    "ar": "عرض حقول نموذج بترتيبها"
+  },
+  "get_api_forms_id_render": {
+    "en": "Show a form ready to fill in",
+    "ar": "عرض نموذج جاهز للتعبئة"
+  },
+  "get_api_group_rules": {
+    "en": "List the kinds of rule a user group can use",
+    "ar": "عرض أنواع قواعد مجموعات المستخدمين"
+  },
+  "get_api_identity_providers": {
+    "en": "List the sign-in providers of your workspace",
+    "ar": "عرض مزودي تسجيل الدخول"
+  },
+  "get_api_invitations": {
+    "en": "List your workspace's invitations",
+    "ar": "عرض الدعوات"
+  },
+  "get_api_licensing_devices": {
+    "en": "See the devices your workspace is licensed for",
+    "ar": "عرض الأجهزة المرخّصة"
+  },
+  "get_api_me": {
+    "en": "See who you are signed in as",
+    "ar": "عرض الحساب الذي سجّلت الدخول به"
+  },
+  "get_api_me_audit_logs": {
+    "en": "See your own activity log",
+    "ar": "عرض سجل نشاطك"
+  },
+  "get_api_me_capabilities": {
+    "en": "See what you are allowed to do",
+    "ar": "عرض ما يُسمح لك بفعله"
+  },
+  "get_api_me_form_submissions": {
+    "en": "See the forms you have sent",
+    "ar": "عرض النماذج التي أرسلتها"
+  },
+  "get_api_me_inbox": {
+    "en": "See items waiting for you from one inbox source",
+    "ar": "عرض عناصر الوارد المنتظرة منك"
+  },
+  "get_api_me_inbox_sources": {
+    "en": "See your inbox sources and how many items each has",
+    "ar": "عرض مصادر الوارد وعدد عناصر كل منها"
+  },
+  "get_api_me_notification_preferences": {
+    "en": "See your notification preferences",
+    "ar": "عرض تفضيلات إشعاراتك"
+  },
+  "get_api_me_notifications": {
+    "en": "See your notifications",
+    "ar": "عرض إشعاراتك"
+  },
+  "get_api_me_notifications_unread_count": {
+    "en": "See how many notifications you have not read",
+    "ar": "عرض عدد إشعاراتك غير المقروءة"
+  },
+  "get_api_meeting_attendees": {
+    "en": "See who came to a meeting and how they replied",
+    "ar": "عرض حضور اجتماع وردود المدعوين"
+  },
+  "get_api_meeting_decisions": {
+    "ar": "عرض قرارات اجتماع"
+  },
+  "get_api_meeting_invitations": {
+    "ar": "عرض دعوات اجتماع وردودها"
+  },
+  "get_api_meetings": {
+    "ar": "عرض الاجتماعات"
+  },
+  "get_api_meetings_id": {
+    "ar": "عرض اجتماع وجدول أعماله وقراراته"
+  },
+  "get_api_migrations": {
+    "en": "See database updates and whether they have run",
+    "ar": "عرض تحديثات قاعدة البيانات وحالتها"
+  },
+  "get_api_notification_metrics": {
+    "en": "See how well notifications are being delivered",
+    "ar": "عرض مدى نجاح تسليم الإشعارات"
+  },
+  "get_api_notification_settings": {
+    "en": "See how each notification channel sends messages",
+    "ar": "عرض إعدادات قنوات الإشعارات"
+  },
+  "get_api_ou_types": {
+    "en": "List the types of organizational unit in your workspace",
+    "ar": "عرض أنواع الوحدات التنظيمية"
+  },
+  "get_api_ou_types_catalog": {
+    "en": "List the built-in unit types and which ones you use",
+    "ar": "عرض أنواع الوحدات الجاهزة"
+  },
+  "get_api_ou_types_id": {
+    "en": "See one unit type",
+    "ar": "عرض نوع وحدة"
+  },
+  "get_api_ous": {
+    "en": "List the organizational units in your workspace",
+    "ar": "عرض الوحدات التنظيمية"
+  },
+  "get_api_ous_id": {
+    "en": "See a unit and the units directly under it",
+    "ar": "عرض وحدة تنظيمية وما تحتها"
+  },
+  "get_api_ous_id_members": {
+    "ar": "عرض مستخدمي وحدة تنظيمية"
+  },
+  "get_api_ous_id_roles": {
+    "ar": "عرض أدوار وحدة تنظيمية"
+  },
+  "get_api_password_resets_approver_coverage": {
+    "en": "See how many people can approve a password reset",
+    "ar": "عرض عدد من يستطيعون الموافقة على إعادة التعيين"
+  },
+  "get_api_password_resets_pending": {
+    "en": "List password reset requests waiting for approval",
+    "ar": "عرض طلبات إعادة تعيين كلمة المرور المعلقة"
+  },
+  "get_api_permissions": {
+    "en": "List all available permissions",
+    "ar": "عرض كل الصلاحيات المتاحة"
+  },
+  "get_api_persons": {
+    "en": "List the people in your workspace",
+    "ar": "عرض الأشخاص"
+  },
+  "get_api_persons_id": {
+    "ar": "عرض بيانات شخص"
+  },
+  "get_api_persons_id_relations": {
+    "en": "List a person's relationships",
+    "ar": "عرض علاقات شخص"
+  },
+  "get_api_plans": {
+    "en": "List subscription plans",
+    "ar": "عرض الباقات"
+  },
+  "get_api_plans_entitlement_catalogue": {
+    "en": "See the limits a plan can include",
+    "ar": "عرض الحدود التي تتضمنها الباقات"
+  },
+  "get_api_plans_id": {
+    "en": "See a plan and what it includes",
+    "ar": "عرض باقة وما تتضمنه"
+  },
+  "get_api_plans_id_prices": {
+    "en": "See a plan's prices",
+    "ar": "عرض أسعار باقة"
+  },
+  "get_api_plans_id_usage": {
+    "en": "See which workspaces still use a plan",
+    "ar": "عرض مساحات العمل التي تستخدم باقة"
+  },
+  "get_api_platform_version": {
+    "en": "See which versions of Whity are running",
+    "ar": "عرض إصدارات المنصة الحالية"
+  },
+  "get_api_platform_version_latest": {
+    "en": "Check whether a newer Whity release is available",
+    "ar": "مقارنة الإصدار الحالي بأحدث إصدار"
+  },
+  "get_api_plugins": {
+    "en": "List all plugins",
+    "ar": "عرض الإضافات"
+  },
+  "get_api_plugins_store_allowed": {
+    "en": "List the trusted plugin stores",
+    "ar": "عرض متاجر الإضافات الموثوقة"
+  },
+  "get_api_plugins_store_catalog": {
+    "en": "Browse and search a trusted plugin store",
+    "ar": "تصفح متجر الإضافات والبحث فيه"
+  },
+  "get_api_profiles_id_relations": {
+    "en": "See a user's person record and relationships",
+    "ar": "عرض بيانات شخص وعلاقاته من حسابه"
+  },
+  "get_api_promotions": {
+    "en": "List early-bird offers and promo codes",
+    "ar": "عرض العروض الترويجية"
+  },
+  "get_api_relations": {
+    "en": "List all relationships in your workspace",
+    "ar": "عرض كل العلاقات بين الأشخاص"
+  },
+  "get_api_relationship_types": {
+    "en": "List the kinds of relationship",
+    "ar": "عرض أنواع العلاقات"
+  },
+  "get_api_reports": {
+    "en": "List the reports you can run",
+    "ar": "عرض التقارير"
+  },
+  "get_api_resource_role_grants": {
+    "en": "List the roles given on one item",
+    "ar": "عرض الأدوار الممنوحة على عنصر"
+  },
+  "get_api_roles": {
+    "en": "List the roles in your workspace",
+    "ar": "عرض الأدوار"
+  },
+  "get_api_roles_id": {
+    "ar": "عرض دور وصلاحياته"
+  },
+  "get_api_roles_id_assignments": {
+    "en": "See who holds a role",
+    "ar": "عرض من يحمل دورًا"
+  },
+  "get_api_roles_id_permissions": {
+    "ar": "عرض صلاحيات دور"
+  },
+  "get_api_routing_rules": {
+    "en": "List the kinds of rule a route step can use",
+    "ar": "عرض أنواع قواعد مسار المستندات"
+  },
+  "get_api_search": {
+    "en": "Search documents, forms, people and units you can see",
+    "ar": "البحث في المستندات والنماذج والأشخاص"
+  },
+  "get_api_search_types": {
+    "ar": "عرض أنواع السجلات القابلة للبحث"
+  },
+  "get_api_settings": {
+    "en": "See your workspace settings",
+    "ar": "عرض إعدادات مساحة العمل"
+  },
+  "get_api_settings_global": {
+    "en": "See the default settings for all workspaces",
+    "ar": "عرض الإعدادات الافتراضية العامة"
+  },
+  "get_api_storage_config": {
+    "en": "See where your workspace stores files",
+    "ar": "عرض مكان تخزين الملفات"
+  },
+  "get_api_subscription": {
+    "en": "See your workspace's subscription",
+    "ar": "عرض اشتراك مساحة عملك"
+  },
+  "get_api_tag_groups": {
+    "en": "List your workspace's tag groups",
+    "ar": "عرض مجموعات الوسوم"
+  },
+  "get_api_tag_groups_id": {
+    "ar": "عرض مجموعة وسوم"
+  },
+  "get_api_tags": {
+    "en": "List your workspace's tags",
+    "ar": "عرض الوسوم"
+  },
+  "get_api_tags_id": {
+    "ar": "عرض وسم"
+  },
+  "get_api_tenants": {
+    "en": "List workspaces",
+    "ar": "عرض مساحات العمل"
+  },
+  "get_api_tenants_id_entitlements": {
+    "en": "See the limits and features of a workspace",
+    "ar": "عرض حدود مساحة عمل وميزاتها"
+  },
+  "get_api_tenants_id_plan": {
+    "en": "See a workspace's current plan",
+    "ar": "عرض باقة مساحة عمل"
+  },
+  "get_api_tenants_id_subscription": {
+    "en": "See a workspace's subscription",
+    "ar": "عرض اشتراك مساحة عمل"
+  },
+  "get_api_time_window_types": {
+    "en": "List the kinds of period in your workspace",
+    "ar": "عرض أنواع الفترات"
+  },
+  "get_api_time_window_types_catalog": {
+    "en": "List the built-in period kinds and which ones you use",
+    "ar": "عرض أنواع الفترات الجاهزة"
+  },
+  "get_api_time_windows": {
+    "en": "List periods, or find the one that contains a date",
+    "ar": "عرض الفترات أو إيجاد فترة تاريخ ما"
+  },
+  "get_api_time_windows_id": {
+    "en": "See one period and its closing history",
+    "ar": "عرض فترة وسجل إغلاقها"
+  },
+  "get_api_time_windows_id_close_report": {
+    "en": "See what closing a period would lock",
+    "ar": "عرض ما سيُقفل عند إغلاق فترة"
+  },
+  "get_api_translations": {
+    "en": "List the translated texts for a language",
+    "ar": "عرض النصوص المترجمة للغة"
+  },
+  "get_api_translations_coverage": {
+    "en": "See how complete each language's translation is",
+    "ar": "عرض اكتمال الترجمة لكل لغة"
+  },
+  "get_api_user_groups": {
+    "en": "List the user groups in your workspace",
+    "ar": "عرض مجموعات المستخدمين"
+  },
+  "get_api_user_groups_id": {
+    "en": "See a user group's definition",
+    "ar": "عرض تعريف مجموعة مستخدمين"
+  },
+  "get_api_user_groups_id_preview": {
+    "en": "See who a user group includes right now",
+    "ar": "عرض أعضاء مجموعة مستخدمين حاليًا"
+  },
+  "get_api_users": {
+    "en": "List the users in your workspace",
+    "ar": "عرض مستخدمي مساحة العمل"
+  },
+  "get_api_users_id": {
+    "ar": "عرض بيانات مستخدم"
+  },
+  "get_api_users_id_memberships": {
+    "en": "See the roles a user holds",
+    "ar": "عرض أدوار مستخدم"
+  },
+  "get_api_workspace_plugins": {
+    "ar": "عرض إضافات مساحة العمل"
+  },
+  "get_api_workspace_plugins_plugin_automation_runs": {
+    "ar": "عرض عمليات التشغيل التلقائي لإضافة"
+  },
+  "get_api_workspace_plugins_plugin_automation_runs_id": {
+    "en": "See one automation run and what it did",
+    "ar": "عرض عملية تشغيل تلقائي وما فعلته"
+  },
+  "get_api_workspace_plugins_plugin_versions": {
+    "ar": "عرض إصدارات إضافة"
+  },
+  "get_api_workspace_plugins_plugin_versions_id": {
+    "ar": "عرض إصدار من إضافة"
+  },
+  "patch_api_2fa_policies_id": {
+    "en": "Change how long people have to set up two-step sign-in",
+    "ar": "تغيير مهلة تفعيل التحقق بخطوتين"
+  },
+  "patch_api_affiliate_payouts_id": {
+    "en": "Record that a payout was transferred",
+    "ar": "تسجيل تحويل دفعة مسوّق"
+  },
+  "patch_api_affiliates_id": {
+    "en": "Change an affiliate's terms or end the arrangement",
+    "ar": "تعديل شروط مسوّق أو إنهاء الاتفاق معه"
+  },
+  "patch_api_agents_id": {
+    "en": "Change an agent's instructions, tools or permissions",
+    "ar": "تعديل تعليمات وكيل وأدواته وصلاحياته"
+  },
+  "patch_api_convening_bodies_id": {
+    "en": "Rename a body, move it, retire it or bring it back",
+    "ar": "تعديل هيئة أو إيقافها أو إعادتها"
+  },
+  "patch_api_document_collections_id": {
+    "en": "Rename one of your document collections",
+    "ar": "تغيير اسم مجموعة مستندات"
+  },
+  "patch_api_document_route_templates_id": {
+    "ar": "تغيير اسم قالب مسار ووصفه"
+  },
+  "patch_api_document_sources_id": {
+    "en": "Change who can see a document",
+    "ar": "تغيير من يستطيع رؤية مستند"
+  },
+  "patch_api_document_themes_ref": {
+    "ar": "تعديل سمة مستندات"
+  },
+  "patch_api_email_domains_id": {
+    "en": "Change an email domain's default role or automatic sign-up",
+    "ar": "تعديل دور نطاق بريد أو تسجيله التلقائي"
+  },
+  "patch_api_forms_id": {
+    "en": "Edit a form's name, title or where answers go",
+    "ar": "تعديل اسم نموذج أو وجهة إجاباته"
+  },
+  "patch_api_forms_id_fields_fieldid": {
+    "ar": "تعديل حقل أو تغيير ترتيبه"
+  },
+  "patch_api_identity_providers_id": {
+    "en": "Change a sign-in provider",
+    "ar": "تعديل مزود تسجيل دخول"
+  },
+  "patch_api_languages_id": {
+    "en": "Change a language's name or switch it on or off",
+    "ar": "تعديل اسم لغة أو تشغيلها وإيقافها"
+  },
+  "patch_api_ou_types_id": {
+    "en": "Rename or reorder a unit type",
+    "ar": "تغيير اسم نوع وحدة أو ترتيبه"
+  },
+  "patch_api_ous_id": {
+    "en": "Update an organizational unit, including moving it",
+    "ar": "تعديل وحدة تنظيمية أو نقلها"
+  },
+  "patch_api_persons_id": {
+    "ar": "تعديل بيانات شخص"
+  },
+  "patch_api_plans_id": {
+    "en": "Update a plan",
+    "ar": "تعديل باقة"
+  },
+  "patch_api_roles_id": {
+    "en": "Update a role and, if given, replace its permissions",
+    "ar": "تعديل دور وصلاحياته"
+  },
+  "patch_api_settings": {
+    "en": "Change your workspace settings",
+    "ar": "تغيير إعدادات مساحة العمل"
+  },
+  "patch_api_settings_global": {
+    "en": "Change the default settings for all workspaces",
+    "ar": "تغيير الإعدادات الافتراضية العامة"
+  },
+  "patch_api_tag_groups_id": {
+    "ar": "تعديل مجموعة وسوم"
+  },
+  "patch_api_tags_id": {
+    "ar": "تغيير اسم وسم"
+  },
+  "patch_api_tenants_id": {
+    "en": "Update a workspace",
+    "ar": "تعديل مساحة عمل"
+  },
+  "patch_api_tenants_id_entitlements": {
+    "en": "Change the limits and features of a workspace",
+    "ar": "تغيير حدود مساحة عمل وميزاتها"
+  },
+  "patch_api_time_window_types_id": {
+    "en": "Rename a period kind, or change what it sits inside",
+    "ar": "تعديل نوع فترة"
+  },
+  "patch_api_time_windows_id": {
+    "en": "Rename a period, or move its start and end",
+    "ar": "تعديل فترة أو حدودها"
+  },
+  "patch_api_translations_id": {
+    "en": "Change a translated text",
+    "ar": "تعديل نص مترجم"
+  },
+  "patch_api_user_groups_id": {
+    "ar": "تعديل مجموعة مستخدمين"
+  },
+  "patch_api_users_id": {
+    "ar": "تعديل بيانات مستخدم"
+  },
+  "post_api_2fa_policies": {
+    "en": "Require two-step sign-in for a workspace, unit or user",
+    "ar": "إلزام التحقق بخطوتين"
+  },
+  "post_api_2fa_recovery_force_reset": {
+    "en": "Turn off a user's two-step sign-in without a request",
+    "ar": "إلغاء التحقق بخطوتين لمستخدم مباشرة"
+  },
+  "post_api_2fa_recovery_id_approve": {
+    "en": "Approve recovery: turn off the user's two-step sign-in and send a password reset link",
+    "ar": "الموافقة على استعادة التحقق بخطوتين"
+  },
+  "post_api_2fa_recovery_id_reject": {
+    "en": "Reject a two-step sign-in recovery request",
+    "ar": "رفض طلب استعادة التحقق بخطوتين"
+  },
+  "post_api_affiliates": {
+    "en": "Create an affiliate",
+    "ar": "إضافة مسوّق بالعمولة"
+  },
+  "post_api_affiliates_id_payouts": {
+    "en": "Prepare a draft payout of what an affiliate is owed",
+    "ar": "تجهيز مسودة دفعة لمسوّق"
+  },
+  "post_api_agents": {
+    "ar": "إنشاء وكيل"
+  },
+  "post_api_agents_id_archive": {
+    "ar": "أرشفة وكيل"
+  },
+  "post_api_agents_id_pause": {
+    "en": "Pause an agent so it is refused until resumed",
+    "ar": "إيقاف وكيل مؤقتًا"
+  },
+  "post_api_agents_id_restore": {
+    "ar": "استعادة وكيل مؤرشف"
+  },
+  "post_api_agents_id_resume": {
+    "ar": "استئناف عمل وكيل"
+  },
+  "post_api_billing_checkout": {
+    "en": "Start a payment for your workspace",
+    "ar": "بدء دفع لمساحة العمل"
+  },
+  "post_api_billing_invoices_id_pay": {
+    "en": "Start paying an invoice",
+    "ar": "بدء دفع فاتورة"
+  },
+  "post_api_billing_quantity": {
+    "ar": "زيادة عدد المقاعد أو تقليلها"
+  },
+  "post_api_branding_assets_key": {
+    "en": "Upload your workspace's own logo or brand image",
+    "ar": "رفع شعار أو صورة خاصة بمساحة العمل"
+  },
+  "post_api_branding_global_assets_key": {
+    "en": "Upload the default logo or brand image for all workspaces",
+    "ar": "رفع شعار أو صورة افتراضية لكل المساحات"
+  },
+  "post_api_convening_bodies": {
+    "en": "Set up a body that holds meetings",
+    "ar": "تأسيس هيئة"
+  },
+  "post_api_convening_bodies_id_members": {
+    "en": "Add a member to a body, or change their seat",
+    "ar": "تعيين عضو في هيئة أو نقله"
+  },
+  "post_api_data_types_type_bulk": {
+    "en": "Trash, restore, retire or delete many records at once",
+    "ar": "تنفيذ إجراء على عدة سجلات معًا"
+  },
+  "post_api_data_types_type_id_restore": {
+    "en": "Restore a record from the trash",
+    "ar": "استعادة سجل من المهملات"
+  },
+  "post_api_data_types_type_id_retire": {
+    "en": "Retire a record so it can't be used again or deleted",
+    "ar": "إنهاء استخدام سجل نهائيًا"
+  },
+  "post_api_data_types_type_id_trash": {
+    "en": "Move a record to the trash (can be restored)",
+    "ar": "نقل سجل إلى المهملات"
+  },
+  "post_api_delegations": {
+    "en": "Delegate some of your permissions to someone",
+    "ar": "تفويض بعض صلاحياتك لشخص آخر"
+  },
+  "post_api_deployments_apply": {
+    "en": "Install a new Whity deployment",
+    "ar": "تثبيت إصدار جديد من المنصة"
+  },
+  "post_api_deployments_rollback": {
+    "ar": "التراجع عن آخر تثبيت للمنصة"
+  },
+  "post_api_document_collections": {
+    "en": "Create a document collection of your own",
+    "ar": "إنشاء مجموعة مستندات خاصة بك"
+  },
+  "post_api_document_route_templates": {
+    "ar": "إنشاء قالب مسار"
+  },
+  "post_api_document_sources": {
+    "en": "Create a document in the editor",
+    "ar": "إنشاء مستند في المحرر"
+  },
+  "post_api_document_sources_id_comments": {
+    "en": "Start a comment on a document",
+    "ar": "بدء تعليق على مستند"
+  },
+  "post_api_document_sources_id_comments_tid_messages": {
+    "ar": "الرد على تعليق"
+  },
+  "post_api_document_sources_id_comments_tid_reopen": {
+    "ar": "إعادة فتح نقاش تعليق"
+  },
+  "post_api_document_sources_id_comments_tid_resolve": {
+    "ar": "إنهاء نقاش تعليق"
+  },
+  "post_api_document_sources_id_copy": {
+    "en": "Make a copy of a document",
+    "ar": "نسخ مستند"
+  },
+  "post_api_document_sources_id_drafts": {
+    "en": "Start a document from a template",
+    "ar": "بدء مستند من قالب"
+  },
+  "post_api_document_sources_id_files": {
+    "en": "Upload an image or file into a document",
+    "ar": "رفع صورة أو ملف إلى مستند"
+  },
+  "post_api_document_sources_id_print_labels": {
+    "ar": "طباعة ورقة ملصقات"
+  },
+  "post_api_document_sources_id_publish": {
+    "ar": "نشر قالب"
+  },
+  "post_api_document_sources_id_render": {
+    "ar": "طباعة قالب عبر Whity Render"
+  },
+  "post_api_document_sources_id_suggestions": {
+    "en": "Suggest a change to a document",
+    "ar": "اقتراح تعديل على مستند"
+  },
+  "post_api_document_sources_id_suggestions_decisions": {
+    "ar": "قبول عدة اقتراحات أو رفضها معًا"
+  },
+  "post_api_document_sources_id_suggestions_sid_decision": {
+    "ar": "قبول اقتراح أو رفضه"
+  },
+  "post_api_document_themes": {
+    "ar": "إنشاء سمة مستندات"
+  },
+  "post_api_document_themes_ref_archive": {
+    "ar": "أرشفة سمة مستندات"
+  },
+  "post_api_document_themes_ref_restore": {
+    "ar": "استعادة سمة مستندات مؤرشفة"
+  },
+  "post_api_document_themes_resolve": {
+    "en": "See which theme a document would print with",
+    "ar": "عرض السمة التي سيُطبع بها مستند"
+  },
+  "post_api_documents": {
+    "en": "Issue a document from a template",
+    "ar": "إصدار مستند من قالب"
+  },
+  "post_api_documents_id_qr": {
+    "ar": "إصدار رمز تحقق جديد لمستند"
+  },
+  "post_api_documents_id_render": {
+    "en": "Rebuild a document's file and keep the old ones",
+    "ar": "إعادة إنشاء ملف المستند مع الاحتفاظ بالقديم"
+  },
+  "post_api_documents_id_routes": {
+    "en": "Send a document along a route of steps",
+    "ar": "إرسال مستند عبر مسار من خطوات"
+  },
+  "post_api_documents_id_routes_from_template": {
+    "en": "Send a document along a route from a template",
+    "ar": "إرسال مستند عبر مسار من قالب"
+  },
+  "post_api_documents_id_routes_routeid_actions": {
+    "ar": "تمرير مستند أو إقراره أو إرجاعه في مساره"
+  },
+  "post_api_email_domains": {
+    "en": "Add an email domain",
+    "ar": "إضافة نطاق بريد"
+  },
+  "post_api_email_domains_id_verify": {
+    "en": "Check that you own an email domain",
+    "ar": "توثيق ملكية نطاق بريد"
+  },
+  "post_api_entity_tags": {
+    "en": "Put a tag on an item",
+    "ar": "وضع وسم على عنصر"
+  },
+  "post_api_form_submissions_id_review": {
+    "ar": "تسجيل قرار المكتب في إجابة"
+  },
+  "post_api_forms": {
+    "en": "Create a new form",
+    "ar": "إنشاء نموذج جديد"
+  },
+  "post_api_forms_id_archive": {
+    "en": "Archive a form so it stops taking answers",
+    "ar": "أرشفة نموذج وإيقاف استقبال إجاباته"
+  },
+  "post_api_forms_id_fields": {
+    "ar": "إضافة حقل إلى نموذج"
+  },
+  "post_api_forms_id_member_access": {
+    "ar": "السماح للأعضاء بتعبئة نموذج"
+  },
+  "post_api_forms_id_public_link": {
+    "en": "Open a form to anyone with a public link",
+    "ar": "فتح نموذج للجميع برابط عام"
+  },
+  "post_api_forms_id_publish": {
+    "en": "Publish a form",
+    "ar": "نشر نموذج"
+  },
+  "post_api_forms_id_submissions": {
+    "ar": "إرسال نموذج بعد تعبئته"
+  },
+  "post_api_forms_id_uploads": {
+    "ar": "إرفاق ملف بنموذج"
+  },
+  "post_api_identity_providers": {
+    "en": "Add a sign-in provider",
+    "ar": "إضافة مزود تسجيل دخول"
+  },
+  "post_api_instance_complete_setup": {
+    "en": "Finish the first-time setup",
+    "ar": "إنهاء الإعداد الأولي"
+  },
+  "post_api_invitations": {
+    "en": "Invite someone to your workspace by email",
+    "ar": "دعوة شخص إلى مساحة العمل"
+  },
+  "post_api_invitations_id_resend": {
+    "en": "Resend an invitation; the old link stops working",
+    "ar": "إعادة إرسال دعوة"
+  },
+  "post_api_languages": {
+    "en": "Add a language",
+    "ar": "إضافة لغة"
+  },
+  "post_api_licensing_codes": {
+    "en": "Create an activation code",
+    "ar": "إنشاء رمز تفعيل"
+  },
+  "post_api_licensing_codes_id_revoke": {
+    "en": "Cancel an activation code",
+    "ar": "إبطال رمز تفعيل"
+  },
+  "post_api_licensing_devices": {
+    "en": "Add many device serial numbers at once",
+    "ar": "تسجيل أرقام أجهزة تسلسلية دفعة واحدة"
+  },
+  "post_api_me_notifications_id_read": {
+    "en": "Mark a notification as read",
+    "ar": "تعليم إشعار كمقروء"
+  },
+  "post_api_me_notifications_read_all": {
+    "en": "Mark all your notifications as read",
+    "ar": "تعليم كل الإشعارات كمقروءة"
+  },
+  "post_api_me_permitted_actions": {
+    "en": "Check which actions you are allowed to take",
+    "ar": "التحقق مما يُسمح لك بفعله"
+  },
+  "post_api_meetings": {
+    "en": "Start a draft meeting for a body",
+    "ar": "فتح اجتماع جديد كمسودة"
+  },
+  "post_api_meetings_id_agenda": {
+    "en": "Add an item to a meeting's agenda",
+    "ar": "إضافة بند إلى جدول أعمال اجتماع"
+  },
+  "post_api_meetings_id_agenda_itemid_decision": {
+    "en": "Record a decision on an agenda item and move its document's approval forward",
+    "ar": "تدوين قرار الهيئة في بند"
+  },
+  "post_api_meetings_id_cancel": {
+    "ar": "إلغاء اجتماع"
+  },
+  "post_api_meetings_id_hold": {
+    "ar": "تسجيل انعقاد اجتماع"
+  },
+  "post_api_meetings_id_invitations": {
+    "ar": "دعوة أعضاء الهيئة إلى اجتماع"
+  },
+  "post_api_meetings_id_schedule": {
+    "en": "Set a meeting's date and place",
+    "ar": "تحديد موعد اجتماع ومكانه"
+  },
+  "post_api_ou_types": {
+    "en": "Add a unit type, or adopt a built-in one",
+    "ar": "إضافة نوع وحدة تنظيمية"
+  },
+  "post_api_ous": {
+    "ar": "إنشاء وحدة تنظيمية"
+  },
+  "post_api_ous_id_roles": {
+    "ar": "إسناد دور إلى وحدة تنظيمية"
+  },
+  "post_api_password_resets_id_approve": {
+    "en": "Approve a password reset and apply the new password",
+    "ar": "الموافقة على إعادة تعيين كلمة المرور"
+  },
+  "post_api_password_resets_id_reject": {
+    "en": "Reject a password reset",
+    "ar": "رفض إعادة تعيين كلمة المرور"
+  },
+  "post_api_persons": {
+    "ar": "إضافة شخص"
+  },
+  "post_api_plans": {
+    "en": "Create a subscription plan",
+    "ar": "إنشاء باقة اشتراك"
+  },
+  "post_api_plans_id_move_subscribers": {
+    "en": "Move every workspace on a plan to another plan",
+    "ar": "نقل كل مساحات باقة إلى باقة أخرى"
+  },
+  "post_api_plans_id_prices": {
+    "en": "Set a price for a plan",
+    "ar": "تحديد سعر لباقة"
+  },
+  "post_api_plugins_id_re_enable": {
+    "en": "Switch a disabled plugin back on",
+    "ar": "إعادة تفعيل إضافة معطلة"
+  },
+  "post_api_plugins_id_uninstall": {
+    "en": "Uninstall a plugin, rolling back its database changes and deleting its files",
+    "ar": "إزالة إضافة وملفاتها"
+  },
+  "post_api_plugins_install_from_store": {
+    "en": "Download a plugin from the store, left switched off",
+    "ar": "تنزيل إضافة من المتجر دون تفعيلها"
+  },
+  "post_api_plugins_name_disable": {
+    "ar": "تعطيل إضافة"
+  },
+  "post_api_plugins_name_enable": {
+    "en": "Switch on a plugin and apply its pending updates",
+    "ar": "تفعيل إضافة"
+  },
+  "post_api_plugins_reload": {
+    "en": "Reload the list of plugins",
+    "ar": "إعادة تحميل الإضافات"
+  },
+  "post_api_plugins_upload": {
+    "en": "Upload a plugin package, left switched off",
+    "ar": "رفع حزمة إضافة دون تفعيلها"
+  },
+  "post_api_promotions": {
+    "en": "Create a promotion",
+    "ar": "إنشاء عرض ترويجي"
+  },
+  "post_api_relations": {
+    "en": "Add a relationship between two people",
+    "ar": "إضافة علاقة بين شخصين"
+  },
+  "post_api_reports_source_document": {
+    "ar": "تشغيل تقرير وإصداره كمستند"
+  },
+  "post_api_resource_role_grants": {
+    "en": "Give a role on one item",
+    "ar": "منح دور على عنصر"
+  },
+  "post_api_roles": {
+    "en": "Create a role",
+    "ar": "إنشاء دور"
+  },
+  "post_api_roles_id_permissions": {
+    "en": "Add permissions to a role",
+    "ar": "إضافة صلاحيات إلى دور"
+  },
+  "post_api_tag_groups": {
+    "ar": "إنشاء مجموعة وسوم"
+  },
+  "post_api_tags": {
+    "ar": "إنشاء وسم"
+  },
+  "post_api_tenants": {
+    "en": "Create a workspace",
+    "ar": "إنشاء مساحة عمل"
+  },
+  "post_api_tenants_id_plan": {
+    "en": "Apply a plan to a workspace",
+    "ar": "تطبيق باقة على مساحة عمل"
+  },
+  "post_api_time_window_types": {
+    "en": "Add a period kind, or adopt a built-in one",
+    "ar": "إضافة نوع فترة"
+  },
+  "post_api_time_windows": {
+    "en": "Define a period with its start and end",
+    "ar": "تحديد فترة ببدايتها ونهايتها"
+  },
+  "post_api_time_windows_id_close": {
+    "en": "Close a period and lock it",
+    "ar": "إغلاق فترة وقفلها"
+  },
+  "post_api_time_windows_id_reopen": {
+    "en": "Reopen a closed period and record it",
+    "ar": "إعادة فتح فترة مغلقة"
+  },
+  "post_api_translations": {
+    "en": "Add a translated text",
+    "ar": "إضافة نص مترجم"
+  },
+  "post_api_user_groups": {
+    "en": "Create a user group from a rule",
+    "ar": "تعريف مجموعة مستخدمين"
+  },
+  "post_api_user_groups_preview": {
+    "en": "Preview who an unsaved group rule would include",
+    "ar": "معاينة قاعدة مجموعة قبل حفظها"
+  },
+  "post_api_users": {
+    "ar": "إضافة مستخدم"
+  },
+  "post_api_users_id_memberships": {
+    "en": "Give a user a role, optionally in another workspace",
+    "ar": "منح مستخدم دورًا إضافيًا"
+  },
+  "post_api_users_id_password_reset": {
+    "en": "Send a user a password reset link",
+    "ar": "إرسال رابط إعادة تعيين كلمة المرور لمستخدم"
+  },
+  "post_api_workspace_plugins": {
+    "ar": "نشر إصدار من إضافة مساحة العمل"
+  },
+  "post_api_workspace_plugins_impact": {
+    "en": "See what publishing a plugin would change",
+    "ar": "معاينة أثر نشر إضافة"
+  },
+  "post_api_workspace_plugins_plugin_versions_id_activate": {
+    "en": "Make a plugin version live, or roll back to it",
+    "ar": "تفعيل إصدار من إضافة أو الرجوع إليه"
+  },
+  "post_api_workspace_plugins_test": {
+    "en": "Run a plugin's own tests",
+    "ar": "تشغيل اختبارات إضافة"
+  },
+  "post_api_workspace_plugins_validate": {
+    "en": "Check a workspace plugin's definition",
+    "ar": "التحقق من تعريف إضافة"
+  },
+  "put_api_document_background_issuing_plugin": {
+    "en": "Allow or stop a plugin issuing documents on its own",
+    "ar": "السماح لإضافة بإصدار مستندات تلقائيًا أو إيقافه"
+  },
+  "put_api_document_collections_id_documents_documentid": {
+    "en": "Add a document to one of your collections",
+    "ar": "إضافة مستند إلى مجموعة"
+  },
+  "put_api_document_route_templates_id_graph": {
+    "en": "Replace all the steps of a route template",
+    "ar": "استبدال كل خطوات قالب مسار"
+  },
+  "put_api_document_sources_id_draft": {
+    "en": "Save a document's draft",
+    "ar": "حفظ مسودة مستند"
+  },
+  "put_api_document_template_slots_key": {
+    "en": "Choose a template for a plugin, or clear it",
+    "ar": "اختيار قالب لإضافة أو إلغاء اختياره"
+  },
+  "put_api_documents_id_star": {
+    "en": "Star a document",
+    "ar": "تمييز مستند بنجمة"
+  },
+  "put_api_forms_id_fields": {
+    "ar": "حفظ كل حقول نموذج دفعة واحدة"
+  },
+  "put_api_me_notification_preferences": {
+    "en": "Change your notification preferences",
+    "ar": "تغيير تفضيلات إشعاراتك"
+  },
+  "put_api_meetings_id_agenda_order": {
+    "en": "Reorder a meeting's agenda",
+    "ar": "إعادة ترتيب جدول أعمال اجتماع"
+  },
+  "put_api_meetings_id_attendance": {
+    "ar": "تسجيل من حضر اجتماعًا"
+  },
+  "put_api_notification_settings_channel": {
+    "en": "Change how a notification channel sends messages",
+    "ar": "تغيير إعدادات قناة إشعارات"
+  },
+  "put_api_notification_settings_channel_credentials": {
+    "en": "Set or clear the sign-in details of a notification channel",
+    "ar": "ضبط بيانات دخول قناة إشعارات أو مسحها"
+  },
+  "put_api_plans_id_entitlements": {
+    "en": "Set what a plan includes",
+    "ar": "تعيين ما تتضمنه باقة"
+  },
+  "put_api_storage_config": {
+    "en": "Set or replace where your workspace stores files",
+    "ar": "تعيين مكان تخزين الملفات أو استبداله"
+  },
+  "put_api_tenants_id_branding_host": {
+    "en": "Set or clear a workspace's own web address",
+    "ar": "تعيين عنوان ويب خاص بمساحة عمل أو مسحه"
+  },
+  "put_api_tenants_id_subscription": {
+    "en": "Set a workspace's subscription or apply a plan",
+    "ar": "تعيين اشتراك مساحة عمل أو باقتها"
+  }
+}

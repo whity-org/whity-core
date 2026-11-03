@@ -4860,6 +4860,19 @@ $mcpAgentOperations = static function () use ($toolDeriver, $authoredMcpTools): 
         ...\Whity\Mcp\Auth\AgentGrantView::operationsFrom($authoredMcpTools->toolObjects(), $authoredMcpTools->accessMap()),
     ];
 };
+// WHIT-867: every tool in plain words, by name. Read per request: a plugin's tools
+// come and go while a worker lives.
+$mcpToolCatalogue = static function () use ($toolDeriver, $authoredMcpTools): array {
+    $catalogue = [];
+    foreach ([[$toolDeriver->deriveTools(), $toolDeriver->buildAccessMap()], [$authoredMcpTools->toolObjects(), $authoredMcpTools->accessMap()]] as [$tools, $access]) {
+        foreach ($tools as $tool) {
+            $name = (string) ($tool['name'] ?? '');
+            $permission = $access[$name]['requiredPermission'] ?? null;
+            $catalogue[$name] = \Whity\Mcp\Tools\ToolCatalogue::describe($tool, is_string($permission) ? $permission : null);
+        }
+    }
+    return $catalogue;
+};
 // WC-0208ce4d: admin read-only view of the MCP tools and their access
 // requirements, plugin-authored tools included (WHIT-754).
 $mcpToolsAdminHandler = new McpToolsAdminHandler($toolDeriver, $roleChecker, $authoredMcpTools, $mcpEnabledPluginAlwaysOn);
@@ -4895,10 +4908,25 @@ $router->register('POST', '/api/me/agent-proposals/{id:\d+}/decline',  [$agentPr
 // WHIT-815: workspace agents (persona, toolsets, starting grant) and the
 // presets they start from. Gated on agents:manage, which migration 180 grants
 // to every role holding mcp:tokens:manage. Writes are agentPolicy refuse.
+// WHIT-867: "today" on the agents pages starts at midnight in the workspace's zone.
+$agentTodayFrom = static function (int $tenantId) use ($settingsService): string {
+    try {
+        $zone = new \DateTimeZone((string) ($settingsService->effective($tenantId)[\Whity\Core\Settings\SettingsRegistry::TIMEZONE] ?? 'UTC'));
+    } catch (\Exception) {
+        $zone = new \DateTimeZone('UTC');
+    }
+    return \Whity\Core\Agent\AgentStatsRepository::todayStart($zone);
+};
+$agentReadableSource = static fn (int $id, int $tenantId, int $profileId): ?array => $documentSourcesHandler->visibleRow($id, $tenantId, $profileId);
+$agentStats = new \Whity\Core\Agent\AgentStatsRepository($db->getPdo());
 $agentsHandler = new \Whity\Api\AgentsApiHandler(
     new \Whity\Core\Agent\AgentRepository($db->getPdo()),
     $agentPresetRegistry,
     $auditLogger,
+    $agentStats,
+    $agentTodayFrom,
+    $mcpAgentOperations,
+    $agentReadableSource,
 );
 $router->register('GET',   '/api/agents',                      [$agentsHandler, 'list'],    null, null, CorePermissions::AGENTS_MANAGE);
 $router->register('POST',  '/api/agents',                      [$agentsHandler, 'create'],  null, null, CorePermissions::AGENTS_MANAGE);
@@ -4906,6 +4934,17 @@ $router->register('GET',   '/api/agents/{id:\d+}',             [$agentsHandler, 
 $router->register('PATCH', '/api/agents/{id:\d+}',             [$agentsHandler, 'update'],  null, null, CorePermissions::AGENTS_MANAGE);
 $router->register('POST',  '/api/agents/{id:\d+}/archive',     [$agentsHandler, 'archive'], null, null, CorePermissions::AGENTS_MANAGE);
 $router->register('POST',  '/api/agents/{id:\d+}/restore',     [$agentsHandler, 'restore'], null, null, CorePermissions::AGENTS_MANAGE);
+$router->register('POST',  '/api/agents/{id:\d+}/pause',       [$agentsHandler, 'pause'],   null, null, CorePermissions::AGENTS_MANAGE);
+$router->register('POST',  '/api/agents/{id:\d+}/resume',      [$agentsHandler, 'resume'],  null, null, CorePermissions::AGENTS_MANAGE);
+// WHIT-867: everything the workspace's agents did and proposed, for the people
+// who manage them. Never on the MCP surface: an agent doesn't read over its
+// colleagues' shoulders.
+$agentActivityHandler = new \Whity\Api\AgentActivityApiHandler(
+    new \Whity\Core\Agent\AgentActivityRepository($db->getPdo()),
+    $agentProposals,
+    $mcpToolCatalogue,
+);
+$router->register('GET',   '/api/agent-activity',              [$agentActivityHandler, 'list'], null, null, CorePermissions::AGENTS_MANAGE);
 $router->register('GET',   '/api/agent-presets',               [$agentsHandler, 'presets'], null, null, CorePermissions::AGENTS_MANAGE);
 // WHIT-816: a person's use of the workspace's agents. Session-only (every
 // member may use one; no `agents:use` permission) and never on the MCP
@@ -4917,6 +4956,9 @@ $myAgentsHandler = new \Whity\Api\MyAgentsApiHandler(
     $roleChecker,
     $mcpAgentOperations,
     $auditLogger,
+    $agentStats,
+    $agentTodayFrom,
+    $agentReadableSource,
 );
 $router->register('GET',    '/api/me/agents',                              [$myAgentsHandler, 'list'],        null);
 $router->register('POST',   '/api/me/agents/{id:\d+}/assignment',          [$myAgentsHandler, 'assign'],      null);
@@ -4926,7 +4968,7 @@ $router->register('PATCH',  '/api/me/agents/{id:\d+}/assignment/grant',    [$myA
 $router->register('POST',   '/api/me/agents/{id:\d+}/credentials',         [$myAgentsHandler, 'credential'],  null);
 // WHIT-812: what agents did for you, and undoing it inside its window. Same
 // rule as the inbox: never on the MCP surface.
-$agentActionsHandler = new \Whity\Api\AgentActionsApiHandler($agentActions, $mcpToolsCallHandler, $agentProposals, $auditLogger);
+$agentActionsHandler = new \Whity\Api\AgentActionsApiHandler($agentActions, $mcpToolsCallHandler, $agentProposals, $auditLogger, $mcpToolCatalogue);
 $router->register('GET',  '/api/me/agent-actions',                      [$agentActionsHandler, 'list'], null);
 $router->register('POST', '/api/me/agent-actions/{id:\d+}/undo',        [$agentActionsHandler, 'undo'], null);
 $mcpHandlers = [
@@ -4943,8 +4985,12 @@ $mcpHandlers = [
     'prompts/get'             => new PromptsGetHandler($promptRegistry, $roleChecker, $tokenValidator),
 ];
 // WHIT-697: "last used", which the connect wizard waits on.
-$mcpRecordTokenUse = static function (\Whity\Mcp\Auth\McpPrincipal $principal) use ($mcpTokenService): void {
+$mcpRecordTokenUse = static function (\Whity\Mcp\Auth\McpPrincipal $principal) use ($mcpTokenService, $agentAssignments): void {
     $mcpTokenService->recordUse($principal->jti, $principal->tenantId);
+    // WHIT-867: when a workspace agent was last active, however it signed in.
+    if ($principal->principalKind === \Whity\Mcp\Auth\AgentScopeGrant::AGENT_KIND) {
+        $agentAssignments->recordActivity($principal->agentPrincipalId(), $principal->tenantId);
+    }
 };
 // WHIT-707, WHIT-750: /mcp?tools=discover answers tools/list with
 // search_operations and call_operation, which search and call the real
@@ -5003,12 +5049,24 @@ $mcpDiscovery = new DiscoveryTools(
             new \Whity\Core\Agent\AgentRepository($mcpBriefingPdo),
         ),
         // WHIT-824: a person's own connection names the agents they granted.
+        // (Not a paused agent: it can't be connected to until it is resumed.)
         static function (int $profileId, int $tenantId) use ($agentAssignments, $mcpBriefingPdo): array {
             $mine = $agentAssignments->activeForPerson($profileId, $tenantId);
             return $mine === [] ? [] : array_values(array_filter(
                 (new \Whity\Core\Agent\AgentRepository($mcpBriefingPdo))->list($tenantId),
-                static fn (array $agent): bool => isset($mine[$agent['id']]),
+                static fn (array $agent): bool => isset($mine[$agent['id']]) && $agent['paused_at'] === null,
             ));
+        },
+        // WHIT-867: what the agent keeps for reference, as far as this person can read it.
+        static function (array $ids, int $profileId, int $tenantId) use ($agentReadableSource): array {
+            $readable = [];
+            foreach ($ids as $id) {
+                $row = $agentReadableSource((int) $id, $tenantId, $profileId);
+                if (is_array($row)) {
+                    $readable[] = ['id' => (int) $id, 'title' => (string) ($row['title'] ?? '')];
+                }
+            }
+            return $readable;
         },
     ),
     // WHIT-754: a plugin's always-on tool is listed only once this workspace's
