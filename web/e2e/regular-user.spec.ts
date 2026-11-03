@@ -73,7 +73,6 @@ test.describe('Regular user (non-admin)', () => {
     await page.goto('/admin/roles');
     await page.waitForURL('**/admin/roles');
     await expect(page.getByRole('heading', { name: 'Roles' })).toBeVisible();
-    await expect(page.getByText('No data available')).toBeVisible();
     await expect(page.getByText('Failed to fetch roles').first()).toBeVisible();
 
     // A second admin page proves the screen-layer 403 handling is not specific

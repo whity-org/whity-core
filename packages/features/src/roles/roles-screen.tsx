@@ -10,6 +10,9 @@
  *
  * @i18n-keys admin
  *   roles.action.clone = Clone
+ *   roles.empty.description = A role decides what the people who hold it may do.
+ *   roles.empty.filtered = No role matches “{term}”
+ *   roles.empty.title = No roles yet
  *   roles.action.delete = Delete
  *   roles.action.delete.disabled = Global base roles can only be deleted by the system tenant.
  *   roles.action.edit = Edit
@@ -36,7 +39,6 @@
  *   ui.pagination.previous = Previous page
  *   ui.table.actions = Actions
  *   ui.table.columnFilter = Filter…
- *   ui.table.empty = No data available
  */
 
 import { useEffect, useState } from 'react';
@@ -59,6 +61,7 @@ import { identityTranslate } from '../nav/types';
 import { ROLES_WRITE, ROLES_DELETE } from './capabilities';
 import { CreateRoleModal } from './create-modal';
 import { DeleteRoleModal } from './delete-modal';
+import { roleLabel } from './role-label';
 import type { Role, RolesScreenProps, RolesTranslate } from './types';
 
 /**
@@ -222,7 +225,7 @@ export function RolesScreen({
             onClick={() => onOpenRecord(role)}
             className="text-start font-medium text-primary underline-offset-4 hover:underline"
           >
-            {role.name}
+            {roleLabel(role.name)}
           </button>
           {role.global && (
             <Badge
@@ -369,7 +372,14 @@ export function RolesScreen({
         // screen's translation of a shared-table string, and a caller that adds
         // a filterable column back would otherwise silently get English.
         columnFilterPlaceholder={t('ui.table.columnFilter', 'Filter…')}
-        emptyStateTitle={t('ui.table.empty', 'No data available')}
+        emptyState={
+          query.search.value !== ''
+            ? { title: t('roles.empty.filtered', 'No role matches “{term}”', { term: query.search.value }) }
+            : {
+                title: t('roles.empty.title', 'No roles yet'),
+                description: t('roles.empty.description', 'A role decides what the people who hold it may do.'),
+              }
+        }
         sorting={query.sorting}
         search={query.search}
         pagination={query.pagination({ total, totalPages })}

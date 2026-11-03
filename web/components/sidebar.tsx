@@ -26,7 +26,11 @@ import {
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useNavItemLabels } from '@/lib/nav-item-labels';
 import { WAITING_CHANGED_EVENT } from '@/lib/waiting-changed';
-import { SETTINGS_AREA_NAV_IDS, SETTINGS_AREA_PREFIXES } from '@/components/settings/settings-area';
+import {
+  PLATFORM_SETTINGS_TABS,
+  SETTINGS_AREA_NAV_IDS,
+  SETTINGS_AREA_PREFIXES,
+} from '@/components/settings/settings-area';
 import type { Icon } from '@tabler/icons-react';
 
 /**
@@ -349,9 +353,11 @@ export function Sidebar() {
             label: t('sidebar.item.settings', 'Settings'),
             href: settingsEntry.href,
             icon: <IconSettings size={20} />,
-            active: SETTINGS_AREA_PREFIXES.some(
-              (prefix) => pathname === prefix || (pathname ?? '').startsWith(`${prefix}/`),
-            ),
+            active:
+              !Object.values(PLATFORM_SETTINGS_TABS).includes(pathname ?? '') &&
+              SETTINGS_AREA_PREFIXES.some(
+                (prefix) => pathname === prefix || (pathname ?? '').startsWith(`${prefix}/`),
+              ),
           },
         ],
       },

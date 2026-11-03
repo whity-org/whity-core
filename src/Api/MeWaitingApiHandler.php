@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Whity\Api;
 
 use Throwable;
+use Whity\Core\Agent\AgentAssignmentRepository;
 use Whity\Core\Agent\AgentProposalRepository;
 use Whity\Core\Inbox\InboxItem;
 use Whity\Core\Inbox\InboxSourceRegistry;
@@ -46,6 +47,7 @@ final class MeWaitingApiHandler
     public function __construct(
         private readonly InboxSourceRegistry $sources,
         private readonly AgentProposalRepository $proposals,
+        private readonly ?AgentAssignmentRepository $assignments = null,
     ) {
     }
 
@@ -93,16 +95,20 @@ final class MeWaitingApiHandler
         try {
             $proposalTotal = $this->proposals->countWaiting($tenantId, $profile);
             $waiting = $this->proposals->oldestWaiting($tenantId, $profile, $limit);
-            $names = $this->proposals->agentNames(
-                $tenantId,
-                array_map(static fn (array $row): string => (string) $row['agent_principal_id'], $waiting)
-            );
+            $principals = array_map(static fn (array $row): string => (string) $row['agent_principal_id'], $waiting);
+            $names = $this->proposals->agentNames($tenantId, $principals);
+            $paused = $this->assignments?->pausedPrincipals($principals, $tenantId) ?? [];
             foreach ($waiting as $proposal) {
                 $rows[] = [
                     'key'      => 'proposal:' . $proposal['id'],
                     'kind'     => 'proposal',
                     'at'       => (string) $proposal['created_at'],
-                    'proposal' => AgentProposalsApiHandler::present($proposal, $names),
+                    'proposal' => AgentProposalsApiHandler::present(
+                        $proposal,
+                        $names,
+                        null,
+                        in_array((string) $proposal['agent_principal_id'], $paused, true)
+                    ),
                 ];
             }
         } catch (Throwable $e) {

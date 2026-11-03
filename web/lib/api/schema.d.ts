@@ -322,6 +322,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/agent-activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What the workspace's agents did and proposed
+         * @description Newest first. Says what happened, for whom and with which permission, never the arguments. Only the person an action was for can undo it.
+         */
+        get: operations["get_api_v1_agent_activity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/agent-presets": {
         parameters: {
             query?: never;
@@ -395,6 +415,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/agents/{id}/pause": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pause a workspace agent, refusing it on every call until it is resumed
+         * @description Applies at once to every person using it and every credential. Its waiting proposals can be declined, and can't be approved until it is resumed. Nothing is revoked.
+         */
+        post: operations["post_api_v1_agents_id_pause"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/agents/{id}/restore": {
         parameters: {
             query?: never;
@@ -406,6 +446,23 @@ export interface paths {
         put?: never;
         /** Offer an archived workspace agent again */
         post: operations["post_api_v1_agents_id_restore"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agents/{id}/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resume a paused workspace agent */
+        post: operations["post_api_v1_agents_id_resume"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6763,6 +6820,31 @@ export interface components {
             status: "active" | "archived";
             createdAt: string;
             updatedAt: string;
+            /** @description Refused on every call until it is resumed */
+            paused: boolean;
+            pausedAt: string | null;
+            /** @description Who paused it */
+            pausedBy: string | null;
+            /** @description Who changed it last */
+            updatedBy: string | null;
+            /** @description The people using it, from their assignments */
+            worksFor: {
+                id: number;
+                name: string | null;
+            }[];
+            actionsToday: number;
+            proposalsToday: number;
+            waiting: number;
+            /** @description UTC, ISO 8601; null when it has never been active */
+            lastActiveAt: string | null;
+            onItsOwn: components["schemas"]["AgentOnItsOwn"];
+            mayRead: {
+                id: number;
+                title: string | null;
+                kind: string | null;
+                /** @description False when you cannot read this document yourself, so its name is withheld */
+                readable: boolean;
+            }[];
         };
         AgentAction: {
             id: number;
@@ -6788,12 +6870,44 @@ export interface components {
             } | null;
             undoneAt: string | null;
             createdAt: string;
+            /** @description What ran, in plain words; null for a tool no longer offered */
+            toolInfo?: components["schemas"]["AgentToolInfo"] | null;
         };
         AgentActionListResponse: {
             data: components["schemas"]["AgentAction"][];
         };
         AgentActionResponse: {
             data: components["schemas"]["AgentAction"];
+        };
+        AgentActivityItem: {
+            id: string;
+            /** @enum {string} */
+            kind: "action" | "proposal";
+            /**
+             * @description failed: approved, and a check refused it when it ran
+             * @enum {string}
+             */
+            status: "done" | "undone" | "waiting" | "declined" | "expired" | "failed";
+            agent: {
+                id: number | null;
+                name: string | null;
+                nameAr: string | null;
+            };
+            person: {
+                id: number;
+                name: string | null;
+            };
+            tool: string;
+            toolInfo: components["schemas"]["AgentToolInfo"] | null;
+            summary: string;
+            permissions: string[];
+            undoWindowSeconds: number | null;
+            undoableUntil: string | null;
+            createdAt: string;
+        };
+        AgentActivityListResponse: {
+            data: components["schemas"]["AgentActivityItem"][];
+            hasMore: boolean;
         };
         AgentAssignmentGrant: {
             assignmentId: number;
@@ -6839,6 +6953,8 @@ export interface components {
             grant?: {
                 [key: string]: "off" | "ask" | "allow";
             };
+            /** @description Documents it keeps for reference, which you must be able to read. Never widens what it may read: that stays within each person's own access. */
+            mayRead?: number[];
             /** @description Start from this preset; fields sent override its own */
             presetKey?: string;
         };
@@ -6874,6 +6990,11 @@ export interface components {
         AgentListResponse: {
             data: components["schemas"]["Agent"][];
         };
+        AgentOnItsOwn: {
+            allowed: number;
+            askFirst: number;
+            off: number;
+        };
         AgentPersonaFields: {
             /** @description Lower-case letters, digits and dashes; unique in the workspace */
             slug?: string;
@@ -6905,6 +7026,8 @@ export interface components {
             grant?: {
                 [key: string]: "off" | "ask" | "allow";
             };
+            /** @description Documents it keeps for reference, which you must be able to read. Never widens what it may read: that stays within each person's own access. */
+            mayRead?: number[];
         };
         AgentPreset: {
             key: string;
@@ -6923,6 +7046,14 @@ export interface components {
             grant: {
                 [key: string]: "off" | "ask" | "allow";
             };
+            /** @description Three things it does; empty for a plugin's preset */
+            does: string[];
+            doesAr: string[];
+            icon: string | null;
+            /** @description The plugin it comes with; null when it works with Whity alone */
+            needs: string | null;
+            /** @description How many of this workspace's agents came from it */
+            agentsFromIt: number;
         };
         AgentPresetListResponse: {
             data: components["schemas"]["AgentPreset"][];
@@ -6950,6 +7081,8 @@ export interface components {
             expiresAt: string;
             createdAt: string;
             action: components["schemas"]["AgentAction"] | null;
+            /** @description The agent is paused, so this can be declined but not approved until it is resumed */
+            agentPaused?: boolean;
         };
         AgentProposalListResponse: {
             data: components["schemas"]["AgentProposal"][];
@@ -6959,6 +7092,22 @@ export interface components {
         };
         AgentResponse: {
             data: components["schemas"]["Agent"];
+        };
+        AgentToolInfo: {
+            plainName: string;
+            plainNameAr: string | null;
+            area: {
+                id: string;
+                title: string;
+                titleAr: string | null;
+            };
+            /**
+             * @description The most an agent can ever do with it, whatever a person grants
+             * @enum {string}
+             */
+            agentAccess: "can" | "proposes" | "suggests" | "never";
+            readOnly: boolean;
+            undoWindowSeconds: number | null;
         };
         AgentUnassignResponse: {
             data: {
@@ -9749,6 +9898,20 @@ export interface components {
                 principalId?: string;
                 createdAt?: string;
             } | null;
+            paused: boolean;
+            actionsToday: number;
+            proposalsToday: number;
+            waiting: number;
+            /** @description UTC, ISO 8601; null when it has never been active */
+            lastActiveAt: string | null;
+            /** @description Under your grant; null when you don't use it */
+            onItsOwn: components["schemas"]["AgentOnItsOwn"] | null;
+            /** @description What it keeps for reference that you can read */
+            mayRead: {
+                id: number;
+                title: string;
+                kind: string;
+            }[];
         };
         MyAgentListResponse: {
             data: components["schemas"]["MyAgent"][];
@@ -13263,6 +13426,82 @@ export interface operations {
             };
         };
     };
+    get_api_v1_agent_activity: {
+        parameters: {
+            query?: {
+                /** @description Only this workspace agent */
+                agent?: number;
+                /** @description done, undone, waiting, declined, expired or failed; all when omitted */
+                status?: string;
+                /** @description Only from this time on (UTC, ISO 8601) */
+                since?: string;
+                /** @description At most 200; 50 when omitted */
+                limit?: number;
+                /** @description How many to skip */
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The activity, newest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentActivityListResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     get_api_v1_agent_presets: {
         parameters: {
             query?: never;
@@ -13727,6 +13966,74 @@ export interface operations {
             };
         };
     };
+    post_api_v1_agents_id_pause: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ID of the agent. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The paused agent */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Agent not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     post_api_v1_agents_id_restore: {
         parameters: {
             query?: never;
@@ -13740,6 +14047,74 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description The restored agent */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Agent not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_agents_id_resume: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ID of the agent. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The resumed agent */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -29823,6 +30198,8 @@ export interface operations {
                 since?: string;
                 /** @description done, undone or expired; all when omitted */
                 status?: string;
+                /** @description Only this agent: its assignment's principalId */
+                principal?: string;
             };
             header?: never;
             path?: never;
