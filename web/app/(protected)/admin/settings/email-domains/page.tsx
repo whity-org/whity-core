@@ -10,6 +10,7 @@ import { Button } from '@whity/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
 import { Input } from '@/components/ui/input';
 import { FieldSelect } from '@/components/field-select';
+import { humanizeCode } from '@/lib/plain-words';
 import { Switch } from '@whity/ui/switch';
 import { Badge } from '@whity/ui/badge';
 import { AccessDenied } from '@whity/ui/access-denied';
@@ -458,7 +459,7 @@ function AddDomainCard({
             disabled={saving}
             placeholder={t('settings.emailDomains.form.noRoles', 'No roles available')}
             onChange={(value) => setDefaultRoleId(Number(value))}
-            options={roles.map((r) => ({ value: String(r.id), label: r.name }))}
+            options={roles.map((r) => ({ value: String(r.id), label: humanizeCode(r.name) }))}
           />
           <p className="text-xs text-muted-foreground">
             {t(

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { TechnicalDetails } from '@whity/ui/display-preferences';
 import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import { useAuth } from '@/lib/auth-context';
@@ -80,9 +81,14 @@ export default function AdminSettingsPage() {
         title={t('settings.title', 'General')}
         description={t(
           'settings.description',
-          "Your tenant's instance identity. Cleared fields fall back to the platform-wide global default. Editing requires the settings:write permission."
+          'Your workspace’s name and basics. A cleared field uses the platform default.'
         )}
       />
+      <TechnicalDetails>
+        <p className="text-sm text-muted-foreground">
+          {t('settings.description.permission', 'Editing needs the settings:write permission.')}
+        </p>
+      </TechnicalDetails>
       <TenantSettingsSection canWrite={canWrite} addToast={addToast} />
       {isSystemTenant && canManageGlobal && <PlatformDefaultsSection addToast={addToast} />}
     </div>
@@ -219,7 +225,7 @@ function TenantSettingsSection({
             ' ' +
               t(
                 'settings.tenant.readOnly',
-                'You have read-only access (settings:write required to edit).'
+                'You can read these settings but not change them.'
               )}
         </CardDescription>
       </CardHeader>

@@ -122,14 +122,14 @@ export default function TenantsPage() {
       enableSorting: true,
       enableColumnFilter: true,
     },
-    { accessorKey: 'userCount', header: t('tenants.table.userCount', 'User Count'), enableSorting: true },
+    { accessorKey: 'userCount', header: t('tenants.table.userCount', 'Users'), enableSorting: true },
     // #1068, and the same two changes the users list needed: gated on the
     // tenant preference, and formatted at all rather than rendered as the raw
     // wire string an `accessorKey` with no `cell` produces.
     ...dates.dateColumns<Tenant>([
       {
         id: 'createdAt',
-        header: t('tenants.table.createdAt', 'Created At'),
+        header: t('tenants.table.createdAt', 'Created'),
         value: (tenant) => tenant.createdAt,
         enableSorting: true,
       },
@@ -176,7 +176,7 @@ export default function TenantsPage() {
     <div className="space-y-8">
       <AdminHeader
         title={t('tenants.title', 'Tenants')}
-        description={t('tenants.description', 'Manage tenants in your system')}
+        description={t('tenants.description', 'The workspaces on this installation.')}
         action={
           canCreate ? (
             <Button
@@ -184,7 +184,7 @@ export default function TenantsPage() {
               className="gap-2"
             >
               <IconPlus size={18} />
-              {t('tenants.createButton', 'Create Tenant')}
+              {t('tenants.createButton', 'Create tenant')}
             </Button>
           ) : undefined
         }
@@ -218,7 +218,7 @@ export default function TenantsPage() {
             description={t('tenants.empty.description', 'Create the first workspace to get started.')}
             action={
               canCreate ? (
-                <Button onClick={() => setIsCreateModalOpen(true)}>{t('tenants.createButton', 'Create Tenant')}</Button>
+                <Button onClick={() => setIsCreateModalOpen(true)}>{t('tenants.createButton', 'Create tenant')}</Button>
               ) : undefined
             }
           />
