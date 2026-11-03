@@ -10615,6 +10615,7 @@ export interface components {
             }[];
         };
         PluginUpdateRequest: {
+            /** @description The store access token, when the store requires one to download. */
             token?: string;
         };
         PluginUpdateResponse: {

@@ -90,7 +90,7 @@ class PluginsCommandTest extends TestCase
 
         $command->expects($this->once())
             ->method('callApi')
-            ->with('POST', '/api/plugins/HelloWorld/uninstall', ['dry_run' => true, 'force' => false])
+            ->with('POST', '/api/plugins/HelloWorld/uninstall', ['dry_run' => true, 'force' => false, 'now' => false])
             ->willReturn($mockResponse);
 
         ob_start();
@@ -120,7 +120,7 @@ class PluginsCommandTest extends TestCase
 
         $command->expects($this->once())
             ->method('callApi')
-            ->with('POST', '/api/plugins/HelloWorld/uninstall', ['dry_run' => false, 'force' => false])
+            ->with('POST', '/api/plugins/HelloWorld/uninstall', ['dry_run' => false, 'force' => false, 'now' => false])
             ->willReturn($mockResponse);
 
         ob_start();
@@ -149,7 +149,7 @@ class PluginsCommandTest extends TestCase
 
         $command->expects($this->once())
             ->method('callApi')
-            ->with('POST', '/api/plugins/BadPlugin/uninstall', ['dry_run' => false, 'force' => false])
+            ->with('POST', '/api/plugins/BadPlugin/uninstall', ['dry_run' => false, 'force' => false, 'now' => false])
             ->willReturn($mockResponse);
 
         ob_start();

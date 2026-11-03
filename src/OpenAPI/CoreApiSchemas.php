@@ -8591,7 +8591,9 @@ final class CoreApiSchemas
                 ], ['plugin', 'installed_version', 'latest_version'])],
                 'meta' => self::object(['stores_unreachable' => self::int()], ['stores_unreachable']),
             ], ['data', 'meta']),
-            'PluginUpdateRequest' => self::object(['token' => self::str()], []),
+            'PluginUpdateRequest' => self::object([
+                'token' => array_merge(self::str(), ['description' => 'The store access token, when the store requires one to download.']),
+            ], []),
             'PluginUpdateResponse' => self::object([
                 'data' => self::object([
                     'status' => ['type' => 'string', 'enum' => ['updated', 'waiting_approval', 'rejected']],

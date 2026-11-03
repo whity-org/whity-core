@@ -60740,7 +60740,8 @@
                 "type": "object",
                 "properties": {
                     "token": {
-                        "type": "string"
+                        "type": "string",
+                        "description": "The store access token, when the store requires one to download."
                     }
                 }
             },
