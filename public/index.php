@@ -878,6 +878,9 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'icon' => 'building',
         'group' => 'platform',
         'order' => 1,
+        // A workspace admin may hold tenants:read for their own row, but managing
+        // workspaces is the platform's job. /admin/tenants still opens by URL for them.
+        'systemTenantOnly' => true,
         // #990: mirrors GET /api/tenants, now gated on tenants:read (migration
         // 138 grants it to every role that may write or delete a tenant).
         // requiredRole is cleared so the item follows the route it mirrors rather

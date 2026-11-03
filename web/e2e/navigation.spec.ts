@@ -53,9 +53,9 @@ test.describe('Sidebar navigation (admin)', () => {
     await expect(page.getByRole('button', { name: /New unit|Add the first unit/ }).first()).toBeVisible();
   });
 
-  test('Tenants section loads its page with heading and table', async ({ adminPage, page }) => {
-    await adminPage.shell.clickNav('Tenants');
-    await page.waitForURL('**/admin/tenants');
+  test('Tenants is not in a workspace admin\'s sidebar, and still opens by URL', async ({ adminPage, page }) => {
+    await page.goto('/admin/tenants');
+    await expect(adminPage.shell.navLink('Tenants')).toHaveCount(0);
     await expect(page.getByRole('heading', { name: 'Tenants' })).toBeVisible();
     await expect(page.getByRole('table')).toBeVisible();
     await expect(page.getByRole('columnheader', { name: 'Slug' })).toBeVisible();
