@@ -326,6 +326,7 @@
         "aiPrincipals.for.other": "شخص آخر",
         "aiPrincipals.for.you": "أنت",
         "aiPrincipals.header.connect": "ربط تطبيق ذكاء اصطناعي",
+        "aiPrincipals.mayDo.agent": "ما يسمح به هذا الشخص",
         "aiPrincipals.mayDo.everything": "كل ما يستطيعه هذا الشخص",
         "aiPrincipals.mayDo.readOnly": "يبحث عن المعلومات فقط",
         "aiPrincipals.mayDo.some": "بعض المجالات فقط",

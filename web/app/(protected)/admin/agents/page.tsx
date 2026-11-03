@@ -114,7 +114,7 @@ export default function AgentsPage() {
           <Avatar kind="agent" name={localized(agent.name, agent.nameAr, arabic)} size={36} />
           <span className="min-w-0">
             <span className="block font-medium">{localized(agent.name, agent.nameAr, arabic)}</span>
-            <span className="block text-sm text-muted-foreground">{localized(agent.role, agent.roleAr, arabic)}</span>
+            <span className="block max-w-xs truncate text-sm text-muted-foreground">{localized(agent.role, agent.roleAr, arabic)}</span>
           </span>
         </span>
       ),

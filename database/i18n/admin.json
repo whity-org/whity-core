@@ -325,6 +325,7 @@
         "aiPrincipals.for.other": "Another person",
         "aiPrincipals.for.you": "You",
         "aiPrincipals.header.connect": "Connect an AI app",
+        "aiPrincipals.mayDo.agent": "What this person allows it",
         "aiPrincipals.mayDo.everything": "Everything this person can do",
         "aiPrincipals.mayDo.readOnly": "Only looks things up",
         "aiPrincipals.mayDo.some": "Some areas only",

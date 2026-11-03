@@ -79,9 +79,13 @@ export default function AiPrincipalsPage() {
    * person can do, reads only, or a narrower list. An app's writes ask first
    * whichever it is, so this says what it reaches, not what it runs alone.
    */
-  const mayDo = (scope: string[]): string => {
-    const narrowing = scope.filter((entry) => !NOT_NARROWING.some((prefix) => entry === prefix || entry.startsWith(prefix)));
-    if (narrowing.length === 0) return t('aiPrincipals.mayDo.everything', 'Everything this person can do');
+  const mayDo = (principal: AiPrincipal): string => {
+    const narrowing = principal.scope.filter((entry) => !NOT_NARROWING.some((prefix) => entry === prefix || entry.startsWith(prefix)));
+    if (narrowing.length === 0) {
+      return principal.principalKind === 'ai-agent'
+        ? t('aiPrincipals.mayDo.agent', 'What this person allows it')
+        : t('aiPrincipals.mayDo.everything', 'Everything this person can do');
+    }
     return narrowing.every(isReadPermission) ? t('aiPrincipals.mayDo.readOnly', 'Only looks things up') : t('aiPrincipals.mayDo.some', 'Some areas only');
   };
 
@@ -129,7 +133,7 @@ export default function AiPrincipalsPage() {
     {
       id: 'mayDo',
       header: t('aiPrincipals.table.mayDo', 'May do'),
-      cell: (row: AiPrincipal) => <span className="text-sm">{mayDo(row.scope)}</span>,
+      cell: (row: AiPrincipal) => <span className="text-sm">{mayDo(row)}</span>,
     },
     // #1068: dates go together when this tenant hides them.
     ...dates.dateColumns<AiPrincipal>([
