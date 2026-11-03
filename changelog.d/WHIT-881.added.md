@@ -1,0 +1,1 @@
+- A workspace can install a declarative plugin from the store into itself. It is data that Whity draws, so none of the publisher's code runs, and it installs turned off with a Turn on switch.

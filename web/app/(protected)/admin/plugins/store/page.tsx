@@ -32,6 +32,7 @@ export default function PluginStorePage() {
   const [allowedHosts, setAllowedHosts] = useState<string[]>([]);
   const [featureEnabled, setFeatureEnabled] = useState<boolean | null>(null);
   const [canInstall, setCanInstall] = useState(false);
+  const [canInstallDeclarative, setCanInstallDeclarative] = useState(false);
   const [storeUrl, setStoreUrl] = useState('');
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState<string | null>(null);
@@ -53,6 +54,7 @@ export default function PluginStorePage() {
     setAllowedHosts(data.data.hosts);
     setFeatureEnabled(data.data.enabled);
     setCanInstall(data.data.can_install);
+    setCanInstallDeclarative(data.data.can_install_declarative);
     // Preselect the first store so a one-store deployment needs no click.
     if (data.data.hosts.length > 0) {
       setStoreUrl(`https://${data.data.hosts[0]}`);
@@ -240,7 +242,7 @@ export default function PluginStorePage() {
                   onOpen={() => openPlugin(plugin)}
                   action={
                     <InstallButton
-                      canInstall={canInstall}
+                      canInstall={plugin.kind === 'declarative' ? canInstallDeclarative : canInstall}
                       disabled={!plugin.latest_version}
                       onClick={() => setInstalling(plugin)}
                     />

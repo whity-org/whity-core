@@ -3990,7 +3990,8 @@ final class CoreApiSchemas
                     'enabled' => self::bool(),
                     'hosts' => ['type' => 'array', 'items' => ['type' => 'string']],
                     'can_install' => self::bool(),
-                ], ['enabled', 'hosts', 'can_install']),
+                    'can_install_declarative' => self::bool(),
+                ], ['enabled', 'hosts', 'can_install', 'can_install_declarative']),
             ], ['data']),
 
             // GET /api/plugins/store/catalog — a store's public catalogue entry.
@@ -4003,6 +4004,7 @@ final class CoreApiSchemas
                 'latest_version' => self::str(true),
                 // S.4. Always `unverified` until the Verified design is approved; a store can't set it.
                 'trust' => ['type' => 'string', 'enum' => ['unverified']],
+                'kind' => ['type' => 'string', 'enum' => ['declarative', 'code']],
                 'price' => array_merge(self::object([
                     'amount' => self::str(),
                     'currency' => self::str(),
@@ -8540,6 +8542,17 @@ final class CoreApiSchemas
                     ], ['version', 'new_permissions', 'new_domains']), ['nullable' => true]),
                 ], ['source', 'installed_at', 'permissions', 'outside_domains']),
             ], ['id', 'name', 'enabled', 'file']),
+            'WorkspacePluginInstallResponse' => self::object([
+                'data' => self::object([
+                    'plugin' => self::str(),
+                    'slug' => self::str(),
+                    'version' => self::str(),
+                    'enabled' => self::bool(),
+                ], ['plugin', 'slug', 'version', 'enabled']),
+            ], ['data']),
+            'WorkspacePluginSwitchResponse' => self::object([
+                'data' => self::object(['plugin' => self::str(), 'enabled' => self::bool()], ['plugin', 'enabled']),
+            ], ['data']),
             'PluginRemovedResponse' => self::object([
                 'data' => ['type' => 'array', 'items' => self::object([
                     'name' => self::str(),
@@ -13562,6 +13575,34 @@ final class CoreApiSchemas
                 'description' => 'Plugins this workspace published (not those installed for every workspace), with the live version and whether the plugin and its automations are switched on.',
                 'tags' => ['platform-ops'],
                 'responses' => [200 => self::jsonResponse('The workspace\'s plugins', 'WorkspacePluginListResponse')] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/workspace-plugins/install-from-store', 'plugins:install', [
+                'summary' => 'Install a declarative plugin from a trusted store into this workspace, turned off',
+                'tags' => ['platform-ops'],
+                'request' => 'InstallFromStoreRequest',
+                'responses' => [
+                    201 => self::jsonResponse('Installed, turned off', 'WorkspacePluginInstallResponse'),
+                    403 => self::errorResponse('No workspace, or the store is not allowed'),
+                    409 => self::errorResponse('Already in this workspace'),
+                    422 => self::errorResponse('Not allowed in a workspace'),
+                    502 => self::errorResponse('Store unavailable'),
+                ],
+            ]),
+            self::permissionRoute('POST', '/api/workspace-plugins/{plugin}/enable', 'plugins:enable', [
+                'summary' => "Turn on this workspace's plugin",
+                'tags' => ['platform-ops'],
+                'responses' => [
+                    200 => self::jsonResponse('Turned on', 'WorkspacePluginSwitchResponse'),
+                    404 => self::errorResponse('Not found'),
+                ],
+            ]),
+            self::permissionRoute('POST', '/api/workspace-plugins/{plugin}/disable', 'plugins:disable', [
+                'summary' => "Turn off this workspace's plugin",
+                'tags' => ['platform-ops'],
+                'responses' => [
+                    200 => self::jsonResponse('Turned off', 'WorkspacePluginSwitchResponse'),
+                    404 => self::errorResponse('Not found'),
+                ],
             ]),
             self::permissionRoute('POST', '/api/workspace-plugins/validate', 'plugins:build', [
                 'summary' => 'Validate a workspace plugin manifest',

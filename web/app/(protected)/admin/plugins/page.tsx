@@ -124,6 +124,26 @@ export default function PluginsPage() {
     const { data: responseData } = await api.GET('/api/v1/plugins/updates');
     return responseData?.data ?? [];
   }, []);
+  // Declarative plugins in this workspace (decision 2). The system tenant has none.
+  const { data: workspacePlugins, refetch: refetchWorkspacePlugins } = useFetch(async () => {
+    const { data: responseData } = await api.GET('/api/v1/workspace-plugins');
+    return responseData?.data ?? [];
+  }, []);
+  const switchWorkspacePlugin = async (slug: string, on: boolean) => {
+    const { error: switchError } = on
+      ? await api.POST('/api/v1/workspace-plugins/{plugin}/enable', { params: { path: { plugin: slug } } })
+      : await api.POST('/api/v1/workspace-plugins/{plugin}/disable', { params: { path: { plugin: slug } } });
+    if (switchError) {
+      addToast(
+        switchError.error ||
+          (on ? t('plugins.error.enable', 'Failed to enable plugin') : t('plugins.error.disable', 'Failed to disable plugin')),
+        'error',
+      );
+      return;
+    }
+    refetchWorkspacePlugins();
+    void refreshNavigation();
+  };
   const [updateTarget, setUpdateTarget] = useState<PluginUpdateTarget | null>(null);
   const waitingUpdates = plugins.filter((plugin) => plugin.install?.update_waiting);
   const availableUpdateFor = (plugin: PluginEntry) =>
@@ -673,6 +693,32 @@ export default function PluginsPage() {
           rowActionsLabel={t('plugins.col.actions', 'Actions')}
         />
       )}
+
+      {(workspacePlugins ?? []).length > 0 ? (
+        <section className="space-y-3" aria-labelledby="plugins-in-workspace">
+          <h2 id="plugins-in-workspace" className="text-base font-semibold text-foreground">
+            {t('plugins.workspace.title', 'In this workspace')}
+          </h2>
+          <ul className="divide-y divide-border rounded-card border border-border">
+            {(workspacePlugins ?? []).map((entry) => (
+              <li key={entry.slug} className="flex flex-wrap items-center justify-between gap-3 p-4 text-sm">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="font-medium text-foreground">{entry.plugin}</p>
+                  <span className="text-muted-foreground">{entry.version}</span>
+                  <Badge variant={entry.enabled ? 'success' : 'secondary'}>
+                    {entry.enabled ? t('plugins.state.active', 'Active') : t('plugins.state.off', 'Turned off')}
+                  </Badge>
+                </div>
+                {hasPermission(entry.enabled ? PLUGINS_DISABLE : PLUGINS_ENABLE) ? (
+                  <Button variant="outline" onClick={() => void switchWorkspacePlugin(entry.slug, !entry.enabled)}>
+                    {entry.enabled ? t('plugins.action.turnOff', 'Turn off') : t('plugins.action.turnOn', 'Turn on')}
+                  </Button>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       {isOperator && (removed ?? []).length > 0 ? (
         <section className="space-y-3" aria-labelledby="plugins-recently-removed">
