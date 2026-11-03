@@ -11,6 +11,7 @@ use Whity\Core\Identity\TwoFactorRecoveryService;
 use Whity\Core\RBAC\CorePermissions;
 use Whity\Core\Request;
 use Whity\Core\Response;
+use Whity\Http\PaginationParams;
 use Whity\Core\Tenant\TenantContext;
 use Whity\Http\JsonBody;
 
@@ -51,9 +52,13 @@ final class TwoFactorRecoveryApprovalsApiHandler
         }
 
         try {
-            $items = $this->service->listPendingForTenant($ctx['tenantId']);
+            $p = PaginationParams::fromPath($request->getPath());
+            $items = $this->service->listPendingForTenant($ctx['tenantId'], $p->perPage, $p->offset);
 
-            return Response::json(['data' => $items], 200);
+            return Response::json([
+                'data' => $items,
+                'pagination' => $p->meta($this->service->countPendingForTenant($ctx['tenantId'])),
+            ], 200);
         } catch (\Throwable $e) {
             error_log('[2fa-recovery-approvals] list failed: ' . $e->getMessage());
 

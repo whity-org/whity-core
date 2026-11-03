@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Whity\Core\Document\Routing;
 
+use Whity\Core\Identity\PersonName;
 use Whity\Core\Inbox\InboxItem;
 use Whity\Core\Inbox\InboxSourceInterface;
 use Whity\Core\RBAC\ResourceTypeRegistry;
@@ -91,6 +92,16 @@ final class DocumentRoutingInboxSource implements InboxSourceInterface
      */
     private static function toItem(array $row): InboxItem
     {
+        // The person whose act put it here. The query names them only if they belong
+        // to this workspace; a profile's name elsewhere is not this tenant's to read.
+        $sender = isset($row['sender_profile_id'])
+            ? [
+                'kind' => 'person',
+                'profile_id' => (int) $row['sender_profile_id'],
+                'name' => PersonName::of((string) ($row['sender_display_name'] ?? ''), (string) ($row['sender_email'] ?? '')),
+            ]
+            : null;
+
         $arrivedBy = (string) ($row['arrived_by'] ?? RouteAction::ISSUED);
         $decision = ($row['step_decision'] ?? false) === true;
         $delivery = RouteSatisfaction::isDelivery($row['step_satisfied_by'] ?? null);
@@ -127,6 +138,9 @@ final class DocumentRoutingInboxSource implements InboxSourceInterface
                 'document_withdrawn' => ($row['document_withdrawn'] ?? false) === true,
                 'arrived_by' => $arrivedBy,
                 'arrived_from_profile_id' => $row['arrived_from'] ?? null,
+                // How it was closed, so a client can say "You approved" and not just
+                // "Done". Null while it is open.
+                'closed_by' => $row['closed_by_action'] ?? null,
                 'ou_id' => $row['ou_id'] ?? null,
                 // #1014: whether this item is a DECISION. A client needs it
                 // before it renders anything, because the acts available differ —
@@ -143,6 +157,7 @@ final class DocumentRoutingInboxSource implements InboxSourceInterface
                 // offering three buttons that cannot work.
                 'satisfied_by' => $delivery ? RouteSatisfaction::DELIVERY : RouteSatisfaction::ACT,
             ],
+            sender: $sender,
         );
     }
 

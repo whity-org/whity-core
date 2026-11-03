@@ -636,12 +636,55 @@ final class CoreApiSchemas
                 'parameters' => [
                     self::queryParam('page', 'integer', '1-indexed page (default 1)'),
                     self::queryParam('per_page', 'integer', 'Page size (default 25, max 100). A client that needs every user must follow the `pagination` envelope to the last page; one request only ever describes page one.'),
-                    self::queryParam('sort', 'string', 'Sort key: `name`, `email`, `role`, `status`, `created` (default), plus `tenant` for a system-tenant caller. `name` and `email` order identically — the name IS the email\'s local part. An unrecognised key is not an error: it falls back to the default, because a client asking for a column it cannot see should get a list rather than a 400.'),
+                    self::queryParam('sort', 'string', 'Sort key: `name`, `email`, `role`, `status`, `created` (default), `lastActive`, plus `tenant` for a system-tenant caller. An unrecognised key is not an error: it falls back to the default, because a client asking for a column it cannot see should get a list rather than a 400.'),
                     self::queryParam('dir', 'string', 'Sort direction, `asc` or `desc`. Anything else is read as `asc`.'),
-                    self::queryParam('q', 'string', 'Case-insensitive substring match on email or role name. It narrows `pagination.total` too, so the envelope always describes the filtered list.'),
+                    self::queryParam('q', 'string', 'Case-insensitive substring match on display name, email or role name. It narrows `pagination.total` too, so the envelope always describes the filtered list.'),
+                    self::queryParam('role_id', 'string', 'Only people whose primary role is one of these ids, comma-separated.'),
+                    self::queryParam('ou_id', 'string', 'Only people in one of these organizational units, comma-separated.'),
+                    self::queryParam('two_step', 'string', '`on` or `off`: whether the person has two-step turned on.'),
+                    self::queryParam('account_status', 'string', '`active` or `inactive`. Both are listed when omitted.'),
                 ],
                 'responses' => [
                     200 => self::jsonResponse('The users visible to the caller\'s tenant', 'UserListResponse'),
+                    422 => self::errorResponse('A malformed filter'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/users/bulk/role', 'users:write', [
+                'summary' => 'Change the primary role of several people at once, all or nothing',
+                'tags' => ['users'],
+                'request' => 'UsersBulkRoleRequest',
+                'responses' => [
+                    200 => self::jsonResponse('Who changed and who already held the role', 'UsersBulkResultResponse'),
+                    403 => self::errorResponse('The role has permissions the caller does not hold'),
+                    404 => self::errorResponse('The role is not available in a target\'s workspace'),
+                    409 => self::errorResponse('This would leave a workspace with nobody able to manage people'),
+                    422 => self::errorResponse('A malformed request, or a target that cannot be changed; `details.refused` gives the reason for each'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/users/bulk/require-two-step', 'security:manage', [
+                'summary' => 'Require two-step of several people, through a policy naming each of them',
+                'tags' => ['users'],
+                'request' => 'UsersBulkTwoStepRequest',
+                'responses' => [
+                    200 => self::jsonResponse('Who now has a policy and who already had one', 'UsersBulkResultResponse'),
+                    422 => self::errorResponse('A malformed request, or a target that was not found; `details.refused` lists them'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('PUT', '/api/users/{id:\d+}/two-step-requirement', 'security:manage', [
+                'summary' => 'Require two-step of one person',
+                'tags' => ['users'],
+                'request' => 'UserTwoStepRequirementRequest',
+                'responses' => [
+                    200 => self::jsonResponse('Whether a policy was added', 'UsersBulkResultResponse'),
+                    422 => self::errorResponse('A malformed request, or the person was not found'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('DELETE', '/api/users/{id:\d+}/two-step-requirement', 'security:manage', [
+                'summary' => 'Remove the policy naming one person. A workspace or unit policy still applies.',
+                'tags' => ['users'],
+                'responses' => [
+                    200 => self::jsonResponse('The person no longer has a policy naming them', 'UserTwoStepClearedResponse'),
+                    404 => self::errorResponse('User not found'),
                 ] + self::authErrors(),
             ]),
             self::adminRoute('POST', '/api/users', [
@@ -2533,7 +2576,7 @@ final class CoreApiSchemas
                     self::queryParam('granteeType', 'string', 'Filter by grantee type (role|user)'),
                     self::queryParam('granteeId', 'integer', 'Filter by grantee id'),
                     self::queryParam('grantorUserId', 'integer', 'Filter by grantor user id'),
-                    self::queryParam('includeRevoked', 'boolean', 'Include revoked delegations'),
+                    self::queryParam('includeRevoked', 'boolean', 'Include delegations that have ended, whether revoked or past their end date'),
                 ],
                 'responses' => [
                     200 => self::jsonResponse('The matching delegations', 'DelegationListResponse'),
@@ -2557,6 +2600,15 @@ final class CoreApiSchemas
                 'responses' => [
                     200 => self::jsonResponse('Revocation confirmation', 'MutationResponse'),
                     404 => self::errorResponse('Delegation not found'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/delegations/{id:\d+}/restore', 'delegation:manage', [
+                'summary' => 'Undo a revoke: only by the person who revoked it, soon after',
+                'tags' => ['delegations'],
+                'responses' => [
+                    200 => self::jsonResponse('Restore confirmation', 'MutationResponse'),
+                    404 => self::errorResponse('Delegation not found, or not revoked'),
+                    409 => self::errorResponse('It can no longer be undone: too late, past its end date, or the grantor no longer holds the permission'),
                 ] + self::authErrors(),
             ]),
         ];
@@ -3813,11 +3865,22 @@ final class CoreApiSchemas
         $user = self::object([
             'id' => self::int(),
             'name' => self::str(),
+            // The stored value, which may be empty. `name` is what to show.
+            'displayName' => self::str(),
             'email' => self::str(),
             'role' => self::str(),
+            'roleId' => self::int(true),
             'tenantId' => self::int(),
             'ou_id' => self::int(true),
+            'ouName' => self::str(true),
             'createdAt' => self::str(true),
+            // Latest session activity in THIS workspace. Null when there is none.
+            'lastActiveAt' => self::str(true),
+            'twoStep' => self::object([
+                'enabled' => self::bool(),
+                'required' => self::bool(),
+                'requiredDirectly' => self::bool(),
+            ], ['enabled', 'required', 'requiredDirectly']),
             'status' => self::str(),
             'accountStatus' => ['type' => 'string', 'enum' => ['active', 'inactive']],
             // #917: which authority holds this account's credentials.
@@ -3845,6 +3908,11 @@ final class CoreApiSchemas
             'parent_id' => self::int(true),
             'created_at' => self::str(true),
             'permissionCount' => self::int(),
+            // Active people holding it in this workspace (every workspace for system).
+            'peopleCount' => self::int(),
+            // Shipped to every workspace: the same fact as `global`, under the name
+            // the screens use.
+            'builtIn' => self::bool(),
             // True when the current tenant may update/delete this role. A global
             // NULL-tenant base role is visible but not manageable by a regular
             // tenant (only the SYSTEM tenant may manage it); the admin UI gates
@@ -3883,9 +3951,11 @@ final class CoreApiSchemas
             'ou_type_id' => self::int(true),
             'ou_type_key' => self::str(true),
             'ou_type_label' => self::str(true),
+            // Active people directly in this unit, not counting the units below.
+            'member_count' => self::int(),
         ], [
             'id', 'tenant_id', 'parent_id', 'name', 'slug', 'description', 'created_at',
-            'ou_type_id', 'ou_type_key', 'ou_type_label',
+            'ou_type_id', 'ou_type_key', 'ou_type_label', 'member_count',
         ]);
 
         $delegation = self::object([
@@ -3898,7 +3968,15 @@ final class CoreApiSchemas
             'ouId' => self::int(true),
             'grantedAt' => self::str(true),
             'revokedAt' => self::str(true),
-        ], ['id', 'tenantId', 'grantorUserId', 'granteeType', 'granteeId', 'permission', 'ouId', 'grantedAt', 'revokedAt']);
+            // UTC. Null is no end date.
+            'expiresAt' => self::str(true),
+            'status' => ['type' => 'string', 'enum' => ['active', 'expired', 'revoked']],
+            // Names from this delegation's own workspace; null when there is none to show.
+            'grantorName' => self::str(true),
+            'granteeName' => self::str(true),
+            'ouName' => self::str(true),
+            'permissionDescription' => self::str(true),
+        ], ['id', 'tenantId', 'grantorUserId', 'granteeType', 'granteeId', 'permission', 'ouId', 'grantedAt', 'revokedAt', 'expiresAt', 'status']);
 
         $auditEntry = self::object([
             'id' => self::int(),
@@ -5550,6 +5628,18 @@ final class CoreApiSchemas
                 'status' => self::str(true),
                 'resource_type' => self::str(true),
                 'resource_id' => self::str(true),
+                // Who it came from. Null when nobody sent it, or the person is not
+                // a member of this workspace.
+                'sender' => [
+                    'type' => 'object',
+                    'nullable' => true,
+                    'properties' => [
+                        'kind' => ['type' => 'string', 'enum' => ['person', 'public']],
+                        'profile_id' => self::int(),
+                        'name' => self::str(),
+                    ],
+                    'required' => ['kind'],
+                ],
                 // Source-specific extras a client may use and must not depend on.
                 'meta' => ['type' => 'object', 'additionalProperties' => true],
             ], ['id', 'title', 'timestamp']),
@@ -5962,6 +6052,17 @@ final class CoreApiSchemas
                 'updated_at' => self::str(),
             ], ['id', 'tenant_id', 'name', 'rule_kind', 'rule_config', 'created_at', 'updated_at']),
             'UserGroupListResponse' => self::paginatedListEnvelope('UserGroup'),
+            'UserGroupUsageResponse' => self::dataEnvelope([
+                'type' => 'array',
+                'items' => self::object([
+                    'id' => self::int(),
+                    'now' => self::int(true) + ['description' => 'People in it now, resolved for the caller as a preview is. Null when its rule cannot be resolved at the moment.'],
+                    'route_templates' => [
+                        'type' => 'array',
+                        'items' => self::object(['id' => self::int(), 'name' => self::str()], ['id', 'name']),
+                    ],
+                ], ['id', 'now', 'route_templates']),
+            ]),
             'UserGroupResponse' => self::dataEnvelope(SchemaBuilder::ref('UserGroup')),
             'UserGroupCreateRequest' => self::object([
                 'name' => self::str(),
@@ -6703,6 +6804,32 @@ final class CoreApiSchemas
             'User' => $user,
             'UserListResponse' => self::paginatedListEnvelope('User'),
             'UserResponse' => self::dataEnvelope(SchemaBuilder::ref('User')),
+            'UsersBulkTarget' => self::object([
+                'profile_id' => self::int(),
+                'tenant_id' => self::int() + ['description' => 'Which workspace. Required for a system-tenant caller, since one person can be in several; anyone else\'s targets are in their own workspace.'],
+            ], ['profile_id']),
+            'UsersBulkRoleRequest' => self::object([
+                'role_id' => self::int() + ['description' => 'The new role, by id. It must be available in every target\'s workspace, and hold nothing the caller does not.'],
+                'targets' => ['type' => 'array', 'items' => SchemaBuilder::ref('UsersBulkTarget'), 'minItems' => 1, 'maxItems' => 200, 'description' => 'The people to change. If any of them cannot be changed, nobody is.'],
+            ], ['role_id', 'targets']),
+            'UsersBulkTwoStepRequest' => self::object([
+                'targets' => ['type' => 'array', 'items' => SchemaBuilder::ref('UsersBulkTarget'), 'minItems' => 1, 'maxItems' => 200, 'description' => 'The people who must use two-step. If any of them is not found, nobody changes.'],
+                'grace_period_days' => self::int() + ['description' => 'Days before it is enforced. Default 0: from their next sign-in.'],
+            ], ['targets']),
+            'UserTwoStepRequirementRequest' => self::object([
+                'tenant_id' => self::int() + ['description' => 'Required for a system-tenant caller.'],
+                'grace_period_days' => self::int() + ['description' => 'Days before it is enforced. Default 0: from their next sign-in.'],
+            ], []),
+            'UsersBulkPair' => self::object(['profile_id' => self::int(), 'tenant_id' => self::int()], ['profile_id', 'tenant_id']),
+            'UsersBulkResultResponse' => self::dataEnvelope(self::object([
+                'changed' => ['type' => 'array', 'items' => SchemaBuilder::ref('UsersBulkPair')],
+                'unchanged' => ['type' => 'array', 'items' => SchemaBuilder::ref('UsersBulkPair')],
+            ], ['changed', 'unchanged'])),
+            'UserTwoStepClearedResponse' => self::dataEnvelope(self::object([
+                'profile_id' => self::int(),
+                'tenant_id' => self::int(),
+                'requiredDirectly' => self::bool(),
+            ], ['profile_id', 'tenant_id', 'requiredDirectly'])),
             // NOTE: no tenantId field — the handler always creates the user in
             // the caller's TenantContext (a declared field with zero runtime
             // effect would be a contract lie).
@@ -6800,6 +6927,7 @@ final class CoreApiSchemas
                 'ou_id' => self::reference('/api/ous', 'name', nullable: true) + ['description' => 'Organizational unit to place the user in (see GET /api/ous). Omitted or null leaves them unassigned.'],
             ], ['email', 'password']),
             'UserUpdateRequest' => self::object([
+                'displayName' => self::str() + ['description' => 'The name shown for this person. Refused with 409 when they also belong to another workspace, unless the caller is the system tenant.'],
                 'email' => self::email() + ['description' => 'New sign-in email address.'],
                 'password' => self::password() + ['description' => 'New password; must satisfy the site password policy.'],
                 'role' => $permissionRef + ['description' => 'Replacement role in this tenant, by name or numeric id.'],
@@ -6827,7 +6955,12 @@ final class CoreApiSchemas
                 'name' => self::str(),
                 'description' => self::str(true),
                 'source' => self::str(),
-            ], ['id', 'name', 'description']),
+                // Where it sits on the role page's grid. See PermissionAreas.
+                'area' => self::str(),
+                'areaLabel' => self::str(),
+                'areaGroup' => ['type' => 'string', 'enum' => ['people', 'documents', 'ai', 'workspace', 'apps']],
+                'actions' => ['type' => 'array', 'items' => ['type' => 'string', 'enum' => ['see', 'create', 'change', 'delete', 'approve']]],
+            ], ['id', 'name', 'description', 'area', 'areaLabel', 'areaGroup', 'actions']),
             'PermissionCatalogueResponse' => self::listEnvelope('PermissionCatalogueEntry'),
             'Role' => $role,
             'RoleListResponse' => self::paginatedListEnvelope('Role'),
@@ -8176,12 +8309,14 @@ final class CoreApiSchemas
                 'granteeId' => self::int() + ['description' => 'Id of the role, or the profile id of the user, named by `granteeType`.'],
                 'permissions' => ['type' => 'array', 'items' => self::str(), 'minItems' => 1, 'description' => 'Permission names (`resource:action`) to delegate. You can only delegate permissions you hold yourself.'],
                 'ouId' => self::int(true) + ['description' => 'Limit the delegation to this organizational unit and the units below it. Null or omitted applies tenant-wide.'],
+                'expiresAt' => self::str(true) + ['description' => 'When it ends, an ISO-8601 moment in the future. Null or omitted is no end date.'],
             ], ['granteeType', 'granteeId', 'permissions']),
             'DelegationCreateResponse' => self::dataEnvelope(self::object([
                 'ids' => ['type' => 'array', 'items' => self::int()],
                 'granteeType' => self::str(),
                 'granteeId' => self::int(),
                 'ouId' => self::int(true),
+                'expiresAt' => self::str(true),
                 'permissions' => ['type' => 'array', 'items' => self::str()],
                 'count' => self::int(),
             ], ['ids', 'count'])),
@@ -8827,6 +8962,7 @@ final class CoreApiSchemas
             'PasswordResetConfirmRequest' => self::object([
                 'token' => self::str(),
                 'password' => self::str(),
+                'reason' => self::str(true) + ['description' => 'Optional. Why you are asking, shown to the approver when approval is required. At most 500 characters.'],
             ], ['token', 'password']),
             // POST /api/auth/password/reset — 200 response. `status` is
             // 'applied' (self-service, no approval required) or
@@ -8839,6 +8975,10 @@ final class CoreApiSchemas
             // POST /api/auth/2fa-recovery/confirm — 200 response. Confirming
             // only SUBMITS the request into the admin queue — status is always
             // 'pending' here; nothing on the target profile has changed yet.
+            'TwoFactorRecoveryConfirmRequest' => self::object([
+                'token' => self::str(),
+                'reason' => self::str(true) + ['description' => 'Optional. Why you are asking, shown to the approver. At most 500 characters.'],
+            ], ['token']),
             'TwoFactorRecoveryConfirmResponse' => self::dataEnvelope(self::object([
                 'status' => ['type' => 'string', 'enum' => ['pending']],
                 'message' => self::str(),
@@ -8852,9 +8992,11 @@ final class CoreApiSchemas
                 'profile_id' => self::int(),
                 'email' => self::str(),
                 'display_name' => self::str(),
+                // Why they asked, in their own words. Optional, so often null.
+                'reason' => self::str(true),
                 'created_at' => self::str(),
             ], ['id', 'profile_id', 'email', 'display_name', 'created_at']),
-            'PendingPasswordResetListResponse' => self::listEnvelope('PendingPasswordResetItem'),
+            'PendingPasswordResetListResponse' => self::paginatedListEnvelope('PendingPasswordResetItem'),
 
             // ── Tenant invitations (WHIT-417) ──
 
@@ -8922,9 +9064,11 @@ final class CoreApiSchemas
                 'profile_id' => self::int(),
                 'email' => self::str(),
                 'display_name' => self::str(),
+                // Why they asked, in their own words. Optional, so often null.
+                'reason' => self::str(true),
                 'created_at' => self::str(),
             ], ['id', 'profile_id', 'email', 'display_name', 'created_at']),
-            'PendingTwoFactorRecoveryListResponse' => self::listEnvelope('PendingTwoFactorRecoveryItem'),
+            'PendingTwoFactorRecoveryListResponse' => self::paginatedListEnvelope('PendingTwoFactorRecoveryItem'),
 
             // Shared 200 response for every id-based approve/reject action across
             // both queues (password-resets and 2fa-recovery).
@@ -10024,7 +10168,7 @@ final class CoreApiSchemas
                 'schema' => [
                     'summary' => 'Confirm the recovery token — CREATES the pending admin-queue entry (clears nothing)',
                     'tags' => ['auth'],
-                    'request' => 'TokenOnlyRequest',
+                    'request' => 'TwoFactorRecoveryConfirmRequest',
                     'responses' => [
                         200 => self::jsonResponse('Submitted for administrator review', 'TwoFactorRecoveryConfirmResponse'),
                         400 => self::errorResponse('The confirmation link is invalid or has expired'),
@@ -11495,6 +11639,17 @@ final class CoreApiSchemas
                         'A malformed kind, a kind nothing provides, a kind that needs a document, '
                         . 'or a config the rule refused'
                     ),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/user-groups/usage', 'groups:read', [
+                'summary' => 'How many people each group holds now, and where it is used',
+                'tags' => ['user-groups'],
+                'parameters' => [
+                    self::queryParam('ids', 'string', 'Group ids, comma-separated, at most 100: the rows on screen. A group of another workspace is left out.'),
+                ],
+                'responses' => [
+                    200 => self::jsonResponse('One entry per group found', 'UserGroupUsageResponse'),
+                    422 => self::errorResponse('`ids` missing, malformed or too many'),
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('POST', '/api/user-groups', 'groups:write', [
