@@ -109,6 +109,10 @@ final class AuditSentences
      *   audit.sentence.profile_email_verification_resent = {actor} asked for another confirmation email
      *   audit.sentence.role_created = {actor} created role {target}
      *   audit.sentence.role_deleted = {actor} deleted role {target}
+     *   audit.sentence.documents_document_withdrawn = {actor} withdrew a document
+     *   audit.sentence.notification_delivery_queued = {actor} queued a notification
+     *   audit.sentence.notification_delivery_sent = {actor} sent a notification
+     *   audit.sentence.notification_delivery_failed = {actor}: a notification could not be sent
      *   audit.sentence.role_updated = {actor} changed role {target}
      *   audit.sentence.security_2fa_policy_created = {actor} added a two-step rule
      *   audit.sentence.security_2fa_policy_deleted = {actor} removed a two-step rule
@@ -204,6 +208,10 @@ final class AuditSentences
         'profile_email.verification_resent' => '{actor} asked for another confirmation email',
         'role.created' => '{actor} created role {target}',
         'role.deleted' => '{actor} deleted role {target}',
+        'documents.document.withdrawn' => '{actor} withdrew a document',
+        'notification.delivery.queued' => '{actor} queued a notification',
+        'notification.delivery.sent' => '{actor} sent a notification',
+        'notification.delivery.failed' => '{actor}: a notification could not be sent',
         'role.updated' => '{actor} changed role {target}',
         'security.2fa_policy.created' => '{actor} added a two-step rule',
         'security.2fa_policy.deleted' => '{actor} removed a two-step rule',

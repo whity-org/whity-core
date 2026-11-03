@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Whity\Api;
 
 use Whity\Core\Plugin\Tenant\TenantPluginRepository;
+use Whity\Core\RBAC\PermissionAreas;
 use Whity\Core\RBAC\PermissionRegistry;
 use Whity\Core\Tenant\TenantContext;
 use Whity\Core\Request;
@@ -76,7 +77,10 @@ class PermissionsApiHandler
 
             $p     = PaginationParams::fromPath($request->getPath());
             $total = count($permissions);
-            $page  = array_slice($permissions, $p->offset, $p->perPage);
+            $page  = array_map(
+                static fn (array $permission): array => $permission + PermissionAreas::of((string) ($permission['name'] ?? '')),
+                array_slice($permissions, $p->offset, $p->perPage)
+            );
 
             return Response::json(['data' => $page, 'pagination' => $p->meta($total)], 200);
         } catch (\Exception $e) {

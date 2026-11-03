@@ -6,7 +6,8 @@ import { Button } from "@whity/ui/button"
 import { DataTable } from "@whity/ui/data-table"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@whity/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@whity/ui/dropdown-menu"
-import { BilingualInput, type BilingualValue } from "@whity/ui/bilingual-input"
+import type { BilingualValue } from "@whity/ui/bilingual-input"
+import { BilingualField } from "./bilingual-field"
 import { AccessDeniedPanel, AreaError, EmptyFiltered, EmptyFirstTime, LoadingRows } from "@whity/ui/page-states"
 import { SearchField } from "@whity/ui/search-field"
 import { PageHeader } from "@whity/ui/page-header"
@@ -288,13 +289,11 @@ function NewFormDialog({ env, existingKeys, onClose }: { env: FormsScreenEnv; ex
           <DialogTitle>{t("builder.new", "New form")}</DialogTitle>
           <DialogDescription>{t("builder.new.body", "Name the form. You add the questions next.")}</DialogDescription>
         </DialogHeader>
-        <BilingualInput
+        <BilingualField
           id="new-form-name"
           label={t("builder.new.name", "Form name")}
           value={name}
           onChange={setName}
-          enLabel={t("builder.lang.en", "English")}
-          arLabel={t("builder.lang.ar", "Arabic")}
         />
         {error !== null && <p role="alert" className="text-sm text-destructive">{error}</p>}
         <DialogFooter>

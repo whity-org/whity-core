@@ -46,7 +46,10 @@ class OusApiHandler
      */
     private const LIST_COLUMNS = 'SELECT ou.id, ou.tenant_id, ou.parent_id, ou.name, ou.slug,'
         . ' ou.description, ou.created_at, ou.ou_type_id,'
-        . ' t.type_key AS ou_type_key, t.label AS ou_type_label';
+        . ' t.type_key AS ou_type_key, t.label AS ou_type_label,'
+        // People directly in the unit, with the same "active" the members list uses.
+        . " (SELECT COUNT(DISTINCT m.profile_id) FROM memberships m"
+        . " WHERE m.ou_id = ou.id AND m.tenant_id = ou.tenant_id AND m.status = 'active') AS member_count";
 
     /**
      * Longest disambiguating suffix tried before a slug is declared unassignable.
@@ -1333,6 +1336,7 @@ class OusApiHandler
      */
     private static function withTypeFields(array $row): array
     {
+        $row['member_count'] = (int) ($row['member_count'] ?? 0);
         $row['ou_type_id'] = self::asNullableInt($row['ou_type_id'] ?? null);
         $row['ou_type_key'] = isset($row['ou_type_key']) ? (string) $row['ou_type_key'] : null;
         $row['ou_type_label'] = isset($row['ou_type_label']) ? (string) $row['ou_type_label'] : null;

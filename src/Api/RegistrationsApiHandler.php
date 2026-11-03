@@ -11,6 +11,7 @@ use Whity\Core\Identity\MembershipRepository;
 use Whity\Core\RBAC\CorePermissions;
 use Whity\Core\Request;
 use Whity\Core\Response;
+use Whity\Http\PaginationParams;
 use Whity\Core\Tenant\TenantContext;
 
 /**
@@ -72,8 +73,21 @@ final class RegistrationsApiHandler
             // the result to whole-workspace-pending rows only (an 'invited'
             // membership in a tenant with no active member), never ordinary
             // tenant invitations.
+            $p = PaginationParams::fromPath($request->getPath());
+
+            // @tenant-guard-ignore: system-tenant platform operation — counts pending registrations across all tenants (WC-235)
+            $count = $this->db->query(
+                "SELECT COUNT(*) FROM memberships m
+                 WHERE m.status = 'invited'
+                   AND NOT EXISTS (
+                       SELECT 1 FROM memberships am
+                       WHERE am.tenant_id = m.tenant_id AND am.status = 'active'
+                   )"
+            );
+            $total = $count === false ? 0 : (int) $count->fetchColumn();
+
             // @tenant-guard-ignore: system-tenant platform operation — lists pending registrations across all tenants (WC-235)
-            $stmt = $this->db->query(
+            $stmt = $this->db->prepare(
                 "SELECT m.id AS membership_id, m.tenant_id, m.created_at,
                         t.name AS tenant_name, t.slug AS tenant_slug,
                         p.id AS profile_id, p.display_name,
@@ -87,10 +101,14 @@ final class RegistrationsApiHandler
                        SELECT 1 FROM memberships am
                        WHERE am.tenant_id = m.tenant_id AND am.status = 'active'
                    )
-                 ORDER BY m.created_at ASC"
+                 ORDER BY m.created_at ASC, m.id ASC
+                 LIMIT :limit OFFSET :offset"
             );
+            $stmt->bindValue(':limit', $p->perPage, PDO::PARAM_INT);
+            $stmt->bindValue(':offset', $p->offset, PDO::PARAM_INT);
+            $stmt->execute();
 
-            $rows = $stmt === false ? [] : $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
             $items = [];
             foreach ($rows as $row) {
@@ -106,7 +124,7 @@ final class RegistrationsApiHandler
                 ];
             }
 
-            return Response::json(['data' => $items], 200);
+            return Response::json(['data' => $items, 'pagination' => $p->meta($total)], 200);
         } catch (\Throwable $e) {
             error_log('[registrations] list failed: ' . $e->getMessage());
             return Response::error('Failed to list pending registrations', 500);

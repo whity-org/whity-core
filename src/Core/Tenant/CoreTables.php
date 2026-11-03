@@ -108,6 +108,7 @@ final class CoreTables
         'form_fields' => '127_create_forms.php',
         'form_submissions' => '127_create_forms.php',
         'form_uploads' => '133_create_form_uploads.php',
+        'form_drafts' => '210_create_form_drafts.php',
         'form_submission_reviews' => '194_add_form_staff_fields_and_reviews.php',
         'forms' => '127_create_forms.php',
         'health_samples' => '085_create_health_samples.php',
@@ -174,6 +175,7 @@ final class CoreTables
         'translations' => '081_create_language_tables.php',
         'two_factor_policies' => '061_create_two_factor_policies.php',
         'two_factor_recovery_requests' => '077_create_two_factor_recovery_requests.php',
+        'two_factor_reminders' => '207_create_two_factor_reminders.php',
         'user_groups' => '116_create_user_groups.php',
         'user_notification_preferences' => '071_create_user_notification_preferences.php',
     ];

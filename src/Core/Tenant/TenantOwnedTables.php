@@ -295,6 +295,7 @@ final class TenantOwnedTables
         // user-scoped rows an admin sets to require 2FA enrollment. Every query
         // binds tenant_id so a policy can never leak across tenants.
         'two_factor_policies' => '061_create_two_factor_policies.php',
+        'two_factor_reminders' => '207_create_two_factor_reminders.php',
 
         // WC-621 — native taxonomy/tagging subsystem (migration 063): tag groups,
         // tags, and polymorphic entity<->tag associations. All three carry
@@ -500,6 +501,9 @@ final class TenantOwnedTables
         // state is unreachable by construction, since the only path that could
         // ever reference it is the claim, which refuses a claimed row.
         'form_uploads' => '133_create_form_uploads.php',
+        // `form_drafts` (migration 210) — one person's unsent answers. Every statement
+        // binds the tenant and the profile.
+        'form_drafts' => '210_create_form_drafts.php',
         // `form_submission_reviews` (migration 194) — the office's record on a
         // submission. Every statement binds `tenant_id`, so a submission id from
         // another tenant reads as not found.
