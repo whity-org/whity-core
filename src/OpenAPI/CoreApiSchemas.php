@@ -5440,6 +5440,8 @@ final class CoreApiSchemas
                 // step's three hundred closed rows read exactly like three
                 // hundred people who acted.
                 'closed_by_delivery' => self::bool(),
+                // S5: closed because the document was withdrawn, not by anybody acting.
+                'closed_by_withdrawal' => self::bool(),
                 'created_at' => self::str(),
             ], [
                 'id', 'document_id', 'route_id', 'step_id', 'profile_id', 'created_by_event_id',
