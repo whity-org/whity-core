@@ -390,7 +390,7 @@ final class AgentPauseAndActivityRealEngineTest extends TestCase
 
         $refused = $this->admin->update($this->as(self::RANA, '{"mayRead":[5,6]}', 'PATCH'), ['id' => (string) $this->clerk]);
         self::assertSame(422, $refused->getStatusCode());
-        self::assertSame([5], $this->agents->find($this->clerk, self::BAKERY)['may_read'] ?? null);
+        self::assertSame([5], $this->mayRead());
 
         self::assertSame(422, $this->admin->update($this->as(self::RANA, '{"mayRead":"all"}', 'PATCH'), ['id' => (string) $this->clerk])->getStatusCode());
     }
@@ -418,11 +418,11 @@ final class AgentPauseAndActivityRealEngineTest extends TestCase
 
         // Omar can't read 6, and sends back what the page sent him.
         $this->ok($this->admin->update($this->as(self::OMAR, '{"mayRead":[5,6],"role":"Prepares invoices"}', 'PATCH'), ['id' => (string) $this->clerk]));
-        self::assertSame([5, 6], $this->agents->find($this->clerk, self::BAKERY)['may_read'] ?? null);
+        self::assertSame([5, 6], $this->mayRead());
 
         // He can add what he can read, and remove what he can't.
         $this->ok($this->admin->update($this->as(self::OMAR, '{"mayRead":[5,7]}', 'PATCH'), ['id' => (string) $this->clerk]));
-        self::assertSame([5, 7], $this->agents->find($this->clerk, self::BAKERY)['may_read'] ?? null);
+        self::assertSame([5, 7], $this->mayRead());
 
         // But once removed, he can't put it back.
         self::assertSame(422, $this->admin->update($this->as(self::OMAR, '{"mayRead":[5,6,7]}', 'PATCH'), ['id' => (string) $this->clerk])->getStatusCode());
@@ -525,6 +525,12 @@ final class AgentPauseAndActivityRealEngineTest extends TestCase
     private function action(int $tenantId, string $principal, int $profileId): int
     {
         return $this->actions->record($tenantId, $principal, $profileId, null, 'post_api_documents', [], 'Create a document', ['documents:write'], null, null);
+    }
+
+    /** @return list<int>|null */
+    private function mayRead(): ?array
+    {
+        return $this->agents->find($this->clerk, self::BAKERY)['may_read'] ?? null;
     }
 
     private function lastActive(int $assignmentId): ?string

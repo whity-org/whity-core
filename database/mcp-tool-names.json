@@ -1074,6 +1074,9 @@
   "post_api_documents_id_routes_routeid_actions": {
     "ar": "تمرير مستند أو إقراره أو إرجاعه في مساره"
   },
+  "post_api_documents_id_withdraw": {
+    "ar": "سحب مستند صادر"
+  },
   "post_api_email_domains": {
     "en": "Add an email domain",
     "ar": "إضافة نطاق بريد"
