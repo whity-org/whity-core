@@ -1178,26 +1178,18 @@ $hookManager->listen('navigation.register', function ($data, $context) {
     ];
     $items[] = [
         // WHIT-820: every member may use an agent for themselves, so this is
-        // ungated, like the routes behind it (GET /api/me/agents).
+        // ungated, like the routes behind it (GET /api/me/agents). Everyone's
+        // agents is a tab on this page for agents:manage (design 2.9, A20).
         'id' => 'my-agents',
-        'label' => 'My agents',
+        'label' => 'Agents',
         'href' => '/admin/my-agents',
         'icon' => 'robot',
         'group' => 'ai',
         'order' => 1,
     ];
     $items[] = [
-        'id' => 'agents',
-        'label' => 'Agents',
-        'href' => '/admin/agents',
-        'icon' => 'robot',
-        'group' => 'ai',
-        'order' => 2,
-        'requiredPermission' => \Whity\Core\RBAC\CorePermissions::AGENTS_MANAGE,
-    ];
-    $items[] = [
         'id' => 'ai-principals',
-        'label' => 'AI Principals',
+        'label' => 'Connected AI apps',
         'href' => '/admin/ai-principals',
         'icon' => 'robot',
         'group' => 'ai',
@@ -1209,7 +1201,7 @@ $hookManager->listen('navigation.register', function ($data, $context) {
     ];
     $items[] = [
         'id' => 'mcp-tools',
-        'label' => 'MCP Tools',
+        'label' => 'What AI can do',
         'href' => '/admin/mcp-tools',
         'icon' => 'tools',
         'group' => 'ai',

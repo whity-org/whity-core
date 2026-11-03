@@ -155,12 +155,12 @@ test.describe('Sidebar navigation (admin)', () => {
     await expect(ai).toHaveAttribute('aria-expanded', 'false');
 
     // Present but hidden — the distinction the RBAC specs depend on.
-    await expect(shell.navLink('AI Principals')).toHaveCount(1);
-    await expect(shell.navLink('AI Principals')).toBeHidden();
+    await expect(shell.navLink('Connected AI apps')).toHaveCount(1);
+    await expect(shell.navLink('Connected AI apps')).toBeHidden();
 
     await ai.click();
     await expect(ai).toHaveAttribute('aria-expanded', 'true');
-    await expect(shell.navLink('AI Principals')).toBeVisible();
+    await expect(shell.navLink('Connected AI apps')).toBeVisible();
   });
 
   test('the nav filter reaches a page sitting in a closed group', async ({
@@ -171,11 +171,11 @@ test.describe('Sidebar navigation (admin)', () => {
     await page.goto('/admin/users');
     await expect(page.getByRole('heading', { name: 'Users' })).toBeVisible();
 
-    await expect(shell.navLink('AI Principals')).toBeHidden();
+    await expect(shell.navLink('Connected AI apps')).toBeHidden();
 
-    await shell.navSearch.fill('principals');
+    await shell.navSearch.fill('connected');
     // Reached without knowing which group holds it, and without opening it.
-    await expect(shell.navLink('AI Principals')).toBeVisible();
+    await expect(shell.navLink('Connected AI apps')).toBeVisible();
     // A query narrows to matches, so a non-matching link leaves the DOM.
     await expect(shell.navLink('Users')).toHaveCount(0);
 
