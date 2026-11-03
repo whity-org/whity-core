@@ -64,7 +64,7 @@ export class LoginPage {
     expect(res.status(), 'login should succeed (200)').toBe(200);
     await this.page.waitForURL('**/dashboard', { timeout: 45_000 });
     await expect(
-      this.page.getByRole('heading', { name: 'Welcome back!' })
+      this.page.getByRole('heading', { name: /^Good (morning|afternoon|evening)$/ })
     ).toBeVisible();
   }
 

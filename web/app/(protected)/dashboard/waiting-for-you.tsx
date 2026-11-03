@@ -17,7 +17,7 @@ import { Card } from '@whity/ui/card';
 import { Icon } from '@whity/ui/icon';
 import { AreaError, LoadingRows } from '@whity/ui/page-states';
 import { useFormattingLocale, useTranslation } from '@whity/features/i18n';
-import { parseWireDate } from '@whity/features/datetime';
+import { parseWireDate, useDateDisplay, type RelativeAgeLabels } from '@whity/features/datetime';
 import { useAuth } from '@/lib/auth-context';
 import { useFetch } from '@/hooks/useFetch';
 import { useToast } from '@/lib/toast-context';
@@ -29,7 +29,6 @@ import {
   type InboxListResponse,
   type InboxSourcesResponse,
 } from '@/components/documents/routing-wire';
-import { ago } from './relative-time';
 
 /** At most this many rows show; the rest are "and N more". */
 const MAX_ROWS = 6;
@@ -40,7 +39,8 @@ interface WaitingRow {
   kind: 'proposal' | 'document';
   title: string;
   from: string;
-  when: string | null;
+  /** How long it has waited, in words; null when this workspace hides dates. */
+  waited: string | null;
   proposal?: AgentProposal;
   href?: string;
 }
@@ -48,6 +48,7 @@ interface WaitingRow {
 export function WaitingForYou({ onChange }: { onChange?: () => void }) {
   const t = useTranslation('common');
   const locale = useFormattingLocale();
+  const dates = useDateDisplay();
   const { apiClient } = useAuth();
   const { addToast } = useToast();
   const router = useRouter();
@@ -77,6 +78,12 @@ export function WaitingForYou({ onChange }: { onChange?: () => void }) {
   }, [apiClient]);
 
   const unknownAgent = t('dashboard.agent.unknown', 'An agent');
+  const ageLabels: RelativeAgeLabels = {
+    seconds: (n) => t('dashboard.ago.seconds', '{n} sec ago', { n }),
+    minutes: (n) => t('dashboard.ago.minutes', '{n} min ago', { n }),
+    hours: (n) => t('dashboard.ago.hours', '{n} h ago', { n }),
+    days: (n) => t('dashboard.ago.days', '{n} days ago', { n }),
+  };
   const rows = useMemo<WaitingRow[]>(() => {
     const data = waiting.data;
     if (data === null) return [];
@@ -88,7 +95,7 @@ export function WaitingForYou({ onChange }: { onChange?: () => void }) {
         kind: 'document',
         title: item.title,
         from: item.subtitle ?? '',
-        when: item.timestamp,
+        waited: dates.relative(item.timestamp, ageLabels),
         href: meta === null ? undefined : `/admin/document-routing/${meta.document_id}`,
       };
     });
@@ -98,11 +105,12 @@ export function WaitingForYou({ onChange }: { onChange?: () => void }) {
       kind: 'proposal',
       title: proposal.summary,
       from: (locale === 'ar' && proposal.agent?.nameAr) || proposal.agent?.name || unknownAgent,
-      when: proposal.createdAt,
+      waited: dates.relative(proposal.createdAt, ageLabels),
       proposal,
     }));
     return [...documents, ...agents].sort((a, b) => a.at - b.at);
-  }, [waiting.data, locale, unknownAgent]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [waiting.data, locale, unknownAgent, dates.hidden]);
 
   const undo = async (action: AgentAction) => {
     const response = await apiClient(`/api/v1/me/agent-actions/${action.id}/undo`, {
@@ -234,13 +242,14 @@ export function WaitingForYou({ onChange }: { onChange?: () => void }) {
             <div className="min-w-0 flex-1">
               <p className="font-medium text-foreground">{row.title}</p>
               <p className="text-sm text-muted-foreground">
-                {row.from !== '' && (
-                  <span>
-                    {row.from}
-                    {row.kind === 'proposal' ? ` ${t('dashboard.waiting.forYou', 'for you')}` : ''} ·{' '}
-                  </span>
-                )}
-                {ago(row.when, locale ?? 'en')}
+                {[
+                  row.from !== ''
+                    ? `${row.from}${row.kind === 'proposal' ? ` ${t('dashboard.waiting.forYou', 'for you')}` : ''}`
+                    : null,
+                  row.waited,
+                ]
+                  .filter((part) => part !== null && part !== '')
+                  .join(' · ')}
               </p>
             </div>
             {row.kind === 'proposal' && row.proposal !== undefined ? (
