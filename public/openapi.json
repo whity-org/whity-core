@@ -33645,6 +33645,92 @@
                 ]
             }
         },
+        "/api/v1/plugins/revocations": {
+            "post": {
+                "operationId": "post_api_v1_plugins_revocations",
+                "summary": "Apply a signed revocation list (how an offline install keeps up)",
+                "tags": [
+                    "platform-ops"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Applied",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PluginTrustStatusResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Not the platform operator",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Refused",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/plugins/store/allowed": {
             "get": {
                 "operationId": "get_api_v1_plugins_store_allowed",
@@ -33821,6 +33907,82 @@
                     },
                     "502": {
                         "description": "The store catalogue could not be fetched",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/plugins/trust-status": {
+            "get": {
+                "operationId": "get_api_v1_plugins_trust_status",
+                "summary": "Whether Verified can work here, and how fresh the signed revocation list is",
+                "tags": [
+                    "platform-ops"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Trust status",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PluginTrustStatusResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -60846,6 +61008,41 @@
                                 "purge_failed"
                             ]
                         }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "PluginTrustStatusResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "keys": {
+                                "type": "integer"
+                            },
+                            "sequence": {
+                                "type": "integer",
+                                "nullable": true
+                            },
+                            "issued_at": {
+                                "type": "integer",
+                                "nullable": true
+                            },
+                            "expires_at": {
+                                "type": "integer",
+                                "nullable": true
+                            },
+                            "stale": {
+                                "type": "boolean"
+                            }
+                        },
+                        "required": [
+                            "keys",
+                            "stale"
+                        ]
                     }
                 },
                 "required": [

@@ -16,6 +16,7 @@ use Whity\Core\Plugin\PluginRecords;
 use Whity\Core\Plugin\StoreCatalogueEntry;
 use Whity\Core\Plugin\Tenant\TenantManifestPublisher;
 use Whity\Core\Plugin\Tenant\TenantPluginRepository;
+use Whity\Core\Plugin\Trust\PluginTrust;
 use Whity\Core\Tenant\TenantContext;
 use Whity\Sdk\Manifest\InvalidManifestException;
 use Whity\Core\PluginInstaller;
@@ -77,6 +78,7 @@ final class InstallFromStoreApiHandler
         private readonly ?PluginRecords $records = null,
         private readonly ?TenantManifestPublisher $publisher = null,
         private readonly ?TenantPluginRepository $workspacePlugins = null,
+        private readonly ?PluginTrust $trust = null,
     ) {
         $this->fetchPackage = $fetchPackage ?? static fn (string $url, array $headers): ?string
             => (new HttpFetcher(timeoutSeconds: 15, maxBytes: PluginInstaller::MAX_UPLOAD_BYTES))
@@ -198,9 +200,9 @@ final class InstallFromStoreApiHandler
      *
      * It's a plugin.json, which is data: no publisher code runs anywhere. It goes
      * through the same validation and workspace policy as one written here, so a
-     * store can't reach further than the workspace itself could. Nothing is
-     * Verified yet, so it lands turned off (S.12) and nothing in the manifest or
-     * the catalogue can change that.
+     * store can't reach further than the workspace itself could. It lands turned
+     * off, and only a signed attestation that checks out against a key pinned in
+     * core turns it on (S.12): nothing in the manifest or the catalogue can.
      *
      * @param array<string, string> $params
      */
@@ -269,6 +271,23 @@ final class InstallFromStoreApiHandler
             return Response::error('Failed to install the plugin.', 500);
         }
 
+        $enabled = false;
+        $attestation = $this->fetchAttestation($origin, $slug, $version);
+        if ($attestation !== null && $this->trust !== null) {
+            $verified = $this->trust->grant(
+                $attestation,
+                $published['plugin'],
+                $published['version'],
+                hash('sha256', $bytes),
+                $published['hash'],
+                $actor,
+                $tenantId
+            );
+            if ($verified) {
+                $enabled = $this->workspacePlugins->setEnabled($tenantId, $published['plugin'], true);
+            }
+        }
+
         // S.3: "Allow and continue" is the consent, kept with the person and the list.
         $this->auditLogger?->record('tenant_plugin.installed', [
             'tenant_id' => $tenantId,
@@ -287,8 +306,65 @@ final class InstallFromStoreApiHandler
             'plugin' => $published['plugin'],
             'slug' => \Whity\Sdk\PluginNamespace::slug($published['plugin']),
             'version' => $published['version'],
-            'enabled' => false,
+            'enabled' => $enabled,
         ]], 201);
+    }
+
+    /** The store's signed statement about this version, if it has one. Checked by PluginTrust. */
+    private function fetchAttestation(string $origin, string $slug, string $version): ?string
+    {
+        if ($this->trust === null) {
+            return null;
+        }
+        try {
+            $bytes = ($this->fetchPackage)(
+                $origin . '/api/v1/plugin-store/plugins/' . rawurlencode($slug) . '/versions/' . rawurlencode($version) . '/attestation',
+                []
+            );
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return is_string($bytes) && $bytes !== '' ? $bytes : null;
+    }
+
+    /**
+     * GET /api/plugins/trust-status - whether Verified can work here, and how
+     * fresh the revocation list is (decision 7's banner).
+     *
+     * @param array<string, string> $params
+     */
+    public function trustStatus(Request $request, array $params = []): Response
+    {
+        return Response::json(['data' => $this->trust?->status() ?? [
+            'keys' => 0,
+            'sequence' => null,
+            'issued_at' => null,
+            'expires_at' => null,
+            'stale' => true,
+        ]]);
+    }
+
+    /**
+     * POST /api/plugins/revocations - apply a signed revocation list. How an
+     * offline install keeps up: the signature is what's trusted, not the caller.
+     *
+     * @param array<string, string> $params
+     */
+    public function importRevocations(Request $request, array $params = []): Response
+    {
+        $refusal = PluginOperatorGate::refusal();
+        if ($refusal !== null) {
+            return $refusal;
+        }
+        if ($this->trust === null) {
+            return Response::error('Verification is unavailable', 503);
+        }
+        $result = $this->trust->applyRevocationList($request->getBody());
+
+        return $result['ok']
+            ? Response::json(['data' => $this->trust->status()])
+            : Response::error('This revocation list was refused.', 422, ['reason' => $result['reason']]);
     }
 
     /**

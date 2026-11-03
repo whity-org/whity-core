@@ -1,6 +1,6 @@
 # Verified plugins: security design
 
-Status: **decided by the owner on 3 Nov 2026, except decision 6 (section 9).** The declaration path may be built; nothing can carry the mark until the root key and signing decisions are made. WHIT-871; S7 in `IMPLEMENTATION-NOTES.md`; answers Q2 and Q4.
+Status: **decided by the owner on 3 Nov 2026 (section 9).** Core's verification is built. No public key is pinned yet and no review process exists, so nothing can carry the mark in practice. WHIT-871; S7 in `IMPLEMENTATION-NOTES.md`; answers Q2 and Q4.
 
 ## 1. The recommendation in short
 
@@ -117,6 +117,15 @@ If the signing key is compromised, root signs a statement rejecting that key and
 
 **Don't ship a placeholder.** If the key ceremony hasn't happened when 0.2.25 ships, core ships with no Whity key pinned, and only the operator path can grant a mark.
 
+### What's built now (decision 6)
+
+Sections 5.1 and 5.2 describe the full design. For now, with the owner as the only key holder and reviewer:
+
+- **One key signs both attestations and the revocation list.** There's no separate signing or revocation key yet.
+- **One signature, not two.** The publisher's signature comes with a publisher key registry, which doesn't exist yet.
+- **`TrustedKeys` is empty.** The owner adds the public key in a reviewed change. Until then every check answers `no_keys`.
+- **The operator's grant isn't built,** so Whity's signature is the only source of a mark.
+
 ### 5.3 CSP
 
 The recommended design needs **no CSP change**, because no new script comes in. Separately, the app should gain a nonce-based `script-src` and a tight `connect-src`, since today any injected script is unconstrained (fact 6). That's worth doing for every XSS risk, not only plugins, and needs care with Next's inline runtime.
@@ -212,7 +221,7 @@ Each runs on real Postgres where data is involved, and each must be seen to fail
 | 3 | What an unverified plugin is called | "Not verified", with a plain warning that its code runs on the server once it's on (S.4) |
 | 4 | The frame | Remove the app's cookies for every non-first-party screen as soon as the system can tell them apart, and plan the move to a bridge for embed screens that rely on cookies. **Not done yet:** nothing can tell first party from third until a mark exists |
 | 5 | Code plugin updates | By hand only (S.6) |
-| 6 | Root key holder, key ceremony, who reviews | **Not answered.** No signing or key work starts before this |
+| 6 | Root key holder, key ceremony, who reviews | The owner holds the root key for now, generated and kept on the owner's machine, never in this repository or any session. The owner is the only reviewer until a process exists, so nothing can be marked Verified in practice. Core has only public-key verification and server-side checks |
 | 7 | Offline, stale revocation list | Keeps running Verified plugins, shows a banner, no new activations |
 
 ### The move to a bridge (decision 4)

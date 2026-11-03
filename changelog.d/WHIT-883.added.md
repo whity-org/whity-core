@@ -1,0 +1,1 @@
+- Core can now check a signed statement that a plugin version passed review, using public keys pinned in code, and apply a signed list of withdrawn plugins. No key is pinned yet, so nothing can become Verified.
