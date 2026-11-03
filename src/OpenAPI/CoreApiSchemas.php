@@ -3897,6 +3897,7 @@ final class CoreApiSchemas
         $selfUser = self::object([
             'id' => self::int(),
             'email' => self::str(),
+            'display_name' => self::str(true),
             'role' => self::str(),
         ], ['id', 'email', 'role']);
 
@@ -5519,6 +5520,23 @@ final class CoreApiSchemas
                 'hidden' => ['type' => 'boolean'],
             ], ['key', 'label', 'labelAr', 'hidden']),
             'HomeCardListResponse' => self::listEnvelope('HomeCard'),
+            'RecentDocument' => self::object([
+                'kind' => ['type' => 'string', 'enum' => ['document', 'draft']],
+                'id' => self::int(),
+                'title' => self::str(),
+                'status' => ['type' => 'string', 'enum' => ['with', 'issued', 'draft']],
+                'waitingWith' => self::str(true),
+                'at' => self::str(),
+            ], ['kind', 'id', 'title', 'status', 'waitingWith', 'at']),
+            'RecentDocumentListResponse' => self::listEnvelope('RecentDocument'),
+            'SetupStepsResponse' => self::dataEnvelope(self::object([
+                'steps' => ['type' => 'array', 'items' => self::object([
+                    'key' => ['type' => 'string', 'enum' => ['branding', 'team', 'agent', 'tax', 'plan']],
+                    'done' => ['type' => 'boolean'],
+                ], ['key', 'done'])],
+                'done' => self::int(),
+                'total' => self::int(),
+            ], ['steps', 'done', 'total'])),
             'HomeCardHiddenRequest' => self::object(['hidden' => ['type' => 'boolean']], ['hidden']),
             'HomeCardHiddenResponse' => self::dataEnvelope(self::object([
                 'key' => self::str(),
@@ -11667,6 +11685,35 @@ final class CoreApiSchemas
                     'tags' => ['home'],
                     'responses' => [
                         200 => self::jsonResponse('The cards', 'HomeCardListResponse'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'GET',
+                'path' => '/api/me/recent-documents',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => "The caller's drafts and the documents they sent this week, newest first, at most five",
+                    'tags' => ['home'],
+                    'responses' => [
+                        200 => self::jsonResponse('The rows', 'RecentDocumentListResponse'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'GET',
+                'path' => '/api/me/setup-steps',
+                'requiredRole' => null,
+                'requiredPermission' => 'settings:write',
+                'schema' => [
+                    'summary' => 'What still blocks real work in this workspace: branding, team, an agent, the tax number and a plan',
+                    'description' => 'A step that does not apply is left out, such as a plan on an install with no plans. The system tenant has none.',
+                    'tags' => ['home'],
+                    // A card on a person's home page, with nothing in it an agent needs.
+                    'mcp' => ['expose' => false],
+                    'responses' => [
+                        200 => self::jsonResponse('The steps and how many are done', 'SetupStepsResponse'),
                     ] + self::authErrors(),
                 ],
             ],
