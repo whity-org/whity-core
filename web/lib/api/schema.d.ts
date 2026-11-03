@@ -5243,6 +5243,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/plugins/removed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Plugins kept for 30 days after uninstalling (empty outside the system tenant) */
+        get: operations["get_api_v1_plugins_removed"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/plugins/store/allowed": {
         parameters: {
             query?: never;
@@ -5275,6 +5292,23 @@ export interface paths {
          * @description Server-side proxy to a store's public catalogue for the admin UI. Query: `store_url` (a bare https origin that MUST be on the allowlist) and optional `q` (case-insensitive substring over slug/name/description/author/tags). The browser never contacts the store directly.
          */
         get: operations["get_api_v1_plugins_store_catalog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/plugins/updates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Newer store versions of installed plugins (empty outside the system tenant) */
+        get: operations["get_api_v1_plugins_updates"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5326,7 +5360,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Uninstall a plugin (disable, roll back migrations, remove files) */
+        /** Uninstall a plugin: turned off and kept 30 days, or removed at once with now */
         post: operations["post_api_v1_plugins_id_uninstall"];
         delete?: never;
         options?: never;
@@ -5362,6 +5396,74 @@ export interface paths {
         put?: never;
         /** Enable a plugin by name (applies pending migrations) */
         post: operations["post_api_v1_plugins_name_enable"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/plugins/{name}/reinstall": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restore an uninstalled plugin within its 30 days */
+        post: operations["post_api_v1_plugins_name_reinstall"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/plugins/{name}/update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Fetch the latest version; applies if it asks for no new access, otherwise waits for approval */
+        post: operations["post_api_v1_plugins_name_update"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/plugins/{name}/update/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Accept the new access a waiting update asks for and apply it */
+        post: operations["post_api_v1_plugins_name_update_approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/plugins/{name}/update/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Drop a waiting update and stay on this version */
+        post: operations["post_api_v1_plugins_name_update_reject"];
         delete?: never;
         options?: never;
         head?: never;
@@ -10850,6 +10952,12 @@ export interface components {
             sdk_version: string;
             php_version: string;
         };
+        PluginActionResponse: {
+            data: {
+                message: string;
+                state?: string | null;
+            };
+        };
         PluginEntry: {
             id: string;
             name: string;
@@ -10859,6 +10967,21 @@ export interface components {
             version?: string;
             routes_count?: number;
             permissions_count?: number;
+            /** @enum {string} */
+            trust?: "unverified";
+            install?: {
+                source: string;
+                store_host?: string | null;
+                installed_by?: string | null;
+                installed_at: string;
+                permissions: string[];
+                outside_domains: string[];
+                update_waiting?: {
+                    version: string;
+                    new_permissions: string[];
+                    new_domains: string[];
+                } | null;
+            };
         };
         PluginListMeta: {
             worker_local: boolean;
@@ -10868,6 +10991,41 @@ export interface components {
         PluginListResponse: {
             data: components["schemas"]["PluginEntry"][];
             meta: components["schemas"]["PluginListMeta"];
+        };
+        PluginRemovedResponse: {
+            data: {
+                name: string;
+                version?: string | null;
+                removed_by?: string | null;
+                removed_at: string;
+                purge_after: string;
+                purge_failed: boolean;
+            }[];
+        };
+        PluginUpdateRequest: {
+            /** @description The store access token, when the store requires one to download. */
+            token?: string;
+        };
+        PluginUpdateResponse: {
+            data: {
+                /** @enum {string} */
+                status: "updated" | "waiting_approval" | "rejected";
+                version?: string;
+                state?: string;
+                new_permissions?: string[];
+                new_domains?: string[];
+                worker_restart_required?: boolean;
+            };
+        };
+        PluginUpdatesResponse: {
+            data: {
+                plugin: string;
+                installed_version: string;
+                latest_version: string;
+            }[];
+            meta: {
+                stores_unreachable: number;
+            };
         };
         PluginUploadResponse: {
             data: components["schemas"]["PluginEntry"];
@@ -11492,6 +11650,7 @@ export interface components {
             data: {
                 enabled: boolean;
                 hosts: string[];
+                can_install: boolean;
             };
         };
         StoreCataloguePlugin: {
@@ -11501,6 +11660,30 @@ export interface components {
             author?: string;
             tags?: string[];
             latest_version?: string | null;
+            /** @enum {string} */
+            trust: "unverified";
+            price?: {
+                amount: string;
+                currency: string;
+                interval?: string | null;
+            } | null;
+            used_by?: number | null;
+            updated_at?: string | null;
+            adds?: {
+                screens: number;
+                document_blocks: number;
+                agent_tools: number;
+                fields: number;
+            };
+            permissions?: string[];
+            outside_domains?: string[];
+            languages?: string[];
+            support_url?: string | null;
+            changelog?: {
+                version: string;
+                date?: string | null;
+                notes: string;
+            }[];
         };
         StoreCatalogueResponse: {
             data: components["schemas"]["StoreCataloguePlugin"][];
@@ -39828,6 +40011,71 @@ export interface operations {
             };
         };
     };
+    get_api_v1_plugins_removed: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kept plugins */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginRemovedResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     get_api_v1_plugins_store_allowed: {
         parameters: {
             query?: never;
@@ -39970,6 +40218,71 @@ export interface operations {
             };
             /** @description The store catalogue could not be fetched */
             502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_plugins_updates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Available updates */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginUpdatesResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -40402,6 +40715,314 @@ export interface operations {
                 };
             };
             /** @description Internal error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_plugins_name_reinstall: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Reinstalled */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginActionResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not the platform operator */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_plugins_name_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PluginUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Updated or waiting */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginUpdateResponse"];
+                };
+            };
+            /** @description Invalid package */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not the platform operator */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Up to date or uninstalled */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Incompatible or not newer */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Store unavailable */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_plugins_name_update_approve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginUpdateResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not the platform operator */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Nothing waiting */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_plugins_name_update_reject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Rejected */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginUpdateResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not the platform operator */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Nothing waiting */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
             500: {
                 headers: {
                     [name: string]: unknown;

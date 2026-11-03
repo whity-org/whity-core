@@ -51,7 +51,7 @@ async function uninstallFixture(baseURL: string): Promise<void> {
   try {
     await api
       .post(`/api/v1/plugins/${FIXTURE_PLUGIN_ID}/uninstall`, {
-        data: { force: true },
+        data: { force: true, now: true },
       })
       .catch(() => undefined);
   } finally {
