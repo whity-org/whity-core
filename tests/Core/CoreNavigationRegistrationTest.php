@@ -73,7 +73,7 @@ final class CoreNavigationRegistrationTest extends TestCase
     private const UNGROUPED_ITEM_IDS = ['settings'];
 
     /**
-     * @return array<string, array{group: string|null, order: string}>
+     * @return array<string, array{group: string|null, order: string, systemTenantOnly: bool}>
      */
     private function registrations(): array
     {
