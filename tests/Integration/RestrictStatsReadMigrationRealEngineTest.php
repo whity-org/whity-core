@@ -71,9 +71,6 @@ final class RestrictStatsReadMigrationRealEngineTest extends TestCase
         self::assertTrue($this->holdsStats(self::WORKSPACE_ROLE));
         self::assertTrue($this->holdsStats(self::GLOBAL_ROLE));
         self::assertTrue($this->holdsStats(self::SYSTEM_TENANT_ROLE));
-        $description = $this->pdo->prepare('SELECT description FROM permissions WHERE name = ?');
-        $description->execute([CorePermissions::STATS_READ]);
-        self::assertStringContainsString('for the current tenant', (string) $description->fetchColumn());
     }
 
     private function db(): Database

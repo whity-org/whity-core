@@ -36,20 +36,12 @@ use Whity\Database\Database;
  * loses anything. Nobody gains anything.
  *
  * Idempotent and reversible. down() gives the slug back to the audience 157 chose
- * among workspace-owned roles, and restores the description.
+ * among workspace-owned roles. The description lives in CorePermissionDescriptions.
  */
 final class RestrictStatsReadToOperators
 {
-    private const DESCRIPTION = 'Read the server statistics. Only takes effect in the system tenant';
-
-    private const PREVIOUS_DESCRIPTION = 'Read the admin dashboard aggregates for the current tenant (counts, role breakdown, trends)';
-
     public static function up(Database $db): void
     {
-        $db->query(
-            'UPDATE permissions SET description = :description WHERE name = :name',
-            [':description' => self::DESCRIPTION, ':name' => CorePermissions::STATS_READ]
-        );
         $db->query(
             'DELETE FROM role_permissions
               WHERE permission_id IN (SELECT id FROM permissions WHERE name = :name)
@@ -60,10 +52,6 @@ final class RestrictStatsReadToOperators
 
     public static function down(Database $db): void
     {
-        $db->query(
-            'UPDATE permissions SET description = :description WHERE name = :name',
-            [':description' => self::PREVIOUS_DESCRIPTION, ':name' => CorePermissions::STATS_READ]
-        );
         $db->query(
             'INSERT INTO role_permissions (role_id, permission_id, created_at)
              SELECT holder.role_id, stats.id, NOW()
