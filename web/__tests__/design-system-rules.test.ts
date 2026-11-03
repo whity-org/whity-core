@@ -134,7 +134,6 @@ describe('ease of use (A.1)', () => {
     'web/app/(protected)/admin/settings/email-domains/page.tsx',
     'web/app/(protected)/admin/settings/settings-shared.tsx',
     'web/app/(protected)/admin/settings/sso/page.tsx',
-    'web/components/forms/form-fields.tsx',
   ];
 
   const relative = (f: string) => path.relative(ROOT, f).split(path.sep).join('/');
