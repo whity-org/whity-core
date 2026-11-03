@@ -12,6 +12,8 @@ use Whity\Core\Exception\PluginNameUnsafe;
 use Whity\Core\Exception\PluginPackageInvalid;
 use Whity\Core\Http\HttpFetcher;
 use Whity\Core\Plugin\PluginOperatorGate;
+use Whity\Core\Plugin\PluginRecords;
+use Whity\Core\Plugin\StoreCatalogueEntry;
 use Whity\Core\PluginInstaller;
 use Whity\Core\PluginLoader;
 use Whity\Core\Request;
@@ -68,6 +70,7 @@ final class InstallFromStoreApiHandler
         private readonly ?AuditLogger $auditLogger = null,
         ?\Closure $fetchPackage = null,
         ?\Closure $fetchJson = null,
+        private readonly ?PluginRecords $records = null,
     ) {
         $this->fetchPackage = $fetchPackage ?? static fn (string $url, array $headers): ?string
             => (new HttpFetcher(timeoutSeconds: 15, maxBytes: PluginInstaller::MAX_UPLOAD_BYTES))
@@ -134,6 +137,9 @@ final class InstallFromStoreApiHandler
             return Response::error('The store rejected the request or the package was not found.', 502);
         }
 
+        // What the store says it reaches, for the consent record. Display data only.
+        $listed = $this->records !== null ? $this->catalogueEntry((string) $origin, $slug) : null;
+
         // ── Install via the hardened pipeline (bytes never trusted) ───────────
         $installer = new PluginInstaller($this->pluginDir, $this->pluginLoader, $this->auditLogger);
         try {
@@ -149,7 +155,338 @@ final class InstallFromStoreApiHandler
             return Response::error('Failed to install the plugin.', 500);
         }
 
+        $inspected = $installer->lastInspected();
+        if ($inspected !== null && $this->records !== null) {
+            $domains = StoreCatalogueEntry::domains($listed['outside_domains'] ?? null);
+            $this->records->recordInstall(
+                $inspected['name'],
+                'store',
+                (string) parse_url((string) $origin, PHP_URL_HOST),
+                $slug,
+                $inspected['version'],
+                $inspected['sha256'],
+                $inspected['permissions'],
+                $domains,
+                PluginOperatorGate::actorProfile($request)
+            );
+            // S.3: "Allow and continue" is the consent, kept with the person and the list.
+            $this->auditLogger?->record('plugin.installed', [
+                'target_type' => 'plugin',
+                'metadata' => [
+                    'plugin' => $inspected['name'],
+                    'version' => $inspected['version'],
+                    'sha256' => $inspected['sha256'],
+                    'store' => $origin,
+                    'permissions' => $inspected['permissions'],
+                    'outside_domains' => $domains,
+                ],
+            ]);
+        }
+
         return Response::json(['data' => $entry], 201);
+    }
+
+    /**
+     * GET /api/plugins/updates - newer versions of store-installed plugins, and
+     * updates waiting for approval. An operator's list; a workspace gets none.
+     *
+     * @param array<string, string> $params
+     */
+    public function availableUpdates(Request $request, array $params = []): Response
+    {
+        if ($this->records === null || !PluginOperatorGate::isOperator()) {
+            return Response::json(['data' => [], 'meta' => ['stores_unreachable' => 0]]);
+        }
+
+        $catalogues = [];
+        $unreachable = [];
+        $updates = [];
+        foreach ($this->records->installs() as $name => $install) {
+            if (($install['source'] ?? null) !== 'store' || !is_string($install['store_host'] ?? null)) {
+                continue;
+            }
+            $host = $install['store_host'];
+            if (!array_key_exists($host, $catalogues)) {
+                $catalogues[$host] = $this->catalogue('https://' . $host);
+                if ($catalogues[$host] === null) {
+                    $unreachable[$host] = true;
+                }
+            }
+            $listed = null;
+            foreach ($catalogues[$host] ?? [] as $entry) {
+                if ($entry['slug'] === ($install['store_slug'] ?? null)) {
+                    $listed = $entry;
+                }
+            }
+            $latest = is_string($listed['latest_version'] ?? null) ? $listed['latest_version'] : null;
+            if ($latest !== null && version_compare($latest, (string) $install['version'], '>')) {
+                $updates[] = [
+                    'plugin' => (string) $name,
+                    'installed_version' => (string) $install['version'],
+                    'latest_version' => $latest,
+                ];
+            }
+        }
+
+        return Response::json(['data' => $updates, 'meta' => ['stores_unreachable' => count($unreachable)]]);
+    }
+
+    /**
+     * POST /api/plugins/{name}/update {token?} - fetch the store's latest version.
+     *
+     * Nothing updates by itself: this is a person asking for it, because an update
+     * is new code on the server. The package goes through the same checks as an
+     * install and waits beside the old version. With no new access it applies
+     * straight away. With new permissions or outside domains it waits for approval,
+     * and the old version keeps running (S.6).
+     *
+     * @param array<string, string> $params
+     */
+    public function update(Request $request, array $params): Response
+    {
+        $refusal = PluginOperatorGate::refusal();
+        if ($refusal !== null) {
+            return $refusal;
+        }
+
+        $name = $params['name'] ?? '';
+        $install = $this->records?->install($name);
+        if ($this->records === null || $install === null) {
+            return Response::error('Plugin not found', 404);
+        }
+        if ($install['source'] !== 'store' || !is_string($install['store_host']) || !is_string($install['store_slug'])) {
+            return Response::error('This plugin was not installed from a store.', 422);
+        }
+        if ($this->records->removal($name) !== null) {
+            return Response::error('This plugin was uninstalled. Reinstall it first.', 409);
+        }
+
+        [$origin, $originError] = $this->resolveStoreOrigin('https://' . $install['store_host']);
+        if ($originError !== null) {
+            return $originError;
+        }
+
+        $listed = $this->catalogueEntry((string) $origin, $install['store_slug']);
+        $latest = is_string($listed['latest_version'] ?? null) ? $listed['latest_version'] : null;
+        if ($latest === null) {
+            return Response::error('The store has no version of this plugin.', 502);
+        }
+        if (preg_match('/^[A-Za-z0-9][A-Za-z0-9.+_-]{0,63}$/', $latest) !== 1) {
+            return Response::error('Invalid version.', 502);
+        }
+        if (!version_compare($latest, (string) $install['version'], '>')) {
+            return Response::error('This plugin is up to date.', 409);
+        }
+
+        $body = json_decode($request->getBody(), true);
+        $token = is_array($body) ? (string) ($body['token'] ?? '') : '';
+        $headers = $token !== '' ? ['Authorization' => 'Bearer ' . $token] : [];
+        $downloadUrl = $origin
+            . '/api/v1/plugin-store/plugins/' . rawurlencode($install['store_slug'])
+            . '/versions/' . rawurlencode($latest) . '/download';
+
+        try {
+            $bytes = ($this->fetchPackage)($downloadUrl, $headers);
+        } catch (\Throwable $e) {
+            error_log('[InstallFromStore] update fetch refused/failed: ' . $e->getMessage());
+            return Response::error('The store package could not be fetched.', 502);
+        }
+        if ($bytes === null || $bytes === '') {
+            return Response::error('The store rejected the request or the package was not found.', 502);
+        }
+
+        $installer = new PluginInstaller($this->pluginDir, $this->pluginLoader, $this->auditLogger);
+        try {
+            $staged = $installer->stageUpdate($bytes, $name);
+        } catch (PluginPackageInvalid | PluginNameUnsafe | PluginExtractionUnsafe $e) {
+            return Response::error($e->clientMessage(), 400, $e->clientDetails());
+        } catch (PluginIncompatible $e) {
+            return Response::error($e->clientMessage(), 422, $e->clientDetails());
+        } catch (\Throwable $e) {
+            error_log('[InstallFromStore] update failed: ' . $e->getMessage());
+            return Response::error('The update could not be prepared.', 500);
+        }
+
+        // The package decides what version it is, not the catalogue, and it may
+        // never take a plugin backwards.
+        if (!version_compare($staged['version'], (string) $install['version'], '>')) {
+            $installer->discardStagedUpdate($name);
+            return Response::error('The package is not newer than what is installed.', 422);
+        }
+
+        $domains = StoreCatalogueEntry::domains($listed['outside_domains'] ?? null);
+        $newPermissions = array_values(array_diff($staged['permissions'], PluginRecords::decodeList($install['permissions'])));
+        $newDomains = array_values(array_diff($domains, PluginRecords::decodeList($install['outside_domains'])));
+
+        if ($newPermissions !== [] || $newDomains !== []) {
+            $this->records->setPending($name, $staged['version'], $staged['sha256'], $staged['permissions'], $domains);
+            $this->auditLogger?->record('plugin.update.waiting', [
+                'target_type' => 'plugin',
+                'metadata' => [
+                    'plugin' => $name,
+                    'from' => $install['version'],
+                    'to' => $staged['version'],
+                    'new_permissions' => $newPermissions,
+                    'new_domains' => $newDomains,
+                ],
+            ]);
+
+            return Response::json(['data' => [
+                'status' => 'waiting_approval',
+                'version' => $staged['version'],
+                'new_permissions' => $newPermissions,
+                'new_domains' => $newDomains,
+            ]]);
+        }
+
+        return $this->applyUpdate($installer, $name, $install, $staged['version'], $staged['sha256'], $staged['permissions'], $domains);
+    }
+
+    /**
+     * POST /api/plugins/{name}/update/approve - accept the waiting update's new access.
+     *
+     * @param array<string, string> $params
+     */
+    public function approveUpdate(Request $request, array $params): Response
+    {
+        $refusal = PluginOperatorGate::refusal();
+        if ($refusal !== null) {
+            return $refusal;
+        }
+
+        $name = $params['name'] ?? '';
+        $install = $this->records?->install($name);
+        if ($this->records === null || $install === null || !is_string($install['pending_version'] ?? null)) {
+            return Response::error('No update is waiting for this plugin.', 404);
+        }
+
+        return $this->applyUpdate(
+            new PluginInstaller($this->pluginDir, $this->pluginLoader, $this->auditLogger),
+            $name,
+            $install,
+            $install['pending_version'],
+            is_string($install['pending_sha256'] ?? null) ? $install['pending_sha256'] : null,
+            PluginRecords::decodeList($install['pending_permissions'] ?? null),
+            PluginRecords::decodeList($install['pending_domains'] ?? null),
+        );
+    }
+
+    /**
+     * POST /api/plugins/{name}/update/reject - drop the waiting update and stay on this version.
+     *
+     * @param array<string, string> $params
+     */
+    public function rejectUpdate(Request $request, array $params): Response
+    {
+        $refusal = PluginOperatorGate::refusal();
+        if ($refusal !== null) {
+            return $refusal;
+        }
+
+        $name = $params['name'] ?? '';
+        $install = $this->records?->install($name);
+        if ($this->records === null || $install === null || !is_string($install['pending_version'] ?? null)) {
+            return Response::error('No update is waiting for this plugin.', 404);
+        }
+
+        (new PluginInstaller($this->pluginDir, $this->pluginLoader, $this->auditLogger))->discardStagedUpdate($name);
+        $this->records->clearPending($name);
+        $this->auditLogger?->record('plugin.update.rejected', [
+            'target_type' => 'plugin',
+            'metadata' => ['plugin' => $name, 'version' => $install['pending_version']],
+        ]);
+
+        return Response::json(['data' => ['status' => 'rejected']]);
+    }
+
+    /**
+     * Swap in the staged version, which lands turned off (see
+     * {@see PluginInstaller::applyStagedUpdate()}), and record it.
+     *
+     * @param array<string, mixed> $install
+     * @param list<string> $permissions
+     * @param list<string> $domains
+     */
+    private function applyUpdate(
+        PluginInstaller $installer,
+        string $name,
+        array $install,
+        string $version,
+        ?string $sha256,
+        array $permissions,
+        array $domains,
+    ): Response {
+        $loader = $this->pluginLoader;
+        try {
+            if ($loader !== null) {
+                foreach ($loader->getPluginMetadata() as $meta) {
+                    if ($meta['name'] === $name) {
+                        $loader->disablePlugin($meta['id']);
+                    }
+                }
+            }
+            $installer->applyStagedUpdate($name);
+        } catch (PluginPackageInvalid $e) {
+            return Response::error($e->clientMessage(), 409, $e->clientDetails());
+        } catch (\Throwable $e) {
+            error_log('[InstallFromStore] update apply failed: ' . $e->getMessage());
+            return Response::error('The update could not be applied.', 500);
+        }
+
+        $this->records?->recordUpdated($name, $version, $sha256, $permissions, $domains);
+        $this->auditLogger?->record('plugin.updated', [
+            'target_type' => 'plugin',
+            'metadata' => [
+                'plugin' => $name,
+                'from' => $install['version'],
+                'to' => $version,
+                'sha256' => $sha256,
+                'permissions' => $permissions,
+                'outside_domains' => $domains,
+            ],
+        ]);
+
+        return Response::json(['data' => [
+            'status' => 'updated',
+            'version' => $version,
+            'state' => 'disabled',
+            'worker_restart_required' => $loader?->isWorkerRecyclePending() ?? false,
+        ]]);
+    }
+
+    /**
+     * A store's catalogue, normalised, or null when it can't be read.
+     *
+     * @return list<array<string, mixed>>|null
+     */
+    private function catalogue(string $origin): ?array
+    {
+        try {
+            $payload = ($this->fetchJson)($origin . '/api/v1/plugin-store/plugins');
+        } catch (\Throwable $e) {
+            error_log('[StoreBrowse] catalogue fetch refused/failed: ' . $e->getMessage());
+            return null;
+        }
+        if (!is_array($payload) || !isset($payload['data']) || !is_array($payload['data'])) {
+            return null;
+        }
+
+        return array_values(array_filter(array_map(
+            static fn (mixed $raw): ?array => is_array($raw) ? StoreCatalogueEntry::normalize($raw) : null,
+            $payload['data']
+        )));
+    }
+
+    /** @return array<string, mixed>|null */
+    private function catalogueEntry(string $origin, string $slug): ?array
+    {
+        foreach ($this->catalogue($origin) ?? [] as $entry) {
+            if ($entry['slug'] === $slug) {
+                return $entry;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -170,6 +507,9 @@ final class InstallFromStoreApiHandler
                 // one clear signal regardless of which gate is actually closed.
                 'enabled' => $this->storeEnabled() && $hosts !== [],
                 'hosts' => $hosts,
+                // WHIT-869: whether this caller's tenant may install at all. The
+                // page combines it with the plugins:install permission.
+                'can_install' => PluginOperatorGate::isOperator(),
             ],
         ]);
     }
@@ -230,6 +570,9 @@ final class InstallFromStoreApiHandler
                 static fn (array $p): bool => self::matchesSearch($p, $search)
             ));
         }
+
+        // A store's fields are display data; only checked ones go on (StoreCatalogueEntry).
+        $plugins = array_values(array_filter(array_map(StoreCatalogueEntry::normalize(...), $plugins)));
 
         return Response::json([
             'data' => $plugins,

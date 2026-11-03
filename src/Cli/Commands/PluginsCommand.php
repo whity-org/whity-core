@@ -167,10 +167,13 @@ class PluginsCommand extends BaseCommand implements CliCommand
         $id = null;
         $dryRun = false;
         $force = false;
+        $now = false;
 
         foreach ($argv as $arg) {
             if ($arg === '--dry-run') {
                 $dryRun = true;
+            } elseif ($arg === '--now') {
+                $now = true;
             } elseif ($arg === '--force') {
                 $force = true;
             } elseif ($id === null && !str_starts_with($arg, '--')) {
@@ -184,7 +187,7 @@ class PluginsCommand extends BaseCommand implements CliCommand
             return 1;
         }
 
-        $body = ['dry_run' => $dryRun, 'force' => $force];
+        $body = ['dry_run' => $dryRun, 'force' => $force, 'now' => $now];
         $response = $this->callApi('POST', "/api/plugins/{$id}/uninstall", $body);
         $statusCode = $response->getStatusCode();
         $payload = json_decode($response->getBody(), true);
@@ -246,7 +249,7 @@ class PluginsCommand extends BaseCommand implements CliCommand
         echo "  enable <id>                           Enable a plugin\n";
         echo "  disable <id>                          Disable a plugin\n";
         echo "  reload                                Reload discovered plugins\n";
-        echo "  uninstall <id> [--dry-run] [--force]  Uninstall a plugin\n";
+        echo "  uninstall <id> [--dry-run] [--now] [--force]  Uninstall a plugin, kept 30 days unless --now\n";
         return 0;
     }
 

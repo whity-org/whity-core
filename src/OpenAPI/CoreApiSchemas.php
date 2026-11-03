@@ -3157,7 +3157,7 @@ final class CoreApiSchemas
                 ],
             ]),
             self::permissionRoute('POST', '/api/plugins/{id}/uninstall', 'plugins:uninstall', [
-                'summary' => 'Uninstall a plugin (disable, roll back migrations, remove files)',
+                'summary' => 'Uninstall a plugin: turned off and kept 30 days, or removed at once with now',
                 'tags' => ['platform-ops'],
                 'responses' => [
                     200 => self::jsonResponse('Plugin uninstalled', 'SimpleMessageResponse'),
@@ -3168,6 +3168,61 @@ final class CoreApiSchemas
                     503 => self::errorResponse('Database connection unavailable'),
                 ],
             ]),
+            self::permissionRoute('GET', '/api/plugins/removed', 'plugins:read', [
+                'summary' => 'Plugins kept for 30 days after uninstalling (empty outside the system tenant)',
+                'tags' => ['platform-ops'],
+                'responses' => [
+                    200 => self::jsonResponse('Kept plugins', 'PluginRemovedResponse'),
+                ],
+            ]),
+            self::permissionRoute('POST', '/api/plugins/{name}/reinstall', 'plugins:install', [
+                'summary' => 'Restore an uninstalled plugin within its 30 days',
+                'tags' => ['platform-ops'],
+                'responses' => [
+                    200 => self::jsonResponse('Reinstalled', 'PluginActionResponse'),
+                    403 => self::errorResponse('Not the platform operator'),
+                    404 => self::errorResponse('Not found'),
+                ],
+            ]),
+            self::permissionRoute('GET', '/api/plugins/updates', 'plugins:read', [
+                'summary' => 'Newer store versions of installed plugins (empty outside the system tenant)',
+                'tags' => ['platform-ops'],
+                'responses' => [
+                    200 => self::jsonResponse('Available updates', 'PluginUpdatesResponse'),
+                ],
+            ]),
+            self::permissionRoute('POST', '/api/plugins/{name}/update', 'plugins:install', [
+                'summary' => 'Fetch the latest version; applies if it asks for no new access, otherwise waits for approval',
+                'tags' => ['platform-ops'],
+                'request' => 'PluginUpdateRequest',
+                'responses' => [
+                    200 => self::jsonResponse('Updated or waiting', 'PluginUpdateResponse'),
+                    400 => self::errorResponse('Invalid package'),
+                    403 => self::errorResponse('Not the platform operator'),
+                    404 => self::errorResponse('Not found'),
+                    409 => self::errorResponse('Up to date or uninstalled'),
+                    422 => self::errorResponse('Incompatible or not newer'),
+                    502 => self::errorResponse('Store unavailable'),
+                ],
+            ]),
+            self::permissionRoute('POST', '/api/plugins/{name}/update/approve', 'plugins:install', [
+                'summary' => 'Accept the new access a waiting update asks for and apply it',
+                'tags' => ['platform-ops'],
+                'responses' => [
+                    200 => self::jsonResponse('Updated', 'PluginUpdateResponse'),
+                    403 => self::errorResponse('Not the platform operator'),
+                    404 => self::errorResponse('Nothing waiting'),
+                ],
+            ]),
+            self::permissionRoute('POST', '/api/plugins/{name}/update/reject', 'plugins:install', [
+                'summary' => 'Drop a waiting update and stay on this version',
+                'tags' => ['platform-ops'],
+                'responses' => [
+                    200 => self::jsonResponse('Rejected', 'PluginUpdateResponse'),
+                    403 => self::errorResponse('Not the platform operator'),
+                    404 => self::errorResponse('Nothing waiting'),
+                ],
+            ]),
             self::permissionRoute('POST', '/api/plugins/reload', 'plugins:reload', [
                 'summary' => 'Reload the plugin registry',
                 'tags' => ['platform-ops'],
@@ -3176,7 +3231,7 @@ final class CoreApiSchemas
                     500 => self::errorResponse('Internal error'),
                 ],
             ]),
-            self::permissionRoute('POST', '/api/plugins/install-from-store', 'plugins:upload', [
+            self::permissionRoute('POST', '/api/plugins/install-from-store', 'plugins:install', [
                 'summary' => 'Fetch a package from a trusted plugin store and stage it (lands disabled)',
                 'description' => 'Downloads a plugin package from a store host that MUST be on the '
                     . 'operator `plugins.store_allowed_hosts` allowlist (SSRF control; empty ⇒ disabled), '
@@ -4098,7 +4153,8 @@ final class CoreApiSchemas
                 'data' => self::object([
                     'enabled' => self::bool(),
                     'hosts' => ['type' => 'array', 'items' => ['type' => 'string']],
-                ], ['enabled', 'hosts']),
+                    'can_install' => self::bool(),
+                ], ['enabled', 'hosts', 'can_install']),
             ], ['data']),
 
             // GET /api/plugins/store/catalog — a store's public catalogue entry.
@@ -4109,7 +4165,31 @@ final class CoreApiSchemas
                 'author' => self::str(),
                 'tags' => ['type' => 'array', 'items' => ['type' => 'string']],
                 'latest_version' => self::str(true),
-            ], ['slug', 'name']),
+                // S.4. Always `unverified` until the Verified design is approved; a store can't set it.
+                'trust' => ['type' => 'string', 'enum' => ['unverified']],
+                'price' => array_merge(self::object([
+                    'amount' => self::str(),
+                    'currency' => self::str(),
+                    'interval' => self::str(true),
+                ], ['amount', 'currency']), ['nullable' => true]),
+                'used_by' => ['type' => 'integer', 'nullable' => true],
+                'updated_at' => self::str(true),
+                'adds' => self::object([
+                    'screens' => self::int(),
+                    'document_blocks' => self::int(),
+                    'agent_tools' => self::int(),
+                    'fields' => self::int(),
+                ], ['screens', 'document_blocks', 'agent_tools', 'fields']),
+                'permissions' => ['type' => 'array', 'items' => ['type' => 'string']],
+                'outside_domains' => ['type' => 'array', 'items' => ['type' => 'string']],
+                'languages' => ['type' => 'array', 'items' => ['type' => 'string']],
+                'support_url' => self::str(true),
+                'changelog' => ['type' => 'array', 'items' => self::object([
+                    'version' => self::str(),
+                    'date' => self::str(true),
+                    'notes' => self::str(),
+                ], ['version', 'notes'])],
+            ], ['slug', 'name', 'trust']),
             'StoreCatalogueResponse' => self::object([
                 'data' => ['type' => 'array', 'items' => ['$ref' => '#/components/schemas/StoreCataloguePlugin']],
                 'store_url' => self::str(),
@@ -8728,7 +8808,59 @@ final class CoreApiSchemas
                 'version' => self::str(),
                 'routes_count' => self::int(),
                 'permissions_count' => self::int(),
+                'trust' => ['type' => 'string', 'enum' => ['unverified']],
+                // Operators only.
+                'install' => self::object([
+                    'source' => self::str(),
+                    'store_host' => self::str(true),
+                    'installed_by' => self::str(true),
+                    'installed_at' => self::str(),
+                    'permissions' => ['type' => 'array', 'items' => ['type' => 'string']],
+                    'outside_domains' => ['type' => 'array', 'items' => ['type' => 'string']],
+                    'update_waiting' => array_merge(self::object([
+                        'version' => self::str(),
+                        'new_permissions' => ['type' => 'array', 'items' => ['type' => 'string']],
+                        'new_domains' => ['type' => 'array', 'items' => ['type' => 'string']],
+                    ], ['version', 'new_permissions', 'new_domains']), ['nullable' => true]),
+                ], ['source', 'installed_at', 'permissions', 'outside_domains']),
             ], ['id', 'name', 'enabled', 'file']),
+            'PluginRemovedResponse' => self::object([
+                'data' => ['type' => 'array', 'items' => self::object([
+                    'name' => self::str(),
+                    'version' => self::str(true),
+                    'removed_by' => self::str(true),
+                    'removed_at' => self::str(),
+                    'purge_after' => self::str(),
+                    'purge_failed' => self::bool(),
+                ], ['name', 'removed_at', 'purge_after', 'purge_failed'])],
+            ], ['data']),
+            'PluginActionResponse' => self::object([
+                'data' => self::object([
+                    'message' => self::str(),
+                    'state' => self::str(true),
+                ], ['message']),
+            ], ['data']),
+            'PluginUpdatesResponse' => self::object([
+                'data' => ['type' => 'array', 'items' => self::object([
+                    'plugin' => self::str(),
+                    'installed_version' => self::str(),
+                    'latest_version' => self::str(),
+                ], ['plugin', 'installed_version', 'latest_version'])],
+                'meta' => self::object(['stores_unreachable' => self::int()], ['stores_unreachable']),
+            ], ['data', 'meta']),
+            'PluginUpdateRequest' => self::object([
+                'token' => array_merge(self::str(), ['description' => 'The store access token, when the store requires one to download.']),
+            ], []),
+            'PluginUpdateResponse' => self::object([
+                'data' => self::object([
+                    'status' => ['type' => 'string', 'enum' => ['updated', 'waiting_approval', 'rejected']],
+                    'version' => self::str(),
+                    'state' => self::str(),
+                    'new_permissions' => ['type' => 'array', 'items' => ['type' => 'string']],
+                    'new_domains' => ['type' => 'array', 'items' => ['type' => 'string']],
+                    'worker_restart_required' => self::bool(),
+                ], ['status']),
+            ], ['data']),
             // WC-210: the list carries a typed propagation/staleness indicator so
             // clients know the per-plugin state is worker-local and admin changes
             // converge across workers on reload/restart.

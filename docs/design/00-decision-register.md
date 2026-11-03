@@ -354,7 +354,7 @@ A Notion-, Gutenberg- and Google Docs–inspired editor for whity-core's Documen
 | E.14 | Callouts | Two kinds: Note (grey) and Important (warning tint), so the success and error colours keep meaning state. |
 | E.15 | Tables | Document tables: rows, columns, a header row, end-aligned numbers. Data stays in records and comes in as a Record or Chart block; no databases inside documents. |
 | E.16 | Live values | Record and Chart blocks are live in the editor; each PDF freezes the values at the moment Whity Render made it. |
-| E.17 | Plugin blocks: rendering | Plugins can add their own blocks. Verified and first-party plugins render natively with the Whity SDK components; others run in a sandboxed frame with the same UI kit, sized by the editor. |
+| E.17 | Plugin blocks: rendering | Plugins can add their own blocks. A Verified plugin is a signed declaration, drawn with the Whity SDK components by Whity's block renderer; publishers' own JavaScript never runs in the app. Other screens run in a sandboxed frame, sized by the editor. Security: `VERIFIED-PLUGINS-SECURITY.md`. |
 | E.18 | Plugin blocks: printing | A plugin block needs a print view for Whity Render to be used in templates or anything that prints; without one it's available in notes and wiki pages only. |
 | E.19 | Plugin blocks: plugin off | The block shows a placeholder ("Needs the Delivery Tracker plugin", with Enable for admins), its data stays in the document, and a template that contains it can't be published. |
 | E.20 | Plugin blocks: inserting | A group per plugin in the / menu and + inserter, with its name and logo, after Whity's own blocks; searchable like the rest. |
@@ -393,18 +393,18 @@ The pages where a workspace finds, installs and manages plugins (A41). Guideline
 
 | # | Decision | Locked value |
 | --- | --- | --- |
-| S.1 | Where | In the app first: inside each workspace (A41, `/admin/plugins/store`), installing into that workspace. A public marketplace site reuses the same pages later. |
+| S.1 | Where | In the app first (A41, `/admin/plugins/store`). A workspace installs declarative plugins into that workspace. A code plugin is install-wide, for the whole deployment, and only an operator installs it. A public marketplace site reuses the same pages later. |
 | S.2 | Billing | Paid plugins are billed through Whity: one invoice from Whity, which takes the marketplace cut and pays publishers. Prices show as `[price]` until decided. |
-| S.3 | Who installs | Anyone whose role has the `plugins:install` permission (S.9). Agents can't install directly; with "Ask first" it becomes a proposal like any other action (7.5). |
-| S.4 | Trust | Verified and By Whity badges, the permissions a plugin asks for, "used by N workspaces" and its last update. No ratings or reviews until there are enough installs for them to mean something. |
+| S.3 | Who installs | Declarative plugins: anyone in the workspace whose role has `plugins:install` (S.9). Code plugins: operators only, from the system tenant. Agents can't install directly; with "Ask first" it becomes a proposal like any other action (7.5). |
+| S.4 | Trust | Verified and By Whity badges, the permissions a plugin asks for, "used by N workspaces" and its last update. Everything else is labelled Not verified, with a plain warning that its code runs on the server once it's on. No ratings or reviews until there are enough installs for them to mean something. |
 | S.5 | Agent tools on install | Every tool a plugin adds starts on Ask first; read-only tools may start Allowed. An admin changes modes afterwards in MCP tools, like any other tool. |
-| S.6 | Updates | Updates install automatically. An update that asks for new permissions or new outside domains waits for an admin's approval, and the old version keeps running meanwhile. Every update is in the audit log. |
+| S.6 | Updates | A Verified declarative plugin's update installs automatically; one that asks for new permissions or new outside domains waits for an admin's approval, and the old version keeps running meanwhile. A code plugin only ever updates by hand. Every update is in the audit log. |
 | S.7 | Uninstall | The plugin's data is kept 30 days; reinstalling in that time restores everything, then it is deleted. Its blocks show the plugin-off placeholder (E.20) meanwhile. |
 | S.8 | Trials | A paid plugin may offer a free trial; the publisher sets the length. Billing starts when it ends, with a reminder before it does. |
-| S.9 | Install and upload | Two permissions: `plugins:install` installs from the store; `plugins:upload` (operators) uploads a .zip of unreviewed code. `plugins:read` sees the pages. Decided 2 Nov 2026 against the built app. |
+| S.9 | Install and upload | Two permissions: `plugins:install` installs from the store (declarative plugins in a workspace; code plugins only in the system tenant, S.3); `plugins:upload` (operators) uploads a .zip of unreviewed code. `plugins:read` sees the pages. Decided 2 Nov 2026 against the built app; narrowed 3 Nov. |
 | S.10 | Sidebar | One sidebar item, Plugins. Its page has two tabs, Store and Installed, which keep their own routes (`/admin/plugins/store`, `/admin/plugins`). |
 | S.11 | Operator tools | Upload plugin and Reload plugins sit in a ⋯ menu on the Installed tab, for `plugins:upload`. Store sources and their access tokens move to Settings › Advanced. A failed plugin's error and stack trace are in its details drawer, collapsed. |
-| S.12 | State after install | Verified and By Whity plugins are active once installed (the Access step is the consent). Sandboxed plugins install turned off, with Turn on on the Done step. |
+| S.12 | State after install | Verified declarative and By Whity plugins are active once installed (the Access step is the consent). Anything Not verified installs turned off, with Turn on on the Done step. |
 
 Values set while drawing, open to change:
 - Third-party plugins are named for their job, "[Job] for Whity" or a plain name. Names starting with "Whity" are kept for first-party products.
