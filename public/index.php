@@ -3829,6 +3829,9 @@ $router->register('GET', '/api/forms/{id:\d+}/render', [$formsHandler, 'render']
 // body that meant to fix a typo, and the audit must read it as an act.
 $router->register('POST', '/api/forms/{id:\d+}/public-link', [$formsHandler, 'enablePublicLink'], null, null, CorePermissions::FORMS_MANAGE);
 $router->register('DELETE', '/api/forms/{id:\d+}/public-link', [$formsHandler, 'disablePublicLink'], null, null, CorePermissions::FORMS_MANAGE);
+// Opening a form to the workspace's members is authoring, for the same reason.
+$router->register('POST', '/api/forms/{id:\d+}/member-access', [$formsHandler, 'openToMembers'], null, null, CorePermissions::FORMS_MANAGE);
+$router->register('DELETE', '/api/forms/{id:\d+}/member-access', [$formsHandler, 'closeToMembers'], null, null, CorePermissions::FORMS_MANAGE);
 
 $formFieldsHandler = new \Whity\Api\FormFieldsApiHandler($formRepository, $formFieldRepository);
 $router->register('GET', '/api/form-fields', [$formFieldsHandler, 'listByQuery'], null, null, CorePermissions::FORMS_READ);
@@ -3890,10 +3893,27 @@ $router->register('GET', '/api/form-submissions/{id:\d+}', [$formSubmissionsHand
 $router->register('GET', '/api/form-submissions/{id:\d+}/review', [$formSubmissionReviewsHandler, 'show'], null, null, CorePermissions::FORMS_READ);
 $router->register('POST', '/api/form-submissions/{id:\d+}/review', [$formSubmissionReviewsHandler, 'record'], null, null, CorePermissions::FORMS_REVIEW);
 // Only ever the caller's own rows — the ROUTE decides whose, not a query param,
-// so no client can widen it. `forms:submit` rather than `forms:read`: the rows
-// already name exactly one person, so a tenant-wide permission has nothing left
-// to decide (migration 113's "being a recipient IS the authorization").
-$router->register('GET', '/api/me/form-submissions', [$formSubmissionsHandler, 'listMine'], null, null, CorePermissions::FORMS_SUBMIT);
+// so no client can widen it. No permission: the rows already name exactly one
+// person, so a tenant-wide permission has nothing left to decide (migration 113's
+// "being a recipient IS the authorization"), and a member who filled in a form
+// opened to them holds none.
+$router->register('GET', '/api/me/form-submissions', [$formSubmissionsHandler, 'listMine'], null);
+
+// A FORM OPENED TO THE WORKSPACE'S MEMBERS (migration 198). No permission, like the
+// inbox: being an active member, on a form somebody with `forms:manage` opened, is the
+// authorization, and the handler checks both. Nothing is open until somebody opens it.
+$memberFormsHandler = new \Whity\Api\MemberFormsApiHandler(
+    $db->getPdo(),
+    $formRepository,
+    $formFieldRepository,
+    $formRenderer,
+    $submissionIssuer,
+    $formUploadsHandler
+);
+$router->register('GET', '/api/me/forms', [$memberFormsHandler, 'list'], null);
+$router->register('GET', '/api/me/forms/{id:\d+}/render', [$memberFormsHandler, 'render'], null);
+$router->register('POST', '/api/me/forms/{id:\d+}/uploads', [$memberFormsHandler, 'upload'], null);
+$router->register('POST', '/api/me/forms/{id:\d+}/submissions', [$memberFormsHandler, 'submit'], null);
 
 // THE PUBLIC END (migration 132). Unauthenticated by construction — the person
 // filling in an external application has no account and the whole point is that
