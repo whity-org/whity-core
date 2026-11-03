@@ -82,7 +82,7 @@ test.describe('Self-service profile management (WC-64)', () => {
     await adminPage.shell.sidebar.getByRole('link', { name: 'Account settings' }).click();
     await page.waitForURL('**/settings');
     await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
-    await expect(page.getByText('Profile', { exact: true })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Profile' })).toBeVisible();
     await expect(page.getByLabel('Email Address')).toBeVisible();
   });
 
