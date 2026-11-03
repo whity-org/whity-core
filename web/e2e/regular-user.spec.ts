@@ -17,8 +17,8 @@ test.describe('Regular user (non-admin)', () => {
     await expect(page).toHaveURL(/\/dashboard$/);
     await expect(page.getByRole('heading', { name: /^Good (morning|afternoon|evening)$/ })).toBeVisible();
     await userPage.shell.expectLoggedInAs(REGULAR_USER.email);
-    // The dashboard reflects the user's role.
-    await expect(page.getByText('User', { exact: true })).toBeVisible();
+    // Waiting for you is always the first card; with nothing waiting it is one line.
+    await expect(page.getByText(/Waiting for you|Nothing is waiting for you\./).first()).toBeVisible();
   });
 
   test('the sidebar hides every gated section and shows only Settings', async ({
