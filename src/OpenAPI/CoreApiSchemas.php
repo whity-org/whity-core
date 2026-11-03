@@ -189,6 +189,11 @@ final class CoreApiSchemas
         'PUT /api/me/notification-preferences',
         'GET /api/me/inbox/sources',
         'GET /api/me/inbox',
+        // WHIT-859: only ever the caller's own rows. It held `forms:submit` until members
+        // could fill in forms without it, and an agent could read it before that too.
+        // The rest of /api/me/forms is left out on purpose: submitting with no permission
+        // would step around the Ask first policy an agent's `forms:submit` carries.
+        'GET /api/me/form-submissions',
         // WHIT-783: searches only the record types the caller may list, each
         // with its list route's per-record rule.
         'GET /api/search',
