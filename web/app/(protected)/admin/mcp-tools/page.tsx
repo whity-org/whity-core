@@ -22,6 +22,18 @@ const ALWAYS_ON_SETTING = 'mcp.always_on_plugin_tools';
 type PolicyFilter = 'all' | McpAgentPolicy;
 
 /**
+ * What an agent really does with a tool. The list carries the tool's ceiling
+ * (`agentPolicy`), but a change that has no Undo is always proposed first, and
+ * `/api/admin/mcp/tools` doesn't say which changes have one (S6). A tool derived
+ * from a route is named for its HTTP method, so a change there reads as
+ * proposed, the safe answer. Authored tools show their own policy.
+ */
+function shownPolicy(tool: McpTool): McpAgentPolicy {
+  const changes = /^(post|put|patch|delete)_/.test(tool.name);
+  return tool.agentPolicy === 'allow' && changes ? 'propose' : tool.agentPolicy;
+}
+
+/**
  * What AI can do (A22, TplWhatAICanDo; was MCP tools): every action AI can
  * take in this workspace and how agents may use it (can do it, proposes and a
  * person approves, suggests only, never), from `agentPolicy`. Tool names,
@@ -60,7 +72,7 @@ export default function McpToolsPage() {
   const shown = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return tools.filter((tool) => {
-      if (policy !== 'all' && tool.agentPolicy !== policy) return false;
+      if (policy !== 'all' && shownPolicy(tool) !== policy) return false;
       if (needle === '') return true;
       return [tool.description, showTechnicalDetails ? tool.name : '', showTechnicalDetails ? tool.toolset : ''].some((text) =>
         text.toLowerCase().includes(needle),
@@ -181,7 +193,7 @@ export default function McpToolsPage() {
       accessorKey: 'agentPolicy',
       header: t('mcpTools.table.agentPolicy', 'Agents'),
       enableSorting: true,
-      cell: (tool) => <Badge variant={policyVariant(tool.agentPolicy)}>{policyLabel(tool.agentPolicy)}</Badge>,
+      cell: (tool) => <Badge variant={policyVariant(shownPolicy(tool))}>{policyLabel(shownPolicy(tool))}</Badge>,
     },
     ...(showTechnicalDetails ? technicalColumns : []),
   ];

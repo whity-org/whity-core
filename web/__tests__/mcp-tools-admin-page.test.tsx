@@ -59,6 +59,7 @@ function api(enabled: string[] = []) {
             name: 'delete_api_users_id', description: 'Delete a user', toolset: 'core.users',
             requiredPermission: 'users:manage', agentPolicy: 'propose',
           }),
+          tool({ name: 'post_api_users', description: 'Create a user', agentPolicy: 'allow' }),
           tool({
             name: 'period_close_status', description: 'Where the close stands', toolset: 'period-close',
             visibility: 'always-on', plugin: 'Plugins\\PeriodClose\\PeriodClosePlugin',
@@ -96,11 +97,21 @@ describe('McpToolsPage', () => {
 
     expect(await screen.findByText('delete_api_users_id')).toBeInTheDocument();
     expect(screen.getByText('core.users')).toBeInTheDocument();
-    expect(screen.getByText('Proposes, a person approves')).toBeInTheDocument();
+    expect(screen.getAllByText('Proposes, a person approves').length).toBeGreaterThan(0);
     expect(screen.getByText('users:manage')).toBeInTheDocument();
     // A core pick is always listed; a plugin's request waits for the admin.
     expect(screen.getAllByText('Always listed')).toHaveLength(1);
     expect(screen.getByRole('switch', { name: 'List period_close_status without searching' })).not.toBeChecked();
+  });
+
+  it('reads a change with no declared undo as proposed, not as something agents just do', async () => {
+    api();
+    render(<Page technical={false} />);
+
+    await screen.findByText('Create a user');
+    // The two reads keep their own policy; the delete and the create read as proposed.
+    expect(screen.queryAllByText('Can do it')).toHaveLength(2);
+    expect(screen.getAllByText('Proposes, a person approves')).toHaveLength(2);
   });
 
   it('keeps names, toolsets and sizes out of the plain view', async () => {
@@ -108,7 +119,7 @@ describe('McpToolsPage', () => {
     render(<Page technical={false} />);
 
     expect(await screen.findByText('Delete a user')).toBeInTheDocument();
-    expect(screen.getByText('Proposes, a person approves')).toBeInTheDocument();
+    expect(screen.getAllByText('Proposes, a person approves').length).toBeGreaterThan(0);
     expect(screen.queryByText('delete_api_users_id')).not.toBeInTheDocument();
     expect(screen.queryByText('core.users')).not.toBeInTheDocument();
     expect(screen.queryByText(/about 2,000 tokens/)).not.toBeInTheDocument();

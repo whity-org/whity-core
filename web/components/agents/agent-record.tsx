@@ -17,7 +17,6 @@ import { Alert, AlertDescription } from '@whity/ui/alert';
 import { Avatar } from '@whity/ui/avatar';
 import { Badge } from '@whity/ui/badge';
 import { Button } from '@whity/ui/button';
-import { Checkbox } from '@whity/ui/checkbox';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@whity/ui/dropdown-menu';
 import { Icon } from '@whity/ui/icon';
 import { Input } from '@whity/ui/input';
@@ -26,8 +25,8 @@ import { ScopeGrant, type ScopeGrantMode } from '@whity/ui/scope-grant';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@whity/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@whity/ui/tabs';
 import { Textarea } from '@whity/ui/textarea';
-import { TechnicalDetails } from '@whity/ui/display-preferences';
 import { useFormattingLocale, useTranslation } from '@whity/features/i18n';
+import { ToolsetPicker } from '@/components/agents/toolset-picker';
 import { AgentActivityPanel } from '@/components/agents/agent-activity-panel';
 import { useFetch } from '@/hooks/useFetch';
 import { useAuth } from '@/lib/auth-context';
@@ -295,25 +294,7 @@ export function AgentRecord({ agent: initial, onChanged }: { agent: WorkspaceAge
             </ChangedField>
           </section>
 
-          <TechnicalDetails>
-            <section className="space-y-3">
-              <h2 className="text-sm font-semibold">{t('agents.field.toolsets', 'What it works with')}</h2>
-              <p className="text-sm text-muted-foreground">{t('agents.toolsets.help', 'Choosing none means everything the person using it can reach.')}</p>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {offered.map((toolset) => (
-                  <label key={toolset} className="flex items-center gap-2 text-sm">
-                    <Checkbox
-                      checked={draft.toolsets.includes(toolset)}
-                      onCheckedChange={(on) =>
-                        set('toolsets', on === true ? [...draft.toolsets, toolset] : draft.toolsets.filter((id) => id !== toolset))
-                      }
-                    />
-                    <span dir="ltr" className="font-mono text-xs">{toolset}</span>
-                  </label>
-                ))}
-              </div>
-            </section>
-          </TechnicalDetails>
+          <ToolsetPicker offered={offered} chosen={draft.toolsets} onChange={(toolsets) => set('toolsets', toolsets)} />
         </TabsContent>
 
         <TabsContent value="scope" className="mt-6 space-y-4">
