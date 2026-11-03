@@ -86,15 +86,17 @@ test.describe('Sidebar navigation (admin)', () => {
     await expect(page.getByText('Security', { exact: true })).toBeVisible();
   });
 
-  test('Dashboard section loads the admin landing page (redirects to stats)', async ({
+  test('Dashboard section loads the home page (/admin redirects to /dashboard)', async ({
     adminPage,
     page,
   }) => {
-    // The "Dashboard" sidebar item points at /admin, which server-redirects to
-    // /admin/stats (the System Statistics page).
+    // The "Dashboard" sidebar item points at /admin, which redirects to the one
+    // home (/dashboard). Server statistics live on /admin/stats (System).
     await adminPage.shell.clickNav('Dashboard');
-    await page.waitForURL('**/admin/stats');
-    await expect(page.getByRole('heading', { name: 'System Statistics' })).toBeVisible();
+    await page.waitForURL('**/dashboard');
+    await expect(
+      page.getByRole('heading', { name: /^Good (morning|afternoon|evening)$/ })
+    ).toBeVisible();
   });
 
   test('sidebar collapses and expands via the header toggle', async ({ adminPage }) => {
