@@ -125,22 +125,22 @@ const FORM = {
   sections: [],
 };
 
-function fakeEnv(calls: Array<{ method: string; path: string; body?: unknown }>): FormsScreenEnv {
+function fakeEnv(calls: Array<{ method: string; path: string; body?: unknown }>, form: Record<string, unknown> = FORM): FormsScreenEnv {
   return {
     transport: {
       async request(method: string, path: string, body?: unknown) {
         calls.push({ method, path, body });
-        if (method === 'GET' && path === '/api/v1/forms/7') return { status: 200, body: { data: { ...FORM, fields: [], sections: [] } } };
+        if (method === 'GET' && path === '/api/v1/forms/7') return { status: 200, body: { data: { ...form, fields: [] } } };
         if (method === 'GET' && path === '/api/v1/forms/7/fields') {
           return {
             status: 200,
             body: {
-              data: [draft('supplier', { label: { en: 'Supplier name' }, is_required: true })],
+              data: [draft('supplier', { label: { en: 'Supplier name' }, is_required: true, section_key: (form as { sections: unknown[] }).sections.length ? 's1' : null })],
               meta: { field_types: ['text', 'textarea', 'select'] },
             },
           };
         }
-        if (method === 'GET' && path.startsWith('/api/v1/forms')) return { status: 200, body: { data: [FORM] } };
+        if (method === 'GET' && path.startsWith('/api/v1/forms')) return { status: 200, body: { data: [form] } };
         if (method === 'PUT') return { status: 200, body: { data: (body as { fields: FieldDraft[] }).fields } };
         return { status: 404, body: null };
       },
@@ -220,5 +220,26 @@ describe('FormBuilderScreen', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Publish' }));
     expect(await screen.findByText('Open this form?')).toBeInTheDocument();
     expect(screen.getByText(/It has 1 questions, 1 of them required/)).toBeInTheDocument();
+  });
+
+  it('saves a draft by itself after a pause, and leaves an open form to the save bar', async () => {
+    const calls: Array<{ method: string; path: string; body?: unknown }> = [];
+    render(<FormBuilderScreen env={fakeEnv(calls)} formId={7} canManage />);
+    await screen.findByText(/Supplier name/);
+    await userEvent.click(screen.getByRole('button', { name: /Add question/ }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Short text' }));
+    await userEvent.type(await screen.findByLabelText('English', { selector: '#q-label-en' }), 'Delivery day');
+    await waitFor(() => expect(calls.some((c) => c.method === 'PUT')).toBe(true), { timeout: 6000 });
+  }, 12000);
+
+  it('collapses a section to its bar and opens it again', async () => {
+    const withSections = { ...FORM, sections: [{ key: 's1', title: { en: 'Part one' }, description: {} }] };
+    render(<FormBuilderScreen env={fakeEnv([], withSections)} formId={7} canManage />);
+    await screen.findByText(/Supplier name/);
+    const bar = screen.getByRole('button', { name: /Part one/ });
+    await userEvent.click(bar);
+    expect(screen.queryByText(/Supplier name/)).not.toBeInTheDocument();
+    await userEvent.click(bar);
+    expect(await screen.findByText(/Supplier name/)).toBeInTheDocument();
   });
 });
