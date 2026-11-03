@@ -7,8 +7,9 @@ test.describe('Sidebar navigation (admin)', () => {
     // The sidebar now opens only the group holding the current page (#1007),
     // so open them all first — otherwise this asserts the disclosure state
     // rather than the RBAC-filtered set it exists to check.
-    await adminPage.shell.expandAllNavGroups();
     for (const section of SIDEBAR_SECTIONS) {
+      // Opening a group folds the others, so each link opens its own.
+      await adminPage.shell.revealNavLink(section.label);
       // navLink resolves by unique href, so "Settings" vs "Website Settings"
       // (both end in "Settings") don't collide under strict mode.
       await expect(adminPage.shell.navLink(section.label)).toBeVisible();
@@ -86,15 +87,17 @@ test.describe('Sidebar navigation (admin)', () => {
     await expect(page.getByRole('tab', { name: 'Sign-in and security' })).toBeVisible();
   });
 
-  test('Dashboard section loads the admin landing page (redirects to stats)', async ({
+  test('Dashboard section loads the home page (/admin redirects to /dashboard)', async ({
     adminPage,
     page,
   }) => {
-    // The "Dashboard" sidebar item points at /admin, which server-redirects to
-    // /admin/stats (the System Statistics page).
+    // The "Dashboard" sidebar item points at /admin, which redirects to the one
+    // home (/dashboard). Server statistics live on /admin/stats (System).
     await adminPage.shell.clickNav('Dashboard');
-    await page.waitForURL('**/admin/stats');
-    await expect(page.getByRole('heading', { name: 'System Statistics' })).toBeVisible();
+    await page.waitForURL('**/dashboard');
+    await expect(
+      page.getByRole('heading', { name: /^Good (morning|afternoon|evening)$/ })
+    ).toBeVisible();
   });
 
   test('sidebar collapses and expands via the header toggle', async ({ adminPage }) => {

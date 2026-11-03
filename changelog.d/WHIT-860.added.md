@@ -1,0 +1,3 @@
+- **A new home page.** Dashboard now opens on Waiting for you: documents from your inbox and agent proposals in one list, oldest first, with Approve and Decline in place. Agents today and, for operators, platform numbers sit beside it. /admin lands here too (WHIT-860).
+- **Inbox and Approvals in plain words.** Inbox rows open when clicked, states read Your decision, To review or Done in your language, and a failed load offers Try again. Approvals shows skeleton rows while loading, and permission codes appear only with Show technical details (WHIT-860).
+- **The sidebar keeps only the current group open.** Opening another group folds the rest (WHIT-860).

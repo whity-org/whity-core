@@ -2,6 +2,7 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ActionProposal } from '@whity/ui/action-proposal';
+import { DisplayPreferencesContextProvider } from '@whity/ui/display-preferences';
 import { ApprovalQueue, type ApprovalQueueItem } from '@whity/ui/approval-queue';
 import { ScopeGrant } from '@whity/ui/scope-grant';
 import { UndoBar } from '@whity/ui/undo-bar';
@@ -30,13 +31,23 @@ describe('ActionProposal', () => {
     expect(screen.getByRole('button', { name: 'Show less' })).toHaveAttribute('aria-expanded', 'true');
   });
 
-  it('always names the permissions used and the undo window', () => {
+  it('keeps permission codes behind Show technical details, and always names the undo window', () => {
+    const card = <ActionProposal agent="Billing assistant" title="t" scope={['invoices:send']} undoWindow="30 minutes" />;
+    const { unmount } = render(card);
+    expect(screen.queryByText('invoices:send')).not.toBeInTheDocument();
+    unmount();
     const { rerender } = render(
-      <ActionProposal agent="Billing assistant" title="t" scope={['invoices:send']} undoWindow="30 minutes" />,
+      <DisplayPreferencesContextProvider value={{ textSize: 'standard', showTechnicalDetails: true, update: () => {} }}>
+        {card}
+      </DisplayPreferencesContextProvider>,
     );
     expect(screen.getByText('invoices:send')).toBeInTheDocument();
     expect(screen.getByText('Can be undone for 30 minutes')).toBeInTheDocument();
-    rerender(<ActionProposal agent="Billing assistant" title="t" reversible={false} />);
+    rerender(
+      <DisplayPreferencesContextProvider value={{ textSize: 'standard', showTechnicalDetails: true, update: () => {} }}>
+        <ActionProposal agent="Billing assistant" title="t" reversible={false} />
+      </DisplayPreferencesContextProvider>,
+    );
     expect(screen.getByText("Can't be undone")).toBeInTheDocument();
   });
 

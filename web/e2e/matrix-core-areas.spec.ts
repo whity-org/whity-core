@@ -114,10 +114,9 @@ test.describe('Core admin areas (role matrix)', () => {
     const statsResponse = page.waitForResponse((res) =>
       res.url().includes('/api/v1/admin/stats')
     );
-    // The "Dashboard" nav item points at /admin, which redirects to the
-    // System Statistics page.
-    await roleSession.shell.clickNav('Dashboard');
-    await page.waitForURL('**/admin/stats');
+    // System statistics are at /admin/stats; the "Dashboard" nav item now opens
+    // the home page instead, and the System nav item arrives with the server work.
+    await page.goto('/admin/stats');
     expect((await statsResponse).status()).toBe(200);
 
     await expect(

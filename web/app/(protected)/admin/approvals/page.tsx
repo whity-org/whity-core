@@ -26,6 +26,7 @@ import { ApprovalQueue, type ApprovalQueueItem } from '@whity/ui/approval-queue'
 import { AgentActivity } from '@whity/ui/agent-activity';
 import { UndoBar, type UndoBarLabels } from '@whity/ui/undo-bar';
 import { EmptyState } from '@whity/ui/empty-state';
+import { AreaError, LoadingRows } from '@whity/ui/page-states';
 import { useFormattingLocale, useTranslation } from '@whity/features/i18n';
 import { useDateDisplay } from '@whity/features/datetime';
 import { AdminHeader } from '@/components/admin/admin-header';
@@ -295,7 +296,11 @@ export default function ApprovalsPage() {
       />
 
       {proposals.error ? (
-        <p className="rounded-md border border-border bg-muted p-4 text-sm text-muted-foreground">{proposals.error}</p>
+        <AreaError
+          message={proposals.error}
+          retryLabel={t('approvals.tryAgain', 'Try again')}
+          onRetry={() => proposals.refetch()}
+        />
       ) : (
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList variant="line">
@@ -311,7 +316,11 @@ export default function ApprovalsPage() {
 
           <TabsContent value="waiting" className="mt-6">
             {proposals.loading && !proposals.data ? (
-              <p className="text-sm text-muted-foreground">{t('approvals.loading', 'Loading…')}</p>
+              <LoadingRows
+                label={t('approvals.loading', 'Loading…')}
+                headers={[t('approvals.loading.agent', 'Agent'), t('approvals.loading.request', 'Request')]}
+                rows={3}
+              />
             ) : (
               <div className="grid gap-6 lg:grid-cols-[minmax(0,560px)_minmax(0,1fr)]">
                 <ApprovalQueue

@@ -15,10 +15,10 @@ import { REGULAR_USER } from './support/constants';
 test.describe('Regular user (non-admin)', () => {
   test('can log in and reach the dashboard', async ({ userPage, page }) => {
     await expect(page).toHaveURL(/\/dashboard$/);
-    await expect(page.getByRole('heading', { name: 'Welcome back!' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /^Good (morning|afternoon|evening)$/ })).toBeVisible();
     await userPage.shell.expectLoggedInAs(REGULAR_USER.email);
-    // The dashboard reflects the user's role.
-    await expect(page.getByText('User', { exact: true })).toBeVisible();
+    // Waiting for you is always the first card; with nothing waiting it is one line.
+    await expect(page.getByText(/Waiting for you|Nothing is waiting for you\./).first()).toBeVisible();
   });
 
   test('the sidebar hides every gated section and shows only Settings', async ({
@@ -114,16 +114,16 @@ test.describe('Regular user (non-admin)', () => {
     await expect(wizard).toBeHidden();
   });
 
-  test('the dashboard reports the user id, role badge and email', async ({
+  test('the home greets the person and shows what is waiting for them', async ({
     userPage,
     page,
   }) => {
     await expect(page).toHaveURL(/\/dashboard$/);
-    await expect(page.getByText('Your User ID')).toBeVisible();
-    await expect(page.getByText('Your Role')).toBeVisible();
-    // The role badge renders the capitalised role.
-    await expect(page.getByText('User', { exact: true })).toBeVisible();
-    await expect(page.getByText(REGULAR_USER.email).first()).toBeVisible();
+    await expect(page.getByRole('heading', { name: /^Good (morning|afternoon|evening)$/ })).toBeVisible();
+    // Waiting for you collapses to one line when nothing waits, so one of the two shows.
+    await expect(
+      page.getByText(/Waiting for you|Nothing is waiting for you\./).first()
+    ).toBeVisible();
     // The footer also reflects the logged-in regular user.
     await userPage.shell.expectLoggedInAs(REGULAR_USER.email);
   });
