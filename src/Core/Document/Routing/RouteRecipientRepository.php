@@ -476,7 +476,7 @@ final class RouteRecipientRepository
                         d.withdrawn_at AS document_withdrawn_at,
                         e.action AS arrived_by, e.actor_profile_id AS arrived_from,
                         s.decision AS step_decision, s.satisfied_by AS step_satisfied_by,
-                        ce.action AS closed_by_action,
+                        ce.action AS closed_by_action, ce.verdict AS closed_by_verdict,
                         sp.id AS sender_profile_id, sp.display_name AS sender_display_name, spe.email AS sender_email
                    FROM document_route_recipients r
                    JOIN documents d
@@ -506,7 +506,7 @@ final class RouteRecipientRepository
                         d.withdrawn_at AS document_withdrawn_at,
                         e.action AS arrived_by, e.actor_profile_id AS arrived_from,
                         s.decision AS step_decision, s.satisfied_by AS step_satisfied_by,
-                        ce.action AS closed_by_action,
+                        ce.action AS closed_by_action, ce.verdict AS closed_by_verdict,
                         sp.id AS sender_profile_id, sp.display_name AS sender_display_name, spe.email AS sender_email
                    FROM document_route_recipients r
                    JOIN documents d
@@ -677,6 +677,7 @@ final class RouteRecipientRepository
             // apart from a circulation offers the wrong buttons, and the person
             // then discovers the difference from a 422 after clicking.
             'closed_by_action' => isset($row['closed_by_action']) ? (string) $row['closed_by_action'] : null,
+            'closed_by_verdict' => isset($row['closed_by_verdict']) ? (string) $row['closed_by_verdict'] : null,
             'sender_profile_id' => isset($row['sender_profile_id']) ? (int) $row['sender_profile_id'] : null,
             'sender_display_name' => $row['sender_display_name'] ?? null,
             'sender_email' => $row['sender_email'] ?? null,

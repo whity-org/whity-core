@@ -70,7 +70,7 @@ describe('TwoFactorRecoveryApprovalsPage — list and actions', () => {
     );
     expect(screen.getByText('lockedout@acme.test')).toBeInTheDocument();
     expect(global.fetch).toHaveBeenCalledWith(
-      '/api/v1/2fa-recovery/pending',
+      '/api/v1/2fa-recovery/pending?page=1&per_page=25',
       expect.objectContaining({ credentials: 'include' })
     );
   });

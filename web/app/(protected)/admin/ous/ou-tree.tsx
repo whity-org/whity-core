@@ -182,6 +182,9 @@ function OuTreeItem({
             <IconFolder className="size-3.5 shrink-0 text-muted-foreground/70" />
           )}
           <span className="truncate font-medium">{node.name}</span>
+          <span className="shrink-0 text-xs text-muted-foreground" data-testid={`ou-member-count-${node.id}`}>
+            {t('ous.tree.memberCount', '{count} people', { count: node.member_count ?? 0 })}
+          </span>
         </button>
 
         <DropdownMenu>

@@ -1,12 +1,13 @@
 'use client';
 
-import { Suspense, useEffect, useRef, useState } from 'react';
+import { Suspense, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useToast } from '@/lib/toast-context';
 import { useBranding } from '@/lib/branding-context';
 import { Button } from '@whity/ui/button';
+import { Textarea } from '@whity/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
 import { Alert, AlertDescription } from '@whity/ui/alert';
@@ -24,12 +25,10 @@ import { useTranslation } from '@whity/features/i18n';
  *    which always reports the same generic "if that address has an account, a
  *    confirmation link is on its way" so it never reveals whether an address
  *    exists or whether this flow is even enabled for this instance.
- *  - token present → auto-confirm via POST /api/v1/auth/2fa-recovery/confirm
- *    (the same useRef single-fire guard as verify-email, since the confirmation
- *    token is SINGLE-USE and React strict-mode would otherwise double-consume
- *    it). Unlike a password reset, there is NO password field here — confirming
- *    only SUBMITS the request into the admin approval queue; nothing is
- *    cleared or changed until an admin reviews it.
+ *  - token present → a button, with an optional reason, that confirms via
+ *    POST /api/v1/auth/2fa-recovery/confirm. Unlike a password reset, there is NO
+ *    password field here — confirming only SUBMITS the request into the admin
+ *    approval queue; nothing is cleared or changed until an admin reviews it.
  *
  * Public + unauthenticated (a user who lost both factors has no session).
  */
@@ -44,6 +43,8 @@ function AccountRecoveryInner() {
   const t = useTranslation('auth');
 
   const [status, setStatus] = useState<Status>(token ? 'confirming' : 'request-form');
+  const [reason, setReason] = useState('');
+  const [confirming, setConfirming] = useState(false);
 
   // Request-form state.
   const [email, setEmail] = useState('');
@@ -51,54 +52,40 @@ function AccountRecoveryInner() {
   const [requestSent, setRequestSent] = useState(false);
   const [requestError, setRequestError] = useState<string | null>(null);
 
-  // The confirmation token is SINGLE-USE, so the confirm POST must fire
-  // exactly once even under React strict-mode's double effect invocation.
-  const confirmStarted = useRef(false);
+  // The token is single-use, so nothing is sent until the person presses the button.
+  // That is also what lets them say why, and a mail scanner opening the link can no
+  // longer file a request on their behalf.
+  const handleConfirm = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setConfirming(true);
+    try {
+      const response = await fetch('/api/v1/auth/2fa-recovery/confirm', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+        body: JSON.stringify({ token, ...(reason.trim() !== '' ? { reason: reason.trim() } : {}) }),
+        credentials: 'include',
+      });
 
-  // Resolved to a STRING at render, and depended on as a string below — NEVER
-  // `t` itself. `useTranslation` hands back a fresh callback the moment the
-  // translation bundle arrives, so listing `t` in the dependency array would
-  // re-run the confirm effect after load and re-POST a SINGLE-USE token. A
-  // string compares by value, so the English case never re-runs at all.
-  const submittedToastMessage = t(
-    'accountRecovery.toast.submitted',
-    'Your account-recovery request has been submitted for review.'
-  );
-
-  useEffect(() => {
-    if (!token) {
-      return;
-    }
-    if (confirmStarted.current) {
-      return;
-    }
-    confirmStarted.current = true;
-
-    void (async () => {
-      try {
-        const response = await fetch('/api/v1/auth/2fa-recovery/confirm', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Requested-With': 'XMLHttpRequest',
-          },
-          body: JSON.stringify({ token }),
-          credentials: 'include',
-        });
-
-        if (response.status === 200) {
-          setStatus('submitted');
-          addToast(submittedToastMessage, 'success');
-          return;
-        }
-
-        // Any non-200 (400 invalid/expired, 422 missing) is a generic failure.
-        setStatus('error');
-      } catch {
-        setStatus('error');
+      if (response.status === 200) {
+        setStatus('submitted');
+        addToast(
+          t('accountRecovery.toast.submitted', 'Your account-recovery request has been submitted for review.'),
+          'success'
+        );
+        return;
       }
-    })();
-  }, [token, addToast, submittedToastMessage]);
+
+      // Any non-200 (400 invalid/expired, 422 missing) is a generic failure.
+      setStatus('error');
+    } catch {
+      setStatus('error');
+    } finally {
+      setConfirming(false);
+    }
+  };
 
   const handleRequestSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -177,7 +164,7 @@ function AccountRecoveryInner() {
           </CardTitle>
           <CardDescription>
             {status === 'confirming'
-              ? t('accountRecovery.subtitle.confirming', 'Confirming your recovery request…')
+              ? t('accountRecovery.subtitle.confirming', 'One more step to send your recovery request')
               : status === 'submitted'
                 ? t('accountRecovery.subtitle.submitted', 'Your request has been submitted')
                 : t(
@@ -189,9 +176,27 @@ function AccountRecoveryInner() {
 
         <CardContent>
           {status === 'confirming' && (
-            <p className="text-sm text-center text-muted-foreground" data-testid="account-recovery-pending">
-              {t('accountRecovery.pending', 'Confirming your request…')}
-            </p>
+            <form onSubmit={handleConfirm} className="space-y-4" data-testid="account-recovery-pending">
+              <div className="space-y-2">
+                <label htmlFor="reason" className="text-sm font-medium">
+                  {t('accountRecovery.reason.label', 'Why do you need this? (optional)')}
+                </label>
+                <Textarea
+                  id="reason"
+                  rows={2}
+                  maxLength={500}
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  disabled={confirming}
+                />
+                <p className="text-sm text-muted-foreground">
+                  {t('accountRecovery.reason.hint', 'The administrator who reviews this sees what you write here.')}
+                </p>
+              </div>
+              <Button type="submit" className="w-full" disabled={confirming}>
+                {t('accountRecovery.confirm', 'Send request')}
+              </Button>
+            </form>
           )}
 
           {status === 'submitted' && (

@@ -8,7 +8,9 @@ import type { components } from '@/lib/api/schema';
 import { useToast } from '@/lib/toast-context';
 import { useFetch } from '@/hooks/useFetch';
 import { useCapabilities } from '@/hooks/useCapabilities';
-import { USERS_WRITE, USERS_DELETE } from '@/lib/capabilities';
+import { USERS_WRITE, USERS_DELETE, SECURITY_MANAGE, ROLES_READ, OUS_READ } from '@/lib/capabilities';
+import { fetchAllPages } from '@/lib/api/fetch-all-pages';
+import { FilterMenu } from '@/components/admin/filter-menu';
 import { AdminHeader } from '@/components/admin/admin-header';
 import {
   DataTable,
@@ -28,11 +30,14 @@ import { Avatar } from '@whity/ui/avatar';
 import { roleLabel } from '@whity/features/roles';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@whity/ui/tabs';
 import { AreaError } from '@whity/ui/page-states';
+import { ConfirmAction } from '@whity/ui/confirm-action';
+import { ToggleGroup } from '@whity/ui/toggle-group';
 import { IconMenu2, IconPlus } from '@tabler/icons-react';
 import { useTranslation } from '@whity/features/i18n';
 import { useDateDisplay } from '@whity/features/datetime';
 import { CreateUserModal } from './create-modal';
 import { DeleteUserModal } from './delete-modal';
+import { BulkRoleDialog } from './bulk-role-dialog';
 import { InvitationsPanel } from './invitations-panel';
 import { MembershipsModal } from './memberships-modal';
 
@@ -47,6 +52,9 @@ interface UsersResponse {
   data: User[];
   pagination?: { total: number; totalPages: number };
 }
+
+/** A row's id. The system tenant lists one person once per workspace. */
+const rowKey = (user: User): string => `${user.tenantId}:${user.id}`;
 
 export default function UsersPage() {
   const { addToast } = useToast();
@@ -64,6 +72,17 @@ export default function UsersPage() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [tab, setTab] = useState('people');
   const [isInviteOpen, setIsInviteOpen] = useState(false);
+  const canReadRoles = hasPermission(ROLES_READ);
+  const canReadUnits = hasPermission(OUS_READ);
+  const canRequireTwoStep = hasPermission(SECURITY_MANAGE);
+
+  const [roleFilter, setRoleFilter] = useState<string[]>([]);
+  const [unitFilter, setUnitFilter] = useState<string[]>([]);
+  const [twoStepFilter, setTwoStepFilter] = useState<string[]>([]);
+  const [statusFilter, setStatusFilter] = useState('active');
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [isBulkRoleOpen, setIsBulkRoleOpen] = useState(false);
+  const [isBulkTwoStepOpen, setIsBulkTwoStepOpen] = useState(false);
 
   /**
    * Page, sort and search all belong to the SERVER now (#1102).
@@ -83,9 +102,42 @@ export default function UsersPage() {
    * the endpoint does not know would click, animate and reorder nothing.
    */
   const query = useDataTableQuery({
-    sortKeys: { accountStatus: 'status', createdAt: 'created' },
+    sortKeys: { accountStatus: 'status', lastActiveAt: 'lastActive' },
   });
-  const queryString = dataTableQueryString(query.request);
+  const filterParams = new URLSearchParams();
+  if (roleFilter.length > 0) filterParams.set('role_id', roleFilter.join(','));
+  if (unitFilter.length > 0) filterParams.set('ou_id', unitFilter.join(','));
+  if (twoStepFilter.length > 0) filterParams.set('two_step', twoStepFilter[0]);
+  if (statusFilter !== 'all') filterParams.set('account_status', statusFilter);
+  const filterString = filterParams.toString();
+  const queryString = [dataTableQueryString(query.request), filterString].filter((part) => part !== '').join('&');
+  const hasFilters = roleFilter.length > 0 || unitFilter.length > 0 || twoStepFilter.length > 0 || statusFilter !== 'active';
+
+  // Roles and units to filter by. A list that could not be read leaves its filter out
+  // rather than offering a short set of choices.
+  const roleOptions = useFetch(async () => {
+    if (!canReadRoles) return [];
+    const result = await fetchAllPages<{ id: number; name: string }>(apiClient, '/api/v1/roles');
+    return result.complete ? result.items : [];
+  }, [canReadRoles]);
+  const unitOptions = useFetch(async () => {
+    if (!canReadUnits) return [];
+    const result = await fetchAllPages<{ id: number; name: string }>(apiClient, '/api/v1/ous');
+    return result.complete ? result.items : [];
+  }, [canReadUnits]);
+
+  const changeFilter = <T,>(set: (value: T) => void) => (value: T) => {
+    set(value);
+    query.setPage(1);
+  };
+
+  const clearFilters = () => {
+    setRoleFilter([]);
+    setUnitFilter([]);
+    setTwoStepFilter([]);
+    setStatusFilter('active');
+    query.setPage(1);
+  };
 
   // `queryString` is the whole dependency, which is also what makes `fetchUsers`
   // safe to call after a create/edit/delete: `refetch` re-runs THIS closure, so
@@ -109,6 +161,63 @@ export default function UsersPage() {
   }, [queryString]);
 
   const users = data?.rows ?? [];
+
+  // Only rows on screen count as selected: a page change or a filter can take a row
+  // away, and a bulk change must never reach somebody the reader can no longer see.
+  const chosen = users.filter((user) => selected.has(rowKey(user)));
+  const targets = chosen.map((user) => ({ profile_id: user.id, tenant_id: user.tenantId }));
+
+  /** Say why a bulk change was refused, in words, naming the people. */
+  const refusalMessage = (body: unknown, fallback: string): string => {
+    const details = (body as { details?: { refused?: { profile_id: number; reason: string }[]; reason?: string } } | null)?.details;
+    if (details?.reason === 'last_people_manager') {
+      return t('users.bulk.refused.lastManager', 'This would leave nobody able to manage people in the workspace.');
+    }
+    if (details?.reason === 'exceeds_your_access') {
+      return t('users.bulk.refused.exceeds', 'That role can do things you cannot, so you cannot give it to anyone.');
+    }
+    const first = details?.refused?.[0];
+    if (first === undefined) return fallback;
+    const name = users.find((user) => user.id === first.profile_id)?.name ?? '';
+    if (first.reason === 'self') {
+      return t('users.bulk.refused.self', 'You cannot change your own role. Clear yourself from the selection.');
+    }
+    if (first.reason === 'outranks_you') {
+      return t('users.bulk.refused.outranks', '{name} has access you do not, so you cannot change their role.', { name });
+    }
+    return t('users.bulk.refused.notFound', '{name} is no longer in this workspace.', { name });
+  };
+
+  const submitBulk = async (path: string, body: Record<string, unknown>, failed: string, done: string) => {
+    const response = await apiClient(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!response.ok) {
+      addToast(refusalMessage(await response.json().catch(() => null), failed), 'error');
+      return;
+    }
+    addToast(done, 'success');
+    setSelected(new Set());
+    fetchUsers();
+  };
+
+  const handleBulkRole = (roleId: number) =>
+    submitBulk(
+      '/api/v1/users/bulk/role',
+      { role_id: roleId, targets },
+      t('users.bulk.role.error', 'The role could not be changed.'),
+      t('users.bulk.role.success', 'Role changed.')
+    );
+
+  const handleBulkTwoStep = () =>
+    submitBulk(
+      '/api/v1/users/bulk/require-two-step',
+      { targets },
+      t('users.bulk.twoStep.error', 'Two-step could not be required.'),
+      t('users.bulk.twoStep.success', 'Two-step is now required of them.')
+    );
 
   /**
    * The skeleton is for the FIRST load only.
@@ -212,6 +321,23 @@ export default function UsersPage() {
       cell: (user) => roleLabel(user.role),
     },
     {
+      accessorKey: 'ouName',
+      header: t('users.table.unit', 'Unit'),
+      cell: (user) => user.ouName ?? <span className="text-muted-foreground">{t('users.table.noUnit', 'No unit')}</span>,
+    },
+    {
+      id: 'twoStep',
+      header: t('users.table.twoStep', 'Two-step'),
+      cell: (user) => {
+        if (user.twoStep?.enabled) return <Badge variant="success">{t('users.twoStep.on', 'On')}</Badge>;
+        return (
+          <Badge variant="warning">
+            {user.twoStep?.required ? t('users.twoStep.required', 'Off, required') : t('users.twoStep.off', 'Off')}
+          </Badge>
+        );
+      },
+    },
+    {
       accessorKey: 'accountStatus',
       header: t('users.table.status', 'Status'),
       enableSorting: true,
@@ -226,9 +352,9 @@ export default function UsersPage() {
     // Gated on the workspace's date preference (#1068).
     ...dates.dateColumns<User>([
       {
-        id: 'createdAt',
-        header: t('users.table.createdAt', 'Added'),
-        value: (user) => user.createdAt,
+        id: 'lastActiveAt',
+        header: t('users.table.lastActive', 'Last active'),
+        value: (user) => user.lastActiveAt ?? null,
         enableSorting: true,
       },
     ]),
@@ -332,12 +458,83 @@ export default function UsersPage() {
               onRetry={() => fetchUsers()}
             />
           ) : (
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center gap-2" data-testid="users-filters">
+                {(roleOptions.data?.length ?? 0) > 0 && (
+                  <FilterMenu
+                    testId="users-filter-role"
+                    label={t('users.filter.role', 'Role')}
+                    options={(roleOptions.data ?? []).map((role) => ({ value: String(role.id), label: roleLabel(role.name) }))}
+                    selected={roleFilter}
+                    onChange={changeFilter(setRoleFilter)}
+                  />
+                )}
+                {(unitOptions.data?.length ?? 0) > 0 && (
+                  <FilterMenu
+                    testId="users-filter-unit"
+                    label={t('users.filter.unit', 'Unit')}
+                    options={(unitOptions.data ?? []).map((unit) => ({ value: String(unit.id), label: unit.name }))}
+                    selected={unitFilter}
+                    onChange={changeFilter(setUnitFilter)}
+                  />
+                )}
+                <FilterMenu
+                  testId="users-filter-two-step"
+                  single
+                  label={t('users.filter.twoStep', 'Two-step')}
+                  options={[
+                    { value: 'on', label: t('users.twoStep.on', 'On') },
+                    { value: 'off', label: t('users.twoStep.off', 'Off') },
+                  ]}
+                  selected={twoStepFilter}
+                  onChange={changeFilter(setTwoStepFilter)}
+                />
+                <ToggleGroup
+                  required
+                  label={t('users.filter.status', 'Status')}
+                  value={statusFilter}
+                  options={[
+                    { value: 'active', label: t('users.filter.status.active', 'Active') },
+                    { value: 'inactive', label: t('users.filter.status.inactive', 'Deactivated') },
+                    { value: 'all', label: t('users.filter.status.all', 'All') },
+                  ]}
+                  onChange={(value) => changeFilter(setStatusFilter)(String(value))}
+                />
+              </div>
             <DataTable
               ariaLabel={t('users.table.label', 'Users')}
               columns={columns}
               data={users}
-              getRowId={(user) => String(user.id)}
+              getRowId={rowKey}
               onRowClick={openRecord}
+              selection={
+                canEdit || canRequireTwoStep
+                  ? {
+                      selected: new Set(chosen.map(rowKey)),
+                      onSelectedChange: setSelected,
+                      labels: {
+                        count: (count) => t('users.bulk.count', '{count} selected', { count }),
+                        clear: t('users.bulk.clear', 'Clear'),
+                        selectAll: t('users.bulk.selectAll', 'Select everyone on this page'),
+                        selectRow: t('users.bulk.selectRow', 'Select this person'),
+                      },
+                      actions: (
+                        <>
+                          {canEdit && (roleOptions.data?.length ?? 0) > 0 && (
+                            <Button variant="outline" size="sm" data-testid="users-bulk-role" onClick={() => setIsBulkRoleOpen(true)}>
+                              {t('users.bulk.role', 'Change role')}
+                            </Button>
+                          )}
+                          {canRequireTwoStep && (
+                            <Button variant="outline" size="sm" data-testid="users-bulk-two-step" onClick={() => setIsBulkTwoStepOpen(true)}>
+                              {t('users.bulk.twoStep', 'Require two-step')}
+                            </Button>
+                          )}
+                        </>
+                      ),
+                    }
+                  : undefined
+              }
               rowActions={rowActions}
               isLoading={isLoading}
               emptyState={
@@ -347,6 +544,15 @@ export default function UsersPage() {
                         term: query.search.value,
                       }),
                     }
+                  : hasFilters
+                    ? {
+                        title: t('users.empty.filteredBar', 'No one matches these filters'),
+                        action: (
+                          <Button variant="outline" onClick={clearFilters}>
+                            {t('users.filter.clear', 'Clear filters')}
+                          </Button>
+                        ),
+                      }
                   : {
                       title: t('users.empty.title', 'No one here yet'),
                       description: t(
@@ -355,7 +561,7 @@ export default function UsersPage() {
                       ),
                     }
               }
-              globalFilterPlaceholder={t('users.searchPlaceholder', 'Search by email or role')}
+              globalFilterPlaceholder={t('users.searchPlaceholder', 'Search by name or email')}
               sorting={query.sorting}
               search={query.search}
               pagination={query.pagination({
@@ -363,6 +569,7 @@ export default function UsersPage() {
                 totalPages: data?.totalPages ?? 1,
               })}
             />
+            </div>
           )}
         </TabsContent>
 
@@ -378,6 +585,28 @@ export default function UsersPage() {
           setIsCreateModalOpen(false);
           fetchUsers();
         }}
+      />
+
+      <BulkRoleDialog
+        open={isBulkRoleOpen}
+        onOpenChange={setIsBulkRoleOpen}
+        count={targets.length}
+        roles={roleOptions.data ?? []}
+        onConfirm={handleBulkRole}
+      />
+
+      <ConfirmAction
+        open={isBulkTwoStepOpen}
+        onOpenChange={setIsBulkTwoStepOpen}
+        variant="default"
+        title={t('users.bulk.twoStep.title', 'Require two-step of {count} people?', { count: targets.length })}
+        description={t(
+          'users.bulk.twoStep.description',
+          'Anyone without it has to set it up the next time they sign in. They stay signed in until then.'
+        )}
+        confirmLabel={t('users.bulk.twoStep.confirm', 'Require two-step')}
+        cancelLabel={t('users.bulk.cancel', 'Cancel')}
+        onConfirm={handleBulkTwoStep}
       />
 
       {selectedUser && (

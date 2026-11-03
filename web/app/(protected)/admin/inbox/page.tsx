@@ -57,6 +57,7 @@
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Badge } from '@whity/ui/badge';
+import { Avatar } from '@whity/ui/avatar';
 import { Icon } from '@whity/ui/icon';
 import { Tabs, TabsList, TabsTrigger } from '@whity/ui/tabs';
 import { ToggleGroup } from '@whity/ui/toggle-group';
@@ -148,7 +149,11 @@ export default function InboxPage() {
   const stateOf = (row: InboxItem): { label: string; done: boolean } | null => {
     const meta = routingMeta(row);
     if (meta === null) return null;
-    if (!meta.open) return { label: t('inbox.state.done', 'Done'), done: true };
+    if (!meta.open) {
+      if (meta.closed_verdict === 'approved') return { label: t('inbox.state.approved', 'You approved'), done: true };
+      if (meta.closed_verdict === 'rejected') return { label: t('inbox.state.rejected', 'You rejected'), done: true };
+      return { label: t('inbox.state.done', 'Done'), done: true };
+    }
     if (meta.decision) return { label: t('inbox.state.decision', 'Your decision'), done: false };
     if (meta.arrived_by === 'returned') {
       return { label: t('inbox.state.returned', 'Returned to you'), done: false };
@@ -183,6 +188,20 @@ export default function InboxPage() {
           </div>
         </div>
       ),
+    },
+    {
+      id: 'from',
+      header: t('inbox.column.from', 'From'),
+      cell: (row) => {
+        if (row.sender?.kind === 'public') return t('inbox.from.public', 'Public form');
+        if (!row.sender?.name) return <span className="text-muted-foreground">—</span>;
+        return (
+          <div className="flex items-center gap-2">
+            <Avatar name={row.sender.name} size={28} />
+            <span className="truncate">{row.sender.name}</span>
+          </div>
+        );
+      },
     },
     {
       id: 'status',

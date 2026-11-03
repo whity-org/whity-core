@@ -31,7 +31,22 @@
  *   users.record.memberships.empty = This person belongs to no workspace.
  *   users.record.memberships.error = Failed to load this person's workspaces and roles
  *   users.record.memberships.primary = Primary
- *   users.record.name.hint = Derived from the email address; there is no separate name to edit.
+ *   users.record.name.hint = The name people see for this person, in every workspace they belong to.
+ *   users.record.changed.name = name
+ *   users.record.fact.lastActive = Active {date}
+ *   users.record.fact.neverActive = Not active yet
+ *   users.record.twoStep.label = Two-step
+ *   users.record.twoStep.on = On
+ *   users.record.twoStep.off = Off
+ *   users.record.twoStep.offRequired = Off, required
+ *   users.record.twoStep.require = Require two-step
+ *   users.record.twoStep.requireStop = Stop requiring two-step
+ *   users.record.twoStep.required = Two-step is now required of {name}.
+ *   users.record.twoStep.notRequired = {name} no longer has a requirement of their own.
+ *   users.record.twoStep.error = Two-step could not be changed.
+ *   users.record.twoStep.confirm.title = Require two-step of {name}?
+ *   users.record.twoStep.confirm.description = If they do not have it on, they have to set it up the next time they sign in.
+ *   users.record.twoStep.confirm.cancel = Cancel
  *   users.record.name.label = Name
  *   users.record.ou.error = Failed to load the organisational units
  *   users.record.ou.incomplete = The organisational units could not be listed in full, so the picker is withheld — a short list would hide units that exist.
@@ -94,6 +109,7 @@ import { Badge } from '@whity/ui/badge';
 import { Button } from '@whity/ui/button';
 import { ConfirmAction } from '@whity/ui/confirm-action';
 import { TechnicalDetails } from '@whity/ui/display-preferences';
+import { Input } from '@whity/ui/input';
 import { SaveBar, ChangedField } from '@whity/ui/save-bar';
 import {
   DropdownMenu,
@@ -127,7 +143,7 @@ import { useDateDisplay } from '../datetime';
 import type { DateDisplay } from '../datetime';
 import type { RecordBadge, RecordFactsFn } from '../record';
 import { identityTranslate } from '../nav/types';
-import { USERS_DELETE, USERS_WRITE } from './capabilities';
+import { SECURITY_MANAGE, USERS_DELETE, USERS_WRITE } from './capabilities';
 import type {
   OuOptionsResult,
   UserActivityEntry,
@@ -174,6 +190,8 @@ interface UserRecordFields {
   membershipStatus: string;
   /** How many memberships this person holds; null while that request is in flight. */
   membershipCount: number | null;
+  /** The formatted last-active date. Empty when the workspace hides dates. */
+  lastActive: string;
 }
 
 /**
@@ -217,6 +235,7 @@ const userFacts: RecordFactsFn<UserRecordFields> = (user, t) => {
         ? t('users.record.fact.noUnit', 'No unit')
         : (user.ouName ?? ''),
       user.email,
+      user.lastActive,
     ]
       .filter((part) => part !== '')
       .join(' · '),
@@ -349,9 +368,10 @@ export function UserRecordScreen({
   // draft would paint one person's role into another person's form for a frame.
   // Stamping the id and ignoring a mismatch makes that frame the skeleton.
   const [saved, setSaved] = useState<UserRecord | null>(null);
-  const [draft, setDraft] = useState<{ id: number; role: string; ouId: number | null } | null>(
+  const [draft, setDraft] = useState<{ id: number; role: string; ouId: number | null; displayName: string } | null>(
     null
   );
+  const [confirmingTwoStep, setConfirmingTwoStep] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isSendingReset, setIsSendingReset] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -360,7 +380,7 @@ export function UserRecordScreen({
   const current = saved !== null && record !== null && saved.id === record.id ? saved : record;
 
   const resetDraft = useCallback((source: UserRecord) => {
-    setDraft({ id: source.id, role: source.role ?? '', ouId: source.ouId });
+    setDraft({ id: source.id, role: source.role ?? '', ouId: source.ouId, displayName: source.displayName });
   }, []);
 
   useEffect(() => {
@@ -401,7 +421,9 @@ export function UserRecordScreen({
   const isDirty =
     current !== null &&
     form !== null &&
-    (form.role !== (current.role ?? '') || form.ouId !== current.ouId);
+    (form.role !== (current.role ?? '') ||
+      form.ouId !== current.ouId ||
+      form.displayName.trim() !== current.displayName);
 
   const back = { label: t('users.record.back', 'Back to users'), onBack };
 
@@ -414,6 +436,7 @@ export function UserRecordScreen({
       const result = await adapter.updateUser(current.id, {
         role: form.role,
         ouId: form.ouId,
+        ...(form.displayName.trim() !== current.displayName ? { displayName: form.displayName.trim() } : {}),
       });
       if (result === 'not-found') {
         onNotify?.(
@@ -426,7 +449,14 @@ export function UserRecordScreen({
       // Re-seat the record on the saved values so the page stops reading dirty
       // without a refetch nobody asked for — and so the stat strip states what
       // was actually persisted.
-      const next: UserRecord = { ...current, role: form.role, ouId: form.ouId };
+      const displayName = form.displayName.trim();
+      const next: UserRecord = {
+        ...current,
+        role: form.role,
+        ouId: form.ouId,
+        displayName,
+        name: displayName !== '' ? displayName : current.name,
+      };
       setSaved(next);
       resetDraft(next);
     } catch (error) {
@@ -438,6 +468,35 @@ export function UserRecordScreen({
       );
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const changeTwoStep = async (required: boolean) => {
+    if (!current || adapter.setTwoStepRequirement === undefined) return;
+    try {
+      await adapter.setTwoStepRequirement(current.id, current.tenantId, required);
+      onNotify?.(
+        required
+          ? t('users.record.twoStep.required', 'Two-step is now required of {name}.', { name: current.name })
+          : t('users.record.twoStep.notRequired', '{name} no longer has a requirement of their own.', { name: current.name }),
+        'success'
+      );
+      setSaved({
+        ...current,
+        twoStep: {
+          ...current.twoStep,
+          requiredDirectly: required,
+          // A workspace or unit policy may still apply, which only a reload can tell.
+          required: required || current.twoStep.required,
+        },
+      });
+    } catch (error) {
+      onNotify?.(
+        error instanceof Error && error.message
+          ? error.message
+          : t('users.record.twoStep.error', 'Two-step could not be changed.'),
+        'error'
+      );
     }
   };
 
@@ -549,7 +608,18 @@ export function UserRecordScreen({
     accountStatus: current.accountStatus,
     membershipStatus: current.status,
     membershipCount,
+    lastActive: dates.hidden
+      ? ''
+      : current.lastActiveAt !== null
+        ? t('users.record.fact.lastActive', 'Active {date}', { date: dates.date(current.lastActiveAt) ?? '' })
+        : t('users.record.fact.neverActive', 'Not active yet'),
   };
+
+  const twoStepLabel = current.twoStep.enabled
+    ? t('users.record.twoStep.on', 'On')
+    : current.twoStep.required
+      ? t('users.record.twoStep.offRequired', 'Off, required')
+      : t('users.record.twoStep.off', 'Off');
 
   const primaryMembership =
     memberships.status === 'ready'
@@ -576,10 +646,9 @@ export function UserRecordScreen({
 
   const identityFields = (
     <>
-      {/* Neither of these is a disabled input. `email` is this person's identity
-          across every tenant and `name` has no column behind it at all, so both
-          are STATED with the reason — a greyed-out box invites the reader to
-          look for the permission that would ungrey it. */}
+      {/* Not a disabled input. `email` is this person's identity across every
+          tenant, so it is STATED with the reason — a greyed-out box invites the
+          reader to look for the permission that would ungrey it. */}
       <StaticField
         label={t('users.record.email.label', 'Email')}
         value={current.email}
@@ -588,14 +657,26 @@ export function UserRecordScreen({
           "The email is this person's identity across every tenant and cannot be changed here."
         )}
       />
-      <StaticField
-        label={t('users.record.name.label', 'Name')}
-        value={current.name}
-        hint={t(
-          'users.record.name.hint',
-          'Derived from the email address; there is no separate name to edit.'
-        )}
-      />
+      <ChangedField
+        changed={form.displayName.trim() !== current.displayName}
+        wasLabel={t('users.record.was', 'Was {value}', { value: current.displayName })}
+        className="space-y-1.5"
+      >
+        <label htmlFor="user-record-name" className="block text-sm font-medium text-foreground">
+          {t('users.record.name.label', 'Name')}
+        </label>
+        <Input
+          id="user-record-name"
+          data-testid="user-record-name"
+          value={form.displayName}
+          placeholder={current.name}
+          maxLength={255}
+          onChange={(event) => setDraft({ ...form, displayName: event.target.value })}
+        />
+        <p className="text-sm text-muted-foreground">
+          {t('users.record.name.hint', 'The name people see for this person, in every workspace they belong to.')}
+        </p>
+      </ChangedField>
     </>
   );
 
@@ -717,6 +798,12 @@ export function UserRecordScreen({
             </dt>
             <dd className="text-sm text-foreground">{ouLabelFor(current.ouId)}</dd>
           </div>
+          <div className="space-y-1.5">
+            <dt className="text-sm font-medium text-foreground">
+              {t('users.record.twoStep.label', 'Two-step')}
+            </dt>
+            <dd className="text-sm text-foreground">{twoStepLabel}</dd>
+          </div>
         </dl>
       )}
     </div>
@@ -725,10 +812,12 @@ export function UserRecordScreen({
   const changedFields = [
     form.role !== (current.role ?? '') ? t('users.record.changed.role', 'role') : null,
     form.ouId !== current.ouId ? t('users.record.changed.ou', 'unit') : null,
+    form.displayName.trim() !== current.displayName ? t('users.record.changed.name', 'name') : null,
   ].filter((part): part is string => part !== null);
 
   const canDeactivate = can(USERS_WRITE) && adapter.setAccountStatus !== undefined;
   const canDelete = can(USERS_DELETE) && adapter.deleteUser !== undefined;
+  const canRequireTwoStep = can(SECURITY_MANAGE) && adapter.setTwoStepRequirement !== undefined;
 
   const accessTab = (
     <RecordCollectionPanel
@@ -826,6 +915,20 @@ export function UserRecordScreen({
                 ? t('users.record.password.sending', 'Sending…')
                 : t('users.record.password.action', 'Send reset link')}
             </Button>
+            {canRequireTwoStep && (
+              <Button
+                type="button"
+                variant="outline"
+                data-testid="user-record-two-step"
+                onClick={() =>
+                  current.twoStep.requiredDirectly ? void changeTwoStep(false) : setConfirmingTwoStep(true)
+                }
+              >
+                {current.twoStep.requiredDirectly
+                  ? t('users.record.twoStep.requireStop', 'Stop requiring two-step')
+                  : t('users.record.twoStep.require', 'Require two-step')}
+              </Button>
+            )}
             {(canDeactivate || canDelete) && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -883,6 +986,19 @@ export function UserRecordScreen({
             onSave={() => void handleSubmit({ preventDefault: () => undefined } as FormEvent)}
           />
         }
+      />
+      <ConfirmAction
+        open={confirmingTwoStep}
+        onOpenChange={setConfirmingTwoStep}
+        variant="default"
+        title={t('users.record.twoStep.confirm.title', 'Require two-step of {name}?', { name: current.name })}
+        description={t(
+          'users.record.twoStep.confirm.description',
+          'If they do not have it on, they have to set it up the next time they sign in.'
+        )}
+        confirmLabel={t('users.record.twoStep.require', 'Require two-step')}
+        cancelLabel={t('users.record.twoStep.confirm.cancel', 'Cancel')}
+        onConfirm={() => changeTwoStep(true)}
       />
       <ConfirmAction
         open={confirmingDelete}
