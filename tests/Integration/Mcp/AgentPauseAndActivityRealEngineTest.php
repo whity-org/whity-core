@@ -447,10 +447,18 @@ final class AgentPauseAndActivityRealEngineTest extends TestCase
         $db->setPingIntervalSeconds(86400);
         $db->forceConnect();
 
-        $has = fn (string $table, string $column): bool => $this->pdo->query(
-            "SELECT 1 FROM information_schema.columns WHERE table_name = '{$table}' AND column_name = '{$column}'",
-        )->fetchColumn() !== false;
-        $index = fn (string $name): bool => $this->pdo->query("SELECT 1 FROM pg_indexes WHERE indexname = '{$name}'")->fetchColumn() !== false;
+        $has = function (string $table, string $column): bool {
+            $stmt = $this->pdo->prepare('SELECT 1 FROM information_schema.columns WHERE table_name = ? AND column_name = ?');
+            $stmt->execute([$table, $column]);
+
+            return $stmt->fetchColumn() !== false;
+        };
+        $index = function (string $name): bool {
+            $stmt = $this->pdo->prepare('SELECT 1 FROM pg_indexes WHERE indexname = ?');
+            $stmt->execute([$name]);
+
+            return $stmt->fetchColumn() !== false;
+        };
 
         AddAgentPauseReadsAndLastActive::down($db);
         foreach ([['agents', 'paused_at'], ['agents', 'paused_by_profile_id'], ['agents', 'may_read'], ['agent_assignments', 'last_active_at']] as [$table, $column]) {

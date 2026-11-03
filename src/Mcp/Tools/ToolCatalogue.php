@@ -88,12 +88,6 @@ final class ToolCatalogue
         return ['id' => $toolset, 'title' => ucfirst(str_replace(['-', '_'], ' ', $root)), 'titleAr' => null];
     }
 
-    /** The tool names the Arabic file covers; for its test. @return list<string> */
-    public static function namedTools(): array
-    {
-        return array_keys(self::names());
-    }
-
     private static function firstSentence(string $text): string
     {
         $text = trim($text);
