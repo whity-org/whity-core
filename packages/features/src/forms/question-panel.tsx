@@ -2,7 +2,8 @@
 
 import type { ReactNode } from "react"
 import { Badge } from "@whity/ui/badge"
-import { BilingualInput, type BilingualValue } from "@whity/ui/bilingual-input"
+import type { BilingualValue } from "@whity/ui/bilingual-input"
+import { BilingualField } from "./bilingual-field"
 import { Button } from "@whity/ui/button"
 import { Checkbox } from "@whity/ui/checkbox"
 import { IconButton } from "@whity/ui/icon-button"
@@ -143,25 +144,21 @@ export function QuestionPanel({
         />
       </Row>
 
-      <BilingualInput
+      <BilingualField
         id="q-label"
         className="sm:[&>.grid]:grid-cols-1"
         label={t("builder.panel.wording", "Question")}
         value={asMap(field.label)}
         onChange={onRelabel}
-        enLabel={t("builder.lang.en", "English")}
-        arLabel={t("builder.lang.ar", "Arabic")}
         disabled={readOnly}
       />
 
-      <BilingualInput
+      <BilingualField
         id="q-help"
         className="sm:[&>.grid]:grid-cols-1"
         label={t("builder.panel.help", "Help under the question")}
         value={asMap(field.help_text_i18n)}
         onChange={(help) => onChange({ ...field, help_text_i18n: help })}
-        enLabel={t("builder.lang.en", "English")}
-        arLabel={t("builder.lang.ar", "Arabic")}
         disabled={readOnly}
       />
 
@@ -171,13 +168,11 @@ export function QuestionPanel({
           {field.options.map((option, i) => (
             <div key={i} className="flex items-start gap-2">
               <div className="min-w-0 flex-1">
-                <BilingualInput
+                <BilingualField
                   id={`q-option-${i}`}
                   className="sm:[&>.grid]:grid-cols-1"
                   value={asMap(option.label)}
                   onChange={(label) => setOptionLabel(i, label)}
-                  enLabel={t("builder.lang.en", "English")}
-                  arLabel={t("builder.lang.ar", "Arabic")}
                   disabled={readOnly}
                 />
               </div>
@@ -253,12 +248,10 @@ export function QuestionPanel({
           <div className="text-sm font-medium">{t("builder.panel.columns", "Columns")}</div>
           {(validation.columns ?? []).map((column, i) => (
             <div key={i} className="space-y-2 rounded-card border border-border p-3">
-              <BilingualInput
+              <BilingualField
                 id={`q-column-${i}`}
                 value={asMap(column.label)}
                 onChange={(label) => setColumn(i, { label })}
-                enLabel={t("builder.lang.en", "English")}
-                arLabel={t("builder.lang.ar", "Arabic")}
                 disabled={readOnly}
               />
               <div className="flex items-center gap-2">
@@ -282,7 +275,7 @@ export function QuestionPanel({
               {column.type === "select" && (
                 <div className="space-y-2">
                   {(column.options ?? []).map((option, j) => (
-                    <BilingualInput
+                    <BilingualField
                       key={j}
                       id={`q-column-${i}-option-${j}`}
                       value={asMap(option.label)}
@@ -293,8 +286,6 @@ export function QuestionPanel({
                           ),
                         })
                       }
-                      enLabel={t("builder.lang.en", "English")}
-                      arLabel={t("builder.lang.ar", "Arabic")}
                       disabled={readOnly}
                     />
                   ))}
