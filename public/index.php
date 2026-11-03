@@ -3886,6 +3886,9 @@ $router->register('PATCH', '/api/forms/{id:\d+}', [$formsHandler, 'update'], nul
 $router->register('POST', '/api/forms/{id:\d+}/publish', [$formsHandler, 'publish'], null, null, CorePermissions::FORMS_MANAGE);
 $router->register('POST', '/api/forms/{id:\d+}/archive', [$formsHandler, 'archive'], null, null, CorePermissions::FORMS_MANAGE);
 $router->register('GET', '/api/forms/{id:\d+}/render', [$formsHandler, 'render'], null, null, CorePermissions::FORMS_SUBMIT);
+// The author's own look at it, whatever its state, so `forms:manage` and not `forms:submit`.
+$router->register('GET', '/api/forms/{id:\d+}/preview', [$formsHandler, 'preview'], null, null, CorePermissions::FORMS_MANAGE);
+$router->register('DELETE', '/api/forms/{id:\d+}', [$formsHandler, 'delete'], null, null, CorePermissions::FORMS_MANAGE);
 // Opening and closing the PUBLIC LINK (migration 132). Ordinary tenant-scoped
 // routes gated on `forms:manage` — the authoring permission, because opening a
 // form to the entire internet is an act of organisational policy and the single
