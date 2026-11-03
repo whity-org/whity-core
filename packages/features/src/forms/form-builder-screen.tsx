@@ -10,13 +10,14 @@ import { ConfirmAction } from "@whity/ui/confirm-action"
 import { SaveBar } from "@whity/ui/save-bar"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@whity/ui/sheet"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@whity/ui/tabs"
-import type { BilingualValue } from "@whity/ui/bilingual-input"
 
 import { useTranslation } from "../i18n"
 import { useCurrentLanguage } from "./language"
 import { useDateDisplay } from "../datetime"
 import { createFormsApi, fieldBody } from "./api"
+import type { BilingualValue } from "./bilingual-field"
 import { BuilderCanvas, scrollToQuestion } from "./builder-canvas"
+import { FormLanguageProvider, useFormLanguages } from "./form-languages"
 import { ProblemList, useProblemText } from "./problem-list"
 import {
   duplicateField,
@@ -78,7 +79,15 @@ function hasText(map: Record<string, string | undefined>): boolean {
 }
 
 /** A form's record page: the builder, its responses, and its settings. */
-export function FormBuilderScreen({ env, formId, canManage }: { env: FormsScreenEnv; formId: number; canManage: boolean }) {
+export function FormBuilderScreen(props: { env: FormsScreenEnv; formId: number; canManage: boolean }) {
+  return (
+    <FormLanguageProvider formId={props.formId}>
+      <FormBuilder {...props} />
+    </FormLanguageProvider>
+  )
+}
+
+function FormBuilder({ env, formId, canManage }: { env: FormsScreenEnv; formId: number; canManage: boolean }) {
   const t = useTranslation("forms")
   const { currentLanguage } = useCurrentLanguage()
   const statusLabel = useStatusLabel()
@@ -150,7 +159,8 @@ export function FormBuilderScreen({ env, formId, canManage }: { env: FormsScreen
     return () => query.removeEventListener("change", update)
   }, [])
 
-  const problems = useMemo(() => problemsOf(fields, settings?.name ?? {}), [fields, settings])
+  const { enabled: enabledLanguages } = useFormLanguages()
+  const problems = useMemo(() => problemsOf(fields, settings?.name ?? {}, enabledLanguages), [fields, settings, enabledLanguages])
   const blocking = useMemo(() => problems.filter((p) => p.blocking), [problems])
   const invalid = useMemo(() => new Set(blocking.flatMap((p) => (p.index === null ? [] : [p.index]))), [blocking])
   const problemText = useProblemText(fields)
@@ -485,7 +495,7 @@ export function FormBuilderScreen({ env, formId, canManage }: { env: FormsScreen
             />
             {wide && (
               <aside className="border-t border-border bg-card p-5 lg:border-s lg:border-t-0">
-                <div className="lg:sticky lg:top-4">{panel}</div>
+                <div className="lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto lg:pe-1">{panel}</div>
               </aside>
             )}
           </div>

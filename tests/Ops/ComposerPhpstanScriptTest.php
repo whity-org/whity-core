@@ -94,4 +94,16 @@ final class ComposerPhpstanScriptTest extends TestCase
             . 'them as findings — the misleading count #934 was filed about.'
         );
     }
+
+    public function testCiGoesThroughTheScriptAndOnlyRaisesItsLimit(): void
+    {
+        $workflow = (string) file_get_contents(dirname(__DIR__, 2) . '/.github/workflows/automated-tests.yml');
+
+        self::assertStringContainsString(
+            'run: composer phpstan -- --memory-limit=2G',
+            $workflow,
+            'CI must keep using the script, which is the only place the path list exists. A cold '
+            . 'analysis on its runner needs more than the 1G a hand-run gets.'
+        );
+    }
 }

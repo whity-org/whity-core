@@ -139,6 +139,12 @@ final class QueueWorkCommand implements CliCommand
                 $jobPlugin,
             );
             $loaded->loader = PluginJobs::register($registry, null, $this->logger, $hookManager, $auditLogger, $documentRegistries);
+            // S.7: ends the 30-day keep on uninstalled plugins. Internal: never API-submittable.
+            $registry->register(
+                \Whity\Core\Queue\Jobs\PurgeRemovedPluginsJob::NAME,
+                new \Whity\Core\Queue\Jobs\PurgeRemovedPluginsJob($pdo, static fn (): ?\Whity\Core\PluginLoader => $loaded->loader, $auditLogger, $this->logger),
+                false
+            );
             $runner ??= new JobRunner($repo, $registry, $this->logger);
         }
         $this->repo = $repo;
