@@ -5062,6 +5062,9 @@ final class CoreApiSchemas
                 'origin_ou_id' => self::int(true),
                 'created_by' => self::int(true),
                 'created_at' => self::str(),
+                // S5: null unless the document was withdrawn. The record is kept.
+                'withdrawn_at' => self::str(true),
+                'withdrawn_by' => self::int(true),
                 // The CURRENT artifact's bytes; null only for a record whose
                 // artifact rows are gone (a partial restore), since the issuer
                 // never commits a document without one.
@@ -5100,6 +5103,9 @@ final class CoreApiSchemas
             // none was supplied) is visible rather than assumed.
             'DocumentListResponse' => self::object([
                 'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('Document')],
+                // S5: display names of the people these rows name, keyed by profile
+                // id. An id with no entry is somebody no longer in this workspace.
+                'people' => ['type' => 'object', 'additionalProperties' => ['type' => 'string']],
                 'pagination' => SchemaBuilder::ref('Pagination'),
                 'view' => self::object([
                     'key' => self::str(),
@@ -5381,6 +5387,8 @@ final class CoreApiSchemas
                 // act on a circulation step, every note, and every event recorded
                 // before migration 119. It never means "not approved".
                 'verdict' => ['type' => 'string', 'enum' => ['approved', 'rejected'], 'nullable' => true],
+                // S5: this row closed the route because the document was withdrawn.
+                'withdrawal' => self::bool(),
                 'occurred_at' => self::str(),
             ], ['id', 'document_id', 'route_id', 'action', 'occurred_at']),
             'DocumentTrailListResponse' => self::paginatedListEnvelope('DocumentTrailEvent'),
@@ -5888,6 +5896,8 @@ final class CoreApiSchemas
                 'name' => self::str(),
                 'description' => self::str(true),
                 'step_count' => self::int(),
+                // S5: how many routes were started from this design, finished or not.
+                'usage_count' => self::int(),
                 // Null once the person who designed it has been deleted. The
                 // design survives them: it is the institution's process, not that
                 // person's private filing.
@@ -6116,7 +6126,11 @@ final class CoreApiSchemas
                 'published_by' => self::int(true),
                 'published_at' => self::str(),
             ], ['version', 'title', 'blocks', 'own_fields', 'published_at'])),
-            'DocumentSourceListResponse' => self::listEnvelope('DocumentSource'),
+            'DocumentSourceListResponse' => self::object([
+                'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('DocumentSource')],
+                // S5: display names of who wrote these rows, keyed by profile id.
+                'people' => ['type' => 'object', 'additionalProperties' => ['type' => 'string']],
+            ], ['data']),
             'DocumentSourceFileResponse' => self::object([
                 'data' => self::object([
                     'id' => self::int(),
@@ -7046,6 +7060,7 @@ final class CoreApiSchemas
                 // Null means "collect only, do not circulate" — a legitimate
                 // configuration, not an unset field.
                 'route_template_id' => self::int(true),
+                'route_template_name' => self::str(true),
                 'created_by_profile_id' => self::int(true),
                 'created_at' => self::str(),
                 'updated_at' => self::str(),
@@ -11189,6 +11204,52 @@ final class CoreApiSchemas
                     404 => self::errorResponse('Document not found or not visible to the caller'),
                 ] + self::authErrors(),
             ]),
+            [
+                'method' => 'GET',
+                'path' => '/api/documents/{id:\\d+}/people',
+                'requiredRole' => null,
+                // Unpermissioned like the actions route below: a person the document
+                // was routed to may read it. The row gate is the visibility policy.
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'The names of the people on this document',
+                    'description' => 'Display names, keyed by profile id, of who raised and withdrew the document, '
+                        . 'who took part in its routes and, for a caller holding documents:read, who issued and '
+                        . 'retired its codes. It takes no ids and returns no email addresses. An id with no entry is '
+                        . 'somebody no longer in this workspace.',
+                    'tags' => ['documents'],
+                    'responses' => [
+                        200 => self::jsonResponse('Names keyed by profile id', self::object([
+                            'data' => ['type' => 'object', 'additionalProperties' => ['type' => 'string']],
+                        ], ['data'])),
+                        404 => self::errorResponse('Document not found or not visible to the caller'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            self::permissionRoute('POST', '/api/documents/{id:\\d+}/withdraw', 'documents:withdraw', [
+                'summary' => 'Withdraw an issued document',
+                // It cannot be undone, so an agent only ever proposes it, whatever its
+                // grant says (MCP-TOOL-SURFACE.md 5.11).
+                'mcp' => ['agentPolicy' => 'propose'],
+                'description' => 'Keeps the record and its history. Every live code stops being honoured, open items on '
+                    . 'its routes close, and it can no longer be routed, corrected or given a new code. Recorded in the '
+                    . 'audit log. There is no way to undo it.',
+                'tags' => ['documents'],
+                'responses' => [
+                    200 => self::jsonResponse('What the withdrawal did', self::object([
+                        'data' => self::object([
+                            'id' => self::int(),
+                            'withdrawn_at' => self::str(),
+                            'withdrawn_by' => self::int(true),
+                            'codes_withdrawn' => self::int(),
+                            'items_closed' => self::int(),
+                        ], ['id', 'withdrawn_at', 'codes_withdrawn', 'items_closed']),
+                    ], ['data'])),
+                    404 => self::errorResponse('Document not found or not visible to the caller'),
+                    409 => self::errorResponse('The document has already been withdrawn'),
+                    503 => self::errorResponse('The document could not be withdrawn'),
+                ] + self::authErrors(),
+            ]),
             self::permissionRoute('GET', '/api/documents/{id:\\d+}/recipients', 'documents:read', [
                 'summary' => 'Who the document\'s routes reached, and what became of each item',
                 'tags' => ['documents'],
@@ -12087,8 +12148,9 @@ final class CoreApiSchemas
                                                 'description' =>
                                                     'Present only when verified is false. `unrecognised` '
                                                     . 'covers unknown, malformed, withdrawn and superseded '
-                                                    . 'at the default disclosure level.',
-                                                'enum' => ['unrecognised', 'withdrawn', 'superseded'],
+                                                    . 'at the default disclosure level, and a withdrawn document too. '
+                                                    . '`document_withdrawn` means the whole document was taken back.',
+                                                'enum' => ['unrecognised', 'withdrawn', 'superseded', 'document_withdrawn'],
                                             ],
                                             'revoked_on' => [
                                                 'type' => 'string',
@@ -12152,8 +12214,9 @@ final class CoreApiSchemas
                                 'properties' => [
                                     'id' => ['type' => 'integer'],
                                     'code_honoured' => ['type' => 'boolean'],
+                                    'document_withdrawn' => ['type' => 'boolean'],
                                 ],
-                                'required' => ['id', 'code_honoured'],
+                                'required' => ['id', 'code_honoured', 'document_withdrawn'],
                             ],
                         ],
                     ]),
@@ -12185,6 +12248,7 @@ final class CoreApiSchemas
                                 'properties' => [
                                     'enabled' => ['type' => 'boolean'],
                                     'configured' => ['type' => 'boolean'],
+                                    'document_withdrawn' => ['type' => 'boolean'],
                                     'token' => [
                                         'type' => 'object',
                                         'nullable' => true,
