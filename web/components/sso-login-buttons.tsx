@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { apiClient } from '@/lib/api-client';
 import { Button } from '@whity/ui/button';
 import { useTranslation } from '@whity/features/i18n';
+import { Mark } from '@whity/ui/mark';
 import { IconBrandGoogle, IconBrandWindows, IconLock } from '@tabler/icons-react';
 
 /**
@@ -26,6 +27,8 @@ function startUrl(providerKey: string): string {
 
 function ProviderIcon({ providerKey }: { providerKey: string }) {
   if (providerKey === 'google') return <IconBrandGoogle className="h-4 w-4" aria-hidden="true" />;
+  // Whity ID, the Whity identity service, keyed whity_id (SSO provider keys are [a-z0-9_]+).
+  if (providerKey === 'whity_id') return <Mark size={16} label="" />;
   if (providerKey === 'microsoft') return <IconBrandWindows className="h-4 w-4" aria-hidden="true" />;
   return <IconLock className="h-4 w-4" aria-hidden="true" />;
 }
@@ -71,11 +74,6 @@ export function SsoLoginButtons() {
 
   return (
     <div className="space-y-3" data-testid="sso-login-buttons">
-      <div className="flex items-center gap-3">
-        <span className="h-px flex-1 bg-border" />
-        <span className="text-xs text-muted-foreground">{t('sso.divider', 'or')}</span>
-        <span className="h-px flex-1 bg-border" />
-      </div>
       {providers.map((provider) => (
         <Button
           key={provider.provider_key}
@@ -86,12 +84,17 @@ export function SsoLoginButtons() {
         >
           <a href={startUrl(provider.provider_key)}>
             <ProviderIcon providerKey={provider.provider_key} />
-            {t('sso.signInWith', 'Sign in with {provider}', {
+            {t('sso.signInWith', 'Continue with {provider}', {
               provider: provider.display_name,
             })}
           </a>
         </Button>
       ))}
+      <div className="flex items-center gap-3">
+        <span className="h-px flex-1 bg-border" />
+        <span className="text-sm text-muted-foreground">{t('sso.divider', 'or with email')}</span>
+        <span className="h-px flex-1 bg-border" />
+      </div>
     </div>
   );
 }

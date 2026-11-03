@@ -21,6 +21,11 @@ jest.mock('@/components/sso-login-buttons', () => ({
 // Mock global fetch
 global.fetch = jest.fn();
 
+/** The six code boxes (the OtpInput), and what they hold together. */
+const codeBoxes = () =>
+  screen.getAllByRole('textbox', { name: /Authenticator Code/i }) as HTMLInputElement[];
+const codeValue = () => codeBoxes().map((box) => box.value).join('');
+
 const mockRouter = {
   push: jest.fn(),
 };
@@ -84,7 +89,7 @@ describe('LoginPage - 2FA Flow', () => {
     expect(screen.queryByPlaceholderText('Enter your password')).not.toBeInTheDocument();
 
     // Verify 2FA input is visible
-    expect(screen.getByPlaceholderText('000000')).toBeInTheDocument();
+    expect(codeBoxes()[0]).toBeInTheDocument();
   });
 
   // Test 2: 2FA code input accepts only digits
@@ -127,11 +132,11 @@ describe('LoginPage - 2FA Flow', () => {
     });
 
     // Type letters and special characters into 2FA code input
-    const codeInput = screen.getByPlaceholderText('000000') as HTMLInputElement;
+    const codeInput = codeBoxes()[0];
     fireEvent.change(codeInput, { target: { value: 'abc123def456' } });
 
     // Should only contain digits, max 6 chars
-    expect(codeInput).toHaveValue('123456');
+    expect(codeValue()).toBe('123456');
   });
 
   // Test 3: 2FA submission calls /api/login/2fa
@@ -179,7 +184,7 @@ describe('LoginPage - 2FA Flow', () => {
     });
 
     // Enter 2FA code
-    const codeInput = screen.getByPlaceholderText('000000');
+    const codeInput = codeBoxes()[0];
     fireEvent.change(codeInput, { target: { value: '123456' } });
 
     // Submit 2FA form
@@ -244,7 +249,7 @@ describe('LoginPage - 2FA Flow', () => {
     });
 
     // Enter invalid 2FA code
-    const codeInput = screen.getByPlaceholderText('000000');
+    const codeInput = codeBoxes()[0];
     fireEvent.change(codeInput, { target: { value: '000000' } });
 
     // Submit 2FA form
@@ -257,7 +262,7 @@ describe('LoginPage - 2FA Flow', () => {
     });
 
     // Code field should be cleared
-    expect(codeInput).toHaveValue('');
+    expect(codeValue()).toBe('');
   });
 
   // Test 5: Back button returns to login form
@@ -358,7 +363,7 @@ describe('LoginPage - 2FA Flow', () => {
     });
 
     // Enter valid 2FA code
-    const codeInput = screen.getByPlaceholderText('000000');
+    const codeInput = codeBoxes()[0];
     fireEvent.change(codeInput, { target: { value: '123456' } });
 
     // Submit 2FA form
@@ -416,7 +421,7 @@ describe('LoginPage - 2FA Flow', () => {
     expect(verifyButton).toBeDisabled();
 
     // Type 5 digits - still disabled
-    const codeInput = screen.getByPlaceholderText('000000');
+    const codeInput = codeBoxes()[0];
     fireEvent.change(codeInput, { target: { value: '12345' } });
     expect(verifyButton).toBeDisabled();
 
