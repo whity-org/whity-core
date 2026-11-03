@@ -311,7 +311,6 @@ describe('RoleRecordScreen reports scope from the server flag (#886)', () => {
     await screen.findByTestId('role-record');
     expect(screen.queryByTestId('role-record-badge-global')).toBeNull();
     expect(screen.queryByTestId('role-record-global-warning')).toBeNull();
-    expect(screen.getByText("Your tenant's role")).toBeInTheDocument();
   });
 
   /**

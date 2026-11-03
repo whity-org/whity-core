@@ -124,17 +124,16 @@ describe('UserRecordScreen — the record and what it states', () => {
     expect(adapter.getUser).toHaveBeenCalledTimes(1);
   });
 
-  it("states the person's role, unit and joined date from the server", async () => {
+  it("states the person's role, unit and email in one facts line, with the unit's name", async () => {
     renderRecord();
 
-    expect(await screen.findByTestId('user-record-stat-role')).toHaveTextContent('manager');
+    await screen.findByTestId('user-record');
     // The unit's NAME, resolved from the OU list rather than left as an id.
     await waitFor(() =>
-      expect(screen.getByTestId('user-record-stat-ou')).toHaveTextContent('Support')
+      expect(screen.getByText('manager · Support · sara@example.test')).toBeInTheDocument()
     );
-    await waitFor(() =>
-      expect(screen.getByTestId('user-record-stat-memberships')).toHaveTextContent('2')
-    );
+    // No stat tiles: the facts line carries them.
+    expect(screen.queryByTestId('user-record-stats')).not.toBeInTheDocument();
   });
 
   /**
@@ -216,20 +215,18 @@ describe('UserRecordScreen — the authority history #889/#890 made possible', (
       }),
     });
 
+    await userEvent.click(await screen.findByRole('tab', { name: 'History' }));
     const panel = await screen.findByTestId('user-record-activity');
     const [revocation, grant] = within(panel).getAllByRole('listitem');
 
     // The revocation names the role that was taken away and how long it was
     // held — neither of which exists anywhere else once the membership row is
     // gone.
-    expect(within(revocation).getByText('user.membership.removed')).toBeInTheDocument();
-    expect(revocation).toHaveTextContent('role approver');
-    expect(revocation).toHaveTextContent(/held since/);
-    expect(revocation).toHaveTextContent('by user 3');
-
-    // A grant with no actor is the system's, not a blank.
-    expect(within(grant).getByText('user.membership.added')).toBeInTheDocument();
-    expect(grant).toHaveTextContent('by the system');
+    // In words, never the event code: that is a technical detail.
+    expect(revocation).toHaveTextContent('Role approver removed');
+    expect(revocation).toHaveTextContent(/Held since/);
+    expect(within(revocation).queryByText('user.membership.removed')).not.toBeInTheDocument();
+    expect(grant).toHaveTextContent('Given the role approver');
   });
 
   it('OMITS the history panel entirely when the caller lacks audit:read', async () => {
@@ -243,7 +240,7 @@ describe('UserRecordScreen — the authority history #889/#890 made possible', (
     await waitFor(() =>
       expect(screen.queryByTestId('user-record-activity')).not.toBeInTheDocument()
     );
-    expect(screen.queryByText('Authority history')).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'History' })).not.toBeInTheDocument();
   });
 
   it('keeps the record usable when the history panel fails', async () => {
@@ -252,15 +249,17 @@ describe('UserRecordScreen — the authority history #889/#890 made possible', (
     });
 
     expect(await screen.findByTestId('user-record')).toBeInTheDocument();
-    const panel = screen.getByTestId('user-record-activity');
+    await userEvent.click(await screen.findByRole('tab', { name: 'History' }));
+    const panel = await screen.findByTestId('user-record-activity');
     expect(within(panel).getByText("Failed to load this person's history")).toBeInTheDocument();
   });
 });
 
 describe('UserRecordScreen — memberships', () => {
-  it('lists every tenant and role, marking the primary one', async () => {
+  it('lists every workspace and role on the Access tab, marking the primary one', async () => {
     renderRecord();
 
+    await userEvent.click(await screen.findByRole('tab', { name: 'Access' }));
     const panel = await screen.findByTestId('user-record-memberships');
     const items = within(panel).getAllByRole('listitem');
     expect(items).toHaveLength(2);
@@ -270,11 +269,12 @@ describe('UserRecordScreen — memberships', () => {
     expect(within(items[1]).queryByText('Primary')).not.toBeInTheDocument();
   });
 
-  it('says the person belongs to no tenant rather than showing an empty panel', async () => {
+  it('says the person belongs to no workspace rather than showing an empty panel', async () => {
     renderRecord({ adapter: fakeAdapter({ listUserMemberships: jest.fn().mockResolvedValue([]) }) });
 
+    await userEvent.click(await screen.findByRole('tab', { name: 'Access' }));
     const panel = await screen.findByTestId('user-record-memberships');
-    expect(within(panel).getByText('This person belongs to no tenant.')).toBeInTheDocument();
+    expect(within(panel).getByText('This person belongs to no workspace.')).toBeInTheDocument();
   });
 });
 
@@ -301,7 +301,8 @@ describe('UserRecordScreen — editing', () => {
     renderRecord();
 
     await screen.findByTestId('user-record');
-    expect(screen.getByRole('button', { name: 'Save changes' })).toBeDisabled();
+    // The save bar appears only once something changes.
+    expect(screen.queryByRole('button', { name: 'Save changes' })).not.toBeInTheDocument();
   });
 
   it('says so in its own words when the person has left the tenant between load and save', async () => {
@@ -355,9 +356,59 @@ describe('UserRecordScreen — editing', () => {
     expect(screen.queryByTestId('user-record-ou')).not.toBeInTheDocument();
     // The unit is still named as far as it can be — "unit 7, name unknown", not
     // "no unit", which is a different fact.
-    expect(screen.getByTestId('user-record-stat-ou')).toHaveTextContent('Unit #7');
+    expect(screen.getByTestId('user-record-ou-withheld').previousElementSibling).toHaveTextContent('Unit #7');
     // …and the role picker is untouched.
     expect(screen.getByTestId('user-record-role')).toBeInTheDocument();
+  });
+});
+
+describe('UserRecordScreen — P.3 save bar and A.2 actions', () => {
+  it('names the change and the previous value in the save bar', async () => {
+    const user = userEvent.setup();
+    renderRecord();
+
+    await screen.findByTestId('user-record-role');
+    await user.click(screen.getByTestId('user-record-role'));
+    await user.click(await screen.findByRole('option', { name: 'approver' }));
+
+    expect(screen.getByText('Changed: role')).toBeInTheDocument();
+    expect(screen.getByText('Was manager')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Discard' }));
+    expect(screen.queryByRole('button', { name: 'Save changes' })).not.toBeInTheDocument();
+  });
+
+  it('deactivates at once and offers Undo', async () => {
+    const user = userEvent.setup();
+    const setAccountStatus = jest.fn().mockResolvedValue(undefined);
+    const onNotify = jest.fn();
+    renderRecord({ adapter: fakeAdapter({ setAccountStatus }), onNotify });
+
+    await user.click(await screen.findByRole('button', { name: 'More actions' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Deactivate' }));
+
+    await waitFor(() => expect(setAccountStatus).toHaveBeenCalledWith(42, 'inactive'));
+    expect(onNotify).toHaveBeenCalledWith(
+      'sara was deactivated',
+      'success',
+      expect.objectContaining({ label: 'Undo' })
+    );
+    onNotify.mock.calls[0][2].onClick();
+    expect(setAccountStatus).toHaveBeenLastCalledWith(42, 'active');
+  });
+
+  it('asks before deleting, naming the consequence, then goes back', async () => {
+    const user = userEvent.setup();
+    const deleteUser = jest.fn().mockResolvedValue(undefined);
+    const { onBack } = renderRecord({ adapter: fakeAdapter({ deleteUser }) });
+
+    await user.click(await screen.findByRole('button', { name: 'More actions' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
+    expect(await screen.findByText('Delete sara?')).toBeInTheDocument();
+    expect(deleteUser).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Delete person' }));
+
+    await waitFor(() => expect(deleteUser).toHaveBeenCalledWith(42));
+    expect(onBack).toHaveBeenCalled();
   });
 });
 
@@ -377,11 +428,12 @@ describe('UserRecordScreen — read-only is a state, not a disabled form', () =>
     expect(screen.queryByTestId('user-record-send-reset-link')).not.toBeInTheDocument();
   });
 
-  it('still states the record, and still shows the side panels', async () => {
+  it('still states the record, and still shows the Access tab', async () => {
     renderRecord({ can: () => false });
 
+    await userEvent.click(await screen.findByRole('tab', { name: 'Access' }));
     expect(await screen.findByTestId('user-record-memberships')).toBeInTheDocument();
-    expect(screen.getByTestId('user-record-stat-role')).toHaveTextContent('manager');
+    expect(screen.getByText('manager · Support · sara@example.test')).toBeInTheDocument();
   });
 });
 

@@ -9,14 +9,11 @@
  * domain, shared UI chrome in `common`.
  *
  * @i18n-keys admin
- *   roles.record.activity.actor = by user {id}
  *   roles.record.activity.empty = Nothing has been recorded for this role yet.
  *   roles.record.activity.error = Failed to load this role's history
  *   roles.record.activity.subtitle = Changes recorded against this role.
  *   roles.record.activity.title = History
- *   roles.record.activity.unknownActor = by the system
  *   roles.record.back = Back to roles
- *   roles.record.cancel = Discard changes
  *   roles.record.details.subtitle = The role's name and description, as they appear everywhere it is used.
  *   roles.record.details.title = Details
  *   roles.record.description.label = Description
@@ -42,17 +39,26 @@
  *   roles.record.permissions.readOnly.permission = You may see what this role grants, but not change it.
  *   roles.record.readOnly.systemRole = This is a global base role. Only the system tenant can change it.
  *   roles.record.save = Save changes
- *   roles.record.saving = Saving…
- *   roles.record.stat.created = Created
- *   roles.record.stat.holders = Users with this role
- *   roles.record.stat.permissions = Permissions granted
- *   roles.record.stat.scope = Scope
  *   roles.record.stat.scope.global = Global base role
- *   roles.record.stat.scope.tenant = Your tenant's role
  *   roles.record.subtitle = Role record
  *   roles.record.success = Role updated successfully
  *   roles.record.validation.descriptionRequired = Description is required
  *   roles.record.validation.nameRequired = Name is required
+ *   roles.record.changed.details = name or description
+ *   roles.record.changed.permissions = permissions
+ *   roles.record.changed.summary = Changed: {fields}
+ *   roles.record.discard = Discard
+ *   roles.record.fact.people = People: {count}
+ *   roles.record.fact.permissions = Permissions: {count}
+ *   roles.record.history.by = by {id}
+ *   roles.record.history.created = Role created
+ *   roles.record.history.deleted = Role deleted
+ *   roles.record.history.other = Something changed
+ *   roles.record.history.updated = Role changed
+ *   roles.record.tab.access = Access
+ *   roles.record.tab.history = History
+ *   roles.record.tab.overview = Overview
+ *   roles.record.tab.people = People
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -60,6 +66,8 @@ import type { FormEvent } from 'react';
 import { Alert, AlertDescription } from '@whity/ui/alert';
 import { Button } from '@whity/ui/button';
 import { Input } from '@whity/ui/input';
+import { TechnicalDetails } from '@whity/ui/display-preferences';
+import { SaveBar } from '@whity/ui/save-bar';
 import { IconAlertTriangle, IconShieldLock } from '@tabler/icons-react';
 
 import {
@@ -172,9 +180,15 @@ function localizeDenial(
  * What the page SAYS about a role — a pure projection, at module scope, of the
  * record and the dictionary. There is no `can` in scope for it to reach for.
  */
-const roleFacts: RecordFactsFn<RoleRecordFields> = (role, t, dates) => ({
+const roleFacts: RecordFactsFn<RoleRecordFields> = (role, t) => ({
   title: role.name,
-  subtitle: role.description || t('roles.record.subtitle', 'Role record'),
+  subtitle: [
+    role.description,
+    t('roles.record.fact.people', 'People: {count}', { count: role.holderCount ?? 0 }),
+    t('roles.record.fact.permissions', 'Permissions: {count}', { count: role.permissionCount ?? 0 }),
+  ]
+    .filter((part) => part !== '')
+    .join(' · '),
   badges: role.global
     ? [
         {
@@ -184,38 +198,6 @@ const roleFacts: RecordFactsFn<RoleRecordFields> = (role, t, dates) => ({
         },
       ]
     : [],
-  stats: [
-    {
-      key: 'holders',
-      label: t('roles.record.stat.holders', 'Users with this role'),
-      value: role.holderCount,
-    },
-    {
-      key: 'permissions',
-      label: t('roles.record.stat.permissions', 'Permissions granted'),
-      value: role.permissionCount,
-    },
-    // #1068: the stat GOES when this tenant hides dates, rather than
-    // surviving as "Created —". A label with an em dash under it is a
-    // question the screen is refusing to answer; an absent stat is simply a
-    // fact the page does not report.
-    ...(dates.hidden
-      ? []
-      : [
-          {
-            key: 'created',
-            label: t('roles.record.stat.created', 'Created'),
-            value: dates.date(role.createdAt),
-          },
-        ]),
-    {
-      key: 'scope',
-      label: t('roles.record.stat.scope', 'Scope'),
-      value: role.global
-        ? t('roles.record.stat.scope.global', 'Global base role')
-        : t('roles.record.stat.scope.tenant', "Your tenant's role"),
-    },
-  ],
 });
 
 /**
@@ -404,16 +386,20 @@ export function RoleRecordScreen({
   // light up its Save button because the grid re-derived a set — and, more to the
   // point, must never send a `permissions` key the server would refuse: the
   // submit below builds its body from the same two flags.
-  const isDirty = useMemo(() => {
-    if (!current || !form) return false;
+  const changes = useMemo(() => {
+    if (!current || !form) return { details: false, permissions: false };
     const original = (current.permissions ?? []).map((p) => p.id);
     const sameSet =
       original.length === form.permissionIds.length &&
       new Set(form.permissionIds).size === new Set([...form.permissionIds, ...original]).size;
     const detailsChanged =
       form.name !== (current.name ?? '') || form.description !== (current.description ?? '');
-    return (canEditDetails && detailsChanged) || (canEditPermissions && !sameSet);
+    return {
+      details: canEditDetails && detailsChanged,
+      permissions: canEditPermissions && !sameSet,
+    };
   }, [current, form, canEditDetails, canEditPermissions]);
+  const isDirty = changes.details || changes.permissions;
 
   const back = { label: t('roles.record.back', 'Back to roles'), onBack };
 
@@ -632,7 +618,97 @@ export function RoleRecordScreen({
     ),
   };
 
-  const sections = [detailsSection, permissionsSection];
+  const holdersPanel = (
+    <RecordCollectionPanel
+      testId="role-record-holders"
+      title={t('roles.record.holders.title', 'Who holds this role')}
+      subtitle={t('roles.record.holders.subtitle', 'Most recently assigned first.')}
+      resource={holderList}
+      emptyLabel={t('roles.record.holders.empty', 'Nobody holds this role yet.')}
+      footer={
+        holderOverflow > 0 ? (
+          <p className="pt-2 text-xs text-muted-foreground">
+            {t('roles.record.holders.more', 'and {count} more', { count: holderOverflow })}
+          </p>
+        ) : undefined
+      }
+    >
+      {(items) => (
+        <RecordList>
+          {items.map((holder) => {
+            const when = dates.date(holder.assignedAt);
+            return (
+              <RecordListItem
+                key={holder.membershipId}
+                primary={holder.displayName || holder.email || `#${holder.profileId}`}
+                // #1068: NO secondary line at all when dates are hidden.
+                secondary={
+                  dates.hidden
+                    ? undefined
+                    : when !== null
+                      ? t('roles.record.holders.assignedOn', 'assigned {date}', { date: when })
+                      : t('roles.record.holders.assignedUnknown', 'assignment date unknown')
+                }
+              />
+            );
+          })}
+        </RecordList>
+      )}
+    </RecordCollectionPanel>
+  );
+
+  const historySentence = (action: string): string => {
+    switch (action) {
+      case 'role.created':
+      case 'role.created.async':
+        return t('roles.record.history.created', 'Role created');
+      case 'role.updated':
+        return t('roles.record.history.updated', 'Role changed');
+      case 'role.deleted':
+      case 'role.deleted.async':
+        return t('roles.record.history.deleted', 'Role deleted');
+      default:
+        return t('roles.record.history.other', 'Something changed');
+    }
+  };
+
+  const historyPanel = (
+    <RecordCollectionPanel
+      testId="role-record-activity"
+      title={t('roles.record.activity.title', 'History')}
+      subtitle={t('roles.record.activity.subtitle', 'Changes recorded against this role.')}
+      resource={activity}
+      emptyLabel={t('roles.record.activity.empty', 'Nothing has been recorded for this role yet.')}
+    >
+      {(entries) => (
+        <RecordTimeline>
+          {entries.map((entry) => (
+            <RecordTimelineItem
+              key={entry.id}
+              // In words; the event code and the actor's id are technical details.
+              title={historySentence(entry.action)}
+              meta={
+                <>
+                  {!dates.hidden && (dates.dateTime(entry.createdAt) ?? '—')}
+                  <TechnicalDetails>
+                    {' · '}
+                    <code className="font-mono text-xs">{entry.action}</code>
+                    {entry.actorUserId !== null &&
+                      ` · ${t('roles.record.history.by', 'by {id}', { id: entry.actorUserId })}`}
+                  </TechnicalDetails>
+                </>
+              }
+            />
+          ))}
+        </RecordTimeline>
+      )}
+    </RecordCollectionPanel>
+  );
+
+  const changedFields = [
+    changes.details ? t('roles.record.changed.details', 'name or description') : null,
+    changes.permissions ? t('roles.record.changed.permissions', 'permissions') : null,
+  ].filter((part): part is string => part !== null);
   const anyEditable = canEditDetails || canEditPermissions;
 
   return (
@@ -655,23 +731,6 @@ export function RoleRecordScreen({
         back={back}
         icon={<IconShieldLock />}
         className={className}
-        actions={
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              disabled={!isDirty || isSaving}
-              onClick={() => resetDraft(current)}
-            >
-              {t('roles.record.cancel', 'Discard changes')}
-            </Button>
-            <Button type="submit" form="role-record-form" disabled={isSaving || !isDirty}>
-              {isSaving
-                ? t('roles.record.saving', 'Saving…')
-                : t('roles.record.save', 'Save changes')}
-            </Button>
-          </div>
-        }
         notices={
           // #886 — the blast radius, stated before the edit rather than after it.
           // Shown only when the record is BOTH global and actually editable here,
@@ -696,100 +755,29 @@ export function RoleRecordScreen({
         // that would not be a second opinion about the same question, so the shell
         // DERIVES the one thing it still needs (does the action bar render?) from
         // the regions themselves. The two therefore cannot disagree.
-        sections={sections}
-        side={
-          <>
-            <RecordCollectionPanel
-              testId="role-record-holders"
-              title={t('roles.record.holders.title', 'Who holds this role')}
-              subtitle={t('roles.record.holders.subtitle', 'Most recently assigned first.')}
-              resource={holderList}
-              emptyLabel={t('roles.record.holders.empty', 'Nobody holds this role yet.')}
-              footer={
-                holderOverflow > 0 ? (
-                  <p className="pt-2 text-xs text-muted-foreground">
-                    {t('roles.record.holders.more', 'and {count} more', {
-                      count: holderOverflow,
-                    })}
-                  </p>
-                ) : undefined
-              }
-            >
-              {(items) => (
-                <RecordList>
-                  {items.map((holder) => {
-                    const when = dates.date(holder.assignedAt);
-                    return (
-                      <RecordListItem
-                        key={holder.membershipId}
-                        primary={holder.displayName || holder.email || `#${holder.profileId}`}
-                        // #1068: NO secondary line at all when dates are
-                        // hidden — not "assignment date unknown", which would
-                        // be untrue. The date is known; this tenant has asked
-                        // not to see it, and saying the record is incomplete
-                        // to cover for that is a worse answer than silence.
-                        secondary={
-                          dates.hidden
-                            ? undefined
-                            : when !== null
-                              ? t('roles.record.holders.assignedOn', 'assigned {date}', {
-                                  date: when,
-                                })
-                              : t('roles.record.holders.assignedUnknown', 'assignment date unknown')
-                        }
-                      />
-                    );
-                  })}
-                </RecordList>
-              )}
-            </RecordCollectionPanel>
-
-            <RecordCollectionPanel
-              testId="role-record-activity"
-              title={t('roles.record.activity.title', 'History')}
-              subtitle={t('roles.record.activity.subtitle', 'Changes recorded against this role.')}
-              resource={activity}
-              emptyLabel={t(
-                'roles.record.activity.empty',
-                'Nothing has been recorded for this role yet.'
-              )}
-            >
-              {(entries) => (
-                <RecordTimeline>
-                  {entries.map((entry) => (
-                    <RecordTimelineItem
-                      key={entry.id}
-                      // The action key is a stable machine identifier
-                      // (`role.updated`), not a source string, so it renders
-                      // verbatim and never enters the catalogue — the same rule
-                      // permission slugs follow.
-                      title={entry.action}
-                      // #1068: the WHO survives, the WHEN goes. A trail's
-                      // value is the ordered sequence of what happened and by
-                      // whom, and the ordering is still on the screen — the
-                      // rows are in order. "— · by user 4" would be a
-                      // separator with nothing on one side of it.
-                      meta={
-                        <>
-                          {!dates.hidden && (
-                            <>
-                              {dates.dateTime(entry.createdAt) ?? '—'}
-                              {' · '}
-                            </>
-                          )}
-                          {entry.actorUserId !== null
-                            ? t('roles.record.activity.actor', 'by user {id}', {
-                                id: entry.actorUserId,
-                              })
-                            : t('roles.record.activity.unknownActor', 'by the system')}
-                        </>
-                      }
-                    />
-                  ))}
-                </RecordTimeline>
-              )}
-            </RecordCollectionPanel>
-          </>
+        sections={[detailsSection]}
+        tabs={{
+          overviewLabel: t('roles.record.tab.overview', 'Overview'),
+          items: [
+            {
+              key: 'access',
+              label: t('roles.record.tab.access', 'Access'),
+              sections: [permissionsSection],
+            },
+            { key: 'people', label: t('roles.record.tab.people', 'People'), content: holdersPanel },
+            { key: 'history', label: t('roles.record.tab.history', 'History'), content: historyPanel },
+          ],
+        }}
+        saveBar={
+          <SaveBar
+            dirty={isDirty}
+            summary={t('roles.record.changed.summary', 'Changed: {fields}', { fields: changedFields.join(', ') })}
+            discardLabel={t('roles.record.discard', 'Discard')}
+            saveLabel={t('roles.record.save', 'Save changes')}
+            saving={isSaving}
+            onDiscard={() => resetDraft(current)}
+            onSave={() => void handleSubmit({ preventDefault: () => undefined } as FormEvent)}
+          />
         }
       />
     </>
