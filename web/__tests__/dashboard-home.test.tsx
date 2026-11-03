@@ -144,6 +144,8 @@ describe('PlatformCards', () => {
   });
 });
 
+const calledUrls = () => mockApiClient.mock.calls.map((call) => call[0] as string);
+
 const card = (over: Record<string, unknown> = {}) => ({
   key: 'Inventory',
   label: 'Stock',
@@ -177,7 +179,7 @@ describe('HomeApps', () => {
     expect(await screen.findByText('3')).toBeInTheDocument();
     expect(screen.getByText('items below reorder level')).toBeInTheDocument();
     expect(screen.getByText('Flour')).toBeInTheDocument();
-    expect(mockApiClient).toHaveBeenCalledWith('/api/v1/inventory/home-card');
+    expect(calledUrls()).toContain('/api/v1/inventory/home-card');
   });
 
   it('leaves a card out when the app refuses this person', async () => {
@@ -186,7 +188,7 @@ describe('HomeApps', () => {
     );
     render(<HomeApps />);
 
-    await waitFor(() => expect(mockApiClient).toHaveBeenCalledWith('/api/v1/inventory/home-card'));
+    await waitFor(() => expect(calledUrls()).toContain('/api/v1/inventory/home-card'));
     await waitFor(() => expect(screen.queryByRole('link', { name: 'Stock' })).not.toBeInTheDocument());
   });
 
@@ -213,7 +215,7 @@ describe('HomeApps', () => {
         expect.objectContaining({ method: 'PUT', body: JSON.stringify({ hidden: false }) })
       )
     );
-    expect(mockApiClient).not.toHaveBeenCalledWith('/api/v1/inventory/home-card');
+    expect(calledUrls()).not.toContain('/api/v1/inventory/home-card');
   });
 });
 

@@ -126,7 +126,8 @@ function AppCard({ card, name, onHide }: { card: HomeCard; name: string; onHide:
 
   const data = useFetch<HomeCardData | null>(async () => {
     if (card.source === null || card.source === undefined) return null;
-    const response = await apiClient(card.source);
+    // The person's choice in this product, which the browser's own header may not be.
+    const response = await apiClient(card.source, locale ? { headers: { 'Accept-Language': locale } } : undefined);
     // The app says this person may not see it now, so there is no card to show.
     if (response.status === 403 || response.status === 404) {
       setDenied(true);
@@ -134,7 +135,7 @@ function AppCard({ card, name, onHide }: { card: HomeCard; name: string; onHide:
     }
     if (!response.ok) throw new Error(t('dashboard.apps.error', 'This card could not be loaded.'));
     return ((await response.json()) as { data?: HomeCardData }).data ?? null;
-  }, [apiClient, card.source]);
+  }, [apiClient, card.source, locale]);
 
   if (denied) return null;
 
