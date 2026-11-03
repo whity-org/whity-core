@@ -4865,6 +4865,11 @@ $router->register('POST', '/api/me/agent-proposals/{id:\d+}/decline',  [$agentPr
 // first. Session-gated and self-scoped like the two surfaces it reads.
 $meWaitingHandler = new \Whity\Api\MeWaitingApiHandler($inboxSourceRegistry, $agentProposals);
 $router->register('GET', '/api/me/waiting', [$meWaitingHandler, 'list'], null);
+// WHIT-872 (H.4): the cards apps add to the caller's home. The handler lists only
+// what the caller holds the permission for, and each card's data is its own route.
+$homeCardsHandler = new \Whity\Api\HomeCardsApiHandler($db->getPdo(), $roleChecker, $pluginLoader, $tenantManifestHost, $tenantRecordRepository, $router);
+$router->register('GET', '/api/me/home-cards', [$homeCardsHandler, 'list'], null);
+$router->register('PUT', '/api/me/home-cards/{key:[A-Za-z][A-Za-z0-9_]*}/hidden', [$homeCardsHandler, 'setHidden'], null);
 // WHIT-815: workspace agents (persona, toolsets, starting grant) and the
 // presets they start from. Gated on agents:manage, which migration 180 grants
 // to every role holding mcp:tokens:manage. Writes are agentPolicy refuse.

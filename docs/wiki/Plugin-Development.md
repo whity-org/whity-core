@@ -1505,6 +1505,39 @@ try {
 - `plugins/HelloWorld` declares a `greeting_card` slot for its greetings as a
   worked example.
 
+
+## Step 12b — Add a card to the home page (SDK 1.62)
+
+Each plugin may add one card to the home page. It names the app, shows one number that matters, a few lines and at most one chart, and links into the app. People can hide it and can't rearrange it. Implement `PluginHomeCardInterface`, or add `homeCard` to `plugin.json` in the same shape:
+
+```php
+public function getHomeCard(): ?array
+{
+    return [
+        'label'      => ['en' => 'Stock', 'ar' => 'المخزون'],
+        'permission' => 'inventory:read',
+        'source'     => '/api/inventory/home-card',
+        'screen'     => 'inventory',   // a screen id: where the card opens
+        'icon'       => 'package',
+    ];
+}
+```
+
+`source` must be a GET route your plugin registered under that same permission, with no path parameters. A card that breaks this rule is dropped with a logged reason, and the plugin keeps loading. The route answers:
+
+```json
+{ "data": {
+  "value": "3",
+  "caption": "items below reorder level",
+  "lines": [{ "label": "Flour, 25 kg", "value": "4 / 6" }],
+  "chart": [{ "label": "W1", "value": 4120 }]
+} }
+```
+
+Only `value` is required, with at most 5 lines and 12 chart points. **The route decides the person's scope:** a branch manager's Stock card counts their branch. Answer in the language of the request's `Accept-Language`, and write amounts as they should appear (`JOD 18,240.500`).
+
+A workspace plugin has no routes, so its `homeCard` names a `record` type instead of a `source`, plus a `caption`. The host counts the records.
+
 ---
 
 ## Step 13 — Declare it in `plugin.json` instead (SDK 1.47)
