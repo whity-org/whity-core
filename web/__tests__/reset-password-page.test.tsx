@@ -97,6 +97,6 @@ test('rejects a too-short password client-side without calling the API', () => {
   render(<ResetPasswordPage />);
   fillAndSubmit('short');
 
-  expect(screen.getByText(/at least 8 characters/i)).toBeInTheDocument();
+  expect(screen.getByText('Password must be at least 8 characters')).toBeInTheDocument();
   expect(global.fetch).not.toHaveBeenCalled();
 });

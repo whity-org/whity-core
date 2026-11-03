@@ -17,6 +17,7 @@
     "./datetime": "./src/datetime/index.ts",
     "./roles": "./src/roles/index.ts",
     "./users": "./src/users/index.ts",
+    "./forms": "./src/forms/index.ts",
     "./sync": "./src/sync/index.ts",
     "./i18n": "./src/i18n/index.ts",
     "./mcp": "./src/mcp/index.ts",

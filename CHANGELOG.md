@@ -6,6 +6,61 @@ uses tag-based releases (see the `v*` tags in the repository).
 
 ## [Unreleased]
 
+## [0.2.24] - 2026-11-03
+
+### Added
+
+- **Questions can be shown only if an earlier answer matches.** A form can ask
+  "how many?" only after someone answers yes. A hidden question isn't required and
+  any answer sent for it isn't stored. Setting a condition is API-only until the
+  new form builder arrives (WHIT-782).
+- **Agents pages.** Admins get an Agents page: create an agent from a preset or from scratch, edit its role name, role and instructions in English and Arabic side by side, set its tone, language, toolsets and where a person's grant starts, and archive or restore it. Everyone gets My agents: start or stop using an agent, set what it may do, and connect an app with its address or a key. These use existing components until the design cards land.
+- **Your own MCP connection now names the agents you've granted.** `init_session` lists them (slug, name and role, in your language), so a client like Whity Agent can offer them. Each agent is still its own sign-in at `/mcp/agents/<slug>`, with its own grant. An agent's own session never sees this list.
+- **13 ready document templates for every workspace, in English and Arabic.** Quote, Invoice, Credit note, Receipt (A5), Statement of account, Payment reminder, Delivery note, Payslip, Employment letter, Leave approval, Report, Letter and Purchase order are now starters in Document templates. New workspaces get them when they are created, and migration 189 adds them to existing ones. Starters you changed, published or deleted are left as they are; an old Letter or Invoice nobody touched is brought up to the guideline. They are drafts to check and publish: tax rates and invoice fields are for your accountant to confirm, and nothing here is a JoFotara submission (WHIT-843).
+- **Printed tables follow the guideline.** A strong rule under the header and hairlines between rows, with no grid or tinted header, and amounts end-aligned in tabular figures. Documents now print on the paper they name: A5 and Letter as well as A4 (WHIT-843).
+- **Forms can say everything in English and Arabic.** A form's description, its
+  help text, its section titles and its button wording now hold both languages.
+  A refused answer also names the question and the reason in a code, so a page
+  can show it in the reader's language and take them to that question (WHIT-851).
+- **Forms can hold questions only staff answer, and offices can record a
+  decision.** A staff question is never shown to the applicant. The office records
+  its answers in a review beside the submission, and changing a decision keeps the
+  old one. Recording needs the new `forms:review` permission, given to roles that
+  can already manage forms (WHIT-852).
+- **Forms accept Word documents, and a question can take several files.** A `.docx`
+  is checked without being unpacked, and one with macros is refused. Legacy `.doc`
+  files are still refused. A file question can allow up to 20 files, and each one
+  is kept as evidence on the submission's document (WHIT-853).
+- **Submissions can get a reference number in your own format.** Set a format such
+  as `BAKE-{YYYY}-{SEQ:4}` on a form and each new submission gets the next number,
+  shown on the public receipt. A format with the year in it restarts each year
+  (WHIT-854).
+- **The pages for filling in a form now work in Arabic.** Every label, state and
+  message on the signed-in and public form pages has English and Arabic text, a
+  form's own translated text is shown, and a refused answer is explained in the
+  reader's language (WHIT-856).
+- **Long forms are now filled in as steps.** A form with sections shows one section
+  at a time with Back and Continue, then a Review before sending. A question with a
+  condition only appears when its answer matches, and a refused answer takes you
+  back to that question (WHIT-857).
+- **The form pages can now take several files, tables and signatures.** A question
+  can take several files, a table question lets people add rows, a signature
+  question takes a typed name, and the reference number is shown once a form is
+  sent (WHIT-858).
+
+### Changed
+
+- **Screens are sized for easier reading: 15px text with nothing below 13px, 40px controls and 48px table rows.** Each person can also choose Larger text and Show technical details, stored on their account (`GET` and `PUT /api/v1/me/display-preferences`). `@whity/ui` adds page states, confirm tiers, the save bar, `Stepper`, `SearchField`, `MoneyInput` and table row selection.
+
+### Fixed
+
+- **Uploads and rendered PDFs survive an image update on a `docker-compose.staging-remote.yml` install.** `/app/storage` is now a named volume, where before it lived inside the container and was lost every time the container was recreated. An install already running this file must copy its current files into the volume when it first applies the change, because the old container's files are not moved for it (WHIT-844).
+- **Signing in with SSO now shows the workspace picker.** A person in several workspaces who signed in through an SSO provider such as Whity ID came back to the login page with a message to sign in again. An account with no password could not get in at all. The page now lists their workspaces and signs them in to the one they choose (WHIT-848).
+- **A required checkbox must now be ticked.** A form accepted a required
+  checkbox left unticked, so a declaration nobody had made was recorded as
+  submitted. A question that can be answered "no" should be a choose-one question
+  (WHIT-849).
+
 ## [0.2.23] - 2026-11-01
 
 ### Added

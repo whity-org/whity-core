@@ -142,7 +142,7 @@ export default function LanguagesPage() {
     },
     {
       // Direction is STATED here and edited on the record page. It used to be a
-      // hand-styled native <select> in this cell — not because a table cell is
+      // hand-styled native select element in this cell — not because a table cell is
       // where a language's writing direction belongs, but because there was
       // nowhere else to put it. Now there is, and a control that re-mirrors the
       // whole interface for every speaker of the language is a poor fit for a
