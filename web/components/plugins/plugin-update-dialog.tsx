@@ -110,7 +110,7 @@ export function PluginUpdateDialog({ target, onClose, onChanged }: PluginUpdateD
               </DialogTitle>
               <DialogDescription>
                 {shown.kind === 'review'
-                  ? t('pluginUpdate.reviewHint', 'The current version keeps running until you decide. Only what is new is listed.')
+                  ? t('pluginUpdate.reviewHint', 'The current version stays until you decide. Only what is new is listed.')
                   : t('pluginUpdate.fetchHint', 'It is turned off when the update lands, and you turn it back on.')}
               </DialogDescription>
             </DialogHeader>
@@ -120,7 +120,7 @@ export function PluginUpdateDialog({ target, onClose, onChanged }: PluginUpdateD
                 {shown.newPermissions.length > 0 ? (
                   <div>
                     <p className="font-medium">
-                      {t('pluginUpdate.newPermissions', 'It adds {count} new permissions', { count: shown.newPermissions.length })}
+                      {t('pluginUpdate.newPermissions', 'New permissions it asks for: {count}', { count: shown.newPermissions.length })}
                     </p>
                     <TechnicalDetails>
                       <ul className="mt-1 space-y-0.5 font-mono text-xs text-muted-foreground">

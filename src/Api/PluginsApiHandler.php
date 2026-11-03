@@ -794,6 +794,9 @@ class PluginsApiHandler
         }
 
         $key = $this->pluginLoader !== null ? $this->resolvePluginKey($identifier) : null;
+        if ($key === null && (str_contains($identifier, '/') || str_contains($identifier, '\\') || str_contains($identifier, '.'))) {
+            return Response::error('Invalid plugin identifier', 400);
+        }
         $name = $identifier;
         $version = null;
         $wasActive = false;
@@ -817,6 +820,7 @@ class PluginsApiHandler
         if ($this->records->removal($name) !== null) {
             return Response::error('This plugin was already uninstalled.', 409);
         }
+        $version ??= $this->records->install($name)['version'] ?? null;
 
         if ($key !== null && $this->pluginLoader !== null) {
             try {
@@ -889,6 +893,10 @@ class PluginsApiHandler
             $install = $installs[$name] ?? $installs[$id] ?? null;
             if ($install !== null) {
                 $plugin['install'] = self::installFacts($install);
+                // A plugin that's turned off isn't loaded, so the loader can't say.
+                if (($plugin['version'] ?? '') === '') {
+                    $plugin['version'] = (string) $install['version'];
+                }
             }
             $out[] = $plugin;
         }

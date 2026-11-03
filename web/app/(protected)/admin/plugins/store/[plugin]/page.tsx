@@ -127,6 +127,7 @@ function PluginDetail() {
             <div className="min-w-0 flex-1 space-y-1">
               <h2 className="text-2xl font-semibold text-foreground">{plugin.name}</h2>
               {plugin.author ? <p className="text-sm text-muted-foreground">{plugin.author}</p> : null}
+              <Badge variant="outline">{t('pluginStore.notVerified', 'Not verified')}</Badge>
               {plugin.description ? <p className="text-sm text-foreground">{plugin.description}</p> : null}
               {usageLabel(plugin) ? <p className="text-sm text-muted-foreground">{usageLabel(plugin)}</p> : null}
               {addsLabels(plugin).length > 0 ? (

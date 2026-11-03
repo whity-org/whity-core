@@ -506,7 +506,7 @@ describe('PluginsPage rejected screens (#953)', () => {
       await user.click(screen.getByRole('button', { name: 'Review access' }));
       const dialog = await screen.findByRole('dialog');
       expect(within(dialog).getByText(/sends data to api\.example\.com/)).toBeInTheDocument();
-      expect(within(dialog).getByText('It adds 1 new permissions')).toBeInTheDocument();
+      expect(within(dialog).getByText('New permissions it asks for: 1')).toBeInTheDocument();
 
       await user.click(within(dialog).getByRole('button', { name: 'Allow and update' }));
 

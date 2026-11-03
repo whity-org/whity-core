@@ -464,6 +464,7 @@ export default function PluginsPage() {
       cell: (plugin) => (
         <div className="space-y-1">
           <p className="font-medium text-foreground">{plugin.name}</p>
+          <Badge variant="outline" className="w-fit">{t('pluginStore.notVerified', 'Not verified')}</Badge>
           <TechnicalDetails>
             <p className="font-mono text-xs text-muted-foreground">{plugin.id}</p>
           </TechnicalDetails>
@@ -493,7 +494,7 @@ export default function PluginsPage() {
         const versionBadge = classifyPluginVersion(plugin.version);
         return (
           <span className="flex items-center gap-1.5">
-            <span>{plugin.version || '1.0.0'}</span>
+            <span>{plugin.version || t('plugins.version.unknown', 'Not known')}</span>
             {versionBadge && (
               <Badge
                 variant={VERSION_BADGE_VARIANT[versionBadge.tier]}
@@ -611,7 +612,7 @@ export default function PluginsPage() {
               >
                 <p className="flex items-center gap-2">
                   <IconAlertTriangle size={16} className="shrink-0" />
-                  {t('plugins.updateWaiting', '{name} {version} asks for more access. The current version keeps running.', {
+                  {t('plugins.updateWaiting', '{name} {version} asks for more access. The current version stays until you decide.', {
                     name: plugin.name,
                     version: waiting.version,
                   })}
@@ -789,7 +790,7 @@ export default function PluginsPage() {
               <div className="space-y-4 px-4 pb-4 text-sm">
                 <div>
                   <h4 className="font-semibold text-muted-foreground">{t('plugins.detail.version', 'Version')}</h4>
-                  <p className="mt-1 font-medium">{detailPlugin.version || '1.0.0'}</p>
+                  <p className="mt-1 font-medium">{detailPlugin.version || t('plugins.version.unknown', 'Not known')}</p>
                 </div>
 
                 {detailPlugin.install ? (

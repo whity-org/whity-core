@@ -34138,7 +34138,7 @@
         "/api/v1/plugins/{id}/uninstall": {
             "post": {
                 "operationId": "post_api_v1_plugins_id_uninstall",
-                "summary": "Uninstall a plugin (disable, roll back migrations, remove files)",
+                "summary": "Uninstall a plugin: turned off and kept 30 days, or removed at once with now",
                 "tags": [
                     "platform-ops"
                 ],

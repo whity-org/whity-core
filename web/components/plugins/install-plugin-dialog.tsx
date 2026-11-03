@@ -178,7 +178,7 @@ export function InstallPluginDialog({ plugin, storeUrl, onOpenChange }: InstallP
                   </li>
                   {(plugin.permissions ?? []).length > 0 ? (
                     <li>
-                      {t('pluginInstall.access.permissions', 'It asks for {count} permissions.', {
+                      {t('pluginInstall.access.permissions', 'Permissions it asks for: {count}', {
                         count: (plugin.permissions ?? []).length,
                       })}
                     </li>

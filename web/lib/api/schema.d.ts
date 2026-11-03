@@ -5143,7 +5143,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Uninstall a plugin (disable, roll back migrations, remove files) */
+        /** Uninstall a plugin: turned off and kept 30 days, or removed at once with now */
         post: operations["post_api_v1_plugins_id_uninstall"];
         delete?: never;
         options?: never;

@@ -176,7 +176,7 @@ final class CoreNavigationRegistrationTest extends TestCase
     {
         $items = $this->registrations();
 
-        foreach (['tenants', 'notifications', 'audit-logs', 'tenant-billing', 'plugins', 'plugin-store', 'translations', 'approval-gating'] as $id) {
+        foreach (['tenants', 'notifications', 'audit-logs', 'tenant-billing', 'plugins', 'translations', 'approval-gating'] as $id) {
             self::assertArrayHasKey($id, $items);
             self::assertFalse($items[$id]['systemTenantOnly'], "{$id} works for a workspace, so it must stay visible");
         }

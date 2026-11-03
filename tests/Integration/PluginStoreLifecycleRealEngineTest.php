@@ -415,7 +415,10 @@ final class PluginStoreLifecycleRealEngineTest extends TestCase
 
     private function tableRows(): int
     {
-        return (int) $this->pdo->query('SELECT COUNT(*) FROM ' . $this->table())->fetchColumn();
+        $rows = $this->pdo->prepare('SELECT COUNT(*) FROM ' . $this->table());
+        $rows->execute();
+
+        return (int) $rows->fetchColumn();
     }
 
     /** @param list<string> $permissions */

@@ -860,6 +860,8 @@ export interface PluginTileProps extends Omit<React.ComponentProps<"div">, "titl
   /** Draw the Verified mark. Only ever set from what the server returns. */
   verified?: boolean
   verifiedLabel?: string
+  /** The server's trust answer when it isn't Verified, such as "Not verified". */
+  trustLabel?: string
   icon?: React.ReactNode
   /** Opens the plugin's page. The name is the keyboard-reachable control; the whole tile is its target. */
   onOpen: () => void
@@ -883,6 +885,7 @@ export function PluginTile({
   facts,
   verified,
   verifiedLabel = "Verified",
+  trustLabel,
   icon,
   onOpen,
   action,
@@ -906,6 +909,7 @@ export function PluginTile({
             {publisher ? <CardDescription className="truncate text-xs">{publisher}</CardDescription> : null}
           </div>
           {verified ? <Badge variant="default" className="text-xs">{verifiedLabel}</Badge> : null}
+          {!verified && trustLabel ? <Badge variant="outline" className="text-xs">{trustLabel}</Badge> : null}
         </div>
       </CardHeader>
       <CardContent className="flex-1 space-y-3">

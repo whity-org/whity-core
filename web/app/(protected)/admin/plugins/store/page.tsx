@@ -235,6 +235,7 @@ export default function PluginStorePage() {
                   version={plugin.latest_version}
                   tags={plugin.tags}
                   adds={addsLabels(plugin)}
+                  trustLabel={t('pluginStore.notVerified', 'Not verified')}
                   facts={[priceLabel(plugin), usageLabel(plugin)].filter((fact): fact is string => fact !== null)}
                   onOpen={() => openPlugin(plugin)}
                   action={

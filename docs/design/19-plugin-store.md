@@ -13,7 +13,7 @@ Where a workspace adds apps, document blocks and agent tools. It lives inside ea
 
 **Names:** third-party plugins are named for their job, as "[Job] for Whity" (Inventory for Whity) or with a plain name (Delivery Tracker). Names that start with "Whity" are kept for first-party products.
 
-**Trust (S.4):** By Whity (first party), Verified (the publisher is checked and the plugin runs natively with Whity components) or Sandboxed (runs in an isolated frame). Alongside: the permissions it asks for, "Used by N workspaces" and the last update. No ratings or reviews until there are enough installs for them to mean something.
+**Trust (S.4):** By Whity (first party), Verified (the publisher is checked, and the plugin is a signed declaration drawn with Whity components) or Not verified (its code runs on the server once it's on, and the page says so plainly). Alongside: the permissions it asks for, "Used by N workspaces" and the last update. No ratings or reviews until there are enough installs for them to mean something.
 
 **What it adds:** small chips on every tile: Screens, Document blocks, Agent tools (on the primary tint, like everything agents do), Fields, Connects out. They answer "what changes in my workspace" before anyone opens the page.
 
@@ -34,7 +34,7 @@ One dialog, with a Stepper, in up to four steps; steps that don't apply are left
 1. **Access:** plain sentences for each permission, with the codes underneath; the screens, blocks and agent tools it adds; every outside domain in a warning row. "Allow and continue" is the consent, logged with the person and the list.
 2. **Plan** (paid plugins): monthly or yearly, billed on the Whity invoice. A publisher may offer a free trial of a set length; the dialog says when billing starts and that a reminder comes before it (S.8).
 3. **Set up** (if the plugin declares settings): Whity form components; "Skip for now" leaves a "Finish setting up" banner on the plugin's screens.
-4. **Done:** where each added thing lives, with links. Verified and By Whity plugins are active from here; a sandboxed plugin installs turned off, and Done offers **Turn on** (S.12).
+4. **Done:** where each added thing lives, with links. Verified and By Whity plugins are active from here; a Not verified plugin installs turned off, and Done offers **Turn on** (S.12).
 
 Every agent tool a plugin adds starts on **Ask first**; read-only tools may start Allowed. Admins change modes afterwards in MCP tools (S.5).
 
@@ -45,7 +45,7 @@ The Installed tab lists every plugin with its state, version and billing. States
 
 **Operator tools (S.11).** People with `plugins:upload` get a ⋯ menu on the Installed tab with Upload plugin and Reload plugins. Store sources and their access tokens live in Settings › Advanced, not on the browsing page. A failed plugin's Details drawer explains the error in plain words, with the stack trace under Technical details, collapsed.
 
-- **Updates (S.6)** install automatically and say so in the Version column. An update that asks for new permissions or new outside domains waits for approval: a warning banner names what's new, "Review access" opens the Access step with only the changes, and the old version keeps running meanwhile. Every update is in the audit log.
+- **Updates (S.6):** a Verified declarative plugin's updates install automatically and say so in the Version column; a code plugin only updates by hand. An update that asks for new permissions or new outside domains waits for approval: a warning banner names what's new, "Review access" opens the Access step with only the changes, and the old version keeps running meanwhile. Every update is in the audit log.
 - **Failed:** the plugin didn't load; its blocks show the plugin-off placeholder (E.20); the row menu offers Try again and Roll back.
 - **Uninstalling (S.7)** keeps the plugin's data for 30 days under "Recently removed", with Reinstall, which restores everything. Its document blocks show the placeholder meanwhile; after 30 days the data is deleted.
 
