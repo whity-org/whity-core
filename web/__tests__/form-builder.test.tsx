@@ -98,6 +98,12 @@ describe('builder model', () => {
     expect(questionIndexIn('Failed')).toBeNull();
   });
 
+  it('stops flagging a language that is switched off', () => {
+    const fields = [draft('a', { label: { en: 'Only English' } })];
+    expect(problemsOf(fields, { en: 'F' }, ['en', 'ar']).map((p) => p.code)).toEqual(['missingLanguage']);
+    expect(problemsOf(fields, { en: 'F' }, ['en'])).toEqual([]);
+  });
+
   it('groups questions under their sections, unsectioned first', () => {
     const groups = groupBySection([draft('a', { section_key: 's1' }), draft('b')], ['s1', 's2']);
     expect(groups.map((g) => [g.key, g.items.length])).toEqual([[null, 1], ['s1', 1], ['s2', 0]]);
@@ -247,7 +253,7 @@ describe('FormBuilderScreen', () => {
     await screen.findByText(/Supplier name/);
     await userEvent.click(screen.getByRole('button', { name: /Add question/ }));
     await userEvent.click(await screen.findByRole('button', { name: 'Short text' }));
-    await userEvent.type(await screen.findByLabelText('English', { selector: '#q-label-en' }), 'Delivery day');
+    await userEvent.type(await screen.findByLabelText(/English/, { selector: '#q-label-en' }), 'Delivery day');
     await waitFor(() => expect(calls.some((c) => c.method === 'PUT')).toBe(true), { timeout: 6000 });
   }, 12000);
 
@@ -260,5 +266,24 @@ describe('FormBuilderScreen', () => {
     expect(screen.queryByText(/Supplier name/)).not.toBeInTheDocument();
     await userEvent.click(bar);
     expect(await screen.findByText(/Supplier name/)).toBeInTheDocument();
+  });
+
+  it('shows one language at a time from the selector, and drops a language switched off', async () => {
+    render(<FormBuilderScreen env={fakeEnv([])} formId={7} canManage />);
+    await screen.findByText(/Supplier name/);
+    await userEvent.click(screen.getByText(/Supplier name/));
+    expect(document.getElementById('q-label-en')).not.toBeNull();
+    expect(document.getElementById('q-label-ar')).not.toBeNull();
+
+    await userEvent.click(screen.getByRole('radio', { name: 'Arabic' }));
+    expect(document.getElementById('q-label-en')).toBeNull();
+    expect(document.getElementById('q-label-ar')).not.toBeNull();
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Settings' }));
+    await userEvent.click(await screen.findByRole('switch', { name: 'Arabic' }));
+    await userEvent.click(screen.getByRole('tab', { name: 'Questions' }));
+    await userEvent.click(screen.getByText(/Supplier name/));
+    expect(document.getElementById('q-label-ar')).toBeNull();
+    expect(document.getElementById('q-label-en')).not.toBeNull();
   });
 });

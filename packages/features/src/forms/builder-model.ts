@@ -173,7 +173,7 @@ const filled = (value: string | undefined): boolean => (value ?? "").trim() !== 
 const anyText = (map: LocalizedMap | [] | undefined): boolean => !Array.isArray(map) && map !== undefined && Object.values(map).some(filled)
 
 /** What is missing from a form, in the order the questions are asked. */
-export function problemsOf(fields: readonly FieldDraft[], name: LocalizedMap): Problem[] {
+export function problemsOf(fields: readonly FieldDraft[], name: LocalizedMap, languages: readonly ("en" | "ar")[] = ["en", "ar"]): Problem[] {
   const problems: Problem[] = []
   if (!anyText(name)) problems.push({ code: "noName", index: null, blocking: true })
   fields.forEach((field, index) => {
@@ -187,8 +187,8 @@ export function problemsOf(fields: readonly FieldDraft[], name: LocalizedMap): P
     }
     const label = field.label
     if (anyText(label) && !Array.isArray(label)) {
-      if (!filled(label.ar)) problems.push({ code: "missingLanguage", index, blocking: false, language: "ar" })
-      else if (!filled(label.en)) problems.push({ code: "missingLanguage", index, blocking: false, language: "en" })
+      if (languages.includes("ar") && !filled(label.ar)) problems.push({ code: "missingLanguage", index, blocking: false, language: "ar" })
+      else if (languages.includes("en") && !filled(label.en)) problems.push({ code: "missingLanguage", index, blocking: false, language: "en" })
     }
   })
   return problems
