@@ -173,7 +173,7 @@ test.describe('Sidebar navigation (admin)', () => {
 
     await expect(shell.navLink('Connected AI apps')).toBeHidden();
 
-    await shell.navSearch.fill('principals');
+    await shell.navSearch.fill('connected');
     // Reached without knowing which group holds it, and without opening it.
     await expect(shell.navLink('Connected AI apps')).toBeVisible();
     // A query narrows to matches, so a non-matching link leaves the DOM.

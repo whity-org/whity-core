@@ -65,7 +65,7 @@ test.describe('Agents pages', () => {
 
     await page.goto('/admin/my-agents');
     await card.getByRole('button', { name: 'Stop using' }).click();
-    await page.getByRole('dialog').getByRole('button', { name: 'Stop using' }).click();
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Stop using' }).click();
     await expect(card.getByRole('button', { name: 'Start using' })).toBeVisible();
   });
 });
