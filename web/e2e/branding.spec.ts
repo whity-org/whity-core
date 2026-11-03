@@ -79,7 +79,7 @@ test.describe('Branding — display wiring (Slice 4, no upload UI)', () => {
       // The login page reads branding server-side; the CardTitle must include
       // the effective site name.
       await expect(
-        page.getByText(`Welcome to ${siteName}`)
+        page.getByText(`Sign in to ${siteName}`)
       ).toBeVisible();
     });
   });
