@@ -218,28 +218,28 @@ export default function AdminStats() {
       value: stats?.totals.users ?? "--",
       description: t("stats.card.users.description", "Registered accounts"),
       icon: IconUsers,
-      color: "text-blue-500",
+      color: "text-primary",
     },
     {
       title: t("stats.card.roles.title", "Active Roles"),
       value: stats?.totals.roles ?? "--",
       description: t("stats.card.roles.description", "Configured permissions"),
       icon: IconUserShield,
-      color: "text-purple-500",
+      color: "text-primary",
     },
     {
       title: t("stats.card.tenants.title", "Total Tenants"),
       value: stats?.totals.tenants ?? "--",
       description: t("stats.card.tenants.description", "Organizations"),
       icon: IconBuildingCommunity,
-      color: "text-orange-500",
+      color: "text-primary",
     },
     {
       title: t("stats.card.permissions.title", "Permissions"),
       value: stats?.totals.permissions ?? "--",
       description: t("stats.card.permissions.description", "Available actions"),
       icon: IconLock,
-      color: "text-green-500",
+      color: "text-primary",
     },
   ];
 
