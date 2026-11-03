@@ -554,6 +554,7 @@
         "organizer.view.belowMyUnit": "كل ما دون وحدتي",
         "organizer.view.collection": "مجموعة",
         "organizer.view.createdByMe": "ما أنشأتُه",
+        "organizer.view.noUnit": "أنت لا تنتمي إلى وحدة تنظيمية. اختر واحدة لاستخدام هذا المجلد.",
         "organizer.view.passedThroughMyUnit": "ما مرّ عبر وحدتي",
         "organizer.view.raisedByMyUnit": "ما صدر عن وحدتي",
         "organizer.view.rejectedByMe": "ما رفضتُه",

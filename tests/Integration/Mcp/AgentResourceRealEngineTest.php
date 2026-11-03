@@ -126,6 +126,22 @@ final class AgentResourceRealEngineTest extends TestCase
         $this->verifier()->verify($this->token(self::RESOURCE . '/agents/hr-assistant'));
     }
 
+    public function testAPausedAgentsAddressIsRefusedAndSaysWhy(): void
+    {
+        $this->assignments->assign($this->clerk, self::RANA, self::TENANT, []);
+        $this->agents->setPaused($this->clerk, self::TENANT, true, self::RANA);
+
+        try {
+            $this->verifier()->verify($this->token(self::RESOURCE . '/agents/finance-clerk'));
+            self::fail('a paused agent is refused');
+        } catch (OAuthTokenRefusedException $e) {
+            self::assertStringContainsString('paused', $e->getMessage());
+        }
+
+        $this->agents->setPaused($this->clerk, self::TENANT, false, self::RANA);
+        self::assertNotNull($this->verifier()->verify($this->token(self::RESOURCE . '/agents/finance-clerk')));
+    }
+
     public function testOnlyThatAgentCanUseTheAddress(): void
     {
         $this->assignments->assign($this->clerk, self::RANA, self::TENANT, []);

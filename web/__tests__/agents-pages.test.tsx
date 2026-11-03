@@ -145,7 +145,8 @@ describe('Persona editor', () => {
     });
     render(<PersonaEditor agent={clerk} />);
 
-    expect(await screen.findByText('core.documents')).toBeInTheDocument();
+    expect(await screen.findByText('Documents')).toBeInTheDocument();
+    expect(screen.queryByText('core.documents')).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('What it does', { selector: '#agent-role-ar' }), { target: { value: 'يجهّز الفواتير.' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
