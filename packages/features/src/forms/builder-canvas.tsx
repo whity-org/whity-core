@@ -10,6 +10,7 @@ import { cn } from "@whity/ui/utils"
 import { useTranslation } from "../i18n"
 import { useCurrentLanguage } from "./language"
 import { groupBySection } from "./builder-model"
+import { ChoiceSelect } from "./choice-select"
 import { useKindLabel } from "./kind-labels"
 import { pickText } from "./text"
 import type { FieldDraft, FieldKind, FormSectionDef } from "./types"
@@ -56,6 +57,35 @@ function AnswerPreview({ field }: { field: FieldDraft }) {
     default:
       return <div className={box}>{t("builder.preview.text", "Short answer")}</div>
   }
+}
+
+/** Bring a question into view once it has been drawn. */
+export function scrollToQuestion(index: number): void {
+  window.requestAnimationFrame(() => document.getElementById(`question-card-${index}`)?.scrollIntoView({ block: "center" }))
+}
+
+const JUMP_NONE = "__none__"
+
+/** "Jump to question": a long form stays navigable. Shown once there is much to scroll. */
+function JumpTo({ fields, onJump }: { fields: readonly FieldDraft[]; onJump: (index: number) => void }) {
+  const t = useTranslation("forms")
+  const { currentLanguage } = useCurrentLanguage()
+  return (
+    <div className="max-w-sm">
+      <ChoiceSelect
+        label={t("builder.jump", "Jump to a question")}
+        value={JUMP_NONE}
+        options={[
+          { value: JUMP_NONE, label: t("builder.jump", "Jump to a question") },
+          ...fields.map((f, i) => ({
+            value: String(i),
+            label: `${i + 1}. ${pickText(f.label, currentLanguage) || t("builder.question.untitled", "Untitled question")}`,
+          })),
+        ]}
+        onChange={(next) => next !== JUMP_NONE && onJump(Number(next))}
+      />
+    </div>
+  )
 }
 
 /** "Add question": the kinds the server can store, all in view, one click each. */
@@ -109,6 +139,7 @@ export function BuilderCanvas({
   onDuplicate,
   onDelete,
   onReorder,
+  invalid,
 }: {
   title: string
   description: string
@@ -123,6 +154,8 @@ export function BuilderCanvas({
   onDuplicate: (index: number) => void
   onDelete: (index: number) => void
   onReorder: (from: number, to: number) => void
+  /** Questions with something missing. */
+  invalid: ReadonlySet<number>
 }) {
   const [dragFrom, setDragFrom] = useState<number | null>(null)
   const t = useTranslation("forms")
@@ -139,6 +172,16 @@ export function BuilderCanvas({
         <h2 className="text-lg font-semibold">{title || t("builder.untitled", "Untitled form")}</h2>
         {description !== "" && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
       </div>
+
+      {fields.length > 8 && (
+        <JumpTo
+          fields={fields}
+          onJump={(index) => {
+            onSelect(index)
+            scrollToQuestion(index)
+          }}
+        />
+      )}
 
       {shown.map((group) => {
         const section = sections.find((s) => s.key === group.key)
@@ -189,7 +232,7 @@ export function BuilderCanvas({
                   }}
                   className={cn(
                     "space-y-2 rounded-card border bg-card p-4 text-start outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                    isSelected ? "border-primary ring-2 ring-primary" : "border-border",
+                    isSelected ? "border-primary ring-2 ring-primary" : invalid.has(index) ? "border-destructive" : "border-border",
                     dragFrom === index && "opacity-50"
                   )}
                 >
@@ -213,6 +256,7 @@ export function BuilderCanvas({
                         })}
                       </Badge>
                     )}
+                    {invalid.has(index) && <Badge variant="destructive">{t("builder.pill.needsAttention", "Needs attention")}</Badge>}
                     {field.audience === "staff" && <Badge variant="warning">{t("builder.pill.staff", "Staff answer")}</Badge>}
                   </div>
                   {help !== "" && <p className="text-xs text-muted-foreground">{help}</p>}

@@ -10,6 +10,8 @@ import { FormBuilderScreen, FormsListScreen } from '@whity/features/forms';
 import type { FormsScreenEnv } from '@whity/features/forms';
 import {
   reorder,
+  problemsOf,
+  questionIndexIn,
   duplicateField,
   groupBySection,
   moveField,
@@ -76,6 +78,24 @@ describe('builder model', () => {
     const next = reorder(fields, 0, 2);
     expect(next.map((f) => f.field_key)).toEqual(['b', 'c', 'a']);
     expect(next[2].section_key).toBe('s2');
+  });
+
+  it('names what is missing: wording, choices, and a language left empty', () => {
+    const fields = [
+      draft('a', { label: {} }),
+      draft('b', { field_type: 'select', options: [{ value: 'x', label: {} }] }),
+      draft('c', { label: { en: 'Only English' } }),
+    ];
+    const found = problemsOf(fields, { en: 'Form' }).map((p) => [p.code, p.index, p.blocking]);
+    expect(found).toEqual([
+      ['noWording', 0, true],
+      ['noChoices', 1, true],
+      ['missingLanguage', 1, false],
+      ['missingLanguage', 2, false],
+    ]);
+    expect(problemsOf([], {}).map((p) => p.code)).toEqual(['noName']);
+    expect(questionIndexIn('fields[3].label is required')).toBe(3);
+    expect(questionIndexIn('Failed')).toBeNull();
   });
 
   it('groups questions under their sections, unsectioned first', () => {
@@ -181,5 +201,24 @@ describe('FormBuilderScreen', () => {
     await userEvent.click(screen.getByRole('button', { name: /Add question/ }));
     await userEvent.click(await screen.findByRole('button', { name: 'Short text' }));
     await waitFor(() => expect(document.activeElement?.id).toBe('q-label-en'));
+  });
+
+  it('refuses to save a question with no wording, and says which one', async () => {
+    const calls: Array<{ method: string; path: string; body?: unknown }> = [];
+    render(<FormBuilderScreen env={fakeEnv(calls)} formId={7} canManage />);
+    await screen.findByText(/Supplier name/);
+    await userEvent.click(screen.getByRole('button', { name: /Add question/ }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Short text' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Save changes' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Question 2 has no wording yet.');
+    expect(calls.some((c) => c.method === 'PUT')).toBe(false);
+  });
+
+  it('asks before opening a form, and says what it is opening', async () => {
+    render(<FormBuilderScreen env={fakeEnv([])} formId={7} canManage />);
+    await screen.findByText(/Supplier name/);
+    await userEvent.click(screen.getByRole('button', { name: 'Publish' }));
+    expect(await screen.findByText('Open this form?')).toBeInTheDocument();
+    expect(screen.getByText(/It has 1 questions, 1 of them required/)).toBeInTheDocument();
   });
 });

@@ -422,6 +422,15 @@ export function QuestionPanel({
         </Row>
       )}
 
+      {field.visible_when !== null && controller !== null && (
+        <p className="rounded-control bg-muted p-3 text-xs text-muted-foreground">
+          {t("builder.panel.show.sentence", "This question is shown only when “{question}” is answered {answer}.", {
+            question: pickText(controller.label, currentLanguage) || controller.field_key,
+            answer: answerChoices.find((c) => c.value === answerValue)?.label ?? answerValue,
+          })}
+        </p>
+      )}
+
       {sections.length > 0 && (
         <Row id="q-section" label={t("builder.panel.section", "Section")}>
           <ChoiceSelect
