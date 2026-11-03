@@ -53,6 +53,8 @@ export interface McpConnectInfo {
 export interface McpPreviewTool {
   name: string;
   description: string;
+  plainName: string;
+  plainNameAr: string | null;
 }
 
 /** One entry of `GET /api/v1/mcp/tokens` — the caller's own tokens, snake_case. */

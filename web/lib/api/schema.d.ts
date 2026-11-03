@@ -3569,6 +3569,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/agent-toolsets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The areas an agent can work with, in both languages */
+        get: operations["get_api_v1_me_agent_toolsets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/agents": {
         parameters: {
             query?: never;
@@ -7147,6 +7164,8 @@ export interface components {
             action: components["schemas"]["AgentAction"] | null;
             /** @description The agent is paused, so this can be declined but not approved until it is resumed */
             agentPaused?: boolean;
+            /** @description What it would run, in plain words */
+            toolInfo?: components["schemas"]["AgentToolInfo"] | null;
         };
         AgentProposalListResponse: {
             data: components["schemas"]["AgentProposal"][];
@@ -7172,6 +7191,14 @@ export interface components {
             agentAccess: "can" | "proposes" | "suggests" | "never";
             readOnly: boolean;
             undoWindowSeconds: number | null;
+        };
+        AgentToolset: {
+            id: string;
+            title: string;
+            titleAr: string | null;
+        };
+        AgentToolsetListResponse: {
+            data: components["schemas"]["AgentToolset"][];
         };
         AgentUnassignResponse: {
             data: {
@@ -30956,6 +30983,71 @@ export interface operations {
             };
             /** @description The proposal is no longer waiting (decided or expired) */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_me_agent_toolsets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Core's areas */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentToolsetListResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -4944,7 +4944,7 @@ $mcpToolsCallHandler = new ToolsCallHandler($toolDeriver, $router, $roleChecker,
 // an agent must not be able to approve its own proposal.
 // WHIT-816: a workspace agent's proposal runs under the person's assignment as it is now.
 $agentAssignments = new \Whity\Core\Agent\AgentAssignmentRepository($db->getPdo());
-$agentProposalsHandler = new \Whity\Api\AgentProposalsApiHandler($agentProposals, $mcpToolsCallHandler, $auditLogger, $agentAssignments, $agentActions);
+$agentProposalsHandler = new \Whity\Api\AgentProposalsApiHandler($agentProposals, $mcpToolsCallHandler, $auditLogger, $agentAssignments, $agentActions, $mcpToolCatalogue);
 $router->register('GET',  '/api/me/agent-proposals',                    [$agentProposalsHandler, 'list'],    null);
 $router->register('POST', '/api/me/agent-proposals/{id:\d+}/approve',  [$agentProposalsHandler, 'approve'], null);
 $router->register('POST', '/api/me/agent-proposals/{id:\d+}/decline',  [$agentProposalsHandler, 'decline'], null);
@@ -5008,6 +5008,7 @@ $myAgentsHandler = new \Whity\Api\MyAgentsApiHandler(
     $agentReadableSource,
 );
 $router->register('GET',    '/api/me/agents',                              [$myAgentsHandler, 'list'],        null);
+$router->register('GET',    '/api/me/agent-toolsets',                      [$myAgentsHandler, 'toolsets'],    null);
 $router->register('POST',   '/api/me/agents/{id:\d+}/assignment',          [$myAgentsHandler, 'assign'],      null);
 $router->register('DELETE', '/api/me/agents/{id:\d+}/assignment',          [$myAgentsHandler, 'unassign'],    null);
 $router->register('GET',    '/api/me/agents/{id:\d+}/assignment/grant',    [$myAgentsHandler, 'grant'],       null);
