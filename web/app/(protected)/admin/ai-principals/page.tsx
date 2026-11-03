@@ -11,6 +11,7 @@ import { SearchField } from '@whity/ui/search-field';
 import { useTranslation } from '@whity/features/i18n';
 import { useDateDisplay } from '@whity/features/datetime';
 import { useAuth } from '@/lib/auth-context';
+import { isReadPermission } from '@/components/agents/workspace-agents';
 import { useFetch } from '@/hooks/useFetch';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { MCP_TOKENS_MANAGE } from '@/lib/capabilities';
@@ -21,13 +22,15 @@ import { ConnectWizard } from './connect-wizard';
 import { RevokeAiPrincipalModal } from './revoke-modal';
 import type { AiPrincipal, AiPrincipalListResponse } from './types';
 
+/** Scope entries that don't narrow what an app reaches: capabilities and the agent's grant. */
+const NOT_NARROWING = ['tools:call', 'resources:read', 'prompts:read', 'grant:'];
+
 /**
  * Connected AI apps (A20, TplConnectedApps; was AI principals): outside apps
  * signed in to Whity, each for one person. The connect wizard issues the
  * credential (WHIT-697); disconnecting asks first (tier 2). Kind and the user
- * number are technical details (A.3). "May do" in words per app needs the
- * scope in plain language, which no API returns yet, so it is left out; the
- * app's own page (What it may do) holds the grant.
+ * number are technical details (A.3). "May do" puts the app's scope in words;
+ * the app's own page (What it may do) holds the grant.
  */
 export default function AiPrincipalsPage() {
   const { apiClient, user } = useAuth();
@@ -71,6 +74,21 @@ export default function AiPrincipalsPage() {
     return people.data?.[principal.userId] || t('aiPrincipals.for.other', 'Another person');
   };
 
+  /**
+   * The wizard's three choices, read back from what it issued: everything the
+   * person can do, reads only, or a narrower list. An app's writes ask first
+   * whichever it is, so this says what it reaches, not what it runs alone.
+   */
+  const mayDo = (principal: AiPrincipal): string => {
+    const narrowing = principal.scope.filter((entry) => !NOT_NARROWING.some((prefix) => entry === prefix || entry.startsWith(prefix)));
+    if (narrowing.length === 0) {
+      return principal.principalKind === 'ai-agent'
+        ? t('aiPrincipals.mayDo.agent', 'What this person allows it')
+        : t('aiPrincipals.mayDo.everything', 'Everything this person can do');
+    }
+    return narrowing.every(isReadPermission) ? t('aiPrincipals.mayDo.readOnly', 'Only looks things up') : t('aiPrincipals.mayDo.some', 'Some areas only');
+  };
+
   const columns: DataTableColumn<AiPrincipal>[] = [
     {
       accessorKey: 'name',
@@ -111,6 +129,11 @@ export default function AiPrincipalsPage() {
           </TechnicalDetails>
         </span>
       ),
+    },
+    {
+      id: 'mayDo',
+      header: t('aiPrincipals.table.mayDo', 'May do'),
+      cell: (row: AiPrincipal) => <span className="text-sm">{mayDo(row)}</span>,
     },
     // #1068: dates go together when this tenant hides them.
     ...dates.dateColumns<AiPrincipal>([
@@ -187,7 +210,6 @@ export default function AiPrincipalsPage() {
           icon="link"
           title={t('aiPrincipals.empty.title', 'No AI apps connected')}
           description={t('aiPrincipals.empty.description', 'Connect Claude, ChatGPT, Cursor or another app so it can work with your data, asking you first for changes.')}
-          action={canManage ? connect : undefined}
         />
       ) : (
         <>

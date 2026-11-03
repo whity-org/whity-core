@@ -209,7 +209,7 @@ describe('the list', () => {
     render(<DocumentTemplatesPage />);
     await waitFor(() => expect(screen.getByText('Example Bakery works order')).toBeInTheDocument());
 
-    expect(screen.getByText('Example Bakery invoice').closest('tr')).toHaveTextContent('System rows carry no permission gate');
+    expect(screen.getByText('Example Bakery invoice').closest('tr')).toHaveTextContent('It comes with Whity');
     expect(screen.getByText('Example Bakery works order').closest('tr')).toHaveTextContent('Visible to everyone at Example Bakery kitchen and below it');
     expect(screen.getByText('Example Bakery shelf labels').closest('tr')).toHaveTextContent('Only');
   });

@@ -551,6 +551,7 @@
         "organizer.view.belowMyUnit": "Everything below my unit",
         "organizer.view.collection": "Collection",
         "organizer.view.createdByMe": "Created by me",
+        "organizer.view.noUnit": "You do not belong to an organizational unit. Select one to use this folder.",
         "organizer.view.passedThroughMyUnit": "Passed through my unit",
         "organizer.view.raisedByMyUnit": "Raised by my unit",
         "organizer.view.rejectedByMe": "Rejected by me",

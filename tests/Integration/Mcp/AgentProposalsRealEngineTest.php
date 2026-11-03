@@ -10,7 +10,9 @@ use Tests\Support\SchemaFromMigrations;
 use Whity\Api\AgentProposalsApiHandler;
 use Whity\Auth\RoleChecker;
 use Whity\Auth\TokenValidator;
+use Whity\Core\Agent\AgentAssignmentRepository;
 use Whity\Core\Agent\AgentProposalRepository;
+use Whity\Core\Agent\AgentRepository;
 use Whity\Core\Request;
 use Whity\Core\Router;
 use Whity\Core\Tenant\TenantContext;
@@ -109,6 +111,34 @@ final class AgentProposalsRealEngineTest extends TestCase
 
         self::assertSame(['name' => 'Billing assistant', 'nameAr' => null], $listed['agent']);
         self::assertArrayNotHasKey('agent_principal_id', $listed, 'the credential id stays server-side');
+    }
+
+    public function testAPausedAgentsProposalCanBeDeclinedButRunsOnlyOnceResumed(): void
+    {
+        $this->pdo->exec("INSERT INTO agents (id, tenant_id, slug, name, status) VALUES (7, 1, 'billing', 'Billing assistant', 'active')");
+        $this->pdo->prepare('INSERT INTO agent_assignments (id, tenant_id, agent_id, profile_id) VALUES (31, 1, 7, ?)')->execute([self::RANA]);
+        $agents      = new AgentRepository($this->pdo);
+        $assignments = new AgentAssignmentRepository($this->pdo);
+        $inbox       = new AgentProposalsApiHandler($this->proposals, $this->toolsCall, null, $assignments);
+        $propose     = fn (): int => $this->proposals->create(self::TENANT, 'agent:31', self::RANA, 'post_api_forms', ['name' => 'Leave request'], ['tools:call'], ['forms:manage'], 'Create a form');
+        $first       = $propose();
+        $second      = $propose();
+
+        $agents->setPaused(7, self::TENANT, true, self::RANA);
+
+        $approve = $inbox->approve($this->as(self::RANA), ['id' => (string) $first]);
+        self::assertSame(409, $approve->getStatusCode());
+        self::assertStringContainsString('paused', $approve->getBody());
+        self::assertSame([], $this->created, 'nothing ran');
+        self::assertSame('waiting', $this->stored($first, self::TENANT)['status'], 'and it keeps waiting');
+        self::assertTrue(json_decode($inbox->list($this->as(self::RANA))->getBody(), true)['data'][0]['agentPaused']);
+
+        self::assertSame(200, $inbox->decline($this->as(self::RANA), ['id' => (string) $second])->getStatusCode(), 'a person can still say no');
+
+        $agents->setPaused(7, self::TENANT, false, self::RANA);
+
+        self::assertSame(200, $inbox->approve($this->as(self::RANA), ['id' => (string) $first])->getStatusCode(), $approve->getBody());
+        self::assertCount(1, $this->created, 'resumed, it runs');
     }
 
     public function testAWorkspaceAgentIsNamedByItsDefinitionEvenOnceRetired(): void

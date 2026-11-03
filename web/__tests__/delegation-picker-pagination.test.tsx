@@ -369,8 +369,8 @@ describe('CreateDelegationModal permission list', () => {
     await awaitFormReady();
     expect(pagesRequested('/api/v1/permissions')).toEqual([1, 2, 3]);
 
-    expect(screen.getByText('perm:101')).toBeInTheDocument();
-    expect(screen.getByText('perm:240')).toBeInTheDocument();
+    expect(screen.getByText('Perm 101')).toBeInTheDocument();
+    expect(screen.getByText('Perm 240')).toBeInTheDocument();
     expect(screen.getAllByRole('checkbox')).toHaveLength(240);
   });
 

@@ -1,0 +1,1 @@
+- **People on documents appear by name for everyone who can read the document.** The library, a document's page and notes and wiki pages no longer need `users:read` to name who raised or handled something, and no longer show "Account #". Only names are shared, never email addresses, and only for people on what you can already see (WHIT-874).

@@ -137,7 +137,7 @@ export function describeAudience(
 
   const where =
     row.owner_ou_id === null
-      ? t('documentTemplates.audience.whereAnywhere', 'everyone in the tenant')
+      ? t('documentTemplates.audience.whereAnywhere', 'everyone in the workspace')
       : t('documentTemplates.audience.whereUnit', 'everyone at {unit} and below it', {
           unit: placementLabel(row, ctx, t),
         });
@@ -145,14 +145,14 @@ export function describeAudience(
   // A system-scope row skips the permission gate entirely — that is the policy's
   // branch, not a simplification here.
   if (row.scope === 'system') {
-    return t('documentTemplates.audience.system', 'Visible to {where}. System rows carry no permission gate.', {
+    return t('documentTemplates.audience.system', 'Visible to {where}. It comes with Whity.', {
       where,
     });
   }
 
   const tag = row.required_permission;
   if (tag === null || tag === '') {
-    return t('documentTemplates.audience.untagged', 'Visible to {where}. No permission is required.', { where });
+    return t('documentTemplates.audience.untagged', 'Visible to {where}.', { where });
   }
 
   return t(

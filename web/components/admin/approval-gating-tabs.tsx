@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { tabsListVariants } from '@whity/ui/tabs';
 import { useTranslation } from '@whity/features/i18n';
+import { useAuth } from '@/lib/auth-context';
 
 /**
  * Shared tab navigation for the unified "Approval Gating" admin surface
@@ -64,8 +65,15 @@ export const TABS: { id: ApprovalGatingTabId; key: string; label: string; href: 
   },
 ];
 
+/** The system tenant: the only one that approves registrations. */
+const SYSTEM_TENANT_ID = 0;
+
 export function ApprovalGatingTabs({ active }: ApprovalGatingTabsProps) {
   const t = useTranslation('admin');
+  const { user } = useAuth();
+  // Sign-up approval is the system tenant's alone, and the server refuses everybody
+  // else, so nobody else is offered a tab that can only say no.
+  const visibleTabs = TABS.filter((tab) => tab.id !== 'signup' || user?.tenant_id === SYSTEM_TENANT_ID);
 
   return (
     <nav
@@ -73,7 +81,7 @@ export function ApprovalGatingTabs({ active }: ApprovalGatingTabsProps) {
       data-testid="approval-gating-tabs"
       className={cn(tabsListVariants({ variant: 'default' }), 'w-full flex-wrap md:w-fit')}
     >
-      {TABS.map((tab) => {
+      {visibleTabs.map((tab) => {
         const isActive = tab.id === active;
         return (
           <Link

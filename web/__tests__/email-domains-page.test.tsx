@@ -3,7 +3,7 @@
  *
  * Mocks @/lib/api-client (the page imports the module-level `apiClient`
  * singleton, like SsoProvidersPage does, rather than useAuth().apiClient),
- * useAuth (for the client-side `admin` role gate), and useToast.
+ * useCapabilities (for the `email_domains:manage` gate), and useToast.
  */
 
 import React from 'react';
@@ -14,9 +14,13 @@ jest.mock('@/lib/api-client', () => ({
   apiClient: (...args: unknown[]) => mockApiClient(...args),
 }));
 
-let mockUser: { role: string } | null = { role: 'admin' };
-jest.mock('@/lib/auth-context', () => ({
-  useAuth: () => ({ user: mockUser }),
+let mockCaps: string[] = ['email_domains:manage'];
+let mockCapsLoading = false;
+jest.mock('@/hooks/useCapabilities', () => ({
+  useCapabilities: () => ({
+    has: (capability: string) => mockCaps.includes(capability),
+    loading: mockCapsLoading,
+  }),
 }));
 
 const addToast = jest.fn();
@@ -95,12 +99,13 @@ function mockRoutes(domains: EmailDomain[]) {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  mockUser = { role: 'admin' };
+  mockCaps = ['email_domains:manage'];
+  mockCapsLoading = false;
 });
 
-describe('EmailDomainsPage — role gate', () => {
-  it('denies access for a non-admin role', async () => {
-    mockUser = { role: 'member' };
+describe('EmailDomainsPage — permission gate', () => {
+  it('denies access without the permission', async () => {
+    mockCaps = [];
     mockRoutes([]);
 
     render(<EmailDomainsPage />);
@@ -108,7 +113,18 @@ describe('EmailDomainsPage — role gate', () => {
     expect(await screen.findByText('Access Denied')).toBeInTheDocument();
   });
 
-  it('renders for an admin role', async () => {
+  it('does not flash a refusal while permissions load', async () => {
+    mockCaps = [];
+    mockCapsLoading = true;
+    mockRoutes([]);
+
+    render(<EmailDomainsPage />);
+
+    await waitFor(() => expect(mockApiClient).toHaveBeenCalled());
+    expect(screen.queryByText('Access Denied')).not.toBeInTheDocument();
+  });
+
+  it('renders for whoever holds the permission, whatever their role is called', async () => {
     mockRoutes([VERIFIED_DOMAIN]);
 
     render(<EmailDomainsPage />);

@@ -17,6 +17,7 @@ export function useNavItemLabels(): Record<string, string> {
   return useMemo<Record<string, string>>(
     () => ({
       dashboard: t('sidebar.item.dashboard', 'Dashboard'),
+      system: t('sidebar.item.system', 'System'),
       inbox: t('sidebar.item.inbox', 'Inbox'),
       approvals: t('sidebar.item.approvals', 'Approvals'),
       users: t('sidebar.item.users', 'Users'),
@@ -41,6 +42,10 @@ export function useNavItemLabels(): Record<string, string> {
       'ai-principals': t('sidebar.item.aiPrincipals', 'Connected AI apps'),
       'mcp-tools': t('sidebar.item.mcpTools', 'What AI can do'),
       languages: t('sidebar.item.languages', 'Languages'),
+      'platform-email': t('sidebar.item.platformEmail', 'Email'),
+      'platform-storage': t('sidebar.item.platformStorage', 'Storage'),
+      'platform-feature-flags': t('sidebar.item.platformFeatureFlags', 'Feature flags'),
+      'member-forms': t('sidebar.item.memberForms', 'Forms'),
       translations: t('sidebar.item.translations', 'Translations'),
       settings: t('sidebar.item.settings', 'Settings'),
     }),

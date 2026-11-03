@@ -65,6 +65,7 @@ import {
 import { Button } from '@whity/ui/button';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@whity/ui/alert';
+import { AreaError } from '@whity/ui/page-states';
 import { Badge } from '@whity/ui/badge';
 import {
   Dialog,
@@ -300,7 +301,11 @@ export default function UserGroupsPage() {
       />
 
       {groups.error !== null ? (
-        <p className="text-sm text-destructive">{groups.error}</p>
+        <AreaError
+          message={groups.error}
+          retryLabel={t('userGroups.tryAgain', 'Try again')}
+          onRetry={() => groups.refetch()}
+        />
       ) : (
         <DataTable
           columns={columns}
@@ -314,6 +319,21 @@ export default function UserGroupsPage() {
           // non-null forever after.
           isLoading={groups.loading && groups.data === null}
           globalFilterPlaceholder={t('userGroups.searchPlaceholder', 'Search user groups…')}
+          emptyState={
+            query.search.value !== ''
+              ? {
+                  title: t('userGroups.empty.filtered', 'No group matches “{term}”', {
+                    term: query.search.value,
+                  }),
+                }
+              : {
+                  title: t('userGroups.empty.title', 'No groups yet'),
+                  description: t(
+                    'userGroups.empty.description',
+                    'A group is a rule that decides who is in it, such as everyone with a role. Nobody is added by hand.'
+                  ),
+                }
+          }
           sorting={query.sorting}
           search={query.search}
           pagination={query.pagination({

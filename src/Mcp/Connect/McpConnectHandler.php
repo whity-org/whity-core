@@ -125,10 +125,16 @@ final class McpConnectHandler
         );
 
         $tools = array_map(
-            static fn (array $tool): array => [
-                'name'        => (string) ($tool['name'] ?? ''),
-                'description' => (string) ($tool['description'] ?? ''),
-            ],
+            static function (array $tool): array {
+                $plain = \Whity\Mcp\Tools\ToolCatalogue::describe($tool);
+
+                return [
+                    'name'        => (string) ($tool['name'] ?? ''),
+                    'description' => (string) ($tool['description'] ?? ''),
+                    'plainName'   => $plain['plainName'],
+                    'plainNameAr' => $plain['plainNameAr'],
+                ];
+            },
             $this->toolsListHandler->listFor($principal, $tenantId),
         );
 

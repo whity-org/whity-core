@@ -49,6 +49,8 @@ final class RouteTemplatePresenter
             'name' => $template['name'],
             'description' => $template['description'],
             'step_count' => $template['step_count'] ?? 0,
+            // S5: how many routes were started from this design, finished or not.
+            'usage_count' => $template['usage_count'] ?? 0,
             'created_by' => $template['created_by'],
             'created_at' => $template['created_at'],
             'updated_at' => $template['updated_at'],

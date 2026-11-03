@@ -70,6 +70,8 @@ export const BILLING_PAY = 'billing:pay';
 // estate, importing stock that arrived, and MINTING A CODE — the last being a
 // commercial act (something was sold) that a warehouse hand who unpacks boxes
 // has no business performing.
+export const EMAIL_DOMAINS_MANAGE = 'email_domains:manage';
+
 export const LICENSING_VIEW = 'licensing:view';
 export const LICENSING_MANAGE = 'licensing:manage';
 export const LICENSING_ISSUE = 'licensing:issue';

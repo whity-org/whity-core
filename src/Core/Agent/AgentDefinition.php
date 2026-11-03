@@ -27,6 +27,9 @@ final class AgentDefinition
     public const NAME_MAX         = 60;
     public const ROLE_MAX         = 200;
     public const INSTRUCTIONS_MAX = 4000;
+    /** How many documents an agent keeps for reference (WHIT-867). */
+    public const MAY_READ_MAX = 20;
+
     public const SLUG_MAX         = 48;
 
     /** The persona's text fields, each with its Arabic twin. */
@@ -105,6 +108,17 @@ final class AgentDefinition
                     $clean[$toolset] = true;
                 }
                 $out['toolsets'] = array_keys($clean);
+            }
+        }
+
+        if (array_key_exists('may_read', $input)) {
+            $sources = $input['may_read'];
+            if (!is_array($sources) || !array_is_list($sources) || array_filter($sources, static fn (mixed $id): bool => !is_int($id) || $id < 1) !== []) {
+                $errors[] = 'mayRead must be a list of document ids';
+            } elseif (count(array_unique($sources)) > self::MAY_READ_MAX) {
+                $errors[] = 'mayRead can hold at most ' . self::MAY_READ_MAX . ' documents';
+            } else {
+                $out['may_read'] = array_values(array_unique($sources));
             }
         }
 
