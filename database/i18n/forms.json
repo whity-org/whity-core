@@ -211,7 +211,6 @@
         "fill.sentPublic": "{title} was submitted successfully. You may close this page.",
         "fill.sentPublicTitle": "Thank you, your response has been recorded",
         "fill.startAgain": "Start again",
-        "fill.submit": "Submit",
         "fill.submitFailed": "This could not be submitted. Please check your answers and try again.",
         "fill.submitFailedConnection": "This could not be submitted. Check your connection and try again.",
         "fill.submitting": "Submitting…",
