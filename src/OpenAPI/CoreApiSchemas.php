@@ -5502,6 +5502,26 @@ final class CoreApiSchemas
                 'item' => SchemaBuilder::ref('InboxItem'),
                 'proposal' => SchemaBuilder::ref('AgentProposal'),
             ], ['key', 'kind', 'at']),
+            // A card an app adds to the home. `source` is where its data is; a workspace
+            // plugin's card has none and carries its number in `value` instead.
+            'HomeCard' => self::object([
+                'key' => self::str(),
+                'label' => self::str(),
+                'labelAr' => self::str(),
+                'caption' => self::str(true),
+                'captionAr' => self::str(true),
+                'icon' => self::str(true),
+                'href' => self::str(true),
+                'source' => self::str(true),
+                'value' => ['type' => 'integer', 'nullable' => true],
+                'hidden' => ['type' => 'boolean'],
+            ], ['key', 'label', 'labelAr', 'hidden']),
+            'HomeCardListResponse' => self::listEnvelope('HomeCard'),
+            'HomeCardHiddenRequest' => self::object(['hidden' => ['type' => 'boolean']], ['hidden']),
+            'HomeCardHiddenResponse' => self::dataEnvelope(self::object([
+                'key' => self::str(),
+                'hidden' => ['type' => 'boolean'],
+            ], ['key', 'hidden'])),
             'WaitingListResponse' => self::object([
                 'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('WaitingRow')],
                 'counts' => self::object([
@@ -11630,6 +11650,37 @@ final class CoreApiSchemas
                     ],
                     'responses' => [
                         200 => self::jsonResponse('The oldest rows and the totals', 'WaitingListResponse'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'GET',
+                'path' => '/api/me/home-cards',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => "The cards installed apps add to the caller's home, in install order",
+                    'description' => 'Only cards whose permission the caller holds in this workspace. Hidden ones are listed too, '
+                        . 'so a client can offer Show. A card names its data route in `source`; that route applies its own permission and the caller\'s scope.',
+                    'tags' => ['home'],
+                    'responses' => [
+                        200 => self::jsonResponse('The cards', 'HomeCardListResponse'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'PUT',
+                'path' => '/api/me/home-cards/{key:[A-Za-z][A-Za-z0-9_]*}/hidden',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Hide a home card or show it again, for the caller in this workspace',
+                    'tags' => ['home'],
+                    'request' => 'HomeCardHiddenRequest',
+                    'responses' => [
+                        200 => self::jsonResponse('The card and its new state', 'HomeCardHiddenResponse'),
+                        404 => self::errorResponse('No card by that name that the caller may see'),
+                        422 => self::errorResponse('hidden is missing or not true or false'),
                     ] + self::authErrors(),
                 ],
             ],

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.61).
+ * SDK identity (v1.62).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -925,13 +925,20 @@ namespace Whity\Sdk;
  * write at Allowed; {@see Manifest\PluginManifest::agentPresets()} reads them
  * (WHIT-818).
  *
+ * Purely additive.) ->
+ * 1.62 (HOME CARDS: the optional {@see PluginHomeCardInterface} and `homeCard` in
+ * `plugin.json` add one card to the home page. It reads a GET route the plugin
+ * registered under the same permission, or counts a record type in a workspace
+ * plugin; {@see Manifest\HomeCardValidator} checks it and
+ * {@see Manifest\PluginManifest::homeCard()} reads it (WHIT-872).
+ *
  * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.61.0';
+    public const VERSION = '1.62.0';
 
     /**
      * Static identity only — never instantiated.
