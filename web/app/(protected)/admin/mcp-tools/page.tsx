@@ -14,33 +14,25 @@ import { Switch } from '@whity/ui/switch';
 import { ToggleGroup } from '@whity/ui/toggle-group';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { useFormattingLocale, useTranslation } from '@whity/features/i18n';
-import type { McpAgentPolicy, McpListSize, McpTool, McpToolListResponse, McpToolVisibility } from './types';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@whity/ui/select';
+import { undoWindowWords, type ProposalWords } from '@/components/agents/proposals';
+import { localized } from '@/components/agents/workspace-agents';
+import type { McpAgentAccess, McpListSize, McpTool, McpToolListResponse, McpToolVisibility } from './types';
 
 /** The setting that holds the plugin tools this workspace lists directly (WHIT-754). */
 const ALWAYS_ON_SETTING = 'mcp.always_on_plugin_tools';
 
-type PolicyFilter = 'all' | McpAgentPolicy;
+type PolicyFilter = 'all' | McpAgentAccess;
 
-/**
- * What an agent really does with a tool. The list carries the tool's ceiling
- * (`agentPolicy`), but a change that has no Undo is always proposed first, and
- * `/api/admin/mcp/tools` doesn't say which changes have one (S6). A tool derived
- * from a route is named for its HTTP method, so a change there reads as
- * proposed, the safe answer. Authored tools show their own policy.
- */
-function shownPolicy(tool: McpTool): McpAgentPolicy {
-  const changes = /^(post|put|patch|delete)_/.test(tool.name);
-  return tool.agentPolicy === 'allow' && changes ? 'propose' : tool.agentPolicy;
-}
+const ALL_AREAS = 'all';
 
 /**
  * What AI can do (A22, TplWhatAICanDo; was MCP tools): every action AI can
- * take in this workspace and how agents may use it (can do it, proposes and a
- * person approves, suggests only, never), from `agentPolicy`. Tool names,
- * toolsets, how apps discover each one, what it needs and the list sizes show
- * only with Show technical details (A.3). A plain name and area per action,
- * and how long Undo lasts ("If it goes wrong"), are not returned by the API
- * yet (S6), so the action reads from its description. A plugin tool that asks
+ * take in this workspace, its area, how agents may use it (can do it, proposes
+ * and a person approves, suggests only, never) and what happens if it goes
+ * wrong. `agentAccess` is the server's own answer, from the check every call
+ * runs. Tool names, toolsets, how apps discover each one, what it needs and the
+ * list sizes show only with Show technical details (A.3). A plugin tool that asks
  * to be listed directly is listed only once an administrator turns it on, in
  * the technical view (docs/design/MCP-TOOL-SURFACE.md §5.10, owner decision 5).
  */
@@ -49,10 +41,12 @@ export default function McpToolsPage() {
   const { addToast } = useToast();
   const t = useTranslation('admin');
   const language = useFormattingLocale();
+  const arabic = language === 'ar';
   const { showTechnicalDetails } = useDisplayPreferences();
   const [saving, setSaving] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [policy, setPolicy] = useState<PolicyFilter>('all');
+  const [area, setArea] = useState(ALL_AREAS);
 
   const { data, loading: isLoading, error, refetch } = useFetch(async () => {
     const response = await apiClient('/api/v1/admin/mcp/tools');
@@ -64,6 +58,13 @@ export default function McpToolsPage() {
 
   const tools = useMemo(() => data?.data ?? [], [data]);
   const sizes = data?.sizes;
+  const nameOf = (tool: McpTool): string => localized(tool.plainName, tool.plainNameAr, arabic);
+  const areaOf = (tool: McpTool): string => localized(tool.area.title, tool.area.titleAr, arabic);
+  const areas = useMemo(() => {
+    const byId = new Map<string, string>();
+    for (const tool of tools) byId.set(tool.area.id, localized(tool.area.title, tool.area.titleAr, arabic));
+    return [...byId.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+  }, [tools, arabic]);
 
   useEffect(() => {
     if (error) addToast(error, 'error');
@@ -72,13 +73,14 @@ export default function McpToolsPage() {
   const shown = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return tools.filter((tool) => {
-      if (policy !== 'all' && shownPolicy(tool) !== policy) return false;
+      if (policy !== 'all' && tool.agentAccess !== policy) return false;
+      if (area !== ALL_AREAS && tool.area.id !== area) return false;
       if (needle === '') return true;
-      return [tool.description, showTechnicalDetails ? tool.name : '', showTechnicalDetails ? tool.toolset : ''].some((text) =>
+      return [tool.plainName, tool.plainNameAr ?? '', showTechnicalDetails ? tool.name : '', showTechnicalDetails ? tool.toolset : ''].some((text) =>
         text.toLowerCase().includes(needle),
       );
     });
-  }, [tools, query, policy, showTechnicalDetails]);
+  }, [tools, query, policy, area, showTechnicalDetails]);
 
   const setAlwaysOn = async (tool: McpTool, on: boolean) => {
     const enabled = tools
@@ -126,15 +128,32 @@ export default function McpToolsPage() {
       off: t('mcpTools.visibility.off', 'Not offered'),
     })[visibility] ?? visibility;
 
-  const policyLabel = (value: McpAgentPolicy): string =>
+  const accessLabelOf = (value: McpAgentAccess): string =>
     ({
-      allow: t('mcpTools.agentPolicy.allow', 'Can do it'),
-      propose: t('mcpTools.agentPolicy.propose', 'Proposes, a person approves'),
-      'suggest-only': t('mcpTools.agentPolicy.suggestOnly', 'Suggests only'),
-      refuse: t('mcpTools.agentPolicy.refuse', 'Never'),
-    })[value] ?? value;
+      can: t('mcpTools.agentPolicy.allow', 'Can do it'),
+      proposes: t('mcpTools.agentPolicy.propose', 'Proposes, a person approves'),
+      suggests: t('mcpTools.agentPolicy.suggestOnly', 'Suggests only'),
+      never: t('mcpTools.agentPolicy.refuse', 'Never'),
+    })[value];
 
-  const policyVariant = (value: McpAgentPolicy) => (value === 'allow' ? 'success' : value === 'refuse' ? 'outline' : 'warning');
+  const accessVariant = (value: McpAgentAccess) => (value === 'can' ? 'success' : value === 'never' ? 'outline' : value === 'suggests' ? 'secondary' : 'warning');
+
+  const undoWords = {
+    minute: t('agentActivity.undo.minute', '1 minute'),
+    minutes: t('agentActivity.undo.minutes', '{n} minutes'),
+    hour: t('agentActivity.undo.hour', '1 hour'),
+    hours: t('agentActivity.undo.hours', '{n} hours'),
+    day: t('agentActivity.undo.day', '1 day'),
+    days: t('agentActivity.undo.days', '{n} days'),
+  } as ProposalWords;
+
+  /** "If it goes wrong" (AI.4). */
+  const ifItGoesWrong = (tool: McpTool): string => {
+    if (tool.readOnly) return t('mcpTools.wrong.read', 'Undo not needed');
+    if (tool.agentAccess === 'suggests') return t('mcpTools.wrong.suggests', 'A person accepts each suggestion');
+    const window = undoWindowWords(tool.undoWindowSeconds, undoWords);
+    return window !== undefined ? t('mcpTools.wrong.undo', 'Undo for {time}', { time: window }) : t('mcpTools.wrong.none', 'Can’t be undone');
+  };
 
   const technicalColumns: DataTableColumn<McpTool>[] = [
     {
@@ -175,12 +194,12 @@ export default function McpToolsPage() {
 
   const columns: DataTableColumn<McpTool>[] = [
     {
-      accessorKey: 'description',
+      accessorKey: 'plainName',
       header: t('mcpTools.table.action', 'Action'),
       enableSorting: true,
       cell: (tool) => (
         <span className="block max-w-xl space-y-0.5">
-          <span className="block text-sm font-medium text-foreground">{tool.description || tool.name}</span>
+          <span className="block text-sm font-medium text-foreground">{nameOf(tool)}</span>
           <TechnicalDetails>
             <code dir="ltr" className="block text-xs text-muted-foreground">
               {tool.name}
@@ -190,10 +209,20 @@ export default function McpToolsPage() {
       ),
     },
     {
-      accessorKey: 'agentPolicy',
+      id: 'area',
+      header: t('mcpTools.table.area', 'Area'),
+      cell: (tool) => <span className="text-sm">{areaOf(tool)}</span>,
+    },
+    {
+      accessorKey: 'agentAccess',
       header: t('mcpTools.table.agentPolicy', 'Agents'),
       enableSorting: true,
-      cell: (tool) => <Badge variant={policyVariant(shownPolicy(tool))}>{policyLabel(shownPolicy(tool))}</Badge>,
+      cell: (tool) => <Badge variant={accessVariant(tool.agentAccess)}>{accessLabelOf(tool.agentAccess)}</Badge>,
+    },
+    {
+      id: 'wrong',
+      header: t('mcpTools.table.wrong', 'If it goes wrong'),
+      cell: (tool) => <span className="text-sm">{ifItGoesWrong(tool)}</span>,
     },
     ...(showTechnicalDetails ? technicalColumns : []),
   ];
@@ -237,7 +266,7 @@ export default function McpToolsPage() {
         <AreaError message={error} retryLabel={t('agents.retry', 'Try again')} onRetry={refetch} />
       ) : isLoading ? (
         <LoadingRows
-          headers={[t('mcpTools.table.action', 'Action'), t('mcpTools.table.agentPolicy', 'Agents')]}
+          headers={[t('mcpTools.table.action', 'Action'), t('mcpTools.table.area', 'Area'), t('mcpTools.table.agentPolicy', 'Agents')]}
           label={t('agents.loading', 'Loading…')}
         />
       ) : (
@@ -251,6 +280,19 @@ export default function McpToolsPage() {
               placeholder={t('mcpTools.searchPlaceholder', 'Search actions')}
               clearLabel={t('agents.search.clear', 'Clear search')}
             />
+            <Select value={area} onValueChange={setArea}>
+              <SelectTrigger aria-label={t('mcpTools.table.area', 'Area')} className="w-56">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL_AREAS}>{t('mcpTools.filter.allAreas', 'All areas')}</SelectItem>
+                {areas.map(([id, title]) => (
+                  <SelectItem key={id} value={id}>
+                    {title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <ToggleGroup
               label={t('mcpTools.filter.label', 'Agents may')}
               value={policy}
@@ -258,10 +300,10 @@ export default function McpToolsPage() {
               onChange={(value) => typeof value === 'string' && setPolicy(value as PolicyFilter)}
               options={[
                 { value: 'all', label: t('mcpTools.filter.all', 'All') },
-                { value: 'allow', label: t('mcpTools.filter.allow', 'Do it') },
-                { value: 'propose', label: t('mcpTools.filter.propose', 'Propose') },
-                { value: 'suggest-only', label: t('mcpTools.filter.suggest', 'Suggest') },
-                { value: 'refuse', label: t('mcpTools.filter.refuse', 'Never') },
+                { value: 'can', label: t('mcpTools.filter.allow', 'Do it') },
+                { value: 'proposes', label: t('mcpTools.filter.propose', 'Propose') },
+                { value: 'suggests', label: t('mcpTools.filter.suggest', 'Suggest') },
+                { value: 'never', label: t('mcpTools.filter.refuse', 'Never') },
               ]}
             />
           </div>
@@ -273,6 +315,7 @@ export default function McpToolsPage() {
               onClear={() => {
                 setQuery('');
                 setPolicy('all');
+                setArea(ALL_AREAS);
               }}
             />
           ) : (

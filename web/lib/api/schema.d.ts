@@ -3569,6 +3569,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/agent-toolsets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The areas an agent can work with, in both languages */
+        get: operations["get_api_v1_me_agent_toolsets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/agents": {
         parameters: {
             query?: never;
@@ -3866,6 +3883,43 @@ export interface paths {
          * @description The ordinary form upload, with its limits and single-use reference, once the caller may fill in this form. MULTIPART, one part named `file`.
          */
         post: operations["post_api_v1_me_forms_id_uploads"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/home-cards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The cards installed apps add to the caller's home, in install order
+         * @description Only cards whose permission the caller holds in this workspace. Hidden ones are listed too, so a client can offer Show. A card names its data route in `source`; that route applies its own permission and the caller's scope.
+         */
+        get: operations["get_api_v1_me_home_cards"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/home-cards/{key}/hidden": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Hide a home card or show it again, for the caller in this workspace */
+        put: operations["put_api_v1_me_home_cards_key_hidden"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -7249,6 +7303,8 @@ export interface components {
             action: components["schemas"]["AgentAction"] | null;
             /** @description The agent is paused, so this can be declined but not approved until it is resumed */
             agentPaused?: boolean;
+            /** @description What it would run, in plain words */
+            toolInfo?: components["schemas"]["AgentToolInfo"] | null;
         };
         AgentProposalListResponse: {
             data: components["schemas"]["AgentProposal"][];
@@ -7274,6 +7330,14 @@ export interface components {
             agentAccess: "can" | "proposes" | "suggests" | "never";
             readOnly: boolean;
             undoWindowSeconds: number | null;
+        };
+        AgentToolset: {
+            id: string;
+            title: string;
+            titleAr: string | null;
+        };
+        AgentToolsetListResponse: {
+            data: components["schemas"]["AgentToolset"][];
         };
         AgentUnassignResponse: {
             data: {
@@ -9377,6 +9441,30 @@ export interface components {
         };
         HelloGreetingResponse: {
             data: components["schemas"]["HelloGreeting"];
+        };
+        HomeCard: {
+            key: string;
+            label: string;
+            labelAr: string;
+            caption?: string | null;
+            captionAr?: string | null;
+            icon?: string | null;
+            href?: string | null;
+            source?: string | null;
+            value?: number | null;
+            hidden: boolean;
+        };
+        HomeCardHiddenRequest: {
+            hidden: boolean;
+        };
+        HomeCardHiddenResponse: {
+            data: {
+                key: string;
+                hidden: boolean;
+            };
+        };
+        HomeCardListResponse: {
+            data: components["schemas"]["HomeCard"][];
         };
         IdentityProvider: {
             id: number;
@@ -31157,6 +31245,71 @@ export interface operations {
             };
         };
     };
+    get_api_v1_me_agent_toolsets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Core's areas */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentToolsetListResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     get_api_v1_me_agents: {
         parameters: {
             query?: never;
@@ -32624,6 +32777,160 @@ export interface operations {
             };
             /** @description Too many uploads */
             429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_me_home_cards: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The cards */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HomeCardListResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    put_api_v1_me_home_cards_key_hidden: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HomeCardHiddenRequest"];
+            };
+        };
+        responses: {
+            /** @description The card and its new state */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HomeCardHiddenResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No card by that name that the caller may see */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description hidden is missing or not true or false */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { apiClient } from '@/lib/api-client';
 import { useToast } from '@/lib/toast-context';
-import { useAuth } from '@/lib/auth-context';
+import { useCapabilities } from '@/hooks/useCapabilities';
+import { EMAIL_DOMAINS_MANAGE } from '@/lib/capabilities';
 import { useFetch } from '@/hooks/useFetch';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { Button } from '@whity/ui/button';
@@ -65,9 +66,8 @@ async function readError(res: Response, fallback: string): Promise<string> {
  * Tenant email-domain policy admin — WC-ac35b6cf.
  *
  * Manage which email domains auto-provision/auto-accept memberships into this
- * tenant (TenantEmailDomainApiHandler, gated on the `admin` ROLE — not a
- * permission, hence the client-side `user.role` check below rather than
- * useCapabilities()). A registered domain never auto-provisions until the
+ * tenant (TenantEmailDomainApiHandler, gated on `email_domains:manage`, which
+ * the check below reads). A registered domain never auto-provisions until the
  * tenant proves ownership via the DNS TXT challenge; each domain's own
  * `auto_provision` toggle is the closest backend-driven equivalent to a
  * "require domain match" policy — it decides whether a newly-verified email
@@ -75,9 +75,8 @@ async function readError(res: Response, fallback: string): Promise<string> {
  */
 export default function EmailDomainsPage() {
   const { addToast } = useToast();
-  const { user } = useAuth();
+  const { has, loading: capabilitiesLoading } = useCapabilities();
   const t = useTranslation('admin');
-  const isAdmin = user?.role === 'admin';
 
   const [addingOpen, setAddingOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<number | null>(null);
@@ -110,13 +109,12 @@ export default function EmailDomainsPage() {
       : [];
   }, []);
 
-  if (!isAdmin) {
+  if (!capabilitiesLoading && !has(EMAIL_DOMAINS_MANAGE)) {
     return (
       <AccessDenied
         description={t(
-          'settings.emailDomains.accessDenied',
-          'You need the tenant {role} role to manage email-domain policies.',
-          { role: 'admin' }
+          'settings.emailDomains.accessDeniedPlain',
+          'You need permission to manage email domains to open this page.'
         )}
         action={
           <Button onClick={() => window.history.back()} variant="outline">

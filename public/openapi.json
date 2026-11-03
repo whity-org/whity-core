@@ -24319,6 +24319,77 @@
                 }
             }
         },
+        "/api/v1/me/agent-toolsets": {
+            "get": {
+                "operationId": "get_api_v1_me_agent_toolsets",
+                "summary": "The areas an agent can work with, in both languages",
+                "tags": [
+                    "me"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Core's areas",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AgentToolsetListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/me/agents": {
             "get": {
                 "operationId": "get_api_v1_me_agents",
@@ -26148,6 +26219,189 @@
                     },
                     "429": {
                         "description": "Too many uploads",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/me/home-cards": {
+            "get": {
+                "operationId": "get_api_v1_me_home_cards",
+                "summary": "The cards installed apps add to the caller's home, in install order",
+                "tags": [
+                    "home"
+                ],
+                "description": "Only cards whose permission the caller holds in this workspace. Hidden ones are listed too, so a client can offer Show. A card names its data route in `source`; that route applies its own permission and the caller's scope.",
+                "responses": {
+                    "200": {
+                        "description": "The cards",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HomeCardListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/me/home-cards/{key}/hidden": {
+            "put": {
+                "operationId": "put_api_v1_me_home_cards_key_hidden",
+                "summary": "Hide a home card or show it again, for the caller in this workspace",
+                "tags": [
+                    "home"
+                ],
+                "parameters": [
+                    {
+                        "name": "key",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/HomeCardHiddenRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The card and its new state",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HomeCardHiddenResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No card by that name that the caller may see",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "hidden is missing or not true or false",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -48535,6 +48789,15 @@
                     "agentPaused": {
                         "type": "boolean",
                         "description": "The agent is paused, so this can be declined but not approved until it is resumed"
+                    },
+                    "toolInfo": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/AgentToolInfo"
+                            }
+                        ],
+                        "nullable": true,
+                        "description": "What it would run, in plain words"
                     }
                 },
                 "required": [
@@ -48645,6 +48908,40 @@
                     "agentAccess",
                     "readOnly",
                     "undoWindowSeconds"
+                ]
+            },
+            "AgentToolset": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "titleAr": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "id",
+                    "title",
+                    "titleAr"
+                ]
+            },
+            "AgentToolsetListResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/AgentToolset"
+                        }
+                    }
+                },
+                "required": [
+                    "data"
                 ]
             },
             "AgentUnassignResponse": {
@@ -55998,6 +56295,101 @@
                         "$ref": "#/components/schemas/HelloGreeting"
                     }
                 }
+            },
+            "HomeCard": {
+                "type": "object",
+                "properties": {
+                    "key": {
+                        "type": "string"
+                    },
+                    "label": {
+                        "type": "string"
+                    },
+                    "labelAr": {
+                        "type": "string"
+                    },
+                    "caption": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "captionAr": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "icon": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "href": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "source": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "value": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "hidden": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "key",
+                    "label",
+                    "labelAr",
+                    "hidden"
+                ]
+            },
+            "HomeCardHiddenRequest": {
+                "type": "object",
+                "properties": {
+                    "hidden": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "hidden"
+                ]
+            },
+            "HomeCardHiddenResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "key": {
+                                "type": "string"
+                            },
+                            "hidden": {
+                                "type": "boolean"
+                            }
+                        },
+                        "required": [
+                            "key",
+                            "hidden"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "HomeCardListResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/HomeCard"
+                        }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
             },
             "IdentityProvider": {
                 "type": "object",

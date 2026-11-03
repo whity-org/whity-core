@@ -760,6 +760,55 @@
           }
         }
       }
+    },
+    "homeCard": {
+      "description": "This plugin's one card on the home page (SDK 1.62). Exactly one of source and record: a GET route this plugin registered under the same permission, or a record type in this manifest that the host counts.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "label",
+        "permission"
+      ],
+      "oneOf": [
+        {
+          "required": [
+            "source"
+          ]
+        },
+        {
+          "required": [
+            "record"
+          ]
+        }
+      ],
+      "properties": {
+        "label": {
+          "$ref": "#/$defs/label",
+          "description": "At most 60 characters in each language."
+        },
+        "caption": {
+          "$ref": "#/$defs/label",
+          "description": "What a record card's number counts. At most 60 characters in each language."
+        },
+        "permission": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string",
+          "pattern": "^/api/[A-Za-z0-9_\\-/]+$"
+        },
+        "record": {
+          "type": "string"
+        },
+        "screen": {
+          "type": "string",
+          "description": "The screen in this manifest the card opens."
+        },
+        "icon": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]{1,64}$"
+        }
+      }
     }
   },
   "$defs": {
