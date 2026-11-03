@@ -92,7 +92,8 @@ export default defineConfig({
       name: 'plugins-upload',
       testMatch: /plugin-upload\.spec\.ts/,
       dependencies: ['setup'],
-      use: { ...devices['Desktop Chrome'], storageState: adminStatePath },
+      // Changing what's installed is the operator's (WHIT-869): the system tenant.
+      use: { ...devices['Desktop Chrome'], storageState: systemStatePath },
     },
     // WC-228: the UiKitShowcase example plugin's UI-Kit Reference block screen
     // runs admin-authenticated (the migration grants uikit:view to admin, so
