@@ -35,7 +35,7 @@ final class AgentGrantView
     ];
 
     /**
-     * @param list<array{permission: string, readOnly: bool, agentPolicy: string, undoWindowSeconds?: ?int}> $operations
+     * @param list<array{permission: string, readOnly: bool, agentPolicy: string, undoWindowSeconds?: ?int, toolset?: ?string}> $operations
      *        every operation an agent could be offered, with its gate
      */
     public function __construct(private readonly array $operations)
@@ -82,6 +82,39 @@ final class AgentGrantView
             ];
         }
         return $rows;
+    }
+
+    /**
+     * How much the agent does on its own, in actions (design 2.9, TplAgents): how
+     * many it runs, how many ask a person first, and how many are off, after the
+     * grant, each operation's ceilings and the toolsets. With $held, only what
+     * that person holds counts; without it, this is what the agent starts with,
+     * before any one person's permissions (the workspace's view of an agent).
+     *
+     * @param list<string>      $scope
+     * @param list<string>|null $held
+     * @return array{allowed: int, askFirst: int, off: int}
+     */
+    public function onItsOwn(array $scope, ?array $held = null): array
+    {
+        $grant  = AgentScopeGrant::fromScope($scope);
+        $narrow = new McpScope($scope);
+        $counts = ['allowed' => 0, 'askFirst' => 0, 'off' => 0];
+        foreach ($this->operations as $op) {
+            if (($held !== null && !in_array($op['permission'], $held, true))
+                || !$narrow->allowsPermission($op['permission'])
+                || !$narrow->allowsToolset($op['toolset'] ?? null)) {
+                continue;
+            }
+            $mode = $grant->effectiveMode($op['permission'], $op['readOnly'], $op['agentPolicy'], ($op['undoWindowSeconds'] ?? null) !== null);
+            $counts[match ($mode) {
+                AgentScopeGrant::ALLOW => 'allowed',
+                AgentScopeGrant::OFF   => 'off',
+                default                => 'askFirst',
+            }]++;
+        }
+
+        return $counts;
     }
 
     /**
@@ -186,7 +219,7 @@ final class AgentGrantView
      *
      * @param iterable<array<string, mixed>> $tools
      * @param array<string, array<string, mixed>> $access tool name => access entry
-     * @return list<array{permission: string, readOnly: bool, agentPolicy: string, undoWindowSeconds: ?int}>
+     * @return list<array{permission: string, readOnly: bool, agentPolicy: string, undoWindowSeconds: ?int, toolset: ?string}>
      */
     public static function operationsFrom(iterable $tools, array $access): array
     {
@@ -204,6 +237,7 @@ final class AgentGrantView
                 'readOnly'    => ($annotations['readOnlyHint'] ?? false) === true,
                 'agentPolicy' => is_string($meta[ToolSurface::META_AGENT_POLICY] ?? null) ? $meta[ToolSurface::META_AGENT_POLICY] : ToolSurface::AGENT_ALLOW,
                 'undoWindowSeconds' => is_int($meta[ToolSurface::META_UNDO_WINDOW] ?? null) ? $meta[ToolSurface::META_UNDO_WINDOW] : null,
+                'toolset'     => is_string($meta[ToolSurface::META_TOOLSET] ?? null) ? $meta[ToolSurface::META_TOOLSET] : null,
             ];
         }
         return $operations;

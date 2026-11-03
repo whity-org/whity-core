@@ -94,7 +94,7 @@ final class AgentProposalRepository
      *
      * @return list<array<string, mixed>>
      */
-    public function listFor(int $tenantId, int $profileId, ?string $status = null, int $limit = 50): array
+    public function listFor(int $tenantId, int $profileId, ?string $status = null, int $limit = 50, ?string $principalId = null): array
     {
         $this->expireDue($tenantId);
 
@@ -103,6 +103,10 @@ final class AgentProposalRepository
         if ($status !== null) {
             $sql .= ' AND status = :status';
             $params[':status'] = $status;
+        }
+        if ($principalId !== null) {
+            $sql .= ' AND agent_principal_id = :principal';
+            $params[':principal'] = $principalId;
         }
         $stmt = $this->db->prepare($sql . ' ORDER BY id DESC LIMIT :limit');
         foreach ($params as $name => $value) {

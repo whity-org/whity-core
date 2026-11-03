@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useToast } from '@/lib/toast-context';
 import { useAuth } from '@/lib/auth-context';
 import { useCapabilities } from '@/hooks/useCapabilities';
@@ -55,6 +56,14 @@ export default function PendingRegistrationsPage() {
 
   const canApprove = hasPermission(REGISTRATIONS_APPROVE);
   const isSystemTenant = user?.tenant_id === SYSTEM_TENANT_ID;
+  const router = useRouter();
+
+  // The sidebar's Approval Gating entry opens here, and sign-up approval is the system
+  // tenant's alone. Everybody else's work is on the next tab, so that is where they go.
+  const belongsElsewhere = user !== null && user !== undefined && !isSystemTenant;
+  useEffect(() => {
+    if (belongsElsewhere) router.replace('/admin/approval-gating/password-resets');
+  }, [belongsElsewhere, router]);
 
   const [items, setItems] = useState<PendingRegistration[]>([]);
   const [loading, setLoading] = useState(true);
@@ -161,6 +170,8 @@ export default function PendingRegistrationsPage() {
   // Approving a registration activates another tenant's owner — a platform
   // operation. Gate on BOTH the system tenant and the permission, matching the
   // backend (which 403s any other caller).
+  if (belongsElsewhere) return null;
+
   if (!isSystemTenant || !canApprove) {
     // ONE translatable sentence with a {link} hole, split at render time so the
     // Website Settings link stays a link without fragmenting the sentence for

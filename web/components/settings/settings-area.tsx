@@ -61,14 +61,24 @@ const DEVICES_HREF = '/licensing';
  * id their navigation item registers under. Exported so the sidebar can fold
  * them into its single Settings entry.
  */
-export const SETTINGS_AREA_NAV_IDS = ['tags', 'tag-groups', 'languages', 'translations'] as const;
+export const SETTINGS_AREA_NAV_IDS = ['tags', 'tag-groups', 'translations'] as const;
+
+/**
+ * Settings pages that live in the sidebar's Platform group for the system tenant
+ * (W.2). They keep their addresses, so they leave this sub-nav and don't light up the
+ * Settings entry.
+ */
+export const PLATFORM_SETTINGS_TABS: Readonly<Record<string, string>> = {
+  email: '/admin/settings/email',
+  storage: '/admin/settings/storage',
+  'feature-flags': '/admin/settings/feature-flags',
+};
 
 /** Every route prefix that opens inside the Settings area. */
 export const SETTINGS_AREA_PREFIXES = [
   '/admin/settings',
   '/admin/tags',
   '/admin/tag-groups',
-  '/admin/languages',
   '/admin/translations',
   DEVICES_HREF,
 ] as const;
@@ -118,6 +128,7 @@ export function SettingsArea({ children }: { children: ReactNode }) {
 
     const links: (SettingsAreaLink & { group: GroupId })[] = [];
     for (const tab of tabs ?? []) {
+      if (tab.id in PLATFORM_SETTINGS_TABS) continue;
       links.push({ id: tab.id, href: tab.href, label: tab.label, group: GROUP_OF[tab.id] ?? 'advanced' });
     }
     for (const id of SETTINGS_AREA_NAV_IDS) {

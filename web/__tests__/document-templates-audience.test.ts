@@ -74,7 +74,7 @@ describe('describeAudience — the four branches DocumentAccessPolicy takes', ()
 
     expect(sentence).toContain('Faculty of Engineering');
     expect(sentence).toContain('below it');
-    expect(sentence).toContain('No permission is required');
+    expect(sentence).not.toContain('permission');
   });
 
   it('states BOTH predicates for a placed, permission-tagged row', () => {
@@ -97,7 +97,7 @@ describe('describeAudience — the four branches DocumentAccessPolicy takes', ()
       t
     );
 
-    expect(sentence).toContain('everyone in the tenant');
+    expect(sentence).toContain('everyone in the workspace');
   });
 
   it('says a system row carries no permission gate even when a tag is set', () => {
@@ -109,7 +109,7 @@ describe('describeAudience — the four branches DocumentAccessPolicy takes', ()
       t
     );
 
-    expect(sentence).toContain('no permission gate');
+    expect(sentence).toContain('comes with Whity');
     expect(sentence).not.toContain('documents:publish');
   });
 
