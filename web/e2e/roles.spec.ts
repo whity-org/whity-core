@@ -224,7 +224,7 @@ test.describe('Roles CRUD (admin)', () => {
     const row = page.getByRole('row', { name: new RegExp(createdRoleName) });
     await expect(row).toBeVisible();
     // The fresh role shows a 0 permission count.
-    await expect(row.getByRole('cell', { name: '0', exact: true })).toBeVisible();
+    await expect(row.getByRole('cell', { name: /^0 of d+$/ })).toBeVisible();
 
     // --- Edit: add a permission on the record page ---
     await row.getByRole('button', { name: 'Actions' }).click();
