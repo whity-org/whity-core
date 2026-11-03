@@ -6,6 +6,7 @@ namespace Whity\Api;
 
 use Whity\Core\Audit\AuditLogger;
 use Whity\Core\Identity\ProfileEmailRepository;
+use Whity\Core\Identity\RequestReason;
 use Whity\Core\Identity\TwoFactorRecoveryMailer;
 use Whity\Core\Identity\TwoFactorRecoveryService;
 use Whity\Core\RateLimit\ClientIp;
@@ -136,7 +137,7 @@ final class TwoFactorRecoveryHandler
             return Response::error('A confirmation token is required', 422);
         }
 
-        $result = $this->service->confirm($token);
+        $result = $this->service->confirm($token, RequestReason::from($body['reason'] ?? null));
 
         if ($result === null) {
             $this->audit->record('auth.2fa_recovery.confirm_failed', [

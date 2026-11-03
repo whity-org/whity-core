@@ -9,6 +9,7 @@ use Whity\Core\Identity\LocalPasswordRefusedException;
 use Whity\Core\Identity\PasswordResetMailer;
 use Whity\Core\Identity\PasswordResetService;
 use Whity\Core\Identity\ProfileEmailRepository;
+use Whity\Core\Identity\RequestReason;
 use Whity\Core\PasswordPolicy;
 use Whity\Core\RateLimit\ClientIp;
 use Whity\Core\Request;
@@ -179,7 +180,7 @@ final class PasswordResetHandler
 
         $requireApproval = $this->approvalRequired();
 
-        $result = $this->service->confirm($token, $password, $requireApproval);
+        $result = $this->service->confirm($token, $password, $requireApproval, RequestReason::from($body['reason'] ?? null));
 
         if ($result === null) {
             $this->audit->record('auth.password_reset.failed', [

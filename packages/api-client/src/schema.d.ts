@@ -1169,6 +1169,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/delegations/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Undo a revoke: only by the person who revoked it, soon after */
+        post: operations["post_api_v1_delegations_id_restore"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/demo-catalog/items": {
         parameters: {
             query?: never;
@@ -6247,6 +6264,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/user-groups/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** How many people each group holds now, and where it is used */
+        get: operations["get_api_v1_user_groups_usage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/user-groups/{id}": {
         parameters: {
             query?: never;
@@ -6295,6 +6329,40 @@ export interface paths {
         put?: never;
         /** Create a user */
         post: operations["post_api_v1_users"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users/bulk/require-two-step": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Require two-step of several people, through a policy naming each of them */
+        post: operations["post_api_v1_users_bulk_require_two_step"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users/bulk/role": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Change the primary role of several people at once, all or nothing */
+        post: operations["post_api_v1_users_bulk_role"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6367,6 +6435,24 @@ export interface paths {
         /** Send this user a password-reset link (never returns a credential) */
         post: operations["post_api_v1_users_id_password_reset"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users/{id}/two-step-requirement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Require two-step of one person */
+        put: operations["put_api_v1_users_id_two_step_requirement"];
+        post?: never;
+        /** Remove the policy naming one person. A workspace or unit policy still applies. */
+        delete: operations["delete_api_v1_users_id_two_step_requirement"];
         options?: never;
         head?: never;
         patch?: never;
@@ -7305,6 +7391,13 @@ export interface components {
             ouId: number | null;
             grantedAt: string | null;
             revokedAt: string | null;
+            expiresAt: string | null;
+            /** @enum {string} */
+            status: "active" | "expired" | "revoked";
+            grantorName?: string | null;
+            granteeName?: string | null;
+            ouName?: string | null;
+            permissionDescription?: string | null;
         };
         DelegationCreateRequest: {
             /**
@@ -7318,6 +7411,8 @@ export interface components {
             permissions: string[];
             /** @description Limit the delegation to this organizational unit and the units below it. Null or omitted applies tenant-wide. */
             ouId?: number | null;
+            /** @description When it ends, an ISO-8601 moment in the future. Null or omitted is no end date. */
+            expiresAt?: string | null;
         };
         DelegationCreateResponse: {
             data: {
@@ -7325,6 +7420,7 @@ export interface components {
                 granteeType?: string;
                 granteeId?: number;
                 ouId?: number | null;
+                expiresAt?: string | null;
                 permissions?: string[];
                 count: number;
             };
@@ -9088,6 +9184,12 @@ export interface components {
             status?: string | null;
             resource_type?: string | null;
             resource_id?: string | null;
+            sender?: {
+                /** @enum {string} */
+                kind: "person" | "public";
+                profile_id?: number;
+                name?: string;
+            } | null;
             meta?: {
                 [key: string]: unknown;
             };
@@ -9816,6 +9918,7 @@ export interface components {
             ou_type_id: number | null;
             ou_type_key: string | null;
             ou_type_label: string | null;
+            member_count: number;
         };
         OuCreateRequest: {
             /** @description Name of the organizational unit. */
@@ -9935,6 +10038,8 @@ export interface components {
         PasswordResetConfirmRequest: {
             token: string;
             password: string;
+            /** @description Optional. Why you are asking, shown to the approver when approval is required. At most 500 characters. */
+            reason?: string | null;
         };
         PasswordResetConfirmResponse: {
             data: {
@@ -9985,10 +10090,12 @@ export interface components {
             profile_id: number;
             email: string;
             display_name: string;
+            reason?: string | null;
             created_at: string;
         };
         PendingPasswordResetListResponse: {
             data: components["schemas"]["PendingPasswordResetItem"][];
+            pagination: components["schemas"]["Pagination"];
         };
         PendingSelectionResponse: {
             data: {
@@ -10004,10 +10111,12 @@ export interface components {
             profile_id: number;
             email: string;
             display_name: string;
+            reason?: string | null;
             created_at: string;
         };
         PendingTwoFactorRecoveryListResponse: {
             data: components["schemas"]["PendingTwoFactorRecoveryItem"][];
+            pagination: components["schemas"]["Pagination"];
         };
         Permission: {
             id: number;
@@ -10019,6 +10128,11 @@ export interface components {
             name: string;
             description: string | null;
             source?: string;
+            area: string;
+            areaLabel: string;
+            /** @enum {string} */
+            areaGroup: "people" | "documents" | "ai" | "workspace" | "apps";
+            actions: ("see" | "create" | "change" | "delete" | "approve")[];
         };
         PermissionCatalogueResponse: {
             data: components["schemas"]["PermissionCatalogueEntry"][];
@@ -10506,6 +10620,8 @@ export interface components {
             parent_id: number | null;
             created_at: string | null;
             permissionCount: number;
+            peopleCount?: number;
+            builtIn?: boolean;
             manageable: boolean;
             global: boolean;
         };
@@ -11300,6 +11416,11 @@ export interface components {
         TwoFactorPolicyUpdateRequest: {
             grace_period_days: number;
         };
+        TwoFactorRecoveryConfirmRequest: {
+            token: string;
+            /** @description Optional. Why you are asking, shown to the approver. At most 500 characters. */
+            reason?: string | null;
+        };
         TwoFactorRecoveryConfirmResponse: {
             data: {
                 /** @enum {string} */
@@ -11398,11 +11519,20 @@ export interface components {
         User: {
             id: number;
             name: string;
+            displayName?: string;
             email: string;
             role: string;
+            roleId?: number | null;
             tenantId: number;
             ou_id?: number | null;
+            ouName?: string | null;
             createdAt: string | null;
+            lastActiveAt?: string | null;
+            twoStep?: {
+                enabled: boolean;
+                required: boolean;
+                requiredDirectly: boolean;
+            };
             status?: string;
             /** @enum {string} */
             accountStatus?: "active" | "inactive";
@@ -11492,6 +11622,17 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        UserGroupUsageResponse: {
+            data: {
+                id: number;
+                /** @description People in it now, resolved for the caller as a preview is. Null when its rule cannot be resolved at the moment. */
+                now: number | null;
+                route_templates: {
+                    id: number;
+                    name: string;
+                }[];
+            }[];
+        };
         UserListResponse: {
             data: components["schemas"]["User"][];
             pagination: components["schemas"]["Pagination"];
@@ -11499,7 +11640,22 @@ export interface components {
         UserResponse: {
             data: components["schemas"]["User"];
         };
+        UserTwoStepClearedResponse: {
+            data: {
+                profile_id: number;
+                tenant_id: number;
+                requiredDirectly: boolean;
+            };
+        };
+        UserTwoStepRequirementRequest: {
+            /** @description Required for a system-tenant caller. */
+            tenant_id?: number;
+            /** @description Days before it is enforced. Default 0: from their next sign-in. */
+            grace_period_days?: number;
+        };
         UserUpdateRequest: {
+            /** @description The name shown for this person. Refused with 409 when they also belong to another workspace, unless the caller is the system tenant. */
+            displayName?: string;
             /**
              * Format: email
              * @description New sign-in email address.
@@ -11523,6 +11679,31 @@ export interface components {
             accountStatus?: "active" | "inactive";
             /** @description Required to set `password` on an account that signs in through an identity provider; otherwise that is refused. */
             allowLocalPasswordOnIdpAccount?: boolean;
+        };
+        UsersBulkPair: {
+            profile_id: number;
+            tenant_id: number;
+        };
+        UsersBulkResultResponse: {
+            data: {
+                changed: components["schemas"]["UsersBulkPair"][];
+                unchanged: components["schemas"]["UsersBulkPair"][];
+            };
+        };
+        UsersBulkRoleRequest: {
+            /** @description The new role, by id. It must be available in every target's workspace, and hold nothing the caller does not. */
+            role_id: number;
+            targets: components["schemas"]["UsersBulkTarget"][];
+        };
+        UsersBulkTarget: {
+            profile_id: number;
+            /** @description Which workspace. Required for a system-tenant caller, since one person can be in several; anyone else's targets are in their own workspace. */
+            tenant_id?: number;
+        };
+        UsersBulkTwoStepRequest: {
+            targets: components["schemas"]["UsersBulkTarget"][];
+            /** @description Days before it is enforced. Default 0: from their next sign-in. */
+            grace_period_days?: number;
         };
         WebhookAckResponse: {
             data: {
@@ -13848,7 +14029,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["TokenOnlyRequest"];
+                "application/json": components["schemas"]["TwoFactorRecoveryConfirmRequest"];
             };
         };
         responses: {
@@ -17228,7 +17409,7 @@ export interface operations {
                 granteeId?: number;
                 /** @description Filter by grantor user id */
                 grantorUserId?: number;
-                /** @description Include revoked delegations */
+                /** @description Include delegations that have ended, whether revoked or past their end date */
                 includeRevoked?: boolean;
             };
             header?: never;
@@ -17438,6 +17619,82 @@ export interface operations {
             };
             /** @description Method not allowed */
             405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_delegations_id_restore: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Restore confirmation */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Delegation not found, or not revoked */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description It can no longer be undone: too late, past its end date, or the grantor no longer holds the permission */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -45673,6 +45930,83 @@ export interface operations {
             };
         };
     };
+    get_api_v1_user_groups_usage: {
+        parameters: {
+            query?: {
+                /** @description Group ids, comma-separated, at most 100: the rows on screen. A group of another workspace is left out. */
+                ids?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One entry per group found */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserGroupUsageResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `ids` missing, malformed or too many */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     get_api_v1_user_groups_id: {
         parameters: {
             query?: never;
@@ -45988,12 +46322,20 @@ export interface operations {
                 page?: number;
                 /** @description Page size (default 25, max 100). A client that needs every user must follow the `pagination` envelope to the last page; one request only ever describes page one. */
                 per_page?: number;
-                /** @description Sort key: `name`, `email`, `role`, `status`, `created` (default), plus `tenant` for a system-tenant caller. `name` and `email` order identically — the name IS the email's local part. An unrecognised key is not an error: it falls back to the default, because a client asking for a column it cannot see should get a list rather than a 400. */
+                /** @description Sort key: `name`, `email`, `role`, `status`, `created` (default), `lastActive`, plus `tenant` for a system-tenant caller. An unrecognised key is not an error: it falls back to the default, because a client asking for a column it cannot see should get a list rather than a 400. */
                 sort?: string;
                 /** @description Sort direction, `asc` or `desc`. Anything else is read as `asc`. */
                 dir?: string;
-                /** @description Case-insensitive substring match on email or role name. It narrows `pagination.total` too, so the envelope always describes the filtered list. */
+                /** @description Case-insensitive substring match on display name, email or role name. It narrows `pagination.total` too, so the envelope always describes the filtered list. */
                 q?: string;
+                /** @description Only people whose primary role is one of these ids, comma-separated. */
+                role_id?: string;
+                /** @description Only people in one of these organizational units, comma-separated. */
+                ou_id?: string;
+                /** @description `on` or `off`: whether the person has two-step turned on. */
+                two_step?: string;
+                /** @description `active` or `inactive`. Both are listed when omitted. */
+                account_status?: string;
             };
             header?: never;
             path?: never;
@@ -46039,6 +46381,15 @@ export interface operations {
             };
             /** @description Method not allowed */
             405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A malformed filter */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -46134,6 +46485,189 @@ export interface operations {
                 };
             };
             /** @description Email longer than 255 characters */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_users_bulk_require_two_step: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UsersBulkTwoStepRequest"];
+            };
+        };
+        responses: {
+            /** @description Who now has a policy and who already had one */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsersBulkResultResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A malformed request, or a target that was not found; `details.refused` lists them */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_users_bulk_role: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UsersBulkRoleRequest"];
+            };
+        };
+        responses: {
+            /** @description Who changed and who already held the role */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsersBulkResultResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The role has permissions the caller does not hold */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The role is not available in a target's workspace */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description This would leave a workspace with nobody able to manage people */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A malformed request, or a target that cannot be changed; `details.refused` gives the reason for each */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -46685,6 +47219,162 @@ export interface operations {
             };
             /** @description Invalid user id, or the user has no email address */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    put_api_v1_users_id_two_step_requirement: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserTwoStepRequirementRequest"];
+            };
+        };
+        responses: {
+            /** @description Whether a policy was added */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsersBulkResultResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A malformed request, or the person was not found */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    delete_api_v1_users_id_two_step_requirement: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The person no longer has a policy naming them */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserTwoStepClearedResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description User not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
                 headers: {
                     [name: string]: unknown;
                 };
