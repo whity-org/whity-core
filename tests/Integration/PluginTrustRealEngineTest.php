@@ -277,7 +277,7 @@ final class PluginTrustRealEngineTest extends TestCase
         return (string) json_encode([
             'key' => $public ?? $this->public,
             'payload' => base64_encode($payload),
-            'signature' => base64_encode(sodium_crypto_sign_detached($format . "\n" . $payload, $secret ?? $this->secret)),
+            'signature' => base64_encode(sodium_crypto_sign_detached($format . "\n" . $payload, $key)),
         ]);
     }
 
