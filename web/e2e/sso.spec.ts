@@ -159,7 +159,7 @@ test.describe('SSO login button + return markers (unauthenticated)', () => {
     await page.goto('/login');
     const button = page.getByTestId('sso-start-microsoft');
     await expect(button).toBeVisible();
-    await expect(button).toHaveText(new RegExp(`Sign in with ${DISPLAY}`));
+    await expect(button).toHaveText(new RegExp(`Continue with ${DISPLAY}`));
     await expect(button).toHaveAttribute('href', '/api/v1/auth/sso/microsoft/start');
   });
 

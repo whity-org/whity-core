@@ -87,6 +87,8 @@
     "./save-bar": "./src/save-bar.tsx",
     "./search-field": "./src/search-field.tsx",
     "./stepper": "./src/stepper.tsx",
+    "./otp-input": "./src/otp-input.tsx",
+    "./system-state": "./src/system-state.tsx",
     "./form": "./src/form.tsx",
     "./globals.css": "./src/globals.css",
     "./icon": "./src/icon.tsx",
