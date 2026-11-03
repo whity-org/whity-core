@@ -391,6 +391,89 @@ final class FormsApiHandler
     }
 
     /**
+     * POST /api/v1/forms/{id}/member-access — let this workspace's active members
+     * fill in this form (migration 198).
+     *
+     * An act of its own rather than a key on PATCH, for the reason the public link
+     * is: letting everybody in shouldn't be one stray key away from fixing a typo, and
+     * who did it is worth recording. Off until this is called. Idempotent.
+     *
+     * Refused on a form that isn't published, and on one asking for a person or unit.
+     * An ordinary member can't read those directories, so the question could never be
+     * answered, and {@see \Whity\Api\MemberFormsApiHandler} leaves it out if one is
+     * added later.
+     *
+     * @param array<string, string> $params
+     */
+    public function openToMembers(Request $request, array $params): Response
+    {
+        try {
+            $tenantId = self::tenantId();
+            if ($tenantId instanceof Response) {
+                return $tenantId;
+            }
+            $id = (int) ($params['id'] ?? 0);
+            $form = $this->forms->find($tenantId, $id);
+            if ($form === null) {
+                return Response::error('Form not found', 404);
+            }
+
+            if ((string) $form['status'] !== FormStatus::PUBLISHED) {
+                return Response::error('Publish this form before opening it to members', 422);
+            }
+
+            $fields = $this->fields->listForForm($tenantId, $id);
+            $unanswerable = PublicFormView::unanswerableFieldKeys($fields);
+            if ($unanswerable !== []) {
+                return Response::error(
+                    'Members can\'t see the workspace\'s people or units, so they could not answer these '
+                    . 'questions: ' . implode(', ', $unanswerable) . '. Remove them first.',
+                    422
+                );
+            }
+            if (PublicFormView::answerableFields($fields) === []) {
+                return Response::error('This form has no questions a member could answer', 422);
+            }
+
+            $this->forms->setOpenToMembers($tenantId, $id, true, self::actorProfileId($request));
+
+            return Response::json(['data' => $this->presentFresh($tenantId, $id)]);
+        } catch (\Exception $e) {
+            error_log('[FormsApiHandler] openToMembers failed: ' . $e->getMessage());
+
+            return Response::error('Failed to open this form to members', 500);
+        }
+    }
+
+    /**
+     * DELETE /api/v1/forms/{id}/member-access — close it again. Idempotent. Submissions
+     * already made are untouched.
+     *
+     * @param array<string, string> $params
+     */
+    public function closeToMembers(Request $request, array $params): Response
+    {
+        try {
+            $tenantId = self::tenantId();
+            if ($tenantId instanceof Response) {
+                return $tenantId;
+            }
+            $id = (int) ($params['id'] ?? 0);
+            if ($this->forms->find($tenantId, $id) === null) {
+                return Response::error('Form not found', 404);
+            }
+
+            $this->forms->setOpenToMembers($tenantId, $id, false, null);
+
+            return Response::json(['data' => $this->presentFresh($tenantId, $id)]);
+        } catch (\Exception $e) {
+            error_log('[FormsApiHandler] closeToMembers failed: ' . $e->getMessage());
+
+            return Response::error('Failed to close this form to members', 500);
+        }
+    }
+
+    /**
      * POST /api/v1/forms/{id}/public-link — open this form to people who have no
      * account, minting the unguessable address they will use.
      *

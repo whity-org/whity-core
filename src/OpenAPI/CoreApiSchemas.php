@@ -1429,6 +1429,98 @@ final class CoreApiSchemas
                     404 => self::errorResponse('Form not found'),
                 ] + self::authErrors(),
             ]),
+            self::permissionRoute('POST', '/api/forms/{id:\d+}/member-access', 'forms:manage', [
+                'summary' => 'Let this workspace\'s members fill in this form',
+                'description' => 'OFF BY DEFAULT on every form. Active members of the workspace can then '
+                    . 'list, open and submit this form through /api/me/forms, with no permission of their '
+                    . 'own. Records who opened it and when. Idempotent. REFUSED (422) on a form that is not '
+                    . 'published, on one asking for a person or unit, and on one with nothing a member can '
+                    . 'answer.',
+                'tags' => ['forms'],
+                'responses' => [
+                    200 => self::jsonResponse('The form', 'FormResponse'),
+                    404 => self::errorResponse('Form not found'),
+                    422 => self::errorResponse('The form is not published, or asks what members cannot answer'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('DELETE', '/api/forms/{id:\d+}/member-access', 'forms:manage', [
+                'summary' => 'Stop members filling in this form',
+                'description' => 'Idempotent. Submissions already made are untouched.',
+                'tags' => ['forms'],
+                'responses' => [
+                    200 => self::jsonResponse('The form', 'FormResponse'),
+                    404 => self::errorResponse('Form not found'),
+                ] + self::authErrors(),
+            ]),
+            [
+                'method' => 'GET',
+                'path' => '/api/me/forms',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'The forms the caller may fill in as a member of this workspace',
+                    'description' => 'Published forms an author opened to members. Empty for somebody who is '
+                        . 'not an active member. Holders of `forms:submit` can fill in other published forms '
+                        . 'through /api/forms too.',
+                    'tags' => ['forms'],
+                    'responses' => [
+                        200 => self::jsonResponse('The forms', 'MemberFormListResponse'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'GET',
+                'path' => '/api/me/forms/{id:\d+}/render',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'What drawing a form opened to members needs',
+                    'description' => 'The same 404 for a form that does not exist, is not published or not '
+                        . 'open, and for a caller who is not an active member. Person and unit questions are '
+                        . 'left out, and staff questions never appear.',
+                    'tags' => ['forms'],
+                    'responses' => [
+                        200 => self::jsonResponse('The form, its questions and the caller\'s prefill', 'MemberFormRenderResponse'),
+                        404 => self::errorResponse('Not available to this caller'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'POST',
+                'path' => '/api/me/forms/{id:\d+}/uploads',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Attach a file to a form opened to members',
+                    'description' => 'The ordinary form upload, with its limits and single-use reference, once '
+                        . 'the caller may fill in this form. MULTIPART, one part named `file`.',
+                    'tags' => ['forms'],
+                    'responses' => [
+                        201 => ['description' => 'The stored upload'],
+                        404 => self::errorResponse('Not available to this caller'),
+                        422 => self::errorResponse('The file was refused, or the form asks for no file'),
+                        429 => self::errorResponse('Too many uploads'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'POST',
+                'path' => '/api/me/forms/{id:\d+}/submissions',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Submit a form opened to members, under the caller\'s own name',
+                    'description' => 'Answers arrive under `data`, keyed by field key. A refused answer carries '
+                        . '`details.reason` and `details.field_key`.',
+                    'tags' => ['forms'],
+                    'request' => 'FormSubmissionCreateRequest',
+                    'responses' => [
+                        201 => self::jsonResponse('The recorded submission', 'FormSubmissionCreateResponse'),
+                        404 => self::errorResponse('Not available to this caller'),
+                        422 => self::errorResponse('An answer failed validation'),
+                    ] + self::authErrors(),
+                ],
+            ],
             self::permissionRoute('POST', '/api/forms/{id:\d+}/uploads', 'forms:submit', array_merge([
                 'summary' => 'Attach a file to a form you are filling in',
                 'description' =>
@@ -1775,25 +1867,29 @@ final class CoreApiSchemas
                     422 => self::errorResponse('The form has no staff fields, or an answer failed validation'),
                 ] + self::authErrors(),
             ]),
-            self::permissionRoute('GET', '/api/me/form-submissions', 'forms:submit', [
-                'summary' => 'The caller\'s own submissions',
-                'description' => 'Only ever the caller\'s rows — the ROUTE decides whose, not a query '
-                    . 'param, so nothing a client omits or changes can widen it. Gated on '
-                    . '`forms:submit` rather than `forms:read` because the rows already name exactly '
-                    . 'one person, so a tenant-wide permission has nothing left to decide; requiring '
-                    . 'the read permission would hide this from precisely the people whose submissions '
-                    . 'are in it. A caller with no profile (a service principal) gets an empty list, '
-                    . 'which is true rather than an authorization failure somebody has to investigate.',
-                'tags' => ['forms'],
-                'parameters' => [
-                    self::queryParam('form_id', 'integer', 'Restrict to one form.'),
-                    self::queryParam('limit', 'integer', 'Page size (default 50, max 200).'),
-                    self::queryParam('offset', 'integer', 'Rows to skip.'),
+            [
+                'method' => 'GET',
+                'path' => '/api/me/form-submissions',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'The caller\'s own submissions',
+                    'description' => 'Only ever the caller\'s rows — the ROUTE decides whose, not a query param, '
+                        . 'so nothing a client omits or changes can widen it. It needs no permission, because '
+                        . 'the rows already name exactly one person: somebody who has submitted nothing gets '
+                        . 'an empty list, and so does a service principal, which is true rather than an '
+                        . 'authorization failure somebody has to investigate.',
+                    'tags' => ['forms'],
+                    'parameters' => [
+                        self::queryParam('form_id', 'integer', 'Restrict to one form.'),
+                        self::queryParam('limit', 'integer', 'Page size (default 50, max 200).'),
+                        self::queryParam('offset', 'integer', 'Rows to skip.'),
+                    ],
+                    'responses' => [
+                        200 => self::jsonResponse('The caller\'s submissions', 'FormSubmissionListResponse'),
+                    ] + self::authErrors(),
                 ],
-                'responses' => [
-                    200 => self::jsonResponse('The caller\'s submissions', 'FormSubmissionListResponse'),
-                ] + self::authErrors(),
-            ]),
+            ],
         ];
     }
 
@@ -6834,6 +6930,10 @@ final class CoreApiSchemas
                 'description_i18n' => self::localizedText(),
                 'submit_label' => self::localizedText() + ['nullable' => true],
                 'reference_format' => self::str(true),
+                // Off on every form until somebody with `forms:manage` opens it.
+                'open_to_members' => self::bool(),
+                'members_opened_at' => self::str(true),
+                'members_opened_by_profile_id' => self::int(true),
                 // Titles by section key. Which sections exist is still derived
                 // from the fields.
                 'sections' => ['type' => 'array', 'items' => SchemaBuilder::ref('FormSectionText')],
@@ -7226,6 +7326,23 @@ final class CoreApiSchemas
                     'ignored_keys' => ['type' => 'array', 'items' => ['type' => 'string']],
                 ], ['routed', 'ignored_keys']),
             ], ['data']),
+            'MemberForm' => self::object([
+                'id' => self::int(),
+                'name' => self::localizedText(),
+                'description' => self::str(true),
+                'description_i18n' => self::localizedText(),
+                'submit_label' => self::localizedText() + ['nullable' => true],
+                'status' => self::str(),
+            ], ['id', 'name', 'status']),
+            'MemberFormListResponse' => self::dataEnvelope(['type' => 'array', 'items' => SchemaBuilder::ref('MemberForm')]),
+            'MemberFormRenderResponse' => self::dataEnvelope(self::object([
+                'form' => SchemaBuilder::ref('MemberForm'),
+                'fields' => ['type' => 'array', 'items' => SchemaBuilder::ref('FormField')],
+                'sections' => ['type' => 'array', 'items' => SchemaBuilder::ref('FormSection')],
+                'prefill' => ['type' => 'object', 'additionalProperties' => true],
+                'unresolved_prefill' => ['type' => 'array', 'items' => ['type' => 'object', 'additionalProperties' => true]],
+                'accepts_submissions' => self::bool(),
+            ], ['form', 'fields', 'sections', 'accepts_submissions'])),
             'FormSubmission' => self::object([
                 'id' => self::int(),
                 // Null when the form gives no references, or was submitted before it did.

@@ -23,7 +23,7 @@ use Whity\Http\JsonBody;
  *   `GET /api/v1/form-submissions`         `forms:read`   — the tenant's
  *                                                            submissions.
  *   `GET /api/v1/form-submissions/{id}`    `forms:read`   — one of them.
- *   `GET /api/v1/me/form-submissions`      `forms:submit` — ONLY the caller's own.
+ *   `GET /api/v1/me/form-submissions`      no permission  — ONLY the caller's own.
  *
  * The alternative — one endpoint gated on `forms:submit` that narrows itself to
  * the caller's own rows when they lack `forms:read` — would move the decision
@@ -32,9 +32,9 @@ use Whity\Http\JsonBody;
  * table beside every other rule, where `RbacMiddleware` enforces it and the
  * route-catalogue gate lists it.
  *
- * `/me/…` needs no permission of its own beyond `forms:submit` because the rows
- * it returns already name exactly one person — a tenant-wide permission has
- * nothing left to decide. Same argument migration 113 makes about routing
+ * `/me/…` needs no permission at all because the rows it returns already name
+ * exactly one person — a tenant-wide permission has nothing left to decide, and a
+ * member who filled in a form opened to them (migration 198) holds none. Same argument migration 113 makes about routing
  * ("being a recipient IS the authorization") and #978 about the inbox.
  *
  * THERE IS NO PATCH AND NO DELETE
