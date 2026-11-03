@@ -1820,7 +1820,7 @@
         "settings.email.title": "البريد الإلكتروني",
         "settings.email.transport.log.note": "تُكتب الرسائل في سجل الخادم (لبيئة التطوير فقط) — ولا تُسلَّم.",
         "settings.email.transport.none.note": "البريد معطّل — ولا يُرسل شيء.",
-        "settings.emailDomains.accessDenied": "تحتاج إلى دور المستأجر {role} لإدارة سياسات نطاقات البريد.",
+        "settings.emailDomains.accessDeniedPlain": "تحتاج إلى صلاحية إدارة نطاقات البريد لفتح هذه الصفحة.",
         "settings.emailDomains.add": "إضافة نطاق",
         "settings.emailDomains.autoProvision.off": "التزويد التلقائي معطّل",
         "settings.emailDomains.autoProvision.on": "التزويد التلقائي مفعّل",
