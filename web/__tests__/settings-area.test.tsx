@@ -25,6 +25,11 @@ jest.mock('next/link', () => ({
 let mockNavItems: { id: string; href: string; label: string }[] = [];
 jest.mock('@/lib/navigation-context', () => ({ useNavigation: () => ({ items: mockNavItems }) }));
 
+let mockCaps: string[] = [];
+jest.mock('@/hooks/useCapabilities', () => ({
+  useCapabilities: () => ({ has: (slug: string) => mockCaps.includes(slug) }),
+}));
+
 const mockGet = jest.fn();
 jest.mock('@/lib/api/client', () => ({ api: { GET: (...args: unknown[]) => mockGet(...args) } }));
 
@@ -38,6 +43,7 @@ function tabs(ids: string[]) {
 beforeEach(() => {
   mockPathname = '/admin/settings';
   mockNavItems = [];
+  mockCaps = [];
   mockGet.mockReset();
 });
 
@@ -79,5 +85,23 @@ describe('SettingsArea', () => {
     const general = await screen.findByTestId('settings-area-link-general');
     expect(screen.getByTestId('settings-area-link-languages')).toHaveAttribute('aria-current', 'page');
     expect(general).not.toHaveAttribute('aria-current');
+  });
+});
+
+describe('SettingsArea devices', () => {
+  it('lists Licensed devices under Devices only for someone who may view them', async () => {
+    mockGet.mockResolvedValue(tabs(['general']));
+    mockCaps = ['licensing:view'];
+    render(<SettingsArea>page</SettingsArea>);
+    const link = await screen.findByTestId('settings-area-link-devices');
+    expect(link).toHaveAttribute('href', '/licensing');
+    expect(screen.getByText('Devices')).toBeInTheDocument();
+  });
+
+  it('leaves the Devices group out without the permission', async () => {
+    mockGet.mockResolvedValue(tabs(['general']));
+    render(<SettingsArea>page</SettingsArea>);
+    await screen.findByTestId('settings-area-link-general');
+    expect(screen.queryByTestId('settings-area-link-devices')).toBeNull();
   });
 });

@@ -10,6 +10,7 @@ import { AdminHeader } from '@/components/admin/admin-header';
 import { Button } from '@whity/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
 import { Input } from '@/components/ui/input';
+import { FieldSelect } from '@/components/field-select';
 import { Switch } from '@whity/ui/switch';
 import { Badge } from '@whity/ui/badge';
 import { AccessDenied } from '@whity/ui/access-denied';
@@ -123,9 +124,6 @@ async function readError(res: Response, fallback: string): Promise<string> {
   }
   return fallback;
 }
-
-const NATIVE_SELECT_CLASS =
-  'h-7 w-full min-w-0 rounded-md border border-input bg-input/20 px-2 text-sm transition-colors outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-50';
 
 /**
  * Identity providers (SSO / OIDC) admin — WC-7b3d9f2c.
@@ -656,19 +654,13 @@ function ProviderFormCard({
       </CardHeader>
       <CardContent className="space-y-5">
         <Field label={t('settings.sso.form.provider.label', 'Provider')} htmlFor="sso-provider-key">
-          <select
+          <FieldSelect
             id="sso-provider-key"
-            className={NATIVE_SELECT_CLASS}
             value={form.provider_key}
             disabled={saving}
-            onChange={(e) => onProviderKeyChange(e.target.value as ProviderKey)}
-          >
-            {PROVIDER_KEYS.map((k) => (
-              <option key={k} value={k}>
-                {PROVIDER_LABELS[k]}
-              </option>
-            ))}
-          </select>
+            onChange={(value) => onProviderKeyChange(value as ProviderKey)}
+            options={PROVIDER_KEYS.map((k) => ({ value: k, label: PROVIDER_LABELS[k] }))}
+          />
         </Field>
 
         <div className="space-y-1.5">

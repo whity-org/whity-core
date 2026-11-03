@@ -1,5 +1,6 @@
 import React from 'react';
 import { render, screen, waitFor, fireEvent, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
 /**
  * Unit/behaviour tests for the settings pages under
@@ -354,13 +355,12 @@ describe('AdminSettingsPage — plugin-declared settings (#713 item 1)', () => {
     const control = screen.getByLabelText(/^sync mode$/i);
     // A free-text box here would let an operator type a value the backend
     // refuses; the declared options are what make it a selector.
-    expect(control.tagName.toLowerCase()).toBe('select');
+    expect(control).toHaveAttribute('role', 'combobox');
     // Option labels are humanised by the shared control (`Incremental`), while
     // the VALUE stays exactly what the plugin declared — the backend validates
     // the value, so it must survive the round trip untouched.
-    const values = Array.from(control.querySelectorAll('option')).map((o) => o.getAttribute('value'));
-    expect(values).toEqual(['off', 'incremental', 'full']);
-    expect(screen.getByRole('option', { name: 'Incremental' })).toBeInTheDocument();
+    await userEvent.click(control);
+    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual(['Off', 'Incremental', 'Full']);
   });
 
   it('PATCHes a changed plugin key under its namespaced key', async () => {
@@ -370,7 +370,8 @@ describe('AdminSettingsPage — plugin-declared settings (#713 item 1)', () => {
     render(<AdminSettingsPage />);
 
     await screen.findByTestId('settings-section-plugins');
-    fireEvent.change(screen.getByLabelText(/^sync mode$/i), { target: { value: 'full' } });
+    await userEvent.click(screen.getByLabelText(/^sync mode$/i));
+    await userEvent.click(screen.getByRole('option', { name: 'Full' }));
     fireEvent.click(screen.getByRole('button', { name: /save platform defaults/i }));
 
     await waitFor(() =>
@@ -547,7 +548,8 @@ describe('BrandingSettingsPage — RBAC gating and locale', () => {
     render(<BrandingSettingsPage />);
     const locale = await screen.findByLabelText(/^locale$/i);
 
-    fireEvent.change(locale, { target: { value: 'fr' } });
+    await userEvent.click(locale);
+    await userEvent.click(screen.getByRole('option', { name: /fr/i }));
     fireEvent.click(screen.getByRole('button', { name: /save language/i }));
 
     await waitFor(() =>

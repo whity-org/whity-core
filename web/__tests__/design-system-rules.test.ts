@@ -131,9 +131,6 @@ describe('ease of use (A.1)', () => {
     'web/app/(protected)/admin/languages/page.tsx',
     'web/app/(protected)/admin/languages/record-screen.tsx',
     'web/app/(protected)/admin/plugins/store/page.tsx',
-    'web/app/(protected)/admin/settings/email-domains/page.tsx',
-    'web/app/(protected)/admin/settings/settings-shared.tsx',
-    'web/app/(protected)/admin/settings/sso/page.tsx',
     'web/components/forms/form-fields.tsx',
   ];
 
