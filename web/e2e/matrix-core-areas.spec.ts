@@ -98,33 +98,10 @@ test.describe('Core admin areas (role matrix)', () => {
     }
   });
 
-  test('Stats page loads numbers for admin; the System link is hidden for user and delegate', async ({
-    roleSession,
-    role,
-    page,
-  }) => {
-    if (role !== 'admin') {
-      // The "System" nav item is gated on `stats:read` in the system tenant (it
-      // points at /admin/stats, backed by GET /api/admin/stats), so it is filtered
-      // out of the sidebar for user and delegate. Dashboard is everyone's.
-      await expect(roleSession.shell.navLink('System')).toHaveCount(0);
-      await expect(roleSession.shell.navLink('Dashboard')).toBeVisible();
-      return;
-    }
-
-    const statsResponse = page.waitForResponse((res) =>
-      res.url().includes('/api/v1/admin/stats')
-    );
-    // System statistics are at /admin/stats, behind the System nav item; the
-    // "Dashboard" nav item opens the home page.
-    await page.goto('/admin/stats');
-    expect((await statsResponse).status()).toBe(200);
-
-    await expect(
-      page.getByRole('heading', { name: 'System Statistics' })
-    ).toBeVisible();
-    await expect(page.getByText('Total Users')).toBeVisible();
-    // Real numbers replace the placeholders once the 200 payload lands.
-    await expect(page.getByText('--')).toHaveCount(0);
+  test('Dashboard is every role's link; System is hidden in a workspace', async ({ roleSession }) => {
+    // System is gated on `stats:read` in the system tenant (H.3). None of these
+    // roles is acting there, including the workspace admin who holds that slug.
+    await expect(roleSession.shell.navLink('Dashboard')).toBeVisible();
+    await expect(roleSession.shell.navLink('System')).toHaveCount(0);
   });
 });

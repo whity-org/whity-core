@@ -1,4 +1,5 @@
 import { test, expect } from './support/fixtures';
+import { systemStatePath } from './support/storage';
 
 /**
  * System Statistics page (/admin/stats — the "System" sidebar target).
@@ -8,7 +9,22 @@ import { test, expect } from './support/fixtures';
  * info cards. These tests cover the page's only interactive element (the tabs)
  * plus that the live metrics render with real values, not the "--" placeholder.
  */
-test.describe('System Statistics (admin)', () => {
+test.describe('System Statistics, for a workspace owner', () => {
+  // The default session is the workspace admin (tenant 1), who holds `stats:read`
+  // through the global admin role: the tenant is what refuses them (H.3).
+  test('the System link is hidden and the numbers are refused', async ({ adminPage, page }) => {
+    await page.goto('/dashboard');
+    await expect(adminPage.shell.navLink('Dashboard')).toBeVisible();
+    await expect(adminPage.shell.navLink('System')).toHaveCount(0);
+
+    const response = await page.request.get('/api/v1/admin/stats');
+    expect(response.status()).toBe(403);
+  });
+});
+
+test.describe('System Statistics (operator)', () => {
+  test.use({ storageState: systemStatePath });
+
   test('renders metric cards populated from the live backend', async ({ page }) => {
     await page.goto('/admin/stats');
     await expect(page.getByRole('heading', { name: 'System Statistics' })).toBeVisible();
