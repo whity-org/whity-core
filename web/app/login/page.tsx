@@ -1,7 +1,6 @@
 ﻿'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
@@ -9,7 +8,8 @@ import { useToast } from '@/lib/toast-context';
 import { useBranding } from '@/lib/branding-context';
 import { Button } from '@whity/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
+import { OtpInput } from '@whity/ui/otp-input';
+import { AuthShell } from '@/components/auth-shell';
 import { Alert, AlertDescription } from '@whity/ui/alert';
 import { SsoLoginButtons } from '@/components/sso-login-buttons';
 import { TwoFactorSetupWizard } from '@/components/TwoFactorSettings';
@@ -130,7 +130,6 @@ export default function LoginPage() {
   >(null);
   const [selectingTenant, setSelectingTenant] = useState(false);
   const emailInputRef = useRef<HTMLInputElement>(null);
-  const twoFactorInputRef = useRef<HTMLInputElement>(null);
   const recoveryCodeInputRef = useRef<HTMLInputElement>(null);
 
   // Mark the component as mounted and move focus to the email field. The form
@@ -255,10 +254,6 @@ export default function LoginPage() {
           setEmail('');
           setPassword('');
           setFieldErrors({});
-          // Focus on 2FA input after render
-          setTimeout(() => {
-            twoFactorInputRef.current?.focus();
-          }, 0);
         }
       } else if (response.ok) {
         const data = await response.json().catch(() => ({}));
@@ -399,7 +394,6 @@ export default function LoginPage() {
           'error'
         );
         setTwoFactorCode('');
-        twoFactorInputRef.current?.focus();
       } else {
         const errorData = await response.json().catch(() => ({}));
         const errorMsg =
@@ -464,379 +458,302 @@ export default function LoginPage() {
     ? t('login.submit.pending', 'Signing in...')
     : t('login.submit', 'Sign in');
 
+  const subtitle = requiresEnrollment
+    ? t('login.subtitle.enrollment', 'Set up two-factor authentication to continue')
+    : requires2fa
+      ? t('login.subtitle.twoFactor', 'Enter your authenticator code')
+      : pendingMemberships
+        ? t('login.subtitle.workspace', 'Choose a workspace to continue')
+        : t('login.subtitle', 'Sign in to your account to continue');
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          {branding.logoWideUrl ? (
-            <Image src={branding.logoWideUrl} alt={branding.siteName} width={220} height={40} className="h-10 w-auto max-w-[220px] object-contain mx-auto mb-2" />
-          ) : null}
-          {/* One translatable sentence with a hole in it — never
-              `t('welcome') + siteName`, whose word order is English-only. */}
-          <CardTitle className="text-2xl">
-            {t('login.welcome', 'Welcome to {site}', { site: branding.siteName })}
-          </CardTitle>
-          <CardDescription>
-            {requiresEnrollment
-              ? t('login.subtitle.enrollment', 'Set up two-factor authentication to continue')
-              : requires2fa
-                ? t('login.subtitle.twoFactor', 'Enter your authenticator code')
-                : pendingMemberships
-                  ? t('login.subtitle.workspace', 'Choose a workspace to continue')
-                  : t('login.subtitle', 'Sign in to your account to continue')}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {/* MANDATORY 2FA ENROLLMENT (WC-525): the account has no device
-              enrolled and the grace period has already expired, so login
-              cannot be completed without setting one up first. */}
-          {requiresEnrollment && enrollmentToken && (
-            <TwoFactorSetupWizard
-              bearerToken={enrollmentToken}
-              onComplete={handleEnrollmentComplete}
-              onCancel={handleEnrollmentCancel}
-            />
-          )}
+    <AuthShell
+      title={t('login.welcome', 'Sign in to {site}', { site: branding.siteName })}
+      subtitle={subtitle}
+    >
+      {/* MANDATORY 2FA ENROLLMENT (WC-525): the account has no device
+          enrolled and the grace period has already expired, so login
+          cannot be completed without setting one up first. */}
+      {requiresEnrollment && enrollmentToken && (
+        <TwoFactorSetupWizard
+          bearerToken={enrollmentToken}
+          onComplete={handleEnrollmentComplete}
+          onCancel={handleEnrollmentCancel}
+        />
+      )}
 
-          {/* LOGIN FORM */}
-          {!requiresEnrollment && !requires2fa && !pendingMemberships && (
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Error Alert */}
-              {loginError && (
-                <Alert variant="destructive">
-                  <AlertDescription>{loginError}</AlertDescription>
-                </Alert>
-              )}
+      {/* LOGIN FORM: single sign-on first when the workspace has it, then
+          email and password. */}
+      {!requiresEnrollment && !requires2fa && !pendingMemberships && (
+        <div className="space-y-4">
+          <SsoLoginButtons />
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {loginError && (
+              <Alert variant="destructive">
+                <AlertDescription>{loginError}</AlertDescription>
+              </Alert>
+            )}
 
-              {/* Email Field */}
-              <div className="space-y-2">
-                <label htmlFor="email" className="text-sm font-medium">
-                  {t('login.email.label', 'Email')}
-                </label>
-                <Input
-                  ref={emailInputRef}
-                  id="email"
-                  type="email"
-                  placeholder={t('login.email.placeholder', 'Enter your email')}
-                  value={email}
-                  onChange={(e) => {
-                    setEmail(e.target.value);
-                    if (fieldErrors.email) {
-                      setFieldErrors({ ...fieldErrors, email: undefined });
-                    }
-                    if (loginError) {
-                      setLoginError(null);
-                    }
-                  }}
-                  disabled={isFormDisabled}
-                  className={fieldErrors.email ? 'border-destructive' : ''}
-                />
-                {fieldErrors.email && (
-                  <p className="text-xs text-destructive">{fieldErrors.email}</p>
-                )}
-              </div>
-
-              {/* Password Field */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label htmlFor="password" className="text-sm font-medium">
-                    {t('login.password.label', 'Password')}
-                  </label>
-                  {/* WC-password-reset-2fa-recovery: self-service reset entry point. */}
-                  <Link href="/forgot-password" className="text-xs font-medium text-primary hover:underline">
-                    {t('login.password.forgot', 'Forgot password?')}
-                  </Link>
-                </div>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder={t('login.password.placeholder', 'Enter your password')}
-                  value={password}
-                  onChange={(e) => {
-                    setPassword(e.target.value);
-                    if (fieldErrors.password) {
-                      setFieldErrors({ ...fieldErrors, password: undefined });
-                    }
-                    if (loginError) {
-                      setLoginError(null);
-                    }
-                  }}
-                  disabled={isFormDisabled}
-                  className={fieldErrors.password ? 'border-destructive' : ''}
-                />
-                {fieldErrors.password && (
-                  <p className="text-xs text-destructive">{fieldErrors.password}</p>
-                )}
-              </div>
-
-              {/* Submit Button */}
-              <Button
-                type="submit"
-                className="w-full"
+            <div className="space-y-2">
+              <label htmlFor="email" className="text-sm font-medium">
+                {t('login.email.label', 'Email')}
+              </label>
+              <Input
+                ref={emailInputRef}
+                id="email"
+                type="email"
+                placeholder={t('login.email.placeholder', 'Enter your email')}
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (fieldErrors.email) {
+                    setFieldErrors({ ...fieldErrors, email: undefined });
+                  }
+                  if (loginError) {
+                    setLoginError(null);
+                  }
+                }}
                 disabled={isFormDisabled}
+                className={fieldErrors.email ? 'border-destructive' : ''}
+              />
+              {fieldErrors.email && <p className="text-sm text-destructive">{fieldErrors.email}</p>}
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label htmlFor="password" className="text-sm font-medium">
+                  {t('login.password.label', 'Password')}
+                </label>
+                {/* WC-password-reset-2fa-recovery: self-service reset entry point. */}
+                <Link href="/forgot-password" className="text-sm font-medium text-primary hover:underline">
+                  {t('login.password.forgot', 'Forgot password?')}
+                </Link>
+              </div>
+              <Input
+                id="password"
+                type="password"
+                placeholder={t('login.password.placeholder', 'Enter your password')}
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (fieldErrors.password) {
+                    setFieldErrors({ ...fieldErrors, password: undefined });
+                  }
+                  if (loginError) {
+                    setLoginError(null);
+                  }
+                }}
+                disabled={isFormDisabled}
+                className={fieldErrors.password ? 'border-destructive' : ''}
+              />
+              {fieldErrors.password && <p className="text-sm text-destructive">{fieldErrors.password}</p>}
+            </div>
+
+            <Button type="submit" className="w-full" disabled={isFormDisabled}>
+              {buttonText}
+            </Button>
+
+            {/* WC-235: self-service registration entry point. The prompt and
+                the link text are SEPARATE keys because they are separate
+                elements — not two halves of one sentence spliced together. */}
+            <p className="text-center text-sm text-muted-foreground">
+              {t('login.register.prompt', 'New here?')}{' '}
+              <Link href="/register" className="font-medium text-primary hover:underline">
+                {t('login.register.link', 'Create a workspace')}
+              </Link>
+            </p>
+
+            {/* WC-password-reset-2fa-recovery: a user who ALSO lost their 2FA
+                device (so "Forgot password?" alone can't get them back in)
+                needs this reachable from login too. */}
+            <p className="text-center text-sm text-muted-foreground">
+              {t('login.recovery.prompt', 'Lost your authenticator too?')}{' '}
+              <Link href="/account-recovery" className="font-medium text-primary hover:underline">
+                {t('login.recovery.link', 'Recover your account')}
+              </Link>
+            </p>
+          </form>
+        </div>
+      )}
+
+      {/* TENANT SELECTION (multi-membership) */}
+      {pendingMemberships && !requires2fa && (
+        <div className="space-y-4">
+          {loginError && (
+            <Alert variant="destructive">
+              <AlertDescription>{loginError}</AlertDescription>
+            </Alert>
+          )}
+          <p className="text-center text-sm text-muted-foreground">
+            {t('workspace.prompt', 'Your account has access to multiple workspaces. Choose one to continue.')}
+          </p>
+          <div className="space-y-2">
+            {pendingMemberships.map((m) => (
+              <Button
+                key={m.tenant_id}
+                type="button"
+                variant="outline"
+                className="w-full justify-between"
+                disabled={selectingTenant}
+                onClick={() => handleSelectTenant(m.tenant_id)}
               >
-                {buttonText}
+                <span>{m.tenant_name}</span>
+                <span className="text-xs capitalize text-muted-foreground">{m.role}</span>
+              </Button>
+            ))}
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            className="w-full"
+            disabled={selectingTenant}
+            onClick={() => {
+              setPendingMemberships(null);
+              setEmail('');
+              setPassword('');
+              setLoginError(null);
+              setTimeout(() => emailInputRef.current?.focus(), 0);
+            }}
+          >
+            {t('workspace.back', 'Back to login')}
+          </Button>
+        </div>
+      )}
+
+      {/* TWO-STEP CODE */}
+      {requires2fa && (
+        <>
+          {!backupCodeMode && (
+            <form onSubmit={handleTwoFactorSubmit} className="space-y-4">
+              <OtpInput
+                label={t('twoFactor.code.label', 'Authenticator Code')}
+                value={twoFactorCode}
+                onChange={(code) => {
+                  setTwoFactorCode(code);
+                  if (twoFactorError) {
+                    setTwoFactorError(null);
+                  }
+                }}
+                helperText={t(
+                  'twoFactor.instructions',
+                  'Enter the 6-digit code from your authenticator app or a backup code'
+                )}
+                errorText={twoFactorError ?? undefined}
+                disabled={twoFactorLoading}
+                autoFocus
+              />
+
+              <Button type="submit" className="w-full" disabled={twoFactorCode.length !== 6 || twoFactorLoading}>
+                {twoFactorLoading ? t('twoFactor.submit.pending', 'Verifying...') : t('twoFactor.submit', 'Verify')}
               </Button>
 
-              {/* WC-235: self-service registration entry point. The prompt and
-                  the link text are SEPARATE keys because they are separate
-                  elements — not two halves of one sentence spliced together. */}
-              <p className="text-sm text-center text-muted-foreground">
-                {t('login.register.prompt', 'New here?')}{' '}
-                <Link href="/register" className="font-medium text-primary hover:underline">
-                  {t('login.register.link', 'Create a workspace')}
-                </Link>
-              </p>
-
-              {/* WC-password-reset-2fa-recovery: a user who ALSO lost their 2FA
-                  device (so "Forgot password?" alone can't get them back in)
-                  needs this reachable from login too. */}
-              <p className="text-sm text-center text-muted-foreground">
-                {t('login.recovery.prompt', 'Lost your authenticator too?')}{' '}
-                <Link href="/account-recovery" className="font-medium text-primary hover:underline">
-                  {t('login.recovery.link', 'Recover your account')}
-                </Link>
-              </p>
-
-              {/* Federated sign-in: one button per enabled provider (renders
-                  nothing when none are configured). */}
-              <SsoLoginButtons />
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={() => {
+                  setRequires2fa(false);
+                  setTwoFactorCode('');
+                  setTwoFactorError(null);
+                  emailInputRef.current?.focus();
+                }}
+                disabled={twoFactorLoading}
+              >
+                {t('twoFactor.back', 'Back to Login')}
+              </Button>
             </form>
           )}
 
-          {/* TENANT SELECTION (multi-membership) */}
-          {pendingMemberships && !requires2fa && (
-            <div className="space-y-4">
-              {loginError && (
+          {/* RECOVERY CODE FORM */}
+          {backupCodeMode && (
+            <form onSubmit={handleTwoFactorSubmit} className="space-y-4">
+              {twoFactorError && (
                 <Alert variant="destructive">
-                  <AlertDescription>{loginError}</AlertDescription>
+                  <AlertDescription>{twoFactorError}</AlertDescription>
                 </Alert>
               )}
-              <p className="text-sm text-muted-foreground text-center">
-                {t(
-                  'workspace.prompt',
-                  'Your account has access to multiple workspaces. Choose one to continue.'
-                )}
-              </p>
-              <div className="space-y-2">
-                {pendingMemberships.map((m) => (
-                  <Button
-                    key={m.tenant_id}
-                    type="button"
-                    variant="outline"
-                    className="w-full justify-between"
-                    disabled={selectingTenant}
-                    onClick={() => handleSelectTenant(m.tenant_id)}
-                  >
-                    <span>{m.tenant_name}</span>
-                    <span className="text-xs text-muted-foreground capitalize">{m.role}</span>
-                  </Button>
-                ))}
+
+              <div className="rounded-control border border-border bg-muted/50 p-3">
+                {/* The emphasised term is its own key because it is its own
+                    ELEMENT (a <strong>), not because the sentence was split
+                    for convenience — the remainder stays one unit. */}
+                <p className="text-sm text-muted-foreground">
+                  <strong className="font-semibold">{t('recovery.instructions.term', 'Recovery codes')}</strong>{' '}
+                  {t(
+                    'recovery.instructions',
+                    'are the XXXX-XXXX-XXXX codes you saved when setting up two-factor authentication. Enter one exactly as it was issued.'
+                  )}
+                </p>
               </div>
-              <Button
-                type="button"
-                variant="ghost"
-                className="w-full"
-                disabled={selectingTenant}
-                onClick={() => {
-                  setPendingMemberships(null);
-                  setEmail('');
-                  setPassword('');
-                  setLoginError(null);
-                  setTimeout(() => emailInputRef.current?.focus(), 0);
-                }}
-              >
-                {t('workspace.back', 'Back to login')}
-              </Button>
-            </div>
-          )}
 
-          {/* 2FA FORM */}
-          {requires2fa && (
-            <>
-              {!backupCodeMode && (
-                <form onSubmit={handleTwoFactorSubmit} className="space-y-4">
-                  {/* 2FA Error Alert */}
-                  {twoFactorError && (
-                    <Alert variant="destructive">
-                      <AlertDescription>{twoFactorError}</AlertDescription>
-                    </Alert>
-                  )}
-
-                  {/* 2FA Instructions */}
-                  <p className="text-sm text-muted-foreground text-center">
-                    {t(
-                      'twoFactor.instructions',
-                      'Enter the 6-digit code from your authenticator app or a backup code'
-                    )}
-                  </p>
-
-                  {/* 2FA Code Input */}
-                  <div className="space-y-2">
-                    <label htmlFor="twoFactorCode" className="text-sm font-medium">
-                      {t('twoFactor.code.label', 'Authenticator Code')}
-                    </label>
-                    <Input
-                      ref={twoFactorInputRef}
-                      id="twoFactorCode"
-                      type="text"
-                      // Format masks, not prose: the issued codes are literally
-                      // six digits / A-Z0-9 groups, identical in every language.
-                      // Deliberately NOT translated.
-                      placeholder="000000"
-                      value={twoFactorCode}
-                      onChange={(e) => {
-                        const cleaned = e.target.value.replace(/\D/g, '').slice(0, 6);
-                        setTwoFactorCode(cleaned);
-                        if (twoFactorError) {
-                          setTwoFactorError(null);
-                        }
-                      }}
-                      disabled={twoFactorLoading}
-                      maxLength={6}
-                      inputMode="numeric"
-                      className="text-center text-2xl tracking-widest font-mono"
-                    />
-                  </div>
-
-                  {/* Submit Button */}
-                  <Button
-                    type="submit"
-                    className="w-full bg-primary hover:bg-primary/90"
-                    disabled={twoFactorCode.length !== 6 || twoFactorLoading}
-                  >
-                    {twoFactorLoading
-                      ? t('twoFactor.submit.pending', 'Verifying...')
-                      : t('twoFactor.submit', 'Verify')}
-                  </Button>
-
-                  {/* Back Button */}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => {
-                      setRequires2fa(false);
-                      setTwoFactorCode('');
+              <div className="space-y-2">
+                <label htmlFor="recoveryCode" className="text-sm font-medium">
+                  {t('recovery.code.label', 'Recovery Code')}
+                </label>
+                <Input
+                  ref={recoveryCodeInputRef}
+                  id="recoveryCode"
+                  type="text"
+                  placeholder="XXXX-XXXX-XXXX"
+                  value={twoFactorCode}
+                  onChange={(e) => {
+                    setTwoFactorCode(formatBackupCode(e.target.value));
+                    if (twoFactorError) {
                       setTwoFactorError(null);
-                      emailInputRef.current?.focus();
-                    }}
-                    disabled={twoFactorLoading}
-                  >
-                    {t('twoFactor.back', 'Back to Login')}
-                  </Button>
-                </form>
-              )}
-
-              {/* RECOVERY CODE FORM */}
-              {backupCodeMode && (
-                <form onSubmit={handleTwoFactorSubmit} className="space-y-4">
-                  {/* 2FA Error Alert */}
-                  {twoFactorError && (
-                    <Alert variant="destructive">
-                      <AlertDescription>{twoFactorError}</AlertDescription>
-                    </Alert>
-                  )}
-
-                  {/* Recovery Instructions Box */}
-                  <div className="bg-muted/50 border border-border rounded-md p-3">
-                    {/* The emphasised term is its own key because it is its own
-                        ELEMENT (a <strong>), not because the sentence was split
-                        for convenience — the remainder stays one unit. */}
-                    <p className="text-sm text-muted-foreground">
-                      <strong>{t('recovery.instructions.term', 'Recovery codes')}</strong>{' '}
-                      {t(
-                        'recovery.instructions',
-                        'are the XXXX-XXXX-XXXX codes you saved when setting up two-factor authentication. Enter one exactly as it was issued.'
-                      )}
-                    </p>
-                  </div>
-
-                  {/* Recovery Code Input */}
-                  <div className="space-y-2">
-                    <label htmlFor="recoveryCode" className="text-sm font-medium">
-                      {t('recovery.code.label', 'Recovery Code')}
-                    </label>
-                    <Input
-                      ref={recoveryCodeInputRef}
-                      id="recoveryCode"
-                      type="text"
-                      placeholder="XXXX-XXXX-XXXX"
-                      value={twoFactorCode}
-                      onChange={(e) => {
-                        setTwoFactorCode(formatBackupCode(e.target.value));
-                        if (twoFactorError) {
-                          setTwoFactorError(null);
-                        }
-                      }}
-                      disabled={twoFactorLoading}
-                      maxLength={BACKUP_CODE_LENGTH}
-                      className="text-center text-lg tracking-wider font-mono"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      {t('recovery.code.hint', 'Format: XXXX-XXXX-XXXX (e.g., A1B2-C3D4-E5F6)')}
-                    </p>
-                  </div>
-
-                  {/* Verify Recovery Button */}
-                  <Button
-                    type="submit"
-                    className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
-                    disabled={twoFactorCode.length !== BACKUP_CODE_LENGTH || twoFactorLoading}
-                  >
-                    {twoFactorLoading
-                      ? t('twoFactor.submit.pending', 'Verifying...')
-                      : t('recovery.submit', 'Verify Recovery Code')}
-                  </Button>
-
-                  {/* Back to Authenticator Button */}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => {
-                      setBackupCodeMode(false);
-                      setTwoFactorCode('');
-                      setTwoFactorError(null);
-                      setTimeout(() => twoFactorInputRef.current?.focus(), 0);
-                    }}
-                    disabled={twoFactorLoading}
-                  >
-                    {t('recovery.back', 'Back to Authenticator')}
-                  </Button>
-                </form>
-              )}
-
-              {/* Recovery Link */}
-              <p className="text-center text-sm mt-6">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setBackupCodeMode(!backupCodeMode);
-                    setTwoFactorCode('');
-                    setTwoFactorError(null);
-
-                    if (!backupCodeMode) {
-                      // Entering recovery mode - focus recovery input
-                      setTimeout(() => recoveryCodeInputRef.current?.focus(), 0);
-                    } else {
-                      // Returning to authenticator - focus authenticator input
-                      setTimeout(() => twoFactorInputRef.current?.focus(), 0);
                     }
                   }}
-                  className="text-primary hover:text-primary/80 underline"
-                >
-                  {t(
-                    'recovery.switch',
-                    "Can't access your authenticator? Use a recovery code instead"
-                  )}
-                </button>
-              </p>
-            </>
+                  disabled={twoFactorLoading}
+                  maxLength={BACKUP_CODE_LENGTH}
+                  dir="ltr"
+                  className="text-center font-mono text-base tracking-wider"
+                />
+                <p className="text-sm text-muted-foreground">
+                  {t('recovery.code.hint', 'Format: XXXX-XXXX-XXXX (e.g., A1B2-C3D4-E5F6)')}
+                </p>
+              </div>
+
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={twoFactorCode.length !== BACKUP_CODE_LENGTH || twoFactorLoading}
+              >
+                {twoFactorLoading ? t('twoFactor.submit.pending', 'Verifying...') : t('recovery.submit', 'Verify Recovery Code')}
+              </Button>
+
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={() => {
+                  setBackupCodeMode(false);
+                  setTwoFactorCode('');
+                  setTwoFactorError(null);
+                }}
+                disabled={twoFactorLoading}
+              >
+                {t('recovery.back', 'Back to Authenticator')}
+              </Button>
+            </form>
           )}
 
-        </CardContent>
-      </Card>
-    </div>
+          <p className="mt-2 text-center text-sm">
+            <button
+              type="button"
+              onClick={() => {
+                setBackupCodeMode(!backupCodeMode);
+                setTwoFactorCode('');
+                setTwoFactorError(null);
+                if (!backupCodeMode) {
+                  setTimeout(() => recoveryCodeInputRef.current?.focus(), 0);
+                }
+              }}
+              className="font-medium text-primary underline hover:text-primary/80"
+            >
+              {t('recovery.switch', "Can't access your authenticator? Use a recovery code instead")}
+            </button>
+          </p>
+        </>
+      )}
+    </AuthShell>
   );
 }

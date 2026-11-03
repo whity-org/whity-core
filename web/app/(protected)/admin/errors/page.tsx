@@ -20,6 +20,7 @@ import { useTranslation, type TranslateFn } from '@whity/features/i18n';
 import { useDateDisplay } from '@whity/features/datetime';
 import type { DateDisplay } from '@whity/features/datetime';
 import { Button } from '@whity/ui/button';
+import { TechnicalDetails } from '@whity/ui/display-preferences';
 import { Badge } from '@whity/ui/badge';
 import { EmptyState } from '@whity/ui/empty-state';
 import { Skeleton } from '@whity/ui/skeleton';
@@ -230,13 +231,15 @@ export default function ErrorsPage() {
                   aria-expanded={expanded === g.id}
                 >
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium">{g.type}</span>
+                    <TechnicalDetails>
+                      <span className="font-medium">{g.type}</span>
+                    </TechnicalDetails>
                     {g.environment ? <Badge variant="outline">{g.environment}</Badge> : null}
                     <Badge variant={g.occurrences > 1 ? 'default' : 'outline'}>
                       {t('errors.row.occurrences', '{count}×', { count: g.occurrences })}
                     </Badge>
                   </div>
-                  <p className="mt-1 truncate text-sm text-muted-foreground">{g.message}</p>
+                  <p className="mt-1 truncate text-sm font-medium text-foreground">{g.message}</p>
                   {/*
                     #1068: the LOCATION survives on its own. It is what an
                     operator needs to find the code; "· last seen —" would be a
@@ -249,14 +252,18 @@ export default function ErrorsPage() {
                     const lastSeen = when(g.last_seen_at, t, dates);
 
                     return (
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {lastSeen === null
-                          ? location
-                          : t('errors.row.lastSeen', '{location} · last seen {when}', {
-                              location,
-                              when: lastSeen,
-                            })}
-                      </p>
+                      <>
+                        {lastSeen !== null && (
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {t('errors.row.lastSeenOnly', 'Last seen {when}', { when: lastSeen })}
+                          </p>
+                        )}
+                        <TechnicalDetails>
+                          <p className="mt-1 font-mono text-xs text-muted-foreground" dir="ltr">
+                            {location}
+                          </p>
+                        </TechnicalDetails>
+                      </>
                     );
                   })()}
                 </button>
