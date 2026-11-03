@@ -252,4 +252,30 @@ final class NavigationApiHandlerRealEngineTest extends TestCase
 
         return array_column($body['data'], 'id');
     }
+
+    public function testAConditionDecidesAnItemAndAnUnknownOneHidesIt(): void
+    {
+        TenantContext::setTenantId(3);
+
+        $hooks = new HookManager();
+        $hooks->listen('navigation.register', static function (array $data): array {
+            $data['items'][] = ['id' => 'shown', 'label' => 'Shown', 'href' => '/a', 'visibleIf' => 'yes'];
+            $data['items'][] = ['id' => 'hidden', 'label' => 'Hidden', 'href' => '/b', 'visibleIf' => 'no'];
+            $data['items'][] = ['id' => 'unknown', 'label' => 'Unknown', 'href' => '/c', 'visibleIf' => 'nobody-registered-this'];
+
+            return $data;
+        });
+        $seen = [];
+        $handler = new NavigationApiHandler($hooks, $this->createStub(RoleChecker::class), [
+            'yes' => static function (int $profile, int $tenant) use (&$seen): bool {
+                $seen = [$profile, $tenant];
+
+                return true;
+            },
+            'no' => static fn (): bool => false,
+        ]);
+
+        $this->assertSame(['shown'], $this->ids($handler->list($this->authedRequest(42))));
+        $this->assertSame([42, 3], $seen);
+    }
 }

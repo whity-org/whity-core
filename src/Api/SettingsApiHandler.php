@@ -154,11 +154,9 @@ final class SettingsApiHandler
         ['id' => 'signup', 'href' => '/admin/settings/signup', 'label' => 'Sign-up', 'requiredPermission' => CorePermissions::SETTINGS_MANAGE, 'systemTenantOnly' => true],
         ['id' => 'sso', 'href' => '/admin/settings/sso', 'label' => 'Single sign-on', 'requiredPermission' => CorePermissions::AUTH_PROVIDERS_MANAGE],
         ['id' => 'email', 'href' => '/admin/settings/email', 'label' => 'Email', 'requiredPermission' => CorePermissions::SETTINGS_MANAGE, 'systemTenantOnly' => true],
-        // Email-domain policy (WC-ac35b6cf): gated on the `admin` ROLE — the
-        // backend route itself (TenantEmailDomainApiHandler) is role-gated,
-        // not permission-gated, so this is the one tab that checks requiredRole
-        // instead of requiredPermission.
-        ['id' => 'email-domains', 'href' => '/admin/settings/email-domains', 'label' => 'Email domains', 'requiredRole' => 'admin'],
+        // Email-domain policy (WC-ac35b6cf): follows the route's own permission,
+        // so a deployment with a renamed administrative role still sees it.
+        ['id' => 'email-domains', 'href' => '/admin/settings/email-domains', 'label' => 'Email domains', 'requiredPermission' => CorePermissions::EMAIL_DOMAINS_MANAGE],
         ['id' => 'storage', 'href' => '/admin/settings/storage', 'label' => 'Storage', 'requiredPermission' => CorePermissions::SETTINGS_MANAGE, 'systemTenantOnly' => true],
         // Feature Flags (WC-feature-flags-settings-page): a generic admin
         // surface over the registry's curated FEATURE_FLAG_KEYS boolean

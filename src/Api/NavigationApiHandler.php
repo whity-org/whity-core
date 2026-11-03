@@ -43,13 +43,23 @@ final class NavigationApiHandler
     private RoleChecker $roleChecker;
 
     /**
+     * Named checks an item may ask for with `visibleIf`, for what a permission can't
+     * say. Registered by the host only: an item naming one that isn't here is hidden.
+     *
+     * @var array<string, callable(int, int): bool>
+     */
+    private array $conditions;
+
+    /**
      * @param HookManager $hookManager Collects items via the navigation.register hook.
      * @param RoleChecker $roleChecker Authoritative RBAC resolver for per-caller filtering.
+     * @param array<string, callable(int, int): bool> $conditions Named checks, given the profile and tenant.
      */
-    public function __construct(HookManager $hookManager, RoleChecker $roleChecker)
+    public function __construct(HookManager $hookManager, RoleChecker $roleChecker, array $conditions = [])
     {
         $this->hookManager = $hookManager;
         $this->roleChecker = $roleChecker;
+        $this->conditions = $conditions;
     }
 
     /**
@@ -153,6 +163,13 @@ final class NavigationApiHandler
         // handler-side systemTenantOnly gates (WC-235).
         if (($item['systemTenantOnly'] ?? false) === true && $tenantId !== 0) {
             return false;
+        }
+
+        $visibleIf = $item['visibleIf'] ?? null;
+        if (is_string($visibleIf)) {
+            $condition = $this->conditions[$visibleIf] ?? null;
+
+            return $condition !== null && $condition($userId, $tenantId);
         }
 
         return true;

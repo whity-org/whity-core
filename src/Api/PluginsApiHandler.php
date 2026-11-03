@@ -18,6 +18,7 @@ use Whity\Core\Exception\PluginInstallException;
 use Whity\Core\Exception\PluginNameUnsafe;
 use Whity\Core\Exception\PluginPackageInvalid;
 use Whity\Core\Exception\PluginPersistenceException;
+use Whity\Core\Plugin\PluginOperatorGate;
 
 /**
  * Plugins API Handler
@@ -100,6 +101,11 @@ class PluginsApiHandler
      */
     public function upload(Request $request, array $params = []): Response
     {
+        $refusal = PluginOperatorGate::refusal();
+        if ($refusal !== null) {
+            return $refusal;
+        }
+
         try {
             $files = $request->getUploadedFiles();
         } catch (\Throwable $e) {
@@ -249,9 +255,24 @@ class PluginsApiHandler
                 }
             }
 
+            // Errors and file names describe the deployment, not the workspace
+            // asking: a stack trace can carry paths and other workspaces' data.
+            $operator = PluginOperatorGate::isOperator();
+            if (!$operator) {
+                $plugins = array_map(
+                    static function (array $plugin): array {
+                        unset($plugin['last_error'], $plugin['consecutive_errors']);
+                        $plugin['file'] = null;
+
+                        return $plugin;
+                    },
+                    $plugins
+                );
+            }
+
             return Response::json([
                 'data' => $plugins,
-                'meta' => self::WORKER_LOCAL_META,
+                'meta' => self::WORKER_LOCAL_META + ['can_operate' => $operator],
             ], 200);
         } catch (\Throwable $e) {
             error_log('[PluginsApiHandler] list failed: ' . $e->getMessage());
@@ -274,6 +295,11 @@ class PluginsApiHandler
      */
     public function enable(Request $request, array $params): Response
     {
+        $refusal = PluginOperatorGate::refusal();
+        if ($refusal !== null) {
+            return $refusal;
+        }
+
         $identifier = $this->identifier($params);
         if ($identifier === null) {
             return Response::error('Plugin identifier required', 400);
@@ -382,6 +408,11 @@ class PluginsApiHandler
      */
     public function disable(Request $request, array $params): Response
     {
+        $refusal = PluginOperatorGate::refusal();
+        if ($refusal !== null) {
+            return $refusal;
+        }
+
         $identifier = $this->identifier($params);
         if ($identifier === null) {
             return Response::error('Plugin identifier required', 400);
@@ -432,6 +463,11 @@ class PluginsApiHandler
      */
     public function reEnable(Request $request, array $params): Response
     {
+        $refusal = PluginOperatorGate::refusal();
+        if ($refusal !== null) {
+            return $refusal;
+        }
+
         $id = $params['id'] ?? null;
         if ($id === null || $id === '') {
             return Response::error('Plugin ID required', 400);
@@ -477,6 +513,11 @@ class PluginsApiHandler
      */
     public function reload(Request $request): Response
     {
+        $refusal = PluginOperatorGate::refusal();
+        if ($refusal !== null) {
+            return $refusal;
+        }
+
         if ($this->pluginLoader === null) {
             return Response::json(['data' => ['message' => 'Plugin loader unavailable; no reload performed']], 200);
         }
@@ -517,6 +558,11 @@ class PluginsApiHandler
      */
     public function uninstall(Request $request, array $params): Response
     {
+        $refusal = PluginOperatorGate::refusal();
+        if ($refusal !== null) {
+            return $refusal;
+        }
+
         $identifier = $this->identifier($params);
         if ($identifier === null) {
             return Response::error('Plugin identifier required', 400);
