@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { FieldSelect } from '@/components/field-select';
 import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import {
@@ -160,15 +161,17 @@ export function CreateLanguageModal({ isOpen, onOpenChange, onSuccess }: CreateL
                 <FormItem>
                   <FormLabel>{t('languages.create.direction.label', 'Writing Direction')}</FormLabel>
                   <FormControl>
-                    <select
-                      {...field}
-                      className="h-9 w-full rounded-md border border-input bg-input/20 px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
-                    >
-                      {/* The same two keys the Languages table's per-row picker
-                          uses — one key, one English string, translated once. */}
-                      <option value="ltr">{t('languages.direction.ltr', 'Left to right')}</option>
-                      <option value="rtl">{t('languages.direction.rtl', 'Right to left')}</option>
-                    </select>
+                    <FieldSelect
+                      id="language-direction"
+                      value={field.value}
+                      onChange={field.onChange}
+                      options={[
+                        // The same two keys the Languages table's direction text
+                        // uses: one key, one English string, translated once.
+                        { value: 'ltr', label: t('languages.direction.ltr', 'Left to right') },
+                        { value: 'rtl', label: t('languages.direction.rtl', 'Right to left') },
+                      ]}
+                    />
                   </FormControl>
                   <FormDescription>
                     {t(
