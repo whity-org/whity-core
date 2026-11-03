@@ -263,27 +263,24 @@ final class SettingsApiHandlerTabsRealEngineTest extends TestCase
         $this->assertSame(['security'], $tabs);
     }
 
-    public function testAdminRoleSeesTheEmailDomainsTab(): void
+    public function testEmailDomainsTabFollowsThePermissionUnderAnyRoleName(): void
     {
-        $profileId = $this->seedProfileWithRoleName($this->tenantId, 'admin');
+        // A renamed administrative role holds the permission and must see the
+        // tab; the route behind it has always been gated on the permission.
+        $profileId = $this->seedProfileWithPermissions($this->tenantId, [CorePermissions::EMAIL_DOMAINS_MANAGE]);
 
         $tabs = $this->tabIds($this->handler->tabs($this->requestAs($profileId, $this->tenantId)));
 
-        // Not assertSame against the full list: the migrated schema may seed
-        // the 'admin' role with other permission grants too (e.g. the 013
-        // grant-migration pattern) — this test's concern is only the new
-        // requiredRole gate, not the exact permission set 'admin' happens to
-        // hold elsewhere.
-        $this->assertContains('email-domains', $tabs, 'A profile whose effective role is named admin must see the Email domains tab.');
+        $this->assertSame(['email-domains'], $tabs);
     }
 
-    public function testNonAdminRoleDoesNotSeeTheEmailDomainsTab(): void
+    public function testARoleWithoutThePermissionDoesNotSeeTheEmailDomainsTab(): void
     {
         $profileId = $this->seedProfileWithRoleName($this->tenantId, 'a-role-that-is-not-admin');
 
         $tabs = $this->tabIds($this->handler->tabs($this->requestAs($profileId, $this->tenantId)));
 
-        $this->assertNotContains('email-domains', $tabs, 'A non-admin role must not see the Email domains tab.');
+        $this->assertNotContains('email-domains', $tabs);
     }
 
     public function testUnresolvedTenantContextRefusesWith403(): void

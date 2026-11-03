@@ -8516,7 +8516,9 @@ final class CoreApiSchemas
             'PluginListMeta' => self::object([
                 'worker_local' => self::bool(),
                 'note' => self::str(),
-            ], ['worker_local', 'note']),
+                // WHIT-869: whether this caller may change what is installed.
+                'can_operate' => self::bool(),
+            ], ['worker_local', 'note', 'can_operate']),
             'PluginListResponse' => self::object([
                 'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('PluginEntry')],
                 'meta' => SchemaBuilder::ref('PluginListMeta'),
