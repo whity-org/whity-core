@@ -68,7 +68,7 @@ async function open() {
 
 async function send(input: HTMLElement) {
   await userEvent.type(input, 'Example Mill');
-  await userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Send' }));
 }
 
 const submitted = () =>
