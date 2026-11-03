@@ -100,3 +100,11 @@ shared store and is deferred to the **Phase-F** work. Until then, to clear an
 auto-failed plugin everywhere, either re-enable it (which converges via the disk
 signal if it had also been administratively disabled) or restart the worker
 pool.
+
+## Who changes plugins, and uninstalling (S7, WHIT-869, WHIT-870)
+
+A code plugin is install-wide, so only the system tenant may install, upload, turn on or off, remove, reload or update one. Workspaces can read the list, without errors or file names. `plugins:install` installs from a store; `plugins:upload` uploads unreviewed code.
+
+**Uninstalling keeps everything for 30 days.** The plugin turns off and leaves the Installed list, and Reinstall restores it as it was. When the time is up, the `core.plugins.purge_removed` job runs its migrations' `down()` and removes its files. A `down()` that fails leaves the code and the row in place, and it's tried again. `plugins uninstall <id> --now` skips the wait.
+
+**Updates are by hand.** `POST /api/plugins/{name}/update` fetches the store's latest version and checks it like an install. With no new access it applies; with new permissions or outside domains it waits for `.../update/approve` or `.../update/reject`, and the old version stays. A new version lands turned off, and turning it on runs its migrations. Permissions come from the package; outside domains are only what the store says.
