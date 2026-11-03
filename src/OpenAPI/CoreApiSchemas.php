@@ -3874,6 +3874,7 @@ final class CoreApiSchemas
         $selfUser = self::object([
             'id' => self::int(),
             'email' => self::str(),
+            'display_name' => self::str(true),
             'role' => self::str(),
         ], ['id', 'email', 'role']);
 

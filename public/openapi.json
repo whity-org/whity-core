@@ -56117,6 +56117,10 @@
                             "email": {
                                 "type": "string"
                             },
+                            "display_name": {
+                                "type": "string",
+                                "nullable": true
+                            },
                             "role": {
                                 "type": "string"
                             }

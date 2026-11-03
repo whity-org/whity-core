@@ -7,6 +7,8 @@ import { SESSION_EXPIRED_EVENT } from './api/client';
 interface User {
   id: number;
   email: string;
+  /** Absent until `/api/me` has answered (login responses don't carry it). */
+  display_name?: string | null;
   role: string;
   tenant_id: number;
 }
