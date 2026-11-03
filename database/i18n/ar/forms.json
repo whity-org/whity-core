@@ -209,7 +209,6 @@
         "fill.sentPublic": "تم إرسال {title} بنجاح. يمكنك إغلاق هذه الصفحة.",
         "fill.sentPublicTitle": "شكرًا لك، تم تسجيل ردك",
         "fill.startAgain": "البدء من جديد",
-        "fill.submit": "إرسال",
         "fill.submitFailed": "تعذّر الإرسال. يرجى مراجعة إجاباتك والمحاولة مرة أخرى.",
         "fill.submitFailedConnection": "تعذّر الإرسال. تحقق من اتصالك وحاول مرة أخرى.",
         "fill.submitting": "جارٍ الإرسال…",

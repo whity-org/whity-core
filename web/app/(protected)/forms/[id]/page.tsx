@@ -286,7 +286,7 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
   const title = localized(rendered.form.name, preferArabic) || t('fill.untitled', 'Form');
   const translatedDescription = Array.isArray(rendered.form.description_i18n) ? null : rendered.form.description_i18n;
   const description = localized(translatedDescription, preferArabic) || rendered.form.description;
-  const submitLabel = localized(rendered.form.submit_label, preferArabic) || t('fill.submit', 'Submit');
+  const submitLabel = localized(rendered.form.submit_label, preferArabic) || t('fill.send', 'Send');
 
   if (submitted) {
     return (
