@@ -701,7 +701,7 @@ export function DocumentRecordScreen({ documentId, onBack }: DocumentRecordScree
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Tabs value={tab} onValueChange={setTab}>
-          <TabsList aria-label={t('record.tabs.label', 'Sections of this document')}>
+          <TabsList className="overflow-visible" aria-label={t('record.tabs.label', 'Sections of this document')}>
             <TabsTrigger value="document">{t('record.tabs.document', 'Document')}</TabsTrigger>
             <TabsTrigger value="routing">{t('record.tabs.routing', 'Routing')}</TabsTrigger>
             <TabsTrigger value="history">{t('record.tabs.history', 'History')}</TabsTrigger>
