@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { useFetch } from '@/hooks/useFetch';
+import { Badge } from '@whity/ui/badge';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { TENANTS_WRITE, TENANTS_DELETE } from '@/lib/capabilities';
 import { AdminHeader } from '@/components/admin/admin-header';
@@ -34,6 +35,27 @@ import { DeleteTenantModal } from './delete-modal';
 import type { Tenant } from './record-screen';
 
 export type { Tenant };
+
+/** The card's four words for a workspace's status (TplTenants). */
+function TenantStatus({ status }: { status: Tenant['status'] }) {
+  const t = useTranslation('admin');
+  switch (status.state) {
+    case 'trial':
+      return (
+        <Badge variant="secondary">
+          {status.daysLeft === null
+            ? t('tenants.status.trial', 'Trial')
+            : t('tenants.status.trialDays', 'Trial, {days} days left', { days: status.daysLeft })}
+        </Badge>
+      );
+    case 'overdue':
+      return <Badge variant="destructive">{t('tenants.status.overdue', 'Payment overdue')}</Badge>;
+    case 'suspended':
+      return <Badge variant="outline">{t('tenants.status.suspended', 'Suspended')}</Badge>;
+    default:
+      return <Badge variant="success">{t('tenants.status.active', 'Active')}</Badge>;
+  }
+}
 
 export default function TenantsPage() {
   const { apiClient } = useAuth();
@@ -122,7 +144,17 @@ export default function TenantsPage() {
       enableSorting: true,
       enableColumnFilter: true,
     },
+    {
+      id: 'plan',
+      header: t('tenants.table.plan', 'Plan'),
+      cell: (tenant) => tenant.plan?.name ?? t('tenants.table.noPlan', 'No plan'),
+    },
     { accessorKey: 'userCount', header: t('tenants.table.userCount', 'User Count'), enableSorting: true },
+    {
+      id: 'status',
+      header: t('tenants.table.status', 'Status'),
+      cell: (tenant) => <TenantStatus status={tenant.status} />,
+    },
     // #1068, and the same two changes the users list needed: gated on the
     // tenant preference, and formatted at all rather than rendered as the raw
     // wire string an `accessorKey` with no `cell` produces.

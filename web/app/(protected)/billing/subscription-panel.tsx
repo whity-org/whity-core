@@ -7,6 +7,7 @@ import { useDateDisplay } from '@whity/features/datetime';
 import { useTranslation } from '@whity/features/i18n';
 import { formatMoney } from '@whity/ui/money/currency';
 import { AvailablePlans } from './available-plans';
+import { ChangePlan } from './change-plan';
 
 /**
  * WHAT THIS WORKSPACE IS PAYING FOR, AND WHAT IT HAS PAID.
@@ -52,7 +53,7 @@ export function SubscriptionPanel() {
   const t = useTranslation('admin');
   const dates = useDateDisplay();
 
-  const { data: access, loading } = useFetch(async () => {
+  const { data: access, loading, refetch: refetchAccess } = useFetch(async () => {
     const res = await apiClient('/api/v1/billing/return');
     if (!res.ok) {
       return null;
@@ -114,16 +115,7 @@ export function SubscriptionPanel() {
             )}
           </dl>
 
-          {/* SAID PLAINLY RATHER THAN LEFT AS A MISSING BUTTON. "Why can I not
-              upgrade" is a question somebody will ask, and the honest answer is
-              that changing plan is not something the billing service can do in
-              place — not that we forgot. */}
-          <p className="text-xs text-muted-foreground">
-            {t(
-              'billing.subscription.changeHint',
-              'To change plan, contact support — your current plan stays active until then.'
-            )}
-          </p>
+          <ChangePlan onChanged={refetchAccess} />
         </section>
       ) : (
         /* TIERS ONLY. An add-on bought without a subscription would let a tenant
