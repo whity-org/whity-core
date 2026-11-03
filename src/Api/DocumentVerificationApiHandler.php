@@ -162,6 +162,16 @@ final class DocumentVerificationApiHandler
 
         $detail = VerificationPresenter::detailLevel($effective);
 
+        // The document is read before the code is judged. The code alone cannot
+        // answer for a withdrawn document: an older printing keeps its `superseded`
+        // row, and a code minted in the instant of the withdrawal could still be
+        // live. Neither may be told anything but that the document was withdrawn.
+        $document = $this->documents->findById((int) $tokenRow['document_id'], $tenantId);
+        $withdrawnAt = $document['withdrawn_at'] ?? null;
+        if ($withdrawnAt !== null) {
+            $tokenRow['revoked_at'] ??= $withdrawnAt;
+        }
+
         if (($tokenRow['revoked_at'] ?? null) !== null) {
             // Recorded BEFORE the refusal is returned, and recorded on purpose:
             // a scan of a withdrawn code is the most interesting scan there is —
@@ -169,10 +179,9 @@ final class DocumentVerificationApiHandler
             // circulation, and somebody just tried to rely on it.
             $this->qr->recordScan($tokenRow, null);
 
-            return $this->refuse($tokenRow, $detail);
+            return $this->refuse($tokenRow, $detail, $withdrawnAt);
         }
 
-        $document = $this->documents->findById((int) $tokenRow['document_id'], $tenantId);
         if ($document === null) {
             // Unreachable under the schema — the token cascades with its
             // document — so this is the branch that catches a future migration
@@ -200,9 +209,9 @@ final class DocumentVerificationApiHandler
     /**
      * @param array<string, mixed>|null $tokenRow
      */
-    private function refuse(?array $tokenRow, string $detail): Response
+    private function refuse(?array $tokenRow, string $detail, ?string $documentWithdrawnAt = null): Response
     {
-        return Response::json(['data' => VerificationPresenter::refusal($tokenRow, $detail)], 200);
+        return Response::json(['data' => VerificationPresenter::refusal($tokenRow, $detail, $documentWithdrawnAt)], 200);
     }
 
     /**

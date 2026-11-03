@@ -21,6 +21,7 @@
 
 import createClient, { type Middleware } from 'openapi-fetch';
 import type { paths } from './schema';
+import { refreshSession } from '@/lib/session-refresh';
 
 /**
  * Fired once when a token refresh is REFUSED — the session is over.
@@ -73,39 +74,42 @@ export function createApiClient(options: CreateApiClientOptions = {}) {
    */
   const pristine = new Map<string, Request>();
 
-  /** POST /api/v1/auth/refresh — true when the backend renewed the cookie. */
+  /**
+   * POST /api/v1/auth/refresh — true when the backend renewed the cookie. Shared with
+   * every other refresh in this tab, so several 401s can't race each other into the
+   * server's reuse detection. See {@link refreshSession}.
+   */
   const refreshAccessToken = async (): Promise<boolean> => {
-    try {
-      const response = await fetchFn(
+    const outcome = await refreshSession(() =>
+      fetchFn(
         new Request(`${baseUrl}/api/v1/auth/refresh`, {
           method: 'POST',
           credentials: 'include',
           headers: { 'X-Requested-With': 'XMLHttpRequest' },
         })
-      );
+      )
+    );
 
-      if (!response.ok) {
-        // A REFUSED refresh is a session that is definitively over, and until
-        // now nothing said so. The 401 went back to whichever component asked,
-        // each one handled it alone, and the app carried on rendering: `AuthGate`
-        // redirects on a null user but only evaluates at MOUNT, so a session that
-        // died mid-visit left a fully-formed shell whose every request failed.
-        //
-        // The visible result was a sidebar with no items — `NavigationProvider`
-        // catches its own 401 and returns `[]` — so the product looked like it
-        // had no features rather than like a session that had ended. That is the
-        // report this fixes: "there is no way to create templates in the GUI".
-        announceSessionExpired();
-      }
-
-      return response.ok;
-    } catch {
-      // A refresh that never REACHED the server says nothing about the session:
-      // a dropped connection, an offline laptop, a proxy hiccup. Signing
-      // somebody out on that would turn a moment of bad network into lost work,
-      // so only an explicit refusal above counts.
-      return false;
+    if (outcome === 'refused') {
+      // A REFUSED refresh is a session that is definitively over, and until
+      // now nothing said so. The 401 went back to whichever component asked,
+      // each one handled it alone, and the app carried on rendering: `AuthGate`
+      // redirects on a null user but only evaluates at MOUNT, so a session that
+      // died mid-visit left a fully-formed shell whose every request failed.
+      //
+      // The visible result was a sidebar with no items — `NavigationProvider`
+      // catches its own 401 and returns `[]` — so the product looked like it
+      // had no features rather than like a session that had ended. That is the
+      // report this fixes: "there is no way to create templates in the GUI".
+      //
+      // A refresh that never REACHED the server ('unreachable') says nothing about
+      // the session: a dropped connection, an offline laptop, a proxy hiccup.
+      // Signing somebody out on that would turn a moment of bad network into lost
+      // work, so only an explicit refusal counts.
+      announceSessionExpired();
     }
+
+    return outcome === 'renewed';
   };
 
   const authMiddleware: Middleware = {

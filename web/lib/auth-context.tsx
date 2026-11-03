@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
 import { apiClient as apiClientModule } from './api-client';
 import { SESSION_EXPIRED_EVENT } from './api/client';
+import { refreshSession } from '@/lib/session-refresh';
 
 interface User {
   id: number;
@@ -98,12 +99,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         // that a stored browser session (e.g. Playwright storageState) survives
         // longer test runs without requiring a fresh login.
         if (response.status === 401) {
-          const refresh = await fetch('/api/v1/auth/refresh', {
-            method: 'POST',
-            credentials: 'include',
-            headers: { 'X-Requested-With': 'XMLHttpRequest' },
-          });
-          if (refresh.ok) {
+          if ((await refreshSession()) === 'renewed') {
             response = await fetch('/api/v1/me', { credentials: 'include' });
           }
         }
