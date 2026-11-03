@@ -9,6 +9,7 @@ import { useCapabilities } from '@/hooks/useCapabilities';
 import { useFetch } from '@/hooks/useFetch';
 import { useApproverCoverage } from '@/hooks/useApproverCoverage';
 import { AdminHeader } from '@/components/admin/admin-header';
+import { Input } from '@whity/ui/input';
 import { Button } from '@whity/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
 import { AccessDenied } from '@whity/ui/access-denied';
