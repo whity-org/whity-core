@@ -10,7 +10,7 @@ import userEvent from '@testing-library/user-event';
  * (`api.GET /plugins/store/allowed`, `api.GET /plugins/store/catalog`,
  * `api.POST /plugins/install-from-store`) and gates on:
  *   - plugins:read   → may view the page at all (else Access Denied)
- *   - plugins:upload → may Install (via <PermissionButton>)
+ *   - plugins:install, in the system tenant → may Install
  */
 
 const mockApiGet = jest.fn();
@@ -52,8 +52,8 @@ const CATALOG = [
   { slug: 'system-ping', name: 'System Ping', description: 'Health pong.', author: 'Demos', tags: ['demo', 'ops'], latest_version: '1.0.0' },
 ];
 
-function allowedResponse(enabled = true, hosts = ['store.example.com']) {
-  return { data: { data: { enabled, hosts } }, error: undefined };
+function allowedResponse(enabled = true, hosts = ['store.example.com'], canInstall = true) {
+  return { data: { data: { enabled, hosts, can_install: canInstall } }, error: undefined };
 }
 
 function catalogResponse(plugins = CATALOG) {
@@ -70,7 +70,7 @@ function routeGet(allowed: unknown = allowedResponse(), catalog: unknown = catal
 
 beforeEach(() => {
   jest.clearAllMocks();
-  hasPermission.mockReturnValue(true); // both plugins:read and plugins:upload
+  hasPermission.mockReturnValue(true); // both plugins:read and plugins:install
   mockApiPost.mockResolvedValue({ data: { data: { id: 'quote-of-day', name: 'Quote' } }, error: undefined });
 });
 
@@ -235,5 +235,41 @@ describe('mint token', () => {
 
     await waitFor(() => expect(addToast).toHaveBeenCalledWith('Forbidden', 'error'));
     expect(screen.getByPlaceholderText(/required to install/i)).toHaveValue('');
+  });
+});
+
+describe('who may install (Q4, S.3)', () => {
+  it('disables Install in a workspace and says who to ask, even with the permission', async () => {
+    routeGet(allowedResponse(true, ['store.example.com'], false));
+    render(<PluginStorePage />);
+
+    await screen.findByText('Quote of the Day');
+
+    const install = screen.getAllByRole('button', { name: /Install/ })[0];
+    expect(install).toBeDisabled();
+    expect(screen.getAllByText('Ask someone with permission to install plugins').length).toBeGreaterThan(0);
+  });
+
+  it('disables Install without plugins:install, even in the system tenant', async () => {
+    hasPermission.mockImplementation((slug: string) => slug !== 'plugins:install');
+    routeGet();
+    render(<PluginStorePage />);
+
+    await screen.findByText('Quote of the Day');
+
+    expect(screen.getAllByRole('button', { name: /Install/ })[0]).toBeDisabled();
+  });
+
+  it('never tells someone a plugin is isolated when it is not', async () => {
+    const user = userEvent.setup();
+    routeGet();
+    render(<PluginStorePage />);
+
+    await screen.findByText('Quote of the Day');
+    await user.click(screen.getAllByRole('button', { name: /Install/ })[0]);
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).queryByText(/isolated/i)).not.toBeInTheDocument();
+    expect(within(dialog).getByText(/runs on this server for every workspace/)).toBeInTheDocument();
   });
 });

@@ -853,9 +853,15 @@ export interface PluginTileProps extends Omit<React.ComponentProps<"div">, "titl
   summary?: string
   version?: string | null
   tags?: string[]
+  /** What it adds, as chips (section 19). */
+  adds?: string[]
+  /** One line of facts: price, usage, last update. Already formatted by the caller. */
+  facts?: string[]
   /** Draw the Verified mark. Only ever set from what the server returns. */
   verified?: boolean
   verifiedLabel?: string
+  /** The server's trust answer when it isn't Verified, such as "Not verified". */
+  trustLabel?: string
   icon?: React.ReactNode
   /** Opens the plugin's page. The name is the keyboard-reachable control; the whole tile is its target. */
   onOpen: () => void
@@ -875,8 +881,11 @@ export function PluginTile({
   summary,
   version,
   tags,
+  adds,
+  facts,
   verified,
   verifiedLabel = "Verified",
+  trustLabel,
   icon,
   onOpen,
   action,
@@ -900,6 +909,7 @@ export function PluginTile({
             {publisher ? <CardDescription className="truncate text-xs">{publisher}</CardDescription> : null}
           </div>
           {verified ? <Badge variant="default" className="text-xs">{verifiedLabel}</Badge> : null}
+          {!verified && trustLabel ? <Badge variant="outline" className="text-xs">{trustLabel}</Badge> : null}
         </div>
       </CardHeader>
       <CardContent className="flex-1 space-y-3">
@@ -909,7 +919,11 @@ export function PluginTile({
           {(tags ?? []).map((tag) => (
             <Badge key={tag} variant="outline" className="text-xs">{tag}</Badge>
           ))}
+          {(adds ?? []).map((label) => (
+            <Badge key={label} variant="secondary" className="text-xs">{label}</Badge>
+          ))}
         </div>
+        {facts && facts.length > 0 ? <p className="text-xs text-muted-foreground">{facts.join(" · ")}</p> : null}
       </CardContent>
       {action ? <CardFooter className="relative justify-end border-t border-border/40 pt-3">{action}</CardFooter> : null}
     </Card>
