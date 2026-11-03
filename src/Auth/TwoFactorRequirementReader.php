@@ -53,11 +53,13 @@ final class TwoFactorRequirementReader
         $direct = [];
         $byUnit = [];
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $policy) {
-            $tenant = (int) $policy['tenant_id'];
-            match ((string) $policy['scope_type']) {
+            $tenant = (int) ($policy['tenant_id'] ?? 0);
+            $scopeId = (int) ($policy['scope_id'] ?? 0);
+            match ($policy['scope_type'] ?? null) {
                 'tenant' => $tenantWide[$tenant] = true,
-                'user' => $direct[$tenant . ':' . (int) $policy['scope_id']] = true,
-                default => $byUnit[$tenant][(int) $policy['scope_id']] = true,
+                'user' => $direct[$tenant . ':' . $scopeId] = true,
+                'ou' => $byUnit[$tenant][$scopeId] = true,
+                default => null,
             };
         }
 
@@ -97,7 +99,7 @@ final class TwoFactorRequirementReader
 
         $parents = [];
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $unit) {
-            $parents[(int) $unit['tenant_id']][(int) $unit['id']] = $unit['parent_id'] !== null ? (int) $unit['parent_id'] : null;
+            $parents[(int) $unit['tenant_id']][(int) $unit['id']] = isset($unit['parent_id']) ? (int) $unit['parent_id'] : null;
         }
 
         return $parents;

@@ -40,6 +40,7 @@ export const OUS_WRITE = 'ous:write';
 export const OUS_DELETE = 'ous:delete';
 
 /** Permissions for tenant management. */
+export const TENANTS_READ = 'tenants:read';
 export const TENANTS_WRITE = 'tenants:write';
 export const TENANTS_DELETE = 'tenants:delete';
 
