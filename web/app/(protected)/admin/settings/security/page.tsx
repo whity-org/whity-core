@@ -106,14 +106,12 @@ function scopeLabel(
     const ou = ous.find((o) => o.id === policy.scope_id);
     return ou
       ? t('settings.security.scope.ou', '{name} (and its sub-units)', { name: ou.name })
-      : t('settings.security.scope.ouFallback', 'Organizational unit #{id}', {
-          id: String(policy.scope_id),
-        });
+      : t('settings.security.scope.ouFallback', 'A unit you can’t see the name of');
   }
   const user = users.find((u) => u.id === policy.scope_id);
   return user
     ? user.email
-    : t('settings.security.scope.userFallback', 'User #{id}', { id: String(policy.scope_id) });
+    : t('settings.security.scope.userFallback', 'A person you can’t see the name of');
 }
 
 function TwoFactorPoliciesSection({

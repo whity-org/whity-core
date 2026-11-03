@@ -23,6 +23,7 @@ import type { components } from '@/lib/api/schema';
 import type { useToast } from '@/lib/toast-context';
 import { Badge } from '@whity/ui/badge';
 import { Input } from '@/components/ui/input';
+import { FieldSelect } from '@/components/field-select';
 import { Switch } from '@whity/ui/switch';
 import { useTranslation, type TranslateFn } from '@whity/features/i18n';
 
@@ -650,10 +651,7 @@ function timezoneOptions(): string[] {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-const NATIVE_SELECT_CLASS =
-  'h-7 w-full min-w-0 rounded-md border border-input bg-input/20 px-2 text-sm transition-colors outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive/20';
-
-interface NativeSelectProps {
+interface SelectFieldProps {
   id: string;
   value: string;
   disabled: boolean;
@@ -662,51 +660,34 @@ interface NativeSelectProps {
   onChange: (value: string) => void;
 }
 
-/** Native <select> of IANA timezone identifiers. */
-function TimezoneSelect({ id, value, disabled, invalid, describedBy, onChange }: NativeSelectProps) {
+/** Choice of IANA timezone identifiers. */
+function TimezoneSelect({ id, value, disabled, invalid, describedBy, onChange }: SelectFieldProps) {
   return (
-    <select
+    <FieldSelect
       id={id}
       value={value}
       disabled={disabled}
-      aria-invalid={invalid || undefined}
-      aria-describedby={describedBy}
-      onChange={(e) => onChange(e.target.value)}
-      className={NATIVE_SELECT_CLASS}
-    >
-      {timezoneOptions().map((tz) => (
-        <option key={tz} value={tz}>
-          {tz}
-        </option>
-      ))}
-    </select>
+      invalid={invalid}
+      describedBy={describedBy}
+      onChange={onChange}
+      options={timezoneOptions().map((tz) => ({ value: tz, label: tz }))}
+    />
   );
 }
 
-/** Native <select> of short locale codes; keeps an out-of-list value selectable. */
-function LocaleSelect({ id, value, disabled, invalid, describedBy, onChange }: NativeSelectProps) {
+/** Choice of short locale codes; keeps an out-of-list value selectable. */
+function LocaleSelect({ id, value, disabled, invalid, describedBy, onChange }: SelectFieldProps) {
   const t = useTranslation('admin');
-  const options = localeOptions(t);
-
   return (
-    <select
+    <FieldSelect
       id={id}
       value={value}
       disabled={disabled}
-      aria-invalid={invalid || undefined}
-      aria-describedby={describedBy}
-      onChange={(e) => onChange(e.target.value)}
-      className={NATIVE_SELECT_CLASS}
-    >
-      {!options.some((o) => o.value === value) && value !== '' && (
-        <option value={value}>{value}</option>
-      )}
-      {options.map((o) => (
-        <option key={o.value} value={o.value}>
-          {o.label}
-        </option>
-      ))}
-    </select>
+      invalid={invalid}
+      describedBy={describedBy}
+      onChange={onChange}
+      options={localeOptions(t)}
+    />
   );
 }
 
@@ -809,7 +790,7 @@ interface SettingsFieldProps {
 
 /**
  * A single label-associated form control for the fixed per-tenant key set.
- * timezone/locale render as native <select> elements; everything else is an
+ * timezone/locale render as fixed-choice selects; everything else is an
  * input. (The global page uses {@link RegistrySettingControl}, which is
  * registry-driven and also renders boolean toggles.)
  */
@@ -1004,26 +985,15 @@ export function RegistrySettingControl({
           onChange={onChange}
         />
       ) : type === 'enum' && entry.options && entry.options.length > 0 ? (
-        <select
+        <FieldSelect
           id={id}
           value={value}
           disabled={disabled}
-          aria-invalid={error ? true : undefined}
-          aria-describedby={describedBy}
-          onChange={(e) => onChange(e.target.value)}
-          className={NATIVE_SELECT_CLASS}
-        >
-          {/* Keep an out-of-range stored value selectable rather than silently
-              snapping it to the first option. */}
-          {!entry.options.includes(value) && value !== '' && (
-            <option value={value}>{value}</option>
-          )}
-          {entry.options.map((option) => (
-            <option key={option} value={option}>
-              {enumOptionLabel(option)}
-            </option>
-          ))}
-        </select>
+          invalid={Boolean(error)}
+          describedBy={describedBy}
+          onChange={onChange}
+          options={entry.options.map((option) => ({ value: option, label: enumOptionLabel(option) }))}
+        />
       ) : (
         <Input
           id={id}

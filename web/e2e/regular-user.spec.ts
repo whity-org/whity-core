@@ -100,6 +100,8 @@ test.describe('Regular user (non-admin)', () => {
     // enrolled, keeping user@example.com a plain-login account for other specs.
     await userPage.shell.openAccountSettings();
     await page.waitForURL('**/settings');
+    // Two-step sign-in lives in the account page's Sign-in and security tab.
+    await page.getByRole('tab', { name: 'Sign-in and security' }).click();
 
     const enable = page.getByRole('button', { name: 'Enable 2FA' });
     await expect(enable).toBeVisible();
