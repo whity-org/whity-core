@@ -455,7 +455,37 @@ export interface RecordPageShellBaseProps<TFields extends object> {
   notices?: ReactNode;
   /** Related collections, in the side column. */
   side?: ReactNode;
+  /**
+   * Record tabs (P.2): Overview holds the body below (`main` or `sections`),
+   * and each item is a further tab such as Access or History. With tabs the
+   * page drops the stat strip and the side column: the header's facts line and
+   * the tabs carry what they held.
+   */
+  tabs?: RecordTabs;
+  /**
+   * The sticky save bar (`SaveBar`), shown under the body only when the record
+   * is editable.
+   */
+  saveBar?: ReactNode;
   className?: string;
+}
+
+/** The record's tabs after Overview. */
+export interface RecordTabs {
+  /** The first tab's label, "Overview". */
+  overviewLabel: string;
+  items: readonly RecordTab[];
+}
+
+export interface RecordTab {
+  key: string;
+  label: string;
+  content?: ReactNode;
+  /**
+   * Regions with their own access, as in `sections`. They join the page's
+   * derived access: the save bar shows when any region on any tab is editable.
+   */
+  sections?: readonly RecordSectionSpec[];
 }
 
 /**

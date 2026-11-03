@@ -28,7 +28,7 @@ test.describe('Sidebar navigation (admin)', () => {
     // violation and leave the second.
     const usersTable = page.getByRole('table', { name: 'Users' });
     await expect(usersTable).toBeVisible();
-    await expect(usersTable.getByRole('columnheader', { name: 'Email' })).toBeVisible();
+    await expect(usersTable.getByRole('columnheader', { name: 'Person' })).toBeVisible();
   });
 
   test('Roles section loads its page with heading, table and Create button', async ({

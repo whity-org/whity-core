@@ -27,6 +27,7 @@
 
 import React from 'react';
 import { render, screen, waitFor, within } from '@testing-library/react';
+import { DisplayPreferencesContextProvider } from '@whity/ui/display-preferences';
 import userEvent from '@testing-library/user-event';
 import { RoleRecordScreen } from '@whity/features/roles';
 import type {
@@ -128,15 +129,22 @@ function renderRecord(props: Partial<React.ComponentProps<typeof RoleRecordScree
   const adapter = props.adapter ?? fakeAdapter();
   const onBack = props.onBack ?? jest.fn();
   render(
-    <RoleRecordScreen
-      adapter={adapter}
-      roleId={props.roleId ?? 10}
-      t={t}
-      onNotify={props.onNotify}
-      onBack={onBack}
-    />
+    <DisplayPreferencesContextProvider value={{ textSize: 'standard', showTechnicalDetails: true, update: () => {} }}>
+      <RoleRecordScreen
+        adapter={adapter}
+        roleId={props.roleId ?? 10}
+        t={t}
+        onNotify={props.onNotify}
+        onBack={onBack}
+      />
+    </DisplayPreferencesContextProvider>
   );
   return { adapter, onBack };
+}
+
+/** Record tabs: the content of the other tabs is not mounted until opened. */
+async function openTab(name: string) {
+  await userEvent.click(await screen.findByRole('tab', { name }));
 }
 
 describe('RoleRecordScreen — the record and its form', () => {
@@ -153,6 +161,7 @@ describe('RoleRecordScreen — the record and its form', () => {
   it('shows the whole permission catalogue grouped by resource, with the role\'s own set ticked', async () => {
     renderRecord();
 
+    await openTab('Access');
     await screen.findByTestId('perm-grid');
     // One section per resource prefix, all present at once.
     expect(screen.getByTestId('perm-grid-group-users')).toBeInTheDocument();
@@ -182,6 +191,7 @@ describe('RoleRecordScreen — the record and its form', () => {
   it('renders the permissions with no height cap and no nested scroll container', async () => {
     renderRecord();
 
+    await openTab('Access');
     const grid = await screen.findByTestId('perm-grid');
     const offenders = grid.querySelectorAll(
       '[class*="max-h-"], [class*="overflow-y-auto"], [class*="overflow-auto"]'
@@ -194,6 +204,7 @@ describe('RoleRecordScreen — the record and its form', () => {
     const user = userEvent.setup();
     renderRecord();
 
+    await openTab('Access');
     await screen.findByTestId('perm-grid');
     await user.type(screen.getByTestId('perm-grid-search'), 'ous');
 
@@ -211,6 +222,7 @@ describe('RoleRecordScreen — the record and its form', () => {
     await user.clear(nameInput);
     await user.type(nameInput, 'Support Tier 2');
 
+    await openTab('Access');
     const usersGroup = screen.getByTestId('perm-grid-group-users');
     const usersWrite = within(usersGroup).getByText('users:write');
     await user.click(usersWrite);
@@ -234,7 +246,7 @@ describe('RoleRecordScreen — the record and its form', () => {
     await user.clear(nameInput);
     await user.type(nameInput, 'Changed');
 
-    await user.click(screen.getByRole('button', { name: 'Discard changes' }));
+    await user.click(screen.getByRole('button', { name: 'Discard' }));
 
     expect(await screen.findByDisplayValue('Support')).toBeInTheDocument();
     expect(adapter.getRole).toHaveBeenCalledTimes(1);
@@ -310,10 +322,12 @@ describe('RoleRecordScreen — context a modal cannot carry', () => {
       }),
     });
 
-    expect(await screen.findByTestId('role-record-stat-holders')).toHaveTextContent('12');
+    // The headcount is in the facts line under the title (no stat tiles).
+    expect(await screen.findByText(/People: 12/)).toBeInTheDocument();
+    await openTab('People');
     // The most recent assignment is the first row — "latest role assignment was
     // to user3".
-    const holders = screen.getByTestId('role-record-holders');
+    const holders = await screen.findByTestId('role-record-holders');
     expect(within(holders).getAllByRole('listitem')[0]).toHaveTextContent('user3');
     expect(within(holders).getByText('and 10 more')).toBeInTheDocument();
   });
@@ -321,9 +335,10 @@ describe('RoleRecordScreen — context a modal cannot carry', () => {
   it('says nobody holds the role rather than showing an empty panel', async () => {
     renderRecord();
 
+    await openTab('People');
     const holders = await screen.findByTestId('role-record-holders');
     expect(within(holders).getByText('Nobody holds this role yet.')).toBeInTheDocument();
-    expect(await screen.findByTestId('role-record-stat-holders')).toHaveTextContent('0');
+    expect(await screen.findByText(/People: 0/)).toBeInTheDocument();
   });
 
   it('keeps the record usable when the holders panel fails', async () => {
@@ -336,7 +351,8 @@ describe('RoleRecordScreen — context a modal cannot carry', () => {
     // The record still rendered — a supplementary panel's failure is not the
     // page's failure.
     expect(await screen.findByDisplayValue('Support')).toBeInTheDocument();
-    const holders = screen.getByTestId('role-record-holders');
+    await openTab('People');
+    const holders = await screen.findByTestId('role-record-holders');
     expect(within(holders).getByText('Failed to load who holds this role')).toBeInTheDocument();
   });
 
@@ -355,9 +371,11 @@ describe('RoleRecordScreen — context a modal cannot carry', () => {
       }),
     });
 
+    await openTab('History');
     const activity = await screen.findByTestId('role-record-activity');
+    // In words, with the code and the actor under Show technical details (on here).
+    expect(within(activity).getByText('Role changed')).toBeInTheDocument();
     expect(within(activity).getByText('role.updated')).toBeInTheDocument();
-    expect(within(activity).getByText(/by user 42/)).toBeInTheDocument();
   });
 
   it('OMITS the history panel entirely when the caller lacks audit:read', async () => {
@@ -439,6 +457,7 @@ describe('RoleRecordScreen — read-only is a state, not a disabled form', () =>
     // The localized sentence, with the server's operator-grade `detail`
     // appended — the composition the shell owns so every screen does it the
     // same way (#968).
+    await openTab('Access');
     expect(
       screen.getByText(
         "You may see what this role grants, but not change it. " +
@@ -455,6 +474,7 @@ describe('RoleRecordScreen — read-only is a state, not a disabled form', () =>
   it('shows only the role\'s own permissions when read-only', async () => {
     renderRecord({ adapter: fakeAdapter({ getRole: jest.fn().mockResolvedValue(GLOBAL_ROLE) }) });
 
+    await openTab('Access');
     await screen.findByTestId('perm-grid');
     expect(screen.getByText('users:read')).toBeInTheDocument();
     expect(screen.getByText('roles:read')).toBeInTheDocument();

@@ -1,4 +1,5 @@
 import { test, expect } from './support/fixtures';
+import type { Page } from '@playwright/test';
 import { uniqueSuffix } from './support/constants';
 import { deleteUser, findUserIdByEmail } from './support/api';
 
@@ -29,6 +30,12 @@ import { deleteUser, findUserIdByEmail } from './support/api';
  * "Moderator" option (which had no backing seed role and 404'd on submit) is
  * gone.
  */
+/** Add a person without inviting them: the main button is Invite people. */
+async function openAddUserDialog(page: Page): Promise<void> {
+  await page.getByRole('button', { name: 'More actions' }).click();
+  await page.getByRole('menuitem', { name: 'Add without inviting' }).click();
+}
+
 test.describe('Users (admin)', () => {
   let createdEmail: string | null = null;
 
@@ -57,8 +64,8 @@ test.describe('Users (admin)', () => {
     // renders; the cell query below needs real rows, so it could never win.
     // With the name applied in both states the named locator is correct here.
     const table = page.getByRole('table', { name: 'Users' });
-    await expect(table.getByRole('cell', { name: 'admin@example.com' })).toBeVisible();
-    await expect(table.getByRole('cell', { name: 'user@example.com' })).toBeVisible();
+    await expect(table.getByText('admin@example.com')).toBeVisible();
+    await expect(table.getByText('user@example.com')).toBeVisible();
   });
 
   test('create, edit and delete a user', async ({ adminPage, page }) => {
@@ -69,7 +76,7 @@ test.describe('Users (admin)', () => {
     await page.waitForURL('**/admin/users');
 
     // --- Create (role: User) ---
-    await page.getByRole('button', { name: 'Create User' }).click();
+    await openAddUserDialog(page);
     const createDialog = page.getByRole('dialog');
     await expect(createDialog.getByText('Create New User')).toBeVisible();
 
@@ -90,7 +97,7 @@ test.describe('Users (admin)', () => {
 
     // --- Edit on the RECORD PAGE (change role user -> admin), persisted ---
     await row.getByRole('button', { name: 'Row actions' }).click();
-    await page.getByRole('menuitem', { name: 'Edit' }).click();
+    await page.getByRole('menuitem', { name: 'Open' }).click();
 
     // The record has an ADDRESS now — that is the whole point of the page, so
     // the URL is asserted rather than only the content.
@@ -113,7 +120,7 @@ test.describe('Users (admin)', () => {
     // ...and re-opening the record shows the new role selected (proves it was
     // read back from the persisted record, not from stale client state).
     await adminRow.getByRole('button', { name: 'Row actions' }).click();
-    await page.getByRole('menuitem', { name: 'Edit' }).click();
+    await page.getByRole('menuitem', { name: 'Open' }).click();
     await page.waitForURL(/\/admin\/users\/\d+$/);
     await expect(page.getByTestId('user-record-role')).toContainText('admin');
     await page.getByRole('button', { name: 'Back to users' }).click();
@@ -141,7 +148,7 @@ test.describe('Users (admin)', () => {
     await page.waitForURL('**/admin/users');
 
     // Seed a user in the `user` role through the API used by the app proxy.
-    await page.getByRole('button', { name: 'Create User' }).click();
+    await openAddUserDialog(page);
     const createDialog = page.getByRole('dialog');
     await createDialog.getByLabel('Email').fill(createdEmail);
     await createDialog.getByLabel('Password', { exact: true }).fill('e2e-password-123');
@@ -155,7 +162,7 @@ test.describe('Users (admin)', () => {
 
     // Change role user -> admin on the record page and save.
     await row.getByRole('button', { name: 'Row actions' }).click();
-    await page.getByRole('menuitem', { name: 'Edit' }).click();
+    await page.getByRole('menuitem', { name: 'Open' }).click();
     await page.waitForURL(/\/admin\/users\/\d+$/);
     await page.getByTestId('user-record-role').click();
     await page.getByRole('option', { name: 'admin', exact: true }).click();
@@ -166,7 +173,8 @@ test.describe('Users (admin)', () => {
     // rebuild it from the server rather than depend on how it was reached.
     await page.reload();
     await expect(page.getByTestId('user-record')).toBeVisible();
-    await expect(page.getByTestId('user-record-stat-role')).toContainText('admin');
+    // The facts line under the name carries the role.
+    await expect(page.getByText(/^admin · /)).toBeVisible();
 
     // Hard reload of the LIST: the table re-fetches from GET /api/users, so a
     // persisted change is the only way the row can still show `admin` (WC-113).
@@ -200,7 +208,7 @@ test.describe('Users (admin)', () => {
     await adminPage.shell.clickNav('Users');
     await page.waitForURL('**/admin/users');
 
-    await page.getByRole('button', { name: 'Create User' }).click();
+    await openAddUserDialog(page);
     const createDialog = page.getByRole('dialog');
     await expect(createDialog.getByText('Create New User')).toBeVisible();
 
@@ -259,7 +267,7 @@ test.describe('User record pre-fill (WC-100)', () => {
     await adminPage.shell.clickNav('Users');
     await page.waitForURL('**/admin/users');
 
-    await page.getByRole('button', { name: 'Create User' }).click();
+    await openAddUserDialog(page);
     const createDialog = page.getByRole('dialog');
     await createDialog.getByLabel('Email').fill(createdEmail);
     await createDialog.getByLabel('Password', { exact: true }).fill('e2e-password-123');
@@ -272,14 +280,16 @@ test.describe('User record pre-fill (WC-100)', () => {
     await expect(row).toBeVisible();
     // The row's own NAME opens the record — the affordance a list gets once its
     // records have addresses.
-    await row.getByRole('button', { name: localPart }).click();
+    await row.getByText(localPart, { exact: true }).click();
     await page.waitForURL(/\/admin\/users\/\d+$/);
     await expect(page.getByTestId('user-record')).toBeVisible();
 
     // The record titles itself with the derived name and carries the tenant it
     // belongs to, by name, beside the form.
     await expect(page.getByRole('heading', { name: localPart })).toBeVisible();
+    await page.getByRole('tab', { name: 'Access' }).click();
     await expect(page.getByTestId('user-record-memberships')).toBeVisible();
+    await page.getByRole('tab', { name: 'Overview' }).click();
 
     // Change the role (user -> admin) and Save: it must succeed and persist.
     await page.getByTestId('user-record-role').click();
@@ -310,7 +320,7 @@ test.describe('Create User validation + dialog (admin)', () => {
     await adminPage.shell.clickNav('Users');
     await page.waitForURL('**/admin/users');
 
-    await page.getByRole('button', { name: 'Create User' }).click();
+    await openAddUserDialog(page);
     const dialog = page.getByRole('dialog');
     await expect(dialog.getByText('Create New User')).toBeVisible();
 
@@ -341,7 +351,7 @@ test.describe('Create User validation + dialog (admin)', () => {
     await adminPage.shell.clickNav('Users');
     await page.waitForURL('**/admin/users');
 
-    await page.getByRole('button', { name: 'Create User' }).click();
+    await openAddUserDialog(page);
     const dialog = page.getByRole('dialog');
     await expect(dialog.getByText('Create New User')).toBeVisible();
     await page.keyboard.press('Escape');
@@ -368,7 +378,7 @@ test.describe('Users role dropdown is driven from real roles (WC-121)', () => {
     await adminPage.shell.clickNav('Users');
     await page.waitForURL('**/admin/users');
 
-    await page.getByRole('button', { name: 'Create User' }).click();
+    await openAddUserDialog(page);
     const createDialog = page.getByRole('dialog');
     await expect(createDialog.getByText('Create New User')).toBeVisible();
 
@@ -398,7 +408,7 @@ test.describe('Users role dropdown is driven from real roles (WC-121)', () => {
     await adminPage.shell.clickNav('Users');
     await page.waitForURL('**/admin/users');
 
-    await page.getByRole('button', { name: 'Create User' }).click();
+    await openAddUserDialog(page);
     const createDialog = page.getByRole('dialog');
     await createDialog.getByLabel('Email').fill(probeEmail);
     await createDialog.getByLabel('Password', { exact: true }).fill('e2e-password-123');
@@ -410,7 +420,7 @@ test.describe('Users role dropdown is driven from real roles (WC-121)', () => {
     try {
       const row = page.getByRole('row', { name: new RegExp(probeEmail) });
       await row.getByRole('button', { name: 'Row actions' }).click();
-      await page.getByRole('menuitem', { name: 'Edit' }).click();
+      await page.getByRole('menuitem', { name: 'Open' }).click();
       await page.waitForURL(/\/admin\/users\/\d+$/);
       await expect(page.getByTestId('user-record')).toBeVisible();
 

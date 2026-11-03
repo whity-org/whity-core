@@ -244,6 +244,22 @@ export function createUsersAdapter(transport: Transport): UsersAdapter {
       }
     },
 
+    async setAccountStatus(id: number, status: 'active' | 'inactive'): Promise<void> {
+      const { status: code, body } = await transport.request('PATCH', `/api/v1/users/${id}`, {
+        accountStatus: status,
+      });
+      if (!isOk(code)) {
+        throw new Error(serverMessage(body));
+      }
+    },
+
+    async deleteUser(id: number): Promise<void> {
+      const { status, body } = await transport.request('DELETE', `/api/v1/users/${id}`);
+      if (!isOk(status)) {
+        throw new Error(serverMessage(body));
+      }
+    },
+
     async getCapabilities(): Promise<string[]> {
       const { status, body } = await transport.request('GET', '/api/v1/me/capabilities');
       if (!isOk(status)) return [];
