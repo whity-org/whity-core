@@ -2942,11 +2942,11 @@ final class CoreApiSchemas
                 ],
             ]),
             self::adminRoute('GET', '/api/admin/stats', [
-                'summary' => 'Platform-wide aggregate statistics',
+                'summary' => 'Platform-wide aggregate statistics, for the system tenant only',
                 'tags' => ['platform-ops'],
                 'responses' => [
                     200 => self::jsonResponse('Aggregate stats', 'AdminStatsResponse'),
-                    403 => self::errorResponse('Insufficient permissions'),
+                    403 => self::errorResponse('Insufficient permissions, or not the system tenant'),
                     500 => self::errorResponse('Internal error'),
                 ],
             ]),
@@ -5470,6 +5470,24 @@ final class CoreApiSchemas
                 'pagination' => SchemaBuilder::ref('Pagination'),
                 'source' => self::str(),
             ], ['data', 'pagination', 'source']),
+            // One row of GET /api/me/waiting: an inbox item or an agent proposal.
+            'WaitingRow' => self::object([
+                'key' => self::str(),
+                'kind' => ['type' => 'string', 'enum' => ['inbox', 'proposal']],
+                'at' => self::str(),
+                'source' => self::str(),
+                'item' => SchemaBuilder::ref('InboxItem'),
+                'proposal' => SchemaBuilder::ref('AgentProposal'),
+            ], ['key', 'kind', 'at']),
+            'WaitingListResponse' => self::object([
+                'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('WaitingRow')],
+                'counts' => self::object([
+                    'inbox' => self::int(),
+                    'proposals' => self::int(),
+                    'total' => self::int(),
+                ], ['inbox', 'proposals', 'total']),
+                'unavailable' => ['type' => 'array', 'items' => self::str()],
+            ], ['data', 'counts', 'unavailable']),
             'InboxSource' => self::object([
                 'key' => self::str(),
                 'label' => self::str(),
@@ -11562,6 +11580,24 @@ final class CoreApiSchemas
                     'responses' => [
                         200 => self::jsonResponse("That source's items, with pagination", 'InboxItemListResponse'),
                         422 => self::errorResponse("'source' is missing or names no registered source"),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'GET',
+                'path' => '/api/me/waiting',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => "What is waiting for the caller: every inbox source and their agent proposals, oldest first",
+                    'description' => 'At most `limit` rows, with the real totals in `counts`. A source that fails is named in '
+                        . '`unavailable` and the rest is still served. There are no pages: the rest is on Inbox and Approvals.',
+                    'tags' => ['inbox'],
+                    'parameters' => [
+                        self::queryParam('limit', 'integer', 'How many rows (default 6, max 50)'),
+                    ],
+                    'responses' => [
+                        200 => self::jsonResponse('The oldest rows and the totals', 'WaitingListResponse'),
                     ] + self::authErrors(),
                 ],
             ],

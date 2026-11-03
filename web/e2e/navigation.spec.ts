@@ -87,12 +87,12 @@ test.describe('Sidebar navigation (admin)', () => {
     await expect(page.getByRole('tab', { name: 'Sign-in and security' })).toBeVisible();
   });
 
-  test('Dashboard section loads the home page (/admin redirects to /dashboard)', async ({
+  test('Dashboard section loads the home page', async ({
     adminPage,
     page,
   }) => {
-    // The "Dashboard" sidebar item points at /admin, which redirects to the one
-    // home (/dashboard). Server statistics live on /admin/stats (System).
+    // The "Dashboard" sidebar item opens the one home. Server statistics live on
+    // /admin/stats (System).
     await adminPage.shell.clickNav('Dashboard');
     await page.waitForURL('**/dashboard');
     await expect(

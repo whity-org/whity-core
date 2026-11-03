@@ -200,7 +200,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Platform-wide aggregate statistics */
+        /** Platform-wide aggregate statistics, for the system tenant only */
         get: operations["get_api_v1_admin_stats"];
         put?: never;
         post?: never;
@@ -4013,6 +4013,26 @@ export interface paths {
         put?: never;
         /** Resolve which of a batch of requests the caller is permitted to make */
         post: operations["post_api_v1_me_permitted_actions"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/waiting": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What is waiting for the caller: every inbox source and their agent proposals, oldest first
+         * @description At most `limit` rows, with the real totals in `counts`. A source that fails is named in `unavailable` and the rest is still served. There are no pages: the rest is on Inbox and Approvals.
+         */
+        get: operations["get_api_v1_me_waiting"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -11738,6 +11758,24 @@ export interface components {
             /** @description Required to set `password` on an account that signs in through an identity provider; otherwise that is refused. */
             allowLocalPasswordOnIdpAccount?: boolean;
         };
+        WaitingListResponse: {
+            data: components["schemas"]["WaitingRow"][];
+            counts: {
+                inbox: number;
+                proposals: number;
+                total: number;
+            };
+            unavailable: string[];
+        };
+        WaitingRow: {
+            key: string;
+            /** @enum {string} */
+            kind: "inbox" | "proposal";
+            at: string;
+            source?: string;
+            item?: components["schemas"]["InboxItem"];
+            proposal?: components["schemas"]["AgentProposal"];
+        };
         WebhookAckResponse: {
             data: {
                 received: number;
@@ -12735,7 +12773,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Insufficient permissions */
+            /** @description Insufficient permissions, or not the system tenant */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -33028,6 +33066,74 @@ export interface operations {
             };
             /** @description Missing 'checks' list, or more than 200 checks */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_me_waiting: {
+        parameters: {
+            query?: {
+                /** @description How many rows (default 6, max 50) */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The oldest rows and the totals */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WaitingListResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
                 headers: {
                     [name: string]: unknown;
                 };
