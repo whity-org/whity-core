@@ -1,0 +1,1 @@
+- Plugins: `plugins:install` now installs from a store, apart from `plugins:upload`. Uninstalling keeps a plugin and its data for 30 days, with Reinstall. Updates are by hand, and one asking for new access waits for approval. The store shows price, usage and what a plugin adds, every third-party plugin is marked Not verified, and Plugins is one sidebar item.

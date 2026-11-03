@@ -98,6 +98,12 @@ final class PluginInstaller
     /** Wall-clock deadline (seconds) for the introspection child. */
     private readonly int $introspectTimeoutSeconds;
 
+    /** Where a plugin's next version waits for approval; a dot directory, so discovery skips it. */
+    public const PENDING_DIR = '.pending';
+
+    /** @var array{name: string, version: string, permissions: list<string>, sha256: ?string}|null */
+    private ?array $lastInspected = null;
+
     /**
      * @param string $pluginDir Absolute path to the host plugins directory.
      * @param PluginLoader|null $pluginLoader Live loader; reloaded after a stage.
@@ -242,6 +248,7 @@ final class PluginInstaller
 
             // 10. Audit success (secret-free).
             $this->audit('plugin.upload', $pluginName, $auditSize, $auditSha, 'staged');
+            $this->lastInspected = ['name' => $pluginName, 'version' => $meta['version'], 'permissions' => $meta['permissions'], 'sha256' => $auditSha];
 
             // 11. (rollback handled in catch) — success path cleans only temp.
             $this->removeRecursive($workDir);
@@ -279,6 +286,123 @@ final class PluginInstaller
             ]);
             throw new PluginPackageInvalid('The uploaded package could not be installed.', [], $e);
         }
+    }
+
+    /**
+     * What the last successful install or stage found in the package.
+     *
+     * @return array{name: string, version: string, permissions: list<string>, sha256: ?string}|null
+     */
+    public function lastInspected(): ?array
+    {
+        return $this->lastInspected;
+    }
+
+    /**
+     * Stage a new version of an installed plugin beside the live one (S.6).
+     *
+     * The same checks as an install, except that it must be the same plugin and
+     * may share its class. Nothing live changes: the version waits in
+     * `.pending/`, a dot directory neither discovery nor the listing reads, until
+     * {@see self::applyStagedUpdate()}.
+     *
+     * @return array{name: string, version: string, permissions: list<string>, sha256: ?string}
+     * @throws PluginInstallException On an invalid, incompatible or different plugin.
+     */
+    public function stageUpdate(string $bytes, string $expectedName): array
+    {
+        $kind = $this->validateBytes($bytes);
+        $workDir = $this->makeWorkDir();
+
+        try {
+            $artifact = $workDir . '/' . ($kind === 'zip' ? 'package.zip' : 'package.php');
+            $this->writeStaged($artifact, $bytes);
+            $sha = hash_file('sha256', $artifact) ?: null;
+
+            if ($kind === 'zip') {
+                $root = $workDir . '/extracted';
+                $this->mkdirOrFail($root);
+                $this->safeExtract($artifact, $root);
+            } else {
+                $root = $artifact;
+            }
+
+            [$meta, $isSingleFile, $artifactPath] = $this->locatePlugin($kind, $root);
+            $name = $this->deriveAndValidateName($meta, $isSingleFile ? null : basename($artifactPath));
+            if ($name !== $expectedName) {
+                throw new PluginPackageInvalid('This package is a different plugin.', ['plugin' => $name]);
+            }
+            $this->assertCompatible($meta, $name);
+
+            $pendingDir = $this->pluginDir . '/' . self::PENDING_DIR;
+            $this->mkdirOrFail($pendingDir);
+            $this->removeRecursive($pendingDir . '/' . $name);
+            $this->removeRecursive($pendingDir . '/' . $name . '.php.disabled');
+            if ($isSingleFile) {
+                if (!@copy($artifactPath, $pendingDir . '/' . $name . '.php.disabled')) {
+                    throw new PluginPackageInvalid('The update could not be staged.');
+                }
+            } else {
+                $this->copyTree($artifactPath, $pendingDir . '/' . $name);
+                if (file_put_contents($pendingDir . '/' . $name . '/' . PluginLoader::DIR_DISABLED_SENTINEL, '') === false) {
+                    throw new PluginPackageInvalid('The update could not be staged.');
+                }
+            }
+
+            return $this->lastInspected = ['name' => $name, 'version' => $meta['version'], 'permissions' => $meta['permissions'], 'sha256' => $sha];
+        } finally {
+            $this->removeRecursive($workDir);
+        }
+    }
+
+    /**
+     * Replace a plugin's files with its staged update, which lands turned off.
+     *
+     * Turned off because a worker can't redefine a class it has loaded and the
+     * new version's migrations run on enable, so the only clean switch is the
+     * one a fresh install already goes through.
+     *
+     * @throws PluginPackageInvalid When nothing is staged or the swap fails.
+     */
+    public function applyStagedUpdate(string $name): void
+    {
+        $pendingDir = $this->pluginDir . '/' . self::PENDING_DIR;
+        $pendingTree = $pendingDir . '/' . $name;
+        $pendingFile = $pendingDir . '/' . $name . '.php.disabled';
+        $pending = file_exists($pendingTree) ? $pendingTree : (file_exists($pendingFile) ? $pendingFile : null);
+        if ($pending === null) {
+            throw new PluginPackageInvalid('No update is staged for this plugin.');
+        }
+
+        $live = null;
+        foreach (['', '.php', '.php.disabled'] as $suffix) {
+            if (file_exists($this->pluginDir . '/' . $name . $suffix)) {
+                $live = $this->pluginDir . '/' . $name . $suffix;
+                break;
+            }
+        }
+        if ($live === null) {
+            throw new PluginPackageInvalid('The plugin is no longer installed.');
+        }
+
+        $aside = $pendingDir . '/.' . $name . '.old_' . bin2hex(random_bytes(8));
+        if (!@rename($live, $aside)) {
+            throw new PluginPackageInvalid('The update could not be applied.');
+        }
+        $target = $this->pluginDir . '/' . basename($pending);
+        if (!@rename($pending, $target)) {
+            @rename($aside, $live);
+            throw new PluginPackageInvalid('The update could not be applied.');
+        }
+        $this->removeRecursive($aside);
+        $this->pluginLoader?->reload();
+    }
+
+    public function discardStagedUpdate(string $name): void
+    {
+        $pendingDir = $this->pluginDir . '/' . self::PENDING_DIR;
+        $this->removeRecursive($pendingDir . '/' . $name);
+        $this->removeRecursive($pendingDir . '/' . $name . '.php.disabled');
     }
 
     /**
@@ -638,7 +762,7 @@ final class PluginInstaller
      *
      * @param 'zip'|'php' $kind The package kind.
      * @param string $sourceRoot The extraction root (zip) or the staged .php path.
-     * @return array{0: array{class: string, name: string, version: string, routes_count: int, permissions_count: int, sdk_constraint: ?string, core_constraint: ?string}, 1: bool, 2: string}
+     * @return array{0: array{class: string, name: string, version: string, routes_count: int, permissions_count: int, permissions: list<string>, sdk_constraint: ?string, core_constraint: ?string}, 1: bool, 2: string}
      *   [metadata, isSingleFile, artifactPath]. artifactPath is the top-level
      *   plugin dir (zip) or the staged .php file (single).
      * @throws PluginPackageInvalid On zero or multiple plugin classes / load error.
@@ -668,7 +792,7 @@ final class PluginInstaller
      * single plugin's metadata.
      *
      * @param list<string> $files Absolute paths to load in the child.
-     * @return array{class: string, name: string, version: string, routes_count: int, permissions_count: int, sdk_constraint: ?string, core_constraint: ?string}
+     * @return array{class: string, name: string, version: string, routes_count: int, permissions_count: int, permissions: list<string>, sdk_constraint: ?string, core_constraint: ?string}
      * @throws PluginPackageInvalid When the child reports zero/multiple plugins
      *                              or fails to load the package.
      */
@@ -853,6 +977,9 @@ final class PluginInstaller
             'version' => is_string($plugin['version'] ?? null) ? $plugin['version'] : '',
             'routes_count' => is_int($plugin['routes_count'] ?? null) ? $plugin['routes_count'] : 0,
             'permissions_count' => is_int($plugin['permissions_count'] ?? null) ? $plugin['permissions_count'] : 0,
+            'permissions' => is_array($plugin['permissions'] ?? null)
+                ? array_values(array_filter($plugin['permissions'], 'is_string'))
+                : [],
             'sdk_constraint' => is_string($plugin['sdk_constraint'] ?? null) ? $plugin['sdk_constraint'] : null,
             'core_constraint' => is_string($plugin['core_constraint'] ?? null) ? $plugin['core_constraint'] : null,
         ];
@@ -1176,7 +1303,7 @@ final class PluginInstaller
      * Any value failing `^[A-Za-z0-9_-]+$` is rejected — this name becomes a path
      * under plugins/.
      *
-     * @param array{class: string, name: string, version: string, routes_count: int, permissions_count: int, sdk_constraint: ?string, core_constraint: ?string} $meta
+     * @param array{class: string, name: string, version: string, routes_count: int, permissions_count: int, permissions: list<string>, sdk_constraint: ?string, core_constraint: ?string} $meta
      * @param string|null $topDirName The archive top-level dir (zip) or null (single).
      * @return string The validated, safe plugin name.
      * @throws PluginNameUnsafe When the name (or dir) is unsafe or they disagree.
@@ -1212,7 +1339,7 @@ final class PluginInstaller
      * {@see CoreVersion::VERSION} via composer/semver. An unparseable constraint
      * fails closed.
      *
-     * @param array{class: string, name: string, version: string, routes_count: int, permissions_count: int, sdk_constraint: ?string, core_constraint: ?string} $meta
+     * @param array{class: string, name: string, version: string, routes_count: int, permissions_count: int, permissions: list<string>, sdk_constraint: ?string, core_constraint: ?string} $meta
      * @param string $pluginName The plugin's name (for the message; safe).
      * @return void
      * @throws PluginIncompatible When a constraint is unsatisfied/unparseable.
@@ -1495,7 +1622,7 @@ final class PluginInstaller
      *
      * Shape matches a GET /api/v1/plugins item for a freshly staged plugin.
      *
-     * @param array{class: string, name: string, version: string, routes_count: int, permissions_count: int, sdk_constraint: ?string, core_constraint: ?string} $meta
+     * @param array{class: string, name: string, version: string, routes_count: int, permissions_count: int, permissions: list<string>, sdk_constraint: ?string, core_constraint: ?string} $meta
      * @param string $name The plugin name.
      * @param bool $isSingleFile Whether it landed as a single file.
      * @return array{id: string, name: string, enabled: bool, file: string, version: string|null, status: string, routes_count: int|null, permissions_count: int|null}

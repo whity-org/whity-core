@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Whity\Core\Plugin;
 
+use Whity\Core\Request;
 use Whity\Core\Response;
 use Whity\Core\Settings\SettingsService;
 use Whity\Core\Tenant\TenantContext;
@@ -41,5 +42,13 @@ final class PluginOperatorGate
         }
 
         return Response::error('Plugins are installed and changed by the platform operator.', 403);
+    }
+
+    /** The profile acting on this request, for the deployment's plugin records. */
+    public static function actorProfile(Request $request): ?int
+    {
+        $user = $request->user;
+
+        return is_object($user) && isset($user->profile_id) && is_int($user->profile_id) ? $user->profile_id : null;
     }
 }
