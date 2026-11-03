@@ -141,6 +141,7 @@ function fakeEnv(calls: Array<{ method: string; path: string; body?: unknown }>,
           };
         }
         if (method === 'GET' && path.startsWith('/api/v1/forms')) return { status: 200, body: { data: [form] } };
+        if (method === 'POST' && path === '/api/v1/forms/7/member-access') return { status: 200, body: { data: { ...form, open_to_members: true } } };
         if (method === 'PUT') return { status: 200, body: { data: (body as { fields: FieldDraft[] }).fields } };
         return { status: 404, body: null };
       },
@@ -193,6 +194,24 @@ describe('FormBuilderScreen', () => {
     await screen.findByText(/Supplier name/);
     expect(screen.getByText('You can look, not change')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Add question/ })).not.toBeInTheDocument();
+  });
+
+  it('shows the open-to-members switch once the server offers it, and turns it on', async () => {
+    const calls: Array<{ method: string; path: string; body?: unknown }> = [];
+    const env = fakeEnv(calls, { ...FORM, status: 'published', open_to_members: false });
+    render(<FormBuilderScreen env={env} formId={7} canManage />);
+    await screen.findByText(/Supplier name/);
+    await userEvent.click(screen.getByRole('tab', { name: 'Settings' }));
+    await userEvent.click(await screen.findByRole('switch', { name: 'Not open to members' }));
+    await waitFor(() => expect(calls.some((c) => c.method === 'POST' && c.path === '/api/v1/forms/7/member-access')).toBe(true));
+    expect(await screen.findByRole('switch', { name: 'Open to members' })).toBeChecked();
+  });
+
+  it('does not show the switch while the server does not offer it', async () => {
+    render(<FormBuilderScreen env={fakeEnv([])} formId={7} canManage />);
+    await screen.findByText(/Supplier name/);
+    await userEvent.click(screen.getByRole('tab', { name: 'Settings' }));
+    expect(screen.queryByText('Not open to members')).not.toBeInTheDocument();
   });
 
   it('puts the cursor in the wording of a question just added', async () => {
