@@ -415,6 +415,8 @@
         "fields.group.company": "Company",
         "fields.group.document": "Document",
         "fields.group.today": "Today",
+        "fields.inWords.ar": "{field} in words (Arabic)",
+        "fields.inWords.en": "{field} in words (English)",
         "fields.month.april": "April",
         "fields.month.august": "August",
         "fields.month.december": "December",

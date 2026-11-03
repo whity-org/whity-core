@@ -177,6 +177,7 @@ final class CoreTables
         'translations' => '081_create_language_tables.php',
         'two_factor_policies' => '061_create_two_factor_policies.php',
         'two_factor_recovery_requests' => '077_create_two_factor_recovery_requests.php',
+        'two_factor_reminders' => '207_create_two_factor_reminders.php',
         'user_groups' => '116_create_user_groups.php',
         'user_notification_preferences' => '071_create_user_notification_preferences.php',
     ];

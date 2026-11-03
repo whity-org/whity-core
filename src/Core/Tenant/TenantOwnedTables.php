@@ -295,6 +295,7 @@ final class TenantOwnedTables
         // user-scoped rows an admin sets to require 2FA enrollment. Every query
         // binds tenant_id so a policy can never leak across tenants.
         'two_factor_policies' => '061_create_two_factor_policies.php',
+        'two_factor_reminders' => '207_create_two_factor_reminders.php',
 
         // WC-621 — native taxonomy/tagging subsystem (migration 063): tag groups,
         // tags, and polymorphic entity<->tag associations. All three carry

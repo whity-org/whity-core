@@ -2226,7 +2226,8 @@ $statusHandler = new \Whity\Api\StatusApiHandler(
     new \Whity\Core\Health\StatusReport(
         new \Whity\Core\Health\HealthSampleRepository($db->getPdo()),
         $healthProbeRegistry
-    )
+    ),
+    $settingsService
 );
 $router->register('GET', '/api/status', [$statusHandler, 'get'], null);
 
@@ -2471,8 +2472,10 @@ $router->register('POST', '/api/delegations/{id:\d+}/restore', [$delegationsHand
 // (6th positional arg; requiredRole stays null so RbacMiddleware enforces the
 // permission). Tenant-scoped in the handler: the SYSTEM tenant (id 0) sees all
 // tenants, every other tenant sees only its own entries.
-$auditLogHandler = new AuditLogApiHandler($db->getPdo(), $roleChecker);
+$auditLogHandler = new AuditLogApiHandler($db->getPdo(), $roleChecker, $serverLabels, $auditLogger);
 $router->register('GET', '/api/audit-logs', [$auditLogHandler, 'list'], null, null, CorePermissions::AUDIT_READ);
+$router->register('GET', '/api/audit-logs/facets', [$auditLogHandler, 'facets'], null, null, CorePermissions::AUDIT_READ);
+$router->register('GET', '/api/audit-logs/export', [$auditLogHandler, 'export'], null, null, CorePermissions::AUDIT_READ);
 
 // 13a. Self-service analogue (no permission gate — every authenticated user
 // may see their OWN activity; requiredPermission stays null and listOwn()
@@ -2652,11 +2655,13 @@ $router->register('DELETE', '/api/storage-config', [$tenantStorageConfigHandler,
 $twoFactorPoliciesHandler = new \Whity\Api\TwoFactorPoliciesApiHandler(
     $db->getPdo(),
     $twoFactorPolicyResolver,
-    $auditLogger
+    $auditLogger,
+    $hookManager
 );
 $router->register('GET',    '/api/2fa-policies',        [$twoFactorPoliciesHandler, 'list'],   null, null, CorePermissions::SECURITY_MANAGE);
 $router->register('POST',   '/api/2fa-policies',        [$twoFactorPoliciesHandler, 'create'], null, null, CorePermissions::SECURITY_MANAGE);
 $router->register('GET',    '/api/2fa-policies/status', [$twoFactorPoliciesHandler, 'status'], null, null, CorePermissions::SECURITY_MANAGE);
+$router->register('POST',   '/api/2fa-policies/remind', [$twoFactorPoliciesHandler, 'remind'], null, null, CorePermissions::SECURITY_MANAGE);
 $router->register('PATCH',  '/api/2fa-policies/{id:\d+}', [$twoFactorPoliciesHandler, 'update'], null, null, CorePermissions::SECURITY_MANAGE);
 $router->register('DELETE', '/api/2fa-policies/{id:\d+}', [$twoFactorPoliciesHandler, 'delete'], null, null, CorePermissions::SECURITY_MANAGE);
 
@@ -2882,7 +2887,8 @@ $externalBillingHandler = new \Whity\Api\ExternalBillingApiHandler(
     $db->getPdo(),
     // The payer returns to a frontend page (/billing, /billing/return).
     $frontendUrls->base(),
-    $logger
+    $logger,
+    $auditLogger
 );
 
 $router->register('POST', '/api/billing/checkout', [$externalBillingHandler, 'checkout'], null, null, CorePermissions::BILLING_PAY);
@@ -2899,6 +2905,8 @@ $router->register('GET',  '/api/billing/receipts', [$externalBillingHandler, 're
 // a PLAN swap would mean cancelling and buying again, which either double-charges
 // or leaves a gap, so it is refused rather than faked.
 $router->register('POST', '/api/billing/quantity', [$externalBillingHandler, 'changeQuantity'], null, null, CorePermissions::BILLING_PAY);
+// A tier change moves the subscription we hold; a second checkout would open another.
+$router->register('POST', '/api/billing/change-plan', [$externalBillingHandler, 'changePlan'], null, null, CorePermissions::BILLING_PAY);
 
 // UNAUTHENTICATED, NECESSARILY: the sender is a server and holds no session.
 // Registering it here is only half the job — EnforceTenantIsolation must also
@@ -5407,13 +5415,15 @@ if ($isWorker) {
             } catch (\Throwable $e) {
                 // Handle any uncaught exceptions
                 try {
-                    $errorResponse = Response::error('Internal server error', 500);
+                    $requestId = \Whity\Core\Observability\ErrorReference::mint();
+                    $errorResponse = Response::json(['error' => 'Internal server error', 'reference' => $requestId], 500);
                     // The 500 path is a response a client can receive, so it gets the
                     // hardening headers too (WC-187).
                     $errorHeaders = array_merge(
                         $errorResponse->getHeaders(),
                         Cors::headers($_SERVER['HTTP_ORIGIN'] ?? null),
-                        $securityHeaders
+                        $securityHeaders,
+                        [\Whity\Core\Observability\ErrorReference::HEADER => $requestId]
                     );
                     $errorResponse = new Response(500, $errorResponse->getBody(), $errorHeaders);
                     $errorResponse->send();
@@ -5421,7 +5431,6 @@ if ($isWorker) {
                     // If send also fails, just log it
                     error_log('Failed to send error response: ' . $sendError->getMessage());
                 }
-                $requestId = \Whity\Core\Observability\ErrorContext::newRequestId();
                 try {
                     $errorTracker->captureException(
                         $e,
@@ -5540,13 +5549,15 @@ if ($isWorker) {
     } catch (\Throwable $e) {
         // Handle any uncaught exceptions
         try {
-            $errorResponse = Response::error('Internal server error', 500);
+            $requestId = \Whity\Core\Observability\ErrorReference::mint();
+            $errorResponse = Response::json(['error' => 'Internal server error', 'reference' => $requestId], 500);
             // The 500 path is a response a client can receive, so it gets the
             // hardening headers too (WC-187).
             $errorHeaders = array_merge(
                 $errorResponse->getHeaders(),
                 Cors::headers($_SERVER['HTTP_ORIGIN'] ?? null),
-                $securityHeaders
+                $securityHeaders,
+                [\Whity\Core\Observability\ErrorReference::HEADER => $requestId]
             );
             $errorResponse = new Response(500, $errorResponse->getBody(), $errorHeaders);
             $errorResponse->send();
@@ -5554,7 +5565,6 @@ if ($isWorker) {
             // If send also fails, just log it
             error_log('Failed to send error response: ' . $sendError->getMessage());
         }
-        $requestId = \Whity\Core\Observability\ErrorContext::newRequestId();
         try {
             $errorTracker->captureException(
                 $e,

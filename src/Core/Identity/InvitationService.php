@@ -321,7 +321,7 @@ final class InvitationService
      * HERE and only here — the caller holds a valid single-use token, which is
      * the same proof of mailbox control a password-reset link demands.
      *
-     * @return array{tenant_id: int, tenant_name: string, email: string, requires_password: bool}|null
+     * @return array{tenant_id: int, tenant_name: string, email: string, requires_password: bool, inviter_name: string|null, role_name: string|null}|null
      *         null for an unknown, expired, revoked, superseded or already-used
      *         token — the four are deliberately indistinguishable.
      */
@@ -337,6 +337,9 @@ final class InvitationService
             'tenant_name' => (string) ($row['tenant_name'] ?? ''),
             'email' => (string) $row['email'],
             'requires_password' => $this->profileIdForEmail((string) $row['email']) === null,
+            // TplAuthInvite: who invited you, to what, as which role.
+            'inviter_name' => isset($row['inviter_name']) && $row['inviter_name'] !== '' ? (string) $row['inviter_name'] : null,
+            'role_name' => isset($row['role_name']) ? (string) $row['role_name'] : null,
         ];
     }
 
@@ -516,9 +519,12 @@ final class InvitationService
 
         // @tenant-guard-ignore: reached from the PUBLIC accept endpoint, which has no tenant context by construction — the 256-bit single-use token is the authority, and the row's own tenant_id is what the membership is then created in
         $stmt = $this->db->prepare(
-            'SELECT i.id, i.tenant_id, i.email, i.role_id, i.ou_id, t.name AS tenant_name
+            'SELECT i.id, i.tenant_id, i.email, i.role_id, i.ou_id, t.name AS tenant_name,
+                    p.display_name AS inviter_name, r.name AS role_name
                FROM invitations i
                LEFT JOIN tenants t ON t.id = i.tenant_id
+               LEFT JOIN profiles p ON p.id = i.invited_by
+               LEFT JOIN roles r ON r.id = i.role_id AND (r.tenant_id IS NULL OR r.tenant_id = i.tenant_id)
               WHERE i.token_hash = :hash AND i.status = :pending AND i.expires_at > :now
               LIMIT 1'
         );

@@ -375,6 +375,133 @@
                 ]
             }
         },
+        "/api/v1/2fa-policies/remind": {
+            "post": {
+                "operationId": "post_api_v1_2fa_policies_remind",
+                "summary": "Remind one person to set up two-step sign-in",
+                "tags": [
+                    "security"
+                ],
+                "description": "Only somebody a rule in this workspace covers and who has not set it up, and once a day per person.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/TwoFactorRemindRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Reminder sent",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TwoFactorRemindResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No rule in this workspace covers that person",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "That person has already set it up",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "profile_id is required",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Already reminded today",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/2fa-policies/status": {
             "get": {
                 "operationId": "get_api_v1_2fa_policies_status",
@@ -3049,6 +3176,24 @@
                         }
                     },
                     {
+                        "name": "agent",
+                        "in": "query",
+                        "required": false,
+                        "description": "Filter by agent principal, as listed by /api/audit-logs/facets",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "area",
+                        "in": "query",
+                        "required": false,
+                        "description": "Filter by area, as listed by /api/audit-logs/facets. An unknown area matches nothing.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
                         "name": "target_type",
                         "in": "query",
                         "required": false,
@@ -3110,6 +3255,253 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/AuditLogListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/audit-logs/export": {
+            "get": {
+                "operationId": "get_api_v1_audit_logs_export",
+                "summary": "The matching audit entries as a CSV",
+                "tags": [
+                    "audit-logs"
+                ],
+                "description": "The same rows, tenant scope and filters as GET /api/audit-logs, newest first. A cell a spreadsheet would run as a formula starts with an apostrophe. `technical=1` adds event codes, ids and IP addresses. More than 50000 rows is refused with 422 rather than cut short; choose a shorter period.",
+                "parameters": [
+                    {
+                        "name": "actor",
+                        "in": "query",
+                        "required": false,
+                        "description": "Filter by actor user id",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "agent",
+                        "in": "query",
+                        "required": false,
+                        "description": "Filter by agent principal",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "area",
+                        "in": "query",
+                        "required": false,
+                        "description": "Filter by area",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "action",
+                        "in": "query",
+                        "required": false,
+                        "description": "Exact action match",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "target_type",
+                        "in": "query",
+                        "required": false,
+                        "description": "Filter by target type",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "target_id",
+                        "in": "query",
+                        "required": false,
+                        "description": "Filter by target id",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "required": false,
+                        "description": "Inclusive ISO-8601 lower bound",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "required": false,
+                        "description": "Inclusive ISO-8601 upper bound",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "technical",
+                        "in": "query",
+                        "required": false,
+                        "description": "1 adds event codes, ids and IP addresses",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The CSV, UTF-8 with a byte order mark",
+                        "content": {
+                            "text/csv": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Too many entries to export at once",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/audit-logs/facets": {
+            "get": {
+                "operationId": "get_api_v1_audit_logs_facets",
+                "summary": "Who, which agents and which areas the audit filters can offer, by name",
+                "tags": [
+                    "audit-logs"
+                ],
+                "description": "Only people and agents in rows the caller could already read. The system tenant reads every workspace, so it sees all of them.",
+                "responses": {
+                    "200": {
+                        "description": "The filter options",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuditLogFacetsResponse"
                                 }
                             }
                         }
@@ -4263,6 +4655,133 @@
                         }
                     }
                 }
+            }
+        },
+        "/api/v1/billing/change-plan": {
+            "post": {
+                "operationId": "post_api_v1_billing_change_plan",
+                "summary": "Move this workspace's subscription to another plan",
+                "tags": [
+                    "billing"
+                ],
+                "description": "A second checkout would open a second subscription, so a tier change moves the one this deployment already holds. A dearer plan is charged now for the rest of the period; a cheaper one starts at renewal with nothing refunded. Either way the amount is the billing service's, so none is quoted here. `idempotency_key` is one per confirmed change, and makes a retry after a timeout safe.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/BillingChangePlanRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The change was accepted",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BillingChangePlanResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "This deployment does not sell subscriptions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Already on that plan, or no active subscription to change",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Unknown plan, an add-on, or a bad idempotency key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "The billing service refused or could not be reached",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
             }
         },
         "/api/v1/billing/checkout": {
@@ -50169,6 +50688,65 @@
                     "createdAt": {
                         "type": "string",
                         "nullable": true
+                    },
+                    "actor": {
+                        "type": "object",
+                        "properties": {
+                            "kind": {
+                                "type": "string",
+                                "enum": [
+                                    "person",
+                                    "agent",
+                                    "system"
+                                ]
+                            },
+                            "name": {
+                                "type": "string"
+                            },
+                            "agent": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "forPerson": {
+                                "type": "string",
+                                "nullable": true
+                            }
+                        },
+                        "required": [
+                            "kind",
+                            "name",
+                            "agent",
+                            "forPerson"
+                        ]
+                    },
+                    "target": {
+                        "type": "object",
+                        "nullable": true,
+                        "properties": {
+                            "type": {
+                                "type": "string"
+                            },
+                            "name": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "type",
+                            "name"
+                        ]
+                    },
+                    "sentence": {
+                        "type": "string"
+                    },
+                    "sentenceTemplate": {
+                        "type": "string"
+                    },
+                    "area": {
+                        "type": "string"
+                    },
+                    "how": {
+                        "type": "string",
+                        "nullable": true
                     }
                 },
                 "required": [
@@ -50180,7 +50758,85 @@
                     "targetId",
                     "metadata",
                     "ipAddress",
-                    "createdAt"
+                    "createdAt",
+                    "actor",
+                    "target",
+                    "sentence",
+                    "sentenceTemplate",
+                    "area",
+                    "how"
+                ]
+            },
+            "AuditLogFacetsResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "people": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "id": {
+                                            "type": "integer"
+                                        },
+                                        "name": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "id",
+                                        "name"
+                                    ]
+                                }
+                            },
+                            "agents": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "id": {
+                                            "type": "string"
+                                        },
+                                        "name": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "id",
+                                        "name"
+                                    ]
+                                }
+                            },
+                            "areas": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "id": {
+                                            "type": "string"
+                                        },
+                                        "name": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "id",
+                                        "name"
+                                    ]
+                                }
+                            }
+                        },
+                        "required": [
+                            "people",
+                            "agents",
+                            "areas"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
                 ]
             },
             "AuditLogListResponse": {
@@ -50417,6 +51073,54 @@
                         },
                         "required": [
                             "has_access"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "BillingChangePlanRequest": {
+                "type": "object",
+                "properties": {
+                    "plan_key": {
+                        "type": "string",
+                        "description": "The plan to move to, from the list of plans this workspace can buy."
+                    },
+                    "billing_period": {
+                        "type": "string",
+                        "description": "month or year. Leave it out to keep the plan's only price."
+                    },
+                    "idempotency_key": {
+                        "type": "string",
+                        "description": "8 to 64 characters, new for each confirmed change and the same on a retry of it."
+                    }
+                },
+                "required": [
+                    "plan_key",
+                    "idempotency_key"
+                ]
+            },
+            "BillingChangePlanResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "plan_key": {
+                                "type": "string"
+                            },
+                            "takes_effect": {
+                                "type": "string",
+                                "enum": [
+                                    "now",
+                                    "renewal"
+                                ]
+                            }
+                        },
+                        "required": [
+                            "plan_key",
+                            "takes_effect"
                         ]
                     }
                 },
@@ -58182,12 +58886,22 @@
                             },
                             "requires_password": {
                                 "type": "boolean"
+                            },
+                            "inviter_name": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "role_name": {
+                                "type": "string",
+                                "nullable": true
                             }
                         },
                         "required": [
                             "email",
                             "tenant_name",
-                            "requires_password"
+                            "requires_password",
+                            "inviter_name",
+                            "role_name"
                         ]
                     }
                 },
@@ -58309,6 +59023,23 @@
                         "items": {
                             "$ref": "#/components/schemas/PaymentTransaction"
                         }
+                    },
+                    "total_in_words": {
+                        "type": "object",
+                        "properties": {
+                            "en": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "ar": {
+                                "type": "string",
+                                "nullable": true
+                            }
+                        },
+                        "required": [
+                            "en",
+                            "ar"
+                        ]
                     }
                 }
             },
@@ -63045,6 +63776,9 @@
                     "plan_key": {
                         "type": "string"
                     },
+                    "is_current": {
+                        "type": "boolean"
+                    },
                     "name": {
                         "type": "string"
                     },
@@ -65499,6 +66233,44 @@
                     "createdAt": {
                         "type": "string",
                         "nullable": true
+                    },
+                    "plan": {
+                        "type": "object",
+                        "nullable": true,
+                        "properties": {
+                            "key": {
+                                "type": "string"
+                            },
+                            "name": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "key",
+                            "name"
+                        ]
+                    },
+                    "status": {
+                        "type": "object",
+                        "properties": {
+                            "state": {
+                                "type": "string",
+                                "enum": [
+                                    "active",
+                                    "trial",
+                                    "overdue",
+                                    "suspended"
+                                ]
+                            },
+                            "daysLeft": {
+                                "type": "integer",
+                                "nullable": true
+                            }
+                        },
+                        "required": [
+                            "state",
+                            "daysLeft"
+                        ]
                     }
                 },
                 "required": [
@@ -65506,7 +66278,9 @@
                     "name",
                     "slug",
                     "userCount",
-                    "createdAt"
+                    "createdAt",
+                    "plan",
+                    "status"
                 ]
             },
             "TenantCreateRequest": {
@@ -66869,6 +67643,10 @@
                     "grace_period_days": {
                         "type": "integer"
                     },
+                    "scope_name": {
+                        "type": "string",
+                        "nullable": true
+                    },
                     "created_by": {
                         "type": "integer",
                         "nullable": true
@@ -66944,6 +67722,9 @@
                     "profile_id": {
                         "type": "integer"
                     },
+                    "name": {
+                        "type": "string"
+                    },
                     "email": {
                         "type": "string"
                     },
@@ -66953,13 +67734,19 @@
                     "enforcement_deadline": {
                         "type": "integer",
                         "nullable": true
+                    },
+                    "last_reminded_at": {
+                        "type": "string",
+                        "nullable": true
                     }
                 },
                 "required": [
                     "profile_id",
+                    "name",
                     "email",
                     "enrolled",
-                    "enforcement_deadline"
+                    "enforcement_deadline",
+                    "last_reminded_at"
                 ]
             },
             "TwoFactorPolicyStatusResponse": {
@@ -67022,6 +67809,41 @@
                         "required": [
                             "status",
                             "message"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "TwoFactorRemindRequest": {
+                "type": "object",
+                "properties": {
+                    "profile_id": {
+                        "type": "integer",
+                        "description": "The person to remind, from the two-step status list."
+                    }
+                },
+                "required": [
+                    "profile_id"
+                ]
+            },
+            "TwoFactorRemindResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "profile_id": {
+                                "type": "integer"
+                            },
+                            "last_reminded_at": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "profile_id",
+                            "last_reminded_at"
                         ]
                     }
                 },
