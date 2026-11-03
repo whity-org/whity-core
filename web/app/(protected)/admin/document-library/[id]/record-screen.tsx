@@ -61,18 +61,16 @@
  * ─────────────────────────────────────────────────────────────────────────────
  * NAMES, AND WHAT HAPPENS WHEN THIS CALLER MAY NOT SEE THEM
  * ─────────────────────────────────────────────────────────────────────────────
- * The trail and the recipient rows are made of ids. Turning `actor_profile_id`
- * into a person needs `users:read` and turning `origin_ou_id` into a unit needs
- * `ous:read` — two gates that have nothing to do with `documents:read`, and
- * migration 101 removed `ous:read` from the plain user role, so a reader with
- * neither is an ordinary state.
+ * The trail and the recipient rows are made of ids. The people come from
+ * `GET .../people` (S5), which names everybody on this record to anybody who may
+ * read it, so no directory permission is involved. Turning `origin_ou_id` into a
+ * unit needs `ous:read`, and migration 101 removed that from the plain user role,
+ * so a reader without it is an ordinary state.
  *
- * So the directory is fetched best-effort and its ABSENCE IS REPORTED. Ids
- * render as `Account #42` / `Unit #7` with a notice above the region saying which
- * permission would have named them — the pattern the organizer next door already
- * uses for the same reason. Printing a bare `#7` with no explanation is what
- * #951 is about: the reader cannot tell a permission boundary from a data bug,
- * and the one who could have fixed it is usually the one who cannot tell.
+ * So the units are fetched best-effort and their ABSENCE IS REPORTED: they render
+ * as `Unit #7` with a notice above the region saying which permission would have
+ * named them. Printing a bare `#7` with no explanation is what #951 is about: the
+ * reader cannot tell a permission boundary from a data bug.
  */
 
 import { useCallback, useMemo, useState } from 'react';
@@ -88,7 +86,9 @@ import {
 import type { RecordFactsFn, RecordSectionSpec } from '@whity/features/record';
 import { useTranslation } from '@whity/features/i18n';
 import { Tabs, TabsList, TabsTrigger } from '@whity/ui/tabs';
+import { Alert, AlertDescription, AlertTitle } from '@whity/ui/alert';
 import { Button } from '@whity/ui/button';
+import { useDateDisplay } from '@whity/features/datetime';
 import { useAuth } from '@/lib/auth-context';
 import { fetchAllPages } from '@/lib/api/fetch-all-pages';
 import { DocumentViewer } from '@/components/plugin/blocks/document-viewer';
@@ -291,6 +291,7 @@ export interface DocumentRecordScreenProps {
 export function DocumentRecordScreen({ documentId, onBack }: DocumentRecordScreenProps) {
   const { apiClient, user } = useAuth();
   const t = useTranslation('documents');
+  const dates = useDateDisplay();
   const [trailPage, setTrailPage] = useState(FIRST_PAGE);
   // The address names the tab (`?tab=routing`), so a link and the old
   // circulation address land on it. The tab body only renders once the record
@@ -430,21 +431,17 @@ export function DocumentRecordScreen({ documentId, onBack }: DocumentRecordScree
   // readable with ids in place of names.
   const directory = useRecordResource<Directory>(
     async () => {
-      const [peopleResult, unitsResult] = await Promise.all([
-        fetchAllPages<{ id: number; name?: string; email?: string }>(apiClient, '/api/v1/users'),
+      const [peopleResponse, unitsResult] = await Promise.all([
+        // The people on THIS record (S5), so naming them needs no directory.
+        apiClient(`/api/v1/documents/${documentId}/people`),
         fetchAllPages<{ id: number; name: string }>(apiClient, '/api/v1/ous'),
       ]);
 
       const people = new Map<number, string>();
-      if (peopleResult.complete) {
-        for (const person of peopleResult.items) {
-          // The email, falling back to the derived `name` the users endpoint
-          // synthesises from its local part. There is no name column in the
-          // identity model, so the email IS how a person is identified here.
-          const label = person.name !== undefined && person.name !== '' ? person.name : person.email;
-          if (label !== undefined && label !== '') {
-            people.set(person.id, label);
-          }
+      if (peopleResponse.ok) {
+        const body = (await peopleResponse.json()) as { data?: Record<string, string> };
+        for (const [id, name] of Object.entries(body.data ?? {})) {
+          people.set(Number(id), name);
         }
       }
 
@@ -458,10 +455,8 @@ export function DocumentRecordScreen({ documentId, onBack }: DocumentRecordScree
       return {
         people,
         units,
-        // A PARTIAL walk counts as unavailable, not as available-and-short. A
-        // directory missing rows would name some ids and silently number
-        // others, which reads as "these two people were deleted".
-        peopleAvailable: peopleResult.complete,
+        peopleAvailable: peopleResponse.ok,
+        // A PARTIAL walk counts as unavailable, not as available-and-short.
         unitsAvailable: unitsResult.complete,
       };
     },
@@ -532,6 +527,12 @@ export function DocumentRecordScreen({ documentId, onBack }: DocumentRecordScree
   const recipientsSettled = recipients.status === 'ready';
   const recipientRows: readonly RouteRecipient[] = recipientsSettled ? recipients.value : [];
 
+  const withdrawn = (record.withdrawn_at ?? null) !== null;
+  const withdrawnBy = personName(t, resolvedDirectory, record.withdrawn_by ?? null);
+  const withdrawnWhen = dates.dateTime(record.withdrawn_at);
+  // Only once the answer is in, so the notice does not flash while it loads.
+  const namesFailed = directory.status !== 'loading' && !resolvedDirectory.peopleAvailable;
+
   const fields: DocumentRecordFields = {
     title: record.title,
     templateName: record.template_name,
@@ -600,7 +601,7 @@ export function DocumentRecordScreen({ documentId, onBack }: DocumentRecordScree
     access: trailAccess,
     editor: (
       <div className="space-y-3">
-        {!resolvedDirectory.peopleAvailable && <DirectoryNotice kind="people" t={t} />}
+        {namesFailed && <DirectoryNotice kind="people" t={t} />}
         {!resolvedDirectory.unitsAvailable && <DirectoryNotice kind="units" t={t} />}
         {trail.status === 'error' ? (
           <p className="text-sm text-destructive">{trail.message}</p>
@@ -631,10 +632,12 @@ export function DocumentRecordScreen({ documentId, onBack }: DocumentRecordScree
     // would have to happen for there to be a trail at all.
     readOnly: (
       <p className="text-sm text-muted-foreground" data-testid="document-record-no-trail">
-        {t(
-          'record.trail.none',
-          'Nothing has been recorded against this document. A trail begins when it is sent into a route, and every step it takes is appended here.'
-        )}
+        {withdrawn
+          ? t('record.trail.noneWithdrawn', 'It was withdrawn without ever being sent into a route.')
+          : t(
+              'record.trail.none',
+              'Nothing has been recorded against this document. A trail begins when it is sent into a route, and every step it takes is appended here.'
+            )}
       </p>
     ),
   };
@@ -648,16 +651,14 @@ export function DocumentRecordScreen({ documentId, onBack }: DocumentRecordScree
       // column to disagree with.
       versionCount={record.artifacts.length}
       directory={resolvedDirectory}
-      canWrite={qrAccess.state === 'editable'}
+      canWrite={qrAccess.state === 'editable' && !withdrawn}
       // Handed DOWN rather than rendered here, unlike the two regions above.
       // Those always list people; this one often lists none — a document with no
       // code and no signed-in scanner numbers nobody — and a notice explaining
       // why ids are showing, above a panel showing no ids, is a true sentence
       // about nothing on screen. The panel renders it when it has somebody to
       // number, and the copy still lives in one place.
-      directoryNotice={
-        resolvedDirectory.peopleAvailable ? undefined : <DirectoryNotice kind="people" t={t} />
-      }
+      directoryNotice={namesFailed ? <DirectoryNotice kind="people" t={t} /> : undefined}
       apiClient={apiClient}
     />
   );
@@ -680,6 +681,7 @@ export function DocumentRecordScreen({ documentId, onBack }: DocumentRecordScree
     <DocumentRoutingPanel
       documentId={record.id}
       documentTitle={record.title}
+      withdrawn={withdrawn}
       onChanged={() => undefined}
     />
   );
@@ -710,7 +712,7 @@ export function DocumentRecordScreen({ documentId, onBack }: DocumentRecordScree
             </TabsTrigger>
           </TabsList>
         </Tabs>
-        <DocumentHeaderActions record={record} />
+        <DocumentHeaderActions record={record} onWithdrawn={() => window.location.reload()} />
       </div>
       {awaitingYou && (
         <p
@@ -724,6 +726,24 @@ export function DocumentRecordScreen({ documentId, onBack }: DocumentRecordScree
             </Button>
           )}
         </p>
+      )}
+      {withdrawn && (
+        <Alert variant="destructive" data-testid="document-record-withdrawn">
+          <AlertTitle>{t('record.withdrawn.title', 'This document was withdrawn')}</AlertTitle>
+          <AlertDescription>
+            {withdrawnWhen === null
+              ? t(
+                  'record.withdrawn.bodyNoDate',
+                  '{who} withdrew it. The record is kept, but its codes no longer confirm anything and nothing further can happen on its routes.',
+                  { who: withdrawnBy }
+                )
+              : t(
+                  'record.withdrawn.body',
+                  '{who} withdrew it {when}. The record is kept, but its codes no longer confirm anything and nothing further can happen on its routes.',
+                  { who: withdrawnBy, when: withdrawnWhen }
+                )}
+          </AlertDescription>
+        </Alert>
       )}
       {legacyNotice(record, t)}
     </div>
@@ -776,7 +796,7 @@ function DirectoryNotice({ kind, t }: { kind: 'people' | 'units'; t: Translate }
       {kind === 'people'
         ? t(
             'record.directory.people',
-            'People are shown by account number: naming them needs the users:read permission.'
+            'The names of the people on this document could not be loaded just now.'
           )
         : t(
             'record.directory.units',

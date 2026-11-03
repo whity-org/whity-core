@@ -28,11 +28,10 @@
  *
  * NAMES ARE BEST-EFFORT, AND SAY SO WHEN THEY ARE MISSING
  * ------------------------------------------------------
- * `GET .../recipients` publishes `profile_id` and no display name, and there is
- * no batch profile-name endpoint. So names come from `GET /api/v1/users`,
- * best-effort, and anything not covered renders as its id with a visible note —
- * the pattern the document organizer already uses for unit names ("shown by
- * id"). Never a blank, never a guess (#756).
+ * `GET .../recipients` publishes `profile_id` and no display name. The names
+ * come from `GET .../people` (S5), which names everybody on this record to anybody
+ * who may read it. Someone it does not name has left the workspace. Never a blank,
+ * never a guess (#756).
  *
  * The rejected alternative was `GET /api/v1/users/{id}` per recipient. A step
  * whose rule is "everyone holding a role" can resolve to four figures of people,
@@ -92,11 +91,13 @@ export interface DocumentRoutingPanelProps {
   documentId: number;
   /** The record's title, which the composer names the document by. */
   documentTitle: string;
+  /** A withdrawn document cannot be sent again: the button stays, disabled with why. */
+  withdrawn?: boolean;
   /** Called after anything the person did changes where the document is, so the record header can refresh. */
   onChanged?: () => void;
 }
 
-export function DocumentRoutingPanel({ documentId, documentTitle, onChanged }: DocumentRoutingPanelProps) {
+export function DocumentRoutingPanel({ documentId, documentTitle, withdrawn = false, onChanged }: DocumentRoutingPanelProps) {
   const t = useTranslation('documents');
   const dates = useDateDisplay();
   const { apiClient, user } = useAuth();
@@ -370,6 +371,13 @@ export function DocumentRoutingPanel({ documentId, documentTitle, onChanged }: D
     };
   }, [apiClient]);
 
+  const recordPeople = useFetch<Map<number, string>>(async () => {
+    const response = await apiClient(`/api/v1/documents/${documentId}/people`);
+    if (!response.ok) return new Map<number, string>();
+    const body = (await response.json()) as { data?: Record<string, string> };
+    return new Map(Object.entries(body.data ?? {}).map(([id, name]) => [Number(id), name]));
+  }, [apiClient, documentId]);
+
   const roleNames = useMemo(() => {
     const map = new Map<number, string>();
     for (const role of rolesResult.data?.items ?? []) map.set(role.id, role.name);
@@ -391,10 +399,12 @@ export function DocumentRoutingPanel({ documentId, documentTitle, onChanged }: D
 
   // Fail-closed while capabilities are in flight, matching the house policy:
   // an unresolved permission renders no write control rather than one that 403s.
-  const canRoute = !capsLoading && has(DOCUMENTS_ROUTE);
+  const canRoute = !capsLoading && has(DOCUMENTS_ROUTE) && !withdrawn;
   const routeDeniedReason = capsLoading
     ? t('routing.gate.loading', 'Checking what you may do…')
-    : t('routing.gate.denied', 'Requires {slug}', { slug: DOCUMENTS_ROUTE });
+    : withdrawn
+      ? t('routing.gate.withdrawn', 'This document was withdrawn, so it cannot be sent.')
+      : t('routing.gate.denied', 'Requires {slug}', { slug: DOCUMENTS_ROUTE });
 
   return (
     <div className="space-y-6">
@@ -567,7 +577,7 @@ export function DocumentRoutingPanel({ documentId, documentTitle, onChanged }: D
                     <RouteFanout
                       route={route}
                       recipients={recipientRows}
-                      profileNames={peopleResult.data?.names ?? new Map()}
+                      profileNames={recordPeople.data ?? new Map()}
                       roleNames={roleNames}
                       viewerProfileId={viewerProfileId}
                     />

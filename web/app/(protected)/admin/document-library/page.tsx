@@ -7,6 +7,7 @@ import { useFetch } from '@/hooks/useFetch';
 import { fetchAllPages } from '@/lib/api/fetch-all-pages';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
+import { Badge } from '@whity/ui/badge';
 import { Button } from '@whity/ui/button';
 import { IconFilePlus } from '@tabler/icons-react';
 import { useTranslation } from '@whity/features/i18n';
@@ -281,15 +282,6 @@ export default function DocumentLibraryPage() {
     return result.items;
   }, [apiClient]);
 
-  // Names for "Raised by". A viewer who cannot list people gets "Account #id"
-  // for the few rows they can see, until the server returns names (S5).
-  const people = useFetch<Map<number, string>>(async () => {
-    const result = await fetchAllPages<{ id: number; name?: string; email?: string }>(apiClient, '/api/v1/users').catch(
-      () => null
-    );
-    return new Map((result?.items ?? []).map((p) => [p.id, p.name || p.email || '']));
-  }, [apiClient]);
-
   const selectedView: DocumentView | null = useMemo(() => {
     const all = views.data?.data ?? [];
     return all.find((v) => v.key === viewKey) ?? null;
@@ -337,6 +329,9 @@ export default function DocumentLibraryPage() {
     }
     return (await response.json()) as DocumentListResponse;
   }, [apiClient, viewKey, collectionId, anchorOuId, page, appliedSearch, sortField, sortDirection]);
+
+  // Who these rows name, sent with the page (S5), so no directory is needed.
+  const people = useMemo(() => documents.data?.people ?? {}, [documents.data]);
 
   // `refetch` is stable (useFetch memoises it with no deps); the fetch RESULT
   // object is not, so the mutations below depend on these rather than on
@@ -582,6 +577,11 @@ export default function DocumentLibraryPage() {
               <DocumentTitle row={row} />
               <span dir="auto" className="block truncate text-sm text-muted-foreground">
                 {row.template_name}
+                {(row.withdrawn_at ?? null) !== null && (
+                  <Badge variant="destructive" className="ms-2" data-testid="library-withdrawn">
+                    {t('organizer.table.withdrawn', 'Withdrawn')}
+                  </Badge>
+                )}
               </span>
             </div>
           </div>
@@ -596,8 +596,7 @@ export default function DocumentLibraryPage() {
               ? '—'
               : row.created_by === user?.id
                 ? t('organizer.table.you', 'You')
-                : people.data?.get(row.created_by) ||
-                  t('organizer.table.account', 'Account #{id}', { id: row.created_by })}
+                : people[String(row.created_by)] ?? t('organizer.table.former', 'A former member')}
           </span>
         ),
       },
@@ -625,7 +624,7 @@ export default function DocumentLibraryPage() {
         cell: (row) => String(row.artifacts.length),
       },
     ],
-    [busy, dates, ouName, people.data, t, toggleStar, user?.id]
+    [busy, dates, ouName, people, t, toggleStar, user?.id]
   );
 
   const listError = documents.error;

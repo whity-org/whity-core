@@ -187,6 +187,9 @@ export const DOCUMENTS_RENDER = 'documents:render';
  */
 export const DOCUMENTS_ISSUE = 'documents:issue';
 
+/** Taking an issued document back (S5). It keeps the record and cannot be undone. */
+export const DOCUMENTS_WITHDRAW = 'documents:withdraw';
+
 /**
  * Document ROUTE TEMPLATES (#1027) — the reusable, branching flow designs the
  * node-based editor edits.

@@ -526,6 +526,8 @@ export interface RoutingItemMeta {
    * learn what kind of thing you are holding.
    */
   decision: boolean;
+  /** S5: the document was withdrawn, so this item was taken away rather than done. */
+  document_withdrawn: boolean;
 }
 
 /**
@@ -572,6 +574,7 @@ export function routingMeta(item: InboxItem): RoutingItemMeta | null {
     // read as false, which is also what it MEANT before decision steps existed:
     // absence of a verdict has never meant a verdict.
     decision: meta['decision'] === true,
+    document_withdrawn: meta['document_withdrawn'] === true,
   };
 }
 

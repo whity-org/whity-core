@@ -86,12 +86,10 @@ function actionLabel(t: (key: string, fallback?: string) => string, action: stri
 /**
  * How this page names a person.
  *
- * Three outcomes, and they must stay three: a name when the directory answered,
- * `#42` when the directory was WITHHELD (the screen prints the reason beside the
- * list — see `DocumentTrail`), and "the system" when the column is null, which
- * migration 112 uses for an actor that is gone (`ON DELETE SET NULL`). Folding
- * the second and third together would tell a reader an absent actor is a
- * permission problem, or the reverse.
+ * A name when the server gave one, a sentence when they have left this workspace
+ * or the names could not be loaded, and "an account that no longer exists" when
+ * the column is null, which migration 112 uses for an actor that is gone
+ * (`ON DELETE SET NULL`). Never an id.
  */
 export function personName(
   t: (key: string, fallback?: string, vars?: Record<string, string | number>) => string,
@@ -105,7 +103,11 @@ export function personName(
   if (known !== undefined) {
     return known;
   }
-  return t('record.person.byId', 'Account #{id}', { id: profileId });
+  // The server names everybody on a record who is still in this workspace (S5),
+  // so a missing entry means they have left, once the names have arrived.
+  return directory.peopleAvailable
+    ? t('record.person.former', 'A former member')
+    : t('record.person.unknown', 'Someone in this workspace');
 }
 
 /** The same three outcomes for a unit. */

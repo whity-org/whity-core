@@ -45,6 +45,9 @@ export interface DocumentRecord {
   origin_ou_id: number | null;
   created_by: number | null;
   created_at: string;
+  /** Set when the document was withdrawn. The record stays readable. */
+  withdrawn_at?: string | null;
+  withdrawn_by?: number | null;
   content_url: string | null;
   artifacts: DocumentArtifact[];
   collection_ids?: number[];
@@ -136,6 +139,10 @@ export interface RouteRecipient {
 export interface Directory {
   people: ReadonlyMap<number, string>;
   units: ReadonlyMap<number, string>;
+  /**
+   * Whether the record's names arrived. False means they could not be loaded,
+   * so a person with no entry is unknown here rather than gone from the workspace.
+   */
   peopleAvailable: boolean;
   unitsAvailable: boolean;
 }

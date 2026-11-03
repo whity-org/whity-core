@@ -74,9 +74,8 @@ export interface RouteFanoutProps {
   /**
    * Display names by profile id, best-effort.
    *
-   * A missing entry renders as the profile id, never as a blank and never as an
-   * invented name (#756). Naming people needs `users:read`, which a person who
-   * may route a document does not necessarily hold — see the host page.
+   * A missing entry is somebody no longer in this workspace (S5), which says so
+   * rather than showing a blank or an invented name (#756).
    */
   profileNames: Map<number, string>;
   /** Role names by role id, best-effort; a missing entry renders as the id. */
@@ -169,7 +168,7 @@ function personLabel(
   viewerProfileId: number | null,
   t: (key: string, fallback?: string, vars?: Record<string, string | number>) => string
 ): string {
-  const name = profileNames.get(profileId) ?? t('routing.profile.byId', 'Account #{id}', { id: profileId });
+  const name = profileNames.get(profileId) ?? t('routing.profile.former', 'A former member');
   return profileId === viewerProfileId ? t('routing.profile.you', '{name} (you)', { name }) : name;
 }
 
