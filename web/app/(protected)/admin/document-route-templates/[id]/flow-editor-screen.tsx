@@ -61,6 +61,7 @@ import { useTranslation } from '@whity/features/i18n';
 import { Button } from '@whity/ui/button';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@whity/ui/alert';
+import { Breadcrumb } from '@whity/ui/breadcrumb';
 import {
   Select,
   SelectContent,
@@ -450,6 +451,12 @@ function RouteFlowBody({
 
   return (
     <div className="space-y-4">
+      <Breadcrumb
+        items={[
+          { label: t('routeTemplates.title', 'Routes'), href: '/admin/document-route-templates' },
+          { label: name },
+        ]}
+      />
       <div className="flex flex-wrap items-center gap-2">
         <div className="me-auto min-w-0">
           {renaming ? (
@@ -534,6 +541,7 @@ function RouteFlowBody({
             continues: t('routeTemplates.canvas.continues', 'Continues'),
             implicit: t('routeTemplates.canvas.implicit', 'implicit'),
             ends: t('routeTemplates.canvas.ends', 'Ends here'),
+            start: t('routeTemplates.canvas.start', 'A document is sent'),
             arrivalsMerge: t(
               'routeTemplates.canvas.arrivalsMerge',
               'Paths merge — 1 item per person'

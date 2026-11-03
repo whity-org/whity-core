@@ -85,10 +85,10 @@ test.describe('Core admin areas (role matrix)', () => {
       await roleSession.shell.clickNav('Organizational Units');
       await page.waitForURL('**/admin/ous');
       await expect(
-        page.getByRole('heading', { name: 'Organizational Units' }).first()
+        page.getByRole('heading', { name: 'Organisational units' }).first()
       ).toBeVisible();
       await expect(
-        page.getByRole('button', { name: /Create (the first )?OU/ }).first()
+        page.getByRole('button', { name: /New unit|Add the first unit/ }).first()
       ).toBeVisible();
     } else {
       // requiredRole 'admin' — the link is filtered out server-side.

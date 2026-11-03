@@ -24,8 +24,11 @@ function Tabs({
   )
 }
 
+// `pb-px` absorbs the 1px each trigger's `-mb-px` overlaps the list's own
+// border: with `overflow-x-auto` the other axis turns auto too, and that single
+// overflowing pixel showed a vertical scroll arrow beside every tab strip.
 const tabsListVariants = cva(
-  "group/tabs-list inline-flex w-fit max-w-full items-center gap-0.5 overflow-x-auto text-muted-foreground group-data-[orientation=horizontal]/tabs:border-b group-data-[orientation=horizontal]/tabs:border-border group-data-[orientation=vertical]/tabs:h-fit group-data-[orientation=vertical]/tabs:flex-col",
+  "group/tabs-list inline-flex w-fit max-w-full items-center gap-0.5 overflow-x-auto pb-px text-muted-foreground group-data-[orientation=horizontal]/tabs:border-b group-data-[orientation=horizontal]/tabs:border-border group-data-[orientation=vertical]/tabs:h-fit group-data-[orientation=vertical]/tabs:flex-col",
   {
     variants: {
       variant: {

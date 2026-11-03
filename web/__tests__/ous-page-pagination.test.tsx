@@ -194,10 +194,10 @@ describe('OUsPage pagination', () => {
     expect(screen.queryByRole('tree')).not.toBeInTheDocument();
     expect(screen.queryByText('Faculty of Engineering')).not.toBeInTheDocument();
     // ...nor may the page claim there is nothing to show.
-    expect(screen.queryByText(/no organizational units yet/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/no units yet/i)).not.toBeInTheDocument();
     // ...and the failure must be stated on the page, not only in a toast.
     expect(
-      screen.getByText(/could not load the organizational units/i)
+      screen.getByText(/could not load the units/i)
     ).toBeInTheDocument();
     // The user is told the size of the gap, not just that something broke.
     expect(screen.getByText(/loaded only 100 of 240/i)).toBeInTheDocument();
@@ -212,10 +212,10 @@ describe('OUsPage pagination', () => {
 
     expect(screen.queryByRole('tree')).not.toBeInTheDocument();
     expect(
-      screen.getByText(/could not load the organizational units/i)
+      screen.getByText(/could not load the units/i)
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/failed to fetch organizational units/i)
+      screen.getByText(/failed to fetch units/i)
     ).toBeInTheDocument();
   });
 });
