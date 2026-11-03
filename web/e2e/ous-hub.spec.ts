@@ -245,7 +245,7 @@ test.describe('OU Management Hub (admin)', () => {
     const tree = page.getByRole('tree');
     // Select the OU to open the drawer (the select button's name starts with the
     // OU name, then its member count; the action button is "Actions for {name}").
-    await tree.getByRole('button', { name: new RegExp(`^${name}\b`) }).click();
+    await tree.getByRole('button', { name: new RegExp(`^${name}\\b`) }).click();
 
     const drawer = page.getByRole('dialog');
     await expect(drawer.getByRole('heading', { name })).toBeVisible();
@@ -279,7 +279,7 @@ test.describe('OU Management Hub (admin)', () => {
     created.push(id);
 
     await gotoHub(adminPage, page);
-    await page.getByRole('tree').getByRole('button', { name: new RegExp(`^${name}\b`) }).click();
+    await page.getByRole('tree').getByRole('button', { name: new RegExp(`^${name}\\b`) }).click();
 
     const drawer = page.getByRole('dialog');
     await expect(drawer.getByRole('heading', { name: 'Members', exact: true })).toBeVisible();
