@@ -9,6 +9,10 @@ import React from 'react';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 
 const hasPermission = jest.fn<boolean, [string]>();
+jest.mock('@/lib/auth-context', () => ({
+  useAuth: () => ({ user: { tenant_id: 3 } }),
+}));
+
 jest.mock('@/hooks/useCapabilities', () => ({
   useCapabilities: () => ({ hasPermission, loading: false, permissions: [] }),
 }));

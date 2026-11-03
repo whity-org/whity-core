@@ -73,7 +73,7 @@ final class CoreNavigationRegistrationTest extends TestCase
     private const UNGROUPED_ITEM_IDS = ['settings'];
 
     /**
-     * @return array<string, array{group: string|null, order: string}>
+     * @return array<string, array{group: string|null, order: string, systemTenantOnly: bool}>
      */
     private function registrations(): array
     {
@@ -106,7 +106,11 @@ final class CoreNavigationRegistrationTest extends TestCase
 
             $group = preg_match("/'group' => '([^']*)'/", $body, $g) === 1 ? $g[1] : null;
 
-            $items[$id[1]] = ['group' => $group, 'order' => $order[1]];
+            $items[$id[1]] = [
+                'group' => $group,
+                'order' => $order[1],
+                'systemTenantOnly' => str_contains($body, "'systemTenantOnly' => true"),
+            ];
         }
 
         return $items;
@@ -137,6 +141,68 @@ final class CoreNavigationRegistrationTest extends TestCase
         self::assertSame(1, preg_match($pattern, $source, $match), "Navigation item {$id} not found.");
 
         return $match[1];
+    }
+
+    /**
+     * Decision W.2: the install's own pages are shown only to the system tenant, so a
+     * workspace admin is never led to a page that answers 403. Tenants and Notification
+     * Delivery are on W.2's list too, but both work for a workspace today, and hiding
+     * them would take a working page away, so they wait for a decision.
+     */
+    public function testInstallWidePagesAreShownOnlyToTheSystemTenant(): void
+    {
+        $items = $this->registrations();
+
+        foreach ([
+            'billing',
+            'promotions',
+            'errors',
+            'languages',
+            'platform-email',
+            'platform-storage',
+            'platform-feature-flags',
+        ] as $id) {
+            self::assertArrayHasKey($id, $items);
+            self::assertSame('platform', $items[$id]['group'], "{$id} belongs in the Platform group");
+            self::assertTrue($items[$id]['systemTenantOnly'], "{$id} must be hidden from workspace admins");
+        }
+    }
+
+    /**
+     * The other half: these share the group id, which a workspace admin sees headed
+     * "Workspace", and they work there. Hiding them would take away a page that works.
+     */
+    public function testAWorkspacesOwnPagesStayVisibleToIt(): void
+    {
+        $items = $this->registrations();
+
+        foreach (['tenants', 'notifications', 'audit-logs', 'tenant-billing', 'plugins', 'plugin-store', 'translations', 'approval-gating'] as $id) {
+            self::assertArrayHasKey($id, $items);
+            self::assertFalse($items[$id]['systemTenantOnly'], "{$id} works for a workspace, so it must stay visible");
+        }
+    }
+
+    /**
+     * A page whose handler refuses every tenant but the system one has to say so in the
+     * nav too. Read from the handlers, so a new refusal without a nav flag fails here.
+     */
+    public function testANavItemIsNotShownWhereItsHandlerRefuses(): void
+    {
+        $items = $this->registrations();
+        $root = dirname(__DIR__, 2) . '/src/Api/';
+
+        foreach ([
+            'billing' => 'PlansApiHandler.php',
+            'promotions' => 'PromotionsApiHandler.php',
+            'errors' => 'ErrorsApiHandler.php',
+        ] as $id => $handler) {
+            self::assertStringContainsString(
+                'system tenant only',
+                (string) file_get_contents($root . $handler),
+                "{$handler} no longer refuses other tenants, so {$id} may not need the flag",
+            );
+            self::assertTrue($items[$id]['systemTenantOnly'], "{$id} would lead a workspace admin to a 403");
+        }
     }
 
     public function testEveryItemDeclaresAKnownGroupOrIsDocumentedAsUngrouped(): void

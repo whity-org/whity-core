@@ -2011,6 +2011,130 @@
                 ]
             }
         },
+        "/api/v1/agent-activity": {
+            "get": {
+                "operationId": "get_api_v1_agent_activity",
+                "summary": "What the workspace's agents did and proposed",
+                "tags": [
+                    "agents"
+                ],
+                "description": "Newest first. Says what happened, for whom and with which permission, never the arguments. Only the person an action was for can undo it.",
+                "parameters": [
+                    {
+                        "name": "agent",
+                        "in": "query",
+                        "required": false,
+                        "description": "Only this workspace agent",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "required": false,
+                        "description": "done, undone, waiting, declined, expired or failed; all when omitted",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "since",
+                        "in": "query",
+                        "required": false,
+                        "description": "Only from this time on (UTC, ISO 8601)",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "required": false,
+                        "description": "At most 200; 50 when omitted",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "offset",
+                        "in": "query",
+                        "required": false,
+                        "description": "How many to skip",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The activity, newest first",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AgentActivityListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/agent-presets": {
             "get": {
                 "operationId": "get_api_v1_agent_presets",
@@ -2612,6 +2736,102 @@
                 ]
             }
         },
+        "/api/v1/agents/{id}/pause": {
+            "post": {
+                "operationId": "post_api_v1_agents_id_pause",
+                "summary": "Pause a workspace agent, refusing it on every call until it is resumed",
+                "tags": [
+                    "agents"
+                ],
+                "description": "Applies at once to every person using it and every credential. Its waiting proposals can be declined, and can't be approved until it is resumed. Nothing is revoked.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "description": "ID of the agent.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The paused agent",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AgentResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Agent not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/agents/{id}/restore": {
             "post": {
                 "operationId": "post_api_v1_agents_id_restore",
@@ -2641,6 +2861,101 @@
                 "responses": {
                     "200": {
                         "description": "The restored agent",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AgentResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Agent not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/agents/{id}/resume": {
+            "post": {
+                "operationId": "post_api_v1_agents_id_resume",
+                "summary": "Resume a paused workspace agent",
+                "tags": [
+                    "agents"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "description": "ID of the agent.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The resumed agent",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -23089,6 +23404,15 @@
                         "in": "query",
                         "required": false,
                         "description": "done, undone or expired; all when omitted",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "principal",
+                        "in": "query",
+                        "required": false,
+                        "description": "Only this agent: its assignment's principalId",
                         "schema": {
                             "type": "string"
                         }
@@ -46639,6 +46963,90 @@
                     },
                     "updatedAt": {
                         "type": "string"
+                    },
+                    "paused": {
+                        "type": "boolean",
+                        "description": "Refused on every call until it is resumed"
+                    },
+                    "pausedAt": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "pausedBy": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Who paused it"
+                    },
+                    "updatedBy": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Who changed it last"
+                    },
+                    "worksFor": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "id": {
+                                    "type": "integer"
+                                },
+                                "name": {
+                                    "type": "string",
+                                    "nullable": true
+                                }
+                            },
+                            "required": [
+                                "id",
+                                "name"
+                            ]
+                        },
+                        "description": "The people using it, from their assignments"
+                    },
+                    "actionsToday": {
+                        "type": "integer"
+                    },
+                    "proposalsToday": {
+                        "type": "integer"
+                    },
+                    "waiting": {
+                        "type": "integer"
+                    },
+                    "lastActiveAt": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "UTC, ISO 8601; null when it has never been active"
+                    },
+                    "onItsOwn": {
+                        "$ref": "#/components/schemas/AgentOnItsOwn"
+                    },
+                    "mayRead": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "id": {
+                                    "type": "integer"
+                                },
+                                "title": {
+                                    "type": "string",
+                                    "nullable": true
+                                },
+                                "kind": {
+                                    "type": "string",
+                                    "nullable": true
+                                },
+                                "readable": {
+                                    "type": "boolean",
+                                    "description": "False when you cannot read this document yourself, so its name is withheld"
+                                }
+                            },
+                            "required": [
+                                "id",
+                                "title",
+                                "kind",
+                                "readable"
+                            ]
+                        }
                     }
                 },
                 "required": [
@@ -46657,7 +47065,18 @@
                     "preset",
                     "status",
                     "createdAt",
-                    "updatedAt"
+                    "updatedAt",
+                    "paused",
+                    "pausedAt",
+                    "pausedBy",
+                    "updatedBy",
+                    "worksFor",
+                    "actionsToday",
+                    "proposalsToday",
+                    "waiting",
+                    "lastActiveAt",
+                    "onItsOwn",
+                    "mayRead"
                 ]
             },
             "AgentAction": {
@@ -46743,6 +47162,15 @@
                     },
                     "createdAt": {
                         "type": "string"
+                    },
+                    "toolInfo": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/AgentToolInfo"
+                            }
+                        ],
+                        "nullable": true,
+                        "description": "What ran, in plain words; null for a tool no longer offered"
                     }
                 },
                 "required": [
@@ -46784,6 +47212,134 @@
                 },
                 "required": [
                     "data"
+                ]
+            },
+            "AgentActivityItem": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "action",
+                            "proposal"
+                        ]
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "done",
+                            "undone",
+                            "waiting",
+                            "declined",
+                            "expired",
+                            "failed"
+                        ],
+                        "description": "failed: approved, and a check refused it when it ran"
+                    },
+                    "agent": {
+                        "type": "object",
+                        "properties": {
+                            "id": {
+                                "type": "integer",
+                                "nullable": true
+                            },
+                            "name": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "nameAr": {
+                                "type": "string",
+                                "nullable": true
+                            }
+                        },
+                        "required": [
+                            "id",
+                            "name",
+                            "nameAr"
+                        ]
+                    },
+                    "person": {
+                        "type": "object",
+                        "properties": {
+                            "id": {
+                                "type": "integer"
+                            },
+                            "name": {
+                                "type": "string",
+                                "nullable": true
+                            }
+                        },
+                        "required": [
+                            "id",
+                            "name"
+                        ]
+                    },
+                    "tool": {
+                        "type": "string"
+                    },
+                    "toolInfo": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/AgentToolInfo"
+                            }
+                        ],
+                        "nullable": true
+                    },
+                    "summary": {
+                        "type": "string"
+                    },
+                    "permissions": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "undoWindowSeconds": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "undoableUntil": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "createdAt": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "kind",
+                    "status",
+                    "agent",
+                    "person",
+                    "tool",
+                    "toolInfo",
+                    "summary",
+                    "permissions",
+                    "undoWindowSeconds",
+                    "undoableUntil",
+                    "createdAt"
+                ]
+            },
+            "AgentActivityListResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/AgentActivityItem"
+                        }
+                    },
+                    "hasMore": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "data",
+                    "hasMore"
                 ]
             },
             "AgentAssignmentGrant": {
@@ -46914,6 +47470,14 @@
                         },
                         "description": "Where a new assignment starts, per permission"
                     },
+                    "mayRead": {
+                        "type": "array",
+                        "maxItems": 20,
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "Documents it keeps for reference, which you must be able to read. Never widens what it may read: that stays within each person's own access."
+                    },
                     "presetKey": {
                         "type": "string",
                         "description": "Start from this preset; fields sent override its own"
@@ -47034,6 +47598,25 @@
                     "data"
                 ]
             },
+            "AgentOnItsOwn": {
+                "type": "object",
+                "properties": {
+                    "allowed": {
+                        "type": "integer"
+                    },
+                    "askFirst": {
+                        "type": "integer"
+                    },
+                    "off": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "allowed",
+                    "askFirst",
+                    "off"
+                ]
+            },
             "AgentPersonaFields": {
                 "type": "object",
                 "properties": {
@@ -47108,6 +47691,14 @@
                             ]
                         },
                         "description": "Where a new assignment starts, per permission"
+                    },
+                    "mayRead": {
+                        "type": "array",
+                        "maxItems": 20,
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "Documents it keeps for reference, which you must be able to read. Never widens what it may read: that stays within each person's own access."
                     }
                 }
             },
@@ -47170,6 +47761,32 @@
                                 "allow"
                             ]
                         }
+                    },
+                    "does": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Three things it does; empty for a plugin's preset"
+                    },
+                    "doesAr": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "icon": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "needs": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "The plugin it comes with; null when it works with Whity alone"
+                    },
+                    "agentsFromIt": {
+                        "type": "integer",
+                        "description": "How many of this workspace's agents came from it"
                     }
                 },
                 "required": [
@@ -47184,7 +47801,12 @@
                     "tone",
                     "language",
                     "toolsets",
-                    "grant"
+                    "grant",
+                    "does",
+                    "doesAr",
+                    "icon",
+                    "needs",
+                    "agentsFromIt"
                 ]
             },
             "AgentPresetListResponse": {
@@ -47279,6 +47901,10 @@
                             }
                         ],
                         "nullable": true
+                    },
+                    "agentPaused": {
+                        "type": "boolean",
+                        "description": "The agent is paused, so this can be declined but not approved until it is resumed"
                     }
                 },
                 "required": [
@@ -47332,6 +47958,63 @@
                 },
                 "required": [
                     "data"
+                ]
+            },
+            "AgentToolInfo": {
+                "type": "object",
+                "properties": {
+                    "plainName": {
+                        "type": "string"
+                    },
+                    "plainNameAr": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "area": {
+                        "type": "object",
+                        "properties": {
+                            "id": {
+                                "type": "string"
+                            },
+                            "title": {
+                                "type": "string"
+                            },
+                            "titleAr": {
+                                "type": "string",
+                                "nullable": true
+                            }
+                        },
+                        "required": [
+                            "id",
+                            "title",
+                            "titleAr"
+                        ]
+                    },
+                    "agentAccess": {
+                        "type": "string",
+                        "enum": [
+                            "can",
+                            "proposes",
+                            "suggests",
+                            "never"
+                        ],
+                        "description": "The most an agent can ever do with it, whatever a person grants"
+                    },
+                    "readOnly": {
+                        "type": "boolean"
+                    },
+                    "undoWindowSeconds": {
+                        "type": "integer",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "plainName",
+                    "plainNameAr",
+                    "area",
+                    "agentAccess",
+                    "readOnly",
+                    "undoWindowSeconds"
                 ]
             },
             "AgentUnassignResponse": {
@@ -57343,6 +58026,55 @@
                                 "type": "string"
                             }
                         }
+                    },
+                    "paused": {
+                        "type": "boolean"
+                    },
+                    "actionsToday": {
+                        "type": "integer"
+                    },
+                    "proposalsToday": {
+                        "type": "integer"
+                    },
+                    "waiting": {
+                        "type": "integer"
+                    },
+                    "lastActiveAt": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "UTC, ISO 8601; null when it has never been active"
+                    },
+                    "onItsOwn": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/AgentOnItsOwn"
+                            }
+                        ],
+                        "nullable": true,
+                        "description": "Under your grant; null when you don't use it"
+                    },
+                    "mayRead": {
+                        "type": "array",
+                        "description": "What it keeps for reference that you can read",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "id": {
+                                    "type": "integer"
+                                },
+                                "title": {
+                                    "type": "string"
+                                },
+                                "kind": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "id",
+                                "title",
+                                "kind"
+                            ]
+                        }
                     }
                 },
                 "required": [
@@ -57355,7 +58087,14 @@
                     "tone",
                     "language",
                     "preset",
-                    "assignment"
+                    "assignment",
+                    "paused",
+                    "actionsToday",
+                    "proposalsToday",
+                    "waiting",
+                    "lastActiveAt",
+                    "onItsOwn",
+                    "mayRead"
                 ]
             },
             "MyAgentListResponse": {
