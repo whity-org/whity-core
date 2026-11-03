@@ -1,1 +1,0 @@
-- **Screens are sized for easier reading: 15px text with nothing below 13px, 40px controls and 48px table rows.** Each person can also choose Larger text and Show technical details, stored on their account (`GET` and `PUT /api/v1/me/display-preferences`). `@whity/ui` adds page states, confirm tiers, the save bar, `Stepper`, `SearchField`, `MoneyInput` and table row selection.

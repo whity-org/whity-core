@@ -127,13 +127,9 @@ describe('ease of use (A.1)', () => {
     'packages/features/src/i18n/EXAMPLE.tsx',
     'packages/features/src/i18n/LanguageSwitcher.tsx',
     'packages/ui/src/editor/block-toolbar.tsx',
-    'web/app/(protected)/admin/languages/create-modal.tsx',
-    'web/app/(protected)/admin/languages/page.tsx',
-    'web/app/(protected)/admin/languages/record-screen.tsx',
     'web/app/(protected)/admin/settings/email-domains/page.tsx',
     'web/app/(protected)/admin/settings/settings-shared.tsx',
     'web/app/(protected)/admin/settings/sso/page.tsx',
-    'web/components/forms/form-fields.tsx',
   ];
 
   const relative = (f: string) => path.relative(ROOT, f).split(path.sep).join('/');
