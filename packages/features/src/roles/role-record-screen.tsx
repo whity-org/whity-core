@@ -64,7 +64,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Alert, AlertDescription } from '@whity/ui/alert';
-import { Button } from '@whity/ui/button';
 import { Input } from '@whity/ui/input';
 import { TechnicalDetails } from '@whity/ui/display-preferences';
 import { SaveBar } from '@whity/ui/save-bar';
