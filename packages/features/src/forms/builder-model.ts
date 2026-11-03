@@ -156,3 +156,46 @@ export function groupBySection<T extends { section_key: string | null }>(
   })
   return groups.filter((g, i) => i > 0 || g.items.length > 0)
 }
+
+export type ProblemCode = "noName" | "noWording" | "noChoices" | "noColumns" | "missingLanguage"
+
+export interface Problem {
+  code: ProblemCode
+  /** The question it is about, or null for the form. */
+  index: number | null
+  /** A blocking problem stops saving; the rest are only worth knowing before publishing. */
+  blocking: boolean
+  /** The language that is empty, for `missingLanguage`. */
+  language?: "en" | "ar"
+}
+
+const filled = (value: string | undefined): boolean => (value ?? "").trim() !== ""
+const anyText = (map: LocalizedMap | [] | undefined): boolean => !Array.isArray(map) && map !== undefined && Object.values(map).some(filled)
+
+/** What is missing from a form, in the order the questions are asked. */
+export function problemsOf(fields: readonly FieldDraft[], name: LocalizedMap): Problem[] {
+  const problems: Problem[] = []
+  if (!anyText(name)) problems.push({ code: "noName", index: null, blocking: true })
+  fields.forEach((field, index) => {
+    if (!anyText(field.label)) problems.push({ code: "noWording", index, blocking: true })
+    if (CHOICE_KINDS.includes(field.field_type) && !field.options.some((o) => anyText(o.label))) {
+      problems.push({ code: "noChoices", index, blocking: true })
+    }
+    if (field.field_type === "repeating") {
+      const columns = Array.isArray(field.validation) ? [] : (field.validation.columns ?? [])
+      if (columns.length === 0 || columns.some((c) => !anyText(c.label))) problems.push({ code: "noColumns", index, blocking: true })
+    }
+    const label = field.label
+    if (anyText(label) && !Array.isArray(label)) {
+      if (!filled(label.ar)) problems.push({ code: "missingLanguage", index, blocking: false, language: "ar" })
+      else if (!filled(label.en)) problems.push({ code: "missingLanguage", index, blocking: false, language: "en" })
+    }
+  })
+  return problems
+}
+
+/** The question a server message is about, from `fields[3].label` style text. */
+export function questionIndexIn(message: string): number | null {
+  const match = /fields\[(\d+)\]/.exec(message)
+  return match === null ? null : Number(match[1])
+}

@@ -20,6 +20,7 @@ jest.mock('next/link', () => ({
 }));
 
 import { WaitingForYou } from '@/app/(protected)/dashboard/waiting-for-you';
+import { PlatformCards } from '@/app/(protected)/dashboard/platform-cards';
 
 const json = (body: unknown, status = 200) =>
   Promise.resolve({ ok: status < 300, status, json: () => Promise.resolve(body) });
@@ -88,5 +89,17 @@ describe('WaitingForYou', () => {
     mockApiClient.mockImplementation(() => json({}, 500));
     render(<WaitingForYou />);
     expect(await screen.findByRole('button', { name: 'Try again' })).toBeInTheDocument();
+  });
+});
+
+describe('PlatformCards', () => {
+  it('reads the totals from the stats envelope the endpoint answers with', async () => {
+    mockApiClient.mockImplementation(() =>
+      json({ status: 'success', stats: { totals: { users: 12, tenants: 3, roles: 5, permissions: 60 } } })
+    );
+    render(<PlatformCards />);
+    expect(await screen.findByText('12')).toBeInTheDocument();
+    expect(screen.getByText('3')).toBeInTheDocument();
+    expect(screen.queryByText('The platform numbers could not be loaded.')).not.toBeInTheDocument();
   });
 });

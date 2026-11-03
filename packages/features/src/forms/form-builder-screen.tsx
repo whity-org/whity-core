@@ -6,7 +6,9 @@ import { Button } from "@whity/ui/button"
 import { Icon } from "@whity/ui/icon"
 import { PageHeader } from "@whity/ui/page-header"
 import { AccessDeniedPanel, AreaError, LoadingRows, ReadOnlyNotice } from "@whity/ui/page-states"
+import { ConfirmAction } from "@whity/ui/confirm-action"
 import { SaveBar } from "@whity/ui/save-bar"
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@whity/ui/sheet"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@whity/ui/tabs"
 import type { BilingualValue } from "@whity/ui/bilingual-input"
 
@@ -14,13 +16,16 @@ import { useTranslation } from "../i18n"
 import { useCurrentLanguage } from "./language"
 import { useDateDisplay } from "../datetime"
 import { createFormsApi, fieldBody } from "./api"
-import { BuilderCanvas } from "./builder-canvas"
+import { BuilderCanvas, scrollToQuestion } from "./builder-canvas"
+import { ProblemList, useProblemText } from "./problem-list"
 import {
   duplicateField,
   KIND_ORDER,
   moveField,
   newField,
   relabel,
+  problemsOf,
+  questionIndexIn,
   removeField,
   reorder,
   snapshot,
@@ -132,6 +137,29 @@ export function FormBuilderScreen({ env, formId, canManage }: { env: FormsScreen
   const settingsChanged = loaded !== null && settings !== null && snapshot(settings) !== snapshot(loaded.settings)
   const dirty = fieldsChanged || settingsChanged
 
+  const [showProblems, setShowProblems] = useState(false)
+  const [publishOpen, setPublishOpen] = useState(false)
+  const [wide, setWide] = useState(true)
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return
+    const query = window.matchMedia("(min-width: 1024px)")
+    const update = () => setWide(query.matches)
+    update()
+    query.addEventListener("change", update)
+    return () => query.removeEventListener("change", update)
+  }, [])
+
+  const problems = useMemo(() => problemsOf(fields, settings?.name ?? {}), [fields, settings])
+  const blocking = useMemo(() => problems.filter((p) => p.blocking), [problems])
+  const invalid = useMemo(() => new Set(blocking.flatMap((p) => (p.index === null ? [] : [p.index]))), [blocking])
+  const problemText = useProblemText(fields)
+
+  const jump = useCallback((index: number) => {
+    setTab("questions")
+    setSelected(index)
+    scrollToQuestion(index)
+  }, [])
+
   const savedOptionValues = useMemo(() => {
     const values = new Set<string>()
     for (const f of loaded?.fields ?? []) for (const o of f.options) values.add(o.value)
@@ -140,6 +168,14 @@ export function FormBuilderScreen({ env, formId, canManage }: { env: FormsScreen
 
   const save = useCallback(async (): Promise<boolean> => {
     if (loaded === null || settings === null) return false
+    if (blocking.length > 0) {
+      setShowProblems(true)
+      const first = blocking.find((p) => p.index !== null)
+      if (first?.index != null) jump(first.index)
+      env.notify(problemText(blocking[0]), "error")
+      return false
+    }
+    setShowProblems(false)
     setSaving(true)
     const failed = t("builder.save.failed", "Your changes could not be saved.")
     let form = loaded.form
@@ -174,7 +210,12 @@ export function FormBuilderScreen({ env, formId, canManage }: { env: FormsScreen
       const result = await api.replaceFields(form.id, nextFields.map(fieldBody), failed)
       if (!result.ok) {
         setSaving(false)
-        env.notify(result.message, "error")
+        const at = questionIndexIn(result.message)
+        if (at !== null) jump(at)
+        env.notify(
+          at === null ? result.message : t("builder.save.failedAt", "Question {number}: {message}", { number: at + 1, message: result.message }),
+          "error"
+        )
         // The first half is saved; remember it so a retry does not repeat it.
         setLoaded({ ...loaded, form, settings: savedSettings })
         return false
@@ -188,7 +229,7 @@ export function FormBuilderScreen({ env, formId, canManage }: { env: FormsScreen
     setFields(nextFields === fields ? fields : nextFields)
     env.notify(t("builder.save.done", "Your changes were saved."), "success")
     return true
-  }, [api, env, fields, fieldsChanged, loaded, settings, settingsChanged, t])
+  }, [api, blocking, env, fields, fieldsChanged, jump, loaded, problemText, settings, settingsChanged, t])
 
   function discard() {
     if (loaded === null) return
@@ -281,6 +322,25 @@ export function FormBuilderScreen({ env, formId, canManage }: { env: FormsScreen
   const description = pickText(settings.description, currentLanguage)
   const selectedField = selected !== null ? fields[selected] : undefined
 
+  const panel =
+    selectedField === undefined || selected === null ? (
+      <p className="text-sm text-muted-foreground">
+        {t("builder.panel.empty", "Choose a question to change it, or add one. The form's own settings are in the Settings tab.")}
+      </p>
+    ) : (
+      <QuestionPanel
+        field={selectedField}
+        index={selected}
+        fields={fields}
+        kinds={kinds}
+        sections={settings.sections}
+        savedOptionValues={savedOptionValues}
+        readOnly={readOnly}
+        onChange={(next) => patchField(selected, next)}
+        onRelabel={(label: BilingualValue) => setFields((current) => relabel(current, selected, label))}
+      />
+    )
+
   function patchField(index: number, next: FieldDraft) {
     setFields((current) => current.map((f, i) => (i === index ? next : f)))
   }
@@ -327,7 +387,21 @@ export function FormBuilderScreen({ env, formId, canManage }: { env: FormsScreen
                   {t("builder.closeForm", "Close the form")}
                 </Button>
               )}
-              {form.status === "draft" && <Button onClick={() => void changeStatus("publish")}>{t("builder.publish", "Publish")}</Button>}
+              {form.status === "draft" && (
+                <Button
+                  onClick={() => {
+                    if (blocking.length > 0) {
+                      setShowProblems(true)
+                      const first = blocking.find((p) => p.index !== null)
+                      if (first?.index != null) jump(first.index)
+                      return
+                    }
+                    setPublishOpen(true)
+                  }}
+                >
+                  {t("builder.publish", "Publish")}
+                </Button>
+              )}
               {form.status === "archived" && <Button onClick={() => void changeStatus("publish")}>{t("builder.reopen", "Reopen the form")}</Button>}
             </div>
           ) : undefined
@@ -340,6 +414,8 @@ export function FormBuilderScreen({ env, formId, canManage }: { env: FormsScreen
           description={t("builder.readOnly.body", "Ask an administrator for permission to manage forms.")}
         />
       )}
+
+      {showProblems && <ProblemList fields={fields} problems={blocking} onJump={jump} />}
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="overflow-visible">
@@ -373,6 +449,7 @@ export function FormBuilderScreen({ env, formId, canManage }: { env: FormsScreen
                 setFields(duplicateField(fields, index))
                 setSelected(index + 1)
               }}
+              invalid={invalid}
               onReorder={(from, to) => {
                 setFields(reorder(fields, from, to))
                 setSelected(to)
@@ -382,27 +459,11 @@ export function FormBuilderScreen({ env, formId, canManage }: { env: FormsScreen
                 setSelected(null)
               }}
             />
-            <aside className="border-t border-border bg-card p-5 lg:border-s lg:border-t-0">
-              <div className="lg:sticky lg:top-4">
-              {selectedField === undefined || selected === null ? (
-                <p className="text-sm text-muted-foreground">
-                  {t("builder.panel.empty", "Choose a question to change it, or add one. The form's own settings are in the Settings tab.")}
-                </p>
-              ) : (
-                <QuestionPanel
-                  field={selectedField}
-                  index={selected}
-                  fields={fields}
-                  kinds={kinds}
-                  sections={settings.sections}
-                  savedOptionValues={savedOptionValues}
-                  readOnly={readOnly}
-                  onChange={(next) => patchField(selected, next)}
-                  onRelabel={(label: BilingualValue) => setFields((current) => relabel(current, selected, label))}
-                />
-              )}
-              </div>
-            </aside>
+            {wide && (
+              <aside className="border-t border-border bg-card p-5 lg:border-s lg:border-t-0">
+                <div className="lg:sticky lg:top-4">{panel}</div>
+              </aside>
+            )}
           </div>
         </TabsContent>
 
@@ -423,6 +484,44 @@ export function FormBuilderScreen({ env, formId, canManage }: { env: FormsScreen
           />
         </TabsContent>
       </Tabs>
+
+      {!wide && selectedField !== undefined && selected !== null && tab === "questions" && (
+        <Sheet open onOpenChange={(open) => !open && setSelected(null)}>
+          <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-md">
+            <SheetHeader>
+              <SheetTitle>{t("builder.panel.title", "Question settings")}</SheetTitle>
+              <SheetDescription>{t("builder.panel.sheet", "Changes apply as you type. Save them with the bar at the bottom.")}</SheetDescription>
+            </SheetHeader>
+            <div className="p-4">{panel}</div>
+          </SheetContent>
+        </Sheet>
+      )}
+
+      <ConfirmAction
+        open={publishOpen}
+        onOpenChange={setPublishOpen}
+        title={t("builder.publish.title", "Open this form?")}
+        description={
+          <span className="block space-y-2">
+            <span className="block">
+              {t("builder.publish.body", "People who may fill in forms will be able to fill it in. It has {count} questions, {required} of them required. You can close it again at any time.", {
+                count: fields.length,
+                required: fields.filter((f) => f.is_required).length,
+              })}
+            </span>
+            {problems.length > 0 && (
+              <span className="block">
+                {t("builder.publish.warnings", "Worth a look first:")} {problems.slice(0, 5).map(problemText).join(" ")}
+                {problems.length > 5 ? ` ${t("builder.publish.more", "And {count} more.", { count: problems.length - 5 })}` : ""}
+              </span>
+            )}
+          </span>
+        }
+        confirmLabel={t("builder.publish.confirm", "Publish form")}
+        cancelLabel={t("builder.cancel", "Cancel")}
+        variant="default"
+        onConfirm={() => void changeStatus("publish")}
+      />
 
       <SaveBar
         dirty={dirty}
