@@ -1434,6 +1434,29 @@ final class CoreApiSchemas
                     404 => self::errorResponse('Form not found'),
                 ] + self::authErrors(),
             ]),
+            self::permissionRoute('GET', '/api/forms/{id:\d+}/preview', 'forms:manage', [
+                'summary' => 'See a form as somebody filling it in would, whatever its state',
+                'description' => 'The render, for the author, so a draft can be checked before it is '
+                    . 'published. `accepts_submissions` is the real answer and `preview` is true. Nothing '
+                    . 'here can be submitted.',
+                'tags' => ['forms'],
+                'responses' => [
+                    200 => self::jsonResponse('The form, drawn for the author', 'FormRenderResponse'),
+                    404 => self::errorResponse('Form not found'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('DELETE', '/api/forms/{id:\d+}', 'forms:manage', [
+                'summary' => 'Delete a form nobody has answered',
+                'description' => 'REFUSED (409) on a published form, and on any form with a submission: '
+                    . 'archive those instead, because a submission needs its form to say what it answered. '
+                    . '`details.reason` says which.',
+                'tags' => ['forms'],
+                'responses' => [
+                    200 => ['description' => 'Deleted'],
+                    404 => self::errorResponse('Form not found'),
+                    409 => self::errorResponse('The form is published or has submissions'),
+                ] + self::authErrors(),
+            ]),
             self::permissionRoute('POST', '/api/forms/{id:\d+}/member-access', 'forms:manage', [
                 'summary' => 'Let this workspace\'s members fill in this form',
                 'description' => 'OFF BY DEFAULT on every form. Active members of the workspace can then '
@@ -7049,6 +7072,8 @@ final class CoreApiSchemas
                 'submit_label' => self::localizedText() + ['nullable' => true],
                 'reference_format' => self::str(true),
                 // Off on every form until somebody with `forms:manage` opens it.
+                // On the list, and on one form's detail.
+                'submission_count' => self::int(),
                 'open_to_members' => self::bool(),
                 'members_opened_at' => self::str(true),
                 'members_opened_by_profile_id' => self::int(true),
@@ -7474,6 +7499,8 @@ final class CoreApiSchemas
             ], ['form', 'fields', 'sections', 'accepts_submissions'])),
             'FormSubmission' => self::object([
                 'id' => self::int(),
+                // Null with no submitter, or when the profile has since gone.
+                'submitted_by_name' => self::str(true),
                 // Null when the form gives no references, or was submitted before it did.
                 'reference' => self::str(true),
                 'tenant_id' => self::int(),

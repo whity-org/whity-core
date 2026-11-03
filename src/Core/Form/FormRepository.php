@@ -36,6 +36,8 @@ use Whity\Core\Db\DbBool;
  * Everything AFTER that lookup binds the tenant it returned.
  *
  * NO DELETE. See {@see FormStatus} for the argument: a form is what somebody's
+ * The one exception is {@see deleteUnanswered()}: a form nobody ever answered has no
+ * record to protect, and it can't leave a submission without its explanation.
  * submission was an answer to, and destroying it makes every submission against
  * it unreadable. `archive()` is the operation that gets asked for and it costs
  * nothing.
@@ -226,6 +228,35 @@ final class FormRepository
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
         return $row === false ? null : self::normalizeRow($row);
+    }
+
+    /**
+     * Delete a form, only if it has never been answered and isn't live.
+     *
+     * Both conditions are in the one statement, so a submission arriving between a
+     * check and the delete can't be taken with it by the cascade.
+     *
+     * @return bool Whether a row went.
+     */
+    public function deleteUnanswered(int $tenantId, int $id): bool
+    {
+        $stmt = $this->db->prepare(
+            'DELETE FROM forms
+              WHERE tenant_id = :tenant_id AND id = :id AND status <> :published
+                AND NOT EXISTS (
+                    SELECT 1 FROM form_submissions fs
+                     WHERE fs.tenant_id = :tenant_id_2 AND fs.form_id = :id_2
+                )'
+        );
+        $stmt->execute([
+            ':tenant_id' => $tenantId,
+            ':id' => $id,
+            ':published' => FormStatus::PUBLISHED,
+            ':tenant_id_2' => $tenantId,
+            ':id_2' => $id,
+        ]);
+
+        return $stmt->rowCount() > 0;
     }
 
     /**
