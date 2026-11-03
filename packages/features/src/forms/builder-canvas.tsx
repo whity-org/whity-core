@@ -1,8 +1,8 @@
 "use client"
 
+import { useState } from "react"
 import { Badge } from "@whity/ui/badge"
 import { Button } from "@whity/ui/button"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@whity/ui/dropdown-menu"
 import { Icon } from "@whity/ui/icon"
 import { IconButton } from "@whity/ui/icon-button"
 import { cn } from "@whity/ui/utils"
@@ -58,26 +58,39 @@ function AnswerPreview({ field }: { field: FieldDraft }) {
   }
 }
 
-/** The "Add question" menu: the kinds the server can store. */
+/** "Add question": the kinds the server can store, all in view, one click each. */
 export function AddQuestion({ kinds, onAdd, disabled }: { kinds: readonly FieldKind[]; onAdd: (kind: FieldKind) => void; disabled?: boolean }) {
   const t = useTranslation("forms")
   const kindLabel = useKindLabel()
+  const [open, setOpen] = useState(false)
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="outline" disabled={disabled}>
-          <Icon name="plus" size={16} />
-          {t("builder.addQuestion", "Add question")}
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start">
-        {kinds.map((kind) => (
-          <DropdownMenuItem key={kind} onSelect={() => onAdd(kind)}>
-            {kindLabel(kind)}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <div className="space-y-2">
+      <Button variant="outline" disabled={disabled} aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+        <Icon name="plus" size={16} />
+        {t("builder.addQuestion", "Add question")}
+      </Button>
+      {open && (
+        <div
+          ref={(node) => node?.scrollIntoView({ block: "nearest" })}
+          role="group"
+          aria-label={t("builder.addQuestion.kinds", "Kind of question")}
+          className="grid grid-cols-2 gap-2 rounded-card border border-border bg-card p-2 sm:grid-cols-3">
+          {kinds.map((kind) => (
+            <Button
+              key={kind}
+              variant="ghost"
+              className="justify-start"
+              onClick={() => {
+                setOpen(false)
+                onAdd(kind)
+              }}
+            >
+              {kindLabel(kind)}
+            </Button>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -95,6 +108,7 @@ export function BuilderCanvas({
   onMove,
   onDuplicate,
   onDelete,
+  onReorder,
 }: {
   title: string
   description: string
@@ -108,7 +122,9 @@ export function BuilderCanvas({
   onMove: (index: number, direction: -1 | 1) => void
   onDuplicate: (index: number) => void
   onDelete: (index: number) => void
+  onReorder: (from: number, to: number) => void
 }) {
+  const [dragFrom, setDragFrom] = useState<number | null>(null)
   const t = useTranslation("forms")
   const { currentLanguage } = useCurrentLanguage()
   const kindLabel = useKindLabel()
@@ -118,7 +134,7 @@ export function BuilderCanvas({
   const shown = groups.length === 0 ? [{ key: null as string | null, items: [] }] : groups
 
   return (
-    <div className="space-y-4 rounded-card bg-muted p-4 md:p-6">
+    <div className="space-y-4 p-4 md:p-6">
       <div className="rounded-card border border-border bg-card p-5">
         <h2 className="text-lg font-semibold">{title || t("builder.untitled", "Untitled form")}</h2>
         {description !== "" && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
@@ -151,18 +167,34 @@ export function BuilderCanvas({
                   tabIndex={0}
                   aria-pressed={isSelected}
                   onClick={() => onSelect(index)}
+                  id={`question-card-${index}`}
+                  draggable={!readOnly}
+                  onDragStart={() => setDragFrom(index)}
+                  onDragEnd={() => setDragFrom(null)}
+                  onDragOver={(event) => dragFrom !== null && event.preventDefault()}
+                  onDrop={(event) => {
+                    event.preventDefault()
+                    if (dragFrom !== null) onReorder(dragFrom, index)
+                    setDragFrom(null)
+                  }}
                   onKeyDown={(event) => {
-                    if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) {
+                    if (event.target !== event.currentTarget) return
+                    if (event.key === "Enter" || event.key === " ") {
                       event.preventDefault()
                       onSelect(index)
+                    } else if (!readOnly && event.altKey && (event.key === "ArrowUp" || event.key === "ArrowDown")) {
+                      event.preventDefault()
+                      onMove(index, event.key === "ArrowUp" ? -1 : 1)
                     }
                   }}
                   className={cn(
                     "space-y-2 rounded-card border bg-card p-4 text-start outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                    isSelected ? "border-primary ring-2 ring-primary" : "border-border"
+                    isSelected ? "border-primary ring-2 ring-primary" : "border-border",
+                    dragFrom === index && "opacity-50"
                   )}
                 >
                   <div className="flex flex-wrap items-center gap-2">
+                    {!readOnly && <Icon name="drag" size={16} className="cursor-grab text-muted-foreground" aria-hidden />}
                     <span className="text-sm text-muted-foreground">{index + 1}.</span>
                     <span className="text-sm font-medium">
                       {label || t("builder.question.untitled", "Untitled question")}

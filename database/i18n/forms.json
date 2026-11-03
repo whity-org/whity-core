@@ -4,7 +4,9 @@
     "keys": {
         "builder.action.failed": "That did not work. Try again.",
         "builder.addQuestion": "Add question",
+        "builder.addQuestion.kinds": "Kind of question",
         "builder.back": "Back to forms",
+        "builder.breadcrumb": "Where you are",
         "builder.cancel": "Cancel",
         "builder.close": "Close",
         "builder.closeForm": "Close the form",
@@ -23,6 +25,7 @@
         "builder.duplicated": "{name} was copied.",
         "builder.empty.body": "Start with a blank form. You can change it any time before you open it.",
         "builder.empty.title": "No forms yet",
+        "builder.facts.changed": "Changed {when}",
         "builder.facts.draft": "Nobody can fill it in yet.",
         "builder.facts.link": "Anyone with the link can fill it in.",
         "builder.facts.members": "People who may fill in forms can fill it in.",

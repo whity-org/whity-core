@@ -126,6 +126,18 @@ export function moveField(fields: readonly FieldDraft[], index: number, directio
   return next
 }
 
+/**
+ * Drag a question onto another: it takes that question's place, and its section,
+ * so dropping into a section is how a question changes section.
+ */
+export function reorder(fields: readonly FieldDraft[], from: number, to: number): FieldDraft[] {
+  if (from === to || from < 0 || to < 0 || from >= fields.length || to >= fields.length) return [...fields]
+  const next = [...fields]
+  const [moved] = next.splice(from, 1)
+  next.splice(to, 0, { ...moved, section_key: fields[to].section_key })
+  return next
+}
+
 /** What a changed form would save: stable text, for comparing against what was loaded. */
 export function snapshot(value: unknown): string {
   return JSON.stringify(value)

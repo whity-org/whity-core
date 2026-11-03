@@ -5,7 +5,9 @@
     "keys": {
         "builder.action.failed": "لم تنجح العملية. حاول مرة أخرى.",
         "builder.addQuestion": "أضف سؤالاً",
+        "builder.addQuestion.kinds": "نوع السؤال",
         "builder.back": "العودة إلى النماذج",
+        "builder.breadcrumb": "أين أنت",
         "builder.cancel": "إلغاء",
         "builder.close": "إغلاق",
         "builder.closeForm": "إغلاق النموذج",
@@ -24,6 +26,7 @@
         "builder.duplicated": "تم نسخ {name}.",
         "builder.empty.body": "ابدأ بنموذج فارغ. يمكنك تعديله في أي وقت قبل فتحه.",
         "builder.empty.title": "لا توجد نماذج بعد",
+        "builder.facts.changed": "آخر تعديل {when}",
         "builder.facts.draft": "لا يمكن لأحد تعبئته بعد.",
         "builder.facts.link": "يمكن لأي شخص لديه الرابط تعبئته.",
         "builder.facts.members": "يمكن للأشخاص المسموح لهم بتعبئة النماذج تعبئته.",
