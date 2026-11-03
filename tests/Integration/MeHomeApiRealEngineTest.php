@@ -156,10 +156,17 @@ final class MeHomeApiRealEngineTest extends TestCase
 
     private function waitingWith(int $documentId, int $profileId): void
     {
-        $this->pdo->exec('PRAGMA foreign_keys = OFF');
-        $this->pdo->prepare('INSERT INTO document_route_recipients (tenant_id, document_id, route_id, step_id, profile_id, created_by_event_id) VALUES (1, ?, 1, 1, ?, 1)')
-            ->execute([$documentId, $profileId]);
-        $this->pdo->exec('PRAGMA foreign_keys = ON');
+        $this->pdo->prepare('INSERT INTO document_routes (tenant_id, document_id, title, created_by) VALUES (1, ?, ?, ?)')
+            ->execute([$documentId, 'Circulation', self::RANA]);
+        $routeId = (int) $this->pdo->lastInsertId();
+        $this->pdo->prepare("INSERT INTO document_route_events (tenant_id, document_id, route_id, actor_profile_id, action, occurred_at) VALUES (1, ?, ?, ?, 'issued', CURRENT_TIMESTAMP)")
+            ->execute([$documentId, $routeId, self::RANA]);
+        $eventId = (int) $this->pdo->lastInsertId();
+        $this->pdo->prepare("INSERT INTO document_route_steps (tenant_id, route_id, position, rule_kind, rule_config) VALUES (1, ?, 1, 'role', '{}')")
+            ->execute([$routeId]);
+        $stepId = (int) $this->pdo->lastInsertId();
+        $this->pdo->prepare('INSERT INTO document_route_recipients (tenant_id, document_id, route_id, step_id, profile_id, created_by_event_id) VALUES (1, ?, ?, ?, ?, ?)')
+            ->execute([$documentId, $routeId, $stepId, $profileId, $eventId]);
     }
 
     private function draft(int $tenantId, int $profileId, string $title, ?int $published): void

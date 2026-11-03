@@ -11705,6 +11705,8 @@ final class CoreApiSchemas
                     'summary' => 'What still blocks real work in this workspace: branding, team, an agent, the tax number and a plan',
                     'description' => 'A step that does not apply is left out, such as a plan on an install with no plans. The system tenant has none.',
                     'tags' => ['home'],
+                    // A card on a person's home page, with nothing in it an agent needs.
+                    'mcp' => ['expose' => false],
                     'responses' => [
                         200 => self::jsonResponse('The steps and how many are done', 'SetupStepsResponse'),
                     ] + self::authErrors(),
