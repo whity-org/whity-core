@@ -6907,7 +6907,7 @@ final class CoreApiSchemas
                 'field_key' => self::str(),
                 'field_type' => ['type' => 'string', 'enum' => [
                     'text', 'textarea', 'number', 'date', 'select',
-                    'multiselect', 'checkbox', 'file', 'profile_ref', 'ou_ref',
+                    'multiselect', 'checkbox', 'file', 'profile_ref', 'ou_ref', 'repeating', 'signature',
                 ]],
                 'label' => self::localizedText(),
                 'help_text' => self::str(true),
@@ -6938,6 +6938,13 @@ final class CoreApiSchemas
                 'required' => ['field'],
                 'additionalProperties' => false,
             ],
+            'FormFieldColumn' => self::object([
+                'key' => self::str(),
+                'type' => ['type' => 'string', 'enum' => ['text', 'textarea', 'number', 'date', 'select', 'checkbox']],
+                'label' => self::localizedText(),
+                'required' => self::bool(),
+                'options' => ['type' => 'array', 'items' => SchemaBuilder::ref('FormFieldOption')],
+            ], ['key', 'type', 'label']),
             'FormFieldOption' => self::object([
                 'value' => self::name(nonEmpty: true),
                 'label' => self::localizedText(),
@@ -6951,6 +6958,9 @@ final class CoreApiSchemas
                 'maxLength' => self::int(),
                 'pattern' => ['type' => 'string', 'maxLength' => 512],
                 'maxFiles' => self::int() + ['description' => 'How many files a file question takes, 1 to 20. Above 1 the answer is a list.'],
+                'columns' => ['type' => 'array', 'maxItems' => 20, 'items' => SchemaBuilder::ref('FormFieldColumn'), 'description' => 'The columns of a repeating question. Required on one.'],
+                'minRows' => self::int() + ['description' => 'Fewest rows a repeating question takes when it has any.'],
+                'maxRows' => self::int() + ['description' => 'Most rows a repeating question takes, up to 200.'],
             ], []),
             // DERIVED from the fields' `section_key`, never stored. There is no
             // `form_sections` table, so a section cannot exist with no fields and
@@ -7041,7 +7051,7 @@ final class CoreApiSchemas
                 ],
                 'field_type' => ['type' => 'string', 'enum' => [
                     'text', 'textarea', 'number', 'date', 'select',
-                    'multiselect', 'checkbox', 'file', 'profile_ref', 'ou_ref',
+                    'multiselect', 'checkbox', 'file', 'profile_ref', 'ou_ref', 'repeating', 'signature',
                 ],
                     'description' => 'Kind of input: text, textarea, number, date, select, multiselect, checkbox, file, profile_ref (a person) or ou_ref (a unit).',
                 ],
@@ -7072,7 +7082,7 @@ final class CoreApiSchemas
             'FormFieldUpdateRequest' => self::object([
                 'field_type' => ['type' => 'string', 'enum' => [
                     'text', 'textarea', 'number', 'date', 'select',
-                    'multiselect', 'checkbox', 'file', 'profile_ref', 'ou_ref',
+                    'multiselect', 'checkbox', 'file', 'profile_ref', 'ou_ref', 'repeating', 'signature',
                 ],
                     'description' => 'Kind of input: text, textarea, number, date, select, multiselect, checkbox, file, profile_ref (a person) or ou_ref (a unit).',
                 ],
@@ -7173,7 +7183,7 @@ final class CoreApiSchemas
             'PublicFormField' => self::object([
                 'field_key' => self::str(),
                 'field_type' => ['type' => 'string', 'enum' => [
-                    'text', 'textarea', 'number', 'date', 'select', 'multiselect', 'checkbox',
+                    'text', 'textarea', 'number', 'date', 'select', 'multiselect', 'checkbox', 'file', 'repeating', 'signature',
                 ]],
                 'label' => self::localizedText(),
                 'help_text' => self::str(true),
