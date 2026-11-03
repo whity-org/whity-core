@@ -11,6 +11,7 @@ import { ApprovalGatingTabs } from '@/components/admin/approval-gating-tabs';
 import { Button } from '@whity/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
 import { AccessDenied } from '@whity/ui/access-denied';
+import { Pagination } from '@whity/ui/pagination';
 import { IconCheck, IconInbox, IconX } from '@tabler/icons-react';
 import { ConfirmAction } from '@whity/ui/confirm-action';
 import { AreaError, LoadingRows } from '@whity/ui/page-states';
@@ -36,6 +37,7 @@ import { useTranslation } from '@whity/features/i18n';
  */
 const REGISTRATIONS_APPROVE = 'registrations:approve';
 const SYSTEM_TENANT_ID = 0;
+const PER_PAGE = 25;
 
 interface PendingRegistration {
   membership_id: number;
@@ -68,6 +70,8 @@ export default function PendingRegistrationsPage() {
   const [items, setItems] = useState<PendingRegistration[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
   // Tracks the membership id currently being approved/rejected so its row's
   // buttons disable while the request is in flight.
   const [busyId, setBusyId] = useState<number | null>(null);
@@ -79,7 +83,7 @@ export default function PendingRegistrationsPage() {
     setLoading(true);
     setLoadError(false);
     try {
-      const res = await fetch('/api/v1/registrations/pending', {
+      const res = await fetch(`/api/v1/registrations/pending?page=${page}&per_page=${PER_PAGE}`, {
         headers: { 'X-Requested-With': 'XMLHttpRequest' },
         credentials: 'include',
       });
@@ -89,14 +93,16 @@ export default function PendingRegistrationsPage() {
         return;
       }
       const body = await res.json().catch(() => ({}));
-      setItems(Array.isArray(body?.data) ? (body.data as PendingRegistration[]) : []);
+      const rows = Array.isArray(body?.data) ? (body.data as PendingRegistration[]) : [];
+      setItems(rows);
+      setTotal(typeof body?.pagination?.total === 'number' ? body.pagination.total : rows.length);
     } catch {
       setLoadError(true);
       setItems([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [page]);
 
   useEffect(() => {
     // Only fetch once the caller is confirmed eligible — otherwise the API
@@ -302,6 +308,9 @@ export default function PendingRegistrationsPage() {
                 </li>
               ))}
             </ul>
+          )}
+          {!loading && !loadError && total > PER_PAGE && (
+            <Pagination className="mt-4" page={page} perPage={PER_PAGE} total={total} onPageChange={setPage} />
           )}
         </CardContent>
       </Card>

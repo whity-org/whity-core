@@ -8,6 +8,7 @@ import { ApprovalGatingTabs } from '@/components/admin/approval-gating-tabs';
 import { Button } from '@whity/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
 import { AccessDenied } from '@whity/ui/access-denied';
+import { Pagination } from '@whity/ui/pagination';
 import { ConfirmAction } from '@whity/ui/confirm-action';
 import { AreaError, LoadingRows } from '@whity/ui/page-states';
 import { useDateDisplay } from '@whity/features/datetime';
@@ -34,11 +35,15 @@ import { useTranslation } from '@whity/features/i18n';
  */
 const PASSWORD_RESETS_APPROVE = 'password_resets:approve';
 
+const PER_PAGE = 25;
+
 interface PendingPasswordReset {
   id: number;
   profile_id: number;
   email: string;
   display_name: string;
+  /** Why they asked, in their own words. Optional, so often null. */
+  reason: string | null;
   created_at: string;
 }
 
@@ -52,6 +57,8 @@ export default function PasswordResetApprovalsPage() {
   const [items, setItems] = useState<PendingPasswordReset[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
   const [busyId, setBusyId] = useState<number | null>(null);
   // Approving is security-sensitive: type the email to confirm (tier 3).
   const [approving, setApproving] = useState<typeof items[number] | null>(null);
@@ -61,7 +68,7 @@ export default function PasswordResetApprovalsPage() {
     setLoading(true);
     setLoadError(false);
     try {
-      const res = await fetch('/api/v1/password-resets/pending', {
+      const res = await fetch(`/api/v1/password-resets/pending?page=${page}&per_page=${PER_PAGE}`, {
         headers: { 'X-Requested-With': 'XMLHttpRequest' },
         credentials: 'include',
       });
@@ -71,14 +78,16 @@ export default function PasswordResetApprovalsPage() {
         return;
       }
       const body = await res.json().catch(() => ({}));
-      setItems(Array.isArray(body?.data) ? (body.data as PendingPasswordReset[]) : []);
+      const rows = Array.isArray(body?.data) ? (body.data as PendingPasswordReset[]) : [];
+      setItems(rows);
+      setTotal(typeof body?.pagination?.total === 'number' ? body.pagination.total : rows.length);
     } catch {
       setLoadError(true);
       setItems([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [page]);
 
   useEffect(() => {
     if (!isCapabilitiesLoading && canApprove) {
@@ -228,6 +237,9 @@ export default function PasswordResetApprovalsPage() {
                 >
                   <div className="min-w-0">
                     <p className="font-medium text-foreground truncate">{item.email}</p>
+                    <p className="text-sm text-foreground" data-testid={`passwordResets-reason-${item.id}`}>
+                      {item.reason ?? t('passwordResets.reason.default', 'Asked to reset their password')}
+                    </p>
                     <p className="text-sm text-muted-foreground truncate">
                       {[
                         item.display_name,
@@ -267,6 +279,9 @@ export default function PasswordResetApprovalsPage() {
                 </li>
               ))}
             </ul>
+          )}
+          {!loading && !loadError && total > PER_PAGE && (
+            <Pagination className="mt-4" page={page} perPage={PER_PAGE} total={total} onPageChange={setPage} />
           )}
         </CardContent>
       </Card>

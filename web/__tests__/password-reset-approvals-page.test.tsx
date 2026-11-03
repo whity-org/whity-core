@@ -69,7 +69,7 @@ describe('PasswordResetApprovalsPage — list and actions', () => {
     await waitFor(() => expect(screen.getByTestId('password-reset-row-501')).toBeInTheDocument());
     expect(screen.getByText('requester@acme.test')).toBeInTheDocument();
     expect(global.fetch).toHaveBeenCalledWith(
-      '/api/v1/password-resets/pending',
+      '/api/v1/password-resets/pending?page=1&per_page=25',
       expect.objectContaining({ credentials: 'include' })
     );
   });
