@@ -2,8 +2,8 @@
 
 import type { ReactNode } from "react"
 import { Badge } from "@whity/ui/badge"
-import type { BilingualValue } from "@whity/ui/bilingual-input"
-import { BilingualField } from "./bilingual-field"
+import { BilingualField, type BilingualValue } from "./bilingual-field"
+import { LanguageBar } from "./form-languages"
 import { Button } from "@whity/ui/button"
 import { Checkbox } from "@whity/ui/checkbox"
 import { IconButton } from "@whity/ui/icon-button"
@@ -31,6 +31,16 @@ function Row({ id, label, hint, children }: { id?: string; label: string; hint?:
       {children}
       {hint !== undefined && <p className="text-xs text-muted-foreground">{hint}</p>}
     </div>
+  )
+}
+
+/** One titled group in the panel, so it is clear where it starts and ends. */
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="space-y-4 border-t border-border pt-5">
+      <h4 className="text-sm font-semibold">{title}</h4>
+      {children}
+    </section>
   )
 }
 
@@ -123,6 +133,9 @@ export function QuestionPanel({
         <h3 className="text-sm font-semibold">{t("builder.panel.heading", "Question")}</h3>
         <Badge variant="outline">{t("builder.panel.number", "Question {number}", { number: index + 1 })}</Badge>
       </div>
+      <LanguageBar />
+
+      <Section title={t("builder.panel.section.question", "The question")}>
       <Row id="q-kind" label={t("builder.panel.type", "Type")}>
         <ChoiceSelect
           id="q-kind"
@@ -146,7 +159,6 @@ export function QuestionPanel({
 
       <BilingualField
         id="q-label"
-        className="sm:[&>.grid]:grid-cols-1"
         label={t("builder.panel.wording", "Question")}
         value={asMap(field.label)}
         onChange={onRelabel}
@@ -155,34 +167,35 @@ export function QuestionPanel({
 
       <BilingualField
         id="q-help"
-        className="sm:[&>.grid]:grid-cols-1"
         label={t("builder.panel.help", "Help under the question")}
         value={asMap(field.help_text_i18n)}
         onChange={(help) => onChange({ ...field, help_text_i18n: help })}
         disabled={readOnly}
       />
 
+      </Section>
+
       {CHOICE_KINDS.includes(field.field_type) && (
-        <div className="space-y-3">
-          <div className="text-sm font-medium">{t("builder.panel.options", "Choices")}</div>
+        <Section title={t("builder.panel.options", "Choices")}>
           {field.options.map((option, i) => (
-            <div key={i} className="flex items-start gap-2">
-              <div className="min-w-0 flex-1">
-                <BilingualField
-                  id={`q-option-${i}`}
-                  className="sm:[&>.grid]:grid-cols-1"
-                  value={asMap(option.label)}
-                  onChange={(label) => setOptionLabel(i, label)}
-                  disabled={readOnly}
-                />
+            <div key={i} className="space-y-2 rounded-card border border-border bg-muted/40 p-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold">{t("builder.panel.choiceN", "Choice {number}", { number: i + 1 })}</span>
+                {!readOnly && field.options.length > 1 && (
+                  <IconButton
+                    icon="delete"
+                    size="sm"
+                    label={t("builder.panel.removeOption", "Remove this choice")}
+                    onClick={() => onChange({ ...field, options: field.options.filter((_, j) => j !== i) })}
+                  />
+                )}
               </div>
-              {!readOnly && field.options.length > 1 && (
-                <IconButton
-                  icon="delete"
-                  label={t("builder.panel.removeOption", "Remove this choice")}
-                  onClick={() => onChange({ ...field, options: field.options.filter((_, j) => j !== i) })}
-                />
-              )}
+              <BilingualField
+                id={`q-option-${i}`}
+                value={asMap(option.label)}
+                onChange={(label) => setOptionLabel(i, label)}
+                disabled={readOnly}
+              />
             </div>
           ))}
           {!readOnly && (
@@ -190,9 +203,11 @@ export function QuestionPanel({
               {t("builder.panel.addOption", "Add a choice")}
             </Button>
           )}
-        </div>
+        </Section>
       )}
 
+      {["file", "number", "text", "textarea", "repeating"].includes(field.field_type) && (
+        <Section title={t("builder.panel.section.rules", "What can be answered")}>
       {field.field_type === "file" && (
         <Row id="q-files" label={t("builder.panel.maxFiles", "Most files")} hint={t("builder.panel.maxFiles.hint", "From 1 to 20.")}>
           <Input
@@ -345,6 +360,10 @@ export function QuestionPanel({
         </div>
       )}
 
+        </Section>
+      )}
+
+      <Section title={t("builder.panel.section.answering", "Who answers")}>
       <div className="flex items-center gap-3">
         <Switch
           id="q-required"
@@ -370,6 +389,9 @@ export function QuestionPanel({
         />
       </Row>
 
+      </Section>
+
+      <Section title={t("builder.panel.section.show", "When it is asked")}>
       <Row
         id="q-show"
         label={t("builder.panel.show", "Show this question")}
@@ -422,7 +444,10 @@ export function QuestionPanel({
         </p>
       )}
 
+      </Section>
+
       {sections.length > 0 && (
+        <Section title={t("builder.panel.section.where", "Where it sits")}>
         <Row id="q-section" label={t("builder.panel.section", "Section")}>
           <ChoiceSelect
             id="q-section"
@@ -438,6 +463,7 @@ export function QuestionPanel({
             onChange={(next) => onChange({ ...field, section_key: next === NO_SECTION ? null : next })}
           />
         </Row>
+        </Section>
       )}
     </div>
   )

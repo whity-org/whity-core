@@ -34578,6 +34578,82 @@
                 ]
             }
         },
+        "/api/v1/plugins/removed": {
+            "get": {
+                "operationId": "get_api_v1_plugins_removed",
+                "summary": "Plugins kept for 30 days after uninstalling (empty outside the system tenant)",
+                "tags": [
+                    "platform-ops"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Kept plugins",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PluginRemovedResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/plugins/store/allowed": {
             "get": {
                 "operationId": "get_api_v1_plugins_store_allowed",
@@ -34754,6 +34830,82 @@
                     },
                     "502": {
                         "description": "The store catalogue could not be fetched",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/plugins/updates": {
+            "get": {
+                "operationId": "get_api_v1_plugins_updates",
+                "summary": "Newer store versions of installed plugins (empty outside the system tenant)",
+                "tags": [
+                    "platform-ops"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Available updates",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PluginUpdatesResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -34995,7 +35147,7 @@
         "/api/v1/plugins/{id}/uninstall": {
             "post": {
                 "operationId": "post_api_v1_plugins_id_uninstall",
-                "summary": "Uninstall a plugin (disable, roll back migrations, remove files)",
+                "summary": "Uninstall a plugin: turned off and kept 30 days, or removed at once with now",
                 "tags": [
                     "platform-ops"
                 ],
@@ -35294,6 +35446,400 @@
                     },
                     "500": {
                         "description": "Internal error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/plugins/{name}/reinstall": {
+            "post": {
+                "operationId": "post_api_v1_plugins_name_reinstall",
+                "summary": "Restore an uninstalled plugin within its 30 days",
+                "tags": [
+                    "platform-ops"
+                ],
+                "parameters": [
+                    {
+                        "name": "name",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Reinstalled",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PluginActionResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Not the platform operator",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/plugins/{name}/update": {
+            "post": {
+                "operationId": "post_api_v1_plugins_name_update",
+                "summary": "Fetch the latest version; applies if it asks for no new access, otherwise waits for approval",
+                "tags": [
+                    "platform-ops"
+                ],
+                "parameters": [
+                    {
+                        "name": "name",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PluginUpdateRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Updated or waiting",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PluginUpdateResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid package",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Not the platform operator",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Up to date or uninstalled",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Incompatible or not newer",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Store unavailable",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/plugins/{name}/update/approve": {
+            "post": {
+                "operationId": "post_api_v1_plugins_name_update_approve",
+                "summary": "Accept the new access a waiting update asks for and apply it",
+                "tags": [
+                    "platform-ops"
+                ],
+                "parameters": [
+                    {
+                        "name": "name",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Updated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PluginUpdateResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Not the platform operator",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Nothing waiting",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/plugins/{name}/update/reject": {
+            "post": {
+                "operationId": "post_api_v1_plugins_name_update_reject",
+                "summary": "Drop a waiting update and stay on this version",
+                "tags": [
+                    "platform-ops"
+                ],
+                "parameters": [
+                    {
+                        "name": "name",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Rejected",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PluginUpdateResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Not the platform operator",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Nothing waiting",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -61743,6 +62289,29 @@
                     "php_version"
                 ]
             },
+            "PluginActionResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "message": {
+                                "type": "string"
+                            },
+                            "state": {
+                                "type": "string",
+                                "nullable": true
+                            }
+                        },
+                        "required": [
+                            "message"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
             "PluginEntry": {
                 "type": "object",
                 "properties": {
@@ -61770,6 +62339,75 @@
                     },
                     "permissions_count": {
                         "type": "integer"
+                    },
+                    "trust": {
+                        "type": "string",
+                        "enum": [
+                            "unverified"
+                        ]
+                    },
+                    "install": {
+                        "type": "object",
+                        "properties": {
+                            "source": {
+                                "type": "string"
+                            },
+                            "store_host": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "installed_by": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "installed_at": {
+                                "type": "string"
+                            },
+                            "permissions": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "outside_domains": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "update_waiting": {
+                                "type": "object",
+                                "properties": {
+                                    "version": {
+                                        "type": "string"
+                                    },
+                                    "new_permissions": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "new_domains": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        }
+                                    }
+                                },
+                                "required": [
+                                    "version",
+                                    "new_permissions",
+                                    "new_domains"
+                                ],
+                                "nullable": true
+                            }
+                        },
+                        "required": [
+                            "source",
+                            "installed_at",
+                            "permissions",
+                            "outside_domains"
+                        ]
                     }
                 },
                 "required": [
@@ -61809,6 +62447,144 @@
                     },
                     "meta": {
                         "$ref": "#/components/schemas/PluginListMeta"
+                    }
+                },
+                "required": [
+                    "data",
+                    "meta"
+                ]
+            },
+            "PluginRemovedResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "name": {
+                                    "type": "string"
+                                },
+                                "version": {
+                                    "type": "string",
+                                    "nullable": true
+                                },
+                                "removed_by": {
+                                    "type": "string",
+                                    "nullable": true
+                                },
+                                "removed_at": {
+                                    "type": "string"
+                                },
+                                "purge_after": {
+                                    "type": "string"
+                                },
+                                "purge_failed": {
+                                    "type": "boolean"
+                                }
+                            },
+                            "required": [
+                                "name",
+                                "removed_at",
+                                "purge_after",
+                                "purge_failed"
+                            ]
+                        }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "PluginUpdateRequest": {
+                "type": "object",
+                "properties": {
+                    "token": {
+                        "type": "string",
+                        "description": "The store access token, when the store requires one to download."
+                    }
+                }
+            },
+            "PluginUpdateResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "status": {
+                                "type": "string",
+                                "enum": [
+                                    "updated",
+                                    "waiting_approval",
+                                    "rejected"
+                                ]
+                            },
+                            "version": {
+                                "type": "string"
+                            },
+                            "state": {
+                                "type": "string"
+                            },
+                            "new_permissions": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "new_domains": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "worker_restart_required": {
+                                "type": "boolean"
+                            }
+                        },
+                        "required": [
+                            "status"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "PluginUpdatesResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "plugin": {
+                                    "type": "string"
+                                },
+                                "installed_version": {
+                                    "type": "string"
+                                },
+                                "latest_version": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "plugin",
+                                "installed_version",
+                                "latest_version"
+                            ]
+                        }
+                    },
+                    "meta": {
+                        "type": "object",
+                        "properties": {
+                            "stores_unreachable": {
+                                "type": "integer"
+                            }
+                        },
+                        "required": [
+                            "stores_unreachable"
+                        ]
                     }
                 },
                 "required": [
@@ -64207,11 +64983,15 @@
                                 "items": {
                                     "type": "string"
                                 }
+                            },
+                            "can_install": {
+                                "type": "boolean"
                             }
                         },
                         "required": [
                             "enabled",
-                            "hosts"
+                            "hosts",
+                            "can_install"
                         ]
                     }
                 },
@@ -64243,11 +65023,113 @@
                     "latest_version": {
                         "type": "string",
                         "nullable": true
+                    },
+                    "trust": {
+                        "type": "string",
+                        "enum": [
+                            "unverified"
+                        ]
+                    },
+                    "price": {
+                        "type": "object",
+                        "properties": {
+                            "amount": {
+                                "type": "string"
+                            },
+                            "currency": {
+                                "type": "string"
+                            },
+                            "interval": {
+                                "type": "string",
+                                "nullable": true
+                            }
+                        },
+                        "required": [
+                            "amount",
+                            "currency"
+                        ],
+                        "nullable": true
+                    },
+                    "used_by": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "adds": {
+                        "type": "object",
+                        "properties": {
+                            "screens": {
+                                "type": "integer"
+                            },
+                            "document_blocks": {
+                                "type": "integer"
+                            },
+                            "agent_tools": {
+                                "type": "integer"
+                            },
+                            "fields": {
+                                "type": "integer"
+                            }
+                        },
+                        "required": [
+                            "screens",
+                            "document_blocks",
+                            "agent_tools",
+                            "fields"
+                        ]
+                    },
+                    "permissions": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "outside_domains": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "languages": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "support_url": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "changelog": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "version": {
+                                    "type": "string"
+                                },
+                                "date": {
+                                    "type": "string",
+                                    "nullable": true
+                                },
+                                "notes": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "version",
+                                "notes"
+                            ]
+                        }
                     }
                 },
                 "required": [
                     "slug",
-                    "name"
+                    "name",
+                    "trust"
                 ]
             },
             "StoreCatalogueResponse": {
