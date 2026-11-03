@@ -91,6 +91,10 @@ final class DocumentPresenter
             'origin_ou_id'         => $document['origin_ou_id'],
             'created_by'           => $document['created_by'],
             'created_at'           => $document['created_at'],
+            // S5: null unless the document was withdrawn. The record stays
+            // readable, and a screen says so rather than hiding it.
+            'withdrawn_at'         => $document['withdrawn_at'] ?? null,
+            'withdrawn_by'         => $document['withdrawn_by'] ?? null,
             // The current artifact's bytes. Stable across corrections — it
             // always resolves to the newest — which is what a link pasted into
             // a message should do.

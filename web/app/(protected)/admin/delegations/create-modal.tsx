@@ -1,7 +1,9 @@
-﻿'use client';
+'use client';
 
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api/client';
+import { TechnicalDetails } from '@whity/ui/display-preferences';
+import { permissionInWords } from './permission-words';
 import {
   fetchAllPagesTyped,
   type FetchAllPagesResult,
@@ -538,6 +540,7 @@ export function CreateDelegationModal({
                         // Registry-only permissions carry id: null — the name is
                         // the stable identity (it is the catalogue's merge key).
                         key={permission.name}
+                        data-permission={permission.name}
                         className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted"
                       >
                         <input
@@ -546,8 +549,16 @@ export function CreateDelegationModal({
                           onChange={() => togglePermission(permission.name)}
                           className="size-4 rounded border-border"
                         />
-                        <span className="text-sm font-medium">
-                          {permission.name}
+                        <span className="min-w-0">
+                          {/* In words first; the code is a technical detail. */}
+                          <span className="block text-sm font-medium">
+                            {permission.description || permissionInWords(permission.name)}
+                          </span>
+                          <TechnicalDetails>
+                            <span className="block font-mono text-xs text-muted-foreground">
+                              {permission.name}
+                            </span>
+                          </TechnicalDetails>
                         </span>
                       </label>
                     ))

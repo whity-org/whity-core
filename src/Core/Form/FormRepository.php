@@ -36,6 +36,8 @@ use Whity\Core\Db\DbBool;
  * Everything AFTER that lookup binds the tenant it returned.
  *
  * NO DELETE. See {@see FormStatus} for the argument: a form is what somebody's
+ * The one exception is {@see deleteUnanswered()}: a form nobody ever answered has no
+ * record to protect, and it can't leave a submission without its explanation.
  * submission was an answer to, and destroying it makes every submission against
  * it unreadable. `archive()` is the operation that gets asked for and it costs
  * nothing.
@@ -49,7 +51,10 @@ final class FormRepository
      * cannot reach one caller and not another.
      */
     private const COLUMNS = 'id, tenant_id, form_key, name, description, submit_label, sections, reference_format, status, version,
-                             route_template_id, created_by_profile_id, created_at, updated_at,
+                             route_template_id,
+                             (SELECT t.name FROM document_route_templates t
+                               WHERE t.id = forms.route_template_id AND t.tenant_id = forms.tenant_id) AS route_template_name,
+                             created_by_profile_id, created_at, updated_at,
                              open_to_members, members_opened_at, members_opened_by_profile_id,
                              public_enabled, public_slug, public_opens_at, public_closes_at,
                              public_enabled_at, public_enabled_by_profile_id,
@@ -223,6 +228,35 @@ final class FormRepository
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
         return $row === false ? null : self::normalizeRow($row);
+    }
+
+    /**
+     * Delete a form, only if it has never been answered and isn't live.
+     *
+     * Both conditions are in the one statement, so a submission arriving between a
+     * check and the delete can't be taken with it by the cascade.
+     *
+     * @return bool Whether a row went.
+     */
+    public function deleteUnanswered(int $tenantId, int $id): bool
+    {
+        $stmt = $this->db->prepare(
+            'DELETE FROM forms
+              WHERE tenant_id = :tenant_id AND id = :id AND status <> :published
+                AND NOT EXISTS (
+                    SELECT 1 FROM form_submissions fs
+                     WHERE fs.tenant_id = :tenant_id_2 AND fs.form_id = :id_2
+                )'
+        );
+        $stmt->execute([
+            ':tenant_id' => $tenantId,
+            ':id' => $id,
+            ':published' => FormStatus::PUBLISHED,
+            ':tenant_id_2' => $tenantId,
+            ':id_2' => $id,
+        ]);
+
+        return $stmt->rowCount() > 0;
     }
 
     /**
@@ -632,6 +666,8 @@ final class FormRepository
             'status' => $status,
             'version' => (int) $row['version'],
             'route_template_id' => $row['route_template_id'] === null ? null : (int) $row['route_template_id'],
+            // S5: so the builder can say "Routed to" without `route_templates:read`.
+            'route_template_name' => isset($row['route_template_name']) ? (string) $row['route_template_name'] : null,
             'created_by_profile_id' => $row['created_by_profile_id'] === null
                 ? null
                 : (int) $row['created_by_profile_id'],

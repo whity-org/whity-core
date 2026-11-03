@@ -1,6 +1,7 @@
 export { RolesScreen } from "./roles-screen"
 export { RoleRecordScreen } from "./role-record-screen"
 export { PermissionsGrid } from "./permissions-grid"
+export { roleLabel } from "./role-label"
 export { groupOf, groupPermissions, titleCase } from "./permission-groups"
 export type {
   RolesAdapter,

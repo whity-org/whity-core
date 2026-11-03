@@ -84,7 +84,7 @@ export const DELEGATED_PERMISSIONS = [
  * all of these.
  */
 export const SIDEBAR_SECTIONS = [
-  { label: 'Dashboard', href: '/admin' },
+  { label: 'Dashboard', href: '/dashboard' },
   { label: 'Users', href: '/admin/users' },
   { label: 'Roles', href: '/admin/roles' },
   { label: 'Organizational Units', href: '/admin/ous' },

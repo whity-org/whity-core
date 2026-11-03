@@ -36,7 +36,8 @@ use PDO;
 final class FormSubmissionRepository
 {
     private const COLUMNS = 's.id, s.tenant_id, s.form_id, s.form_version, s.submitted_by_profile_id,
-                             s.document_id, s.data, s.reference, s.submitted_at, s.created_at';
+                             s.document_id, s.data, s.reference, s.submitted_at, s.created_at,
+                             p.display_name AS submitted_by_name';
 
     public function __construct(private readonly PDO $db)
     {
@@ -161,6 +162,7 @@ final class FormSubmissionRepository
         $sql = 'SELECT ' . self::COLUMNS . ', f.form_key, f.name AS form_name' . self::ROUTE_STATE . '
                   FROM form_submissions s
                   JOIN forms f ON f.id = s.form_id AND f.tenant_id = s.tenant_id
+                  LEFT JOIN profiles p ON p.id = s.submitted_by_profile_id
                  WHERE s.tenant_id = :tenant_id';
         $params = [':tenant_id' => $tenantId];
 
@@ -207,6 +209,7 @@ final class FormSubmissionRepository
         $sql = 'SELECT ' . self::COLUMNS . ', f.form_key, f.name AS form_name' . self::ROUTE_STATE . '
                   FROM form_submissions s
                   JOIN forms f ON f.id = s.form_id AND f.tenant_id = s.tenant_id
+                  LEFT JOIN profiles p ON p.id = s.submitted_by_profile_id
                  WHERE s.tenant_id = :tenant_id AND s.id = :id';
         $params = [':tenant_id' => $tenantId, ':id' => $id];
 
@@ -230,6 +233,35 @@ final class FormSubmissionRepository
      * that thirty people have already answered it — the cheapest possible way to
      * turn "I'll just rename this field" into a decision rather than a reflex.
      */
+    /**
+     * Response counts for several forms at once, so a list of forms doesn't ask once
+     * per row. A form with none is absent from the map.
+     *
+     * @param list<int> $formIds
+     * @return array<int, int> Form id to count.
+     */
+    public function countForForms(int $tenantId, array $formIds): array
+    {
+        if ($formIds === []) {
+            return [];
+        }
+
+        $placeholders = implode(', ', array_fill(0, count($formIds), '?'));
+        $stmt = $this->db->prepare(
+            'SELECT form_id, COUNT(*) AS total FROM form_submissions
+              WHERE tenant_id = ? AND form_id IN (' . $placeholders . ')
+              GROUP BY form_id'
+        );
+        $stmt->execute([$tenantId, ...$formIds]);
+
+        $counts = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $counts[(int) $row['form_id']] = (int) $row['total'];
+        }
+
+        return $counts;
+    }
+
     public function countForForm(int $tenantId, int $formId): int
     {
         $stmt = $this->db->prepare(
@@ -284,6 +316,9 @@ final class FormSubmissionRepository
             // 127 for both cases.
             'document_id' => $row['document_id'] === null ? null : (int) $row['document_id'],
             'reference' => ($row['reference'] ?? null) === null ? null : (string) $row['reference'],
+            // Null with no submitter (a public link, a service principal) or when the
+            // profile has since gone. A name, so a screen never has to show an id.
+            'submitted_by_name' => ($row['submitted_by_name'] ?? null) === null ? null : (string) $row['submitted_by_name'],
             // `{}` rather than `[]` for a submission with no answers (every field
             // optional, none filled in). Same reason as
             // {@see FormFieldRepository}'s `validation`: PHP cannot tell an empty

@@ -87,7 +87,7 @@ final class AgentPresetRegistryTest extends TestCase
                 self::assertSame('refuse', $route['schema']['mcp']['agentPolicy'] ?? null, "{$route['method']} {$route['path']}");
             }
         }
-        self::assertSame(7, $seen, 'every agents route is checked');
+        self::assertSame(10, $seen, 'every agents route is checked');
         self::assertSame('core.agents', CoreToolsets::TAG_TOOLSET['agents']);
     }
 

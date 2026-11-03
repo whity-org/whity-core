@@ -129,8 +129,7 @@ test.describe('Delegations (role matrix)', () => {
     // One permission the admin grantor holds (the subset invariant is
     // enforced server-side; a non-held permission would 422).
     await dialog
-      .locator('label')
-      .filter({ hasText: /^relations:read$/ })
+      .locator('label[data-permission="relations:read"]')
       .locator('input[type="checkbox"]')
       .check();
 

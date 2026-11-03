@@ -25,7 +25,7 @@ final class AgentRepository
     ];
 
     private const COLUMNS = 'id, tenant_id, slug, name, name_ar, role, role_ar, instructions, instructions_ar, tone,
-                             language, toolsets, grant_template, preset_key, preset_version, status,
+                             language, toolsets, grant_template, preset_key, preset_version, status, paused_at, paused_by_profile_id, may_read,
                              created_by_profile_id, updated_by_profile_id, created_at, updated_at';
 
     public function __construct(private readonly PDO $db)
@@ -141,6 +141,10 @@ final class AgentRepository
             $sets[]              = 'toolsets = :toolsets';
             $params[':toolsets'] = self::encode(array_values((array) $fields['toolsets']));
         }
+        if (array_key_exists('may_read', $fields)) {
+            $sets[]              = 'may_read = :may_read';
+            $params[':may_read'] = self::encode(array_values((array) $fields['may_read']));
+        }
         if (array_key_exists('grant', $fields)) {
             $sets[]                    = 'grant_template = :grant_template';
             $params[':grant_template'] = self::encode(self::object((array) $fields['grant']));
@@ -162,6 +166,34 @@ final class AgentRepository
               WHERE id = :id AND tenant_id = :tenant_id'
         );
         $stmt->execute([':status' => $status, ':actor' => $actorProfileId, ':id' => $id, ':tenant_id' => $tenantId]);
+
+        return $stmt->rowCount() === 1;
+    }
+
+    /**
+     * Pause or resume an agent (WHIT-867). Pausing one already paused keeps who
+     * paused it and when. True when the agent exists in the tenant.
+     */
+    public function setPaused(int $id, int $tenantId, bool $paused, int $actorProfileId): bool
+    {
+        if ($paused) {
+            $stmt = $this->db->prepare(
+                'UPDATE agents
+                    SET paused_at = COALESCE(paused_at, NOW()),
+                        paused_by_profile_id = CASE WHEN paused_at IS NULL THEN :by ELSE paused_by_profile_id END,
+                        updated_by_profile_id = :actor, updated_at = NOW()
+                  WHERE id = :id AND tenant_id = :tenant_id'
+            );
+            $stmt->execute([':by' => $actorProfileId, ':actor' => $actorProfileId, ':id' => $id, ':tenant_id' => $tenantId]);
+
+            return $stmt->rowCount() === 1;
+        }
+
+        $stmt = $this->db->prepare(
+            'UPDATE agents SET paused_at = NULL, paused_by_profile_id = NULL, updated_by_profile_id = :actor, updated_at = NOW()
+              WHERE id = :id AND tenant_id = :tenant_id'
+        );
+        $stmt->execute([':actor' => $actorProfileId, ':id' => $id, ':tenant_id' => $tenantId]);
 
         return $stmt->rowCount() === 1;
     }
@@ -194,6 +226,9 @@ final class AgentRepository
             'preset_key'            => $row['preset_key'] === null ? null : (string) $row['preset_key'],
             'preset_version'        => $row['preset_version'] === null ? null : (int) $row['preset_version'],
             'status'                => (string) $row['status'],
+            'paused_at'             => $row['paused_at'] === null ? null : (string) $row['paused_at'],
+            'paused_by_profile_id'  => $row['paused_by_profile_id'] === null ? null : (int) $row['paused_by_profile_id'],
+            'may_read'              => array_values(array_filter($json($row['may_read']), 'is_int')),
             'created_by_profile_id' => $row['created_by_profile_id'] === null ? null : (int) $row['created_by_profile_id'],
             'updated_by_profile_id' => $row['updated_by_profile_id'] === null ? null : (int) $row['updated_by_profile_id'],
             'created_at'            => (string) $row['created_at'],

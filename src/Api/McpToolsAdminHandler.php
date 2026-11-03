@@ -12,6 +12,7 @@ use Whity\Core\Tenant\TenantContext;
 use Whity\Mcp\Tools\AuthoredToolRegistry;
 use Whity\Mcp\Tools\CoreToolsets;
 use Whity\Mcp\Tools\Discovery\DiscoveryTools;
+use Whity\Mcp\Tools\ToolCatalogue;
 use Whity\Mcp\Tools\ToolDeriver;
 use Whity\Mcp\Tools\ToolSurface;
 
@@ -37,6 +38,9 @@ use Whity\Mcp\Tools\ToolSurface;
  * says whether this workspace has turned it on (setting
  * mcp.always_on_plugin_tools, edited through the settings API), and `sizes`
  * estimates what each list mode costs a client before it does anything.
+ *
+ * WHIT-867: each tool also says, in plain words, what it is called, its area, how
+ * agents may use it and how long Undo lasts ({@see ToolCatalogue}).
  *
  * Worker-safe: reads from ToolDeriver (static cache) and RoleChecker; no
  * instance-level mutable state.
@@ -106,7 +110,8 @@ final class McpToolsAdminHandler
                 $visibility = (string) ($meta[ToolSurface::META_VISIBILITY] ?? ToolSurface::VISIBILITY_DISCOVERABLE);
                 $isCore     = CoreToolsets::isAlwaysOn($name);
                 $requested  = $visibility === ToolSurface::VISIBILITY_ALWAYS_ON && !$isCore;
-                $data[] = [
+                $permission = is_string($access['requiredPermission'] ?? null) ? $access['requiredPermission'] : null;
+                $data[] = ToolCatalogue::describe($tool, $permission) + [
                     'name'               => $name,
                     'description'        => (string) ($tool['description'] ?? ''),
                     'requiredPermission' => is_string($access['requiredPermission'] ?? null) ? $access['requiredPermission'] : null,
