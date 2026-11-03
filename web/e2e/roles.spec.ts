@@ -103,9 +103,12 @@ test.describe('Roles CRUD (admin)', () => {
     await page.waitForURL(/\/admin\/roles\/\d+$/);
     await expect(page.getByRole('dialog')).toHaveCount(0);
 
+    // The grants are on the Access tab; the code is a technical detail, so the
+    // row is found by its data attribute rather than its text.
+    await page.getByRole('tab', { name: 'Access' }).click();
     const region = page.getByTestId('role-record-section-permissions');
     await expect(region).toBeVisible();
-    await expect(region.getByText(/ous:read/)).toBeVisible();
+    await expect(region.locator('[data-permission="ous:read"]')).toBeVisible();
   });
 
   test('clone a role prefills the create dialog with its permissions', async ({ adminPage, page }) => {
@@ -235,12 +238,13 @@ test.describe('Roles CRUD (admin)', () => {
 
     // No dialog, and no scroll porthole: every permission group is on the page.
     await expect(page.getByRole('dialog')).toHaveCount(0);
+    await page.getByRole('tab', { name: 'Access' }).click();
     const grid = page.getByTestId('perm-grid');
     await expect(grid).toBeVisible();
     await expect(page.getByTestId('perm-grid-group-roles')).toBeVisible();
     await expect(page.getByTestId('perm-grid-group-users')).toBeVisible();
 
-    const rolesReadLabel = grid.locator('label', { hasText: 'roles:read' });
+    const rolesReadLabel = grid.locator('label[data-permission="roles:read"]');
     await expect(rolesReadLabel).toBeVisible();
     await rolesReadLabel.click();
     await expect(page.getByTestId('perm-grid-summary')).toHaveText(/^1 of \d+ selected$/);

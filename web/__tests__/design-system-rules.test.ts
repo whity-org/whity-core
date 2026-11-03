@@ -127,10 +127,6 @@ describe('ease of use (A.1)', () => {
     'packages/features/src/i18n/EXAMPLE.tsx',
     'packages/features/src/i18n/LanguageSwitcher.tsx',
     'packages/ui/src/editor/block-toolbar.tsx',
-    'web/app/(protected)/admin/plugins/store/page.tsx',
-    'web/app/(protected)/admin/settings/email-domains/page.tsx',
-    'web/app/(protected)/admin/settings/settings-shared.tsx',
-    'web/app/(protected)/admin/settings/sso/page.tsx',
   ];
 
   const relative = (f: string) => path.relative(ROOT, f).split(path.sep).join('/');

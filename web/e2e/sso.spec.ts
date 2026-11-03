@@ -2,7 +2,7 @@ import { test, expect, type APIRequestContext } from '@playwright/test';
 import { SYSTEM_ADMIN, REGULAR_USER } from './support/constants';
 import { createAuthedApi } from './support/api';
 import { systemStatePath } from './support/storage';
-import { LoginPage } from './support/pages';
+import { LoginPage, chooseOption } from './support/pages';
 
 /**
  * E2E for the SSO / identity-providers admin page and the "Sign in with …"
@@ -67,7 +67,7 @@ test.describe('SSO providers — admin CRUD (system-tenant operator)', () => {
     // --- Add ---
     await page.getByTestId('sso-add-provider').click();
     await expect(page.getByTestId('sso-form')).toBeVisible();
-    await page.locator('#sso-provider-key').selectOption('oidc');
+    await chooseOption(page, page.locator('#sso-provider-key'), 'Generic OpenID Connect');
 
     // The redirect URI to register with the provider is shown and follows the
     // documented shape <origin>/api/v1/auth/sso/<key>/callback.

@@ -9,6 +9,7 @@ import { AdminHeader } from '@/components/admin/admin-header';
 import { Button } from '@whity/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
 import { Input } from '@/components/ui/input';
+import { FieldSelect } from '@/components/field-select';
 import { Switch } from '@whity/ui/switch';
 import { Badge } from '@whity/ui/badge';
 import { AccessDenied } from '@whity/ui/access-denied';
@@ -21,9 +22,6 @@ import {
   IconWorld,
 } from '@tabler/icons-react';
 import { useTranslation } from '@whity/features/i18n';
-
-const NATIVE_SELECT_CLASS =
-  'h-7 w-full min-w-0 rounded-md border border-input bg-input/20 px-2 text-sm transition-colors outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-50';
 
 interface DomainVerification {
   record_name: string;
@@ -454,22 +452,14 @@ function AddDomainCard({
           <label htmlFor="domain-default-role" className="text-sm font-medium text-foreground">
             {t('settings.emailDomains.form.defaultRole', 'Default role')}
           </label>
-          <select
+          <FieldSelect
             id="domain-default-role"
-            className={NATIVE_SELECT_CLASS}
-            value={defaultRoleId}
+            value={roles.length === 0 ? '' : String(defaultRoleId)}
             disabled={saving}
-            onChange={(e) => setDefaultRoleId(Number(e.target.value))}
-          >
-            {roles.length === 0 && (
-              <option value="">{t('settings.emailDomains.form.noRoles', 'No roles available')}</option>
-            )}
-            {roles.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.name}
-              </option>
-            ))}
-          </select>
+            placeholder={t('settings.emailDomains.form.noRoles', 'No roles available')}
+            onChange={(value) => setDefaultRoleId(Number(value))}
+            options={roles.map((r) => ({ value: String(r.id), label: r.name }))}
+          />
           <p className="text-xs text-muted-foreground">
             {t(
               'settings.emailDomains.form.defaultRoleHelp',

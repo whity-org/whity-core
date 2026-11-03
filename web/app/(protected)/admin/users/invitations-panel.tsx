@@ -9,6 +9,7 @@ import { useCapabilities } from '@/hooks/useCapabilities';
 import { USERS_READ, USERS_WRITE } from '@/lib/capabilities';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { Button } from '@whity/ui/button';
+import { ConfirmAction } from '@whity/ui/confirm-action';
 import { Badge } from '@whity/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
 import {
@@ -100,7 +101,18 @@ const buildInviteSchema = (t: TranslateFn) =>
 
 type InviteFormData = z.infer<ReturnType<typeof buildInviteSchema>>;
 
-export function InvitationsPanel() {
+/**
+ * `inviteOpen` and `onInviteOpenChange` let the page header's Invite people
+ * button open the dialog that lives here. Without them the panel keeps its own
+ * state and its own button.
+ */
+export function InvitationsPanel({
+  inviteOpen,
+  onInviteOpenChange,
+}: {
+  inviteOpen?: boolean;
+  onInviteOpenChange?: (open: boolean) => void;
+} = {}) {
   const { addToast } = useToast();
   const { hasPermission } = useCapabilities();
   const t = useTranslation('admin');
@@ -109,8 +121,13 @@ export function InvitationsPanel() {
   const canRead = hasPermission(USERS_READ);
   const canWrite = hasPermission(USERS_WRITE);
 
-  const [isInviteOpen, setIsInviteOpen] = useState(false);
+  const [ownInviteOpen, setOwnInviteOpen] = useState(false);
+  const controlled = onInviteOpenChange !== undefined;
+  const isInviteOpen = controlled ? (inviteOpen ?? false) : ownInviteOpen;
+  const setIsInviteOpen = controlled ? onInviteOpenChange : setOwnInviteOpen;
   const [busyId, setBusyId] = useState<number | null>(null);
+  // Revoking can't be taken back: it asks first and names the consequence (tier 2).
+  const [revoking, setRevoking] = useState<Invitation | null>(null);
 
   const {
     data,
@@ -255,7 +272,7 @@ export function InvitationsPanel() {
           <DropdownMenuItem onClick={() => void handleResend(invitation)}>
             {t('invitations.rowActions.resend', 'Resend')}
           </DropdownMenuItem>
-          <DropdownMenuItem variant="destructive" onClick={() => void handleRevoke(invitation)}>
+          <DropdownMenuItem variant="destructive" onClick={() => setRevoking(invitation)}>
             {t('invitations.rowActions.revoke', 'Revoke')}
           </DropdownMenuItem>
         </DropdownMenuContent>
@@ -279,7 +296,7 @@ export function InvitationsPanel() {
             )}
           </CardDescription>
         </div>
-        {canWrite && (
+        {canWrite && !controlled && (
           <Button className="gap-2 shrink-0" onClick={() => setIsInviteOpen(true)}>
             <IconSend />
             {t('invitations.invite', 'Invite')}
@@ -297,6 +314,25 @@ export function InvitationsPanel() {
           pagination={{ pageSize: 10 }}
         />
       </CardContent>
+
+      <ConfirmAction
+        open={revoking !== null}
+        onOpenChange={(open) => {
+          if (!open) setRevoking(null);
+        }}
+        title={t('invitations.revoke.title', 'Revoke the invitation for {email}?', {
+          email: revoking?.email ?? '',
+        })}
+        description={t(
+          'invitations.revoke.description',
+          'The link in the email stops working. You can invite them again later.'
+        )}
+        confirmLabel={t('invitations.revoke.confirm', 'Revoke invitation')}
+        cancelLabel={t('invitations.revoke.cancel', 'Cancel')}
+        onConfirm={async () => {
+          if (revoking !== null) await handleRevoke(revoking);
+        }}
+      />
 
       <InviteModal
         isOpen={isInviteOpen}

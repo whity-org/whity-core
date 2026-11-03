@@ -286,7 +286,8 @@ export class SettingsPage {
   }
 
   async goto(): Promise<void> {
-    await this.page.goto('/settings');
+    // Two-step sign-in is on the account page's Sign-in and security tab.
+    await this.page.goto('/settings?tab=security');
     await expect(this.page.getByRole('heading', { name: 'Settings' })).toBeVisible();
   }
 
@@ -350,6 +351,15 @@ export class SettingsPage {
  */
 export function toastWithText(page: Page, text: string | RegExp): Locator {
   return page.getByText(text);
+}
+
+/**
+ * Choose an option in a design-system select (a Radix combobox, not a native
+ * `<select>`): open it, then click the option by its visible label.
+ */
+export async function chooseOption(page: Page, trigger: Locator, label: string | RegExp): Promise<void> {
+  await trigger.click();
+  await page.getByRole('option', { name: label, exact: typeof label === 'string' }).click();
 }
 
 function escapeRegExp(value: string): string {

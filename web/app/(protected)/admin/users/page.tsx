@@ -1,6 +1,6 @@
-﻿'use client';
+'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api-client';
 import { api } from '@/lib/api/client';
@@ -24,11 +24,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@whity/ui/dropdown-menu';
+import { Avatar } from '@whity/ui/avatar';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@whity/ui/tabs';
+import { AreaError } from '@whity/ui/page-states';
 import { IconMenu2, IconPlus } from '@tabler/icons-react';
 import { useTranslation } from '@whity/features/i18n';
 import { useDateDisplay } from '@whity/features/datetime';
 import { CreateUserModal } from './create-modal';
-import { EditUserModal } from './edit-modal';
 import { DeleteUserModal } from './delete-modal';
 import { InvitationsPanel } from './invitations-panel';
 import { MembershipsModal } from './memberships-modal';
@@ -45,15 +47,6 @@ interface UsersResponse {
   pagination?: { total: number; totalPages: number };
 }
 
-/**
- * Whether the list's Edit action opens the record page (#882) or the edit modal.
- *
- * Typed `boolean` rather than left as a literal so both branches stay live code
- * that the compiler checks — a `true` literal would narrow the modal path to
- * unreachable and let it rot until the day somebody needs it back.
- */
-const EDIT_OPENS_RECORD: boolean = true;
-
 export default function UsersPage() {
   const { addToast } = useToast();
   const router = useRouter();
@@ -65,10 +58,11 @@ export default function UsersPage() {
   const canDelete = hasPermission(USERS_DELETE);
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isMembershipsModalOpen, setIsMembershipsModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [tab, setTab] = useState('people');
+  const [isInviteOpen, setIsInviteOpen] = useState(false);
 
   /**
    * Page, sort and search all belong to the SERVER now (#1102).
@@ -127,12 +121,6 @@ export default function UsersPage() {
    */
   const isLoading = loading && data === null;
 
-  useEffect(() => {
-    if (error) {
-      addToast(error, 'error');
-    }
-  }, [error, addToast]);
-
   /** #882: open the user's RECORD PAGE. */
   const openRecord = useCallback(
     (user: User) => {
@@ -140,21 +128,6 @@ export default function UsersPage() {
     },
     [router]
   );
-
-  // #882: Edit opens the record page. Both paths are live on purpose — the
-  // record page is ADDITIVE, and reverting it is flipping the constant above
-  // rather than restoring a deleted component, which is the same property the
-  // roles list gets from its optional `onOpenRecord` prop. The edit modal below
-  // is still mounted and still works; #884 decides per screen when a modal is
-  // actually retired.
-  const handleEditClick = (user: User) => {
-    if (EDIT_OPENS_RECORD) {
-      openRecord(user);
-      return;
-    }
-    setSelectedUser(user);
-    setIsEditModalOpen(true);
-  };
 
   const handleDeleteClick = (user: User) => {
     setSelectedUser(user);
@@ -167,8 +140,9 @@ export default function UsersPage() {
   };
 
   // Deactivate/reactivate (WC-user-status) is gated on the SAME users:write
-  // capability as Edit — no dedicated permission exists for it server-side.
-  const handleToggleAccountStatus = async (user: User) => {
+  // capability as Edit. Deactivating is undoable, so it happens at once and the
+  // toast offers Undo (tier 1); the Undo is the opposite change.
+  const handleToggleAccountStatus = async (user: User, offerUndo = true) => {
     const nextStatus = user.accountStatus === 'inactive' ? 'active' : 'inactive';
     try {
       const { error, response } = await api.PATCH('/api/v1/users/{id}', {
@@ -184,9 +158,16 @@ export default function UsersPage() {
 
       addToast(
         nextStatus === 'inactive'
-          ? t('users.status.deactivated', 'User deactivated')
-          : t('users.status.reactivated', 'User reactivated'),
-        'success'
+          ? t('users.status.deactivated', '{name} was deactivated', { name: user.name })
+          : t('users.status.reactivated', '{name} was reactivated', { name: user.name }),
+        'success',
+        10000,
+        offerUndo
+          ? {
+              label: t('users.status.undo', 'Undo'),
+              onClick: () => void handleToggleAccountStatus({ ...user, accountStatus: nextStatus }, false),
+            }
+          : undefined
       );
       fetchUsers();
     } catch (error) {
@@ -207,55 +188,40 @@ export default function UsersPage() {
   // (`searchable` in the same ListSpec).
   const columns: DataTableColumn<User>[] = [
     {
+      // Sorted by the email on the server, which is what a person is listed by.
+      id: 'email',
       accessorKey: 'name',
-      header: t('users.table.name', 'Name'),
+      header: t('users.table.person', 'Person'),
       enableSorting: true,
-      // #882: the row's own name opens the record — the affordance a list gets
-      // once its records have addresses. Same treatment the roles list gained.
+      // A person is a name with an avatar and their email, never an id.
       cell: (user) => (
-        <button
-          type="button"
-          onClick={() => openRecord(user)}
-          className="text-start font-medium text-primary underline-offset-4 hover:underline"
-        >
-          {user.name}
-        </button>
+        <div className="flex items-center gap-3">
+          <Avatar name={user.name || user.email} size={32} />
+          <div className="min-w-0">
+            <p className="truncate font-medium text-foreground">{user.name || user.email}</p>
+            <p className="truncate text-sm text-muted-foreground">{user.email}</p>
+          </div>
+        </div>
       ),
     },
-    {
-      accessorKey: 'email',
-      header: t('users.table.email', 'Email'),
-      enableSorting: true,
-    },
     { accessorKey: 'role', header: t('users.table.role', 'Role'), enableSorting: true },
-    // NOT sortable, deliberately. `tenant` is in the spec's `sortable` map only
-    // when the caller is the system tenant — for anybody else every row holds
-    // the same tenant id, so the key would order nothing and the endpoint does
-    // not offer it. This screen does not know which caller it is serving, and a
-    // header that sorts for one operator and silently does nothing for the next
-    // is worse than one that never claimed to.
-    { accessorKey: 'tenantId', header: t('users.table.tenantId', 'Tenant ID') },
     {
       accessorKey: 'accountStatus',
       header: t('users.table.status', 'Status'),
       enableSorting: true,
       cell: (user) => (
-        <Badge variant={user.accountStatus === 'inactive' ? 'secondary' : 'outline'}>
+        <Badge variant={user.accountStatus === 'inactive' ? 'secondary' : 'success'}>
           {user.accountStatus === 'inactive'
-            ? t('users.status.inactive', 'Inactive')
+            ? t('users.status.inactive', 'Deactivated')
             : t('users.status.active', 'Active')}
         </Badge>
       ),
     },
-    // #1068. Two things changed here. The column is now GATED on the tenant
-    // preference, and it is now FORMATTED at all: an `accessorKey` with no
-    // `cell` renders `String(value)`, so this column has been printing the raw
-    // wire string — `2026-08-25 14:02:11`, unlocalised, in the middle of an
-    // otherwise Arabic table — since it was written.
+    // Gated on the workspace's date preference (#1068).
     ...dates.dateColumns<User>([
       {
         id: 'createdAt',
-        header: t('users.table.createdAt', 'Created At'),
+        header: t('users.table.createdAt', 'Added'),
         value: (user) => user.createdAt,
         enableSorting: true,
       },
@@ -279,14 +245,12 @@ export default function UsersPage() {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={() => handleMembershipsClick(user)}>
-            {t('users.rowActions.memberships', 'Tenants and roles')}
+          <DropdownMenuItem onClick={() => openRecord(user)}>
+            {t('users.rowActions.open', 'Open')}
           </DropdownMenuItem>
-          {canEdit && (
-            <DropdownMenuItem onClick={() => handleEditClick(user)}>
-              {t('users.rowActions.edit', 'Edit')}
-            </DropdownMenuItem>
-          )}
+          <DropdownMenuItem onClick={() => handleMembershipsClick(user)}>
+            {t('users.rowActions.memberships', 'Workspaces and roles')}
+          </DropdownMenuItem>
           {canEdit && (
             <DropdownMenuItem onClick={() => handleToggleAccountStatus(user)}>
               {user.accountStatus === 'inactive'
@@ -307,46 +271,84 @@ export default function UsersPage() {
     );
   };
 
+  const firstLoadFailed = error !== null && data === null;
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <AdminHeader
         title={t('users.title', 'Users')}
-        description={t('users.description', 'Manage users in your system')}
+        description={t('users.description', 'The people in your workspace, and what each of them may do.')}
         action={
           canCreate ? (
-            <Button
-              onClick={() => setIsCreateModalOpen(true)}
-              className="gap-2"
-            >
-              <IconPlus />
-              {t('users.createUser', 'Create User')}
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={() => {
+                  setTab('invitations');
+                  setIsInviteOpen(true);
+                }}
+                className="gap-2"
+              >
+                <IconPlus />
+                {t('users.invitePeople', 'Invite people')}
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    aria-label={t('users.moreActions', 'More actions')}
+                  >
+                    <IconMenu2 />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setIsCreateModalOpen(true)}>
+                    {t('users.addWithoutInviting', 'Add without inviting')}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           ) : undefined
         }
       />
 
-      <DataTable
-        ariaLabel={t('users.table.label', 'Users')}
-        columns={columns}
-        data={users}
-        getRowId={(user) => String(user.id)}
-        rowActions={rowActions}
-        isLoading={isLoading}
-        globalFilterPlaceholder={t('users.searchPlaceholder', 'Search users…')}
-        sorting={query.sorting}
-        search={query.search}
-        pagination={query.pagination({
-          total: data?.total ?? 0,
-          totalPages: data?.totalPages ?? 1,
-        })}
-      />
+      <Tabs value={tab} onValueChange={setTab}>
+        <TabsList variant="line">
+          <TabsTrigger value="people">{t('users.tab.people', 'People')}</TabsTrigger>
+          <TabsTrigger value="invitations">{t('users.tab.invitations', 'Invitations')}</TabsTrigger>
+        </TabsList>
 
-      {/*
-        Invitations sit under the user list rather than on a page of their own:
-        an invited person is a user who has not arrived yet, and "is Sara in?"
-        should not depend on knowing whether she was added or invited (WHIT-417).
-      */}
-      <InvitationsPanel />
+        <TabsContent value="people" className="mt-6">
+          {firstLoadFailed ? (
+            <AreaError
+              message={error}
+              retryLabel={t('users.tryAgain', 'Try again')}
+              onRetry={() => fetchUsers()}
+            />
+          ) : (
+            <DataTable
+              ariaLabel={t('users.table.label', 'Users')}
+              columns={columns}
+              data={users}
+              getRowId={(user) => String(user.id)}
+              onRowClick={openRecord}
+              rowActions={rowActions}
+              isLoading={isLoading}
+              globalFilterPlaceholder={t('users.searchPlaceholder', 'Search by email or role')}
+              sorting={query.sorting}
+              search={query.search}
+              pagination={query.pagination({
+                total: data?.total ?? 0,
+                totalPages: data?.totalPages ?? 1,
+              })}
+            />
+          )}
+        </TabsContent>
+
+        <TabsContent value="invitations" className="mt-6">
+          <InvitationsPanel inviteOpen={isInviteOpen} onInviteOpenChange={setIsInviteOpen} />
+        </TabsContent>
+      </Tabs>
 
       <CreateUserModal
         isOpen={isCreateModalOpen}
@@ -359,17 +361,6 @@ export default function UsersPage() {
 
       {selectedUser && (
         <>
-          <EditUserModal
-            isOpen={isEditModalOpen}
-            onOpenChange={setIsEditModalOpen}
-            user={selectedUser}
-            onSuccess={() => {
-              setIsEditModalOpen(false);
-              setSelectedUser(null);
-              fetchUsers();
-            }}
-          />
-
           <DeleteUserModal
             isOpen={isDeleteModalOpen}
             onOpenChange={setIsDeleteModalOpen}

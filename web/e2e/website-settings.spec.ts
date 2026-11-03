@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { ADMIN, uniqueSuffix } from './support/constants';
 import { createAuthedApi, ensureUser, ensureDelegation, deleteUser } from './support/api';
-import { LoginPage } from './support/pages';
+import { LoginPage, chooseOption } from './support/pages';
 
 /**
  * E2E for the admin Website Settings page (global defaults + per-tenant
@@ -56,7 +56,7 @@ test.describe('Website Settings — admin (settings:read/write/manage)', () => {
     await expect(siteName).toBeEnabled();
     await siteName.fill(newName);
 
-    await page.getByLabel('Timezone', { exact: true }).selectOption(newTz);
+    await chooseOption(page, page.getByLabel('Timezone', { exact: true }), newTz);
 
     const saveResponse = page.waitForResponse(
       (res) =>
@@ -72,7 +72,7 @@ test.describe('Website Settings — admin (settings:read/write/manage)', () => {
     await page.reload();
     await expect(page.getByRole('heading', { name: 'General' })).toBeVisible();
     await expect(page.getByLabel('Site name', { exact: true })).toHaveValue(newName);
-    await expect(page.getByLabel('Timezone', { exact: true })).toHaveValue(newTz);
+    await expect(page.getByLabel('Timezone', { exact: true })).toHaveText(newTz);
   });
 
   test('platform defaults are off the tenant page and Sign-up is denied to a non-system-tenant admin (WC-235)', async ({ page }) => {

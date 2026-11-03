@@ -135,7 +135,7 @@ async function openRowMenu(rowName: string): Promise<HTMLElement> {
 }
 
 describe('UsersPage account status (WC-user-status)', () => {
-  it('renders an Active badge for an active user and an Inactive badge for a deactivated one', async () => {
+  it('renders an Active badge for an active user and a Deactivated badge for a deactivated one', async () => {
     setCapabilities(['users:write', 'users:delete']);
     mockUsers([ACTIVE_USER, INACTIVE_USER]);
 
@@ -146,7 +146,7 @@ describe('UsersPage account status (WC-user-status)', () => {
     });
 
     expect(screen.getByText('Active')).toBeInTheDocument();
-    expect(screen.getByText('Inactive')).toBeInTheDocument();
+    expect(screen.getByText('Deactivated')).toBeInTheDocument();
   });
 
   it('offers "Deactivate" for an active user and calls PATCH with accountStatus: inactive', async () => {
@@ -172,7 +172,12 @@ describe('UsersPage account status (WC-user-status)', () => {
         })
       );
     });
-    await waitFor(() => expect(addToast).toHaveBeenCalledWith('User deactivated', 'success'));
+    await waitFor(() => expect(addToast).toHaveBeenCalledWith(
+        'alice was deactivated',
+        'success',
+        10000,
+        expect.objectContaining({ label: 'Undo' })
+      ));
   });
 
   it('offers "Reactivate" for an inactive user and calls PATCH with accountStatus: active', async () => {
@@ -198,7 +203,12 @@ describe('UsersPage account status (WC-user-status)', () => {
         })
       );
     });
-    await waitFor(() => expect(addToast).toHaveBeenCalledWith('User reactivated', 'success'));
+    await waitFor(() => expect(addToast).toHaveBeenCalledWith(
+        'bob was reactivated',
+        'success',
+        10000,
+        expect.objectContaining({ label: 'Undo' })
+      ));
   });
 
   it('hides the Deactivate/Reactivate action for a caller without users:write', async () => {

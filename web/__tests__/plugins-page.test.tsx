@@ -44,6 +44,9 @@ jest.mock('@/lib/plugin-features-context', () => ({
 jest.mock('@/lib/toast-context', () => ({
   useToast: jest.fn(),
 }));
+jest.mock('next/navigation', () => ({
+  usePathname: () => '/admin/plugins',
+}));
 
 const mockUseCapabilities = useCapabilities as jest.MockedFunction<
   typeof useCapabilities
@@ -113,6 +116,12 @@ function setCapabilities(perms: string[]): void {
   });
 }
 
+/** Opens a row's menu and returns the menu element. */
+async function openRowMenu(user: ReturnType<typeof userEvent.setup>, name: string) {
+  await user.click(screen.getByRole('button', { name: `More actions for ${name}` }));
+  return screen.findByRole('menu');
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
   mockUseToast.mockReturnValue({
@@ -137,7 +146,7 @@ describe('PluginsPage RBAC page gate', () => {
 
     render(<PluginsPage />);
 
-    expect(screen.getByText('Access Denied')).toBeInTheDocument();
+    expect(screen.getByText('You cannot manage plugins')).toBeInTheDocument();
   });
 });
 
@@ -152,88 +161,80 @@ describe('PluginsPage per-action gating (plugins:read only)', () => {
     await screen.findByText('HelloWorld');
   });
 
-  it('DISABLES Reload + Upload (non-destructive) with a tooltip reason', async () => {
+  it('shows no operator menu to someone without plugins:upload or plugins:reload', async () => {
     render(<PluginsPage />);
     await screen.findByText('HelloWorld');
 
-    const reload = screen.getByRole('button', { name: /Reload Plugins/i });
-    expect(reload).toBeDisabled();
-    expect(reload.closest('span')).toHaveAttribute(
-      'title',
-      'Requires plugins:reload'
-    );
-
-    const upload = screen.getByRole('button', { name: /Upload Plugin/i });
-    expect(upload).toBeDisabled();
-    expect(upload.closest('span')).toHaveAttribute(
-      'title',
-      'Requires plugins:upload'
-    );
+    expect(screen.queryByRole('button', { name: 'Operator tools' })).not.toBeInTheDocument();
   });
 
-  it('DISABLES the Disable toggle (active plugin) keyed off plugins:disable', async () => {
-    render(<PluginsPage />);
-    await screen.findByText('HelloWorld');
-
-    const toggle = screen.getByRole('button', { name: /Disable/i });
-    expect(toggle).toBeDisabled();
-    expect(toggle.closest('span')).toHaveAttribute(
-      'title',
-      'Requires plugins:disable'
-    );
-  });
-
-  it('HIDES the destructive Uninstall trigger in the detail modal', async () => {
+  it('HIDES Turn off when the caller lacks plugins:disable', async () => {
     const user = userEvent.setup();
     render(<PluginsPage />);
     await screen.findByText('HelloWorld');
 
-    await user.click(screen.getByRole('button', { name: /Details/i }));
-    // The modal opened (Status heading is modal-only) but the destructive
-    // Uninstall trigger is hidden for a read-only caller.
-    await screen.findByText('Status');
-    expect(
-      screen.queryByRole('button', { name: /Uninstall/i })
-    ).not.toBeInTheDocument();
+    const menu = await openRowMenu(user, 'HelloWorld');
+    expect(within(menu).getByRole('menuitem', { name: 'Details' })).toBeInTheDocument();
+    expect(within(menu).queryByRole('menuitem', { name: 'Turn off' })).not.toBeInTheDocument();
+  });
+
+  it('HIDES the destructive Uninstall item for a read-only caller', async () => {
+    const user = userEvent.setup();
+    render(<PluginsPage />);
+    await screen.findByText('HelloWorld');
+
+    const menu = await openRowMenu(user, 'HelloWorld');
+    expect(within(menu).queryByRole('menuitem', { name: 'Uninstall' })).not.toBeInTheDocument();
   });
 });
 
 describe('PluginsPage per-action gating (matching perms)', () => {
-  it('ENABLES Reload + Upload when the caller holds those perms', async () => {
-    setCapabilities([
-      'plugins:read',
-      'plugins:reload',
-      'plugins:upload',
-      'plugins:disable',
-    ]);
+  it('shows Upload plugin and Reload plugins in the operator menu', async () => {
+    const user = userEvent.setup();
+    setCapabilities(['plugins:read', 'plugins:reload', 'plugins:upload', 'plugins:disable']);
     mockPluginList([ACTIVE_PLUGIN]);
 
     render(<PluginsPage />);
     await screen.findByText('HelloWorld');
 
-    expect(
-      screen.getByRole('button', { name: /Reload Plugins/i })
-    ).toBeEnabled();
-    expect(
-      screen.getByRole('button', { name: /Upload Plugin/i })
-    ).toBeEnabled();
-    expect(screen.getByRole('button', { name: /Disable/i })).toBeEnabled();
+    await user.click(screen.getByRole('button', { name: 'Operator tools' }));
+    const menu = await screen.findByRole('menu');
+    expect(within(menu).getByRole('menuitem', { name: /Upload plugin/i })).toBeInTheDocument();
+    expect(within(menu).getByRole('menuitem', { name: /Reload plugins/i })).toBeInTheDocument();
   });
 
-  it('chooses plugins:enable for a disabled plugin toggle', async () => {
-    // The caller holds disable but NOT enable: a DISABLED plugin's toggle
-    // performs Enable, so it must be gated on plugins:enable -> disabled here.
+  it('offers Turn on for a turned-off plugin only with plugins:enable', async () => {
+    const user = userEvent.setup();
     setCapabilities(['plugins:read', 'plugins:disable']);
     mockPluginList([DISABLED_PLUGIN]);
 
     render(<PluginsPage />);
     await screen.findByText('BetaThing');
 
-    const toggle = screen.getByRole('button', { name: /Enable/i });
-    expect(toggle).toBeDisabled();
-    expect(toggle.closest('span')).toHaveAttribute(
-      'title',
-      'Requires plugins:enable'
+    const menu = await openRowMenu(user, 'BetaThing');
+    expect(within(menu).queryByRole('menuitem', { name: 'Turn on' })).not.toBeInTheDocument();
+  });
+
+  it('Uninstall asks first, naming what happens, then posts', async () => {
+    const user = userEvent.setup();
+    setCapabilities(['plugins:read', 'plugins:uninstall']);
+    mockPluginList([ACTIVE_PLUGIN]);
+
+    render(<PluginsPage />);
+    await screen.findByText('HelloWorld');
+
+    const menu = await openRowMenu(user, 'HelloWorld');
+    await user.click(within(menu).getByRole('menuitem', { name: 'Uninstall' }));
+    const dialog = await screen.findByRole('alertdialog');
+    expect(within(dialog).getByText('Uninstall HelloWorld?')).toBeInTheDocument();
+    expect(mockApiPost).not.toHaveBeenCalled();
+
+    await user.click(within(dialog).getByRole('button', { name: 'Uninstall plugin' }));
+    await waitFor(() =>
+      expect(mockApiPost).toHaveBeenCalledWith(
+        '/api/v1/plugins/{id}/uninstall',
+        expect.objectContaining({ params: { path: { id: 'hello-world' } } })
+      )
     );
   });
 });
@@ -262,7 +263,8 @@ describe('PluginsPage upload dialog', () => {
     await screen.findByText('HelloWorld');
     expect(mockApiGet).toHaveBeenCalledTimes(1);
 
-    await user.click(screen.getByRole('button', { name: /Upload Plugin/i }));
+    await user.click(screen.getByRole('button', { name: 'Operator tools' }));
+    await user.click(await screen.findByRole('menuitem', { name: /Upload plugin/i }));
 
     const dialog = await screen.findByRole('dialog');
     const file = new File(['<?php'], 'demo.php', { type: 'text/x-php' });
@@ -291,7 +293,8 @@ describe('PluginsPage upload dialog', () => {
     render(<PluginsPage />);
     await screen.findByText('HelloWorld');
 
-    await user.click(screen.getByRole('button', { name: /Upload Plugin/i }));
+    await user.click(screen.getByRole('button', { name: 'Operator tools' }));
+    await user.click(await screen.findByRole('menuitem', { name: /Upload plugin/i }));
     const dialog = await screen.findByRole('dialog');
 
     // 33 MiB > the 32 MiB cap.
@@ -346,7 +349,8 @@ describe('PluginsPage optimistic sidenav on disable', () => {
     render(<PluginsPage />);
     await screen.findByText('HelloWorld');
 
-    await user.click(screen.getByRole('button', { name: /Disable/i }));
+    const menu = await openRowMenu(user, 'HelloWorld');
+    await user.click(within(menu).getByRole('menuitem', { name: 'Turn off' }));
 
     await waitFor(() => expect(mockApiPost).toHaveBeenCalled());
     // Optimistic removal targets the plugin's contributed nav hrefs...
@@ -400,10 +404,12 @@ describe('PluginsPage rejected screens (#953)', () => {
 
     render(<PluginsPage />);
     await screen.findByText('HelloWorld');
-    await user.click(screen.getByRole('button', { name: /Details/i }));
+    const menu = await openRowMenu(user, 'HelloWorld');
+    await user.click(within(menu).getByRole('menuitem', { name: 'Details' }));
 
     expect(await screen.findByText('Rejected screens')).toBeInTheDocument();
-    expect(screen.getByText('hello-blocks')).toBeInTheDocument();
+    // The screen's id is a technical detail, shown only when asked for.
+    expect(screen.queryByText('hello-blocks')).toBeNull();
     // Verbatim: this is the string that used to exist only in a container log.
     expect(screen.getByText(DROPPED.reason)).toBeInTheDocument();
   });

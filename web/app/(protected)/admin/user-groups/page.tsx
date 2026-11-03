@@ -685,9 +685,7 @@ function UserGroupDialog({
                 removeLabel={(personName) =>
                   t('userGroups.form.people.remove', 'Remove {name}', { name: personName })
                 }
-                unknownPersonLabel={(profileId) =>
-                  t('userGroups.form.people.unknown', 'Profile #{id}', { id: profileId })
-                }
+                unknownPersonLabel={() => t('userGroups.form.people.unknown', 'Someone without a name')}
               />
             </div>
           )}
@@ -751,9 +749,7 @@ function UserGroupDialog({
                         <li key={member.profile_id}>
                           <Badge variant="secondary">
                             {member.display_name ??
-                              t('userGroups.preview.unnamed', 'Profile #{id}', {
-                                id: member.profile_id,
-                              })}
+                              t('userGroups.preview.unnamed', 'Someone without a name')}
                           </Badge>
                         </li>
                       ))}

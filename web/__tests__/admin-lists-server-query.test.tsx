@@ -198,7 +198,7 @@ describe('Users list asks the server to page, sort and search (#1102)', () => {
       );
     });
 
-    fireEvent.click(screen.getByRole('columnheader', { name: /Email/ }));
+    fireEvent.click(screen.getByRole('columnheader', { name: /Person/ }));
 
     // THE ASSERTION THIS CASE EXISTS FOR: page 2 of the old ordering is not
     // page 2 of the new one, it is an arbitrary window into a different list.
@@ -213,7 +213,7 @@ describe('Users list asks the server to page, sort and search (#1102)', () => {
     render(<UsersPage />);
     await screen.findByText('alice');
 
-    const email = () => screen.getByRole('columnheader', { name: /Email/ });
+    const email = () => screen.getByRole('columnheader', { name: /Person/ });
     fireEvent.click(email()); // asc
     await waitFor(() =>
       expect(lastRequestTo(mockApiClient, '/api/v1/users?')).toContain('sort=email&dir=asc')
@@ -273,13 +273,13 @@ describe('Users list asks the server to page, sort and search (#1102)', () => {
       render(<UsersPage />);
       await act(async () => {});
 
-      fireEvent.click(screen.getByRole('columnheader', { name: /Email/ }));
+      fireEvent.click(screen.getByRole('columnheader', { name: /Person/ }));
       await act(async () => {});
       fireEvent.click(screen.getByRole('button', { name: 'Next page' }));
       await act(async () => {});
       expect(lastRequestTo(mockApiClient, '/api/v1/users?')).toContain('page=2');
 
-      const box = screen.getByPlaceholderText('Search users…');
+      const box = screen.getByPlaceholderText('Search by email or role');
       fireEvent.change(box, { target: { value: 'sa' } });
       fireEvent.change(box, { target: { value: 'sar' } });
       fireEvent.change(box, { target: { value: 'sara' } });

@@ -28,7 +28,7 @@ test.describe('Sidebar navigation (admin)', () => {
     // violation and leave the second.
     const usersTable = page.getByRole('table', { name: 'Users' });
     await expect(usersTable).toBeVisible();
-    await expect(usersTable.getByRole('columnheader', { name: 'Email' })).toBeVisible();
+    await expect(usersTable.getByRole('columnheader', { name: 'Person' })).toBeVisible();
   });
 
   test('Roles section loads its page with heading, table and Create button', async ({
@@ -81,8 +81,9 @@ test.describe('Sidebar navigation (admin)', () => {
     await page.waitForURL('**/settings');
     await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
     // The Account Information card became the editable Profile card (WC-64).
-    await expect(page.getByText('Profile', { exact: true })).toBeVisible();
-    await expect(page.getByText('Security', { exact: true })).toBeVisible();
+    // The account page is in tabs (Profile, Sign-in and security, Sessions and devices, Preferences).
+    await expect(page.getByRole('tab', { name: 'Profile' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Sign-in and security' })).toBeVisible();
   });
 
   test('Dashboard section loads the admin landing page (redirects to stats)', async ({

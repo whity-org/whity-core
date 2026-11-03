@@ -225,8 +225,10 @@ test.describe('OU Management Hub (admin)', () => {
     await node.click();
     const drawer = page.getByRole('dialog');
     await expect(drawer.getByRole('heading', { name })).toBeVisible();
-    await expect(drawer.getByRole('heading', { name: 'Roles', exact: true })).toBeVisible();
+    // Members is the first tab; the roles that apply here are one click away.
     await expect(drawer.getByRole('heading', { name: 'Members', exact: true })).toBeVisible();
+    await drawer.getByRole('tab', { name: 'Roles here' }).click();
+    await expect(drawer.getByRole('heading', { name: 'Roles', exact: true })).toBeVisible();
   });
 
   test('assign a role to an OU in the drawer, see it listed, then remove it', async ({
@@ -247,6 +249,7 @@ test.describe('OU Management Hub (admin)', () => {
 
     const drawer = page.getByRole('dialog');
     await expect(drawer.getByRole('heading', { name })).toBeVisible();
+    await drawer.getByRole('tab', { name: 'Roles here' }).click();
     await expect(drawer.getByText('No roles assigned to this OU.')).toBeVisible();
 
     // Pick a role and assign it.

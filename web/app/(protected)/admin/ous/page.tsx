@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
@@ -246,6 +246,8 @@ export default function OUsPage() {
         onClose={() => setSelectedId(null)}
         onAction={handleAction}
         onChanged={fetchOUs}
+        canWrite={canEdit}
+        canDelete={canDelete}
       />
 
       <CreateOuModal
