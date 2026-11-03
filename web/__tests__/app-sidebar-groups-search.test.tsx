@@ -109,17 +109,19 @@ describe('AppSidebar — group disclosure', () => {
     expect(screen.getByText('Dashboard')).not.toBeVisible();
   });
 
-  it('leaves a group the user opened by hand open when the active group changes', async () => {
+  it('keeps only the current group open: opening another folds the rest', async () => {
     const user = userEvent.setup();
     const { rerender } = render(<AppSidebar groups={groups('users')} collapsibleGroups />);
 
     await user.click(groupToggle('Overview'));
     expect(groupToggle('Overview')).toHaveAttribute('aria-expanded', 'true');
+    expect(groupToggle('Access')).toHaveAttribute('aria-expanded', 'false');
 
-    // Navigating WITHIN the already-open active group must not re-narrow.
-    rerender(<AppSidebar groups={groups('roles')} collapsibleGroups />);
+    // Moving to another group re-narrows the sidebar to that one.
+    await user.click(groupToggle('Access'));
+    rerender(<AppSidebar groups={groups('inbox')} collapsibleGroups />);
     expect(groupToggle('Overview')).toHaveAttribute('aria-expanded', 'true');
-    expect(groupToggle('Access')).toHaveAttribute('aria-expanded', 'true');
+    expect(groupToggle('Access')).toHaveAttribute('aria-expanded', 'false');
   });
 
   it('never hides a group that has no heading', () => {

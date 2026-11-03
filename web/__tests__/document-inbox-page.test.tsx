@@ -15,6 +15,7 @@
  */
 
 import React from 'react';
+import userEvent from '@testing-library/user-event';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 
 const mockApiClient = jest.fn();
@@ -118,8 +119,9 @@ describe('InboxPage', () => {
     expect(mockApiClient).toHaveBeenCalledWith('/api/v1/me/inbox/sources');
     // The subtitle is the template name — what KIND of thing is waiting.
     expect(screen.getByText('Purchase order')).toBeInTheDocument();
-    // The status is the trail's own word, surfaced verbatim.
-    expect(screen.getByText('Forwarded to you')).toBeInTheDocument();
+    // The state is a word the app composes and translates, not the server's sentence.
+    expect(screen.getByText('To review')).toBeInTheDocument();
+    expect(screen.queryByText('Forwarded to you')).not.toBeInTheDocument();
   });
 
   it('always sends ?source= — never an unsourced request', async () => {
@@ -167,7 +169,7 @@ describe('InboxPage', () => {
     render(<InboxPage />);
     await waitFor(() => expect(screen.getByText('Purchase order 9912')).toBeInTheDocument());
 
-    fireEvent.click(screen.getByRole('tab', { name: /approvals/i }));
+    await userEvent.click(screen.getByRole('tab', { name: /approvals/i }));
 
     await waitFor(() => {
       const urls = mockApiClient.mock.calls.map((call) => String(call[0]));
@@ -201,7 +203,7 @@ describe('InboxPage', () => {
       .find((u) => u.startsWith('/api/v1/me/inbox?'));
     expect(first).not.toContain('open=0');
 
-    fireEvent.click(screen.getByRole('button', { name: /including what i have done/i }));
+    fireEvent.click(screen.getByRole('button', { name: /including done/i }));
 
     await waitFor(() => {
       const urls = mockApiClient.mock.calls.map((call) => String(call[0]));
@@ -215,7 +217,8 @@ describe('InboxPage', () => {
     render(<InboxPage />);
     await waitFor(() => expect(screen.getByText('Purchase order 9912')).toBeInTheDocument());
 
-    fireEvent.click(screen.getByRole('button', { name: 'Purchase order 9912' }));
+    // Every row opens its item (P.1).
+    fireEvent.click(screen.getByText('Purchase order 9912'));
     expect(push).toHaveBeenCalledWith('/admin/document-routing/318');
   });
 
@@ -237,15 +240,10 @@ describe('InboxPage', () => {
     render(<InboxPage />);
     await waitFor(() => expect(screen.getByText('Purchase order 9912')).toBeInTheDocument());
 
-    // The server's sentence, verbatim, as always.
-    expect(screen.getByText('Awaiting your decision')).toBeInTheDocument();
-    // And a marker of this screen's own, beside the thing you click. The
-    // server's sentence is composed in PHP with no key a translator can reach;
-    // this one has one, which is the difference between the distinction being
-    // available in Arabic and not.
-    const chip = document.querySelector('[data-slot="inbox-decision"]');
-    expect(chip).not.toBeNull();
-    expect(chip?.textContent).toBe('Decision');
+    // The server's sentence is composed in PHP with no key a translator can
+    // reach, so the state is this screen's own word, from the machine flag.
+    expect(screen.getByText('Your decision')).toBeInTheDocument();
+    expect(screen.queryByText('Awaiting your decision')).not.toBeInTheDocument();
   });
 
   it('does not mark an ordinary circulation item as a decision', async () => {
@@ -256,8 +254,8 @@ describe('InboxPage', () => {
 
     // The fixture carries no `decision` key at all — the shape a server older
     // than #1030 sends. Absence is read as false, and the item keeps its link.
-    expect(document.querySelector('[data-slot="inbox-decision"]')).toBeNull();
-    expect(screen.getByRole('button', { name: 'Purchase order 9912' })).toBeInTheDocument();
+    expect(screen.queryByText('Your decision')).not.toBeInTheDocument();
+    expect(screen.getByText('To review')).toBeInTheDocument();
   });
 
   it('does not label a decision you have already answered as still waiting', async () => {
@@ -275,7 +273,7 @@ describe('InboxPage', () => {
     await waitFor(() => expect(screen.getByText('Purchase order 9912')).toBeInTheDocument());
 
     expect(screen.getByText('Done')).toBeInTheDocument();
-    expect(document.querySelector('[data-slot="inbox-decision"]')).toBeNull();
+    expect(screen.queryByText('Your decision')).not.toBeInTheDocument();
   });
 
   it('renders an item with no routing meta as text, never as a dead link', async () => {
@@ -293,7 +291,7 @@ describe('InboxPage', () => {
     wire([ROUTING_SOURCE], []);
 
     const { unmount } = render(<InboxPage />);
-    await waitFor(() => expect(screen.getByText('Nothing is awaiting you')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Nothing is waiting for you')).toBeInTheDocument());
     unmount();
 
     jest.clearAllMocks();
@@ -306,7 +304,7 @@ describe('InboxPage', () => {
       ).toBeInTheDocument()
     );
     // Not the "you are up to date" message — a different fact.
-    expect(screen.queryByText('Nothing is awaiting you')).not.toBeInTheDocument();
+    expect(screen.queryByText('Nothing is waiting for you')).not.toBeInTheDocument();
   });
 
   it('surfaces the server’s own message when the catalogue fails', async () => {
