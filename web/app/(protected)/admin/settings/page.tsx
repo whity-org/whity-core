@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import { useAuth } from '@/lib/auth-context';
@@ -12,6 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whit
 import { AccessDenied } from '@whity/ui/access-denied';
 import { IconDeviceFloppy } from '@tabler/icons-react';
 import { useTranslation } from '@whity/features/i18n';
+import { TENANTS_READ } from '@/lib/capabilities';
 import {
   SETTINGS_READ,
   SETTINGS_WRITE,
@@ -84,8 +86,37 @@ export default function AdminSettingsPage() {
         )}
       />
       <TenantSettingsSection canWrite={canWrite} addToast={addToast} />
+      {!isSystemTenant && typeof user?.tenant_id === 'number' && hasPermission(TENANTS_READ) && (
+        <WorkspaceRecordLink tenantId={user.tenant_id} />
+      )}
       {isSystemTenant && canManageGlobal && <PlatformDefaultsSection addToast={addToast} />}
     </div>
+  );
+}
+
+/**
+ * The way to a workspace's own record, which Tenants in the sidebar no longer gives
+ * a workspace admin.
+ */
+function WorkspaceRecordLink({ tenantId }: { tenantId: number }) {
+  const t = useTranslation('admin');
+
+  return (
+    <Card className="border border-border bg-card shadow-sm">
+      <CardHeader>
+        <CardTitle className="text-lg font-semibold font-heading">
+          {t('settings.workspaceRecord.title', 'Workspace record')}
+        </CardTitle>
+        <CardDescription>
+          {t('settings.workspaceRecord.description', "This workspace's own record, with its name and address.")}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Button asChild variant="outline">
+          <Link href={`/admin/tenants/${tenantId}`}>{t('settings.workspaceRecord.open', 'Open workspace record')}</Link>
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
 
