@@ -103,7 +103,9 @@ final class SystemTenantRefreshRealEngineTest extends TestCase
     {
         $this->seedSystemAdmin('sysadmin-reuse@example.test');
         $old = $this->mintRefresh('sysadmin-reuse@example.test', self::SYSTEM_TENANT_ID);
-        $oldJti = (string) $this->jwtParser->parse($old)['jti'];
+        $oldClaims = $this->jwtParser->parse($old);
+        $this->assertIsArray($oldClaims);
+        $oldJti = (string) $oldClaims['jti'];
 
         $_COOKIE['refresh_token'] = $old;
         $first = $this->authHandler->handleRefresh(new Request('POST', '/api/auth/refresh', []));
