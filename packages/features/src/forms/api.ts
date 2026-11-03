@@ -69,6 +69,10 @@ export function createFormsApi(transport: Transport) {
       call(transport, "POST", `/api/v1/forms/${id}/public-link`, {}, fallback, (b) => data<FormRow>(b)),
     disablePublicLink: (id: number, fallback: string) =>
       call(transport, "DELETE", `/api/v1/forms/${id}/public-link`, undefined, fallback, () => true),
+    openToMembers: (id: number, open: boolean, fallback: string) =>
+      call(transport, open ? "POST" : "DELETE", `/api/v1/forms/${id}/member-access`, open ? {} : undefined, fallback, (b) => data<FormRow>(b)),
+    listMyForms: (fallback: string) =>
+      call(transport, "GET", "/api/v1/me/forms", undefined, fallback, (b) => data<FormRow[]>(b)),
     listSubmissions: (formId: number | null, fallback: string) =>
       call(
         transport,

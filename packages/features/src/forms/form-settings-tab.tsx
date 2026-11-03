@@ -27,6 +27,7 @@ export function FormSettingsTab({
   onChange,
   onPublicLink,
   onCopyLink,
+  onMemberAccess,
 }: {
   form: FormRow
   settings: FormSettings
@@ -35,6 +36,7 @@ export function FormSettingsTab({
   onChange: (next: FormSettings) => void
   onPublicLink: (enabled: boolean) => void
   onCopyLink: () => void
+  onMemberAccess: (open: boolean) => void
 }) {
   const t = useTranslation("forms")
   const lang = { enLabel: t("builder.lang.en", "English"), arLabel: t("builder.lang.ar", "Arabic") }
@@ -150,6 +152,33 @@ export function FormSettingsTab({
           )}
         </CardContent>
       </Card>
+
+      {form.open_to_members !== undefined && (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("builder.settings.members", "Open to members")}</CardTitle>
+            <CardDescription>
+              {t("builder.settings.members.body", "Let people in this workspace fill in this form, even if they cannot manage or read forms. They see only this form and their own submissions.")}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="flex items-center gap-3">
+              <Switch
+                id="form-members"
+                checked={form.open_to_members}
+                disabled={readOnly || publicBusy || form.status !== "published"}
+                onCheckedChange={onMemberAccess}
+              />
+              <label htmlFor="form-members" className="text-sm font-medium">
+                {form.open_to_members ? t("builder.settings.members.on", "Open to members") : t("builder.settings.members.off", "Not open to members")}
+              </label>
+            </div>
+            {form.status !== "published" && (
+              <p className="text-xs text-muted-foreground">{t("builder.settings.members.publishFirst", "Open the form first to turn this on.")}</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

@@ -37,6 +37,8 @@ export interface FormRow {
   public_url: string | null
   public_opens_at: string | null
   public_closes_at: string | null
+  /** Present once the server offers the switch (WHIT-859). */
+  open_to_members?: boolean
   submission_count?: number
 }
 

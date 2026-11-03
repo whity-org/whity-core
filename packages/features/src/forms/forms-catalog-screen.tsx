@@ -41,7 +41,13 @@ export function FormsCatalogScreen({ env }: { env: FormsScreenEnv }) {
 
   const load = useCallback(async () => {
     setFailure(null)
-    const result = await api.listForms(t("catalog.error", "The forms could not be loaded."))
+    const failed = t("catalog.error", "The forms could not be loaded.")
+    let result = await api.listForms(failed)
+    // A member who may fill forms in but not read them all sees the forms opened to them.
+    if (!result.ok && result.status === 403) {
+      const mine = await api.listMyForms(failed)
+      if (mine.ok) result = mine
+    }
     if (!result.ok) {
       setFailure({ denied: result.status === 403, message: result.message })
       return

@@ -219,6 +219,18 @@ export function FormBuilderScreen({ env, formId, canManage }: { env: FormsScreen
     }
   }
 
+  async function setMemberAccess(open: boolean) {
+    if (loaded === null) return
+    setPublicBusy(true)
+    const result = await api.openToMembers(formId, open, t("builder.action.failed", "That did not work. Try again."))
+    setPublicBusy(false)
+    if (!result.ok) {
+      env.notify(result.message, "error")
+      return
+    }
+    setLoaded((current) => (current === null ? current : { ...current, form: { ...current.form, ...result.data } }))
+  }
+
   function copyLink() {
     const url = loaded?.form.public_url
     if (!url) return
@@ -375,6 +387,7 @@ export function FormBuilderScreen({ env, formId, canManage }: { env: FormsScreen
             onChange={setSettings}
             onPublicLink={(enabled) => void setPublicLink(enabled)}
             onCopyLink={copyLink}
+            onMemberAccess={(open) => void setMemberAccess(open)}
           />
         </TabsContent>
       </Tabs>
