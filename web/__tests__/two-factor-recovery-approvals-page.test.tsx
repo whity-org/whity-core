@@ -87,6 +87,9 @@ describe('TwoFactorRecoveryApprovalsPage — list and actions', () => {
       expect(screen.getByTestId('two-factor-recovery-approve-701')).toBeInTheDocument()
     );
     fireEvent.click(screen.getByTestId('two-factor-recovery-approve-701'));
+    // Approving is tier 3: the dialog asks for the email to be typed.
+    fireEvent.change(await screen.findByLabelText('Type their email to confirm'), { target: { value: 'lockedout@acme.test' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Approve request' }));
 
     await waitFor(() =>
       expect(global.fetch).toHaveBeenCalledWith(

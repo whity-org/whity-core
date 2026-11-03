@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState } from 'react';
 import { api } from '@/lib/api/client';
@@ -15,12 +15,18 @@ import { Button } from '@whity/ui/button';
 import { Alert, AlertDescription } from '@whity/ui/alert';
 import { IconAlertCircle } from '@tabler/icons-react';
 import { useTranslation } from '@whity/features/i18n';
+import { TechnicalDetails } from '@whity/ui/display-preferences';
+import { permissionInWords } from './permission-words';
 import type { Delegation } from './types';
 
 interface RevokeDelegationModalProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   delegation: Delegation;
+  /** Who it was delegated to, as a name. */
+  granteeName: string;
+  /** Where it applies, as a name. */
+  scopeName: string;
   onSuccess: () => void;
 }
 
@@ -33,6 +39,8 @@ export function RevokeDelegationModal({
   isOpen,
   onOpenChange,
   delegation,
+  granteeName,
+  scopeName,
   onSuccess,
 }: RevokeDelegationModalProps) {
   const { addToast } = useToast();
@@ -69,37 +77,25 @@ export function RevokeDelegationModal({
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{t('delegations.revoke.title', 'Revoke Delegation')}</DialogTitle>
+          <DialogTitle>{t('delegations.revoke.title', 'Revoke this delegation?')}</DialogTitle>
           <DialogDescription>
             {t(
               'delegations.revoke.description',
-              'Are you sure you want to revoke this delegation? The grantee will lose ' +
-                'the delegated access immediately.'
+              'They lose the delegated access straight away.'
             )}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3 py-4">
           <div className="rounded-lg bg-muted p-3">
-            <div className="text-sm font-medium">{delegation.permission}</div>
-            {/*
-              One sentence, one key. The grantee kind and the scope are holes in
-              it rather than fragments concatenated around it, so a translator
-              can move the id, the kind and the scope wherever their grammar
-              wants them — which is the whole reason this is not
-              `'Delegated to ' + type + ' #' + id`.
-            */}
+            <div className="text-sm font-medium">{permissionInWords(delegation.permission)}</div>
+            <TechnicalDetails>
+              <div className="font-mono text-xs text-muted-foreground">{delegation.permission}</div>
+            </TechnicalDetails>
             <div className="mt-1 text-xs text-muted-foreground">
-              {t('delegations.revoke.grantee', 'Delegated to {type} #{id} ({scope})', {
-                type:
-                  delegation.granteeType === 'role'
-                    ? t('delegations.revoke.granteeType.role', 'role')
-                    : t('delegations.revoke.granteeType.user', 'user'),
-                id: delegation.granteeId,
-                scope:
-                  delegation.ouId !== null
-                    ? t('delegations.revoke.scope.ou', 'OU #{id}', { id: delegation.ouId })
-                    : t('delegations.revoke.scope.tenantWide', 'tenant-wide'),
+              {t('delegations.revoke.grantee', 'Delegated to {name} ({scope})', {
+                name: granteeName,
+                scope: scopeName,
               })}
             </div>
           </div>
@@ -109,8 +105,7 @@ export function RevokeDelegationModal({
             <AlertDescription>
               {t(
                 'delegations.revoke.warning',
-                'This action cannot be undone. To restore access you would create a ' +
-                  'new delegation.'
+                "This can't be undone here. To give the access back, delegate it again."
               )}
             </AlertDescription>
           </Alert>
@@ -132,8 +127,8 @@ export function RevokeDelegationModal({
             disabled={isRevoking}
           >
             {isRevoking
-              ? t('delegations.revoke.submitting', 'Revoking...')
-              : t('delegations.revoke.submit', 'Revoke Delegation')}
+              ? t('delegations.revoke.submitting', 'Revoking…')
+              : t('delegations.revoke.submit', 'Revoke delegation')}
           </Button>
         </DialogFooter>
       </DialogContent>

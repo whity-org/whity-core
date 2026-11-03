@@ -11,6 +11,9 @@ import { Button } from '@whity/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
 import { AccessDenied } from '@whity/ui/access-denied';
 import { IconCheck, IconInbox, IconX } from '@tabler/icons-react';
+import { ConfirmAction } from '@whity/ui/confirm-action';
+import { AreaError, LoadingRows } from '@whity/ui/page-states';
+import { useDateDisplay } from '@whity/features/datetime';
 import { useTranslation } from '@whity/features/i18n';
 
 /**
@@ -59,6 +62,9 @@ export default function PendingRegistrationsPage() {
   // Tracks the membership id currently being approved/rejected so its row's
   // buttons disable while the request is in flight.
   const [busyId, setBusyId] = useState<number | null>(null);
+  // Rejecting suspends the account, so it asks first and names that (tier 2).
+  const [rejecting, setRejecting] = useState<PendingRegistration | null>(null);
+  const dates = useDateDisplay();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -213,15 +219,18 @@ export default function PendingRegistrationsPage() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="flex items-center justify-center py-10">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-            </div>
+            <LoadingRows
+              label={t('registrations.loading', 'Loading sign-up requests')}
+              headers={[t('registrations.column.workspace', 'Workspace'), t('registrations.column.owner', 'Owner')]}
+              rows={3}
+            />
           ) : loadError ? (
-            <div className="text-sm text-destructive" data-testid="registrations-load-error">
-              {t('registrations.loadError', 'Failed to load pending registrations.')}{' '}
-              <button type="button" onClick={() => void load()} className="underline font-medium">
-                {t('registrations.retry', 'Retry')}
-              </button>
+            <div data-testid="registrations-load-error">
+              <AreaError
+                message={t('registrations.loadError', 'Failed to load pending registrations.')}
+                retryLabel={t('registrations.retry', 'Try again')}
+                onRetry={() => void load()}
+              />
             </div>
           ) : items.length === 0 ? (
             <div
@@ -242,7 +251,16 @@ export default function PendingRegistrationsPage() {
                   <div className="min-w-0">
                     <p className="font-medium text-foreground truncate">{item.tenant_name}</p>
                     <p className="text-sm text-muted-foreground truncate">
-                      {item.owner_email || item.display_name}
+                      {[
+                        item.owner_email || item.display_name,
+                        // "Asked on …": missing before, and dropped when this
+                        // workspace hides dates.
+                        dates.date(item.created_at) !== null
+                          ? t('registrations.asked', 'Asked on {date}', { date: dates.date(item.created_at) ?? '' })
+                          : null,
+                      ]
+                        .filter((part) => part)
+                        .join(' · ')}
                     </p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
@@ -262,7 +280,7 @@ export default function PendingRegistrationsPage() {
                       size="sm"
                       variant="outline"
                       disabled={busyId === item.membership_id}
-                      onClick={() => void act(item, 'reject')}
+                      onClick={() => setRejecting(item)}
                       className="gap-1"
                       data-testid={`registration-reject-${item.membership_id}`}
                     >
@@ -276,6 +294,22 @@ export default function PendingRegistrationsPage() {
           )}
         </CardContent>
       </Card>
+      <ConfirmAction
+        open={rejecting !== null}
+        onOpenChange={(open) => {
+          if (!open) setRejecting(null);
+        }}
+        title={t('registrations.reject.title', 'Reject {tenant}?', { tenant: rejecting?.tenant_name ?? '' })}
+        description={t(
+          'registrations.reject.description',
+          'Its owner cannot sign in. The account is suspended, and you can approve it later.'
+        )}
+        confirmLabel={t('registrations.reject.confirm', 'Reject sign-up')}
+        cancelLabel={t('registrations.reject.cancel', 'Cancel')}
+        onConfirm={async () => {
+          if (rejecting !== null) await act(rejecting, 'reject');
+        }}
+      />
     </div>
   );
 }

@@ -1,6 +1,10 @@
-﻿'use client';
+'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { fetchAllPagesTyped } from '@/lib/api/fetch-all-pages';
+import { Avatar } from '@whity/ui/avatar';
+import { TechnicalDetails } from '@whity/ui/display-preferences';
+import { useDateDisplay } from '@whity/features/datetime';
 import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import { AdminHeader } from '@/components/admin/admin-header';
@@ -11,6 +15,7 @@ import { ErrorState } from '@whity/ui/empty-state';
 import { IconPlus, IconShare, IconShieldLock } from '@tabler/icons-react';
 import { useTranslation } from '@whity/features/i18n';
 import { CreateDelegationModal } from './create-modal';
+import { permissionInWords } from './permission-words';
 import { RevokeDelegationModal } from './revoke-modal';
 import type { Delegation } from './types';
 
@@ -22,8 +27,11 @@ import type { Delegation } from './types';
 interface DelegationRow {
   id: number;
   permission: string;
+  /** The grantee's name, or a plain word when the viewer cannot read it. */
   grantee: string;
+  granteeIsRole: boolean;
   scope: string;
+  grantedAt: string | null;
   status: string;
   source: Delegation;
 }
@@ -39,6 +47,37 @@ export default function DelegationsPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isRevokeOpen, setIsRevokeOpen] = useState(false);
   const [selected, setSelected] = useState<Delegation | null>(null);
+  const dates = useDateDisplay();
+
+  // Names for who and where, never ids. Each list is read once and dropped when
+  // it could not be read in full, so a row falls back to a plain word rather
+  // than to a number.
+  const [roleNames, setRoleNames] = useState<Map<number, string>>(new Map());
+  const [userNames, setUserNames] = useState<Map<number, string>>(new Map());
+  const [ouNames, setOuNames] = useState<Map<number, string>>(new Map());
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const [roles, users, ous] = await Promise.all([
+        fetchAllPagesTyped<{ id: number; name: string }>((query) =>
+          api.GET('/api/v1/roles', { params: { query } })
+        ),
+        fetchAllPagesTyped<{ id: number; name: string; email: string }>((query) =>
+          api.GET('/api/v1/users', { params: { query } })
+        ),
+        fetchAllPagesTyped<{ id: number; name: string }>((query) =>
+          api.GET('/api/v1/ous', { params: { query } })
+        ),
+      ]);
+      if (cancelled) return;
+      if (roles.complete) setRoleNames(new Map(roles.items.map((r) => [r.id, r.name])));
+      if (users.complete) setUserNames(new Map(users.items.map((u) => [u.id, u.name || u.email])));
+      if (ous.complete) setOuNames(new Map(ous.items.map((o) => [o.id, o.name])));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Sort/filter/pagination all still run CLIENT-side over a single fetch —
   // fetching the backend's own page-size ceiling (100) rather than its default
@@ -99,36 +138,71 @@ export default function DelegationsPage() {
         permission: d.permission,
         grantee:
           d.granteeType === 'role'
-            ? t('delegations.grantee.role', 'Role #{id}', { id: d.granteeId })
-            : t('delegations.grantee.user', 'User #{id}', { id: d.granteeId }),
+            ? (roleNames.get(d.granteeId) ?? t('delegations.grantee.role', 'A role'))
+            : (userNames.get(d.granteeId) ?? t('delegations.grantee.user', 'A person')),
+        granteeIsRole: d.granteeType === 'role',
         scope:
           d.ouId !== null
-            ? t('delegations.scope.ou', 'OU #{id}', { id: d.ouId })
-            : t('delegations.scope.tenantWide', 'Tenant-wide'),
+            ? (ouNames.get(d.ouId) ?? t('delegations.scope.ou', 'One unit'))
+            : t('delegations.scope.tenantWide', 'Whole workspace'),
+        grantedAt: d.grantedAt,
         status:
           d.revokedAt !== null
             ? t('delegations.status.revoked', 'Revoked')
             : t('delegations.status.active', 'Active'),
         source: d,
       })),
-    [delegations, t]
+    [delegations, t, roleNames, userNames, ouNames]
   );
 
   const columns: DataTableColumn<DelegationRow>[] = [
     {
-      accessorKey: 'permission',
-      header: t('delegations.table.permission', 'Permission'),
+      accessorKey: 'grantee',
+      header: t('delegations.table.grantee', 'To'),
       enableSorting: true,
-      enableColumnFilter: true,
+      cell: (row) => (
+        <div className="flex items-center gap-3">
+          {row.granteeIsRole ? (
+            <Badge variant="outline">{row.grantee}</Badge>
+          ) : (
+            <>
+              <Avatar name={row.grantee} size={28} />
+              <span className="font-medium text-foreground">{row.grantee}</span>
+            </>
+          )}
+        </div>
+      ),
     },
     {
-      accessorKey: 'grantee',
-      header: t('delegations.table.grantee', 'Grantee'),
+      accessorKey: 'permission',
+      header: t('delegations.table.permission', 'What'),
       enableSorting: true,
-      enableColumnFilter: true,
+      cell: (row) => (
+        <div>
+          <p className="text-foreground">{permissionInWords(row.permission)}</p>
+          <TechnicalDetails>
+            <p className="font-mono text-xs text-muted-foreground">{row.permission}</p>
+          </TechnicalDetails>
+        </div>
+      ),
     },
-    { accessorKey: 'scope', header: t('delegations.table.scope', 'Scope'), enableSorting: true },
-    { accessorKey: 'status', header: t('delegations.table.status', 'Status'), enableSorting: true },
+    { accessorKey: 'scope', header: t('delegations.table.scope', 'Where'), enableSorting: true },
+    ...dates.dateColumns<DelegationRow>([
+      {
+        id: 'grantedAt',
+        header: t('delegations.table.grantedAt', 'Since'),
+        value: (row) => row.grantedAt,
+        enableSorting: true,
+      },
+    ]),
+    {
+      accessorKey: 'status',
+      header: t('delegations.table.status', 'Status'),
+      enableSorting: true,
+      cell: (row) => (
+        <Badge variant={row.source.revokedAt !== null ? 'secondary' : 'success'}>{row.status}</Badge>
+      ),
+    },
   ];
 
   const handleRevokeClick = (delegation: Delegation) => {
@@ -137,16 +211,10 @@ export default function DelegationsPage() {
   };
 
   const rowActions = (row: DelegationRow) => {
-    if (row.source.revokedAt !== null) {
-      return <Badge variant="outline">{t('delegations.status.revoked', 'Revoked')}</Badge>;
-    }
+    // Ended delegations stay listed, for the record, with nothing left to do.
+    if (row.source.revokedAt !== null) return null;
     return (
-      <Button
-        variant="ghost"
-        size="sm"
-        className="text-destructive hover:text-destructive"
-        onClick={() => handleRevokeClick(row.source)}
-      >
+      <Button variant="outline" size="sm" onClick={() => handleRevokeClick(row.source)}>
         {t('delegations.action.revoke', 'Revoke')}
       </Button>
     );
@@ -182,7 +250,7 @@ export default function DelegationsPage() {
           isForbidden ? undefined : (
             <Button onClick={() => setIsCreateOpen(true)} className="gap-2">
               <IconPlus size={18} />
-              {t('delegations.header.create', 'Create Delegation')}
+              {t('delegations.header.create', 'Delegate')}
             </Button>
           )
         }
@@ -235,6 +303,8 @@ export default function DelegationsPage() {
           isOpen={isRevokeOpen}
           onOpenChange={setIsRevokeOpen}
           delegation={selected}
+          granteeName={rows.find((row) => row.id === selected.id)?.grantee ?? ''}
+          scopeName={rows.find((row) => row.id === selected.id)?.scope ?? ''}
           onSuccess={() => {
             setIsRevokeOpen(false);
             setSelected(null);
