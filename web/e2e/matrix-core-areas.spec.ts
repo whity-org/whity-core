@@ -98,7 +98,7 @@ test.describe('Core admin areas (role matrix)', () => {
     }
   });
 
-  test('Dashboard is every role's link; System is hidden in a workspace', async ({ roleSession }) => {
+  test("Dashboard is every role's link; System is hidden in a workspace", async ({ roleSession }) => {
     // System is gated on `stats:read` in the system tenant (H.3). None of these
     // roles is acting there, including the workspace admin who holds that slug.
     await expect(roleSession.shell.navLink('Dashboard')).toBeVisible();
