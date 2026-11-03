@@ -8,6 +8,7 @@ use Whity\Auth\RoleChecker;
 use Whity\Core\Agent\AgentAssignmentRepository;
 use Whity\Core\Agent\AgentDefinition;
 use Whity\Core\Agent\AgentRepository;
+use Whity\Core\Agent\AgentStatsRepository;
 use Whity\Core\Audit\AuditLoggerInterface;
 use Whity\Core\Request;
 use Whity\Core\Response;
@@ -16,12 +17,15 @@ use Whity\Mcp\Auth\AgentGrantView;
 use Whity\Mcp\Auth\AgentScopeGrant;
 use Whity\Mcp\Auth\McpScope;
 use Whity\Mcp\Auth\McpTokenService;
+use Whity\Mcp\Tools\CoreToolsets;
+use Whity\Mcp\Tools\ToolCatalogue;
 
 /**
  * A person's use of the workspace's agents (WHIT-816;
  * docs/design/AGENT-PERSONAS-AND-WHITY-AGENT.md §4.3 and §4.4).
  *
  *   GET    /api/me/agents                          the workspace's agents, with the caller's assignment
+ *   GET    /api/me/agent-toolsets                  the areas an agent can work with, by name
  *   POST   /api/me/agents/{id}/assignment          grant the agent for yourself
  *   DELETE /api/me/agents/{id}/assignment          stop using it; its credentials are revoked
  *   GET    /api/me/agents/{id}/assignment/grant    your grant, permission by permission
@@ -56,6 +60,11 @@ final class MyAgentsApiHandler
         private readonly RoleChecker $roles,
         private readonly \Closure $agentOperations,
         private readonly ?AuditLoggerInterface $audit = null,
+        // WHIT-867: the caller's own use of each agent, and when today began.
+        private readonly ?AgentStatsRepository $stats = null,
+        private readonly ?\Closure $todayFrom = null,
+        // WHIT-867: the row when this person can read that document, else null.
+        private readonly ?\Closure $readableSource = null,
     ) {
     }
 
@@ -68,12 +77,52 @@ final class MyAgentsApiHandler
         }
         [$tenantId, $profileId] = $caller;
 
-        $mine = $this->assignments->activeForPerson($profileId, $tenantId);
+        $mine   = $this->assignments->activeForPerson($profileId, $tenantId);
+        $agents = $this->agents->list($tenantId);
+        $stats  = $this->stats?->forWorkspace(
+            $tenantId,
+            $this->todayFrom !== null ? ($this->todayFrom)($tenantId) : gmdate('Y-m-d 00:00:00'),
+            $profileId,
+        ) ?? [];
+
+        $operations = ($this->agentOperations)();
+        $view       = new AgentGrantView($operations);
+        $held       = $this->held(array_values(array_unique(array_column($operations, 'permission'))), $profileId, $tenantId);
 
         return Response::json(['data' => array_map(
-            static fn (array $agent): array => self::presentAgent($agent, $mine[$agent['id']] ?? null),
-            $this->agents->list($tenantId),
+            function (array $agent) use ($mine, $stats, $view, $held, $profileId, $tenantId): array {
+                $assignment = $mine[$agent['id']] ?? null;
+                $use        = $stats[$agent['id']] ?? [];
+
+                return self::presentAgent($agent, $assignment) + [
+                    'paused'         => $agent['paused_at'] !== null,
+                    'actionsToday'   => $use['actionsToday'] ?? 0,
+                    'proposalsToday' => $use['proposalsToday'] ?? 0,
+                    'waiting'        => $use['waiting'] ?? 0,
+                    'lastActiveAt'   => isset($use['lastActiveAt']) ? self::utc($use['lastActiveAt']) : null,
+                    'onItsOwn'       => $assignment === null
+                        ? null
+                        : $view->onItsOwn(AgentAssignmentRepository::scopeEntries($agent['toolsets'], $assignment['grant']), $held),
+                    'mayRead'        => $this->mayRead($agent['may_read'], $profileId, $tenantId),
+                ];
+            },
+            $agents,
         )], 200);
+    }
+
+    /**
+     * Core's areas in both languages. Names only, nothing about this workspace.
+     *
+     * @param array<string, string> $params
+     */
+    public function toolsets(Request $request, array $params = []): Response
+    {
+        $caller = $this->caller($request);
+        if ($caller instanceof Response) {
+            return $caller;
+        }
+
+        return Response::json(['data' => array_map(ToolCatalogue::area(...), array_keys(CoreToolsets::TOOLSETS))], 200);
     }
 
     /** @param array<string, string> $params */
@@ -208,6 +257,10 @@ final class MyAgentsApiHandler
         }
         [$agent, $assignment, $tenantId, $profileId] = $found;
 
+        if ($agent['paused_at'] !== null) {
+            return Response::error('This agent is paused, so it can\'t connect. Someone who manages agents can resume it.', 409);
+        }
+
         $body = json_decode($request->getBody(), true);
         $name = is_array($body) && is_string($body['name'] ?? null) ? trim($body['name']) : '';
         if (mb_strlen($name) > 100) {
@@ -330,6 +383,31 @@ final class MyAgentsApiHandler
         }
 
         return [$agent, $assignment, $tenantId, $profileId];
+    }
+
+    /**
+     * What the agent keeps for reference that this person can read: nothing they
+     * can't, so the list never tells them more than they may know.
+     *
+     * @param list<int> $ids
+     * @return list<array{id: int, title: string, kind: string}>
+     */
+    private function mayRead(array $ids, int $profileId, int $tenantId): array
+    {
+        $out = [];
+        foreach ($ids as $id) {
+            $row = $this->readableSource !== null ? ($this->readableSource)($id, $tenantId, $profileId) : null;
+            if (is_array($row)) {
+                $out[] = ['id' => $id, 'title' => (string) ($row['title'] ?? ''), 'kind' => (string) ($row['kind'] ?? '')];
+            }
+        }
+
+        return $out;
+    }
+
+    private static function utc(string $time): string
+    {
+        return gmdate('Y-m-d\TH:i:s\Z', (int) strtotime($time . ' UTC'));
     }
 
     /** @return array{0: int, 1: int}|Response */

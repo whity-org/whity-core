@@ -91,7 +91,7 @@ final class AgentActionRepository
      *
      * @return list<array<string, mixed>>
      */
-    public function listFor(int $tenantId, int $profileId, int $limit = 50, ?string $since = null, ?string $status = null): array
+    public function listFor(int $tenantId, int $profileId, int $limit = 50, ?string $since = null, ?string $status = null, ?string $principalId = null): array
     {
         $now    = gmdate('Y-m-d H:i:s');
         $sql    = 'SELECT ' . self::COLUMNS . ' FROM agent_actions a ' . self::JOINS . '
@@ -100,6 +100,10 @@ final class AgentActionRepository
         if ($since !== null) {
             $sql .= ' AND a.created_at >= :since';
             $params[':since'] = $since;
+        }
+        if ($principalId !== null) {
+            $sql .= ' AND a.agent_principal_id = :principal';
+            $params[':principal'] = $principalId;
         }
         if ($status === self::UNDONE) {
             $sql .= ' AND a.status = :undone';

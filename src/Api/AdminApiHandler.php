@@ -55,9 +55,18 @@ class AdminApiHandler
 
     /**
      * GET /api/admin/stats - Comprehensive system statistics
+     *
+     * For the platform's operators only (H.3, WHIT-872). `stats:read` can't say
+     * that alone, because the seeded `admin` is one global role held in every
+     * workspace, so the tenant is checked here. An unresolved context is not the
+     * system tenant, so it is refused too.
      */
     public function stats(Request $request): Response
     {
+        if (TenantContext::getTenantId() !== self::SYSTEM_TENANT_ID) {
+            return Response::error('Server statistics are for the system tenant', 403);
+        }
+
         try {
             $pdo = $this->db->getPdo();
 
@@ -97,112 +106,45 @@ class AdminApiHandler
      */
     private function collectStats(PDO $pdo): Response
     {
-            // Scope every aggregate to the caller (WC-50). System users
-            // (tenant_id=0) see platform-wide totals; a regular tenant sees only
-            // its own figures. A null/unresolved context is treated as a regular
-            // tenant (it is not the system tenant), so it can never fall through
-            // to the global counts.
-            $tenantId = TenantContext::getTenantId();
-            $isSystemUser = $tenantId === self::SYSTEM_TENANT_ID;
+            // 1. Basic Totals (platform-wide)
+            // ROLE/TENANT data: this is an ACTIVE-MEMBERSHIP count, not a profile
+            // count — a person with active memberships in N tenants counts N times
+            // (each tenant occupancy is one active membership, ADR 0005 §3).
+            // @tenant-guard-ignore: system-tenant only, stats() refuses every other tenant; aggregates across all tenants
+            $totalUsers = $pdo->query('SELECT COUNT(*) FROM memberships WHERE is_primary AND status = \'active\'')->fetchColumn();
+            $totalTenants = $pdo->query('SELECT COUNT(*) FROM tenants')->fetchColumn();
+            // @tenant-guard-ignore: system-tenant only, stats() refuses every other tenant; aggregates across all tenants
+            $totalRoles = $pdo->query('SELECT COUNT(*) FROM roles')->fetchColumn();
 
-            if ($isSystemUser) {
-                // 1. Basic Totals (platform-wide)
-                // ROLE/TENANT data: this is an ACTIVE-MEMBERSHIP count, not a profile
-                // count — a person with active memberships in N tenants counts N times
-                // (each tenant occupancy is one active membership, ADR 0005 §3).
-                // @tenant-guard-ignore: system-tenant dashboard (isSystemUser) aggregates across all tenants; scoped sibling below uses tenant_id
-                $totalUsers = $pdo->query('SELECT COUNT(*) FROM memberships WHERE is_primary AND status = \'active\'')->fetchColumn();
-                $totalTenants = $pdo->query('SELECT COUNT(*) FROM tenants')->fetchColumn();
-                // @tenant-guard-ignore: system-tenant dashboard (isSystemUser) aggregates across all tenants; scoped sibling below uses tenant_id
-                $totalRoles = $pdo->query('SELECT COUNT(*) FROM roles')->fetchColumn();
+            // 2. Role Breakdown (all roles, all memberships)
+            // ROLE data: role_id now lives on memberships (ADR 0005 §3).
+            // @tenant-guard-ignore: system-tenant only, stats() refuses every other tenant; aggregates across all tenants
+            $usersPerRole = $pdo->query('
+                SELECT r.name, COUNT(DISTINCT m.profile_id) as count
+                FROM roles r
+                LEFT JOIN memberships m ON m.role_id = r.id AND m.status = \'active\'
+                GROUP BY r.name
+            ')->fetchAll(PDO::FETCH_ASSOC);
 
-                // 2. Role Breakdown (all roles, all memberships)
-                // ROLE data: role_id now lives on memberships (ADR 0005 §3).
-                // @tenant-guard-ignore: system-tenant dashboard (isSystemUser) aggregates across all tenants; scoped sibling below uses tenant_id
-                $usersPerRole = $pdo->query('
-                    SELECT r.name, COUNT(DISTINCT m.profile_id) as count
-                    FROM roles r
-                    LEFT JOIN memberships m ON m.role_id = r.id AND m.status = \'active\'
-                    GROUP BY r.name
-                ')->fetchAll(PDO::FETCH_ASSOC);
+            // 3. Growth Trends (Last 7 Days, platform-wide)
+            // ROLE/TENANT data: membership creation date tracks when a person joined a tenant.
+            // @tenant-guard-ignore: system-tenant only, stats() refuses every other tenant; aggregates across all tenants
+            $userGrowth = $pdo->query("
+                SELECT DATE(created_at) as date, COUNT(*) as count
+                FROM memberships
+                WHERE status = 'active' AND is_primary
+                  AND created_at >= NOW() - INTERVAL '7 days'
+                GROUP BY DATE(created_at)
+                ORDER BY DATE(created_at)
+            ")->fetchAll(PDO::FETCH_ASSOC);
 
-                // 3. Growth Trends (Last 7 Days, platform-wide)
-                // ROLE/TENANT data: membership creation date tracks when a person joined a tenant.
-                // @tenant-guard-ignore: system-tenant dashboard (isSystemUser) aggregates across all tenants; scoped sibling below uses tenant_id
-                $userGrowth = $pdo->query("
-                    SELECT DATE(created_at) as date, COUNT(*) as count
-                    FROM memberships
-                    WHERE status = 'active' AND is_primary
-                      AND created_at >= NOW() - INTERVAL '7 days'
-                    GROUP BY DATE(created_at)
-                    ORDER BY DATE(created_at)
-                ")->fetchAll(PDO::FETCH_ASSOC);
-
-                $tenantGrowth = $pdo->query("
-                    SELECT DATE(created_at) as date, COUNT(*) as count
-                    FROM tenants
-                    WHERE created_at >= NOW() - INTERVAL '7 days'
-                    GROUP BY DATE(created_at)
-                    ORDER BY DATE(created_at)
-                ")->fetchAll(PDO::FETCH_ASSOC);
-            } else {
-                // 1. Basic Totals (scoped to the caller's tenant). The tenant
-                // total is fixed at 1 (the caller's own) so the platform tenant
-                // count never leaks.
-                // ROLE/TENANT data: active memberships are the authoritative tenant-scoped
-                // count (ADR 0005 §3 — memberships replace users.tenant_id).
-                $usersStmt = $pdo->prepare('SELECT COUNT(*) FROM memberships WHERE is_primary AND tenant_id = :tid AND status = \'active\'');
-                $usersStmt->execute(['tid' => $tenantId]);
-                $totalUsers = $usersStmt->fetchColumn();
-
-                $totalTenants = 1;
-
-                // Roles visible to the tenant: its own plus globals (NULL
-                // tenant_id), consistent with the WC-110 role-visibility model.
-                $rolesStmt = $pdo->prepare(
-                    'SELECT COUNT(*) FROM roles WHERE tenant_id = :tid OR tenant_id IS NULL'
-                );
-                $rolesStmt->execute(['tid' => $tenantId]);
-                $totalRoles = $rolesStmt->fetchColumn();
-
-                // 2. Role Breakdown: only roles the tenant can see, counting only
-                // the tenant's own memberships against them.
-                // ROLE data: role_id now lives on memberships (ADR 0005 §3).
-                $breakdownStmt = $pdo->prepare('
-                    SELECT r.name, COUNT(DISTINCT m.profile_id) as count
-                    FROM roles r
-                    LEFT JOIN memberships m ON m.role_id = r.id AND m.tenant_id = :tid_m AND m.status = \'active\'
-                    WHERE r.tenant_id = :tid_roles OR r.tenant_id IS NULL
-                    GROUP BY r.name
-                ');
-                $breakdownStmt->execute(['tid_m' => $tenantId, 'tid_roles' => $tenantId]);
-                $usersPerRole = $breakdownStmt->fetchAll(PDO::FETCH_ASSOC);
-
-                // 3. Growth Trends (Last 7 Days, scoped to the caller's tenant).
-                // ROLE/TENANT data: membership creation tracks join date within this tenant.
-                $userGrowthStmt = $pdo->prepare("
-                    SELECT DATE(created_at) as date, COUNT(*) as count
-                    FROM memberships
-                    WHERE tenant_id = :tid AND status = 'active' AND created_at >= NOW() - INTERVAL '7 days'
-                    GROUP BY DATE(created_at)
-                    ORDER BY DATE(created_at)
-                ");
-                $userGrowthStmt->execute(['tid' => $tenantId]);
-                $userGrowth = $userGrowthStmt->fetchAll(PDO::FETCH_ASSOC);
-
-                // A regular tenant only ever owns itself, so its tenant-growth
-                // series carries just its own creation; the platform-wide
-                // tenant timeline is never exposed.
-                $tenantGrowthStmt = $pdo->prepare("
-                    SELECT DATE(created_at) as date, COUNT(*) as count
-                    FROM tenants
-                    WHERE id = :tid AND created_at >= NOW() - INTERVAL '7 days'
-                    GROUP BY DATE(created_at)
-                    ORDER BY DATE(created_at)
-                ");
-                $tenantGrowthStmt->execute(['tid' => $tenantId]);
-                $tenantGrowth = $tenantGrowthStmt->fetchAll(PDO::FETCH_ASSOC);
-            }
+            $tenantGrowth = $pdo->query("
+                SELECT DATE(created_at) as date, COUNT(*) as count
+                FROM tenants
+                WHERE created_at >= NOW() - INTERVAL '7 days'
+                GROUP BY DATE(created_at)
+                ORDER BY DATE(created_at)
+            ")->fetchAll(PDO::FETCH_ASSOC);
 
             // Permissions are a global catalogue (not tenant-owned), so the count
             // is the same for every caller.

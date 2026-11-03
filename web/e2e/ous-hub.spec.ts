@@ -45,7 +45,7 @@ test.describe('OU Management Hub (admin)', () => {
   async function gotoHub(adminPage: { shell: { clickNav: (l: string) => Promise<void> } }, page: import('@playwright/test').Page) {
     await adminPage.shell.clickNav('Organizational Units');
     await page.waitForURL('**/admin/ous');
-    await expect(page.getByRole('heading', { name: 'Organizational Units' }).first()).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Organisational units' }).first()).toBeVisible();
     // The hub renders a Tree | Graph toggle.
     await expect(page.getByRole('group', { name: 'View mode' })).toBeVisible();
   }

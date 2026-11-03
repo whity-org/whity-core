@@ -17,12 +17,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Alert, AlertDescription } from '@whity/ui/alert';
 import { Button } from '@whity/ui/button';
-import { Checkbox } from '@whity/ui/checkbox';
 import { Input } from '@whity/ui/input';
 import { ScopeGrant, type ScopeGrantMode } from '@whity/ui/scope-grant';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@whity/ui/select';
 import { Textarea } from '@whity/ui/textarea';
 import { useTranslation } from '@whity/features/i18n';
+import { ToolsetPicker } from '@/components/agents/toolset-picker';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { useFetch } from '@/hooks/useFetch';
 import { useAuth } from '@/lib/auth-context';
@@ -66,9 +66,6 @@ export function PersonaEditor({ agent }: { agent: WorkspaceAgent | null }) {
     return body.data ?? [];
   }, [apiClient]);
   const offered = toolsetsFromSplits(splits.data ?? [], toolsets);
-
-  const toggleToolset = (toolset: string, on: boolean) =>
-    setToolsets((current) => (on ? [...current, toolset] : current.filter((id) => id !== toolset)));
 
   const save = async (event: FormEvent) => {
     event.preventDefault();
@@ -127,8 +124,7 @@ export function PersonaEditor({ agent }: { agent: WorkspaceAgent | null }) {
         <div className="space-y-4">
           <h2 className="text-sm font-semibold">{t('agents.editor.english', 'English')}</h2>
           <div className="space-y-2">
-            <label htmlFor="agent-name" className="block text-sm font-medium">{t('agents.field.name', 'Role name')}</label>
-            <Input id="agent-name" dir="ltr" required maxLength={NAME_MAX} value={name} onChange={(e) => setName(e.target.value)} />
+            <Input id="agent-name" label={t('agents.field.name', 'Role name')} dir="ltr" required maxLength={NAME_MAX} value={name} onChange={(e) => setName(e.target.value)} />
           </div>
           <div className="space-y-2">
             <label htmlFor="agent-role" className="block text-sm font-medium">{t('agents.field.role', 'What it does')}</label>
@@ -189,22 +185,7 @@ export function PersonaEditor({ agent }: { agent: WorkspaceAgent | null }) {
         </div>
       </section>
 
-      <section className="space-y-3">
-        <h2 className="text-sm font-semibold">{t('agents.field.toolsets', 'What it works with')}</h2>
-        <p className="text-sm text-muted-foreground">
-          {t('agents.toolsets.help', 'Choosing none means everything the person using it can reach.')}
-        </p>
-        <div className="grid gap-2 sm:grid-cols-2">
-          {offered.map((toolset) => (
-            <label key={toolset} className="flex items-center gap-2 text-sm">
-              <Checkbox checked={toolsets.includes(toolset)} onCheckedChange={(on) => toggleToolset(toolset, on === true)} />
-              <span dir="ltr" className="font-mono text-xs">
-                {toolset}
-              </span>
-            </label>
-          ))}
-        </div>
-      </section>
+      <ToolsetPicker offered={offered} chosen={toolsets} onChange={setToolsets} />
 
       <section className="space-y-3">
         <h2 className="text-sm font-semibold">{t('agents.field.grant', 'Where a person’s grant starts')}</h2>

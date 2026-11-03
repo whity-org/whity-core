@@ -107,7 +107,11 @@ final class DocumentRoutingInboxSource implements InboxSourceInterface
             // which one.
             subtitle: (string) $row['document_template_name'],
             timestamp: (string) $row['created_at'],
-            status: self::statusFor($arrivedBy, $row['closed_by_event_id'] !== null, $decision, $delivery),
+            status: ($row['document_withdrawn'] ?? false) === true
+                // First, because "Done" would tell a person they dealt with an item
+                // that was taken away from them.
+                ? 'Withdrawn'
+                : self::statusFor($arrivedBy, $row['closed_by_event_id'] !== null, $decision, $delivery),
             resourceType: ResourceTypeRegistry::TYPE_DOCUMENT,
             resourceId: (string) $row['document_id'],
             meta: [
@@ -120,6 +124,7 @@ final class DocumentRoutingInboxSource implements InboxSourceInterface
                 'step_id' => (int) $row['step_id'],
                 'document_id' => (int) $row['document_id'],
                 'open' => $row['closed_by_event_id'] === null,
+                'document_withdrawn' => ($row['document_withdrawn'] ?? false) === true,
                 'arrived_by' => $arrivedBy,
                 'arrived_from_profile_id' => $row['arrived_from'] ?? null,
                 'ou_id' => $row['ou_id'] ?? null,

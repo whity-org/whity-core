@@ -19,6 +19,7 @@ use Whity\Core\Document\Routing\RouteRepository;
 use Whity\Core\Document\Routing\RouteStepRepository;
 use Whity\Core\Document\Routing\RouteVerdict;
 use Whity\Core\Document\Routing\RoutingPresenter;
+use Whity\Core\Document\DocumentPeople;
 use Whity\Core\Document\Routing\RoutingRejectedException;
 use Whity\Core\Document\Routing\RoutingRuleLabels;
 use Whity\Core\Document\Routing\RoutingRuleRegistry;
@@ -117,6 +118,7 @@ final class DocumentRoutingApiHandler
         private readonly RoleChecker $roleChecker,
         private readonly RouteTemplateRepository $templates,
         private readonly ServerLabels $labels,
+        private readonly ?DocumentPeople $people = null,
     ) {
     }
 
@@ -431,6 +433,40 @@ final class DocumentRoutingApiHandler
         $rows = $this->recipients->listForDocument((int) $document['id'], $tenantId);
 
         return Response::json(['data' => array_map(RoutingPresenter::recipient(...), $rows)]);
+    }
+
+    /**
+     * GET /api/documents/{id}/people — the names of the people on this record.
+     *
+     * Session-gated like the trail, and for the same reason: a person a document
+     * was routed to may read where it has been without `documents:read`, so they
+     * are told who those people are. No ids go in, so this cannot be walked: see
+     * {@see DocumentPeople}. Codes sit behind `documents:read` on their own route,
+     * so who issued one is named only to a caller holding it.
+     *
+     * @param array<string, string> $params
+     */
+    public function people(Request $request, array $params): Response
+    {
+        $resolved = $this->resolveVisibleDocument($request, $params);
+        if ($resolved instanceof Response) {
+            return $resolved;
+        }
+        [$tenantId, $callerId, $document] = $resolved;
+
+        if ($this->people === null) {
+            return Response::json(['data' => new \stdClass()]);
+        }
+
+        $withCodes = $this->roleChecker->hasPermissionForProfile($callerId, CorePermissions::DOCUMENTS_READ, $tenantId);
+        $withScanners = $withCodes
+            && $this->roleChecker->hasPermissionForProfile($callerId, CorePermissions::USERS_READ, $tenantId);
+        $names = $this->people->names(
+            $tenantId,
+            $this->people->idsOnRecord($tenantId, (int) $document['id'], $withCodes, $withScanners),
+        );
+
+        return Response::json(['data' => $names === [] ? new \stdClass() : $names]);
     }
 
     /**

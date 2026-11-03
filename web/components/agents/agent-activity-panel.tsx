@@ -24,8 +24,9 @@ import { useToast } from '@/lib/toast-context';
  * What agents did for this person and what they asked (A23, AgentActivity,
  * Timeline, UndoBar): a timeline of `/api/me/agent-proposals` and
  * `/api/me/agent-actions`, with Undo while an action's window is open. It is
- * the viewer's own activity only. Everyone's activity, and a filter by one
- * agent's id, wait for S6 (actions name their agent but carry no agent id).
+ * the viewer's own activity only; whoever manages agents has everyone's in
+ * WorkspaceActivityPanel. Reads as each action's plain name in the viewer's
+ * language.
  */
 export function AgentActivityPanel() {
   const t = useTranslation('admin');

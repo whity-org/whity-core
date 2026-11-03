@@ -207,13 +207,29 @@ final class DocumentRepository
         // means "not fetched by this read", never "empty".
         $stmt = $this->db->prepare(
             'SELECT id, tenant_id, document_template_id, document_source_id, document_source_version, origin_key, template_name,
-                    title, origin_ou_id, created_by, variable_data, created_at
+                    title, origin_ou_id, created_by, variable_data, created_at, withdrawn_at, withdrawn_by
              FROM documents WHERE id = :id AND tenant_id = :tenant_id'
         );
         $stmt->execute([':id' => $id, ':tenant_id' => $tenantId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
         return $row !== false ? $this->normalizeRow($row) : null;
+    }
+
+    /**
+     * Stamp a document withdrawn. False when it already was, so two requests
+     * cannot both claim the act; {@see DocumentWithdrawal} is the caller.
+     */
+    public function markWithdrawn(int $id, int $tenantId, int $actorId): bool
+    {
+        $stmt = $this->db->prepare(
+            'UPDATE documents
+                SET withdrawn_at = NOW(), withdrawn_by = :actor
+              WHERE id = :id AND tenant_id = :tenant_id AND withdrawn_at IS NULL'
+        );
+        $stmt->execute([':actor' => $actorId, ':id' => $id, ':tenant_id' => $tenantId]);
+
+        return $stmt->rowCount() > 0;
     }
 
     /**
@@ -241,7 +257,7 @@ final class DocumentRepository
         // unusable once an alias is introduced. An alias here would work on
         // SQLite and fail on production.
         $sql = 'SELECT id, tenant_id, document_template_id, document_source_id, document_source_version, origin_key, template_name, title,
-                       origin_ou_id, created_by, created_at
+                       origin_ou_id, created_by, created_at, withdrawn_at, withdrawn_by
                   FROM documents
                  WHERE tenant_id = :tenant_id';
         $bindings = [];
@@ -617,6 +633,11 @@ final class DocumentRepository
             'origin_ou_id'         => $row['origin_ou_id'] !== null ? (int) $row['origin_ou_id'] : null,
             'created_by'           => $row['created_by'] !== null ? (int) $row['created_by'] : null,
             'created_at'           => (string) $row['created_at'],
+            // Null on the statements that do not read them, which is the same
+            // answer as a document nobody has withdrawn: withdrawal is only
+            // ever decided on a row read by findById().
+            'withdrawn_at'         => isset($row['withdrawn_at']) ? (string) $row['withdrawn_at'] : null,
+            'withdrawn_by'         => isset($row['withdrawn_by']) ? (int) $row['withdrawn_by'] : null,
         ] + (
             // Present only on the single-document read - see findById(). The key
             // is added rather than defaulted so a consumer can tell "this read
