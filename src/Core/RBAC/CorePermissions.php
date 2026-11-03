@@ -26,14 +26,13 @@ final class CorePermissions
     public const SOURCE = 'core';
 
     /**
-     * Read the admin dashboard aggregates (#990).
+     * Read the server statistics (#990, WHIT-872).
      *
-     * Its own slug rather than a reuse of `users:read`, because the Dashboard
-     * NAV ITEM must gate on the same thing as the route it points at, and
-     * `/admin` redirects to `/admin/stats` — so this pair decides whether the
-     * console has a landing page. Migration 157 grants it to whoever already
-     * holds `users:read`, since the endpoint aggregates rows that permission
-     * already exposes one by one.
+     * Holding it isn't enough: `GET /api/admin/stats` and the System nav item
+     * answer only in the system tenant (H.3), because the seeded `admin` is one
+     * global role held in every workspace. Migration 157 granted it to whoever
+     * held `users:read`; it no longer follows that permission, and migration 199
+     * took it off the roles workspaces own.
      */
     public const STATS_READ = 'stats:read';
 

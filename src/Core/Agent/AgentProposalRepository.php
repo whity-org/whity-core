@@ -94,7 +94,7 @@ final class AgentProposalRepository
      *
      * @return list<array<string, mixed>>
      */
-    public function listFor(int $tenantId, int $profileId, ?string $status = null, int $limit = 50): array
+    public function listFor(int $tenantId, int $profileId, ?string $status = null, int $limit = 50, ?string $principalId = null): array
     {
         $this->expireDue($tenantId);
 
@@ -104,10 +104,53 @@ final class AgentProposalRepository
             $sql .= ' AND status = :status';
             $params[':status'] = $status;
         }
+        if ($principalId !== null) {
+            $sql .= ' AND agent_principal_id = :principal';
+            $params[':principal'] = $principalId;
+        }
         $stmt = $this->db->prepare($sql . ' ORDER BY id DESC LIMIT :limit');
         foreach ($params as $name => $value) {
             $stmt->bindValue($name, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
         }
+        $stmt->bindValue(':limit', max(1, min($limit, 200)), PDO::PARAM_INT);
+        $stmt->execute();
+
+        return array_map(self::normalize(...), $stmt->fetchAll(PDO::FETCH_ASSOC));
+    }
+
+    /**
+     * How many proposals wait for this person (WHIT-872).
+     */
+    public function countWaiting(int $tenantId, int $profileId): int
+    {
+        $this->expireDue($tenantId);
+
+        $stmt = $this->db->prepare(
+            'SELECT COUNT(*) FROM agent_proposals WHERE tenant_id = :tenant_id AND on_behalf_of_profile_id = :profile AND status = :status'
+        );
+        $stmt->bindValue(':tenant_id', $tenantId, PDO::PARAM_INT);
+        $stmt->bindValue(':profile', $profileId, PDO::PARAM_INT);
+        $stmt->bindValue(':status', self::WAITING, PDO::PARAM_STR);
+        $stmt->execute();
+
+        return (int) $stmt->fetchColumn();
+    }
+
+    /**
+     * The proposals that have waited longest for this person (WHIT-872).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function oldestWaiting(int $tenantId, int $profileId, int $limit): array
+    {
+        $this->expireDue($tenantId);
+
+        $stmt = $this->db->prepare(
+            'SELECT ' . self::COLUMNS . ' FROM agent_proposals WHERE tenant_id = :tenant_id AND on_behalf_of_profile_id = :profile AND status = :status ORDER BY id ASC LIMIT :limit'
+        );
+        $stmt->bindValue(':tenant_id', $tenantId, PDO::PARAM_INT);
+        $stmt->bindValue(':profile', $profileId, PDO::PARAM_INT);
+        $stmt->bindValue(':status', self::WAITING, PDO::PARAM_STR);
         $stmt->bindValue(':limit', max(1, min($limit, 200)), PDO::PARAM_INT);
         $stmt->execute();
 
