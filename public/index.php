@@ -3995,6 +3995,17 @@ $memberFormsHandler = new \Whity\Api\MemberFormsApiHandler(
     $submissionIssuer,
     $formUploadsHandler
 );
+$formDraftsHandler = new \Whity\Api\FormDraftsApiHandler(
+    $db->getPdo(),
+    $formRepository,
+    $formFieldRepository,
+    new \Whity\Core\Form\FormDraftRepository($db->getPdo()),
+    $roleChecker
+);
+$router->register('GET', '/api/me/form-drafts', [$formDraftsHandler, 'list'], null);
+$router->register('GET', '/api/me/forms/{id:\d+}/draft', [$formDraftsHandler, 'show'], null);
+$router->register('PUT', '/api/me/forms/{id:\d+}/draft', [$formDraftsHandler, 'save'], null);
+$router->register('DELETE', '/api/me/forms/{id:\d+}/draft', [$formDraftsHandler, 'delete'], null);
 $router->register('GET', '/api/me/forms', [$memberFormsHandler, 'list'], null);
 $router->register('GET', '/api/me/forms/{id:\d+}/render', [$memberFormsHandler, 'render'], null);
 $router->register('POST', '/api/me/forms/{id:\d+}/uploads', [$memberFormsHandler, 'upload'], null);

@@ -1482,6 +1482,68 @@ final class CoreApiSchemas
             ]),
             [
                 'method' => 'GET',
+                'path' => '/api/me/form-drafts',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'The caller\'s unsent answers, on forms still open to them',
+                    'tags' => ['forms'],
+                    'responses' => [
+                        200 => self::jsonResponse('The drafts', 'FormDraftListResponse'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'GET',
+                'path' => '/api/me/forms/{id:\d+}/draft',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'The caller\'s draft of a form, or null',
+                    'description' => 'Nobody else can read a draft. The same 404 for a form that does not '
+                        . 'exist, is not open, or that the caller may not fill in.',
+                    'tags' => ['forms'],
+                    'responses' => [
+                        200 => self::jsonResponse('The draft, or null', 'FormDraftResponse'),
+                        404 => self::errorResponse('Not available to this caller'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'PUT',
+                'path' => '/api/me/forms/{id:\d+}/draft',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Save the caller\'s unsent answers',
+                    'description' => 'Not validated, because half-finished answers are what a draft is. '
+                        . 'Staff questions, file answers and unknown keys are dropped. Sending the form '
+                        . 'deletes the draft.',
+                    'tags' => ['forms'],
+                    'request' => 'FormDraftSaveRequest',
+                    'responses' => [
+                        200 => self::jsonResponse('The saved draft', 'FormDraftResponse'),
+                        404 => self::errorResponse('Not available to this caller'),
+                        422 => self::errorResponse('Malformed, or larger than 256 KB'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'DELETE',
+                'path' => '/api/me/forms/{id:\d+}/draft',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Throw away the caller\'s draft',
+                    'description' => 'Idempotent, and works on a form that has since closed.',
+                    'tags' => ['forms'],
+                    'responses' => [
+                        200 => ['description' => 'Deleted'],
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'GET',
                 'path' => '/api/me/forms',
                 'requiredRole' => null,
                 'requiredPermission' => null,
@@ -7502,6 +7564,23 @@ final class CoreApiSchemas
                     'routed' => self::bool(),
                     'ignored_keys' => ['type' => 'array', 'items' => ['type' => 'string']],
                 ], ['routed', 'ignored_keys']),
+            ], ['data']),
+            'FormDraft' => self::object([
+                'form_id' => self::int(),
+                'data' => ['type' => 'object', 'additionalProperties' => true],
+                'step' => self::int(true),
+                'updated_at' => self::str(),
+            ], ['form_id', 'data', 'updated_at']),
+            'FormDraftResponse' => self::dataEnvelope(SchemaBuilder::ref('FormDraft') + ['nullable' => true]),
+            'FormDraftListResponse' => self::dataEnvelope(['type' => 'array', 'items' => self::object([
+                'form_id' => self::int(),
+                'form_name' => self::localizedText(),
+                'step' => self::int(true),
+                'updated_at' => self::str(),
+            ], ['form_id', 'form_name', 'updated_at'])]),
+            'FormDraftSaveRequest' => self::object([
+                'data' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'The answers so far, keyed by field key.'],
+                'step' => self::int(true) + ['description' => 'Which step the person is on.'],
             ], ['data']),
             'MemberForm' => self::object([
                 'id' => self::int(),

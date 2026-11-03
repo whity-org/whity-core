@@ -225,6 +225,36 @@ final class MemberFormsApiRealEngineTest extends TestCase
         self::assertSame(404, $this->submitAs(self::MEMBER, $closed)->getStatusCode());
     }
 
+    public function testSendingAFormDeletesThatPersonsDraftOnly(): void
+    {
+        $formId = $this->publishedForm();
+        $this->open($formId);
+        $drafts = new \Whity\Core\Form\FormDraftRepository($this->pdo);
+        $drafts->save(self::TENANT, self::MEMBER, $formId, ['supplier' => 'draft'], null);
+        $drafts->save(self::TENANT, self::AUTHOR, $formId, ['supplier' => 'theirs'], null);
+
+        self::assertSame(201, $this->submitAs(self::MEMBER, $formId)->getStatusCode());
+
+        self::assertNull($drafts->find(self::TENANT, self::MEMBER, $formId));
+        self::assertNotNull($drafts->find(self::TENANT, self::AUTHOR, $formId));
+    }
+
+    public function testARefusedSubmissionKeepsTheDraft(): void
+    {
+        $formId = $this->publishedForm();
+        $this->open($formId);
+        $drafts = new \Whity\Core\Form\FormDraftRepository($this->pdo);
+        $drafts->save(self::TENANT, self::MEMBER, $formId, ['supplier' => 'draft'], null);
+
+        $refused = $this->members->submit(
+            $this->asCaller(self::MEMBER, self::TENANT, json_encode(['data' => []], JSON_THROW_ON_ERROR)),
+            ['id' => (string) $formId],
+        );
+
+        self::assertSame(422, $refused->getStatusCode());
+        self::assertNotNull($drafts->find(self::TENANT, self::MEMBER, $formId));
+    }
+
     public function testAMemberIsNotShownWhoAuthoredItOrWhereItGoes(): void
     {
         $formId = $this->publishedForm();
