@@ -390,7 +390,7 @@ final class AgentPauseAndActivityRealEngineTest extends TestCase
 
         $refused = $this->admin->update($this->as(self::RANA, '{"mayRead":[5,6]}', 'PATCH'), ['id' => (string) $this->clerk]);
         self::assertSame(422, $refused->getStatusCode());
-        self::assertSame([5], $this->agents->find($this->clerk, self::BAKERY)['may_read'] ?? null);
+        self::assertSame([5], $this->mayRead());
 
         self::assertSame(422, $this->admin->update($this->as(self::RANA, '{"mayRead":"all"}', 'PATCH'), ['id' => (string) $this->clerk])->getStatusCode());
     }
@@ -409,6 +409,34 @@ final class AgentPauseAndActivityRealEngineTest extends TestCase
 
         $mine = $this->byName($this->list($this->mine->list($this->as(self::OMAR, '', 'GET'))))['Finance clerk'];
         self::assertSame([['id' => 5, 'title' => 'Reference 5', 'kind' => 'wiki']], $mine['mayRead'], 'and a member sees only what they can read');
+    }
+
+    public function testADocumentAnEditorCantReadStaysWhenTheyEditTheRest(): void
+    {
+        $this->readable = [self::RANA => [5, 6], self::OMAR => [5, 7]];
+        $this->agents->update($this->clerk, self::BAKERY, ['may_read' => [5, 6]], self::RANA);
+
+        // Omar can't read 6, and sends back what the page sent him.
+        $this->ok($this->admin->update($this->as(self::OMAR, '{"mayRead":[5,6],"role":"Prepares invoices"}', 'PATCH'), ['id' => (string) $this->clerk]));
+        self::assertSame([5, 6], $this->mayRead());
+
+        // He can add what he can read, and remove what he can't.
+        $this->ok($this->admin->update($this->as(self::OMAR, '{"mayRead":[5,7]}', 'PATCH'), ['id' => (string) $this->clerk]));
+        self::assertSame([5, 7], $this->mayRead());
+
+        // But once removed, he can't put it back.
+        self::assertSame(422, $this->admin->update($this->as(self::OMAR, '{"mayRead":[5,6,7]}', 'PATCH'), ['id' => (string) $this->clerk])->getStatusCode());
+    }
+
+    public function testTheAreasAreNamedInBothLanguages(): void
+    {
+        $areas = [];
+        foreach ($this->list($this->mine->toolsets($this->as(self::RANA, '', 'GET'))) as $area) {
+            $areas[$area['id']] = $area;
+        }
+
+        self::assertSame('People and roles', $areas['core.people']['title']);
+        self::assertSame('الأشخاص والأدوار', $areas['core.people']['titleAr']);
     }
 
     // ── Presets ─────────────────────────────────────────────────────────────
@@ -497,6 +525,12 @@ final class AgentPauseAndActivityRealEngineTest extends TestCase
     private function action(int $tenantId, string $principal, int $profileId): int
     {
         return $this->actions->record($tenantId, $principal, $profileId, null, 'post_api_documents', [], 'Create a document', ['documents:write'], null, null);
+    }
+
+    /** @return list<int>|null */
+    private function mayRead(): ?array
+    {
+        return $this->agents->find($this->clerk, self::BAKERY)['may_read'] ?? null;
     }
 
     private function lastActive(int $assignmentId): ?string

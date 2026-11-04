@@ -39,6 +39,13 @@ use PDO;
  */
 class DelegationsApiHandler
 {
+    /** What a refused Undo says, by {@see DelegationService}'s reason. */
+    private const RESTORE_REFUSALS = [
+        DelegationService::RESTORE_TOO_LATE => 'This can no longer be undone. Create the delegation again instead.',
+        DelegationService::RESTORE_ENDED => 'This delegation has passed its end date.',
+        DelegationService::RESTORE_NOT_HELD => 'The person who delegated this no longer holds the permission.',
+    ];
+
     private PDO $db;
     private DelegationService $service;
     private ?LoggerInterface $logger;
@@ -125,7 +132,16 @@ class DelegationsApiHandler
                 $q
             );
 
-            return Response::json(['data' => array_map([$this, 'toPublic'], $rows), 'pagination' => $q->meta($total)], 200);
+            // One batch of names for the page. The people named are the subject of
+            // a screen gated on `delegation:manage`: who gave what to whom is the
+            // thing being managed, so unlike a group's sample this needs no
+            // `users:read` of its own.
+            $names = $this->service->namesFor($rows);
+
+            return Response::json([
+                'data' => array_map(fn (array $row): array => $this->toPublic($row, $names), $rows),
+                'pagination' => $q->meta($total),
+            ], 200);
         } catch (\Exception $e) {
             $this->log('error', 'Failed to fetch delegations', [
                 'event' => 'delegations.error',
@@ -140,7 +156,8 @@ class DelegationsApiHandler
      * POST /api/delegations - Create a delegation (grant a subset of own permissions).
      *
      * Body: `{granteeType: 'role'|'user', granteeId: int, permissions: string[],
-     * ouId?: int|null}`. The acting user is the grantor; the subset invariant is
+     * ouId?: int|null, expiresAt?: string|null}`. `expiresAt` is an ISO-8601 moment
+     * in the future. The acting user is the grantor; the subset invariant is
      * enforced against THEIR effective permissions.
      *
      * @param Request $request The incoming request (must carry the authenticated user).
@@ -180,6 +197,11 @@ class DelegationsApiHandler
 
             $ouId = $this->extractOuId($body);
 
+            $expiresAt = self::parseExpiry($body['expiresAt'] ?? null);
+            if ($expiresAt === false) {
+                return Response::error('expiresAt must be a date and time in the future', 422);
+            }
+
             // Grantee must be visible to the acting tenant; otherwise 404 so a
             // grantee's existence in another tenant is never disclosed.
             if (!$this->granteeVisible($granteeType, $granteeId, $tenantId)) {
@@ -198,7 +220,8 @@ class DelegationsApiHandler
                 $granteeType,
                 $granteeId,
                 $permissions,
-                $ouId
+                $ouId,
+                $expiresAt
             );
 
             // A new delegation changes effective permission sets; refresh caches.
@@ -220,6 +243,7 @@ class DelegationsApiHandler
                     'granteeType' => $granteeType,
                     'granteeId' => $granteeId,
                     'ouId' => $ouId,
+                    'expiresAt' => $expiresAt,
                     'permissions' => $permissions,
                     'count' => count($ids),
                 ],
@@ -268,7 +292,7 @@ class DelegationsApiHandler
                 return Response::error('Tenant context is required', 400);
             }
 
-            $revoked = $this->service->revoke((int) $id, $tenantId);
+            $revoked = $this->service->revoke((int) $id, $tenantId, $this->actingUserId($request));
             if (!$revoked) {
                 // Not found, not visible to this tenant, or already revoked.
                 return Response::error('Delegation not found', 404);
@@ -292,6 +316,81 @@ class DelegationsApiHandler
             ]);
             return Response::error('Failed to revoke delegation', 500);
         }
+    }
+
+    /**
+     * POST /api/delegations/{id}/restore - Undo a revoke.
+     *
+     * See {@see DelegationService::restore()} for what makes this an undo and not a
+     * grant. 404 covers another tenant's row, so its existence is never disclosed.
+     *
+     * @param Request              $request The incoming request.
+     * @param array<string, mixed> $params  Route params (expects `id`).
+     * @return Response JSON confirmation (200) or an error.
+     */
+    public function restore(Request $request, array $params): Response
+    {
+        try {
+            $id = $params['id'] ?? null;
+            if ($id === null || !is_numeric($id)) {
+                return Response::error('Delegation ID is required', 400);
+            }
+
+            $tenantId = TenantContext::getTenantId();
+            if ($tenantId === null) {
+                return Response::error('Tenant context is required', 400);
+            }
+
+            $actor = $this->actingUserId($request);
+            if ($actor === null) {
+                return Response::error('Authenticated user is required', 401);
+            }
+
+            $refused = $this->service->restore((int) $id, $tenantId, $actor);
+            if ($refused === DelegationService::RESTORE_NOT_FOUND) {
+                return Response::error('Delegation not found', 404);
+            }
+            if ($refused !== null) {
+                return Response::error(self::RESTORE_REFUSALS[$refused], 409, ['reason' => $refused]);
+            }
+
+            RoleChecker::clearCache();
+
+            $this->log('info', 'Delegation restored', [
+                'event' => 'delegations.restore',
+                'tenant_id' => $tenantId,
+                'delegation_id' => (int) $id,
+            ]);
+
+            return Response::json(['data' => ['id' => (int) $id, 'message' => 'Delegation restored']], 200);
+        } catch (\Exception $e) {
+            $this->log('error', 'Failed to restore delegation', [
+                'event' => 'delegations.error',
+                'tenant_id' => TenantContext::getTenantId(),
+                'detail' => $e->getMessage(),
+            ]);
+            return Response::error('Failed to restore delegation', 500);
+        }
+    }
+
+    /**
+     * Read `expiresAt`: null for no end date, a UTC `Y-m-d H:i:s` string, or false
+     * when it is not a moment in the future.
+     */
+    private static function parseExpiry(mixed $value): string|false|null
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+        if (!is_string($value)) {
+            return false;
+        }
+        $at = strtotime($value);
+        if ($at === false || $at <= time()) {
+            return false;
+        }
+
+        return gmdate('Y-m-d H:i:s', $at);
     }
 
     /**
@@ -515,12 +614,21 @@ class DelegationsApiHandler
      * response shape. `grantorUserId` is kept as a deprecated alias pointing to
      * the same value so existing clients do not hard-break before they migrate.
      *
+     * `status` is worked out here so that every client reads a delegation's state the
+     * same way: `revoked` wins over `expired`, since somebody ended it on purpose.
+     *
      * @param array<string, mixed> $row Normalised delegation row.
+     * @param array{people: array<string, string>, roles: array<string, string>, units: array<string, string>, permissions: array<string, string>} $names
      * @return array<string, mixed> Public representation.
      */
-    private function toPublic(array $row): array
+    private function toPublic(array $row, array $names): array
     {
         $grantorId = (int) ($row['grantor_profile_id'] ?? $row['grantor_user_id'] ?? 0);
+        $tenantKey = (int) $row['tenant_id'] . ':';
+        $granteeNames = $row['grantee_type'] === DelegationRepository::GRANTEE_ROLE ? $names['roles'] : $names['people'];
+        $expiresAt = $row['expires_at'] ?? null;
+        $expired = $expiresAt !== null && strtotime((string) $expiresAt . ' UTC') <= time();
+        $status = $row['revoked_at'] !== null ? 'revoked' : ($expired ? 'expired' : 'active');
 
         return [
             'id'              => (int) $row['id'],
@@ -533,6 +641,12 @@ class DelegationsApiHandler
             'ouId'            => $row['ou_id'] !== null ? (int) $row['ou_id'] : null,
             'grantedAt'       => $row['granted_at'] !== null ? (string) $row['granted_at'] : null,
             'revokedAt'       => $row['revoked_at'] !== null ? (string) $row['revoked_at'] : null,
+            'expiresAt'       => $expiresAt !== null ? (string) $expiresAt : null,
+            'status'          => $status,
+            'grantorName'     => $names['people'][$tenantKey . $grantorId] ?? null,
+            'granteeName'     => $granteeNames[$tenantKey . (int) $row['grantee_id']] ?? null,
+            'ouName'          => $row['ou_id'] !== null ? ($names['units'][$tenantKey . (int) $row['ou_id']] ?? null) : null,
+            'permissionDescription' => $names['permissions'][(string) $row['permission']] ?? null,
         ];
     }
 

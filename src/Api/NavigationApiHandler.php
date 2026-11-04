@@ -29,8 +29,9 @@ use Whity\Core\Tenant\TenantContext;
  * ------------------------------------
  * Each item is included ONLY when the caller actually satisfies any RBAC gate
  * it declares, checked against the authoritative {@see RoleChecker} (tenant
- * scoped). An item may carry `requiredRole` (string) and/or `requiredPermission`
- * (string); when both are present BOTH must pass, mirroring RbacMiddleware. An
+ * scoped). An item may carry `requiredRole` (string), `requiredPermission` (string)
+ * and/or `requiredAnyPermission` (list, one must be held); when several are present
+ * ALL must pass, mirroring RbacMiddleware. An
  * item with neither gate is always included (a public item). The client is
  * never trusted to filter — nav items are UI metadata only and grant nothing;
  * data access remains enforced by the route-level RBAC of the linked page's
@@ -42,13 +43,23 @@ final class NavigationApiHandler
     private RoleChecker $roleChecker;
 
     /**
+     * Named checks an item may ask for with `visibleIf`, for what a permission can't
+     * say. Registered by the host only: an item naming one that isn't here is hidden.
+     *
+     * @var array<string, callable(int, int): bool>
+     */
+    private array $conditions;
+
+    /**
      * @param HookManager $hookManager Collects items via the navigation.register hook.
      * @param RoleChecker $roleChecker Authoritative RBAC resolver for per-caller filtering.
+     * @param array<string, callable(int, int): bool> $conditions Named checks, given the profile and tenant.
      */
-    public function __construct(HookManager $hookManager, RoleChecker $roleChecker)
+    public function __construct(HookManager $hookManager, RoleChecker $roleChecker, array $conditions = [])
     {
         $this->hookManager = $hookManager;
         $this->roleChecker = $roleChecker;
+        $this->conditions = $conditions;
     }
 
     /**
@@ -130,12 +141,35 @@ final class NavigationApiHandler
             return false;
         }
 
+        // Any-of: for an item that opens onto several things, each with its own
+        // permission. The caller needs one of them to have a reason to see it.
+        $requiredAny = $item['requiredAnyPermission'] ?? null;
+        if (is_array($requiredAny) && $requiredAny !== []) {
+            $holdsOne = false;
+            foreach ($requiredAny as $permission) {
+                if (is_string($permission) && $this->roleChecker->hasPermissionForProfile($userId, $permission, $tenantId)) {
+                    $holdsOne = true;
+                    break;
+                }
+            }
+            if (!$holdsOne) {
+                return false;
+            }
+        }
+
         // System-tenant-only items (e.g. platform governance surfaces) are
         // hidden for any caller not acting in the system tenant (id 0), even if
         // they hold the declared permission within their own tenant. Mirrors the
         // handler-side systemTenantOnly gates (WC-235).
         if (($item['systemTenantOnly'] ?? false) === true && $tenantId !== 0) {
             return false;
+        }
+
+        $visibleIf = $item['visibleIf'] ?? null;
+        if (is_string($visibleIf)) {
+            $condition = $this->conditions[$visibleIf] ?? null;
+
+            return $condition !== null && $condition($userId, $tenantId);
         }
 
         return true;

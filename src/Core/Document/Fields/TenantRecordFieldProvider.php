@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Whity\Core\Document\Fields;
 
+use Whity\Core\Money\AmountInWords;
 use Whity\Core\Plugin\Tenant\TenantRecordRepository;
 use Whity\Sdk\Manifest\PluginManifest;
 
@@ -102,6 +103,17 @@ final class TenantRecordFieldProvider implements DocumentFieldProvider
                 $item['required'] = true;
             }
             $items[] = $item;
+            if (self::isWritableInWords($field)) {
+                $label = $item['label'];
+                $items[] = [
+                    'path' => 'record.' . $name . '_in_words_en',
+                    'label' => str_replace('{field}', $label, $this->labels->get('fields.inWords.en', '{field} in words (English)')),
+                ];
+                $items[] = [
+                    'path' => 'record.' . $name . '_in_words_ar',
+                    'label' => str_replace('{field}', $label, $this->labels->get('fields.inWords.ar', '{field} in words (Arabic)')),
+                ];
+            }
         }
 
         return [['group' => $this->recordLabel(), 'items' => $items]];
@@ -122,6 +134,14 @@ final class TenantRecordFieldProvider implements DocumentFieldProvider
         $values = [];
         foreach ($this->fields() as $name => $field) {
             $values['record.' . $name] = $this->format($tenantId, $field, $data[$name] ?? null);
+            if (self::isWritableInWords($field)) {
+                $minor = $data[$name] ?? null;
+                foreach (['en', 'ar'] as $language) {
+                    $values['record.' . $name . '_in_words_' . $language] = is_int($minor)
+                        ? AmountInWords::write($minor, 'JOD', $language)
+                        : null;
+                }
+            }
         }
 
         return ['label' => $this->title($row), 'values' => $values];
@@ -192,6 +212,16 @@ final class TenantRecordFieldProvider implements DocumentFieldProvider
             'ou' => null,
             default => is_scalar($value) ? (string) $value : null,
         };
+    }
+
+    /**
+     * Section 16's amount in words: dinars and fils, so a JOD money field only.
+     *
+     * @param array<string, mixed> $field
+     */
+    private static function isWritableInWords(array $field): bool
+    {
+        return ($field['type'] ?? null) === 'money' && strtoupper((string) ($field['currency'] ?? '')) === 'JOD';
     }
 
     private function money(int $minor, string $currency): string

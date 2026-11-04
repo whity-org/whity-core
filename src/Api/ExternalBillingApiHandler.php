@@ -8,6 +8,7 @@ use PDO;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Whity\Auth\RoleChecker;
+use Whity\Core\Audit\AuditLogger;
 use Whity\Core\Billing\External\AccessRecorder;
 use Whity\Core\Billing\External\BillingPortal;
 use Whity\Core\Billing\External\BillingActor;
@@ -64,6 +65,7 @@ final class ExternalBillingApiHandler
         private readonly PDO $pdo,
         private readonly string $appUrl,
         private readonly LoggerInterface $logger = new NullLogger(),
+        private readonly ?AuditLogger $audit = null,
     ) {
     }
 
@@ -407,6 +409,179 @@ final class ExternalBillingApiHandler
     }
 
     /**
+     * POST /api/v1/billing/change-plan — move this tenant's subscription to another tier.
+     *
+     * THE ONE THING CHECKOUT REFUSES. A second checkout opens a second subscription
+     * beside the first, so a tier change goes through {@see BillingPortal::changePlan()},
+     * which moves the subscription we already hold. Its reference comes from our
+     * own record, and the price from the plan the caller named, exactly as checkout.
+     *
+     * WHEN IT TAKES EFFECT is decided here, because nobody expects to choose: more
+     * expensive is charged now for the rest of the period, and cheaper starts at
+     * renewal with nothing refunded. The amount is the billing service's, so this
+     * never quotes one. A price this side can't compare takes effect at renewal,
+     * because the wrong guess then costs a wait, not a charge.
+     *
+     * THE CALLER SENDS AN IDEMPOTENCY KEY, one per confirmed dialog. A key derived
+     * only from the move would make "back to the old plan, then forward again"
+     * look like a retry of the first move and do nothing.
+     */
+    public function changePlan(Request $request): Response
+    {
+        $tenantId = $this->requireTenant($request, CorePermissions::BILLING_PAY);
+        if ($tenantId instanceof Response) {
+            return $tenantId;
+        }
+
+        if (!$this->portal->isConfigured()) {
+            return Response::error('This deployment does not sell subscriptions.', 404);
+        }
+
+        $body = JsonBody::parsed($request);
+        $planKey = $body['plan_key'] ?? null;
+        if (!is_string($planKey) || trim($planKey) === '') {
+            return Response::error('Name the plan to move to with plan_key.', 422);
+        }
+        $planKey = trim($planKey);
+
+        $clientKey = $body['idempotency_key'] ?? null;
+        if (!is_string($clientKey) || preg_match('/^[A-Za-z0-9_-]{8,64}$/', $clientKey) !== 1) {
+            return Response::error('Send an idempotency_key of 8 to 64 letters, digits, dashes or underscores.', 422);
+        }
+
+        if ($this->planIsAddon($planKey)) {
+            return Response::error('An add-on is bought beside a plan, not moved to.', 422);
+        }
+
+        $current = $this->currentPlanKey($tenantId);
+        if ($current === $planKey) {
+            return Response::error('This workspace is already on that plan.', 409);
+        }
+
+        $interval = $body['billing_period'] ?? 'month';
+        $interval = is_string($interval) && $interval !== '' ? $interval : 'month';
+
+        $priceRef = $this->externalPriceRef($tenantId, $planKey, $interval);
+        if ($priceRef === null) {
+            return Response::error('That plan cannot be bought on these terms.', 422);
+        }
+
+        $subscriptionRef = $this->subscriptionRefFor($tenantId);
+        if ($subscriptionRef === null) {
+            return Response::error('This workspace has no subscription to change.', 409);
+        }
+
+        try {
+            if (!$this->portal->accessFor(BillingSubject::forTenant($tenantId))->hasAccess) {
+                return Response::error('This workspace needs an active subscription before it can change plan.', 409);
+            }
+        } catch (BillingPortalException $e) {
+            return $this->portalFailure($e, 'check an existing subscription', ['tenant_id' => $tenantId]);
+        }
+
+        $isUpgrade = $this->isUpgrade($tenantId, $current, $planKey, $interval);
+        $key = hash('sha256', implode(':', ['plan-change', $tenantId, $subscriptionRef, $priceRef, $clientKey]));
+
+        try {
+            $this->portal->changePlan(
+                $this->actorFor($request),
+                $subscriptionRef,
+                $priceRef,
+                $isUpgrade ? BillingPortal::PRORATION_IMMEDIATE : BillingPortal::PRORATION_AT_PERIOD_END,
+                true,
+                $key,
+            );
+        } catch (BillingPortalException $e) {
+            return $this->portalFailure($e, 'change the plan', ['tenant_id' => $tenantId]);
+        }
+
+        $this->audit?->record('billing.plan_changed', [
+            'tenant_id' => $tenantId,
+            'target_type' => 'tenant',
+            'target_id' => $tenantId,
+            'metadata' => ['from' => $current, 'to' => $planKey, 'billing_period' => $interval, 'takes_effect' => $isUpgrade ? 'now' : 'renewal'],
+        ]);
+
+        // The move has happened. If this read fails the sweep catches up, and
+        // saying "failed" would invite a retry of something that worked.
+        try {
+            $this->recorder->record($tenantId, $this->portal->accessFor(BillingSubject::forTenant($tenantId)));
+        } catch (BillingPortalException $e) {
+            $this->logger->warning('Plan changed, but the new access could not be read back', [
+                'tenant_id' => $tenantId,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        return Response::json(['data' => ['plan_key' => $planKey, 'takes_effect' => $isUpgrade ? 'now' : 'renewal']]);
+    }
+
+    private function currentPlanKey(int $tenantId): ?string
+    {
+        $statement = $this->pdo->prepare(
+            'SELECT p.plan_key FROM tenant_plan tp JOIN plans p ON p.id = tp.plan_id WHERE tp.tenant_id = :tenant_id'
+        );
+        $statement->bindValue(':tenant_id', $tenantId, PDO::PARAM_INT);
+        $statement->execute();
+        $key = $statement->fetchColumn();
+
+        return is_string($key) ? $key : null;
+    }
+
+    /**
+     * Whether moving to this plan costs more, comparing the same period when the
+     * current plan has one, and per month otherwise. False when there's no price
+     * to compare, which makes the change wait for renewal.
+     */
+    private function isUpgrade(int $tenantId, ?string $current, string $target, string $interval): bool
+    {
+        if ($current === null) {
+            return false;
+        }
+        $from = $this->monthlyPrice($tenantId, $current, $interval);
+        $to = $this->monthlyPrice($tenantId, $target, $interval);
+
+        return $from !== null && $to !== null && $to > $from;
+    }
+
+    /**
+     * What a plan costs per month, in minor units: its price for this period if it
+     * has one, or otherwise its first active price.
+     */
+    private function monthlyPrice(int $tenantId, string $planKey, string $preferredPeriod): ?float
+    {
+        $currency = strtoupper($this->setting($tenantId, SettingsRegistry::BILLING_DEFAULT_CURRENCY, 'JOD'));
+        $statement = $this->pdo->prepare(
+            'SELECT pp.unit_amount, pp.billing_period
+               FROM plan_prices pp
+               JOIN plans p ON p.id = pp.plan_id
+              WHERE p.plan_key = :plan_key AND pp.currency = :currency AND pp.is_active = :on
+              ORDER BY pp.id ASC'
+        );
+        $statement->bindValue(':plan_key', $planKey);
+        $statement->bindValue(':currency', $currency);
+        $statement->bindValue(':on', true, PDO::PARAM_BOOL);
+        $statement->execute();
+        $rows = $statement->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        $chosen = null;
+        foreach ($rows as $row) {
+            if ($row['billing_period'] === $preferredPeriod) {
+                $chosen = $row;
+                break;
+            }
+            $chosen ??= $row;
+        }
+        if ($chosen === null) {
+            return null;
+        }
+
+        $months = ['month' => 1, 'quarter' => 3, 'year' => 12][(string) $chosen['billing_period']] ?? null;
+
+        return $months === null ? null : ((int) $chosen['unit_amount']) / $months;
+    }
+
+    /**
      * GET /api/v1/billing/plans — what this tenant can actually buy.
      *
      * WITHOUT THIS, CHECKOUT IS UNREACHABLE FROM THE PRODUCT. Buying names a
@@ -453,10 +628,14 @@ final class ExternalBillingApiHandler
         $statement->bindValue(':currency', $currency);
         $statement->execute();
 
+        $current = $this->currentPlanKey($tenantId);
+
         $rows = [];
         foreach ($statement->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
             $rows[] = [
                 'plan_key' => (string) $row['plan_key'],
+                // So Change plan can mark this workspace's own without another call.
+                'is_current' => $current === (string) $row['plan_key'],
                 'name' => (string) $row['name'],
                 'description' => $row['description'] !== null ? (string) $row['description'] : null,
                 'unit_amount' => (int) $row['unit_amount'],

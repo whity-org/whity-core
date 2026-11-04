@@ -11,6 +11,7 @@ import { Button } from '@whity/ui/button';
 import { Input } from '@/components/ui/input';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { TechnicalDetails, useDisplayPreferences } from '@whity/ui/display-preferences';
+import { humanizeCode } from '@/lib/plain-words';
 import { IconRefresh } from '@tabler/icons-react';
 import type {
   AuditLogEntry,
@@ -181,7 +182,20 @@ export default function AuditLogsPage() {
         value: (entry) => entry.createdAt,
       },
     ]),
-    { accessorKey: 'action', header: t('auditLogs.table.action', 'Action') },
+    {
+      accessorKey: 'action',
+      header: t('auditLogs.table.action', 'Action'),
+      cell: (entry) => (
+        <span>
+          {humanizeCode(entry.action)}
+          <TechnicalDetails>
+            <code className="ms-2 text-xs text-muted-foreground" dir="ltr">
+              {entry.action}
+            </code>
+          </TechnicalDetails>
+        </span>
+      ),
+    },
     {
       id: 'actor',
       header: t('auditLogs.table.actor', 'Actor'),

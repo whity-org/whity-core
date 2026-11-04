@@ -2,8 +2,10 @@
 
 import { Checkbox } from '@whity/ui/checkbox';
 import { TechnicalDetails } from '@whity/ui/display-preferences';
-import { useTranslation } from '@whity/features/i18n';
-import { toolsetLabel } from './workspace-agents';
+import { useFormattingLocale, useTranslation } from '@whity/features/i18n';
+import { useFetch } from '@/hooks/useFetch';
+import { useAuth } from '@/lib/auth-context';
+import { localized, toolsetLabel } from './workspace-agents';
 
 /**
  * "What it works with": the areas an agent may use, by name; the toolset id
@@ -19,6 +21,17 @@ export function ToolsetPicker({
   onChange: (toolsets: string[]) => void;
 }) {
   const t = useTranslation('admin');
+  const arabic = useFormattingLocale() === 'ar';
+  const { apiClient } = useAuth();
+  const names = useFetch<{ id: string; title: string; titleAr: string | null }[]>(async () => {
+    const response = await apiClient('/api/v1/me/agent-toolsets');
+    return response.ok ? ((await response.json()) as { data: { id: string; title: string; titleAr: string | null }[] }).data : [];
+  }, [apiClient]);
+  const nameOf = (id: string): string => {
+    const known = names.data?.find((toolset) => toolset.id === id);
+    return known !== undefined ? localized(known.title, known.titleAr, arabic) : toolsetLabel(id);
+  };
+
   return (
     <section className="space-y-3">
       <h2 className="text-sm font-semibold">{t('agents.field.toolsets', 'What it works with')}</h2>
@@ -30,7 +43,7 @@ export function ToolsetPicker({
               checked={chosen.includes(toolset)}
               onCheckedChange={(on) => onChange(on === true ? [...chosen, toolset] : chosen.filter((id) => id !== toolset))}
             />
-            <span>{toolsetLabel(toolset)}</span>
+            <span>{nameOf(toolset)}</span>
             <TechnicalDetails>
               <span dir="ltr" className="font-mono text-xs text-muted-foreground">
                 {toolset}

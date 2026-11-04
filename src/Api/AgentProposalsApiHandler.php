@@ -47,6 +47,8 @@ final class AgentProposalsApiHandler
         private readonly ?AgentAssignmentRepository $assignments = null,
         // WHIT-812: the action an approved proposal ran, for its undo.
         private readonly ?AgentActionRepository $actions = null,
+        // WHIT-867: each tool's plain name, for the Arabic screens.
+        private readonly ?\Closure $toolInfo = null,
     ) {
     }
 
@@ -73,8 +75,11 @@ final class AgentProposalsApiHandler
         $actions    = $this->actions?->forProposals($tenantId, array_map(static fn (array $row): int => (int) $row['id'], $rows)) ?? [];
         $paused     = $this->assignments?->pausedPrincipals($principals, $tenantId) ?? [];
 
+        $catalogue = $this->toolInfo !== null ? ($this->toolInfo)() : [];
+
         return Response::json(['data' => array_map(
-            static fn (array $row): array => self::present($row, $names, $actions[(int) $row['id']] ?? null, in_array((string) $row['agent_principal_id'], $paused, true)),
+            static fn (array $row): array => self::present($row, $names, $actions[(int) $row['id']] ?? null, in_array((string) $row['agent_principal_id'], $paused, true))
+                + ['toolInfo' => $catalogue[$row['tool']] ?? null],
             $rows,
         )], 200);
     }

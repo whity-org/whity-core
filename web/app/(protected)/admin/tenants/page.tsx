@@ -33,14 +33,18 @@ import { DeleteTenantModal } from './delete-modal';
  */
 import type { Tenant } from './record-screen';
 
+const SYSTEM_TENANT_ID = 0;
+
 export type { Tenant };
 
 export default function TenantsPage() {
-  const { apiClient } = useAuth();
+  const { apiClient, user } = useAuth();
   const { hasPermission } = useCapabilities();
   const t = useTranslation('admin');
   const dates = useDateDisplay();
-  const canCreate = hasPermission(TENANTS_WRITE);
+  // The route refuses every other tenant whatever permissions they hold, so the
+  // button would only lead to a 403.
+  const canCreate = user?.tenant_id === SYSTEM_TENANT_ID && hasPermission(TENANTS_WRITE);
   const canEdit = hasPermission(TENANTS_WRITE);
   const canDelete = hasPermission(TENANTS_DELETE);
 
@@ -122,14 +126,14 @@ export default function TenantsPage() {
       enableSorting: true,
       enableColumnFilter: true,
     },
-    { accessorKey: 'userCount', header: t('tenants.table.userCount', 'User Count'), enableSorting: true },
+    { accessorKey: 'userCount', header: t('tenants.table.userCount', 'Users'), enableSorting: true },
     // #1068, and the same two changes the users list needed: gated on the
     // tenant preference, and formatted at all rather than rendered as the raw
     // wire string an `accessorKey` with no `cell` produces.
     ...dates.dateColumns<Tenant>([
       {
         id: 'createdAt',
-        header: t('tenants.table.createdAt', 'Created At'),
+        header: t('tenants.table.createdAt', 'Created'),
         value: (tenant) => tenant.createdAt,
         enableSorting: true,
       },
@@ -176,7 +180,7 @@ export default function TenantsPage() {
     <div className="space-y-8">
       <AdminHeader
         title={t('tenants.title', 'Tenants')}
-        description={t('tenants.description', 'Manage tenants in your system')}
+        description={t('tenants.description', 'The workspaces on this installation.')}
         action={
           canCreate ? (
             <Button
@@ -184,7 +188,7 @@ export default function TenantsPage() {
               className="gap-2"
             >
               <IconPlus size={18} />
-              {t('tenants.createButton', 'Create Tenant')}
+              {t('tenants.createButton', 'Create tenant')}
             </Button>
           ) : undefined
         }
@@ -218,7 +222,7 @@ export default function TenantsPage() {
             description={t('tenants.empty.description', 'Create the first workspace to get started.')}
             action={
               canCreate ? (
-                <Button onClick={() => setIsCreateModalOpen(true)}>{t('tenants.createButton', 'Create Tenant')}</Button>
+                <Button onClick={() => setIsCreateModalOpen(true)}>{t('tenants.createButton', 'Create tenant')}</Button>
               ) : undefined
             }
           />

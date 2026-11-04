@@ -61,6 +61,10 @@ final class InboxItem
      *                                  so a client can resolve a destination and so a
      *                                  per-record permission can be scoped to it.
      * @param string|null $resourceId   The record's id within that type.
+     * @param array{kind: string, profile_id?: int, name?: string}|null $sender
+     *                                  Who it came from, for the From column: `person`
+     *                                  with a name, or `public` for somebody without an
+     *                                  account. Null when nobody sent it.
      * @param array<string, mixed> $meta Source-specific extras a client may use and
      *                                  must not depend on. Never load-bearing for the
      *                                  aggregate: anything the aggregate needs is a
@@ -75,6 +79,7 @@ final class InboxItem
         public readonly ?string $resourceType,
         public readonly ?string $resourceId,
         public readonly array $meta = [],
+        public readonly ?array $sender = null,
     ) {
     }
 
@@ -97,6 +102,7 @@ final class InboxItem
             'status' => $this->status,
             'resource_type' => $this->resourceType,
             'resource_id' => $this->resourceId,
+            'sender' => $this->sender,
             'meta' => $this->meta,
         ];
     }
