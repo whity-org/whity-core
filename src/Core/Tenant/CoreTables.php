@@ -111,6 +111,7 @@ final class CoreTables
         'form_submissions' => '127_create_forms.php',
         'form_uploads' => '133_create_form_uploads.php',
         'form_drafts' => '210_create_form_drafts.php',
+        'plugin_document_links' => '214_create_plugin_document_links.php',
         'form_submission_reviews' => '194_add_form_staff_fields_and_reviews.php',
         'forms' => '127_create_forms.php',
         'health_samples' => '085_create_health_samples.php',
