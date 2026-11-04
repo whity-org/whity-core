@@ -40,6 +40,8 @@ final class StoreCatalogueEntry
             'tags' => self::textList($raw['tags'] ?? null, 64),
             'latest_version' => self::text($raw['latest_version'] ?? null, 64),
             'trust' => self::TRUST_UNVERIFIED,
+            // Decides only which install path is offered; each path checks for itself.
+            'kind' => ($raw['kind'] ?? null) === 'declarative' ? 'declarative' : 'code',
             'price' => self::price($raw['price'] ?? null),
             'used_by' => is_int($raw['used_by'] ?? null) && $raw['used_by'] >= 0 ? $raw['used_by'] : null,
             'updated_at' => self::date($raw['updated_at'] ?? null),
