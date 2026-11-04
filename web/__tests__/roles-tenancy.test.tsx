@@ -88,7 +88,7 @@ import type {
 } from '@whity/features/roles';
 import { createRolesAdapter } from '@/lib/roles-adapter';
 
-const GLOBAL_BADGE = 'Global';
+const GLOBAL_BADGE = 'Built in';
 const EDIT_WARNING =
   'This is a global base role: one role shared by every tenant on this deployment. Saving changes it for all of them, including their existing users.';
 const DELETE_WARNING =

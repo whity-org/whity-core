@@ -144,8 +144,8 @@ describe('showing what an affiliate earns', () => {
 
     render(<Affiliates />);
 
-    expect(await screen.findByText('9000 JOD')).toBeInTheDocument();
-    expect(screen.getByText('500 USD')).toBeInTheDocument();
+    expect(await screen.findByText('JOD 9.000')).toBeInTheDocument();
+    expect(screen.getByText('USD 5.00')).toBeInTheDocument();
     // The sum that must NOT appear anywhere.
     expect(screen.queryByText(/9500/)).not.toBeInTheDocument();
   });

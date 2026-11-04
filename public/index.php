@@ -2163,6 +2163,8 @@ $tenantPluginVersionsHandler = new \Whity\Api\TenantPluginVersionsApiHandler(
 );
 $router->register('GET', '/api/workspace-plugins', [$tenantPluginVersionsHandler, 'list'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_READ);
 $router->register('POST', '/api/workspace-plugins', [$tenantPluginVersionsHandler, 'publish'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_PUBLISH);
+$router->register('POST', '/api/workspace-plugins/{plugin:[a-z][a-z0-9_]*}/enable', [$tenantPluginVersionsHandler, 'enable'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_ENABLE);
+$router->register('POST', '/api/workspace-plugins/{plugin:[a-z][a-z0-9_]*}/disable', [$tenantPluginVersionsHandler, 'disable'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_DISABLE);
 $router->register('POST', '/api/workspace-plugins/validate', [$tenantPluginVersionsHandler, 'validate'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_BUILD);
 $router->register('POST', '/api/workspace-plugins/impact', [$tenantPluginVersionsHandler, 'impact'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_BUILD);
 $router->register('POST', '/api/workspace-plugins/test', [$tenantPluginVersionsHandler, 'test'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_BUILD);
@@ -2226,7 +2228,8 @@ $statusHandler = new \Whity\Api\StatusApiHandler(
     new \Whity\Core\Health\StatusReport(
         new \Whity\Core\Health\HealthSampleRepository($db->getPdo()),
         $healthProbeRegistry
-    )
+    ),
+    $settingsService
 );
 $router->register('GET', '/api/status', [$statusHandler, 'get'], null);
 
@@ -2315,9 +2318,13 @@ $installFromStoreHandler = new \Whity\Api\InstallFromStoreApiHandler(
     $auditLogger,
     null,
     null,
-    new \Whity\Core\Plugin\PluginRecords($db->getPdo())
+    new \Whity\Core\Plugin\PluginRecords($db->getPdo()),
+    $tenantManifestPublisher,
+    $tenantPluginRepository
 );
 $router->register('POST', '/api/plugins/install-from-store', [$installFromStoreHandler, 'install'], null, null, CorePermissions::PLUGINS_INSTALL);
+// Decision 2: a workspace installs declarative plugins into itself. Data, not code.
+$router->register('POST', '/api/workspace-plugins/install-from-store', [$installFromStoreHandler, 'installDeclarative'], null, null, CorePermissions::PLUGINS_INSTALL);
 // S.6: updates, always asked for by a person; new access waits for approval.
 $router->register('GET', '/api/plugins/updates', [$installFromStoreHandler, 'availableUpdates'], null, null, CorePermissions::PLUGINS_READ);
 $router->register('POST', '/api/plugins/{name}/update', [$installFromStoreHandler, 'update'], null, null, CorePermissions::PLUGINS_INSTALL);
@@ -2471,8 +2478,10 @@ $router->register('POST', '/api/delegations/{id:\d+}/restore', [$delegationsHand
 // (6th positional arg; requiredRole stays null so RbacMiddleware enforces the
 // permission). Tenant-scoped in the handler: the SYSTEM tenant (id 0) sees all
 // tenants, every other tenant sees only its own entries.
-$auditLogHandler = new AuditLogApiHandler($db->getPdo(), $roleChecker);
+$auditLogHandler = new AuditLogApiHandler($db->getPdo(), $roleChecker, $serverLabels, $auditLogger);
 $router->register('GET', '/api/audit-logs', [$auditLogHandler, 'list'], null, null, CorePermissions::AUDIT_READ);
+$router->register('GET', '/api/audit-logs/facets', [$auditLogHandler, 'facets'], null, null, CorePermissions::AUDIT_READ);
+$router->register('GET', '/api/audit-logs/export', [$auditLogHandler, 'export'], null, null, CorePermissions::AUDIT_READ);
 
 // 13a. Self-service analogue (no permission gate — every authenticated user
 // may see their OWN activity; requiredPermission stays null and listOwn()
@@ -2652,11 +2661,13 @@ $router->register('DELETE', '/api/storage-config', [$tenantStorageConfigHandler,
 $twoFactorPoliciesHandler = new \Whity\Api\TwoFactorPoliciesApiHandler(
     $db->getPdo(),
     $twoFactorPolicyResolver,
-    $auditLogger
+    $auditLogger,
+    $hookManager
 );
 $router->register('GET',    '/api/2fa-policies',        [$twoFactorPoliciesHandler, 'list'],   null, null, CorePermissions::SECURITY_MANAGE);
 $router->register('POST',   '/api/2fa-policies',        [$twoFactorPoliciesHandler, 'create'], null, null, CorePermissions::SECURITY_MANAGE);
 $router->register('GET',    '/api/2fa-policies/status', [$twoFactorPoliciesHandler, 'status'], null, null, CorePermissions::SECURITY_MANAGE);
+$router->register('POST',   '/api/2fa-policies/remind', [$twoFactorPoliciesHandler, 'remind'], null, null, CorePermissions::SECURITY_MANAGE);
 $router->register('PATCH',  '/api/2fa-policies/{id:\d+}', [$twoFactorPoliciesHandler, 'update'], null, null, CorePermissions::SECURITY_MANAGE);
 $router->register('DELETE', '/api/2fa-policies/{id:\d+}', [$twoFactorPoliciesHandler, 'delete'], null, null, CorePermissions::SECURITY_MANAGE);
 
@@ -2882,7 +2893,8 @@ $externalBillingHandler = new \Whity\Api\ExternalBillingApiHandler(
     $db->getPdo(),
     // The payer returns to a frontend page (/billing, /billing/return).
     $frontendUrls->base(),
-    $logger
+    $logger,
+    $auditLogger
 );
 
 $router->register('POST', '/api/billing/checkout', [$externalBillingHandler, 'checkout'], null, null, CorePermissions::BILLING_PAY);
@@ -2899,6 +2911,8 @@ $router->register('GET',  '/api/billing/receipts', [$externalBillingHandler, 're
 // a PLAN swap would mean cancelling and buying again, which either double-charges
 // or leaves a gap, so it is refused rather than faked.
 $router->register('POST', '/api/billing/quantity', [$externalBillingHandler, 'changeQuantity'], null, null, CorePermissions::BILLING_PAY);
+// A tier change moves the subscription we hold; a second checkout would open another.
+$router->register('POST', '/api/billing/change-plan', [$externalBillingHandler, 'changePlan'], null, null, CorePermissions::BILLING_PAY);
 
 // UNAUTHENTICATED, NECESSARILY: the sender is a server and holds no session.
 // Registering it here is only half the job — EnforceTenantIsolation must also
@@ -3545,6 +3559,19 @@ $documentsHandler = new \Whity\Api\DocumentsApiHandler(
 \Whity\register_service(\Whity\Sdk\Documents\Documents::class, new \Whity\Core\Document\Issuing\SdkDocuments(
     \Whity\app(\Whity\Core\Document\Issuing\TemplateIssuing::class),
     $roleChecker,
+));
+// SDK 1.63 (WHIT-886): plugin files, through the storage resolver built above
+// for the tenant storage routes, and plugin documents, which wrap Documents and
+// use the QR service built earlier.
+\Whity\register_service(\Whity\Sdk\Storage\PluginFiles::class, new \Whity\Core\Plugin\HostPluginFiles(
+    static fn (): \Whity\Storage\TenantStorageResolver => $storageResolver,
+));
+\Whity\register_service(\Whity\Sdk\Documents\PluginDocuments::class, new \Whity\Core\Plugin\HostPluginDocuments(
+    $db->getPdo(),
+    static fn (): \Whity\Sdk\Documents\Documents => \Whity\app(\Whity\Sdk\Documents\Documents::class),
+    $documentQrService,
+    $documentQrScanRepository,
+    $settingsService,
 ));
 $documentWithdrawalHandler = new \Whity\Api\DocumentWithdrawalApiHandler(
     $documentRepository,
@@ -5416,13 +5443,15 @@ if ($isWorker) {
             } catch (\Throwable $e) {
                 // Handle any uncaught exceptions
                 try {
-                    $errorResponse = Response::error('Internal server error', 500);
+                    $requestId = \Whity\Core\Observability\ErrorReference::mint();
+                    $errorResponse = Response::json(['error' => 'Internal server error', 'reference' => $requestId], 500);
                     // The 500 path is a response a client can receive, so it gets the
                     // hardening headers too (WC-187).
                     $errorHeaders = array_merge(
                         $errorResponse->getHeaders(),
                         Cors::headers($_SERVER['HTTP_ORIGIN'] ?? null),
-                        $securityHeaders
+                        $securityHeaders,
+                        [\Whity\Core\Observability\ErrorReference::HEADER => $requestId]
                     );
                     $errorResponse = new Response(500, $errorResponse->getBody(), $errorHeaders);
                     $errorResponse->send();
@@ -5430,7 +5459,6 @@ if ($isWorker) {
                     // If send also fails, just log it
                     error_log('Failed to send error response: ' . $sendError->getMessage());
                 }
-                $requestId = \Whity\Core\Observability\ErrorContext::newRequestId();
                 try {
                     $errorTracker->captureException(
                         $e,
@@ -5549,13 +5577,15 @@ if ($isWorker) {
     } catch (\Throwable $e) {
         // Handle any uncaught exceptions
         try {
-            $errorResponse = Response::error('Internal server error', 500);
+            $requestId = \Whity\Core\Observability\ErrorReference::mint();
+            $errorResponse = Response::json(['error' => 'Internal server error', 'reference' => $requestId], 500);
             // The 500 path is a response a client can receive, so it gets the
             // hardening headers too (WC-187).
             $errorHeaders = array_merge(
                 $errorResponse->getHeaders(),
                 Cors::headers($_SERVER['HTTP_ORIGIN'] ?? null),
-                $securityHeaders
+                $securityHeaders,
+                [\Whity\Core\Observability\ErrorReference::HEADER => $requestId]
             );
             $errorResponse = new Response(500, $errorResponse->getBody(), $errorHeaders);
             $errorResponse->send();
@@ -5563,7 +5593,6 @@ if ($isWorker) {
             // If send also fails, just log it
             error_log('Failed to send error response: ' . $sendError->getMessage());
         }
-        $requestId = \Whity\Core\Observability\ErrorContext::newRequestId();
         try {
             $errorTracker->captureException(
                 $e,

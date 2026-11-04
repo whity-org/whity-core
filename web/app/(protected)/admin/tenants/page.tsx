@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { useFetch } from '@/hooks/useFetch';
+import { Badge } from '@whity/ui/badge';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { TENANTS_WRITE, TENANTS_DELETE } from '@/lib/capabilities';
 import { AdminHeader } from '@/components/admin/admin-header';
@@ -36,6 +37,27 @@ import type { Tenant } from './record-screen';
 const SYSTEM_TENANT_ID = 0;
 
 export type { Tenant };
+
+/** The card's four words for a workspace's status (TplTenants). */
+function TenantStatus({ status }: { status: Tenant['status'] }) {
+  const t = useTranslation('admin');
+  switch (status.state) {
+    case 'trial':
+      return (
+        <Badge variant="secondary">
+          {status.daysLeft === null
+            ? t('tenants.status.trial', 'Trial')
+            : t('tenants.status.trialDays', 'Trial, {days} days left', { days: status.daysLeft })}
+        </Badge>
+      );
+    case 'overdue':
+      return <Badge variant="destructive">{t('tenants.status.overdue', 'Payment overdue')}</Badge>;
+    case 'suspended':
+      return <Badge variant="outline">{t('tenants.status.suspended', 'Suspended')}</Badge>;
+    default:
+      return <Badge variant="success">{t('tenants.status.active', 'Active')}</Badge>;
+  }
+}
 
 export default function TenantsPage() {
   const { apiClient, user } = useAuth();
@@ -126,14 +148,24 @@ export default function TenantsPage() {
       enableSorting: true,
       enableColumnFilter: true,
     },
-    { accessorKey: 'userCount', header: t('tenants.table.userCount', 'User Count'), enableSorting: true },
+    {
+      id: 'plan',
+      header: t('tenants.table.plan', 'Plan'),
+      cell: (tenant) => tenant.plan?.name ?? t('tenants.table.noPlan', 'No plan'),
+    },
+    { accessorKey: 'userCount', header: t('tenants.table.userCount', 'Users'), enableSorting: true },
+    {
+      id: 'status',
+      header: t('tenants.table.status', 'Status'),
+      cell: (tenant) => <TenantStatus status={tenant.status} />,
+    },
     // #1068, and the same two changes the users list needed: gated on the
     // tenant preference, and formatted at all rather than rendered as the raw
     // wire string an `accessorKey` with no `cell` produces.
     ...dates.dateColumns<Tenant>([
       {
         id: 'createdAt',
-        header: t('tenants.table.createdAt', 'Created At'),
+        header: t('tenants.table.createdAt', 'Created'),
         value: (tenant) => tenant.createdAt,
         enableSorting: true,
       },
@@ -180,7 +212,7 @@ export default function TenantsPage() {
     <div className="space-y-8">
       <AdminHeader
         title={t('tenants.title', 'Tenants')}
-        description={t('tenants.description', 'Manage tenants in your system')}
+        description={t('tenants.description', 'The workspaces on this installation.')}
         action={
           canCreate ? (
             <Button
@@ -188,7 +220,7 @@ export default function TenantsPage() {
               className="gap-2"
             >
               <IconPlus size={18} />
-              {t('tenants.createButton', 'Create Tenant')}
+              {t('tenants.createButton', 'Create tenant')}
             </Button>
           ) : undefined
         }
@@ -222,7 +254,7 @@ export default function TenantsPage() {
             description={t('tenants.empty.description', 'Create the first workspace to get started.')}
             action={
               canCreate ? (
-                <Button onClick={() => setIsCreateModalOpen(true)}>{t('tenants.createButton', 'Create Tenant')}</Button>
+                <Button onClick={() => setIsCreateModalOpen(true)}>{t('tenants.createButton', 'Create tenant')}</Button>
               ) : undefined
             }
           />

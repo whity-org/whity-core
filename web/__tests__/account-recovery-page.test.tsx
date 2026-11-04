@@ -74,11 +74,36 @@ test('surfaces a 429 as a rate-limit message on the request form', async () => {
 // Token confirmation
 // ---------------------------------------------------------------------------
 
-test('auto-confirms the token on mount and shows the submitted state', async () => {
+test('sends nothing when the link opens, so a mail scanner cannot file a request', async () => {
+  mockToken = 'a-valid-token';
+
+  render(<AccountRecoveryPage />);
+
+  expect(screen.getByTestId('account-recovery-pending')).toBeInTheDocument();
+  expect(global.fetch).not.toHaveBeenCalled();
+});
+
+test('sends the reason the person gave when they confirm', async () => {
   mockToken = 'a-valid-token';
   (global.fetch as jest.Mock).mockResolvedValueOnce({ status: 200, json: async () => ({}) });
 
   render(<AccountRecoveryPage />);
+  fireEvent.change(screen.getByLabelText(/why do you need this/i), { target: { value: 'Lost my phone' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Send request' }));
+
+  await waitFor(() => expect(screen.getByTestId('account-recovery-submitted')).toBeInTheDocument());
+  expect(global.fetch).toHaveBeenCalledWith(
+    '/api/v1/auth/2fa-recovery/confirm',
+    expect.objectContaining({ body: JSON.stringify({ token: 'a-valid-token', reason: 'Lost my phone' }) })
+  );
+});
+
+test('confirms the token when the person presses the button, and shows the submitted state', async () => {
+  mockToken = 'a-valid-token';
+  (global.fetch as jest.Mock).mockResolvedValueOnce({ status: 200, json: async () => ({}) });
+
+  render(<AccountRecoveryPage />);
+  fireEvent.click(screen.getByRole('button', { name: 'Send request' }));
 
   await waitFor(() => expect(screen.getByTestId('account-recovery-submitted')).toBeInTheDocument());
   expect(global.fetch).toHaveBeenCalledTimes(1);
@@ -96,6 +121,7 @@ test('confirming a token never submits a password field (no such input exists on
   (global.fetch as jest.Mock).mockResolvedValueOnce({ status: 200, json: async () => ({}) });
 
   render(<AccountRecoveryPage />);
+  fireEvent.click(screen.getByRole('button', { name: 'Send request' }));
   await waitFor(() => expect(screen.getByTestId('account-recovery-submitted')).toBeInTheDocument());
 
   expect(screen.queryByLabelText(/password/i)).not.toBeInTheDocument();
@@ -106,6 +132,7 @@ test('shows a generic error and falls back to the request form for an invalid/ex
   (global.fetch as jest.Mock).mockResolvedValueOnce({ status: 400, json: async () => ({}) });
 
   render(<AccountRecoveryPage />);
+  fireEvent.click(screen.getByRole('button', { name: 'Send request' }));
 
   await waitFor(() => expect(screen.getByTestId('account-recovery-form')).toBeInTheDocument());
 });

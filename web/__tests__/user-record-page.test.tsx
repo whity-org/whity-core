@@ -44,6 +44,7 @@ const t = (_key: string, fallback?: string, vars?: Record<string, string | numbe
 const USER: UserRecord = {
   id: 42,
   name: 'sara',
+  displayName: '',
   email: 'sara@example.test',
   role: 'manager',
   tenantId: 1,
@@ -51,6 +52,8 @@ const USER: UserRecord = {
   createdAt: '2026-02-03T09:00:00Z',
   status: 'active',
   accountStatus: 'active',
+  lastActiveAt: null,
+  twoStep: { enabled: false, required: false, requiredDirectly: false },
 };
 
 const MEMBERSHIPS: UserMembership[] = [
@@ -130,7 +133,7 @@ describe('UserRecordScreen — the record and what it states', () => {
     await screen.findByTestId('user-record');
     // The unit's NAME, resolved from the OU list rather than left as an id.
     await waitFor(() =>
-      expect(screen.getByText('manager · Support · sara@example.test')).toBeInTheDocument()
+      expect(screen.getByText('manager · Support · sara@example.test · Not active yet')).toBeInTheDocument()
     );
     // No stat tiles: the facts line carries them.
     expect(screen.queryByTestId('user-record-stats')).not.toBeInTheDocument();
@@ -433,7 +436,7 @@ describe('UserRecordScreen — read-only is a state, not a disabled form', () =>
 
     await userEvent.click(await screen.findByRole('tab', { name: 'Access' }));
     expect(await screen.findByTestId('user-record-memberships')).toBeInTheDocument();
-    expect(screen.getByText('manager · Support · sara@example.test')).toBeInTheDocument();
+    expect(screen.getByText('manager · Support · sara@example.test · Not active yet')).toBeInTheDocument();
   });
 });
 

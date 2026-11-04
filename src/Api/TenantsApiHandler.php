@@ -158,11 +158,15 @@ class TenantsApiHandler
                 // @tenant-guard-ignore: system-tenant (isSystemUser) lists all real tenants; memberships LEFT JOIN is unscoped by design — each row is a distinct tenant
                 $stmt = $this->db->prepare('
                     SELECT t.id, t.name, t.slug, t.created_at,
+                           tp.status AS subscription_status, tp.current_period_end,
+                           pl.plan_key, pl.name AS plan_name,
                            COUNT(DISTINCT m.profile_id) as userCount
                     FROM tenants t
                     LEFT JOIN memberships m ON t.id = m.tenant_id AND m.status = \'active\'
+                    LEFT JOIN tenant_plan tp ON tp.tenant_id = t.id
+                    LEFT JOIN plans pl ON pl.id = tp.plan_id
                     WHERE t.id != 0' . $search . '
-                    GROUP BY t.id
+                    GROUP BY t.id, tp.status, tp.current_period_end, pl.plan_key, pl.name
                     ' . $q->orderBy() . '
                     LIMIT :limit OFFSET :offset
                 ');
@@ -184,11 +188,15 @@ class TenantsApiHandler
                 // @tenant-guard-ignore: caller's own tenant; WHERE t.id = :tenant_id on tenants constrains the memberships LEFT JOIN to one tenant's rows
                 $stmt = $this->db->prepare('
                     SELECT t.id, t.name, t.slug, t.created_at,
+                           tp.status AS subscription_status, tp.current_period_end,
+                           pl.plan_key, pl.name AS plan_name,
                            COUNT(DISTINCT m.profile_id) as userCount
                     FROM tenants t
                     LEFT JOIN memberships m ON t.id = m.tenant_id AND m.status = \'active\'
+                    LEFT JOIN tenant_plan tp ON tp.tenant_id = t.id
+                    LEFT JOIN plans pl ON pl.id = tp.plan_id
                     WHERE t.id = :tenant_id' . $search . '
-                    GROUP BY t.id
+                    GROUP BY t.id, tp.status, tp.current_period_end, pl.plan_key, pl.name
                     ' . $q->orderBy() . '
                     LIMIT :limit OFFSET :offset
                 ');
@@ -238,7 +246,7 @@ class TenantsApiHandler
      * payload (WC-100/WC-113).
      *
      * @param array<string, mixed> $row Raw row from the tenants SELECT.
-     * @return array{id: int, name: string, slug: string|null, userCount: int, createdAt: string|null}
+     * @return array{id: int, name: string, slug: string|null, userCount: int, createdAt: string|null, plan: array{key: string, name: string}|null, status: array{state: string, daysLeft: int|null}}
      */
     private function toPublicTenant(array $row): array
     {
@@ -253,7 +261,40 @@ class TenantsApiHandler
             'slug' => isset($row['slug']) ? (string)$row['slug'] : null,
             'userCount' => (int)$userCount,
             'createdAt' => isset($row['created_at']) ? (string)$row['created_at'] : null,
+            'plan' => isset($row['plan_key'])
+                ? ['key' => (string) $row['plan_key'], 'name' => (string) ($row['plan_name'] ?? $row['plan_key'])]
+                : null,
+            'status' => self::statusOf(
+                isset($row['subscription_status']) ? (string) $row['subscription_status'] : null,
+                isset($row['current_period_end']) ? (string) $row['current_period_end'] : null,
+            ),
         ];
+    }
+
+    /**
+     * A workspace's status in the card's four words (TplTenants), from what the
+     * billing columns say. No subscription row is Active: an operator assigned
+     * the plan or the install sells nothing, and the payment wall lets it through.
+     *
+     * @return array{state: string, daysLeft: int|null}
+     */
+    private static function statusOf(?string $status, ?string $periodEnd): array
+    {
+        return match ($status) {
+            'trialing' => ['state' => 'trial', 'daysLeft' => self::daysUntil($periodEnd)],
+            'past_due' => ['state' => 'overdue', 'daysLeft' => null],
+            'canceled', 'expired' => ['state' => 'suspended', 'daysLeft' => null],
+            default => ['state' => 'active', 'daysLeft' => null],
+        };
+    }
+
+    private static function daysUntil(?string $when): ?int
+    {
+        if ($when === null || ($end = strtotime($when . ' UTC')) === false) {
+            return null;
+        }
+
+        return max(0, (int) ceil(($end - time()) / 86400));
     }
 
     /**

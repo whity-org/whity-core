@@ -703,6 +703,25 @@ final class PeopleServerRealEngineTest extends TestCase
         self::assertNull($items[2]['meta']['closed_by']);
     }
 
+    public function testAClosedInboxItemSaysHowItWasDecided(): void
+    {
+        $role = $this->role('staff', self::BAKERY);
+        $me = $this->person('me@example.com', 'Me');
+        $this->member($me, self::BAKERY, $role);
+        $this->inboxItem(201, self::BAKERY, $me, null);
+        $this->pdo->exec(
+            "INSERT INTO document_route_events (id, tenant_id, document_id, route_id, step_id, action, verdict)
+             VALUES (202, " . self::BAKERY . ", 201, 201, 201, 'acknowledged', 'rejected')"
+        );
+        $this->pdo->exec('UPDATE document_route_recipients SET closed_by_event_id = 202 WHERE document_id = 201');
+
+        $source = new DocumentRoutingInboxSource(new RouteRecipientRepository($this->pdo));
+        $items = $source->list(self::BAKERY, $me, false, 10, 0);
+
+        self::assertCount(1, $items);
+        self::assertSame('rejected', $items[0]->toArray()['meta']['closed_verdict']);
+    }
+
     // -- approval queues ----------------------------------------------------
 
     public function testPasswordResetQueuePagesWithinTheWorkspaceAndCarriesTheReason(): void
