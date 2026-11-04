@@ -1,0 +1,1 @@
+- **Operators in the system workspace stay signed in.** Refreshing a session in the system tenant (tenant 0) was refused, so operators were signed out every 15 minutes. The refresh endpoint now accepts the system tenant, and still refuses a missing or negative tenant claim (#1601).
