@@ -14087,7 +14087,7 @@ final class CoreApiSchemas
                     502 => self::errorResponse('Store unavailable'),
                 ],
             ]),
-            self::permissionRoute('POST', '/api/workspace-plugins/{plugin}/enable', 'plugins:enable', [
+            self::permissionRoute('POST', '/api/workspace-plugins/{plugin:[a-z][a-z0-9_]*}/enable', 'plugins:enable', [
                 'summary' => "Turn on this workspace's plugin",
                 'tags' => ['platform-ops'],
                 'responses' => [
@@ -14095,7 +14095,7 @@ final class CoreApiSchemas
                     404 => self::errorResponse('Not found'),
                 ],
             ]),
-            self::permissionRoute('POST', '/api/workspace-plugins/{plugin}/disable', 'plugins:disable', [
+            self::permissionRoute('POST', '/api/workspace-plugins/{plugin:[a-z][a-z0-9_]*}/disable', 'plugins:disable', [
                 'summary' => "Turn off this workspace's plugin",
                 'tags' => ['platform-ops'],
                 'responses' => [
