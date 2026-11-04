@@ -25,7 +25,7 @@ final class AgentRepository
     ];
 
     private const COLUMNS = 'id, tenant_id, slug, name, name_ar, role, role_ar, instructions, instructions_ar, tone,
-                             language, toolsets, grant_template, preset_key, preset_version, status, paused_at, paused_by_profile_id, may_read,
+                             language, toolsets, grant_template, preset_key, preset_version, status, paused_at, paused_by_profile_id, may_read, features,
                              created_by_profile_id, updated_by_profile_id, created_at, updated_at';
 
     public function __construct(private readonly PDO $db)
@@ -94,10 +94,10 @@ final class AgentRepository
         $stmt = $this->db->prepare(
             'INSERT INTO agents
                  (tenant_id, slug, name, name_ar, role, role_ar, instructions, instructions_ar, tone, language,
-                  toolsets, grant_template, preset_key, preset_version, status,
+                  toolsets, grant_template, preset_key, preset_version, status, features,
                   created_by_profile_id, updated_by_profile_id, created_at, updated_at)
              VALUES (:tenant_id, :slug, :name, :name_ar, :role, :role_ar, :instructions, :instructions_ar, :tone, :language,
-                  :toolsets, :grant_template, :preset_key, :preset_version, :status,
+                  :toolsets, :grant_template, :preset_key, :preset_version, :status, :features,
                   :actor, :actor, NOW(), NOW())'
         );
         $stmt->execute([
@@ -116,6 +116,7 @@ final class AgentRepository
             ':preset_key'      => $presetKey,
             ':preset_version'  => $presetVersion,
             ':status'          => self::ACTIVE,
+            ':features'        => self::encode(self::object((array) ($fields['features'] ?? []))),
             ':actor'           => $actorProfileId,
         ]);
 
@@ -229,6 +230,7 @@ final class AgentRepository
             'paused_at'             => $row['paused_at'] === null ? null : (string) $row['paused_at'],
             'paused_by_profile_id'  => $row['paused_by_profile_id'] === null ? null : (int) $row['paused_by_profile_id'],
             'may_read'              => array_values(array_filter($json($row['may_read']), 'is_int')),
+            'features'              => array_filter($json($row['features'] ?? null), 'is_bool'),
             'created_by_profile_id' => $row['created_by_profile_id'] === null ? null : (int) $row['created_by_profile_id'],
             'updated_by_profile_id' => $row['updated_by_profile_id'] === null ? null : (int) $row['updated_by_profile_id'],
             'created_at'            => (string) $row['created_at'],
