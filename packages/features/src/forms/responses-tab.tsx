@@ -106,6 +106,7 @@ export function ResponsesTab({ env, formId }: { env: FormsScreenEnv; formId: num
         getRowId={(row) => String(row.id)}
         onRowClick={(row) => setOpenId(row.id)}
         columns={[
+          { id: "person", header: t("responses.col.person", "From"), cell: (row) => row.submitted_by_name ?? t("responses.visitor", "A visitor") },
           { id: "reference", header: headers[0], cell: (row) => <span className="font-mono">{row.reference ?? `#${row.id}`}</span> },
           { id: "submitted", header: headers[1], cell: (row) => dateTime(row.submitted_at) ?? "" },
           { id: "routing", header: headers[2], cell: (row) => <Badge variant={row.state === "completed" ? "success" : "outline"}>{routingLabel(row)}</Badge> },
@@ -146,7 +147,9 @@ export function ResponseDialog({ env, submissionId, onClose }: { env: FormsScree
         <DialogHeader>
           <DialogTitle>{detail?.reference ?? t("responses.one.title", "Response")}</DialogTitle>
           <DialogDescription>
-            {detail === null ? "" : `${dateTime(detail.submitted_at) ?? ""} · ${routingLabel(detail)}`}
+            {detail === null
+              ? ""
+              : `${detail.submitted_by_name ?? t("responses.visitor", "A visitor")} · ${dateTime(detail.submitted_at) ?? ""} · ${routingLabel(detail)}`}
           </DialogDescription>
         </DialogHeader>
         {error !== null ? (
