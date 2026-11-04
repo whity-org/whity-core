@@ -504,6 +504,10 @@ final class TenantOwnedTables
         // `form_drafts` (migration 210) — one person's unsent answers. Every statement
         // binds the tenant and the profile.
         'form_drafts' => '210_create_form_drafts.php',
+        // `plugin_document_links` (migration 214, SDK 1.63) — which plugin issued
+        // each document. Every statement binds `tenant_id` and the plugin slug,
+        // so one plugin's tracking never answers for another plugin's document.
+        'plugin_document_links' => '214_create_plugin_document_links.php',
         // `form_submission_reviews` (migration 194) — the office's record on a
         // submission. Every statement binds `tenant_id`, so a submission id from
         // another tenant reads as not found.

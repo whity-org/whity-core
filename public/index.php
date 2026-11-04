@@ -2163,6 +2163,8 @@ $tenantPluginVersionsHandler = new \Whity\Api\TenantPluginVersionsApiHandler(
 );
 $router->register('GET', '/api/workspace-plugins', [$tenantPluginVersionsHandler, 'list'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_READ);
 $router->register('POST', '/api/workspace-plugins', [$tenantPluginVersionsHandler, 'publish'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_PUBLISH);
+$router->register('POST', '/api/workspace-plugins/{plugin:[a-z][a-z0-9_]*}/enable', [$tenantPluginVersionsHandler, 'enable'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_ENABLE);
+$router->register('POST', '/api/workspace-plugins/{plugin:[a-z][a-z0-9_]*}/disable', [$tenantPluginVersionsHandler, 'disable'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_DISABLE);
 $router->register('POST', '/api/workspace-plugins/validate', [$tenantPluginVersionsHandler, 'validate'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_BUILD);
 $router->register('POST', '/api/workspace-plugins/impact', [$tenantPluginVersionsHandler, 'impact'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_BUILD);
 $router->register('POST', '/api/workspace-plugins/test', [$tenantPluginVersionsHandler, 'test'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_BUILD);
@@ -2316,9 +2318,13 @@ $installFromStoreHandler = new \Whity\Api\InstallFromStoreApiHandler(
     $auditLogger,
     null,
     null,
-    new \Whity\Core\Plugin\PluginRecords($db->getPdo())
+    new \Whity\Core\Plugin\PluginRecords($db->getPdo()),
+    $tenantManifestPublisher,
+    $tenantPluginRepository
 );
 $router->register('POST', '/api/plugins/install-from-store', [$installFromStoreHandler, 'install'], null, null, CorePermissions::PLUGINS_INSTALL);
+// Decision 2: a workspace installs declarative plugins into itself. Data, not code.
+$router->register('POST', '/api/workspace-plugins/install-from-store', [$installFromStoreHandler, 'installDeclarative'], null, null, CorePermissions::PLUGINS_INSTALL);
 // S.6: updates, always asked for by a person; new access waits for approval.
 $router->register('GET', '/api/plugins/updates', [$installFromStoreHandler, 'availableUpdates'], null, null, CorePermissions::PLUGINS_READ);
 $router->register('POST', '/api/plugins/{name}/update', [$installFromStoreHandler, 'update'], null, null, CorePermissions::PLUGINS_INSTALL);
@@ -3553,6 +3559,19 @@ $documentsHandler = new \Whity\Api\DocumentsApiHandler(
 \Whity\register_service(\Whity\Sdk\Documents\Documents::class, new \Whity\Core\Document\Issuing\SdkDocuments(
     \Whity\app(\Whity\Core\Document\Issuing\TemplateIssuing::class),
     $roleChecker,
+));
+// SDK 1.63 (WHIT-886): plugin files, through the storage resolver built above
+// for the tenant storage routes, and plugin documents, which wrap Documents and
+// use the QR service built earlier.
+\Whity\register_service(\Whity\Sdk\Storage\PluginFiles::class, new \Whity\Core\Plugin\HostPluginFiles(
+    static fn (): \Whity\Storage\TenantStorageResolver => $storageResolver,
+));
+\Whity\register_service(\Whity\Sdk\Documents\PluginDocuments::class, new \Whity\Core\Plugin\HostPluginDocuments(
+    $db->getPdo(),
+    static fn (): \Whity\Sdk\Documents\Documents => \Whity\app(\Whity\Sdk\Documents\Documents::class),
+    $documentQrService,
+    $documentQrScanRepository,
+    $settingsService,
 ));
 $documentWithdrawalHandler = new \Whity\Api\DocumentWithdrawalApiHandler(
     $documentRepository,

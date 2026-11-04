@@ -128,6 +128,107 @@ final class S3StorageDriver implements StorageDriverInterface
         return $ts;
     }
 
+    /**
+     * ListObjectsV2 under $prefix, following continuation tokens to the end.
+     *
+     * The bucket-level request carries the bucket in the path when path-style
+     * (the same rule {@see objectPath()} applies to objects), and the request
+     * line and the SigV4 canonical query are built from the same parameters.
+     */
+    public function list(string $prefix): array
+    {
+        $keys = [];
+        $token = null;
+        do {
+            $query = ['list-type' => '2', 'prefix' => $prefix];
+            if ($token !== null) {
+                $query['continuation-token'] = $token;
+            }
+
+            $res = $this->listRequest($query);
+            $this->assertOk($res, $prefix, 'list');
+
+            $page = $this->parseListPage($res->body);
+            array_push($keys, ...$page['keys']);
+            $token = $page['next'];
+        } while ($token !== null);
+
+        sort($keys, SORT_STRING);
+
+        return $keys;
+    }
+
+    /**
+     * @param array<string, string> $query
+     */
+    private function listRequest(array $query): ObjectHttpResponse
+    {
+        $host = $this->hostFor();
+        $path = $this->config->pathStyle ? '/' . $this->config->bucket : '/';
+        $amzDate = $this->amzDate();
+        $payloadHash = hash('sha256', '');
+
+        $headers = [
+            'Host'                 => $host,
+            'x-amz-date'           => $amzDate,
+            'x-amz-content-sha256' => $payloadHash,
+        ];
+        $headers['Authorization'] = $this->signer->authorizationHeader(
+            'GET',
+            $path,
+            $query,
+            $headers,
+            $payloadHash,
+            $amzDate,
+        );
+
+        $url = $this->scheme . '://' . $host . self::encodePath($path)
+            . '?' . http_build_query($query, '', '&', PHP_QUERY_RFC3986);
+
+        return $this->transport->send('GET', $url, $headers, null);
+    }
+
+    /**
+     * The keys on one ListObjectsV2 page, and the token for the next one (null
+     * when this is the last page). Read with DOM rather than SimpleXML so the
+     * S3 XML namespace does not have to be spelled out.
+     *
+     * @return array{keys: list<string>, next: ?string}
+     */
+    private function parseListPage(string $xml): array
+    {
+        $doc = new \DOMDocument();
+        if (@$doc->loadXML($xml, LIBXML_NONET) !== true) {
+            throw new StorageException('S3StorageDriver: unreadable list response');
+        }
+
+        $keys = [];
+        foreach ($doc->getElementsByTagName('Contents') as $contents) {
+            foreach ($contents->getElementsByTagName('Key') as $key) {
+                $keys[] = $key->textContent;
+            }
+        }
+
+        $truncated = false;
+        $next = null;
+        foreach ($doc->documentElement?->childNodes ?? [] as $node) {
+            if ($node->nodeName === 'IsTruncated') {
+                $truncated = strtolower(trim($node->textContent)) === 'true';
+            }
+            if ($node->nodeName === 'NextContinuationToken') {
+                $next = $node->textContent;
+            }
+        }
+        if (!$truncated) {
+            return ['keys' => $keys, 'next' => null];
+        }
+        if ($next === null || $next === '') {
+            throw new StorageException('S3StorageDriver: truncated list without a continuation token');
+        }
+
+        return ['keys' => $keys, 'next' => $next];
+    }
+
     public function temporaryUrl(string $key, int $expiresInSeconds = 3600): string
     {
         $host = $this->hostFor();

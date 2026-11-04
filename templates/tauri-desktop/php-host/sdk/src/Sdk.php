@@ -932,6 +932,16 @@ namespace Whity\Sdk;
  * plugin; {@see Manifest\HomeCardValidator} checks it and
  * {@see Manifest\PluginManifest::homeCard()} reads it (WHIT-872).
  *
+ * Purely additive.) ->
+ * 1.63 (PLUGIN FILES AND DOCUMENT TRACKING: the host services {@see Storage\PluginFiles}
+ * and {@see Documents\PluginDocuments} give a plugin its own files, kept per plugin
+ * and per workspace in the platform's storage layer, and its own documents, issued
+ * through {@see Documents} and recorded as the plugin's, with a QR verification code
+ * and the scan tracking for those documents only. {@see Storage\PluginFileController}
+ * is a generic upload and download endpoint a plugin wires into its own routes.
+ * {@see Storage\PluginFileStore::list()} is new and the storage driver gains a
+ * `list()` (WHIT-886).
+ *
  * Purely additive.)
  * 1.64 (PLUGIN AGENTS: the optional {@see PluginAgentsInterface} lets a plugin
  * declare or customize agents under its own toolset root: a persona in English
@@ -939,8 +949,7 @@ namespace Whity\Sdk;
  * flags it turns on ({@see Manifest\AgentFeatures}). Checked by
  * {@see Manifest\AgentDeclarationValidator}, which refuses another plugin's or
  * core's agent, a write at Allowed, and an unknown feature. Re-declaring a key
- * with a higher version customizes it. Version 1.63 is skipped so that a
- * release already in flight can take it.
+ * with a higher version customizes it.
  *
  * Purely additive.)
  * Breaking changes require a new major version.

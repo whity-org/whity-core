@@ -53,7 +53,7 @@ const CATALOG = [
 ];
 
 function allowedResponse(enabled = true, hosts = ['store.example.com'], canInstall = true) {
-  return { data: { data: { enabled, hosts, can_install: canInstall } }, error: undefined };
+  return { data: { data: { enabled, hosts, can_install: canInstall, can_install_declarative: true } }, error: undefined };
 }
 
 function catalogResponse(plugins = CATALOG) {
@@ -271,5 +271,31 @@ describe('who may install (Q4, S.3)', () => {
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).queryByText(/isolated/i)).not.toBeInTheDocument();
     expect(within(dialog).getByText(/runs on this server for every workspace/)).toBeInTheDocument();
+  });
+});
+
+describe('declarative plugins (decision 2)', () => {
+  it('lets a workspace install one, and says no publisher code runs', async () => {
+    const user = userEvent.setup();
+    routeGet(
+      allowedResponse(true, ['store.example.com'], false),
+      catalogResponse([{ slug: 'cake-orders', name: 'Cake orders', latest_version: '1.0.0', trust: 'unverified', kind: 'declarative' }] as never),
+    );
+    render(<PluginStorePage />);
+
+    await screen.findByText('Cake orders');
+    const install = screen.getByRole('button', { name: /Install/ });
+    expect(install).toBeEnabled();
+    await user.click(install);
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/none of the publisher/)).toBeInTheDocument();
+    expect(within(dialog).queryByText(/runs on this server/)).not.toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole('button', { name: 'Allow and continue' }));
+
+    await waitFor(() =>
+      expect(mockApiPost).toHaveBeenCalledWith('/api/v1/workspace-plugins/install-from-store', expect.anything()),
+    );
   });
 });

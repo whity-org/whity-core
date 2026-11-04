@@ -215,6 +215,17 @@ Each runs on real Postgres where data is involved, and each must be seen to fail
 | 6 | Root key holder, key ceremony, who reviews | **Not answered.** No signing or key work starts before this |
 | 7 | Offline, stale revocation list | Keeps running Verified plugins, shows a banner, no new activations |
 
+### The move to a bridge (decision 4)
+
+Today's embed screens rely on the app's cookies. To take those away:
+
+1. **Tell them apart.** A screen keeps cookies only if its plugin carries a By Whity mark. That needs the marks table, so it comes with the signing work. Until then nothing changes and the frame stays as described in section 2.
+2. **Serve third-party frames with no origin.** `Content-Security-Policy: sandbox allow-scripts; default-src 'none'; connect-src 'none'; frame-ancestors` set to the app, and no `allow-same-origin` on the iframe. No extra domain is needed, so it works when self-hosted.
+3. **Add the bridge.** `postMessage` from the frame to the host page, with an allowlist of operations per plugin. The host page checks the sender's window, makes the call as the person, and the server's own checks still apply.
+4. **Move first-party embed screens to the bridge**, then take `allow-same-origin` off every frame.
+
+Step 2 alone breaks any third-party embed that calls an API from its page, so steps 2 and 3 ship together.
+
 ## 10. Time, and what can't be finished for 0.2.25
 
 Said plainly:
