@@ -89,6 +89,8 @@ final class InvitationAcceptHandler
             'email' => $preview['email'],
             'tenant_name' => $preview['tenant_name'],
             'requires_password' => $preview['requires_password'],
+            'inviter_name' => $preview['inviter_name'],
+            'role_name' => $preview['role_name'],
         ]], 200);
     }
 

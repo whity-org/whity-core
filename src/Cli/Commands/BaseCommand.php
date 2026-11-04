@@ -524,6 +524,42 @@ abstract class BaseCommand implements CliCommand, CommandHelp
             static fn (): \Whity\Core\Security\EncryptedSecretStore => \Whity\Core\Security\EncryptedSecretStore::fromEnv($_ENV),
             $auditLogger,
         ));
+        // SDK 1.63 (WHIT-886): plugin files and plugin documents with QR
+        // tracking, as in public/index.php, so a plugin's job reaches the same
+        // services its routes do. The storage resolver is built on first use:
+        // a command that touches no plugin file needs no storage key.
+        \Whity\register_service(\Whity\Sdk\Storage\PluginFiles::class, new \Whity\Core\Plugin\HostPluginFiles(
+            static function () use ($db, $settingsService, $baseDir): \Whity\Storage\TenantStorageResolver {
+                $default = \Whity\Storage\StorageDriverFactory::fromSettings(
+                    $settingsService,
+                    $_ENV,
+                    getenv('STORAGE_ROOT') ?: ($baseDir . '/storage')
+                );
+
+                return new \Whity\Storage\TenantStorageResolver(
+                    $default,
+                    new \Whity\Storage\TenantStorageConfigRepository($db->getPdo()),
+                    new \Whity\Core\Entitlement\EntitlementService(
+                        new \Whity\Core\Entitlement\TenantEntitlementRepository($db->getPdo())
+                    ),
+                    \Whity\Core\Security\EncryptedSecretStore::fromEnv($_ENV),
+                );
+            },
+        ));
+        $pluginDocumentUrls = \Whity\Core\Http\FrontendUrls::fromEnv();
+        \Whity\register_service(\Whity\Sdk\Documents\PluginDocuments::class, new \Whity\Core\Plugin\HostPluginDocuments(
+            $db->getPdo(),
+            static fn (): \Whity\Sdk\Documents\Documents => \Whity\app(\Whity\Sdk\Documents\Documents::class),
+            new \Whity\Core\Document\Qr\DocumentQrService(
+                $db->getPdo(),
+                new \Whity\Core\Document\Qr\DocumentQrTokenRepository($db->getPdo()),
+                new \Whity\Core\Document\Qr\DocumentQrScanRepository($db->getPdo()),
+                $pluginDocumentUrls->base(),
+                $pluginDocumentUrls->link(\Whity\Core\Http\FrontendUrls::DOCUMENT_VERIFY)
+            ),
+            new \Whity\Core\Document\Qr\DocumentQrScanRepository($db->getPdo()),
+            $settingsService,
+        ));
         \Whity\register_service(
             \Whity\Sdk\Documents\Documents::class,
             new \Whity\Core\Document\Issuing\SdkDocuments(

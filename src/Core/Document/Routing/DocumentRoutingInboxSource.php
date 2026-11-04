@@ -141,6 +141,7 @@ final class DocumentRoutingInboxSource implements InboxSourceInterface
                 // How it was closed, so a client can say "You approved" and not just
                 // "Done". Null while it is open.
                 'closed_by' => $row['closed_by_action'] ?? null,
+                'closed_verdict' => $row['closed_by_verdict'] ?? null,
                 'ou_id' => $row['ou_id'] ?? null,
                 // #1014: whether this item is a DECISION. A client needs it
                 // before it renders anything, because the acts available differ —

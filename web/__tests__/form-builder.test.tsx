@@ -148,6 +148,7 @@ function fakeEnv(calls: Array<{ method: string; path: string; body?: unknown }>,
         }
         if (method === 'GET' && path.startsWith('/api/v1/forms')) return { status: 200, body: { data: [form] } };
         if (method === 'POST' && path === '/api/v1/forms/7/member-access') return { status: 200, body: { data: { ...form, open_to_members: true } } };
+        if (method === 'DELETE' && path === '/api/v1/forms/7') return { status: 200, body: { data: { deleted: true } } };
         if (method === 'PUT') return { status: 200, body: { data: (body as { fields: FieldDraft[] }).fields } };
         return { status: 404, body: null };
       },
@@ -158,6 +159,19 @@ function fakeEnv(calls: Array<{ method: string; path: string; body?: unknown }>,
 }
 
 describe('FormsListScreen', () => {
+  it('shows how many responses a form has, and deletes an unanswered draft after asking', async () => {
+    const calls: Array<{ method: string; path: string; body?: unknown }> = [];
+    const env = fakeEnv(calls, { ...FORM, submission_count: 4 });
+    render(<FormsListScreen env={env} canManage />);
+    await screen.findByText('Supplier form');
+    expect(screen.getByText('4')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /More actions/ }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }));
+    expect(await screen.findByText(/It has 4 responses/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Delete form' }));
+    await waitFor(() => expect(calls.some((c) => c.method === 'DELETE')).toBe(true));
+  });
+
   it('lists forms with their status and opens one', async () => {
     const env = fakeEnv([]);
     render(<FormsListScreen env={env} canManage />);

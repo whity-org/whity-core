@@ -2672,6 +2672,8 @@ final class CoreApiSchemas
                 'parameters' => [
                     self::queryParam('action', 'string', 'Exact action match (e.g. users:create)'),
                     self::queryParam('actor', 'integer', 'Filter by actor user id'),
+                    self::queryParam('agent', 'string', 'Filter by agent principal, as listed by /api/audit-logs/facets'),
+                    self::queryParam('area', 'string', 'Filter by area, as listed by /api/audit-logs/facets. An unknown area matches nothing.'),
                     self::queryParam('target_type', 'string', 'Filter by target type'),
                     self::queryParam('target_id', 'integer', 'Filter by target id — the history of ONE record. Normally paired with target_type; alone it matches that id across every target type.'),
                     self::queryParam('from', 'string', 'Inclusive ISO-8601 lower bound'),
@@ -2681,6 +2683,37 @@ final class CoreApiSchemas
                 ],
                 'responses' => [
                     200 => self::jsonResponse('The matching audit entries with pagination', 'AuditLogListResponse'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/audit-logs/facets', 'audit:read', [
+                'summary' => 'Who, which agents and which areas the audit filters can offer, by name',
+                'description' => 'Only people and agents in rows the caller could already read. The system tenant reads every workspace, so it sees all of them.',
+                'tags' => ['audit-logs'],
+                'responses' => [
+                    200 => self::jsonResponse('The filter options', 'AuditLogFacetsResponse'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/audit-logs/export', 'audit:read', [
+                'summary' => 'The matching audit entries as a CSV',
+                'description' => 'The same rows, tenant scope and filters as GET /api/audit-logs, newest first. A cell a spreadsheet would run as a formula starts with an apostrophe. `technical=1` adds event codes, ids and IP addresses. More than 50000 rows is refused with 422 rather than cut short; choose a shorter period.',
+                'tags' => ['audit-logs'],
+                'parameters' => [
+                    self::queryParam('actor', 'integer', 'Filter by actor user id'),
+                    self::queryParam('agent', 'string', 'Filter by agent principal'),
+                    self::queryParam('area', 'string', 'Filter by area'),
+                    self::queryParam('action', 'string', 'Exact action match'),
+                    self::queryParam('target_type', 'string', 'Filter by target type'),
+                    self::queryParam('target_id', 'integer', 'Filter by target id'),
+                    self::queryParam('from', 'string', 'Inclusive ISO-8601 lower bound'),
+                    self::queryParam('to', 'string', 'Inclusive ISO-8601 upper bound'),
+                    self::queryParam('technical', 'string', '1 adds event codes, ids and IP addresses'),
+                ],
+                'responses' => [
+                    200 => [
+                        'description' => 'The CSV, UTF-8 with a byte order mark',
+                        'content' => ['text/csv' => ['schema' => ['type' => 'string']]],
+                    ],
+                    422 => self::errorResponse('Too many entries to export at once'),
                 ] + self::authErrors(),
             ]),
         ];
@@ -4036,7 +4069,15 @@ final class CoreApiSchemas
             'slug' => self::str(true),
             'userCount' => self::int(),
             'createdAt' => self::str(true),
-        ], ['id', 'name', 'slug', 'userCount', 'createdAt']);
+            'plan' => ['type' => 'object', 'nullable' => true, 'properties' => [
+                'key' => self::str(),
+                'name' => self::str(),
+            ], 'required' => ['key', 'name']],
+            'status' => self::object([
+                'state' => ['type' => 'string', 'enum' => ['active', 'trial', 'overdue', 'suspended']],
+                'daysLeft' => self::int(true),
+            ], ['state', 'daysLeft']),
+        ], ['id', 'name', 'slug', 'userCount', 'createdAt', 'plan', 'status']);
 
         // #822: a unit's KIND travels with it as both the per-tenant id and the
         // stable key a consumer's rule is written against. All three are nullable
@@ -4089,7 +4130,24 @@ final class CoreApiSchemas
             'metadata' => ['type' => 'object'],
             'ipAddress' => self::str(true),
             'createdAt' => self::str(true),
-        ], ['id', 'tenantId', 'actorUserId', 'action', 'targetType', 'targetId', 'metadata', 'ipAddress', 'createdAt']);
+            'actor' => self::object([
+                'kind' => ['type' => 'string', 'enum' => ['person', 'agent', 'system']],
+                'name' => self::str(),
+                'agent' => self::str(true),
+                'forPerson' => self::str(true),
+            ], ['kind', 'name', 'agent', 'forPerson']),
+            'target' => ['type' => 'object', 'nullable' => true, 'properties' => [
+                'type' => self::str(),
+                'name' => self::str(),
+            ], 'required' => ['type', 'name']],
+            'sentence' => self::str(),
+            'sentenceTemplate' => self::str(),
+            'area' => self::str(),
+            'how' => self::str(true),
+        ], [
+            'id', 'tenantId', 'actorUserId', 'action', 'targetType', 'targetId', 'metadata', 'ipAddress', 'createdAt',
+            'actor', 'target', 'sentence', 'sentenceTemplate', 'area', 'how',
+        ]);
 
         $roleSummary = self::object([
             'id' => self::int(),
@@ -4200,7 +4258,8 @@ final class CoreApiSchemas
                     'enabled' => self::bool(),
                     'hosts' => ['type' => 'array', 'items' => ['type' => 'string']],
                     'can_install' => self::bool(),
-                ], ['enabled', 'hosts', 'can_install']),
+                    'can_install_declarative' => self::bool(),
+                ], ['enabled', 'hosts', 'can_install', 'can_install_declarative']),
             ], ['data']),
 
             // GET /api/plugins/store/catalog — a store's public catalogue entry.
@@ -4213,6 +4272,7 @@ final class CoreApiSchemas
                 'latest_version' => self::str(true),
                 // S.4. Always `unverified` until the Verified design is approved; a store can't set it.
                 'trust' => ['type' => 'string', 'enum' => ['unverified']],
+                'kind' => ['type' => 'string', 'enum' => ['declarative', 'code']],
                 'price' => array_merge(self::object([
                     'amount' => self::str(),
                     'currency' => self::str(),
@@ -4581,6 +4641,7 @@ final class CoreApiSchemas
                 'scope_type' => ['type' => 'string', 'enum' => ['tenant', 'ou', 'user']],
                 'scope_id' => self::int(true),
                 'grace_period_days' => self::int(),
+                'scope_name' => self::str(true),
                 'created_by' => self::int(true),
                 'created_at' => self::str(),
                 'updated_at' => self::str(),
@@ -4599,11 +4660,22 @@ final class CoreApiSchemas
             ], ['grace_period_days']),
             'TwoFactorPolicyStatusEntry' => self::object([
                 'profile_id' => self::int(),
+                'name' => self::str(),
                 'email' => self::str(),
                 'enrolled' => self::bool(),
                 'enforcement_deadline' => self::int(true),
-            ], ['profile_id', 'email', 'enrolled', 'enforcement_deadline']),
+                'last_reminded_at' => self::str(true),
+            ], ['profile_id', 'name', 'email', 'enrolled', 'enforcement_deadline', 'last_reminded_at']),
             'TwoFactorPolicyStatusResponse' => self::listEnvelope('TwoFactorPolicyStatusEntry'),
+            'TwoFactorRemindRequest' => self::object([
+                'profile_id' => self::int() + [
+                    'description' => 'The person to remind, from the two-step status list.',
+                ],
+            ], ['profile_id']),
+            'TwoFactorRemindResponse' => self::dataEnvelope(self::object([
+                'profile_id' => self::int(),
+                'last_reminded_at' => self::str(),
+            ], ['profile_id', 'last_reminded_at'])),
 
             // ── i18n admin management (WC-583) ────────────────────────────────
             // A language row (admin shape — the public GET /api/languages list
@@ -4909,6 +4981,11 @@ final class CoreApiSchemas
             'InvoiceDetail' => self::object([
                 'lines' => ['type' => 'array', 'items' => SchemaBuilder::ref('InvoiceLine')],
                 'payments' => ['type' => 'array', 'items' => SchemaBuilder::ref('PaymentTransaction')],
+                // Both null for any currency but JOD.
+                'total_in_words' => self::object([
+                    'en' => self::str(true),
+                    'ar' => self::str(true),
+                ], ['en', 'ar']),
             ], []),
             // What a rail can do, so a client offers only what will work.
             'PaymentMethodOption' => self::object([
@@ -4934,6 +5011,21 @@ final class CoreApiSchemas
                 'provider' => self::str(),
                 'return_url' => self::str(true),
             ], ['provider']),
+            'BillingChangePlanRequest' => self::object([
+                'plan_key' => self::str() + [
+                    'description' => 'The plan to move to, from the list of plans this workspace can buy.',
+                ],
+                'billing_period' => self::str() + [
+                    'description' => 'month or year. Leave it out to keep the plan\'s only price.',
+                ],
+                'idempotency_key' => self::str() + [
+                    'description' => '8 to 64 characters, new for each confirmed change and the same on a retry of it.',
+                ],
+            ], ['plan_key', 'idempotency_key']),
+            'BillingChangePlanResponse' => self::dataEnvelope(self::object([
+                'plan_key' => self::str(),
+                'takes_effect' => ['type' => 'string', 'enum' => ['now', 'renewal']],
+            ], ['plan_key', 'takes_effect'])),
             'InvoiceListResponse' => self::listEnvelope('Invoice'),
             'InvoiceResponse' => self::dataEnvelope(SchemaBuilder::ref('Invoice')),
             'PaymentMethodListResponse' => self::listEnvelope('PaymentMethodOption'),
@@ -5146,6 +5238,7 @@ final class CoreApiSchemas
             // wrong by a factor of ten.
             'PurchasablePlan' => self::object([
                 'plan_key' => self::str(),
+                'is_current' => self::bool(),
                 'name' => self::str(),
                 'description' => self::str(true),
                 'unit_amount' => self::int(),
@@ -8640,6 +8733,11 @@ final class CoreApiSchemas
                 'total' => self::int(),
                 'totalPages' => self::int(),
             ], ['page', 'perPage', 'total', 'totalPages']),
+            'AuditLogFacetsResponse' => self::dataEnvelope(self::object([
+                'people' => ['type' => 'array', 'items' => self::object(['id' => self::int(), 'name' => self::str()], ['id', 'name'])],
+                'agents' => ['type' => 'array', 'items' => self::object(['id' => self::str(), 'name' => self::str()], ['id', 'name'])],
+                'areas' => ['type' => 'array', 'items' => self::object(['id' => self::str(), 'name' => self::str()], ['id', 'name'])],
+            ], ['people', 'agents', 'areas'])),
             'AuditLogListResponse' => self::object([
                 'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('AuditLogEntry')],
                 'pagination' => SchemaBuilder::ref('Pagination'),
@@ -8898,6 +8996,17 @@ final class CoreApiSchemas
                     ], ['version', 'new_permissions', 'new_domains']), ['nullable' => true]),
                 ], ['source', 'installed_at', 'permissions', 'outside_domains']),
             ], ['id', 'name', 'enabled', 'file']),
+            'WorkspacePluginInstallResponse' => self::object([
+                'data' => self::object([
+                    'plugin' => self::str(),
+                    'slug' => self::str(),
+                    'version' => self::str(),
+                    'enabled' => self::bool(),
+                ], ['plugin', 'slug', 'version', 'enabled']),
+            ], ['data']),
+            'WorkspacePluginSwitchResponse' => self::object([
+                'data' => self::object(['plugin' => self::str(), 'enabled' => self::bool()], ['plugin', 'enabled']),
+            ], ['data']),
             'PluginRemovedResponse' => self::object([
                 'data' => ['type' => 'array', 'items' => self::object([
                     'name' => self::str(),
@@ -9250,7 +9359,9 @@ final class CoreApiSchemas
                 'email' => self::str(),
                 'tenant_name' => self::str(),
                 'requires_password' => self::bool(),
-            ], ['email', 'tenant_name', 'requires_password'])),
+                'inviter_name' => self::str(true),
+                'role_name' => self::str(true),
+            ], ['email', 'tenant_name', 'requires_password', 'inviter_name', 'role_name'])),
             // POST /api/invitations/accept — `password` is required ONLY when
             // the preview said so; supplied for an address that already has an
             // account it is ignored, never applied.
@@ -10127,6 +10238,19 @@ final class CoreApiSchemas
                     400 => self::errorResponse('Tenant context is required'),
                 ] + self::authErrors(),
             ]),
+            self::permissionRoute('POST', '/api/2fa-policies/remind', 'security:manage', [
+                'summary' => 'Remind one person to set up two-step sign-in',
+                'description' => 'Only somebody a rule in this workspace covers and who has not set it up, and once a day per person.',
+                'tags' => ['security'],
+                'request' => 'TwoFactorRemindRequest',
+                'responses' => [
+                    200 => self::jsonResponse('Reminder sent', 'TwoFactorRemindResponse'),
+                    404 => self::errorResponse('No rule in this workspace covers that person'),
+                    409 => self::errorResponse('That person has already set it up'),
+                    422 => self::errorResponse('profile_id is required'),
+                    429 => self::errorResponse('Already reminded today'),
+                ] + self::authErrors(),
+            ]),
             self::permissionRoute('PATCH', '/api/2fa-policies/{id:\d+}', 'security:manage', [
                 'summary' => 'Change a policy\'s grace period',
                 'tags' => ['security'],
@@ -10833,6 +10957,24 @@ final class CoreApiSchemas
                     422 => self::errorResponse('quantity must be a whole number of at least 1'),
                     502 => self::errorResponse('The billing service refused the request'),
                     503 => self::errorResponse('The billing service is temporarily unreachable'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/billing/change-plan', 'billing:pay', [
+                'summary' => 'Move this workspace\'s subscription to another plan',
+                'description' =>
+                    'A second checkout would open a second subscription, so a tier change moves the '
+                    . 'one this deployment already holds. A dearer plan is charged now for the rest of '
+                    . 'the period; a cheaper one starts at renewal with nothing refunded. Either way '
+                    . 'the amount is the billing service\'s, so none is quoted here. `idempotency_key` '
+                    . 'is one per confirmed change, and makes a retry after a timeout safe.',
+                'tags' => ['billing'],
+                'request' => 'BillingChangePlanRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The change was accepted', 'BillingChangePlanResponse'),
+                    404 => self::errorResponse('This deployment does not sell subscriptions'),
+                    409 => self::errorResponse('Already on that plan, or no active subscription to change'),
+                    422 => self::errorResponse('Unknown plan, an add-on, or a bad idempotency key'),
+                    502 => self::errorResponse('The billing service refused or could not be reached'),
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('GET', '/api/billing/plans', 'billing:view', [
@@ -14006,6 +14148,34 @@ final class CoreApiSchemas
                 'description' => 'Plugins this workspace published (not those installed for every workspace), with the live version and whether the plugin and its automations are switched on.',
                 'tags' => ['platform-ops'],
                 'responses' => [200 => self::jsonResponse('The workspace\'s plugins', 'WorkspacePluginListResponse')] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/workspace-plugins/install-from-store', 'plugins:install', [
+                'summary' => 'Install a declarative plugin from a trusted store into this workspace, turned off',
+                'tags' => ['platform-ops'],
+                'request' => 'InstallFromStoreRequest',
+                'responses' => [
+                    201 => self::jsonResponse('Installed, turned off', 'WorkspacePluginInstallResponse'),
+                    403 => self::errorResponse('No workspace, or the store is not allowed'),
+                    409 => self::errorResponse('Already in this workspace'),
+                    422 => self::errorResponse('Not allowed in a workspace'),
+                    502 => self::errorResponse('Store unavailable'),
+                ],
+            ]),
+            self::permissionRoute('POST', '/api/workspace-plugins/{plugin:[a-z][a-z0-9_]*}/enable', 'plugins:enable', [
+                'summary' => "Turn on this workspace's plugin",
+                'tags' => ['platform-ops'],
+                'responses' => [
+                    200 => self::jsonResponse('Turned on', 'WorkspacePluginSwitchResponse'),
+                    404 => self::errorResponse('Not found'),
+                ],
+            ]),
+            self::permissionRoute('POST', '/api/workspace-plugins/{plugin:[a-z][a-z0-9_]*}/disable', 'plugins:disable', [
+                'summary' => "Turn off this workspace's plugin",
+                'tags' => ['platform-ops'],
+                'responses' => [
+                    200 => self::jsonResponse('Turned off', 'WorkspacePluginSwitchResponse'),
+                    404 => self::errorResponse('Not found'),
+                ],
             ]),
             self::permissionRoute('POST', '/api/workspace-plugins/validate', 'plugins:build', [
                 'summary' => 'Validate a workspace plugin manifest',

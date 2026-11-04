@@ -490,6 +490,8 @@ export interface InboxItem {
   status: string | null;
   resource_type: string | null;
   resource_id: string | null;
+  /** Who it came from, for the From column. Null when nobody sent it. */
+  sender?: { kind: 'person' | 'public'; profile_id?: number; name?: string } | null;
   meta?: Record<string, unknown> | null;
 }
 
@@ -518,6 +520,8 @@ export interface RoutingItemMeta {
   document_id: number;
   open: boolean;
   arrived_by: RouteActionName;
+  /** The verdict that closed it, so the state can say You approved or You rejected. */
+  closed_verdict?: 'approved' | 'rejected' | null;
   /**
    * Whether this item is a DECISION (#1030).
    *
@@ -568,6 +572,8 @@ export function routingMeta(item: InboxItem): RoutingItemMeta | null {
     document_id: documentId,
     open,
     arrived_by: arrivedBy as RouteActionName,
+    closed_verdict:
+      meta['closed_verdict'] === 'approved' || meta['closed_verdict'] === 'rejected' ? meta['closed_verdict'] : null,
     // The ONE field here that does not join the guard above, and on purpose. A
     // server older than #1030 sends no `decision` key, and requiring it would
     // make every routing item on such an install fail the whole check — which

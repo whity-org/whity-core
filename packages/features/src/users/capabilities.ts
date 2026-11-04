@@ -13,6 +13,9 @@
 /** Permission required to create/edit users. */
 export const USERS_WRITE = 'users:write';
 
+/** Permission required to require two-step of somebody, like the rest of the 2FA policies. */
+export const SECURITY_MANAGE = 'security:manage';
+
 /** Permission required to delete users. */
 export const USERS_DELETE = 'users:delete';
 

@@ -132,6 +132,12 @@ interface DraftPreview {
 type ApiClient = ReturnType<typeof useAuth>['apiClient'];
 type AddToast = ReturnType<typeof useToast>['addToast'];
 
+interface GroupUsage {
+  id: number;
+  now: number | null;
+  route_templates: { id: number; name: string }[];
+}
+
 export default function UserGroupsPage() {
   const { apiClient } = useAuth();
   const { addToast } = useToast();
@@ -180,6 +186,17 @@ export default function UserGroupsPage() {
       totalPages: body.pagination?.totalPages ?? 1,
     };
   }, [apiClient, queryString]);
+
+  // The Now and Used in columns, for the rows on screen. Asked for apart from the list
+  // because a count resolves the rule; a failure leaves the two columns blank.
+  const groupIds = (groups.data?.items ?? []).map((group) => group.id).join(',');
+  const usage = useFetch(async () => {
+    if (groupIds === '') return new Map<number, GroupUsage>();
+    const response = await apiClient(`/api/v1/user-groups/usage?ids=${groupIds}`);
+    if (!response.ok) return new Map<number, GroupUsage>();
+    const body = (await response.json()) as { data?: GroupUsage[] };
+    return new Map((body.data ?? []).map((entry) => [entry.id, entry]));
+  }, [apiClient, groupIds]);
 
   /** What a group's definition may name. NOT the route-step list — see the docblock. */
   const rules = useFetch(async () => {
@@ -254,6 +271,33 @@ export default function UserGroupsPage() {
       cell: (group) => (
         <span className="text-muted-foreground">{group.description ?? '—'}</span>
       ),
+    },
+    {
+      id: 'now',
+      header: t('userGroups.table.now', 'Now'),
+      cell: (group) => {
+        const now = usage.data?.get(group.id)?.now;
+        if (now === undefined || now === null) return <span className="text-muted-foreground">—</span>;
+        return now === 0 ? <span className="text-muted-foreground">{t('userGroups.table.now.none', 'No one')}</span> : now;
+      },
+    },
+    {
+      id: 'usedIn',
+      header: t('userGroups.table.usedIn', 'Used in'),
+      cell: (group) => {
+        const templates = usage.data?.get(group.id)?.route_templates;
+        if (templates === undefined) return <span className="text-muted-foreground">—</span>;
+        if (templates.length === 0) {
+          return <span className="text-muted-foreground">{t('userGroups.table.usedIn.none', 'Not used yet')}</span>;
+        }
+        return (
+          <span title={templates.map((template) => template.name).join(', ')}>
+            {templates.length === 1
+              ? templates[0].name
+              : t('userGroups.table.usedIn.routes', '{count} routes', { count: templates.length })}
+          </span>
+        );
+      },
     },
   ];
 

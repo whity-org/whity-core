@@ -26,7 +26,9 @@ final class SettingsRegistryTest extends TestCase
              'mcp.always_on_plugin_tools',
              'auth.self_registration_enabled', 'auth.registration_approval_required',
              'auth.registration_payment_required',
-             'auth.self_password_reset_enabled', 'auth.password_reset_approval_required',
+             'auth.self_password_reset_enabled',
+             'maintenance.active', 'maintenance.until',
+             'auth.password_reset_approval_required',
              'auth.self_2fa_recovery_enabled',
              'auth.sso_enabled', 'auth.sso_self_provision_workspace', 'auth.desktop_login_max_hours',
              'storage.driver', 'storage.s3.endpoint', 'storage.s3.region', 'storage.s3.bucket',
@@ -429,7 +431,8 @@ final class SettingsRegistryTest extends TestCase
         // 91 since WHIT-742: documents.slot_bindings.
         // 93 since WHIT-788: three billing.seller_* out, five company.* in.
         // 94 since WHIT-742 slice 3: documents.background_issuing.
-        self::assertCount(94, $describe);
+        // 96 since WHIT-873: maintenance.active and maintenance.until.
+        self::assertCount(96, $describe);
         self::assertSame(
             ['key' => 'site_name', 'type' => 'string', 'default' => 'Whity'],
             $describe[0]

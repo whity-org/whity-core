@@ -27,7 +27,7 @@ import BillingPage from '@/app/(protected)/admin/billing/page';
 const ok = (data: unknown) => ({ ok: true, status: 200, json: async () => ({ data }) });
 
 const TENANTS = [
-  { id: 7, name: 'Example Bakery', slug: 'example-bakery', userCount: 3, createdAt: '2026-01-01T00:00:00Z' },
+  { id: 7, name: 'Example Bakery', slug: 'example-bakery', userCount: 3, createdAt: '2026-01-01T00:00:00Z', plan: null, status: { state: 'active', daysLeft: null } },
 ];
 
 beforeEach(() => {

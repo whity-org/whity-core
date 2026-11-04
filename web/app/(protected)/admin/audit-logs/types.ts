@@ -15,6 +15,25 @@ export interface AuditLogEntry {
   metadata: Record<string, unknown>;
   ipAddress: string | null;
   createdAt: string | null;
+  actor: {
+    kind: 'person' | 'agent' | 'system';
+    name: string;
+    agent: string | null;
+    forPerson: string | null;
+  };
+  target: { type: string; name: string } | null;
+  /** The sentence in the reader's language, for reading as it is. */
+  sentence: string;
+  /** The same sentence with `{actor}` and `{target}` left in, to set the names in bold. */
+  sentenceTemplate: string;
+  area: string;
+  how: string | null;
+}
+
+export interface AuditLogFacets {
+  people: { id: number; name: string }[];
+  agents: { id: string; name: string }[];
+  areas: { id: string; name: string }[];
 }
 
 export interface AuditLogPagination {
@@ -36,6 +55,10 @@ export interface AuditLogFilters {
   action: string;
   targetType: string;
   actor: string;
+  agent: string;
+  area: string;
+  /** A preset: today, week or month. Wins over `from`. */
+  when: string;
   from: string;
   to: string;
 }

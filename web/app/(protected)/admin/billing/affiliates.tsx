@@ -1,6 +1,7 @@
 'use client';
 
 import { Fragment, useState } from 'react';
+import { toDecimalString } from '@whity/ui/money/currency';
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/lib/toast-context';
 import { useFetch } from '@/hooks/useFetch';
@@ -190,7 +191,7 @@ export function Affiliates() {
           <p className="text-sm text-muted-foreground">
             {t(
               'affiliate.description',
-              'Who sends us customers, at what rate, and what they are owed. Amounts are minor units and already net of refunds.'
+              'Who sends us customers, at what rate, and what they are owed. Amounts are already net of refunds.'
             )}
           </p>
         </div>
@@ -260,7 +261,7 @@ export function Affiliates() {
                     ) : (
                       a.balances.map((b) => (
                         <div key={b.currency}>
-                          {b.amount_minor} {b.currency}
+                          {b.currency} {toDecimalString(b.amount_minor, b.currency)}
                         </div>
                       ))
                     )}

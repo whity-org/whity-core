@@ -166,7 +166,7 @@ describe('Users list asks the server to page, sort and search (#1102)', () => {
     // Byte-for-byte: an extra `sort=` here would be the UI presenting the
     // endpoint's fallback ordering as a choice the reader made.
     expect(requestsTo(mockApiClient, '/api/v1/users?')).toEqual([
-      '/api/v1/users?page=1&per_page=25',
+      '/api/v1/users?page=1&per_page=25&account_status=active',
     ]);
   });
 
@@ -181,7 +181,7 @@ describe('Users list asks the server to page, sort and search (#1102)', () => {
     // default order — so the header would click and reorder nothing.
     await waitFor(() => {
       expect(lastRequestTo(mockApiClient, '/api/v1/users?')).toBe(
-        '/api/v1/users?page=1&per_page=25&sort=status&dir=asc'
+        '/api/v1/users?page=1&per_page=25&sort=status&dir=asc&account_status=active'
       );
     });
   });
@@ -194,7 +194,7 @@ describe('Users list asks the server to page, sort and search (#1102)', () => {
     await user.click(screen.getByRole('button', { name: 'Next page' }));
     await waitFor(() => {
       expect(lastRequestTo(mockApiClient, '/api/v1/users?')).toBe(
-        '/api/v1/users?page=2&per_page=25'
+        '/api/v1/users?page=2&per_page=25&account_status=active'
       );
     });
 
@@ -204,7 +204,7 @@ describe('Users list asks the server to page, sort and search (#1102)', () => {
     // page 2 of the new one, it is an arbitrary window into a different list.
     await waitFor(() => {
       expect(lastRequestTo(mockApiClient, '/api/v1/users?')).toBe(
-        '/api/v1/users?page=1&per_page=25&sort=email&dir=asc'
+        '/api/v1/users?page=1&per_page=25&sort=email&dir=asc&account_status=active'
       );
     });
   });
@@ -226,7 +226,7 @@ describe('Users list asks the server to page, sort and search (#1102)', () => {
 
     await waitFor(() => {
       expect(lastRequestTo(mockApiClient, '/api/v1/users?')).toBe(
-        '/api/v1/users?page=1&per_page=25'
+        '/api/v1/users?page=1&per_page=25&account_status=active'
       );
     });
   });
@@ -254,7 +254,7 @@ describe('Users list asks the server to page, sort and search (#1102)', () => {
     // this asserts against, and it looks like the table simply "refreshed".
     await waitFor(() => {
       expect(lastRequestTo(mockApiClient, '/api/v1/users?')).toBe(
-        '/api/v1/users?page=2&per_page=25&sort=role&dir=asc'
+        '/api/v1/users?page=2&per_page=25&sort=role&dir=asc&account_status=active'
       );
     });
   });
@@ -279,7 +279,7 @@ describe('Users list asks the server to page, sort and search (#1102)', () => {
       await act(async () => {});
       expect(lastRequestTo(mockApiClient, '/api/v1/users?')).toContain('page=2');
 
-      const box = screen.getByPlaceholderText('Search by email or role');
+      const box = screen.getByPlaceholderText('Search by name or email');
       fireEvent.change(box, { target: { value: 'sa' } });
       fireEvent.change(box, { target: { value: 'sar' } });
       fireEvent.change(box, { target: { value: 'sara' } });
@@ -293,7 +293,7 @@ describe('Users list asks the server to page, sort and search (#1102)', () => {
 
       expect(requestsTo(mockApiClient, '/api/v1/users?')).toHaveLength(before + 1);
       expect(lastRequestTo(mockApiClient, '/api/v1/users?')).toBe(
-        '/api/v1/users?page=1&per_page=25&sort=email&dir=asc&q=sara'
+        '/api/v1/users?page=1&per_page=25&sort=email&dir=asc&q=sara&account_status=active'
       );
     });
   });
@@ -457,7 +457,7 @@ describe('User groups list asks the server to page, sort and search (#1102)', ()
     render(<UserGroupsPage />);
     await screen.findByText('Technicians');
 
-    expect(requestsTo(mockAuthApiClient, '/api/v1/user-groups')).toEqual([
+    expect(requestsTo(mockAuthApiClient, '/api/v1/user-groups?')).toEqual([
       '/api/v1/user-groups?page=1&per_page=25',
     ]);
   });

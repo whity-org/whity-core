@@ -26,6 +26,9 @@ export const RELATIONS_MANAGE = 'relations:manage';
  */
 export const USERS_READ = 'users:read';
 export const USERS_WRITE = 'users:write';
+export const SECURITY_MANAGE = 'security:manage';
+export const ROLES_READ = 'roles:read';
+export const OUS_READ = 'ous:read';
 export const USERS_DELETE = 'users:delete';
 
 /** Permissions for role management. */

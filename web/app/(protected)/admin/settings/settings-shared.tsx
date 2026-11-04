@@ -172,6 +172,13 @@ export function fieldMeta(t: TranslateFn): Record<string, FieldMeta> {
         'Stop showing dates and times anywhere in the interface. Everything is still recorded — timestamps stay in the database, in the audit trail and in the API, and turning this off brings them all back. The public document-verification page is not affected; it has its own setting.'
       ),
     },
+    'maintenance.active': {
+      label: t('settings.meta.maintenance.active.label', 'Announce maintenance'),
+      help: t(
+        'settings.meta.maintenance.active.help',
+        'Tell everyone the service is being updated, on the status page and at the top of every page. It does not stop anybody working.'
+      ),
+    },
     'error_tracking.enabled': {
       label: t('settings.meta.error_tracking.enabled.label', 'Record errors'),
       help: t(

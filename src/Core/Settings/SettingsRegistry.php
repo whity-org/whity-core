@@ -88,6 +88,15 @@ final class SettingsRegistry
     //     valid token, must an admin approve it before the new password takes
     //     effect? Default 'false' (frictionless).
     public const SELF_PASSWORD_RESET_ENABLED = 'auth.self_password_reset_enabled';
+
+    /**
+     * A maintenance window the operator announces (TplSystemStates). A signal for
+     * the status page and the web app, not a gate: the API keeps answering, so an
+     * operator is never locked out of turning it off.
+     */
+    public const MAINTENANCE_ACTIVE = 'maintenance.active';
+    /** When it's expected to end, as ISO 8601; empty when nobody can say. */
+    public const MAINTENANCE_UNTIL = 'maintenance.until';
     public const PASSWORD_RESET_APPROVAL_REQUIRED = 'auth.password_reset_approval_required';
 
     // How long a tenant invitation stays usable (WHIT-417). Deliberately NOT
@@ -719,6 +728,8 @@ final class SettingsRegistry
      * @var list<string>
      */
     private const GLOBAL_ONLY_KEYS = [
+        self::MAINTENANCE_ACTIVE,
+        self::MAINTENANCE_UNTIL,
         self::ERROR_TRACKING_ENABLED,
         self::ERROR_TRACKING_PROVIDER,
         self::ERROR_TRACKING_ENVIRONMENT,
@@ -787,6 +798,7 @@ final class SettingsRegistry
      * @var list<string>
      */
     private const BOOL_KEYS = [
+        self::MAINTENANCE_ACTIVE,
         self::ERROR_TRACKING_ENABLED,
         self::ERROR_TRACKING_NOTIFY_ADMINS,
         self::MCP_ENABLED,
@@ -855,6 +867,7 @@ final class SettingsRegistry
      * @var list<string>
      */
     private const FEATURE_FLAG_KEYS = [
+        self::MAINTENANCE_ACTIVE,
         self::ERROR_TRACKING_ENABLED,
         self::MCP_ENABLED,
         self::SELF_REGISTRATION_ENABLED,
@@ -938,6 +951,8 @@ final class SettingsRegistry
         // and expected (OPEN by default), and approval is an opt-in extra gate
         // (OFF by default — frictionless self-service unless a tenant opts in).
         self::SELF_PASSWORD_RESET_ENABLED => 'true',
+        self::MAINTENANCE_ACTIVE => 'false',
+        self::MAINTENANCE_UNTIL => '',
         self::PASSWORD_RESET_APPROVAL_REQUIRED => 'false',
         // Permissive by default: the flow is already unconditionally
         // approval-gated (see TwoFactorRecoveryService), so a locked-out user
@@ -1371,6 +1386,8 @@ final class SettingsRegistry
             self::REGISTRATION_APPROVAL_REQUIRED => self::validateBoolean($value, self::REGISTRATION_APPROVAL_REQUIRED),
             self::REGISTRATION_PAYMENT_REQUIRED => self::validateBoolean($value, self::REGISTRATION_PAYMENT_REQUIRED),
             self::SELF_PASSWORD_RESET_ENABLED => self::validateBoolean($value, self::SELF_PASSWORD_RESET_ENABLED),
+            self::MAINTENANCE_ACTIVE => self::validateBoolean($value, self::MAINTENANCE_ACTIVE),
+            self::MAINTENANCE_UNTIL => self::validateMaintenanceUntil($value),
             self::PASSWORD_RESET_APPROVAL_REQUIRED => self::validateBoolean($value, self::PASSWORD_RESET_APPROVAL_REQUIRED),
             self::SELF_2FA_RECOVERY_ENABLED => self::validateBoolean($value, self::SELF_2FA_RECOVERY_ENABLED),
             self::SSO_ENABLED => self::validateBoolean($value, self::SSO_ENABLED),
@@ -1797,6 +1814,15 @@ final class SettingsRegistry
         }
 
         return null;
+    }
+
+    private static function validateMaintenanceUntil(string $value): ?string
+    {
+        if ($value === '' || \DateTimeImmutable::createFromFormat(\DATE_ATOM, $value) !== false) {
+            return null;
+        }
+
+        return 'maintenance.until must be an ISO 8601 date and time with an offset (or empty).';
     }
 
     private static function validateSupportEmail(string $value): ?string

@@ -118,7 +118,12 @@ final class ResponsesCsv
         if (is_string($wanted) && $wanted !== '') {
             return $wanted;
         }
-        foreach ($label as $text) {
+        // A named order, not the array's: PostgreSQL's JSONB reorders keys, so the same
+        // label would otherwise fall back to a different language on each engine.
+        $others = array_keys($label);
+        sort($others);
+        foreach (['en', 'ar', ...$others] as $language) {
+            $text = $label[$language] ?? null;
             if (is_string($text) && $text !== '') {
                 return $text;
             }

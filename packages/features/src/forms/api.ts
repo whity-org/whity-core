@@ -18,6 +18,11 @@ function message(body: unknown, fallback: string): string {
   return fallback
 }
 
+function reasonOf(body: unknown): string | undefined {
+  const details = typeof body === "object" && body !== null ? (body as { details?: { reason?: unknown } }).details : undefined
+  return typeof details?.reason === "string" ? details.reason : undefined
+}
+
 async function call<T>(
   transport: Transport,
   method: string,
@@ -29,7 +34,7 @@ async function call<T>(
   try {
     const response = await transport.request(method, path, body)
     if (response.status < 200 || response.status >= 300) {
-      return { ok: false, status: response.status, message: message(response.body, fallback) }
+      return { ok: false, status: response.status, message: message(response.body, fallback), reason: reasonOf(response.body) }
     }
     return { ok: true, data: pick(response.body) }
   } catch {
@@ -69,6 +74,8 @@ export function createFormsApi(transport: Transport) {
       call(transport, "POST", `/api/v1/forms/${id}/public-link`, {}, fallback, (b) => data<FormRow>(b)),
     disablePublicLink: (id: number, fallback: string) =>
       call(transport, "DELETE", `/api/v1/forms/${id}/public-link`, undefined, fallback, () => true),
+    deleteForm: (id: number, fallback: string) =>
+      call(transport, "DELETE", `/api/v1/forms/${id}`, undefined, fallback, () => true),
     openToMembers: (id: number, open: boolean, fallback: string) =>
       call(transport, open ? "POST" : "DELETE", `/api/v1/forms/${id}/member-access`, open ? {} : undefined, fallback, (b) => data<FormRow>(b)),
     listMyForms: (fallback: string) =>

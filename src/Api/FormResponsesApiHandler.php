@@ -210,7 +210,7 @@ final class FormResponsesApiHandler
         foreach ($question['counts'] as $value => $count) {
             $options[] = ['value' => (string) $value, 'label' => $labels[$value] ?? null, 'count' => $count];
         }
-        usort($options, static fn (array $a, array $b): int => $b['count'] <=> $a['count']);
+        usort($options, static fn (array $a, array $b): int => [$b['count'], $a['value']] <=> [$a['count'], $b['value']]);
 
         /** @var array<string, string> $label */
         $label = is_array($field['label'] ?? null) ? $field['label'] : [];

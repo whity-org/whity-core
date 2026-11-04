@@ -411,11 +411,9 @@ function FormBuilder({ env, formId, canManage }: { env: FormsScreenEnv; formId: 
         action={
           canManage ? (
             <div className="flex flex-wrap gap-2">
-              {form.status === "published" && (
-                <Button variant="outline" onClick={() => window.open(`/forms/${form.id}`, "_blank", "noopener")}>
-                  {t("builder.preview", "Preview")}
-                </Button>
-              )}
+              <Button variant="outline" disabled={dirty} onClick={() => window.open(`/forms/${form.id}/preview`, "_blank", "noopener")}>
+                {t("builder.preview", "Preview")}
+              </Button>
               {form.status === "published" && (
                 <Button variant="outline" onClick={() => void changeStatus("archive")}>
                   {t("builder.closeForm", "Close the form")}

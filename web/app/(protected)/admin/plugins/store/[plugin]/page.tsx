@@ -32,6 +32,7 @@ function PluginDetail() {
   const usageLabel = useUsageLabel();
   const dates = useDateDisplay();
   const [canInstall, setCanInstall] = useState(false);
+  const [canInstallDeclarative, setCanInstallDeclarative] = useState(false);
 
   const [storeUrl, setStoreUrl] = useState(searchParams.get('store') ?? '');
   const [plugin, setPlugin] = useState<CataloguePlugin | null>(null);
@@ -46,6 +47,7 @@ function PluginDetail() {
       let store = storeUrl;
       const { data: allowed } = await api.GET('/api/v1/plugins/store/allowed');
       setCanInstall(allowed?.data.can_install ?? false);
+      setCanInstallDeclarative(allowed?.data.can_install_declarative ?? false);
       if (!store) {
         const host = allowed?.data.hosts[0];
         if (!host) {
@@ -141,7 +143,7 @@ function PluginDetail() {
               ) : null}
             </div>
             <div className="flex flex-col items-end gap-1">
-              <InstallButton canInstall={canInstall} disabled={!plugin.latest_version} onClick={() => setInstallOpen(true)} />
+              <InstallButton canInstall={plugin.kind === 'declarative' ? canInstallDeclarative : canInstall} disabled={!plugin.latest_version} onClick={() => setInstallOpen(true)} />
               {priceLabel(plugin) ? <p className="text-sm text-muted-foreground">{priceLabel(plugin)}</p> : null}
             </div>
           </header>
@@ -232,10 +234,15 @@ function PluginDetail() {
                   <div>
                     <dt className="text-muted-foreground">{t('pluginDetail.runs', 'How it runs')}</dt>
                     <dd className="font-medium">
-                      {t(
-                        'pluginDetail.runsServer',
-                        'On this server, for every workspace, once it is turned on. Whity has not reviewed it.',
-                      )}
+                      {plugin.kind === 'declarative'
+                        ? t(
+                            'pluginDetail.runsDeclarative',
+                            'In this workspace only, drawn by Whity. None of the publisher\'s code runs. Whity has not reviewed it.',
+                          )
+                        : t(
+                            'pluginDetail.runsServer',
+                            'On this server, for every workspace, once it is turned on. Whity has not reviewed it.',
+                          )}
                     </dd>
                   </div>
                   {plugin.updated_at && dates.date(plugin.updated_at) ? (

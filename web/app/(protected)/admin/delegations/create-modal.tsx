@@ -18,6 +18,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@whity/ui/button';
+import { Input } from '@whity/ui/input';
 import {
   Select,
   SelectContent,
@@ -134,6 +135,8 @@ export function CreateDelegationModal({
   const [granteeId, setGranteeId] = useState<string>('');
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
   const [ouId, setOuId] = useState<string>('');
+  // Empty is no end date.
+  const [until, setUntil] = useState<string>('');
 
   const loadOptions = useCallback(async () => {
     try {
@@ -238,6 +241,8 @@ export function CreateDelegationModal({
           granteeId: Number(granteeId),
           permissions: selectedPermissions,
           ouId: ouId === '' ? null : Number(ouId),
+          // The end of the day chosen, in the reader's own time.
+          expiresAt: until === '' ? null : new Date(`${until}T23:59:59`).toISOString(),
         },
       });
 
@@ -406,6 +411,24 @@ export function CreateDelegationModal({
                   </AlertDescription>
                 </Alert>
               ) : null}
+            </div>
+
+            {/* Until (optional) */}
+            <div className="space-y-2">
+              <label htmlFor="delegation-until" className="text-sm font-medium">
+                {t('delegations.create.until', 'Until (optional)')}
+              </label>
+              <Input
+                id="delegation-until"
+                type="date"
+                data-testid="delegation-until"
+                min={new Date().toISOString().slice(0, 10)}
+                value={until}
+                onChange={(event) => setUntil(event.target.value)}
+              />
+              <p className="text-sm text-muted-foreground">
+                {t('delegations.create.until.hint', 'It ends at the end of this day. Leave it empty for no end date.')}
+              </p>
             </div>
 
             {/* OU scope (optional) */}

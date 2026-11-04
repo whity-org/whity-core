@@ -9,6 +9,7 @@ import { useCapabilities } from '@/hooks/useCapabilities';
 import { useFetch } from '@/hooks/useFetch';
 import { useApproverCoverage } from '@/hooks/useApproverCoverage';
 import { AdminHeader } from '@/components/admin/admin-header';
+import { Input } from '@whity/ui/input';
 import { Button } from '@whity/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
 import { AccessDenied } from '@whity/ui/access-denied';
@@ -116,6 +117,28 @@ export default function FeatureFlagsSettingsPage() {
  * mechanism for a single flag would be the larger change.
  */
 const PASSWORD_RESET_APPROVAL_REQUIRED = 'auth.password_reset_approval_required';
+
+const MAINTENANCE_ACTIVE = 'maintenance.active';
+const MAINTENANCE_UNTIL = 'maintenance.until';
+
+/** The stored ISO 8601 value as a `datetime-local` input wants it, in the reader's zone. */
+function toLocalInput(value: string): string {
+  if (value === '') return '';
+  const when = new Date(value);
+  if (Number.isNaN(when.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${when.getFullYear()}-${pad(when.getMonth() + 1)}-${pad(when.getDate())}T${pad(when.getHours())}:${pad(when.getMinutes())}`;
+}
+
+/** What the reader picked as ISO 8601 with their offset, which is what the setting stores. */
+function fromLocalInput(value: string): string {
+  if (value === '') return '';
+  const when = new Date(value);
+  if (Number.isNaN(when.getTime())) return '';
+  const offset = -when.getTimezoneOffset();
+  const pad = (n: number) => String(Math.floor(Math.abs(n))).padStart(2, '0');
+  return `${value}:00${offset < 0 ? '-' : '+'}${pad(offset / 60)}:${pad(offset % 60)}`;
+}
 
 function FeatureFlagsForm({ addToast }: { addToast: AddToast }) {
   const t = useTranslation('admin');
@@ -243,6 +266,24 @@ function FeatureFlagsForm({ addToast }: { addToast: AddToast }) {
                   error={fieldErrors[entry.key]}
                   onChange={(value) => setField(entry.key, value)}
                 />
+                {entry.key === MAINTENANCE_ACTIVE && valueOf(entry) === 'true' && (
+                  <div className="space-y-1">
+                    <label htmlFor="maintenance-until" className="text-sm font-medium">
+                      {t('settings.featureFlags.maintenance.until', 'Expected back at (optional)')}
+                    </label>
+                    <Input
+                      id="maintenance-until"
+                      type="datetime-local"
+                      value={toLocalInput(draft[MAINTENANCE_UNTIL] ?? global?.[MAINTENANCE_UNTIL] ?? '')}
+                      onChange={(e) => setField(MAINTENANCE_UNTIL, fromLocalInput(e.target.value))}
+                    />
+                    {fieldErrors[MAINTENANCE_UNTIL] && (
+                      <p role="alert" className="text-sm text-destructive">
+                        {fieldErrors[MAINTENANCE_UNTIL]}
+                      </p>
+                    )}
+                  </div>
+                )}
                 {entry.key === PASSWORD_RESET_APPROVAL_REQUIRED &&
                   valueOf(entry) === 'true' && (
                     <p

@@ -14,6 +14,10 @@ use Whity\Core\Http\HttpFetcher;
 use Whity\Core\Plugin\PluginOperatorGate;
 use Whity\Core\Plugin\PluginRecords;
 use Whity\Core\Plugin\StoreCatalogueEntry;
+use Whity\Core\Plugin\Tenant\TenantManifestPublisher;
+use Whity\Core\Plugin\Tenant\TenantPluginRepository;
+use Whity\Core\Tenant\TenantContext;
+use Whity\Sdk\Manifest\InvalidManifestException;
 use Whity\Core\PluginInstaller;
 use Whity\Core\PluginLoader;
 use Whity\Core\Request;
@@ -71,6 +75,8 @@ final class InstallFromStoreApiHandler
         ?\Closure $fetchPackage = null,
         ?\Closure $fetchJson = null,
         private readonly ?PluginRecords $records = null,
+        private readonly ?TenantManifestPublisher $publisher = null,
+        private readonly ?TenantPluginRepository $workspacePlugins = null,
     ) {
         $this->fetchPackage = $fetchPackage ?? static fn (string $url, array $headers): ?string
             => (new HttpFetcher(timeoutSeconds: 15, maxBytes: PluginInstaller::MAX_UPLOAD_BYTES))
@@ -184,6 +190,105 @@ final class InstallFromStoreApiHandler
         }
 
         return Response::json(['data' => $entry], 201);
+    }
+
+    /**
+     * POST /api/workspace-plugins/install-from-store - put a declarative plugin
+     * from a trusted store into this workspace (decision 2).
+     *
+     * It's a plugin.json, which is data: no publisher code runs anywhere. It goes
+     * through the same validation and workspace policy as one written here, so a
+     * store can't reach further than the workspace itself could. Nothing is
+     * Verified yet, so it lands turned off (S.12) and nothing in the manifest or
+     * the catalogue can change that.
+     *
+     * @param array<string, string> $params
+     */
+    public function installDeclarative(Request $request, array $params = []): Response
+    {
+        $tenantId = TenantContext::getTenantId();
+        if ($tenantId === null || $tenantId <= 0) {
+            return Response::error('A workspace is required', 403);
+        }
+        if ($this->publisher === null || $this->workspacePlugins === null) {
+            return Response::error('Workspace plugins are unavailable', 503);
+        }
+
+        $body = json_decode($request->getBody(), true);
+        if (!is_array($body)) {
+            return Response::error('A JSON body is required.', 400);
+        }
+        $storeUrl = trim((string) ($body['store_url'] ?? ''));
+        $slug = trim((string) ($body['slug'] ?? ''));
+        $version = trim((string) ($body['version'] ?? ''));
+        $token = (string) ($body['token'] ?? '');
+        if ($storeUrl === '' || $slug === '' || $version === '') {
+            return Response::error('store_url, slug and version are required.', 422);
+        }
+        if (preg_match('/^[a-z0-9][a-z0-9._-]{0,127}$/', $slug) !== 1) {
+            return Response::error('Invalid slug.', 422);
+        }
+        if (preg_match('/^[A-Za-z0-9][A-Za-z0-9.+_-]{0,63}$/', $version) !== 1) {
+            return Response::error('Invalid version.', 422);
+        }
+
+        [$origin, $originError] = $this->resolveStoreOrigin($storeUrl);
+        if ($originError !== null) {
+            return $originError;
+        }
+        $origin = (string) $origin;
+
+        try {
+            $bytes = ($this->fetchPackage)(
+                $origin . '/api/v1/plugin-store/plugins/' . rawurlencode($slug) . '/versions/' . rawurlencode($version) . '/manifest',
+                $token !== '' ? ['Authorization' => 'Bearer ' . $token] : []
+            );
+        } catch (\Throwable $e) {
+            error_log('[InstallFromStore] manifest fetch refused/failed: ' . $e->getMessage());
+            return Response::error('The store manifest could not be fetched.', 502);
+        }
+        $manifest = is_string($bytes) ? json_decode($bytes, true) : null;
+        if (!is_array($manifest)) {
+            return Response::error('The store did not return a plugin manifest.', 502);
+        }
+
+        $actor = PluginOperatorGate::actorProfile($request);
+        try {
+            $parsed = $this->publisher->check($tenantId, $manifest);
+            if ($parsed->version() !== $version) {
+                return Response::error('The manifest is a different version.', 422);
+            }
+            if ($this->workspacePlugins->liveVersionId($tenantId, $parsed->name()) !== null) {
+                return Response::error('This plugin is already in this workspace.', 409);
+            }
+            $published = $this->publisher->publishTurnedOff($tenantId, $manifest, $actor);
+        } catch (InvalidManifestException $e) {
+            return Response::json(['error' => 'This plugin is not allowed in a workspace.', 'details' => ['errors' => $e->getErrors()]], 422);
+        } catch (\Throwable $e) {
+            error_log('[InstallFromStore] declarative install failed: ' . $e->getMessage());
+            return Response::error('Failed to install the plugin.', 500);
+        }
+
+        // S.3: "Allow and continue" is the consent, kept with the person and the list.
+        $this->auditLogger?->record('tenant_plugin.installed', [
+            'tenant_id' => $tenantId,
+            'target_type' => 'tenant_plugin',
+            'target_id' => $published['version_id'],
+            'metadata' => [
+                'plugin' => $published['plugin'],
+                'version' => $published['version'],
+                'hash' => $published['hash'],
+                'store' => $origin,
+                'permissions' => $parsed->permissions(),
+            ],
+        ]);
+
+        return Response::json(['data' => [
+            'plugin' => $published['plugin'],
+            'slug' => \Whity\Sdk\PluginNamespace::slug($published['plugin']),
+            'version' => $published['version'],
+            'enabled' => false,
+        ]], 201);
     }
 
     /**
@@ -510,6 +615,8 @@ final class InstallFromStoreApiHandler
                 // WHIT-869: whether this caller's tenant may install at all. The
                 // page combines it with the plugins:install permission.
                 'can_install' => PluginOperatorGate::isOperator(),
+                // A declarative plugin goes into one workspace, so any workspace may.
+                'can_install_declarative' => (TenantContext::getTenantId() ?? 0) > 0,
             ],
         ]);
     }

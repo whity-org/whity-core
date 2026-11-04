@@ -8,6 +8,7 @@ use DateTimeImmutable;
 use Whity\Auth\RoleChecker;
 use Whity\Core\Billing\InvoiceRepository;
 use Whity\Core\Billing\PaymentReconciler;
+use Whity\Core\Money\AmountInWords;
 use Whity\Core\Money\Currency;
 use Whity\Core\Payment\PaymentEventType;
 use Whity\Core\Payment\PaymentInstruction;
@@ -104,6 +105,11 @@ final class BillingApiHandler
             'data' => $this->present($context, $invoice) + [
                 'lines' => $this->invoices->linesFor($context, $invoiceId),
                 'payments' => $this->ledger->historyFor($context, $invoiceId),
+                // Null for any currency but JOD (section 16).
+                'total_in_words' => [
+                    'en' => AmountInWords::write((int) $invoice['total_minor'], (string) $invoice['currency'], 'en'),
+                    'ar' => AmountInWords::write((int) $invoice['total_minor'], (string) $invoice['currency'], 'ar'),
+                ],
             ],
         ]);
     }
