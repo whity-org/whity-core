@@ -248,9 +248,20 @@ final class FormResponsesApiRealEngineTest extends TestCase
             ['flour' => 2, 'milk' => 1],
             array_column($questions['kind']['options'], 'count', 'value'),
         );
-        self::assertSame(['en' => 'Flour', 'ar' => 'طحين'], $questions['kind']['options'][0]['label']);
+        // assertEquals: the order of a label's languages means nothing, and JSONB changes it.
+        self::assertEquals(['en' => 'Flour', 'ar' => 'طحين'], $questions['kind']['options'][0]['label']);
         self::assertSame(['flour' => 1, 'milk' => 1], array_column($questions['kinds']['options'], 'count', 'value'));
-        self::assertEquals(['true' => 1, 'false' => 1], array_column($questions['imports']['options'], 'count', 'value'));
+        self::assertSame(['false' => 1, 'true' => 1], array_column($questions['imports']['options'], 'count', 'value'));
+    }
+
+    public function testALabelFallsBackInTheSameOrderHoweverItsKeysAreStored(): void
+    {
+        $field = ['field_key' => 'kind', 'field_type' => 'text'];
+        $first = ResponsesCsv::build([$field + ['label' => ['ar' => 'نوع', 'en' => 'Kind', 'de' => 'Art']]], [], 'fr');
+        $second = ResponsesCsv::build([$field + ['label' => ['de' => 'Art', 'en' => 'Kind', 'ar' => 'نوع']]], [], 'fr');
+
+        self::assertSame($first, $second);
+        self::assertStringContainsString('Kind', $first);
     }
 
     public function testResponsesPerWeekIncludesQuietWeeks(): void
