@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.62).
+ * SDK identity (v1.63).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -932,13 +932,23 @@ namespace Whity\Sdk;
  * plugin; {@see Manifest\HomeCardValidator} checks it and
  * {@see Manifest\PluginManifest::homeCard()} reads it (WHIT-872).
  *
+ * Purely additive.) ->
+ * 1.63 (PLUGIN FILES AND DOCUMENT TRACKING: the host services {@see Storage\PluginFiles}
+ * and {@see Documents\PluginDocuments} give a plugin its own files, kept per plugin
+ * and per workspace in the platform's storage layer, and its own documents, issued
+ * through {@see Documents} and recorded as the plugin's, with a QR verification code
+ * and the scan tracking for those documents only. {@see Storage\PluginFileController}
+ * is a generic upload and download endpoint a plugin wires into its own routes.
+ * {@see Storage\PluginFileStore::list()} is new and the storage driver gains a
+ * `list()` (WHIT-886).
+ *
  * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.62.0';
+    public const VERSION = '1.63.0';
 
     /**
      * Static identity only — never instantiated.

@@ -242,9 +242,13 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsOneEightForInteractiveBlocks(): void
     {
         $this->assertSame(
-            '1.62.0',
+            '1.63.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.62 ADDS HOME CARDS: PluginHomeCardInterface and homeCard in plugin.json add one card to the '
+            'SDK 1.63 ADDS PLUGIN FILES AND DOCUMENT TRACKING: the host services PluginFiles and PluginDocuments '
+            . 'give a plugin its own files per workspace (a generic upload and download controller included) and '
+            . 'its own documents, recorded as issued by that plugin, with a QR code and tracking for those documents only '
+            . '(WHIT-886). Purely additive. '
+            . 'SDK 1.62 ADDS HOME CARDS: PluginHomeCardInterface and homeCard in plugin.json add one card to the '
             . 'home page, reading a GET route the plugin registered under the same permission or counting a '
             . 'record type in a workspace plugin (WHIT-872). Purely additive. '
             . 'SDK 1.61 ADDS AGENT PRESETS: PluginAgentPresetsInterface and agentPresets in plugin.json ship '
