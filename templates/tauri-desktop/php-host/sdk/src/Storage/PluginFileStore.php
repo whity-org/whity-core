@@ -30,6 +30,7 @@ interface PluginFileStore
      * The file at $path, or null when there is none.
      *
      * @throws \InvalidArgumentException for a path that is not a plain relative path
+     * @throws \LogicException           when there is no workspace in scope
      */
     public function get(string $path): ?PluginFile;
 
@@ -37,6 +38,7 @@ interface PluginFileStore
      * Whether a file exists at $path.
      *
      * @throws \InvalidArgumentException for a path that is not a plain relative path
+     * @throws \LogicException           when there is no workspace in scope
      */
     public function exists(string $path): bool;
 
@@ -48,6 +50,7 @@ interface PluginFileStore
      * @return list<string>
      *
      * @throws \InvalidArgumentException for a prefix that is not a plain relative path
+     * @throws \LogicException           when there is no workspace in scope
      */
     public function list(string $prefix = ''): array;
 
@@ -55,6 +58,7 @@ interface PluginFileStore
      * Remove the file at $path; nothing happens when there is none.
      *
      * @throws \InvalidArgumentException for a path that is not a plain relative path
+     * @throws \LogicException           when there is no workspace in scope
      */
     public function delete(string $path): void;
 }

@@ -43,6 +43,7 @@ final class PluginFileController
     }
 
     /** POST `/…/{name}`: store the request body as the named file. */
+    /** @param array<string, string> $params */
     public function upload(Request $request, array $params): Response
     {
         $name = (string) ($params['name'] ?? '');
@@ -69,6 +70,7 @@ final class PluginFileController
     }
 
     /** GET `/…/{name}`: the named file as an attachment. */
+    /** @param array<string, string> $params */
     public function download(Request $request, array $params): Response
     {
         try {
@@ -95,6 +97,7 @@ final class PluginFileController
     }
 
     /** GET `/…`: the names of the plugin's files in this workspace. */
+    /** @param array<string, string> $params */
     public function list(Request $request, array $params): Response
     {
         try {
@@ -107,6 +110,7 @@ final class PluginFileController
     }
 
     /** DELETE `/…/{name}`: remove the named file; deleting a missing one is not an error. */
+    /** @param array<string, string> $params */
     public function delete(Request $request, array $params): Response
     {
         try {
