@@ -153,7 +153,7 @@ export default function TenantsPage() {
       header: t('tenants.table.plan', 'Plan'),
       cell: (tenant) => tenant.plan?.name ?? t('tenants.table.noPlan', 'No plan'),
     },
-    { accessorKey: 'userCount', header: t('tenants.table.userCount', 'User Count'), enableSorting: true },
+    { accessorKey: 'userCount', header: t('tenants.table.userCount', 'Users'), enableSorting: true },
     {
       id: 'status',
       header: t('tenants.table.status', 'Status'),
@@ -165,7 +165,7 @@ export default function TenantsPage() {
     ...dates.dateColumns<Tenant>([
       {
         id: 'createdAt',
-        header: t('tenants.table.createdAt', 'Created At'),
+        header: t('tenants.table.createdAt', 'Created'),
         value: (tenant) => tenant.createdAt,
         enableSorting: true,
       },
@@ -212,7 +212,7 @@ export default function TenantsPage() {
     <div className="space-y-8">
       <AdminHeader
         title={t('tenants.title', 'Tenants')}
-        description={t('tenants.description', 'Manage tenants in your system')}
+        description={t('tenants.description', 'The workspaces on this installation.')}
         action={
           canCreate ? (
             <Button
@@ -220,7 +220,7 @@ export default function TenantsPage() {
               className="gap-2"
             >
               <IconPlus size={18} />
-              {t('tenants.createButton', 'Create Tenant')}
+              {t('tenants.createButton', 'Create tenant')}
             </Button>
           ) : undefined
         }
@@ -254,7 +254,7 @@ export default function TenantsPage() {
             description={t('tenants.empty.description', 'Create the first workspace to get started.')}
             action={
               canCreate ? (
-                <Button onClick={() => setIsCreateModalOpen(true)}>{t('tenants.createButton', 'Create Tenant')}</Button>
+                <Button onClick={() => setIsCreateModalOpen(true)}>{t('tenants.createButton', 'Create tenant')}</Button>
               ) : undefined
             }
           />

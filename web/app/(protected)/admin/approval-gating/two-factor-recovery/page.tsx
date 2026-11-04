@@ -8,6 +8,7 @@ import { ApprovalGatingTabs } from '@/components/admin/approval-gating-tabs';
 import { Button } from '@whity/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
 import { AccessDenied } from '@whity/ui/access-denied';
+import { Pagination } from '@whity/ui/pagination';
 import { Alert, AlertDescription } from '@whity/ui/alert';
 import { ConfirmAction } from '@whity/ui/confirm-action';
 import { AreaError, LoadingRows } from '@whity/ui/page-states';
@@ -29,11 +30,15 @@ import { useTranslation } from '@whity/features/i18n';
  */
 const TWO_FACTOR_RECOVERY_APPROVE = 'two_factor_recovery:approve';
 
+const PER_PAGE = 25;
+
 interface PendingTwoFactorRecovery {
   id: number;
   profile_id: number;
   email: string;
   display_name: string;
+  /** Why they asked, in their own words. Optional, so often null. */
+  reason: string | null;
   created_at: string;
 }
 
@@ -47,6 +52,8 @@ export default function TwoFactorRecoveryApprovalsPage() {
   const [items, setItems] = useState<PendingTwoFactorRecovery[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
   const [busyId, setBusyId] = useState<number | null>(null);
   // Approving is security-sensitive: type the email to confirm (tier 3).
   const [approving, setApproving] = useState<typeof items[number] | null>(null);
@@ -56,7 +63,7 @@ export default function TwoFactorRecoveryApprovalsPage() {
     setLoading(true);
     setLoadError(false);
     try {
-      const res = await fetch('/api/v1/2fa-recovery/pending', {
+      const res = await fetch(`/api/v1/2fa-recovery/pending?page=${page}&per_page=${PER_PAGE}`, {
         headers: { 'X-Requested-With': 'XMLHttpRequest' },
         credentials: 'include',
       });
@@ -66,14 +73,16 @@ export default function TwoFactorRecoveryApprovalsPage() {
         return;
       }
       const body = await res.json().catch(() => ({}));
-      setItems(Array.isArray(body?.data) ? (body.data as PendingTwoFactorRecovery[]) : []);
+      const rows = Array.isArray(body?.data) ? (body.data as PendingTwoFactorRecovery[]) : [];
+      setItems(rows);
+      setTotal(typeof body?.pagination?.total === 'number' ? body.pagination.total : rows.length);
     } catch {
       setLoadError(true);
       setItems([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [page]);
 
   useEffect(() => {
     if (!isCapabilitiesLoading && canApprove) {
@@ -234,6 +243,9 @@ export default function TwoFactorRecoveryApprovalsPage() {
                 >
                   <div className="min-w-0">
                     <p className="font-medium text-foreground truncate">{item.email}</p>
+                    <p className="text-sm text-foreground" data-testid={`twoFactorRecovery-reason-${item.id}`}>
+                      {item.reason ?? t('twoFactorRecovery.reason.default', 'Lost access to their second step')}
+                    </p>
                     <p className="text-sm text-muted-foreground truncate">
                       {[
                         item.display_name,
@@ -273,6 +285,9 @@ export default function TwoFactorRecoveryApprovalsPage() {
                 </li>
               ))}
             </ul>
+          )}
+          {!loading && !loadError && total > PER_PAGE && (
+            <Pagination className="mt-4" page={page} perPage={PER_PAGE} total={total} onPageChange={setPage} />
           )}
         </CardContent>
       </Card>

@@ -146,23 +146,14 @@ test.describe('Delegations (role matrix)', () => {
     await expect(row).toContainText('Relations read');
     await expect(row).toContainText('Active');
 
-    // Revoke via the row action + confirmation modal.
+    // Revoke happens at once, and the toast offers Undo (tier 1).
     await row.getByRole('button', { name: 'Revoke' }).click();
-    const revokeDialog = page.getByRole('dialog');
     await expect(
-      revokeDialog.getByText('They lose the delegated access straight away.')
-    ).toBeVisible();
-    await revokeDialog
-      .getByRole('button', { name: 'Revoke delegation' })
-      .click();
-    await expect(
-      toastWithText(page, 'Delegation revoked successfully')
+      toastWithText(page, 'Delegation revoked. They lost this access straight away.')
     ).toBeVisible();
 
-    // CURRENT BEHAVIOR: GET /api/delegations excludes revoked rows unless
-    // includeRevoked is passed (the page never passes it), so after the
-    // post-revoke refetch the row DISAPPEARS from the list — it does not stay
-    // behind with a "Revoked" badge.
+    // The default view is what is live, so the row leaves it. All keeps it, for the
+    // record.
     await expect(row).toHaveCount(0);
   });
 });

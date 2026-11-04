@@ -16,6 +16,11 @@ export interface Permission {
   id: number;
   name: string;
   description: string;
+  /** Where it sits on the role page's grid. Present on the catalogue, not on a role's own list. */
+  area?: string;
+  areaLabel?: string;
+  areaGroup?: string;
+  actions?: string[];
 }
 
 export interface Role {
@@ -24,6 +29,8 @@ export interface Role {
   description: string;
   createdAt: string;
   permissionCount?: number;
+  /** Active people holding it in this workspace. */
+  peopleCount?: number;
   /**
    * Whether the current tenant may update/delete this role (computed
    * server-side, mirroring the WC-110 write guard). A global NULL-tenant base
