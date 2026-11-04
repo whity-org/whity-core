@@ -3137,6 +3137,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/forms/{id}/responses/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download a form's responses as a CSV file
+         * @description At most 20,000 rows, and `X-Whity-Rows-Truncated` says if it stopped there. A text cell that a spreadsheet would run as a formula is made safe with a leading `'`. Staff answers are left out, and a file answer says how many are attached rather than giving the storage key. `?language=ar` chooses the wording. Each export is audited.
+         */
+        get: operations["get_api_v1_forms_id_responses_export"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/forms/{id}/responses/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What a form's responses add up to
+         * @description A count per choice for each choice question, responses per week for the last 12 weeks, and where responses are in their routing. Text and file questions are not summarised, and staff answers appear nowhere. Reads at most 20,000 responses; `truncated` says so.
+         */
+        get: operations["get_api_v1_forms_id_responses_summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/forms/{id}/submissions": {
         parameters: {
             query?: never;
@@ -9613,6 +9653,38 @@ export interface components {
         };
         FormResponse: {
             data: components["schemas"]["Form"];
+        };
+        FormResponsesSummaryResponse: {
+            data: {
+                total: number;
+                truncated: boolean;
+                per_week: {
+                    week: string;
+                    count: number;
+                }[];
+                routing: {
+                    not_routed: number;
+                    in_progress: number;
+                    completed: number;
+                };
+                questions: {
+                    field_key: string;
+                    field_type: string;
+                    label: {
+                        ar?: string;
+                        en?: string;
+                    };
+                    answered: number;
+                    options: {
+                        value: string;
+                        label?: {
+                            ar?: string;
+                            en?: string;
+                        } | null;
+                        count: number;
+                    }[];
+                }[];
+            };
         };
         FormSection: {
             key: string | null;
@@ -29275,6 +29347,143 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FormRenderResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Form not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_forms_id_responses_export: {
+        parameters: {
+            query?: {
+                /** @description en or ar; the wording of labels and choices. */
+                language?: string;
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The CSV file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Form not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_forms_id_responses_summary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The summary */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormResponsesSummaryResponse"];
                 };
             };
             /** @description Missing or invalid authentication */
