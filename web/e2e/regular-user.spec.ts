@@ -15,7 +15,7 @@ import { REGULAR_USER } from './support/constants';
 test.describe('Regular user (non-admin)', () => {
   test('can log in and reach the dashboard', async ({ userPage, page }) => {
     await expect(page).toHaveURL(/\/dashboard$/);
-    await expect(page.getByRole('heading', { name: /^Good (morning|afternoon|evening)$/ })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /^Good (morning|afternoon|evening)/ })).toBeVisible();
     await userPage.shell.expectLoggedInAs(REGULAR_USER.email);
     // Waiting for you is always the first card; with nothing waiting it is one line.
     await expect(page.getByText(/Waiting for you|Nothing is waiting for you\./).first()).toBeVisible();
@@ -121,7 +121,7 @@ test.describe('Regular user (non-admin)', () => {
     page,
   }) => {
     await expect(page).toHaveURL(/\/dashboard$/);
-    await expect(page.getByRole('heading', { name: /^Good (morning|afternoon|evening)$/ })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /^Good (morning|afternoon|evening)/ })).toBeVisible();
     // Waiting for you collapses to one line when nothing waits, so one of the two shows.
     await expect(
       page.getByText(/Waiting for you|Nothing is waiting for you\./).first()

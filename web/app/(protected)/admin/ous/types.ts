@@ -6,5 +6,7 @@ export interface OU {
   slug: string;
   description?: string;
   created_at: string;
+  /** Active people directly in this unit. */
+  member_count?: number;
   children?: { id: number }[];
 }

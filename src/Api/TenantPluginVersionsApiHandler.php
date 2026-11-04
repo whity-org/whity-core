@@ -64,6 +64,42 @@ final class TenantPluginVersionsApiHandler
         )]));
     }
 
+    /**
+     * POST /api/workspace-plugins/{plugin}/enable and /disable: this workspace's
+     * switch. A slug another workspace owns answers 404.
+     *
+     * @param array<string, string> $params
+     */
+    public function enable(Request $request, array $params = []): Response
+    {
+        return $this->setEnabled($request, $params, true);
+    }
+
+    /** @param array<string, string> $params */
+    public function disable(Request $request, array $params = []): Response
+    {
+        return $this->setEnabled($request, $params, false);
+    }
+
+    /** @param array<string, string> $params */
+    private function setEnabled(Request $request, array $params, bool $enabled): Response
+    {
+        return $this->guarded(function (int $tenantId) use ($request, $params, $enabled): Response {
+            $plugin = $this->plugins->pluginKey($tenantId, (string) ($params['plugin'] ?? ''));
+            if ($plugin === null || !$this->plugins->setEnabled($tenantId, $plugin, $enabled)) {
+                return self::notFound();
+            }
+            $this->audit?->record($enabled ? 'tenant_plugin.enabled' : 'tenant_plugin.disabled', [
+                'tenant_id' => $tenantId,
+                'actor_user_id' => self::profileId($request),
+                'target_type' => 'tenant_plugin',
+                'metadata' => ['plugin' => $plugin],
+            ]);
+
+            return Response::json(['data' => ['plugin' => $plugin, 'enabled' => $enabled]]);
+        });
+    }
+
     public function validate(Request $request): Response
     {
         return $this->guarded(function (int $tenantId) use ($request): Response {

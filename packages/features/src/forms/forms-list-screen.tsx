@@ -6,9 +6,10 @@ import { Button } from "@whity/ui/button"
 import { DataTable } from "@whity/ui/data-table"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@whity/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@whity/ui/dropdown-menu"
-import { BilingualInput, type BilingualValue } from "@whity/ui/bilingual-input"
+import { BilingualField, type BilingualValue } from "./bilingual-field"
 import { AccessDeniedPanel, AreaError, EmptyFiltered, EmptyFirstTime, LoadingRows } from "@whity/ui/page-states"
 import { SearchField } from "@whity/ui/search-field"
+import { ConfirmAction } from "@whity/ui/confirm-action"
 import { PageHeader } from "@whity/ui/page-header"
 import { Icon } from "@whity/ui/icon"
 import { IconDots } from "@tabler/icons-react"
@@ -54,6 +55,7 @@ export function FormsListScreen({ env, canManage }: { env: FormsScreenEnv; canMa
   const [failure, setFailure] = useState<{ denied: boolean; message: string } | null>(null)
   const [search, setSearch] = useState("")
   const [creating, setCreating] = useState(false)
+  const [deleting, setDeleting] = useState<FormRow | null>(null)
 
   const load = useCallback(async () => {
     setFailure(null)
@@ -94,6 +96,24 @@ export function FormsListScreen({ env, canManage }: { env: FormsScreenEnv; canMa
         onClick: () => void setOpen(updated, !open),
       }
     )
+  }
+
+  async function remove(form: FormRow) {
+    const result = await api.deleteForm(form.id, t("builder.action.failed", "That did not work. Try again."))
+    setDeleting(null)
+    if (!result.ok) {
+      env.notify(
+        result.reason === "form_is_published"
+          ? t("builder.delete.published", "This form is open. Close it before deleting it.")
+          : result.reason === "form_has_submissions"
+            ? t("builder.delete.answered", "People have answered this form, so it can only be closed.")
+            : result.message,
+        "error"
+      )
+      return
+    }
+    setForms((current) => (current ?? []).filter((row) => row.id !== form.id))
+    env.notify(t("builder.deleted", "{name} was deleted.", { name: nameOf(form) }), "success")
   }
 
   async function duplicate(form: FormRow) {
@@ -149,6 +169,7 @@ export function FormsListScreen({ env, canManage }: { env: FormsScreenEnv; canMa
     t("builder.col.form", "Form"),
     t("builder.col.status", "Status"),
     t("builder.col.who", "Who can fill it"),
+    t("builder.col.responses", "Responses"),
     t("builder.col.changed", "Changed"),
   ]
 
@@ -212,7 +233,8 @@ export function FormsListScreen({ env, canManage }: { env: FormsScreenEnv; canMa
                 },
                 { id: "status", header: headers[1], cell: (row) => <Badge variant={statusVariant(row.status)}>{statusLabel(row.status)}</Badge> },
                 { id: "who", header: headers[2], cell: (row) => whoCanFill(row) },
-                { id: "changed", header: headers[3], cell: (row) => dateTime(row.updated_at) ?? "" },
+                { id: "responses", header: headers[3], cell: (row) => (row.submission_count ?? 0) },
+                { id: "changed", header: headers[4], cell: (row) => dateTime(row.updated_at) ?? "" },
               ]}
               rowActionsLabel={t("builder.col.actions", "Actions")}
               rowActions={(row) => (
@@ -231,6 +253,11 @@ export function FormsListScreen({ env, canManage }: { env: FormsScreenEnv; canMa
                       <>
                         <DropdownMenuItem onSelect={() => void duplicate(row)}>{t("builder.row.duplicate", "Duplicate")}</DropdownMenuItem>
                         <DropdownMenuSeparator />
+                        {row.status !== "published" && (
+                          <DropdownMenuItem variant="destructive" onSelect={() => setDeleting(row)}>
+                            {t("builder.row.delete", "Delete")}
+                          </DropdownMenuItem>
+                        )}
                         {row.status === "archived" ? (
                           <DropdownMenuItem onSelect={() => void setOpen(row, true)}>{t("builder.row.reopen", "Reopen")}</DropdownMenuItem>
                         ) : row.status === "published" ? (
@@ -244,6 +271,22 @@ export function FormsListScreen({ env, canManage }: { env: FormsScreenEnv; canMa
             />
           )}
         </>
+      )}
+
+      {deleting !== null && (
+        <ConfirmAction
+          open
+          onOpenChange={(open) => !open && setDeleting(null)}
+          title={t("builder.delete.title", "Delete {name}?", { name: nameOf(deleting) })}
+          description={
+            (deleting.submission_count ?? 0) > 0
+              ? t("builder.delete.withResponses", "It has {count} responses, so it cannot be deleted. Close it instead.", { count: deleting.submission_count ?? 0 })
+              : t("builder.delete.body", "The form and its questions are removed. Nobody has answered it, so no responses are lost.")
+          }
+          confirmLabel={t("builder.delete.confirm", "Delete form")}
+          cancelLabel={t("builder.cancel", "Cancel")}
+          onConfirm={() => remove(deleting)}
+        />
       )}
 
       {creating && (
@@ -288,13 +331,11 @@ function NewFormDialog({ env, existingKeys, onClose }: { env: FormsScreenEnv; ex
           <DialogTitle>{t("builder.new", "New form")}</DialogTitle>
           <DialogDescription>{t("builder.new.body", "Name the form. You add the questions next.")}</DialogDescription>
         </DialogHeader>
-        <BilingualInput
+        <BilingualField
           id="new-form-name"
           label={t("builder.new.name", "Form name")}
           value={name}
           onChange={setName}
-          enLabel={t("builder.lang.en", "English")}
-          arLabel={t("builder.lang.ar", "Arabic")}
         />
         {error !== null && <p role="alert" className="text-sm text-destructive">{error}</p>}
         <DialogFooter>

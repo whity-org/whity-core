@@ -28,7 +28,7 @@ import {
 } from '@whity/ui/select';
 import { IconAlertCircle, IconCircleCheck, IconPlugConnected } from '@tabler/icons-react';
 import { Stepper } from '@whity/ui/stepper';
-import { useTranslation } from '@whity/features/i18n';
+import { useFormattingLocale, useTranslation } from '@whity/features/i18n';
 import { titleCase } from '@whity/features/roles';
 import {
   MCP_CLIENTS,
@@ -544,6 +544,7 @@ function Preflight({ info, infoError }: { info: McpConnectInfo | null; infoError
 
 function PreviewPanel({ scope, tools, loading }: { scope: string[] | null; tools: McpPreviewTool[] | null; loading: boolean }) {
   const t = useTranslation('admin');
+  const arabic = useFormattingLocale() === 'ar';
   const [expanded, setExpanded] = useState(false);
   if (scope === null) {
     return (
@@ -568,7 +569,7 @@ function PreviewPanel({ scope, tools, loading }: { scope: string[] | null; tools
       </p>
       <ul className="space-y-1 text-xs text-muted-foreground">
         {shown.map((tool) => (
-          <li key={tool.name}>{tool.description !== '' ? tool.description : tool.name}</li>
+          <li key={tool.name}>{(arabic && tool.plainNameAr) || tool.plainName}</li>
         ))}
       </ul>
       {tools.length > shown.length && (

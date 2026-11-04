@@ -102,7 +102,6 @@ const GRANDFATHERED = [
     // one of the three would hide a page they are entitled to use. The broad
     // role is the correct gate for VISIBILITY here; authority is enforced per
     // tab regardless of what the client renders.
-    'nav:approval-gating' => 'DELIBERATE: three tabs, three permissions, each enforced server-side per tab',
 ];
 
 $root = dirname(__DIR__);

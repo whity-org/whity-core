@@ -22,6 +22,8 @@ class PluginsApiHandlerTest extends TestCase
 
     protected function setUp(): void
     {
+        \Whity\Core\Tenant\TenantContext::reset();
+        \Whity\Core\Tenant\TenantContext::setTenantId(0);
         $this->tempDir = sys_get_temp_dir() . '/whity_plugins_api_' . uniqid();
         mkdir($this->tempDir, 0755, true);
         $this->router = new Router('');
@@ -29,6 +31,7 @@ class PluginsApiHandlerTest extends TestCase
 
     protected function tearDown(): void
     {
+        \Whity\Core\Tenant\TenantContext::reset();
         $this->removeDirectory($this->tempDir);
     }
 
@@ -339,7 +342,7 @@ class PluginsApiHandlerTest extends TestCase
             'POST',
             '/api/plugins/ExecuteUninstallPlugin/uninstall',
             ['Content-Type' => 'application/json'],
-            (string) json_encode(['dry_run' => false, 'force' => false])
+            (string) json_encode(['dry_run' => false, 'force' => false, 'now' => true])
         );
 
         $response = $apiHandler->uninstall($request, ['id' => 'ExecuteUninstallPlugin']);
@@ -455,7 +458,7 @@ class PluginsApiHandlerTest extends TestCase
         // No loader: forces the filesystem-fallback path.
         $apiHandler = new PluginsApiHandler($this->tempDir, null, $pdo);
         $response = $apiHandler->uninstall(
-            new Request('POST', '/api/plugins/Foo/uninstall'),
+            new Request('POST', '/api/plugins/Foo/uninstall', [], (string) json_encode(['now' => true])),
             ['id' => 'Foo']
         );
 
@@ -550,7 +553,7 @@ class PluginsApiHandlerTest extends TestCase
             'POST',
             '/api/plugins/SignalUninstallPlugin/uninstall',
             ['Content-Type' => 'application/json'],
-            (string) json_encode(['dry_run' => false, 'force' => false])
+            (string) json_encode(['dry_run' => false, 'force' => false, 'now' => true])
         );
 
         $response = $apiHandler->uninstall($request, ['id' => 'SignalUninstallPlugin']);
@@ -616,7 +619,7 @@ PHP;
             'POST',
             '/api/plugins/DirUninstallPlugin/uninstall',
             ['Content-Type' => 'application/json'],
-            (string) json_encode(['dry_run' => false])
+            (string) json_encode(['dry_run' => false, 'now' => true])
         );
 
         $response = $apiHandler->uninstall($request, ['id' => 'DirUninstallPlugin']);

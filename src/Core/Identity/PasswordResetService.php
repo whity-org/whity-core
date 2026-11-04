@@ -159,7 +159,7 @@ final class PasswordResetService
      *
      * @return array{profile_id: int, request_id: int, applied: bool}|null
      */
-    public function confirm(string $rawToken, string $newPassword, bool $requireApproval): ?array
+    public function confirm(string $rawToken, string $newPassword, bool $requireApproval, ?string $reason = null): ?array
     {
         if ($rawToken === '') {
             return null;
@@ -217,10 +217,11 @@ final class PasswordResetService
                     "UPDATE password_resets
                         SET status = '" . self::STATUS_AWAITING_APPROVAL . "',
                             staged_password_hash = :hash,
+                            reason = :reason,
                             consumed_at = :now,
                             updated_at = NOW()
                       WHERE id = :id AND consumed_at IS NULL"
-                )->execute([':hash' => $newHash, ':now' => $now, ':id' => $requestId]);
+                )->execute([':hash' => $newHash, ':reason' => $reason, ':now' => $now, ':id' => $requestId]);
             } else {
                 // Apply immediately: new password hash + token_epoch bump
                 // (invalidates every existing session for this profile, exactly
@@ -307,27 +308,29 @@ final class PasswordResetService
      * authenticated tenant context, so only a caller genuinely acting in
      * tenant 0 can reach the unscoped branch.
      *
-     * @return list<array{id:int, profile_id:int, email:string, display_name:string, created_at:string}>
+     * `$limit` and `$offset` page the queue; {@see self::countPendingForTenant()} is its total.
+     *
+     * @return list<array{id:int, profile_id:int, email:string, display_name:string, reason:string|null, created_at:string}>
      */
-    public function listPendingForTenant(int $tenantId): array
+    public function listPendingForTenant(int $tenantId, int $limit = PHP_INT_MAX, int $offset = 0): array
     {
         if ($tenantId === self::SYSTEM_TENANT_ID) {
             // @tenant-guard-ignore: platform (system tenant 0) break-glass — cross-tenant by design; every other caller takes the membership-scoped branch below
             $stmt = $this->db->prepare(
-                "SELECT pr.id, pr.profile_id, pr.created_at,
+                "SELECT pr.id, pr.profile_id, pr.created_at, pr.reason,
                         p.display_name,
                         pe.email AS email
                  FROM password_resets pr
                  JOIN profiles p ON p.id = pr.profile_id
                  LEFT JOIN profile_emails pe ON pe.profile_id = pr.profile_id AND pe.is_primary = TRUE
                  WHERE pr.status = '" . self::STATUS_AWAITING_APPROVAL . "'
-                 ORDER BY pr.created_at ASC"
+                 ORDER BY pr.created_at ASC, pr.id ASC
+                 LIMIT :limit OFFSET :offset"
             );
-            $stmt->execute();
         } else {
             // @tenant-guard-ignore: joins the global password_resets/profiles tables to memberships, scoped by the tenant_id predicate below
             $stmt = $this->db->prepare(
-                "SELECT DISTINCT pr.id, pr.profile_id, pr.created_at,
+                "SELECT DISTINCT pr.id, pr.profile_id, pr.created_at, pr.reason,
                         p.display_name,
                         pe.email AS email
                  FROM password_resets pr
@@ -335,10 +338,14 @@ final class PasswordResetService
                  JOIN profiles p ON p.id = pr.profile_id
                  LEFT JOIN profile_emails pe ON pe.profile_id = pr.profile_id AND pe.is_primary = TRUE
                  WHERE pr.status = '" . self::STATUS_AWAITING_APPROVAL . "'
-                 ORDER BY pr.created_at ASC"
+                 ORDER BY pr.created_at ASC, pr.id ASC
+                 LIMIT :limit OFFSET :offset"
             );
-            $stmt->execute([':tenant_id' => $tenantId]);
+            $stmt->bindValue(':tenant_id', $tenantId, PDO::PARAM_INT);
         }
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $stmt->execute();
 
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -349,11 +356,37 @@ final class PasswordResetService
                 'profile_id'   => (int) $row['profile_id'],
                 'email'        => (string) ($row['email'] ?? ''),
                 'display_name' => (string) ($row['display_name'] ?? ''),
+                'reason'       => isset($row['reason']) ? (string) $row['reason'] : null,
                 'created_at'   => (string) ($row['created_at'] ?? ''),
             ];
         }
 
         return $items;
+    }
+
+    /**
+     * The total behind {@see self::listPendingForTenant()}, with the same scope.
+     */
+    public function countPendingForTenant(int $tenantId): int
+    {
+        if ($tenantId === self::SYSTEM_TENANT_ID) {
+            // @tenant-guard-ignore: platform (system tenant 0) break-glass, the same scope listPendingForTenant() documents
+            $stmt = $this->db->prepare(
+                "SELECT COUNT(*) FROM password_resets pr WHERE pr.status = '" . self::STATUS_AWAITING_APPROVAL . "'"
+            );
+            $stmt->execute();
+        } else {
+            // @tenant-guard-ignore: joins the global password_resets table to memberships, scoped by the tenant_id predicate below
+            $stmt = $this->db->prepare(
+                "SELECT COUNT(DISTINCT pr.id)
+                 FROM password_resets pr
+                 JOIN memberships m ON m.profile_id = pr.profile_id AND m.tenant_id = :tenant_id AND m.status = 'active'
+                 WHERE pr.status = '" . self::STATUS_AWAITING_APPROVAL . "'"
+            );
+            $stmt->execute([':tenant_id' => $tenantId]);
+        }
+
+        return (int) $stmt->fetchColumn();
     }
 
     /**

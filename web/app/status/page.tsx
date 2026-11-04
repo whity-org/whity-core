@@ -47,6 +47,7 @@ interface StatusPayload {
   incidents: StatusIncident[];
   window_days: number;
   generated_at: string;
+  maintenance?: { active: boolean; until: string | null };
 }
 
 /** Refresh cadence. The collector samples every 60s, so polling faster only adds load. */
@@ -191,6 +192,24 @@ export default function StatusPage() {
             ) : null}
           </div>
         </section>
+
+        {data?.maintenance?.active ? (
+          <section
+            data-testid="status-maintenance"
+            className="mb-10 rounded-xl border border-border bg-card px-5 py-4"
+          >
+            <p className="font-medium">
+              {data.maintenance.until !== null && dates.dateTime(data.maintenance.until) !== null
+                ? t('maintenance.until', 'Under maintenance, back at {when}', {
+                    when: dates.dateTime(data.maintenance.until) ?? '',
+                  })
+                : t('maintenance.active', 'Under maintenance')}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {t('maintenance.body', 'We’re updating the service. Your data is safe.')}
+            </p>
+          </section>
+        ) : null}
 
         {loading && !data ? (
           <p className="text-sm text-muted-foreground">{t('loading', 'Loading…')}</p>

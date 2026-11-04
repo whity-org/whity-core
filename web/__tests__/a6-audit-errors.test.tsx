@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { DisplayPreferencesContextProvider } from '@whity/ui/display-preferences';
 
 jest.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams() }));
@@ -24,12 +24,32 @@ const ENTRY = {
   id: 1,
   tenantId: 1,
   actorUserId: 42,
-  action: 'auth.login.success',
+  action: 'role.updated',
   targetType: 'role',
   targetId: 5,
-  metadata: { via: 'password' },
+  metadata: { field: 'name' },
   ipAddress: '203.0.113.9',
-  createdAt: '2026-11-01T10:00:00Z',
+  createdAt: '2026-11-02 10:31:00',
+  actor: { kind: 'person', name: 'Rana Haddad', agent: null, forPerson: null },
+  target: { type: 'role', name: 'Branch manager' },
+  sentence: 'Rana Haddad changed role Branch manager',
+  sentenceTemplate: '{actor} changed role {target}',
+  area: 'people',
+  how: null,
+};
+
+const AGENT_ENTRY = {
+  ...ENTRY,
+  id: 2,
+  actor: { kind: 'agent', name: 'Billing assistant for Rana', agent: 'Billing assistant', forPerson: 'Rana' },
+  sentence: 'Billing assistant for Rana changed role Branch manager',
+  how: 'Through a connected agent',
+};
+
+const FACETS = {
+  people: [{ id: 42, name: 'Rana Haddad' }],
+  agents: [{ id: 'jti-1', name: 'Billing assistant' }],
+  areas: [{ id: 'people', name: 'People' }],
 };
 
 function renderWith(technical: boolean, ui: React.ReactElement) {
@@ -42,29 +62,87 @@ function renderWith(technical: boolean, ui: React.ReactElement) {
   );
 }
 
+let auditRows: unknown[] = [ENTRY];
+let auditStatus = 200;
+
 beforeEach(() => {
-  apiClient.mockResolvedValue({
-    ok: true,
-    json: async () => ({ data: [ENTRY], pagination: { page: 1, perPage: 25, total: 1, totalPages: 1 } }),
+  auditRows = [ENTRY];
+  auditStatus = 200;
+  apiClient.mockReset();
+  apiClient.mockImplementation(async (url: string) => {
+    if (url.includes('/audit-logs/facets')) {
+      return { ok: true, status: 200, json: async () => ({ data: FACETS }) };
+    }
+    if (url.includes('/audit-logs')) {
+      return {
+        ok: auditStatus === 200,
+        status: auditStatus,
+        json: async () => ({ data: auditRows, pagination: { page: 1, perPage: 25, total: auditRows.length, totalPages: 1 } }),
+      };
+    }
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({ data: [ENTRY], pagination: { page: 1, perPage: 25, total: 1, totalPages: 1 } }),
+    };
   });
 });
 
 describe('audit log', () => {
-  it('shows no ids, addresses or detail blobs by default', async () => {
+  it('says what happened with people by name, and no ids or addresses by default', async () => {
     renderWith(false, <AuditLogsPage />);
-    expect(await screen.findByText('A person')).toBeInTheDocument();
+    expect(await screen.findByText('Rana Haddad')).toBeInTheDocument();
+    expect(screen.getByText('Branch manager')).toBeInTheDocument();
     expect(screen.queryByText('#42', { exact: false })).toBeNull();
     expect(screen.queryByText('203.0.113.9')).toBeNull();
-    expect(screen.queryByText('role #5')).toBeNull();
-    expect(screen.queryByText('Actor (User ID)')).toBeNull();
+    expect(screen.queryByText('role.updated')).toBeNull();
   });
 
-  it('adds them with Show technical details on', async () => {
+  it('adds codes, ids and addresses with Show technical details on', async () => {
     renderWith(true, <AuditLogsPage />);
-    expect(await screen.findByText('A person (#42)')).toBeInTheDocument();
+    expect(await screen.findByText('role.updated')).toBeInTheDocument();
+    expect(screen.getByText('#42')).toBeInTheDocument();
     expect(screen.getByText('203.0.113.9')).toBeInTheDocument();
     expect(screen.getByText('role #5')).toBeInTheDocument();
-    expect(screen.getByText('Actor (User ID)')).toBeInTheDocument();
+  });
+
+  it('shows an agent as a chip for its person, with how', async () => {
+    auditRows = [AGENT_ENTRY];
+    renderWith(false, <AuditLogsPage />);
+    expect(await screen.findByText('Billing assistant')).toBeInTheDocument();
+    expect(screen.getByText('Through a connected agent')).toBeInTheDocument();
+  });
+
+  it('never reads a placeholder out of a name', async () => {
+    auditRows = [{ ...ENTRY, actor: { ...ENTRY.actor, name: '{target}' } }];
+    renderWith(false, <AuditLogsPage />);
+    expect(await screen.findByText('{target}')).toBeInTheDocument();
+  });
+
+  it('says a refusal is a refusal, not an empty log', async () => {
+    auditStatus = 403;
+    renderWith(false, <AuditLogsPage />);
+    expect(await screen.findByText('You can’t open the audit log')).toBeInTheDocument();
+    expect(screen.queryByText('No audit entries found')).toBeNull();
+  });
+
+  it('says a failure is a failure, with a way to try again', async () => {
+    auditStatus = 500;
+    renderWith(false, <AuditLogsPage />);
+    expect(await screen.findByRole('button', { name: 'Try again' })).toBeInTheDocument();
+  });
+
+  it('asks the server for the CSV, with the technical columns only when they are on', async () => {
+    auditRows = [];
+    renderWith(false, <AuditLogsPage />);
+    const exportButton = await screen.findByRole('button', { name: 'Export' });
+    URL.createObjectURL = jest.fn(() => 'blob:x');
+    URL.revokeObjectURL = jest.fn();
+    apiClient.mockImplementationOnce(async () => ({ ok: true, status: 200, blob: async () => new Blob(['x']) }));
+    fireEvent.click(exportButton);
+    await waitFor(() => expect(apiClient).toHaveBeenCalledWith(expect.stringContaining('/api/v1/audit-logs/export?')));
+    const call = apiClient.mock.calls.find(([url]: [string]) => url.includes('/export'));
+    expect(call?.[0]).not.toContain('technical=1');
   });
 });
 

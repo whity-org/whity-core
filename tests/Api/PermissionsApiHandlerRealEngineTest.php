@@ -143,7 +143,7 @@ final class PermissionsApiHandlerRealEngineTest extends TestCase
         $data = json_decode($response->getBody(), true)['data'];
         $this->assertCount(1, $data, 'No registry means no permission is merged in.');
         $this->assertGreaterThan(0, (int) $data[0]['id']);
-        $this->assertSame(['id', 'name', 'description'], array_keys($data[0]), 'No `source` key without a registry.');
+        $this->assertSame(['id', 'name', 'description', 'area', 'areaLabel', 'areaGroup', 'actions'], array_keys($data[0]), 'No `source` key without a registry.');
         $this->assertSame('users:read', $data[0]['name']);
         $this->assertSame('Read users', $data[0]['description']);
     }

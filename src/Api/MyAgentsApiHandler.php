@@ -17,12 +17,15 @@ use Whity\Mcp\Auth\AgentGrantView;
 use Whity\Mcp\Auth\AgentScopeGrant;
 use Whity\Mcp\Auth\McpScope;
 use Whity\Mcp\Auth\McpTokenService;
+use Whity\Mcp\Tools\CoreToolsets;
+use Whity\Mcp\Tools\ToolCatalogue;
 
 /**
  * A person's use of the workspace's agents (WHIT-816;
  * docs/design/AGENT-PERSONAS-AND-WHITY-AGENT.md §4.3 and §4.4).
  *
  *   GET    /api/me/agents                          the workspace's agents, with the caller's assignment
+ *   GET    /api/me/agent-toolsets                  the areas an agent can work with, by name
  *   POST   /api/me/agents/{id}/assignment          grant the agent for yourself
  *   DELETE /api/me/agents/{id}/assignment          stop using it; its credentials are revoked
  *   GET    /api/me/agents/{id}/assignment/grant    your grant, permission by permission
@@ -105,6 +108,21 @@ final class MyAgentsApiHandler
             },
             $agents,
         )], 200);
+    }
+
+    /**
+     * Core's areas in both languages. Names only, nothing about this workspace.
+     *
+     * @param array<string, string> $params
+     */
+    public function toolsets(Request $request, array $params = []): Response
+    {
+        $caller = $this->caller($request);
+        if ($caller instanceof Response) {
+            return $caller;
+        }
+
+        return Response::json(['data' => array_map(ToolCatalogue::area(...), array_keys(CoreToolsets::TOOLSETS))], 200);
     }
 
     /** @param array<string, string> $params */

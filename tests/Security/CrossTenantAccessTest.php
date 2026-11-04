@@ -450,12 +450,18 @@ class CrossTenantAccessTest extends TestCase
             'role' => 'user',
         ]);
 
+        // The response says whether a two-step policy applies to them.
+        $mockPolicyStatement = $this->createMock(PDOStatement::class);
+        $mockPolicyStatement->method('execute')->willReturn(true);
+        $mockPolicyStatement->method('fetchAll')->willReturn([]);
+
         $this->mockDb->method('prepare')
             ->willReturnOnConsecutiveCalls(
                 $mockSelectStatement,
                 $mockOuCheckStatement,
                 $mockUpdateStatement,
-                $mockRefetchStatement
+                $mockRefetchStatement,
+                $mockPolicyStatement
             );
 
         // Attack: User A tries to assign themselves to Engineering OU

@@ -42,9 +42,9 @@ test.describe('Audit Logs (role matrix)', () => {
 
     // admin (role grant) and delegate (delegated audit:read) read the trail.
     // A fresh database may legitimately hold zero entries, so pin "entries
-    // table or empty state" rather than a row count.
+    // or empty state" rather than a row count.
     await expect(
-      page.getByRole('table').or(page.getByText('No audit entries found'))
+      page.getByTestId('audit-feed').or(page.getByText('No audit entries found'))
     ).toBeVisible();
   });
 
@@ -58,27 +58,18 @@ test.describe('Audit Logs (role matrix)', () => {
       'The filter exercise needs guaranteed 200s; the per-role surface is pinned above.'
     );
 
-    await roleSession.shell.clickNav('Audit Logs');
-    await page.waitForURL('**/admin/audit-logs');
-    await expect(
-      page.getByRole('heading', { name: 'Audit Logs' })
-    ).toBeVisible();
-
-    // Filter on an action name that cannot exist: Apply must round-trip the
-    // value to the API and deterministically produce the empty state, with no
+    // A link can arrive with an action name that cannot exist: it must round-trip
+    // to the API and deterministically produce the filtered empty state, with no
     // dependence on what audit data the environment holds.
     const impossibleAction = `matrix.e2e.${uniqueSuffix()}`;
-    await page
-      .getByPlaceholder('e.g. auth.login.success')
-      .fill(impossibleAction);
     const filtered = page.waitForResponse(
       (res) =>
         res.url().includes('/api/v1/audit-logs') &&
         res.url().includes(`action=${impossibleAction}`)
     );
-    await page.getByRole('button', { name: 'Apply' }).click();
+    await page.goto(`/admin/audit-logs?action=${impossibleAction}`);
     expect((await filtered).status()).toBe(200);
-    await expect(page.getByText('No audit entries found')).toBeVisible();
+    await expect(page.getByText('Nothing matches these filters')).toBeVisible();
 
     // Clear restores the unfiltered query (and whatever data it yields).
     const cleared = page.waitForResponse(
@@ -89,7 +80,7 @@ test.describe('Audit Logs (role matrix)', () => {
     await page.getByRole('button', { name: 'Clear' }).click();
     expect((await cleared).status()).toBe(200);
     await expect(
-      page.getByRole('table').or(page.getByText('No audit entries found'))
+      page.getByTestId('audit-feed').or(page.getByText('No audit entries found'))
     ).toBeVisible();
   });
 });

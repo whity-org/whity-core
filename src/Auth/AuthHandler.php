@@ -1234,11 +1234,23 @@ class AuthHandler
             'user' => [
                 'id'        => $profileId,
                 'email'     => $email,
+                // WHIT-872: the home greets a person by name.
+                'display_name' => $this->profileDisplayName($profileId),
                 'role'      => $role,
                 'tenant_id' => $activeTenantId,
             ],
             'memberships' => $memberships,
         ], 200);
+    }
+
+    private function profileDisplayName(int $profileId): ?string
+    {
+        // @tenant-guard-ignore: profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
+        $stmt = $this->db->prepare('SELECT display_name FROM profiles WHERE id = ?');
+        $stmt->execute([$profileId]);
+        $name = $stmt->fetchColumn();
+
+        return is_string($name) && trim($name) !== '' ? $name : null;
     }
 
     /**

@@ -1,317 +1,317 @@
 ﻿'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/lib/toast-context';
+import { useFetch } from '@/hooks/useFetch';
 import { useTranslation } from '@whity/features/i18n';
-import { useDateDisplay } from '@whity/features/datetime';
 import { AdminHeader } from '@/components/admin/admin-header';
+import { FieldSelect } from '@/components/field-select';
 import { Button } from '@whity/ui/button';
 import { Input } from '@/components/ui/input';
-import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
+import { Pagination } from '@/components/ui/pagination';
 import { TechnicalDetails, useDisplayPreferences } from '@whity/ui/display-preferences';
-import { IconRefresh } from '@tabler/icons-react';
-import type {
-  AuditLogEntry,
-  AuditLogFilters,
-  AuditLogResponse,
-} from './types';
+import { AccessDeniedPanel, AreaError, EmptyFiltered, EmptyFirstTime, LoadingRows } from '@whity/ui/page-states';
+import { IconDownload, IconRefresh } from '@tabler/icons-react';
+import { AuditFeed } from './audit-feed';
+import type { AuditLogEntry, AuditLogFacets, AuditLogFilters, AuditLogResponse } from './types';
 
 const EMPTY_FILTERS: AuditLogFilters = {
   action: '',
   targetType: '',
   actor: '',
+  agent: '',
+  area: '',
+  when: '',
   from: '',
   to: '',
 };
 
 const PER_PAGE = 25;
 
+/** "When" as the card draws it. Picking one fills `from`; a deep link can set `from` and `to` itself. */
+const WHEN_DAYS: Readonly<Record<string, number>> = { today: 0, week: 7, month: 30 };
+
+/** Radix forbids an empty item value, so "everyone" and friends need one of their own. */
+const ANY = 'any';
+
+function startOfDayDaysAgo(days: number): string {
+  const day = new Date();
+  day.setDate(day.getDate() - days);
+  day.setHours(0, 0, 0, 0);
+  return day.toISOString();
+}
+
+function queryOf(filters: AuditLogFilters): URLSearchParams {
+  const params = new URLSearchParams();
+  if (filters.action) params.set('action', filters.action);
+  if (filters.targetType) params.set('target_type', filters.targetType);
+  if (filters.actor) params.set('actor', filters.actor);
+  if (filters.agent) params.set('agent', filters.agent);
+  if (filters.area) params.set('area', filters.area);
+  const from = filters.when in WHEN_DAYS ? startOfDayDaysAgo(WHEN_DAYS[filters.when]) : filters.from;
+  if (from) params.set('from', from);
+  if (filters.to) params.set('to', filters.to);
+  return params;
+}
+
 /**
- * Audit Logs admin page (WC-34).
+ * The audit log (W.4, TplAuditLog): what happened, in sentences grouped by day,
+ * with filters for who, agent, area and when, and a CSV of the same rows.
  *
- * Lists security audit entries newest-first with filters (action, target type,
- * actor, date range) and pagination. Tenant scoping is enforced by the backend:
- * a tenant sees only its own entries; the system tenant sees all. Mirrors the
- * loading / empty / error patterns and design tokens of the other admin pages
- * (users / roles / OUs).
+ * The server writes the sentences and scopes every row: a workspace sees its own,
+ * the system tenant sees all. Codes, ids and addresses need Show technical details.
  */
 export default function AuditLogsPage() {
   const { apiClient } = useAuth();
   const { addToast } = useToast();
   const t = useTranslation('admin');
-  const dates = useDateDisplay();
   const { showTechnicalDetails } = useDisplayPreferences();
 
-  const [entries, setEntries] = useState<AuditLogEntry[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
-
-  // DEEP-LINKABLE FILTERS. Another screen can send somebody here already
-  // narrowed — `/admin/audit-logs?action=notification.` is how the
-  // notification-delivery page hands off its per-delivery trail instead of
-  // growing a second log viewer over the same rows.
-  //
-  // Read ONCE, as the initial state, deliberately: these are the same fields
-  // the inputs below bind to, so tracking the URL afterwards would fight the
-  // user every time they edited a box. The link sets the starting point; the
-  // page is theirs from then on.
+  // DEEP-LINKABLE FILTERS. Another screen can send somebody here already narrowed:
+  // `/admin/audit-logs?action=notification.` is how the delivery page hands off
+  // its trail. Read once, as the starting point; the page is theirs from then on.
   const searchParams = useSearchParams();
-  const initialFilters: AuditLogFilters = {
+  const [filters, setFilters] = useState<AuditLogFilters>(() => ({
     ...EMPTY_FILTERS,
     action: searchParams.get('action') ?? '',
     targetType: searchParams.get('target_type') ?? '',
     actor: searchParams.get('actor') ?? '',
+    agent: searchParams.get('agent') ?? '',
+    area: searchParams.get('area') ?? '',
     from: searchParams.get('from') ?? '',
     to: searchParams.get('to') ?? '',
-  };
+  }));
+  const [page, setPage] = useState(1);
+  const [exporting, setExporting] = useState(false);
 
-  // Draft filters bound to the inputs; applied filters drive the query.
-  const [draftFilters, setDraftFilters] = useState<AuditLogFilters>(initialFilters);
-  const [appliedFilters, setAppliedFilters] = useState<AuditLogFilters>(initialFilters);
+  const [entries, setEntries] = useState<AuditLogEntry[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState<'denied' | 'failed' | null>(null);
+  const [total, setTotal] = useState(0);
 
-  const buildQuery = useCallback(
-    (targetPage: number, filters: AuditLogFilters): string => {
-      const params = new URLSearchParams();
-      params.set('page', String(targetPage));
-      params.set('per_page', String(PER_PAGE));
-      if (filters.action) params.set('action', filters.action);
-      if (filters.targetType) params.set('target_type', filters.targetType);
-      if (filters.actor) params.set('actor', filters.actor);
-      if (filters.from) params.set('from', filters.from);
-      if (filters.to) params.set('to', filters.to);
-      return params.toString();
-    },
-    []
-  );
+  const { data: facets } = useFetch<AuditLogFacets | null>(async () => {
+    const response = await apiClient('/api/v1/audit-logs/facets');
+    if (!response.ok) return null;
+    return ((await response.json()) as { data: AuditLogFacets }).data;
+  }, []);
 
-  const fetchEntries = useCallback(
-    async (targetPage: number, filters: AuditLogFilters) => {
-      try {
-        setIsLoading(true);
-        const response = await apiClient(
-          `/api/v1/audit-logs?${buildQuery(targetPage, filters)}`
-        );
-
-        if (!response.ok) {
-          throw new Error(t('auditLogs.error.fetch', 'Failed to fetch audit logs'));
-        }
-
-        const data: AuditLogResponse = await response.json();
-        setEntries(data.data ?? []);
-        setTotalPages(data.pagination?.totalPages ?? 1);
-        setTotal(data.pagination?.total ?? 0);
-      } catch (error) {
-        const message =
-          error instanceof Error
-            ? error.message
-            : t('auditLogs.error.fetch', 'Failed to fetch audit logs');
-        addToast(message, 'error');
-      } finally {
-        setIsLoading(false);
+  const fetchEntries = useCallback(async () => {
+    setIsLoading(true);
+    const params = queryOf(filters);
+    params.set('page', String(page));
+    params.set('per_page', String(PER_PAGE));
+    try {
+      const response = await apiClient(`/api/v1/audit-logs?${params.toString()}`);
+      if (!response.ok) {
+        setLoadFailed(response.status === 403 ? 'denied' : 'failed');
+        return;
       }
-    },
-    [apiClient, addToast, buildQuery, t]
-  );
+      const data: AuditLogResponse = await response.json();
+      setLoadFailed(null);
+      setEntries(data.data ?? []);
+      setTotal(data.pagination?.total ?? 0);
+    } catch {
+      setLoadFailed('failed');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [apiClient, filters, page]);
 
   useEffect(() => {
-    // Defer out of the synchronous effect body so the loading-state update made
-    // by fetchEntries() does not run synchronously inside the effect (avoids the
-    // React 19 cascading-render warning while still loading on mount/filter/page).
+    // Deferred so the loading state isn't set synchronously inside the effect.
     let active = true;
     void Promise.resolve().then(() => {
-      if (active) {
-        fetchEntries(page, appliedFilters);
-      }
+      if (active) void fetchEntries();
     });
     return () => {
       active = false;
     };
-  }, [page, appliedFilters, fetchEntries]);
+  }, [fetchEntries]);
 
-  const handleApplyFilters = () => {
+  const setFilter = (key: keyof AuditLogFilters, value: string) => {
     setPage(1);
-    setAppliedFilters(draftFilters);
+    setFilters((previous) => ({ ...previous, [key]: value === ANY ? '' : value }));
   };
 
-  const handleClearFilters = () => {
-    setDraftFilters(EMPTY_FILTERS);
+  const isFiltered = useMemo(() => Object.values(filters).some((value) => value !== ''), [filters]);
+
+  const clearFilters = () => {
     setPage(1);
-    setAppliedFilters(EMPTY_FILTERS);
+    setFilters(EMPTY_FILTERS);
   };
 
-  const updateDraft = (key: keyof AuditLogFilters, value: string) => {
-    setDraftFilters((prev) => ({ ...prev, [key]: value }));
+  const exportCsv = async () => {
+    setExporting(true);
+    const params = queryOf(filters);
+    if (showTechnicalDetails) params.set('technical', '1');
+    try {
+      const response = await apiClient(`/api/v1/audit-logs/export?${params.toString()}`);
+      if (response.status === 422) {
+        addToast(t('auditLogs.export.tooMany', 'That is too many entries to export at once. Choose a shorter period.'), 'error');
+        return;
+      }
+      if (!response.ok) {
+        addToast(t('auditLogs.export.failed', 'The export did not work. Try again.'), 'error');
+        return;
+      }
+      const url = URL.createObjectURL(await response.blob());
+      const link = window.document.createElement('a');
+      link.href = url;
+      link.download = 'audit-log.csv';
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    } catch {
+      addToast(t('auditLogs.export.failed', 'The export did not work. Try again.'), 'error');
+    } finally {
+      setExporting(false);
+    }
   };
 
-  const formatTarget = (entry: AuditLogEntry): string => {
-    if (!entry.targetType) return '-';
-    return showTechnicalDetails && entry.targetId !== null
-      ? `${entry.targetType} #${entry.targetId}`
-      : entry.targetType;
-  };
-
-  const formatMetadata = (metadata: Record<string, unknown>): string => {
-    const keys = Object.keys(metadata);
-    if (keys.length === 0) return '-';
-    return keys.map((key) => `${key}: ${String(metadata[key])}`).join(', ');
-  };
-
-  // The `action`, target and metadata CELLS stay untranslated on purpose: they
-  // are audit records written by the backend (`auth.login.success`, a target
-  // type, a metadata blob), i.e. data this screen displays, not source copy.
-  const columns: DataTableColumn<AuditLogEntry>[] = [
-    // #1068: the whole COLUMN goes when this tenant hides dates — header and
-    // cells together. Every other column still says what happened, to what, by
-    // whom and from where, and the rows are still newest-first; a column of em
-    // dashes under a heading that says "Time" would be the screen asking a
-    // question this tenant has said it does not want asked.
-    //
-    // The audit RECORD is untouched. `audit_log.created_at` is still written,
-    // still indexed, still what the export and the API return, and still what
-    // the From/To filters below query on — which is the point of a display
-    // setting: the trail is intact, the screen is quieter.
-    ...dates.dateColumns<AuditLogEntry>([
-      {
-        id: 'time',
-        header: t('auditLogs.table.time', 'Time'),
-        value: (entry) => entry.createdAt,
-      },
-    ]),
-    { accessorKey: 'action', header: t('auditLogs.table.action', 'Action') },
-    {
-      id: 'actor',
-      header: t('auditLogs.table.actor', 'Actor'),
-      // The API returns the actor's id only, never a name. A person is not
-      // shown as a number: the id appears only with Show technical details.
-      cell: (entry) =>
-        entry.actorUserId === null
-          ? t('auditLogs.table.actorSystem', 'system')
-          : showTechnicalDetails
-            ? t('auditLogs.table.actorPersonId', 'A person (#{id})', { id: entry.actorUserId })
-            : t('auditLogs.table.actorPerson', 'A person'),
-    },
-    { id: 'target', header: t('auditLogs.table.target', 'Target'), cell: formatTarget },
-    // Addresses and the raw detail blob are for people who turned technical details on.
-    ...(showTechnicalDetails
-      ? ([
-          { accessorKey: 'ipAddress', header: t('auditLogs.table.ip', 'IP') },
-          {
-            id: 'details',
-            header: t('auditLogs.table.details', 'Details'),
-            cell: (entry) => formatMetadata(entry.metadata),
-            className: 'max-w-md truncate',
-          },
-        ] as DataTableColumn<AuditLogEntry>[])
-      : []),
+  const whoOptions = [
+    { value: ANY, label: t('auditLogs.filter.anyone', 'Anyone') },
+    ...(facets?.people ?? []).map((person) => ({ value: String(person.id), label: person.name })),
   ];
+  const agentOptions = [
+    { value: ANY, label: t('auditLogs.filter.anyAgent', 'Any agent') },
+    ...(facets?.agents ?? []).map((agent) => ({ value: agent.id, label: agent.name })),
+  ];
+  const areaOptions = [
+    { value: ANY, label: t('auditLogs.filter.anyArea', 'Every area') },
+    ...(facets?.areas ?? []).map((area) => ({ value: area.id, label: area.name })),
+  ];
+  const whenOptions = [
+    { value: ANY, label: t('auditLogs.filter.anyTime', 'Any time') },
+    { value: 'today', label: t('auditLogs.filter.today', 'Today') },
+    { value: 'week', label: t('auditLogs.filter.week', 'Last 7 days') },
+    { value: 'month', label: t('auditLogs.filter.month', 'Last 30 days') },
+  ];
+
+  const body = () => {
+    if (loadFailed === 'denied') {
+      return (
+        <AccessDeniedPanel
+          title={t('auditLogs.denied.title', 'You can’t open the audit log')}
+          description={t('auditLogs.denied.description', 'Ask someone who manages this workspace to give you permission to read it.')}
+        />
+      );
+    }
+    if (loadFailed === 'failed') {
+      return (
+        <AreaError
+          message={t('auditLogs.error.fetch', 'Failed to fetch audit logs')}
+          retryLabel={t('auditLogs.error.retry', 'Try again')}
+          onRetry={() => void fetchEntries()}
+        />
+      );
+    }
+    if (isLoading && entries.length === 0) {
+      return (
+        <LoadingRows
+          headers={[t('auditLogs.table.time', 'Time'), t('auditLogs.loading.what', 'What happened')]}
+          label={t('auditLogs.loading.label', 'Loading the audit log')}
+        />
+      );
+    }
+    if (entries.length === 0) {
+      return isFiltered ? (
+        <EmptyFiltered
+          title={t('auditLogs.emptyFiltered', 'Nothing matches these filters')}
+          clearLabel={t('auditLogs.filter.clear', 'Clear')}
+          onClear={clearFilters}
+        />
+      ) : (
+        <EmptyFirstTime
+          title={t('auditLogs.empty', 'No audit entries found')}
+          description={t('auditLogs.emptyDescription', 'Changes to access, settings and records will show here.')}
+        />
+      );
+    }
+    return (
+      <>
+        <AuditFeed entries={entries} />
+        <Pagination page={page} total={total} perPage={PER_PAGE} onPageChange={setPage} />
+      </>
+    );
+  };
 
   return (
     <div className="space-y-8">
       <AdminHeader
         title={t('auditLogs.title', 'Audit Logs')}
         description={t(
-          'auditLogs.description',
-          'Security audit trail of authentication, role, permission, tenant and user activity'
+          'auditLogs.descriptionPlain',
+          'Everything people and agents did that changes access, settings or records.'
         )}
         action={
-          <Button
-            variant="outline"
-            onClick={() => fetchEntries(page, appliedFilters)}
-            className="gap-2"
-          >
-            <IconRefresh size={18} />
-            {t('auditLogs.action.refresh', 'Refresh')}
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => void fetchEntries()} className="gap-2">
+              <IconRefresh size={18} />
+              {t('auditLogs.action.refresh', 'Refresh')}
+            </Button>
+            <Button variant="outline" onClick={() => void exportCsv()} disabled={exporting} className="gap-2">
+              <IconDownload size={18} />
+              {t('auditLogs.action.export', 'Export')}
+            </Button>
+          </div>
         }
       />
 
-      {/* Filters */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-muted-foreground">
-            {t('auditLogs.filter.action', 'Action')}
+          <label htmlFor="audit-who" className="text-sm font-medium text-muted-foreground">
+            {t('auditLogs.filter.who', 'Who')}
           </label>
-          <Input
-            value={draftFilters.action}
-            onChange={(e) => updateDraft('action', e.target.value)}
-            placeholder={t('auditLogs.filter.actionPlaceholder', 'e.g. auth.login.success')}
-          />
+          <FieldSelect id="audit-who" value={filters.actor || ANY} options={whoOptions} onChange={(v) => setFilter('actor', v)} />
         </div>
         <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-muted-foreground">
-            {t('auditLogs.filter.targetType', 'Target Type')}
+          <label htmlFor="audit-agent" className="text-sm font-medium text-muted-foreground">
+            {t('auditLogs.filter.agent', 'Agent')}
           </label>
-          <Input
-            value={draftFilters.targetType}
-            onChange={(e) => updateDraft('targetType', e.target.value)}
-            placeholder={t('auditLogs.filter.targetTypePlaceholder', 'e.g. role')}
-          />
+          <FieldSelect id="audit-agent" value={filters.agent || ANY} options={agentOptions} onChange={(v) => setFilter('agent', v)} />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label htmlFor="audit-area" className="text-sm font-medium text-muted-foreground">
+            {t('auditLogs.filter.area', 'Area')}
+          </label>
+          <FieldSelect id="audit-area" value={filters.area || ANY} options={areaOptions} onChange={(v) => setFilter('area', v)} />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label htmlFor="audit-when" className="text-sm font-medium text-muted-foreground">
+            {t('auditLogs.filter.when', 'When')}
+          </label>
+          <FieldSelect id="audit-when" value={filters.when || ANY} options={whenOptions} onChange={(v) => setFilter('when', v)} />
         </div>
         <TechnicalDetails>
           <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-muted-foreground">
-              {t('auditLogs.filter.actor', 'Actor (User ID)')}
+            <label htmlFor="audit-action" className="text-sm font-medium text-muted-foreground">
+              {t('auditLogs.filter.action', 'Action')}
             </label>
             <Input
-              type="number"
-              value={draftFilters.actor}
-              onChange={(e) => updateDraft('actor', e.target.value)}
-              placeholder={t('auditLogs.filter.actorPlaceholder', 'e.g. 42')}
+              id="audit-action"
+              dir="ltr"
+              value={filters.action}
+              onChange={(e) => setFilter('action', e.target.value)}
+              placeholder={t('auditLogs.filter.actionPlaceholder', 'e.g. auth.login.success')}
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label htmlFor="audit-target-type" className="text-sm font-medium text-muted-foreground">
+              {t('auditLogs.filter.targetType', 'Target Type')}
+            </label>
+            <Input
+              id="audit-target-type"
+              dir="ltr"
+              value={filters.targetType}
+              onChange={(e) => setFilter('targetType', e.target.value)}
+              placeholder={t('auditLogs.filter.targetTypePlaceholder', 'e.g. role')}
             />
           </div>
         </TechnicalDetails>
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-muted-foreground">
-            {t('auditLogs.filter.from', 'From')}
-          </label>
-          <Input
-            type="date"
-            value={draftFilters.from}
-            onChange={(e) => updateDraft('from', e.target.value)}
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-muted-foreground">
-            {t('auditLogs.filter.to', 'To')}
-          </label>
-          <Input
-            type="date"
-            value={draftFilters.to}
-            onChange={(e) => updateDraft('to', e.target.value)}
-          />
-        </div>
-        <div className="flex items-end gap-2">
-          <Button onClick={handleApplyFilters} className="flex-1">
-            {t('auditLogs.filter.apply', 'Apply')}
-          </Button>
-          <Button variant="outline" onClick={handleClearFilters} className="flex-1">
-            {t('auditLogs.filter.clear', 'Clear')}
-          </Button>
-        </div>
       </div>
 
-      {/* Table — real server-side pagination (the backend already supports
-          page/per_page and this table's own filters, unlike the other admin
-          list endpoints, so it stays in DataTable's manual/server mode rather
-          than the single-fetch client mode used elsewhere). */}
-      <DataTable
-        columns={columns}
-        data={entries}
-        getRowId={(entry) => String(entry.id)}
-        isLoading={isLoading}
-        emptyState={{ title: t('auditLogs.empty', 'No audit entries found') }}
-        pagination={{
-          pageIndex: page - 1,
-          pageSize: PER_PAGE,
-          pageCount: totalPages,
-          total,
-          onPaginationChange: (nextPageIndex) => setPage(nextPageIndex + 1),
-        }}
-      />
+      {body()}
     </div>
   );
 }

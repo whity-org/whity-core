@@ -68,8 +68,7 @@ test.describe('Role record regions (#910)', () => {
     const permissions = page.getByTestId('role-record-section-permissions');
     await expect(permissions).toHaveAttribute('data-section-state', 'editable');
     await expect(page.getByTestId('role-record-section-permissions-readonly')).toHaveCount(0);
-    const rolesRead = page.getByTestId('perm-grid').locator('label[data-permission="roles:read"]');
-    await rolesRead.click();
+    await page.getByTestId('perm-grid').getByRole('checkbox', { name: 'Roles: See' }).click();
     await page.getByRole('button', { name: 'Save changes' }).click();
     await expect(page.getByText('Role updated successfully')).toBeVisible();
 

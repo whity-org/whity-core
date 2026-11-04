@@ -174,7 +174,7 @@ final class AgentsApiHandler
         if ($fields === []) {
             return Response::error('Nothing to change', 422);
         }
-        $unreadable = $this->unreadableSources($fields, $tenantId, $profileId);
+        $unreadable = $this->unreadableSources($fields, $tenantId, $profileId, $existing['may_read']);
         if ($unreadable !== []) {
             return Response::json(['error' => 'Invalid agent', 'errors' => $unreadable], 422);
         }
@@ -267,15 +267,17 @@ final class AgentsApiHandler
 
     /**
      * An agent keeps for reference only what the person setting it can read, so
-     * nobody reaches a document's name through an agent they manage.
+     * nobody reaches a document's name through an agent they manage. Ids already
+     * stored stay: someone who can't read one can still edit the rest of the agent.
      *
      * @param array<string, mixed> $fields
+     * @param list<int>            $kept   already on the agent, so not re-checked
      * @return list<string>
      */
-    private function unreadableSources(array $fields, int $tenantId, int $profileId): array
+    private function unreadableSources(array $fields, int $tenantId, int $profileId, array $kept = []): array
     {
         $errors = [];
-        foreach ((array) ($fields['may_read'] ?? []) as $id) {
+        foreach (array_diff((array) ($fields['may_read'] ?? []), $kept) as $id) {
             $row = $this->readableSource !== null ? ($this->readableSource)((int) $id, $tenantId, $profileId) : null;
             if (!is_array($row)) {
                 $errors[] = "mayRead: document {$id} doesn't exist or you can't read it";

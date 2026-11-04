@@ -112,6 +112,8 @@ export interface SubmissionRow {
   form_id: number
   form_version: number
   submitted_by_profile_id: number | null
+  /** The person's name, as the server resolves it. */
+  submitted_by_name?: string | null
   document_id: number | null
   reference: string | null
   data: Record<string, unknown> | []
@@ -132,7 +134,7 @@ export interface FormsScreenCaps {
   canManage: boolean
 }
 
-export type FormsResult<T> = { ok: true; data: T } | { ok: false; status: number; message: string }
+export type FormsResult<T> = { ok: true; data: T } | { ok: false; status: number; message: string; reason?: string }
 
 export type NotifyType = "success" | "error" | "warning" | "info"
 

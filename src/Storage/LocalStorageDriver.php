@@ -117,6 +117,37 @@ final class LocalStorageDriver implements StorageDriverInterface
         return $mtime;
     }
 
+    public function list(string $prefix): array
+    {
+        $normalized = str_replace('\\', '/', $prefix);
+        // A prefix names a directory (`tenants/1/reports/`), so resolve it as one.
+        // resolve() rejects traversal, NUL and absolute prefixes exactly as it
+        // does for a key.
+        $dir = $this->resolve(rtrim($normalized, '/'));
+        if (!is_dir($dir)) {
+            return [];
+        }
+
+        $keys = [];
+        $base = $this->root . '/';
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($dir, \FilesystemIterator::SKIP_DOTS),
+        );
+        foreach ($iterator as $file) {
+            if (!$file->isFile()) {
+                continue;
+            }
+            $path = str_replace('\\', '/', $file->getPathname());
+            $key = substr($path, strlen($base));
+            if (str_starts_with($key, $normalized)) {
+                $keys[] = $key;
+            }
+        }
+        sort($keys, SORT_STRING);
+
+        return $keys;
+    }
+
     public function temporaryUrl(string $key, int $expiresInSeconds = 3600): string
     {
         throw new \RuntimeException('LocalStorageDriver does not support temporary URLs.');

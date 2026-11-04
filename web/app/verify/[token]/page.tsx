@@ -88,6 +88,8 @@ const STAGE_LABELS: Record<string, { key: string; text: string }> = {
  *   verify.refused.withdrawnBody = The organisation has stopped standing behind the copy this code was printed on.
  *   verify.refused.superseded = This copy has been replaced
  *   verify.refused.supersededBody = A newer version of this document has been issued, so the copy you are holding is not the current one.
+ *   verify.refused.document_withdrawn = This document has been withdrawn
+ *   verify.refused.document_withdrawnBody = The organisation that issued this document has withdrawn it and no longer stands behind it.
  */
 const REFUSAL_COPY: Record<string, { titleKey: string; title: string; bodyKey: string; body: string }> = {
   unrecognised: {
@@ -103,6 +105,12 @@ const REFUSAL_COPY: Record<string, { titleKey: string; title: string; bodyKey: s
     title: 'This code has been withdrawn',
     bodyKey: 'verify.refused.withdrawnBody',
     body: 'The organisation has stopped standing behind the copy this code was printed on.',
+  },
+  document_withdrawn: {
+    titleKey: 'verify.refused.document_withdrawn',
+    title: 'This document has been withdrawn',
+    bodyKey: 'verify.refused.document_withdrawnBody',
+    body: 'The organisation that issued this document has withdrawn it and no longer stands behind it.',
   },
   superseded: {
     titleKey: 'verify.refused.superseded',
@@ -129,6 +137,9 @@ export default function VerifyDocumentPage({ params }: { params: Promise<{ token
   // case — deliberately the same state, so the page renders identically for
   // both and cannot be used to tell them apart.
   const [recordId, setRecordId] = useState<number | null>(null);
+  // Told only to a reader who may open the record. The public answer above stays
+  // what the organisation chose to disclose to everybody.
+  const [recordWithdrawn, setRecordWithdrawn] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -176,8 +187,9 @@ export default function VerifyDocumentPage({ params }: { params: Promise<{ token
     })
       .then(async (response) => {
         if (cancelled || !response.ok) return;
-        const body = (await response.json()) as { data?: { id?: number } };
+        const body = (await response.json()) as { data?: { id?: number; document_withdrawn?: boolean } };
         if (typeof body.data?.id === 'number') setRecordId(body.data.id);
+        setRecordWithdrawn(body.data?.document_withdrawn === true);
       })
       .catch(() => {
         /* no record for this reader; the button simply does not appear */
@@ -243,6 +255,15 @@ export default function VerifyDocumentPage({ params }: { params: Promise<{ token
             <dl className="space-y-3 text-sm">
               <Fact label={t('verify.field.withdrawnOn', 'Withdrawn on')} value={phase.data.revoked_on} />
             </dl>
+          )}
+
+          {recordId !== null &&
+            recordWithdrawn &&
+            phase.kind === 'ready' &&
+            phase.data.reason !== 'document_withdrawn' && (
+            <p className="text-sm" data-testid="verify-record-withdrawn" dir="auto">
+              {t('verify.recordWithdrawn', 'You can open this document, so you can also be told it has been withdrawn.')}
+            </p>
           )}
 
           {recordId !== null && (

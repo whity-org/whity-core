@@ -187,6 +187,7 @@ declare(strict_types=1);
         $name = $plugin->getName();
         $version = $plugin->getVersion();
         $routesCount = count($plugin->getRoutes());
+        $permissions = array_values(array_filter($plugin->getPermissions(), 'is_string'));
         $permissionsCount = count($plugin->getPermissions());
 
         $sdkConstraint = null;
@@ -212,6 +213,7 @@ declare(strict_types=1);
             'version' => $version,
             'routes_count' => $routesCount,
             'permissions_count' => $permissionsCount,
+            'permissions' => $permissions,
             'sdk_constraint' => $sdkConstraint,
             'core_constraint' => $coreConstraint,
         ],

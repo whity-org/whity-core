@@ -3,36 +3,36 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api/client';
-import type { components } from '@/lib/api/schema';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { useTranslation } from '@whity/features/i18n';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { PluginsTabs } from '@/components/plugins/plugins-tabs';
 import { InstallPluginDialog } from '@/components/plugins/install-plugin-dialog';
-import { PermissionButton } from '@/components/rbac/permission-button';
+import { InstallButton, type CataloguePlugin, usePluginAddsLabels, usePriceLabel, useUsageLabel } from '@/components/plugins/plugin-facts';
 import { Button } from '@whity/ui/button';
 import { PluginTile } from '@whity/ui/plugin-card';
 import { SearchField } from '@whity/ui/search-field';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@whity/ui/select';
 import { AccessDeniedPanel, AreaError, EmptyFiltered, EmptyFirstTime } from '@whity/ui/page-states';
 import { Skeleton } from '@whity/ui/skeleton';
-import { IconDownload } from '@tabler/icons-react';
 
-// Read access to the store matches the Installed tab (plugins:read); Install is
-// gated on plugins:upload until the server splits out plugins:install (S7).
+// Read access to the store matches the Installed tab (plugins:read). Install is
+// plugins:install, and only for operators: a code plugin is install-wide (Q4).
 const PLUGINS_READ = 'plugins:read';
-const PLUGINS_UPLOAD = 'plugins:upload';
-
-type CataloguePlugin = components['schemas']['StoreCataloguePlugin'];
 
 export default function PluginStorePage() {
   const t = useTranslation('admin');
   const router = useRouter();
+  const addsLabels = usePluginAddsLabels();
+  const priceLabel = usePriceLabel();
+  const usageLabel = useUsageLabel();
   const { hasPermission, loading: isCapabilitiesLoading } = useCapabilities();
   const hasAccess = hasPermission(PLUGINS_READ);
 
   const [allowedHosts, setAllowedHosts] = useState<string[]>([]);
   const [featureEnabled, setFeatureEnabled] = useState<boolean | null>(null);
+  const [canInstall, setCanInstall] = useState(false);
+  const [canInstallDeclarative, setCanInstallDeclarative] = useState(false);
   const [storeUrl, setStoreUrl] = useState('');
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState<string | null>(null);
@@ -53,6 +53,8 @@ export default function PluginStorePage() {
     setLoadError(null);
     setAllowedHosts(data.data.hosts);
     setFeatureEnabled(data.data.enabled);
+    setCanInstall(data.data.can_install);
+    setCanInstallDeclarative(data.data.can_install_declarative);
     // Preselect the first store so a one-store deployment needs no click.
     if (data.data.hosts.length > 0) {
       setStoreUrl(`https://${data.data.hosts[0]}`);
@@ -128,7 +130,7 @@ export default function PluginStorePage() {
     <div className="mx-auto max-w-7xl space-y-6 px-4 pb-16 md:px-0">
       <AdminHeader
         title={t('plugins.title', 'Plugins')}
-        description={t('pluginStore.description', 'Browse a trusted store and install plugins into this instance.')}
+        description={t('pluginStore.description', 'Browse a trusted store. A plugin installed here runs for every workspace on this deployment.')}
       />
       <PluginsTabs />
 
@@ -234,17 +236,16 @@ export default function PluginStorePage() {
                   summary={plugin.description}
                   version={plugin.latest_version}
                   tags={plugin.tags}
+                  adds={addsLabels(plugin)}
+                  trustLabel={t('pluginStore.notVerified', 'Not verified')}
+                  facts={[priceLabel(plugin), usageLabel(plugin)].filter((fact): fact is string => fact !== null)}
                   onOpen={() => openPlugin(plugin)}
                   action={
-                    <PermissionButton
-                      permission={PLUGINS_UPLOAD}
+                    <InstallButton
+                      canInstall={plugin.kind === 'declarative' ? canInstallDeclarative : canInstall}
                       disabled={!plugin.latest_version}
                       onClick={() => setInstalling(plugin)}
-                      className="gap-2"
-                    >
-                      <IconDownload />
-                      {t('pluginStore.action.install', 'Install')}
-                    </PermissionButton>
+                    />
                   }
                 />
               ))}

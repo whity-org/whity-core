@@ -1,6 +1,6 @@
 "use client"
 
-import { BilingualInput } from "@whity/ui/bilingual-input"
+import { BilingualField } from "./bilingual-field"
 import { Button } from "@whity/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@whity/ui/card"
 import { IconButton } from "@whity/ui/icon-button"
@@ -8,6 +8,7 @@ import { Input } from "@whity/ui/input"
 import { Switch } from "@whity/ui/switch"
 
 import { useTranslation } from "../i18n"
+import { LanguageBar, useFormLanguages } from "./form-languages"
 import type { FormRow, FormSectionDef, LocalizedMap } from "./types"
 
 /** The parts of a form the Settings tab edits, held together so one save bar covers them. */
@@ -39,7 +40,7 @@ export function FormSettingsTab({
   onMemberAccess: (open: boolean) => void
 }) {
   const t = useTranslation("forms")
-  const lang = { enLabel: t("builder.lang.en", "English"), arLabel: t("builder.lang.ar", "Arabic") }
+  const { enabled, setEnabled } = useFormLanguages()
 
   function setSection(index: number, patch: Partial<FormSectionDef>) {
     onChange({ ...settings, sections: settings.sections.map((s, i) => (i === index ? { ...s, ...patch } : s)) })
@@ -56,34 +57,62 @@ export function FormSettingsTab({
     <div className="max-w-3xl space-y-6">
       <Card>
         <CardHeader>
+          <CardTitle>{t("builder.settings.languages", "Languages")}</CardTitle>
+          <CardDescription>
+            {t(
+              "builder.settings.languages.body",
+              "Choose the languages you write this form in. Switching one off hides its fields here and stops asking for it. Text already written stays on the form, and this choice is kept in this browser only."
+            )}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {(["en", "ar"] as const).map((language) => (
+            <div key={language} className="flex items-center gap-3">
+              <Switch
+                id={`form-language-${language}`}
+                checked={enabled.includes(language)}
+                disabled={readOnly || (enabled.length === 1 && enabled.includes(language))}
+                onCheckedChange={(on) => setEnabled(language, on)}
+              />
+              <label htmlFor={`form-language-${language}`} className="text-sm font-medium">
+                {language === "en" ? t("builder.lang.en", "English") : t("builder.lang.ar", "Arabic")}
+              </label>
+            </div>
+          ))}
+          <LanguageBar />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>{t("builder.settings.about", "About this form")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-5">
-          <BilingualInput
+          <BilingualField
             id="form-name"
             label={t("builder.settings.name", "Form name")}
             value={settings.name}
             onChange={(name) => onChange({ ...settings, name })}
             disabled={readOnly}
-            {...lang}
+            
           />
-          <BilingualInput
+          <BilingualField
             id="form-description"
             label={t("builder.settings.description", "Description")}
             description={t("builder.settings.description.hint", "Say who receives the form and what happens next.")}
             value={settings.description}
             onChange={(description) => onChange({ ...settings, description })}
             disabled={readOnly}
-            {...lang}
+            
           />
-          <BilingualInput
+          <BilingualField
             id="form-submit"
             label={t("builder.settings.submit", "Send button text")}
             description={t("builder.settings.submit.hint", "Name what happens, such as “Send application”.")}
             value={settings.submit_label}
             onChange={(submit_label) => onChange({ ...settings, submit_label })}
             disabled={readOnly}
-            {...lang}
+            
           />
           <div className="space-y-1.5">
             <label htmlFor="form-reference" className="text-sm font-medium">
@@ -119,21 +148,21 @@ export function FormSettingsTab({
           {settings.sections.map((section, i) => (
             <div key={section.key} className="flex items-start gap-2 rounded-card border border-border p-3">
               <div className="min-w-0 flex-1 space-y-3">
-                <BilingualInput
+                <BilingualField
                   id={`section-${i}-title`}
                   label={t("builder.settings.sectionTitle", "Section {number} title", { number: i + 1 })}
                   value={section.title}
                   onChange={(title) => setSection(i, { title })}
                   disabled={readOnly}
-                  {...lang}
+                  
                 />
-                <BilingualInput
+                <BilingualField
                   id={`section-${i}-description`}
                   label={t("builder.settings.sectionDescription", "Section {number} description", { number: i + 1 })}
                   value={section.description}
                   onChange={(description) => setSection(i, { description })}
                   disabled={readOnly}
-                  {...lang}
+                  
                 />
               </div>
               {!readOnly && (
