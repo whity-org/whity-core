@@ -268,7 +268,7 @@ final class FormResponsesApiRealEngineTest extends TestCase
     {
         $this->respond(['supplier' => 'a', 'kind' => 'flour']);
         $this->respond(['supplier' => 'b', 'kind' => 'milk']);
-        $this->pdo->exec("UPDATE form_submissions SET withdrawn_at = NOW() WHERE data LIKE '%milk%'");
+        $this->pdo->exec('UPDATE form_submissions SET withdrawn_at = NOW() WHERE id = (SELECT MAX(id) FROM form_submissions)');
 
         $summary = $this->summary();
 
