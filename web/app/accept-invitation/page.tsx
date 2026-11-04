@@ -43,6 +43,8 @@ interface InvitationPreview {
   email: string;
   tenantName: string;
   requiresPassword: boolean;
+  inviterName: string | null;
+  roleName: string | null;
 }
 
 function AcceptInvitationInner() {
@@ -88,6 +90,8 @@ function AcceptInvitationInner() {
           email: typeof data?.email === 'string' ? data.email : '',
           tenantName: typeof data?.tenant_name === 'string' ? data.tenant_name : '',
           requiresPassword: data?.requires_password === true,
+          inviterName: typeof data?.inviter_name === 'string' ? data.inviter_name : null,
+          roleName: typeof data?.role_name === 'string' ? data.role_name : null,
         });
         setStatus('form');
       } catch {
@@ -213,6 +217,16 @@ function AcceptInvitationInner() {
                     : t('acceptInvitation.summary', 'You have been invited to join as {email}.', {
                         email: invitation.email,
                       })}
+                  {invitation.inviterName !== null && (
+                    <span className="mt-1 block" data-testid="invitation-inviter">
+                      {t('acceptInvitation.invitedBy', 'Invited by {name}.', { name: invitation.inviterName })}
+                    </span>
+                  )}
+                  {invitation.roleName !== null && (
+                    <span className="mt-1 block" data-testid="invitation-role">
+                      {t('acceptInvitation.role', 'Your role: {role}.', { role: invitation.roleName })}
+                    </span>
+                  )}
                 </AlertDescription>
               </Alert>
 
