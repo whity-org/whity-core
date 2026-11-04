@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.62).
+ * SDK identity (v1.64).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -933,12 +933,22 @@ namespace Whity\Sdk;
  * {@see Manifest\PluginManifest::homeCard()} reads it (WHIT-872).
  *
  * Purely additive.)
+ * 1.64 (PLUGIN AGENTS: the optional {@see PluginAgentsInterface} lets a plugin
+ * declare or customize agents under its own toolset root: a persona in English
+ * and Arabic, toolsets, where a person's grant starts, and the host feature
+ * flags it turns on ({@see Manifest\AgentFeatures}). Checked by
+ * {@see Manifest\AgentDeclarationValidator}, which refuses another plugin's or
+ * core's agent, a write at Allowed, and an unknown feature. Re-declaring a key
+ * with a higher version customizes it. Version 1.63 is skipped so that a
+ * release already in flight can take it.
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.62.0';
+    public const VERSION = '1.64.0';
 
     /**
      * Static identity only — never instantiated.
