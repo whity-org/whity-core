@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@whity/ui/select';
-import { IconPlus, IconShieldLock, IconTrash } from '@tabler/icons-react';
+import { IconPencil, IconPlus, IconShieldLock, IconTrash } from '@tabler/icons-react';
 import { useTranslation, type TranslateFn } from '@whity/features/i18n';
 import { useDateDisplay } from '@whity/features/datetime';
 import { SECURITY_MANAGE, errorMessage, type AddToast } from '../settings-shared';
@@ -127,6 +127,7 @@ function TwoFactorPoliciesSection({
   const dates = useDateDisplay();
   const [adding, setAdding] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
 
   const {
     data: policies,
@@ -203,7 +204,14 @@ function TwoFactorPoliciesSection({
           </CardDescription>
         </div>
         {!adding && (
-          <Button className="gap-2 shrink-0" data-testid="add-two-factor-policy" onClick={() => setAdding(true)}>
+          <Button
+            className="gap-2 shrink-0"
+            data-testid="add-two-factor-policy"
+            onClick={() => {
+              setEditingId(null);
+              setAdding(true);
+            }}
+          >
             <IconPlus className="w-4 h-4" />
             {t('settings.security.policies.add', 'Add policy')}
           </Button>
@@ -249,7 +257,23 @@ function TwoFactorPoliciesSection({
           </div>
         ) : (
           <div className="space-y-2">
-            {policies.map((policy) => (
+            {policies.map((policy) =>
+              editingId === policy.id ? (
+                <PolicyFormCard
+                  key={policy.id}
+                  editing={policy}
+                  ous={ous ?? []}
+                  ousError={ousError}
+                  users={users ?? []}
+                  onCancel={() => setEditingId(null)}
+                  onSaved={() => {
+                    setEditingId(null);
+                    refetchPolicies();
+                    onPoliciesChanged();
+                  }}
+                  addToast={addToast}
+                />
+              ) : (
               <div
                 key={policy.id}
                 data-testid={`two-factor-policy-${policy.id}`}
@@ -288,20 +312,36 @@ function TwoFactorPoliciesSection({
                       </Button>
                     </>
                   ) : (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="gap-1 text-destructive"
-                      data-testid={`delete-policy-${policy.id}`}
-                      onClick={() => setPendingDelete(policy.id)}
-                    >
-                      <IconTrash className="w-3.5 h-3.5" />
-                      {t('settings.security.policies.remove', 'Remove')}
-                    </Button>
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1"
+                        data-testid={`edit-policy-${policy.id}`}
+                        onClick={() => {
+                          setAdding(false);
+                          setEditingId(policy.id);
+                        }}
+                      >
+                        <IconPencil className="w-3.5 h-3.5" />
+                        {t('settings.security.policies.edit', 'Edit')}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="gap-1 text-destructive"
+                        data-testid={`delete-policy-${policy.id}`}
+                        onClick={() => setPendingDelete(policy.id)}
+                      >
+                        <IconTrash className="w-3.5 h-3.5" />
+                        {t('settings.security.policies.remove', 'Remove')}
+                      </Button>
+                    </>
                   )}
                 </div>
               </div>
-            ))}
+              )
+            )}
           </div>
         )}
       </CardContent>
@@ -310,6 +350,7 @@ function TwoFactorPoliciesSection({
 }
 
 function PolicyFormCard({
+  editing,
   ous,
   ousError,
   users,
@@ -317,6 +358,8 @@ function PolicyFormCard({
   onSaved,
   addToast,
 }: {
+  /** Set to change an existing policy; absent when adding one. */
+  editing?: TwoFactorPolicy;
   ous: OuOption[];
   /** Non-null when the OU list is incomplete, which makes the OU scope unusable. */
   ousError: string | null;
@@ -328,11 +371,11 @@ function PolicyFormCard({
   const t = useTranslation('admin');
   const [scopeType, setScopeType] = useState<ScopeChoice>('tenant');
   const [scopeId, setScopeId] = useState<string>('');
-  const [gracePeriodDays, setGracePeriodDays] = useState('0');
+  const [gracePeriodDays, setGracePeriodDays] = useState(String(editing?.grace_period_days ?? 0));
   const [saving, setSaving] = useState(false);
 
   const submit = async () => {
-    if (scopeType !== 'tenant' && scopeId === '') {
+    if (editing === undefined && scopeType !== 'tenant' && scopeId === '') {
       addToast(
         scopeType === 'ou'
           ? t('settings.security.form.error.selectOu', 'Select an organizational unit.')
@@ -355,6 +398,22 @@ function PolicyFormCard({
 
     setSaving(true);
     try {
+      if (editing !== undefined) {
+        // Who a rule covers is identity; the PATCH route changes only the
+        // grace period, so a different scope is a new rule, not an edit.
+        const { error, response } = await api.PATCH('/api/v1/2fa-policies/{id}', {
+          params: { path: { id: editing.id } },
+          body: { grace_period_days: grace },
+        });
+        if (error !== undefined || !response.ok) {
+          throw new Error(
+            errorMessage(error, t('settings.security.form.updateError', 'Failed to update policy'))
+          );
+        }
+        addToast(t('settings.security.form.updated', '2FA policy updated.'), 'success');
+        onSaved();
+        return;
+      }
       const { error, response } = await api.POST('/api/v1/2fa-policies', {
         body: {
           scope_type: scopeType,
@@ -373,7 +432,9 @@ function PolicyFormCard({
       addToast(
         err instanceof Error
           ? err.message
-          : t('settings.security.form.createError', 'Failed to create policy'),
+          : editing === undefined
+            ? t('settings.security.form.createError', 'Failed to create policy')
+            : t('settings.security.form.updateError', 'Failed to update policy'),
         'error'
       );
     } finally {
@@ -388,6 +449,17 @@ function PolicyFormCard({
           <label className="text-sm font-medium text-foreground">
             {t('settings.security.form.scopeType.label', 'Applies to')}
           </label>
+          {editing !== undefined ? (
+            <div className="space-y-1" data-testid="policy-scope-locked">
+              <p className="text-sm font-medium text-foreground">{scopeLabel(editing, t)}</p>
+              <p className="text-xs text-muted-foreground">
+                {t(
+                  'settings.security.form.scopeLocked',
+                  'Who a policy covers can’t be changed. Remove it and add a new one instead.'
+                )}
+              </p>
+            </div>
+          ) : (
           <Select
             value={scopeType}
             onValueChange={(value) => {
@@ -410,6 +482,7 @@ function PolicyFormCard({
               </SelectItem>
             </SelectContent>
           </Select>
+          )}
         </div>
 
         <div className="space-y-1.5">
@@ -427,7 +500,7 @@ function PolicyFormCard({
         </div>
       </div>
 
-      {scopeType === 'ou' && (
+      {editing === undefined && scopeType === 'ou' && (
         <div className="space-y-1.5">
           <label className="text-sm font-medium text-foreground">
             {t('settings.security.form.ou.label', 'Organizational unit')}
@@ -469,7 +542,7 @@ function PolicyFormCard({
         </div>
       )}
 
-      {scopeType === 'user' && (
+      {editing === undefined && scopeType === 'user' && (
         <div className="space-y-1.5">
           <label className="text-sm font-medium text-foreground">
             {t('settings.security.form.user.label', 'Person')}
@@ -496,7 +569,9 @@ function PolicyFormCard({
         <Button onClick={() => void submit()} disabled={saving} data-testid="save-two-factor-policy">
           {saving
             ? t('settings.security.form.saving', 'Saving…')
-            : t('settings.security.form.submit', 'Add policy')}
+            : editing === undefined
+              ? t('settings.security.form.submit', 'Add policy')
+              : t('settings.security.form.update', 'Save changes')}
         </Button>
       </div>
     </div>

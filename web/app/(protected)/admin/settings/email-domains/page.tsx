@@ -19,6 +19,7 @@ import {
   IconAlertCircle,
   IconCircleCheck,
   IconCopy,
+  IconPencil,
   IconPlus,
   IconTrash,
   IconWorld,
@@ -81,6 +82,7 @@ export default function EmailDomainsPage() {
 
   const [addingOpen, setAddingOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
 
   const {
     data: domains,
@@ -170,7 +172,14 @@ export default function EmailDomainsPage() {
         )}
         action={
           !addingOpen ? (
-            <Button className="gap-2" data-testid="email-domains-add" onClick={() => setAddingOpen(true)}>
+            <Button
+              className="gap-2"
+              data-testid="email-domains-add"
+              onClick={() => {
+                setEditingId(null);
+                setAddingOpen(true);
+              }}
+            >
               <IconPlus className="w-4 h-4" />
               {t('settings.emailDomains.add', 'Add domain')}
             </Button>
@@ -179,7 +188,7 @@ export default function EmailDomainsPage() {
       />
 
       {addingOpen && (
-        <AddDomainCard
+        <DomainFormCard
           roles={roles ?? []}
           onCancel={() => setAddingOpen(false)}
           onSaved={() => {
@@ -212,7 +221,20 @@ export default function EmailDomainsPage() {
         </Card>
       ) : (
         <div className="space-y-3">
-          {domains.map((d) => (
+          {domains.map((d) =>
+            editingId === d.id ? (
+              <DomainFormCard
+                key={d.id}
+                editing={d}
+                roles={roles ?? []}
+                onCancel={() => setEditingId(null)}
+                onSaved={() => {
+                  setEditingId(null);
+                  refetch();
+                }}
+                addToast={addToast}
+              />
+            ) : (
             <Card key={d.id} data-testid={`email-domain-${d.id}`} className="border border-border bg-card shadow-sm">
               <CardContent className="flex flex-col gap-4 py-4 md:flex-row md:items-start md:justify-between">
                 <div className="min-w-0 space-y-1.5">
@@ -287,6 +309,19 @@ export default function EmailDomainsPage() {
                         </Button>
                       )}
                       <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1"
+                        data-testid={`email-domain-edit-${d.id}`}
+                        onClick={() => {
+                          setAddingOpen(false);
+                          setEditingId(d.id);
+                        }}
+                      >
+                        <IconPencil className="w-3.5 h-3.5" />
+                        {t('settings.emailDomains.edit.action', 'Edit')}
+                      </Button>
+                      <Button
                         variant="ghost"
                         size="sm"
                         className="gap-1 text-destructive"
@@ -301,7 +336,8 @@ export default function EmailDomainsPage() {
                 </div>
               </CardContent>
             </Card>
-          ))}
+            )
+          )}
         </div>
       )}
     </div>
@@ -359,12 +395,15 @@ function ChallengeRow({
   );
 }
 
-function AddDomainCard({
+function DomainFormCard({
+  editing,
   roles,
   onCancel,
   onSaved,
   addToast,
 }: {
+  /** Set to edit a registered domain; absent when registering a new one. */
+  editing?: EmailDomain;
   roles: Role[];
   onCancel: () => void;
   onSaved: () => void;
@@ -372,12 +411,14 @@ function AddDomainCard({
 }) {
   const t = useTranslation('admin');
   const [domain, setDomain] = useState('');
-  const [defaultRoleId, setDefaultRoleId] = useState<number | ''>(roles[0]?.id ?? '');
-  const [autoProvision, setAutoProvision] = useState(true);
+  const [defaultRoleId, setDefaultRoleId] = useState<number | ''>(
+    editing?.default_role_id ?? roles[0]?.id ?? ''
+  );
+  const [autoProvision, setAutoProvision] = useState(editing?.auto_provision ?? true);
   const [saving, setSaving] = useState(false);
 
   const submit = async () => {
-    if (domain.trim() === '') {
+    if (editing === undefined && domain.trim() === '') {
       addToast(t('settings.emailDomains.form.domainRequired', 'A domain is required.'), 'error');
       return;
     }
@@ -388,27 +429,46 @@ function AddDomainCard({
 
     setSaving(true);
     try {
-      const res = await apiClient('/api/v1/email-domains', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          domain: domain.trim(),
-          default_role_id: defaultRoleId,
-          auto_provision: autoProvision,
-        }),
-      });
+      // The domain name is identity: the PATCH route changes only the default
+      // role and the auto-provision switch, so editing never sends it.
+      const res =
+        editing === undefined
+          ? await apiClient('/api/v1/email-domains', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                domain: domain.trim(),
+                default_role_id: defaultRoleId,
+                auto_provision: autoProvision,
+              }),
+            })
+          : await apiClient(`/api/v1/email-domains/${editing.id}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                default_role_id: defaultRoleId,
+                auto_provision: autoProvision,
+              }),
+            });
       if (!res.ok) {
         addToast(
-          await readError(res, t('settings.emailDomains.form.saveFailed', 'Failed to register domain')),
+          await readError(
+            res,
+            editing === undefined
+              ? t('settings.emailDomains.form.saveFailed', 'Failed to register domain')
+              : t('settings.emailDomains.form.updateFailed', 'Failed to update domain')
+          ),
           'error'
         );
         return;
       }
       addToast(
-        t(
-          'settings.emailDomains.form.saved',
-          'Domain registered — publish the TXT record to verify it.'
-        ),
+        editing === undefined
+          ? t(
+              'settings.emailDomains.form.saved',
+              'Domain registered — publish the TXT record to verify it.'
+            )
+          : t('settings.emailDomains.form.updated', 'Domain updated.'),
         'success'
       );
       onSaved();
@@ -421,7 +481,11 @@ function AddDomainCard({
     <Card className="border border-primary/30 bg-card shadow-sm" data-testid="email-domain-form">
       <CardHeader>
         <CardTitle className="text-lg font-semibold font-heading">
-          <h2>{t('settings.emailDomains.form.title', 'Add email domain')}</h2>
+          <h2>
+            {editing === undefined
+              ? t('settings.emailDomains.form.title', 'Add email domain')
+              : t('settings.emailDomains.form.editTitle', 'Edit {domain}', { domain: editing.domain })}
+          </h2>
         </CardTitle>
         <CardDescription className="text-sm">
           {t(
@@ -441,10 +505,19 @@ function AddDomainCard({
           <Input
             id="domain-input"
             placeholder="example.com"
-            value={domain}
-            disabled={saving}
+            value={editing?.domain ?? domain}
+            disabled={saving || editing !== undefined}
+            readOnly={editing !== undefined}
             onChange={(e) => setDomain(e.target.value)}
           />
+          {editing !== undefined && (
+            <p className="text-xs text-muted-foreground" data-testid="email-domain-name-locked">
+              {t(
+                'settings.emailDomains.form.domainLocked',
+                'A domain name can’t be changed once registered. Remove it and add the new one instead.'
+              )}
+            </p>
+          )}
         </div>
 
         <div className="space-y-1.5">
@@ -495,7 +568,9 @@ function AddDomainCard({
           <Button onClick={() => void submit()} disabled={saving} data-testid="email-domain-save">
             {saving
               ? t('settings.emailDomains.form.saving', 'Saving…')
-              : t('settings.emailDomains.form.submit', 'Add domain')}
+              : editing === undefined
+                ? t('settings.emailDomains.form.submit', 'Add domain')
+                : t('settings.emailDomains.form.update', 'Save changes')}
           </Button>
         </div>
       </CardContent>
