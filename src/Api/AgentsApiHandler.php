@@ -127,6 +127,10 @@ final class AgentsApiHandler
             $fields['slug'] = $this->agents->freeSlug($tenantId, $base !== '' ? $base : (string) ($preset['slug'] ?? 'agent'));
         }
 
+        // Feature flags come only from the preset a plugin declared, never from
+        // the request body, so a person cannot switch on a flag by sending it.
+        $fields['features'] = $preset === null ? [] : (array) ($preset['features'] ?? []);
+
         $id = $this->agents->create(
             $tenantId,
             $fields,

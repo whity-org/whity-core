@@ -51,6 +51,7 @@ use Whity\Mcp\Prompts\Prompt;
 use Whity\Mcp\Prompts\PromptRegistry;
 use Whity\Mcp\Tools\AuthoredToolRegistry;
 use Whity\Sdk\PluginAgentPresetsInterface;
+use Whity\Sdk\PluginAgentsInterface;
 use Whity\Sdk\PluginHomeCardInterface;
 use Whity\Sdk\Manifest\HomeCardValidator;
 use Whity\Sdk\PluginDocumentsInterface;
@@ -3484,6 +3485,22 @@ class PluginLoader
                 }
             } catch (Throwable $e) {
                 $this->handlePluginThrowable($pluginKey, $e, 'getAgentPresets');
+            }
+        }
+
+        // 2a-quater-ter. Plugin agents (SDK 1.64, WHIT-893). Same shape: optional,
+        //     and a bad declaration is dropped with a logged reason while the
+        //     plugin keeps loading. They join the plugin's presets, so a workspace
+        //     starts an agent from one as a copy. Scope is the plugin's own root:
+        //     another plugin's or core's agent, a write at Allowed, and an unknown
+        //     feature are refused.
+        if ($plugin instanceof PluginAgentsInterface && $this->agentPresetRegistry !== null && $this->permissionRegistry !== null) {
+            try {
+                foreach ($this->agentPresetRegistry->registerPluginAgents($pluginKey, $plugin->getAgents(), $this->permissionRegistry->exists(...)) as $reason) {
+                    $this->logWarning("[Plugin:{$pluginKey}] getAgents(): {$reason}.");
+                }
+            } catch (Throwable $e) {
+                $this->handlePluginThrowable($pluginKey, $e, 'getAgents');
             }
         }
 

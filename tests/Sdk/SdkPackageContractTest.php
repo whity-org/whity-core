@@ -242,9 +242,12 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsOneEightForInteractiveBlocks(): void
     {
         $this->assertSame(
-            '1.63.0',
+            '1.64.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.63 ADDS PLUGIN FILES AND DOCUMENT TRACKING: the host services PluginFiles and PluginDocuments '
+            'SDK 1.64 ADDS PLUGIN AGENTS: PluginAgentsInterface lets a plugin declare or customize agents under its '
+            . 'own toolset root (persona, toolsets, grant start, host feature flags); another plugin\'s or core\'s agent, '
+            . 'a write at Allowed and an unknown feature are refused. Purely additive. '
+            . 'SDK 1.63 ADDS PLUGIN FILES AND DOCUMENT TRACKING: the host services PluginFiles and PluginDocuments '
             . 'give a plugin its own files per workspace (a generic upload and download controller included) and '
             . 'its own documents, recorded as issued by that plugin, with a QR code and tracking for those documents only '
             . '(WHIT-886). Purely additive. '
