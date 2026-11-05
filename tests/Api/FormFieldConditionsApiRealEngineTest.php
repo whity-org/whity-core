@@ -167,6 +167,49 @@ final class FormFieldConditionsApiRealEngineTest extends TestCase
         self::assertCount(2, $this->fields->listForForm(self::TENANT, $this->formId));
     }
 
+    public function testATableNeedsColumnsAndTheyAreChecked(): void
+    {
+        $post = fn (string $key, array $validation): Response => $this->handler->create(
+            $this->request('POST', self::body($key, FieldType::REPEATING, ['validation' => $validation])),
+            ['id' => (string) $this->formId],
+        );
+        $name = ['key' => 'name', 'type' => 'text', 'label' => ['en' => 'Name']];
+
+        self::assertSame(422, $post('none', [])->getStatusCode());
+        self::assertSame(422, $post('dup', ['columns' => [$name, $name]])->getStatusCode());
+        self::assertSame(422, $post('file', ['columns' => [['key' => 'a', 'type' => 'file', 'label' => ['en' => 'A']]]])->getStatusCode());
+        self::assertSame(422, $post('nested', ['columns' => [['key' => 'a', 'type' => 'repeating', 'label' => ['en' => 'A']]]])->getStatusCode());
+        self::assertSame(422, $post('noopts', ['columns' => [['key' => 'a', 'type' => 'select', 'label' => ['en' => 'A']]]])->getStatusCode());
+        self::assertSame(422, $post('bounds', ['columns' => [$name], 'minRows' => 5, 'maxRows' => 2])->getStatusCode());
+
+        $good = $post('suppliers', ['columns' => [$name], 'minRows' => 1, 'maxRows' => 10]);
+        self::assertSame(201, $good->getStatusCode());
+        $stored = self::data($good);
+        self::assertTrue($stored['multi_valued']);
+        self::assertSame(10, $stored['validation']['maxRows']);
+        self::assertSame('name', $stored['validation']['columns'][0]['key']);
+    }
+
+    public function testRetypingAQuestionAsATableWithoutColumnsIsRefused(): void
+    {
+        $id = (int) self::data($this->create('a', FieldType::TEXT))['id'];
+
+        $response = $this->handler->update(
+            $this->request('PATCH', ['field_type' => FieldType::REPEATING]),
+            ['id' => (string) $this->formId, 'fieldId' => (string) $id],
+        );
+
+        self::assertSame(422, $response->getStatusCode());
+    }
+
+    public function testASignatureQuestionCanBeAddedAndEditedOnTheMigratedTable(): void
+    {
+        $created = self::data($this->create('signed', FieldType::SIGNATURE));
+
+        self::assertSame('signature', $created['field_type']);
+        self::assertFalse($created['multi_valued']);
+    }
+
     public function testDeletingAQuestionOthersDependOnIsRefusedUntilTheyStop(): void
     {
         $a = (int) self::data($this->create('a', FieldType::TEXT))['id'];

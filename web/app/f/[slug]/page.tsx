@@ -26,9 +26,12 @@
 
 import { use, useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
+import { BuiltOnWhity } from '@whity/ui/built-on-whity';
+import { TenantLogo } from '@whity/ui/tenant-logo';
+import { useBranding } from '@/lib/branding-context';
 import { useDirection } from '@/lib/direction-context';
 import { useDateDisplay } from '@whity/features/datetime';
-import { useTranslation } from '@whity/features/i18n';
+import { LanguageSwitcher, useTranslation } from '@whity/features/i18n';
 import {
   localized,
   type Answer,
@@ -167,9 +170,30 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
     return null;
   }
 
+  // The workspace's brand leads: its logo above the card, and its colour on the
+  // card's edge, the main button and the focus rings (the theme is already the
+  // workspace's, set for the whole app from its branding).
+  const branding = useBranding();
   const shell = (children: React.ReactNode) => (
-    <main className="flex min-h-screen items-start justify-center bg-background px-4 py-10">
-      <div className="w-full max-w-2xl">{children}</div>
+    <main className="flex min-h-screen flex-col items-center bg-background px-4 py-10">
+      <div className="w-full max-w-2xl flex-1 space-y-6">
+        <div className="flex justify-center">
+          <TenantLogo
+            name={branding.siteName}
+            src={branding.logoWideUrl ?? branding.logoSquareUrl}
+            shape={branding.logoWideUrl ? 'wide' : 'square'}
+            size={40}
+          />
+        </div>
+        {children}
+      </div>
+      <footer className="mt-10 flex w-full max-w-2xl flex-wrap items-center justify-between gap-3">
+        <BuiltOnWhity label={t('fill.builtOn', 'Built on Whity')} />
+        <LanguageSwitcher
+          variant="dropdown"
+          className="h-10 cursor-pointer rounded-control border border-input bg-card px-2.5 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
+        />
+      </footer>
     </main>
   );
 
@@ -183,13 +207,13 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
 
   if (loadError !== null || form === null) {
     return shell(
-      <Card>
+      <Card className="border-t-4 border-t-primary">
         <CardHeader>
           <CardTitle>{t('fill.notAvailable', 'This form is not available')}</CardTitle>
           <CardDescription>
             {loadError === 'loadFailed'
               ? t('fill.loadFailed', 'This form could not be loaded. Check your connection and try again.')
-              : t('fill.notValid', 'This form link is not valid, or is no longer open.')}
+              : t('fill.notValid', 'This form link is not valid, or is no longer open. Check the link you were given.')}
           </CardDescription>
         </CardHeader>
       </Card>
@@ -200,11 +224,11 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
   const closedOn = dateTime(form.closes_at);
   const translatedDescription = Array.isArray(form.description_i18n) ? null : form.description_i18n;
   const description = localized(translatedDescription, preferArabic) || form.description;
-  const submitLabel = localized(form.submit_label, preferArabic) || t('fill.submit', 'Submit');
+  const submitLabel = localized(form.submit_label, preferArabic) || t('fill.send', 'Send');
 
   if (submitted) {
     return shell(
-      <Card>
+      <Card className="border-t-4 border-t-primary">
         <CardHeader>
           <CardTitle>{t('fill.sentPublicTitle', 'Thank you, your response has been recorded')}</CardTitle>
           <CardDescription>
@@ -219,7 +243,7 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
   }
 
   return shell(
-    <Card>
+    <Card className="border-t-4 border-t-primary">
       <CardHeader>
         <CardTitle>{title}</CardTitle>
         {description !== null && description !== '' && <CardDescription>{description}</CardDescription>}

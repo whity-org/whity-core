@@ -1,6 +1,6 @@
 /**
  * #882/#884: the CORE record routes — `/admin/tenants/[id]`,
- * `/admin/languages/[id]` and `/admin/tag-groups/[id]`.
+ * `/admin/languages/[id]` (tag groups moved into the Tags page's drawer).
  *
  * Every one of these is driven through its ROUTE rather than through the screen
  * component, and every mount seeds nothing but the URL segment. That is the
@@ -81,8 +81,7 @@ jest.mock('@/lib/toast-context', () => ({ useToast: () => ({ addToast }) }));
 
 import TenantRecordPage from '@/app/(protected)/admin/tenants/[id]/page';
 import LanguageRecordPage from '@/app/(protected)/admin/languages/[id]/page';
-import TagGroupRecordPage from '@/app/(protected)/admin/tag-groups/[id]/page';
-import { TENANTS_WRITE, LANGUAGES_MANAGE, TAGS_MANAGE } from '@/lib/capabilities';
+import { TENANTS_WRITE, LANGUAGES_MANAGE } from '@/lib/capabilities';
 
 // Radix (select, switch) needs Pointer Capture + scrollIntoView, absent in jsdom.
 beforeAll(() => {
@@ -222,6 +221,25 @@ describe('/admin/tenants/[id] — the workspace record', () => {
     );
     const patch = rawApiClient.mock.calls.find((call) => call[1]?.method === 'PATCH');
     expect(JSON.parse(patch![1].body)).toEqual({ name: 'Acme Widgets', slug: 'acme' });
+  });
+
+  it('lets a workspace with no slug be renamed without inventing one', async () => {
+    params = { id: '7' };
+    grant(TENANTS_WRITE);
+    mockTenantBackend({ list: rawResponse(tenantPage([{ ...TENANT, slug: null }])) });
+    const user = userEvent.setup();
+
+    render(<TenantRecordPage />);
+    await screen.findByTestId('tenant-record');
+
+    await user.clear(screen.getByTestId('tenant-record-name'));
+    await user.type(screen.getByTestId('tenant-record-name'), 'Acme Widgets');
+    await user.click(screen.getByTestId('tenant-record-save'));
+
+    await waitFor(() => expect(rawApiClient.mock.calls.some((call) => call[1]?.method === 'PATCH')).toBe(true));
+    expect(screen.queryByTestId('tenant-record-slug-error')).not.toBeInTheDocument();
+    const patch = rawApiClient.mock.calls.find((call) => call[1]?.method === 'PATCH');
+    expect(JSON.parse(patch![1].body)).toEqual({ name: 'Acme Widgets' });
   });
 
   it('refuses a slug the backend would accept but no URL should carry', async () => {
@@ -511,125 +529,6 @@ describe('/admin/languages/[id] — the record that closes #884’s clearest gap
 });
 
 // ===========================================================================
-// Tag groups
-// ===========================================================================
-
-const TAG_GROUP = {
-  id: 3,
-  tenant_id: 1,
-  key: 'priority',
-  display_name: { ar: 'الأولوية', en: 'Priority' },
-  created_at: '2026-03-01T00:00:00Z',
-  updated_at: '2026-03-01T00:00:00Z',
-};
-
-const TAGS = [
-  { id: 10, tenant_id: 1, group_id: 3, name: 'high', created_at: '', updated_at: '' },
-  { id: 11, tenant_id: 1, group_id: 3, name: 'low', created_at: '', updated_at: '' },
-];
-
-function mockTagGroupBackend({
-  group = typedOk({ data: TAG_GROUP }),
-  tags = typedOk({ data: TAGS }),
-}: { group?: unknown; tags?: unknown } = {}) {
-  apiGet.mockImplementation((path: string) => {
-    if (path === '/api/v1/tag-groups/{id}') return Promise.resolve(group);
-    if (path === '/api/v1/tags') return Promise.resolve(tags);
-    return Promise.resolve(typedFail(404));
-  });
-  apiPatch.mockImplementation((_path: string, options: { body: Record<string, unknown> }) =>
-    Promise.resolve(typedOk({ data: { ...TAG_GROUP, ...options.body } }))
-  );
-}
-
-describe('/admin/tag-groups/[id] — the container and what is in it', () => {
-  it('lists the tags in THIS group, asked for by group', async () => {
-    params = { id: '3' };
-    grant(TAGS_MANAGE);
-    mockTagGroupBackend();
-
-    render(<TagGroupRecordPage />);
-    await screen.findByTestId('tag-group-record');
-
-    // Asserted on the REQUEST: a panel rendering the whole tenant's tags would
-    // look identical on a one-group fixture.
-    expect(apiGet).toHaveBeenCalledWith('/api/v1/tags', {
-      params: { query: { group_id: 3 } },
-    });
-    const panel = await screen.findByTestId('tag-group-record-tags');
-    expect(panel).toHaveTextContent('high');
-    expect(panel).toHaveTextContent('low');
-    expect(screen.getByTestId('tag-group-record-stat-tags')).toHaveTextContent('2');
-  });
-
-  it('RENAMES the key — the field the dialog only ever offered while creating', async () => {
-    params = { id: '3' };
-    grant(TAGS_MANAGE);
-    mockTagGroupBackend();
-    const user = userEvent.setup();
-
-    render(<TagGroupRecordPage />);
-    await screen.findByTestId('tag-group-record');
-
-    await user.clear(screen.getByTestId('tag-group-record-key'));
-    await user.type(screen.getByTestId('tag-group-record-key'), 'severity');
-    await user.click(screen.getByTestId('tag-group-record-save'));
-
-    await waitFor(() =>
-      expect(apiPatch).toHaveBeenCalledWith(
-        '/api/v1/tag-groups/{id}',
-        expect.objectContaining({
-          params: { path: { id: 3 } },
-          body: { key: 'severity', display_name: { ar: 'الأولوية', en: 'Priority' } },
-        })
-      )
-    );
-  });
-
-  it('refuses a key the handler would reject, before the request', async () => {
-    params = { id: '3' };
-    grant(TAGS_MANAGE);
-    mockTagGroupBackend();
-    const user = userEvent.setup();
-
-    render(<TagGroupRecordPage />);
-    await screen.findByTestId('tag-group-record');
-
-    await user.clear(screen.getByTestId('tag-group-record-key'));
-    await user.type(screen.getByTestId('tag-group-record-key'), 'not a key');
-    await user.click(screen.getByTestId('tag-group-record-save'));
-
-    expect(await screen.findByTestId('tag-group-record-key-error')).toBeInTheDocument();
-    expect(apiPatch).not.toHaveBeenCalled();
-  });
-
-  it('is readable without tags:manage, and says the record is read-only', async () => {
-    params = { id: '3' };
-    grant();
-    mockTagGroupBackend();
-
-    render(<TagGroupRecordPage />);
-
-    expect(await screen.findByTestId('tag-group-record')).toBeInTheDocument();
-    expect(screen.getByTestId('tag-group-record-readonly-notice')).toHaveTextContent(
-      /permission to manage tags/i
-    );
-    expect(screen.queryByTestId('tag-group-record-key')).not.toBeInTheDocument();
-  });
-
-  it("keeps the URL on the server's own 404 rather than bouncing to the list", async () => {
-    params = { id: '3' };
-    grant(TAGS_MANAGE);
-    mockTagGroupBackend({ group: typedFail(404) });
-
-    render(<TagGroupRecordPage />);
-
-    expect(await screen.findByTestId('tag-group-record-missing')).toBeInTheDocument();
-    expect(push).not.toHaveBeenCalled();
-  });
-});
-
-// ===========================================================================
 // The shared route contract
 // ===========================================================================
 
@@ -646,21 +545,5 @@ describe('every core record route', () => {
     // permission" is not a slow truth — it is a false sentence on screen.
     expect(screen.getByTestId('record-loading')).toBeInTheDocument();
     expect(screen.queryByTestId('tenant-record-readonly-notice')).not.toBeInTheDocument();
-  });
-
-  it('sends the back control to the list rather than into browser history', async () => {
-    params = { id: '3' };
-    grant(TAGS_MANAGE);
-    mockTagGroupBackend();
-    const user = userEvent.setup();
-
-    render(<TagGroupRecordPage />);
-    await screen.findByTestId('tag-group-record');
-
-    await user.click(screen.getByRole('button', { name: /back to tag groups/i }));
-
-    // push, not back(): a record reached from a pasted link has no history entry
-    // to go back TO.
-    expect(push).toHaveBeenCalledWith('/admin/tag-groups');
   });
 });

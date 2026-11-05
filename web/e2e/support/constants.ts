@@ -84,11 +84,10 @@ export const DELEGATED_PERMISSIONS = [
  * all of these.
  */
 export const SIDEBAR_SECTIONS = [
-  { label: 'Dashboard', href: '/admin' },
+  { label: 'Dashboard', href: '/dashboard' },
   { label: 'Users', href: '/admin/users' },
   { label: 'Roles', href: '/admin/roles' },
   { label: 'Organizational Units', href: '/admin/ous' },
-  { label: 'Tenants', href: '/admin/tenants' },
   { label: 'User Groups', href: '/admin/user-groups' },
   // The one Settings entry opens the Settings area (WHIT-806). The personal
   // account page is not in the nav: AppShell.openAccountSettings() uses the

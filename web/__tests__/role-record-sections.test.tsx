@@ -29,6 +29,7 @@
 
 import React from 'react';
 import { render, screen, waitFor, within } from '@testing-library/react';
+import { DisplayPreferencesContextProvider } from '@whity/ui/display-preferences';
 import userEvent from '@testing-library/user-event';
 import { RoleRecordScreen } from '@whity/features/roles';
 import type { Permission, RoleWithPermissions, RolesAdapter } from '@whity/features/roles';
@@ -42,9 +43,9 @@ const t = (_key: string, fallback?: string, vars?: Record<string, string | numbe
 };
 
 const CATALOGUE: Permission[] = [
-  { id: 1, name: 'users:read', description: 'Read users' },
-  { id: 2, name: 'users:write', description: 'Write users' },
-  { id: 3, name: 'roles:read', description: 'Read roles' },
+  { id: 1, name: 'users:read', description: 'Read users', area: 'users', areaLabel: 'Users', areaGroup: 'people', actions: ['see'] },
+  { id: 2, name: 'users:write', description: 'Write users', area: 'users', areaLabel: 'Users', areaGroup: 'people', actions: ['create', 'change'] },
+  { id: 3, name: 'roles:read', description: 'Read roles', area: 'roles', areaLabel: 'Roles', areaGroup: 'people', actions: ['see'] },
 ];
 
 /** The role as the server describes it, before any per-region verdict. */
@@ -90,8 +91,17 @@ function fakeAdapter(over: Partial<RolesAdapter> = {}): RolesAdapter {
 /** Mount the record for one server answer. No `can` — there is no such prop. */
 function renderFor(role: RoleWithPermissions, over: Partial<RolesAdapter> = {}) {
   const adapter = fakeAdapter({ getRole: jest.fn().mockResolvedValue(role), ...over });
-  render(<RoleRecordScreen adapter={adapter} roleId={10} t={t} onBack={jest.fn()} />);
+  render(
+    <DisplayPreferencesContextProvider value={{ textSize: 'standard', showTechnicalDetails: true, update: () => {} }}>
+      <RoleRecordScreen adapter={adapter} roleId={10} t={t} onBack={jest.fn()} />
+    </DisplayPreferencesContextProvider>
+  );
   return adapter;
+}
+
+/** Record tabs: the content of the other tabs is not mounted until opened. */
+async function openTab(name: string) {
+  await userEvent.click(await screen.findByRole('tab', { name }));
 }
 
 describe('the permissions region — hidden, read-only, editable', () => {
@@ -102,22 +112,16 @@ describe('the permissions region — hidden, read-only, editable', () => {
       sections: { details: EDITABLE, permissions: EDITABLE },
     });
 
+    await openTab('Access');
     await screen.findByTestId('perm-grid');
-    expect(screen.getByTestId('perm-grid-group-users')).toBeInTheDocument();
-    // Editable is the only state that needs the catalogue, and the only state
-    // that fetches it.
     expect(adapter.listPermissions).toHaveBeenCalled();
 
-    const usersGroup = screen.getByTestId('perm-grid-group-users');
-    const usersRead = within(usersGroup)
-      .getByText('users:read')
-      .closest('label')
-      ?.querySelector('input[type="checkbox"]');
-    expect(usersRead).toBeChecked();
-    expect(usersRead).not.toBeDisabled();
+    const usersSee = screen.getByRole('checkbox', { name: 'Users: See' });
+    expect(usersSee).toBeChecked();
+    expect(usersSee).not.toBeDisabled();
   });
 
-  it('READ-ONLY: the ROLE’s own grants, no controls, and a reason — plus the detail', async () => {
+  it('READ-ONLY: the ROLE’s own grants ticked, nothing to change, and a reason — plus the detail', async () => {
     const adapter = renderFor({
       ...ROLE,
       permissions: [CATALOGUE[0]],
@@ -127,6 +131,7 @@ describe('the permissions region — hidden, read-only, editable', () => {
       },
     });
 
+    await openTab('Access');
     await screen.findByTestId('role-record-section-permissions');
 
     // #951/#968 one level up: refused WITH a reason, and with the
@@ -136,14 +141,14 @@ describe('the permissions region — hidden, read-only, editable', () => {
         "(changing this requires the 'roles:manage' permission)"
     );
 
-    // The role's OWN grants, never the installation's catalogue — feeding the
-    // catalogue to a read-only view renders every permission on the deployment
-    // as though the role held it.
-    expect(screen.getByText('users:read')).toBeInTheDocument();
-    expect(screen.queryByText('users:write')).not.toBeInTheDocument();
-    expect(adapter.listPermissions).not.toHaveBeenCalled();
+    // The whole grid with the role's ticks, and nothing that can change them.
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Users: See: allowed' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Users: Change: not allowed' })).toBeInTheDocument();
+    expect(adapter.listPermissions).toHaveBeenCalled();
 
     // The details region is still editable beside it — that is the whole point.
+    await openTab('Overview');
     expect(screen.getByDisplayValue('Support')).toBeInTheDocument();
   });
 
@@ -154,6 +159,7 @@ describe('the permissions region — hidden, read-only, editable', () => {
       sections: { details: EDITABLE, permissions: permissionDenied(null) },
     });
 
+    await openTab('Access');
     const notice = await screen.findByTestId('role-record-section-permissions-readonly');
     expect(notice).toHaveTextContent('You may see what this role grants, but not change it.');
     // The slug is what `detail` gates, so it must not appear anywhere.
@@ -285,9 +291,9 @@ describe('a save carries only the regions this caller may write', () => {
       { updateRole }
     );
 
+    await openTab('Access');
     await screen.findByTestId('perm-grid');
-    const usersGroup = screen.getByTestId('perm-grid-group-users');
-    await user.click(within(usersGroup).getByText('users:write'));
+    await user.click(screen.getByRole('checkbox', { name: 'Users: Change' }));
     await user.click(screen.getByRole('button', { name: 'Save changes' }));
 
     await waitFor(() => expect(updateRole).toHaveBeenCalled());
@@ -307,10 +313,9 @@ describe('a save carries only the regions this caller may write', () => {
 
     // Nothing has been changed in the one editable region, so there is nothing
     // to save — even though the read-only grid below has re-derived its set.
-    const save = await screen.findByRole('button', { name: 'Save changes' });
-    expect(save).toBeDisabled();
+    const nameInput = await screen.findByDisplayValue('Support');
+    expect(screen.queryByRole('button', { name: 'Save changes' })).not.toBeInTheDocument();
 
-    const nameInput = screen.getByDisplayValue('Support');
     await user.type(nameInput, '!');
     expect(screen.getByRole('button', { name: 'Save changes' })).not.toBeDisabled();
   });

@@ -1,6 +1,9 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { NoAccess } from '@/components/no-access';
+import { TechnicalDetails } from '@whity/ui/display-preferences';
+import Link from 'next/link';
 import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import { useAuth } from '@/lib/auth-context';
@@ -9,9 +12,9 @@ import { useFetch } from '@/hooks/useFetch';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { Button } from '@whity/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
-import { AccessDenied } from '@whity/ui/access-denied';
 import { IconDeviceFloppy } from '@tabler/icons-react';
 import { useTranslation } from '@whity/features/i18n';
+import { TENANTS_READ } from '@/lib/capabilities';
 import {
   SETTINGS_READ,
   SETTINGS_WRITE,
@@ -59,18 +62,7 @@ export default function AdminSettingsPage() {
 
   if (!canRead) {
     return (
-      <AccessDenied
-        description={t(
-          'settings.accessDenied',
-          'You do not have the required permission ({permission}) to view Website Settings.',
-          { permission: SETTINGS_READ }
-        )}
-        action={
-          <Button onClick={() => window.history.back()} variant="outline">
-            {t('settings.goBack', 'Go Back')}
-          </Button>
-        }
-      />
+      <NoAccess area={t('access.area.settings.accessDenied', 'settings')} permission="settings:read" />
     );
   }
 
@@ -80,12 +72,46 @@ export default function AdminSettingsPage() {
         title={t('settings.title', 'General')}
         description={t(
           'settings.description',
-          "Your tenant's instance identity. Cleared fields fall back to the platform-wide global default. Editing requires the settings:write permission."
+          'Your workspace’s name and basics. A cleared field uses the platform default.'
         )}
       />
+      <TechnicalDetails>
+        <p className="text-sm text-muted-foreground">
+          {t('settings.description.permission', 'Editing needs the settings:write permission.')}
+        </p>
+      </TechnicalDetails>
       <TenantSettingsSection canWrite={canWrite} addToast={addToast} />
+      {!isSystemTenant && typeof user?.tenant_id === 'number' && hasPermission(TENANTS_READ) && (
+        <WorkspaceRecordLink tenantId={user.tenant_id} />
+      )}
       {isSystemTenant && canManageGlobal && <PlatformDefaultsSection addToast={addToast} />}
     </div>
+  );
+}
+
+/**
+ * The way to a workspace's own record, which Tenants in the sidebar no longer gives
+ * a workspace admin.
+ */
+function WorkspaceRecordLink({ tenantId }: { tenantId: number }) {
+  const t = useTranslation('admin');
+
+  return (
+    <Card className="border border-border bg-card shadow-sm">
+      <CardHeader>
+        <CardTitle className="text-lg font-semibold font-heading">
+          {t('settings.workspaceRecord.title', 'Workspace record')}
+        </CardTitle>
+        <CardDescription>
+          {t('settings.workspaceRecord.description', "This workspace's own record, with its name and address.")}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Button asChild variant="outline">
+          <Link href={`/admin/tenants/${tenantId}`}>{t('settings.workspaceRecord.open', 'Open workspace record')}</Link>
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -219,7 +245,7 @@ function TenantSettingsSection({
             ' ' +
               t(
                 'settings.tenant.readOnly',
-                'You have read-only access (settings:write required to edit).'
+                'You can read these settings but not change them.'
               )}
         </CardDescription>
       </CardHeader>
@@ -347,7 +373,10 @@ function PlatformDefaultsSection({ addToast }: { addToast: AddToast }) {
   const sections = useMemo(
     () =>
       groupRegistry(registry, t).filter(
-        (s) => s.section.id === 'general' || s.section.id === 'integrations' || s.section.id === 'plugins'
+        (s) => s.section.id === 'general' ||
+          s.section.id === 'integrations' ||
+          s.section.id === 'plugin-store' ||
+          s.section.id === 'plugins'
       ),
     [registry, t]
   );

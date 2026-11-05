@@ -73,14 +73,14 @@ export const test = base.extend<Fixtures>({
   adminPage: async ({ page }, use) => {
     await page.goto('/dashboard');
     await page.waitForURL('**/dashboard');
-    await expect(page.getByRole('heading', { name: 'Welcome back!' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /^Good (morning|afternoon|evening)/ })).toBeVisible();
     await use({ shell: new AppShell(page) });
   },
 
   userPage: async ({ page }, use) => {
     await page.goto('/dashboard');
     await page.waitForURL('**/dashboard');
-    await expect(page.getByRole('heading', { name: 'Welcome back!' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /^Good (morning|afternoon|evening)/ })).toBeVisible();
     await use({ shell: new AppShell(page) });
   },
 
@@ -118,7 +118,7 @@ export const test = base.extend<Fixtures>({
     void role;
     await page.goto('/dashboard');
     await page.waitForURL('**/dashboard');
-    await expect(page.getByRole('heading', { name: 'Welcome back!' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /^Good (morning|afternoon|evening)/ })).toBeVisible();
     await use({ shell: new AppShell(page) });
   },
 });

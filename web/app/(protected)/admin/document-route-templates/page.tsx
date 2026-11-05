@@ -37,9 +37,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { IconPlus } from '@tabler/icons-react';
+import { IconMenu2, IconPlus } from '@tabler/icons-react';
+import { ConfirmAction } from '@whity/ui/confirm-action';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@whity/ui/dropdown-menu';
+import { routeSentence } from '@/lib/documents/route-sentence';
 import { useTranslation } from '@whity/features/i18n';
-import type { RouteTemplateSummary } from './types';
+import type { RouteTemplateGraphWire, RouteTemplateSummary } from './types';
 
 export default function RouteTemplatesPage() {
   const { apiClient } = useAuth();
@@ -62,6 +71,93 @@ export default function RouteTemplatesPage() {
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState('');
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState<RouteTemplateSummary | null>(null);
+
+  // Each route is described in a sentence, which needs its stages: read them per
+  // route (the list carries only a count). Role and group names are looked up
+  // once; a viewer who cannot read them sees the stage's own label instead.
+  const sentences = useFetch(async () => {
+    const rows = data ?? [];
+    const [rolesRes, groupsRes] = await Promise.all([
+      apiClient('/api/v1/roles?per_page=100').catch(() => null),
+      apiClient('/api/v1/user-groups?per_page=100').catch(() => null),
+    ]);
+    const nameMap = async (res: Response | null) => {
+      const map = new Map<number, string>();
+      if (res?.ok) {
+        const body = (await res.json().catch(() => null)) as { data?: { id: number; name: string }[] } | null;
+        for (const item of body?.data ?? []) map.set(item.id, item.name);
+      }
+      return map;
+    };
+    const roles = await nameMap(rolesRes);
+    const groups = await nameMap(groupsRes);
+    const out: Record<number, string> = {};
+    await Promise.all(
+      rows.map(async (row) => {
+        const res = await apiClient(`/api/v1/document-route-templates/${row.id}`).catch(() => null);
+        if (!res?.ok) return;
+        const body = (await res.json().catch(() => null)) as { data?: RouteTemplateGraphWire } | null;
+        if (body?.data === undefined) return;
+        out[row.id] = routeSentence(
+          body.data.steps.map((st) => ({
+            position: st.position,
+            ruleKind: st.rule_kind,
+            ruleConfig: st.rule_config,
+            label: st.label,
+          })),
+          (st) =>
+            st.ruleKind === 'group'
+              ? (groups.get(st.ruleConfig.group_id as number) ?? null)
+              : (roles.get(st.ruleConfig.role_id as number) ?? null),
+          {
+            unnamed: t('routeTemplates.sentence.unnamed', 'A stage'),
+            empty: t('routeTemplates.sentence.empty', 'No stages drawn yet'),
+            join: (before, next) => t('routeTemplates.sentence.then', '{before}, then {next}', { before, next }),
+          }
+        );
+      })
+    );
+    return out;
+  }, [apiClient, data]);
+
+  const duplicate = useCallback(
+    async (row: RouteTemplateSummary) => {
+      const failed = t('routeTemplates.error.duplicate', 'The route could not be duplicated');
+      const source = await apiClient(`/api/v1/document-route-templates/${row.id}`);
+      if (!source.ok) return addToast(failed, 'error');
+      const graph = ((await source.json()) as { data: RouteTemplateGraphWire }).data;
+      const made = await apiClient('/api/v1/document-route-templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: t('routeTemplates.duplicate.name', '{name} (copy)', { name: row.name }),
+          description: row.description,
+        }),
+      });
+      if (!made.ok) return addToast(failed, 'error');
+      const id = ((await made.json()) as { data: { id: number } }).data.id;
+      const put = await apiClient(`/api/v1/document-route-templates/${id}/graph`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ steps: graph.steps, edges: graph.edges }),
+      });
+      if (!put.ok) return addToast(failed, 'error');
+      router.push(`/admin/document-route-templates/${id}`);
+    },
+    [addToast, apiClient, router, t]
+  );
+
+  const remove = useCallback(async () => {
+    if (deleting === null) return;
+    const response = await apiClient(`/api/v1/document-route-templates/${deleting.id}`, { method: 'DELETE' });
+    if (!response.ok) {
+      addToast(t('routeTemplates.error.delete', 'The route could not be deleted'), 'error');
+      return;
+    }
+    setDeleting(null);
+    refetch();
+  }, [addToast, apiClient, deleting, refetch, t]);
 
   const create = useCallback(async () => {
     setSaving(true);
@@ -105,16 +201,21 @@ export default function RouteTemplatesPage() {
         <button
           type="button"
           onClick={() => router.push(`/admin/document-route-templates/${row.id}`)}
-          className="text-start font-medium text-primary hover:underline"
+          className="text-start font-medium text-foreground hover:underline"
+          dir="auto"
         >
           {row.name}
         </button>
       ),
     },
     {
-      accessorKey: 'description',
-      header: t('routeTemplates.column.description', 'Description'),
-      cell: (row) => <span className="text-muted-foreground">{row.description ?? '—'}</span>,
+      id: 'sentence',
+      header: t('routeTemplates.column.route', 'The route'),
+      cell: (row) => (
+        <span className="text-muted-foreground" dir="auto">
+          {sentences.data?.[row.id] ?? row.description ?? '—'}
+        </span>
+      ),
     },
     {
       accessorKey: 'step_count',
@@ -122,21 +223,30 @@ export default function RouteTemplatesPage() {
       enableSorting: true,
       cell: (row) => row.step_count,
     },
+    {
+      accessorKey: 'usage_count',
+      header: t('routeTemplates.column.used', 'Used'),
+      enableSorting: true,
+      cell: (row) =>
+        row.usage_count === 1
+          ? t('routeTemplates.used.once', 'Once')
+          : t('routeTemplates.used.times', '{count} times', { count: row.usage_count }),
+    },
   ];
 
   return (
     <div className="space-y-6">
       <AdminHeader
-        title={t('routeTemplates.title', 'Route Templates')}
+        title={t('routeTemplates.title', 'Routes')}
         description={t(
           'routeTemplates.description',
-          'Reusable flows a document travels. A stage names a rule — a role, a group, a unit — never a list of people, so a design authored today reaches whoever holds the role when it is used.'
+          'The routes a document can travel. A stage names a role, a group or a unit rather than a list of people, so a route reaches whoever holds the role when it is used.'
         )}
         action={
           canWrite ? (
             <Button onClick={() => setCreating(true)}>
               <IconPlus className="me-1 size-4" />
-              {t('routeTemplates.action.new', 'New template')}
+              {t('routeTemplates.action.new', 'New route')}
             </Button>
           ) : undefined
         }
@@ -150,6 +260,36 @@ export default function RouteTemplatesPage() {
           data={data ?? []}
           getRowId={(row) => String(row.id)}
           isLoading={loading}
+          onRowClick={(row) => router.push(`/admin/document-route-templates/${row.id}`)}
+          rowActions={(row) => (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={t('routeTemplates.rowActions.label', 'Actions for {name}', { name: row.name })}
+                >
+                  <IconMenu2 size={16} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-auto min-w-44">
+                <DropdownMenuItem onClick={() => router.push(`/admin/document-route-templates/${row.id}`)}>
+                  {t('routeTemplates.rowActions.open', 'Open')}
+                </DropdownMenuItem>
+                <DropdownMenuItem disabled={!canWrite} onClick={() => void duplicate(row)}>
+                  {t('routeTemplates.rowActions.duplicate', 'Duplicate')}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem disabled={!canWrite} variant="destructive" onClick={() => setDeleting(row)}>
+                  {t('routeTemplates.rowActions.delete', 'Delete…')}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+          emptyState={{
+            title: t('routeTemplates.empty.title', 'No routes yet'),
+            description: t('routeTemplates.empty.description', 'Make one so documents go to the right people.'),
+          }}
           enableGlobalFilter
           globalFilterPlaceholder={t('routeTemplates.searchPlaceholder', 'Search route templates…')}
           pagination={{ pageSize: 10 }}
@@ -159,7 +299,7 @@ export default function RouteTemplatesPage() {
       <Dialog open={creating} onOpenChange={setCreating}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{t('routeTemplates.create.title', 'New route template')}</DialogTitle>
+            <DialogTitle>{t('routeTemplates.create.title', 'New route')}</DialogTitle>
             <DialogDescription>
               {t(
                 'routeTemplates.create.description',
@@ -183,6 +323,20 @@ export default function RouteTemplatesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmAction
+        open={deleting !== null}
+        onOpenChange={(open) => !open && setDeleting(null)}
+        title={t('routeTemplates.delete.title', 'Delete the route “{name}”?', { name: deleting?.name ?? '' })}
+        description={t(
+          'routeTemplates.delete.description',
+          'Documents already on this route finish it. New documents can no longer be sent on it.'
+        )}
+        confirmLabel={t('routeTemplates.delete.confirm', 'Delete route')}
+        cancelLabel={t('routeTemplates.action.cancel', 'Cancel')}
+        variant="destructive"
+        onConfirm={remove}
+      />
 
       {/* Refetching is what the list does after a delete elsewhere returns here;
           the button exists so a stale tab has a way back without a reload. */}

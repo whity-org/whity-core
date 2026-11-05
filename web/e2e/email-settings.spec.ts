@@ -2,6 +2,7 @@ import { test, expect, type APIRequestContext } from '@playwright/test';
 import { SYSTEM_ADMIN } from './support/constants';
 import { createAuthedApi } from './support/api';
 import { systemStatePath } from './support/storage';
+import { chooseOption } from './support/pages';
 
 /**
  * E2E for the Email (SMTP) settings admin page (WC-3ac81b7e), against the live
@@ -27,6 +28,21 @@ async function mailBackendLive(baseURL: string): Promise<boolean> {
 test.describe('Email settings — UI behaviour + gating (system-tenant operator)', () => {
   test.use({ storageState: systemStatePath });
 
+  test('choosing OAuth swaps the password for the OAuth fields and a status', async ({ page }) => {
+    await page.goto('/admin/settings/email');
+    await chooseOption(page, page.locator('#email-mail-transport'), 'SMTP');
+    await expect(page.getByTestId('email-password-field')).toBeVisible();
+    await expect(page.getByTestId('email-oauth-fields')).toHaveCount(0);
+
+    await chooseOption(page, page.locator('#email-mail-smtp-auth_mode'), 'OAuth');
+    await expect(page.getByTestId('email-password-field')).toHaveCount(0);
+    await expect(page.getByTestId('email-oauth-state')).toBeVisible();
+    await expect(page.getByTestId('email-oauth-save')).toBeDisabled();
+
+    await chooseOption(page, page.locator('#email-mail-oauth-provider'), 'Microsoft');
+    await expect(page.locator('#email-mail-oauth-microsoft_tenant')).toBeVisible();
+  });
+
   test('renders and reveals SMTP fields conditionally by transport', async ({ page }) => {
     await page.goto('/admin/settings/email');
     await expect(page.getByRole('heading', { name: 'Email', exact: true })).toBeVisible();
@@ -37,19 +53,19 @@ test.describe('Email settings — UI behaviour + gating (system-tenant operator)
     const sendTest = page.getByTestId('email-send-test');
 
     // none → disabled note, no SMTP card, test disabled.
-    await transport.selectOption('none');
+    await chooseOption(page, transport, 'None');
     await expect(page.getByTestId('email-transport-note')).toContainText(/disabled/i);
     await expect(smtpCard).toHaveCount(0);
     await expect(sendTest).toBeDisabled();
 
     // log → server-log note, no SMTP card, test enabled.
-    await transport.selectOption('log');
+    await chooseOption(page, transport, 'Log');
     await expect(page.getByTestId('email-transport-note')).toContainText(/server log/i);
     await expect(smtpCard).toHaveCount(0);
     await expect(sendTest).toBeEnabled();
 
     // smtp → SMTP card + host field + write-only password status; test enabled.
-    await transport.selectOption('smtp');
+    await chooseOption(page, transport, 'SMTP');
     await expect(smtpCard).toBeVisible();
     await expect(page.locator('#email-mail-smtp-host')).toBeVisible();
     await expect(page.getByTestId('email-password-status')).toBeVisible();
@@ -84,12 +100,12 @@ test.describe('Email settings — save / password / send-test round-trip', () =>
     if (!baseURL) test.skip();
 
     await page.goto('/admin/settings/email');
-    await page.locator('#email-mail-transport').selectOption('smtp');
+    await chooseOption(page, page.locator('#email-mail-transport'), 'SMTP');
     // The BACKEND opens the SMTP connection from inside the compose network, so
     // the host is the Mailpit service name, not localhost.
     await page.locator('#email-mail-smtp-host').fill('mailpit');
     await page.locator('#email-mail-smtp-port').fill('1025'); // Mailpit
-    await page.locator('#email-mail-smtp-encryption').selectOption('none');
+    await chooseOption(page, page.locator('#email-mail-smtp-encryption'), 'None');
     await page.locator('#email-mail-from_address').fill('noreply@example.test');
     await page.locator('#email-mail-from_name').fill('E2E Mailer');
 
@@ -112,7 +128,7 @@ test.describe('Email settings — save / password / send-test round-trip', () =>
 
     // Reload: values persist; the password never round-trips (input stays blank).
     await page.reload();
-    await expect(page.locator('#email-mail-transport')).toHaveValue('smtp');
+    await expect(page.locator('#email-mail-transport')).toHaveText('SMTP');
     await expect(page.locator('#email-mail-smtp-host')).toHaveValue('mailpit');
     await expect(page.locator('#email-smtp-password')).toHaveValue('');
     await expect(page.getByTestId('email-password-status')).toContainText(/is set/i);

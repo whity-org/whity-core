@@ -68,7 +68,7 @@ describe('TranslationsPage write-access column gating (WC-583)', () => {
 
     render(<TranslationsPage />);
 
-    expect(await screen.findByText('Access Denied')).toBeInTheDocument();
+    expect(await screen.findByText('You don’t have access to translations')).toBeInTheDocument();
   });
 
   it('marks the SYSTEM DEFAULT column editable for the system tenant, and the override read-only', async () => {
@@ -77,7 +77,7 @@ describe('TranslationsPage write-access column gating (WC-583)', () => {
 
     render(<TranslationsPage />);
 
-    await screen.findByText('greeting');
+    await screen.findByText('Hello');
     expect(screen.getByText('Hello')).toBeInTheDocument();
     expect(
       screen.getByText(/system tenant has no per-tenant override layer/i)
@@ -92,7 +92,7 @@ describe('TranslationsPage write-access column gating (WC-583)', () => {
 
     render(<TranslationsPage />);
 
-    await screen.findByText('greeting');
+    await screen.findByText('Hello');
     expect(screen.getByText('Hello')).toBeInTheDocument();
     expect(screen.getByText('A-Hello')).toBeInTheDocument();
     expect(screen.queryByText(/system tenant has no per-tenant override layer/i)).not.toBeInTheDocument();

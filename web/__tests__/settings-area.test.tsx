@@ -25,6 +25,11 @@ jest.mock('next/link', () => ({
 let mockNavItems: { id: string; href: string; label: string }[] = [];
 jest.mock('@/lib/navigation-context', () => ({ useNavigation: () => ({ items: mockNavItems }) }));
 
+let mockCaps: string[] = [];
+jest.mock('@/hooks/useCapabilities', () => ({
+  useCapabilities: () => ({ has: (slug: string) => mockCaps.includes(slug) }),
+}));
+
 const mockGet = jest.fn();
 jest.mock('@/lib/api/client', () => ({ api: { GET: (...args: unknown[]) => mockGet(...args) } }));
 
@@ -38,6 +43,7 @@ function tabs(ids: string[]) {
 beforeEach(() => {
   mockPathname = '/admin/settings';
   mockNavItems = [];
+  mockCaps = [];
   mockGet.mockReset();
 });
 
@@ -50,17 +56,24 @@ describe('SettingsArea', () => {
     const nav = await screen.findByTestId('settings-area-nav');
     await waitFor(() => expect(within(nav).getByText('Workspace')).toBeInTheDocument());
     const headings = Array.from(nav.querySelectorAll('[data-settings-group]')).map((p) => p.textContent);
-    expect(headings).toEqual(['Workspace', 'Sign-in and security', 'Email', 'Data', 'Advanced']);
+    expect(headings).toEqual(['Workspace', 'Sign-in and security', 'Data']);
     const links = within(nav).getAllByRole('link').map((a) => a.getAttribute('href'));
     expect(links).toEqual([
       '/admin/settings',
       '/admin/settings/branding',
       '/admin/settings/security',
-      '/admin/settings/email',
-      '/admin/settings/storage',
       '/admin/tags',
-      '/admin/settings/feature-flags',
     ]);
+  });
+
+  it('leaves the pages that moved to Platform out of its own list', async () => {
+    mockGet.mockResolvedValue(tabs(['general', 'email', 'storage', 'feature-flags']));
+    mockNavItems = [{ id: 'languages', href: '/admin/languages', label: 'Languages' }];
+    render(<SettingsArea>page</SettingsArea>);
+    const nav = await screen.findByTestId('settings-area-nav');
+    await waitFor(() => expect(within(nav).getByText('Workspace')).toBeInTheDocument());
+
+    expect(within(nav).getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual(['/admin/settings']);
   });
 
   it('leaves out a group with nothing the person may open', async () => {
@@ -72,12 +85,30 @@ describe('SettingsArea', () => {
   });
 
   it('marks the current page, General only on its exact route', async () => {
-    mockPathname = '/admin/languages/7';
+    mockPathname = '/admin/translations/7';
     mockGet.mockResolvedValue(tabs(['general']));
-    mockNavItems = [{ id: 'languages', href: '/admin/languages', label: 'Languages' }];
+    mockNavItems = [{ id: 'translations', href: '/admin/translations', label: 'Translations' }];
     render(<SettingsArea>page</SettingsArea>);
     const general = await screen.findByTestId('settings-area-link-general');
-    expect(screen.getByTestId('settings-area-link-languages')).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByTestId('settings-area-link-translations')).toHaveAttribute('aria-current', 'page');
     expect(general).not.toHaveAttribute('aria-current');
+  });
+});
+
+describe('SettingsArea devices', () => {
+  it('lists Licensed devices under Devices only for someone who may view them', async () => {
+    mockGet.mockResolvedValue(tabs(['general']));
+    mockCaps = ['licensing:view'];
+    render(<SettingsArea>page</SettingsArea>);
+    const link = await screen.findByTestId('settings-area-link-devices');
+    expect(link).toHaveAttribute('href', '/licensing');
+    expect(screen.getByText('Devices')).toBeInTheDocument();
+  });
+
+  it('leaves the Devices group out without the permission', async () => {
+    mockGet.mockResolvedValue(tabs(['general']));
+    render(<SettingsArea>page</SettingsArea>);
+    await screen.findByTestId('settings-area-link-general');
+    expect(screen.queryByTestId('settings-area-link-devices')).toBeNull();
   });
 });

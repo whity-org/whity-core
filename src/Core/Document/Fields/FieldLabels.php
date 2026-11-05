@@ -23,6 +23,8 @@ use Whity\Core\i18n\ServerLabels;
  *   fields.document.number = Document number
  *   fields.document.template = Template
  *   fields.document.issued = Issued on
+ *   fields.group.issuedDocument = This document
+ *   fields.issuedDocument.number = This document's number
  *   fields.month.january = January
  *   fields.month.february = February
  *   fields.month.march = March
@@ -35,6 +37,8 @@ use Whity\Core\i18n\ServerLabels;
  *   fields.month.october = October
  *   fields.month.november = November
  *   fields.month.december = December
+ *   fields.inWords.en = {field} in words (English)
+ *   fields.inWords.ar = {field} in words (Arabic)
  *   fields.yes = Yes
  *   fields.no = No
  */

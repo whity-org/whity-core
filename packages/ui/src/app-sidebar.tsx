@@ -232,19 +232,18 @@ export function AppSidebar({
   // nav fetch resolves, so the default cannot be computed in useState's
   // initializer — it has to react to the id appearing. Keyed on the id alone:
   // a group the user opened by hand survives navigation within it, and only a
-  // move to a DIFFERENT group re-narrows the sidebar.
+  // move to a DIFFERENT group re-narrows the sidebar to that one.
   React.useEffect(() => {
     if (expandedGroupIds !== undefined) return
     if (openByDefaultGroupId === null) return
-    setExpandedState((prev) =>
-      prev.includes(openByDefaultGroupId) ? prev : [openByDefaultGroupId]
-    )
+    // Only the current group stays open (section 21): moving to another group
+    // folds the rest.
+    setExpandedState([openByDefaultGroupId])
   }, [openByDefaultGroupId, expandedGroupIds])
 
   const toggleGroup = (id: string) => {
-    const next = expanded.includes(id)
-      ? expanded.filter((groupId) => groupId !== id)
-      : [...expanded, id]
+    // Opening a group folds the others; only the current group stays open.
+    const next = expanded.includes(id) ? expanded.filter((groupId) => groupId !== id) : [id]
     if (expandedGroupIds === undefined) setExpandedState(next)
     onExpandedGroupsChange?.(next)
   }
@@ -302,7 +301,7 @@ export function AppSidebar({
                 aria-expanded={open}
                 aria-controls={bodyId}
                 onClick={() => toggleGroup(group.id)}
-                className="flex w-full items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground outline-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                className="flex min-h-8 w-full items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground outline-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-ring"
               >
                 {open ? (
                   <IconChevronDown className="size-3 shrink-0" />

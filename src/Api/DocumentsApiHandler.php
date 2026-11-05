@@ -9,6 +9,7 @@ use Whity\Auth\RoleChecker;
 use Whity\Core\Document\DocumentArtifactRepository;
 use Whity\Core\Document\DocumentArtifactStore;
 use Whity\Core\Document\DocumentCollectionRepository;
+use Whity\Core\Document\DocumentPeople;
 use Whity\Core\Document\DocumentPresenter;
 use Whity\Core\Document\DocumentRepository;
 use Whity\Core\Document\DocumentVisibilityPolicy;
@@ -200,6 +201,8 @@ final class DocumentsApiHandler
         // ── WHIT-742: issuing by template slot ───────────────────────────────
         // Without it, `slot` in the body is refused and callers name a template.
         private readonly ?TemplateSlotRegistry $slots = null,
+        // S5: names for the library's "Raised by", from the page being served.
+        private readonly ?DocumentPeople $people = null,
     ) {
     }
 
@@ -404,6 +407,24 @@ final class DocumentsApiHandler
             self::stringParam($query, 'q')
         );
 
+        // What it was issued from (WHIT-684). Refused rather than ignored when
+        // malformed: a filter that silently didn't apply lists the wrong documents.
+        $recordParam = self::stringParam($query, 'record');
+        $record = $recordParam !== null ? TemplateIssuing::parseRecord($recordParam) : null;
+        if ($recordParam !== null && $record === null) {
+            return Response::error("'record' must be \"<type>:<id>\", such as Bakery.order:131", 400);
+        }
+        $sourceParam = self::stringParam($query, 'source_id');
+        if ($sourceParam !== null && (!ctype_digit($sourceParam) || (int) $sourceParam <= 0)) {
+            return Response::error("'source_id' must be the id of a template", 400);
+        }
+        $criteria = $criteria->withIssueFilters(
+            $record[0] ?? null,
+            $record[1] ?? null,
+            $sourceParam !== null ? (int) $sourceParam : null,
+            self::stringParam($query, 'slot'),
+        );
+
         // Parsed AFTER the view resolves so a bad `sort` on an unanchorable
         // folder still reports the folder's reason: the caller's first problem
         // is the one worth telling them about, and 422-then-400 would have them
@@ -442,8 +463,16 @@ final class DocumentsApiHandler
             $rows
         );
 
+        // S5: who these rows name, in one statement, and only the rows this caller
+        // was just served. See DocumentPeople for why ids never come from a client.
+        $names = $this->people?->names($tenantId, array_values(array_filter(array_merge(
+            array_column($rows, 'created_by'),
+            array_column($rows, 'withdrawn_by'),
+        ), static fn ($id): bool => $id !== null))) ?? [];
+
         return Response::json([
             'data' => $data,
+            'people' => $names === [] ? new \stdClass() : $names,
             'pagination' => $p->meta($total),
             // Echoed so a client rendering a rail can tell which entry is
             // selected without re-parsing its own URL, and so the anchor the
@@ -587,6 +616,10 @@ final class DocumentsApiHandler
             return $resolved;
         }
         [$tenantId, $callerId, $document] = $resolved;
+
+        if (($document['withdrawn_at'] ?? null) !== null) {
+            return Response::error('This document has been withdrawn, so it cannot be corrected', 409);
+        }
 
         $effective = $this->settings->effective($tenantId);
         if (($effective[SettingsRegistry::DOCUMENTS_RENDER_ENABLED] ?? 'false') !== 'true') {
@@ -914,6 +947,10 @@ final class DocumentsApiHandler
      */
     private function documentIsReissuable(int $tenantId, int $callerId, array $document): bool
     {
+        if (($document['withdrawn_at'] ?? null) !== null) {
+            return false;
+        }
+
         $effective = $this->settings->effective($tenantId);
         if (($effective[SettingsRegistry::DOCUMENTS_RENDER_ENABLED] ?? 'false') !== 'true') {
             return false;

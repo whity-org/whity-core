@@ -9,6 +9,10 @@ import React from 'react';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 
 const hasPermission = jest.fn<boolean, [string]>();
+jest.mock('@/lib/auth-context', () => ({
+  useAuth: () => ({ user: { tenant_id: 3 } }),
+}));
+
 jest.mock('@/hooks/useCapabilities', () => ({
   useCapabilities: () => ({ hasPermission, loading: false, permissions: [] }),
 }));
@@ -66,7 +70,7 @@ describe('TwoFactorRecoveryApprovalsPage — list and actions', () => {
     );
     expect(screen.getByText('lockedout@acme.test')).toBeInTheDocument();
     expect(global.fetch).toHaveBeenCalledWith(
-      '/api/v1/2fa-recovery/pending',
+      '/api/v1/2fa-recovery/pending?page=1&per_page=25',
       expect.objectContaining({ credentials: 'include' })
     );
   });
@@ -87,6 +91,9 @@ describe('TwoFactorRecoveryApprovalsPage — list and actions', () => {
       expect(screen.getByTestId('two-factor-recovery-approve-701')).toBeInTheDocument()
     );
     fireEvent.click(screen.getByTestId('two-factor-recovery-approve-701'));
+    // Approving is tier 3: the dialog asks for the email to be typed.
+    fireEvent.change(await screen.findByLabelText('Type their email to confirm'), { target: { value: 'lockedout@acme.test' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Approve request' }));
 
     await waitFor(() =>
       expect(global.fetch).toHaveBeenCalledWith(

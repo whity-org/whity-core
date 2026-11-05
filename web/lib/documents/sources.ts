@@ -84,6 +84,15 @@ export async function listDocumentSources(kind?: DocumentKind): Promise<Row[]> {
   return data.data;
 }
 
+/** The same list with the names of who wrote each row, sent with it (S5). */
+export async function listDocumentSourcesWithPeople(
+  kind?: DocumentKind
+): Promise<{ rows: Row[]; people: Record<string, string> }> {
+  const { data, response } = await api.GET('/api/v1/document-sources', { params: { query: kind ? { kind } : {} } });
+  if (data === undefined) throw new Error(`Failed to load documents (${response.status})`);
+  return { rows: data.data, people: data.people ?? {} };
+}
+
 export async function createDocumentSource(kind: DocumentKind, title: string): Promise<Row> {
   const { data, response } = await api.POST('/api/v1/document-sources', { body: { kind, title, blocks: [] } });
   if (data === undefined) throw new Error(`Failed to create the document (${response.status})`);

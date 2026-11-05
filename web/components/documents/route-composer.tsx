@@ -146,6 +146,7 @@ import {
 } from '@whity/ui/audience-people-picker';
 import { IconArrowDown, IconArrowUp, IconPlus, IconTrash } from '@tabler/icons-react';
 import { useTranslation } from '@whity/features/i18n';
+import { reachText } from './route-act-panel';
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/lib/toast-context';
 import type { DraftStep, IssueRouteResponse, RoutingRule } from './routing-wire';
@@ -595,8 +596,8 @@ export function RouteComposer({
             )
           : t(
               'routing.compose.issued',
-              'Route created. Its first step resolved to {resolved} people and reached {delivered}.',
-              { resolved, delivered }
+              'Route created. The first step reached {people}.',
+              { people: reachText(t, resolved, delivered) }
             ),
         resolved === 0 ? 'error' : 'success'
       );
@@ -728,7 +729,7 @@ export function RouteComposer({
         <AlertDescription>
           {t(
             'routing.compose.preview.contract',
-            'Each step names a RULE, not people. Who it reaches is worked out when the document is sent — and for every step after the first, relative to whoever forwards it. You will be told how many people the first step reached as soon as the route is created.'
+            'Each step says who it is for, such as a role, not particular people. Who that is gets worked out when the document is sent. You will be told how many people the first step reached as soon as the route is created.'
           )}
         </AlertDescription>
       </Alert>
@@ -941,8 +942,8 @@ export function RouteComposer({
                         'routing.compose.step.groupDynamic',
                         'A group is a rule, not a saved list of people. Who it reaches is worked out again every time the document moves, so this is what it means right now — not a set that has been fixed in place.'
                       )}
-                      unnamedMemberLabel={(profileId) =>
-                        t('routing.compose.step.groupUnnamed', 'Profile #{id}', { id: profileId })
+                      unnamedMemberLabel={() =>
+                        t('routing.compose.step.groupUnnamed', 'Someone in this workspace')
                       }
                       previewRetryLabel={t('routing.compose.step.groupRetry', 'Try again')}
                       unknownGroupLabel={(groupId) =>
@@ -997,8 +998,8 @@ export function RouteComposer({
                       removeLabel={(name) =>
                         t('routing.compose.step.peopleRemove', 'Remove {name}', { name })
                       }
-                      unknownPersonLabel={(profileId) =>
-                        t('routing.compose.step.peopleUnknown', 'Profile #{id}', { id: profileId })
+                      unknownPersonLabel={() =>
+                        t('routing.compose.step.peopleUnknown', 'Someone in this workspace')
                       }
                     />
                   </div>

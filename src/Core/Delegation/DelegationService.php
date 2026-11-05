@@ -32,6 +32,14 @@ use Whity\Http\ListQuery;
  */
 class DelegationService implements DelegatedPermissionResolver
 {
+    /** How long after a revoke its Undo still works. After that it is a new delegation. */
+    public const RESTORE_WINDOW_SECONDS = 900;
+
+    public const RESTORE_NOT_FOUND = 'not_found';
+    public const RESTORE_TOO_LATE = 'too_late';
+    public const RESTORE_ENDED = 'ended';
+    public const RESTORE_NOT_HELD = 'not_held';
+
     private DelegationRepository $repository;
     private RoleChecker $roleChecker;
     private PermissionRegistry $registry;
@@ -82,7 +90,8 @@ class DelegationService implements DelegatedPermissionResolver
         string $granteeType,
         int $granteeId,
         array $permissions,
-        ?int $ouId
+        ?int $ouId,
+        ?string $expiresAt = null
     ): array {
         // De-duplicate and drop empties while preserving order.
         $requested = [];
@@ -129,7 +138,8 @@ class DelegationService implements DelegatedPermissionResolver
                 $granteeType,
                 $granteeId,
                 $permission,
-                $ouId
+                $ouId,
+                $expiresAt
             );
         }
 
@@ -226,11 +236,69 @@ class DelegationService implements DelegatedPermissionResolver
      *
      * @param int $id       The delegation id.
      * @param int $tenantId The acting tenant (0 = system may revoke any).
+     * @param int|null $revokedBy Who revoked it, which decides who may restore it.
      * @return bool True when a live delegation was revoked; false when none matched.
      */
-    public function revoke(int $id, int $tenantId): bool
+    public function revoke(int $id, int $tenantId, ?int $revokedBy = null): bool
     {
-        return $this->repository->revoke($id, $tenantId) > 0;
+        return $this->repository->revoke($id, $tenantId, $revokedBy) > 0;
+    }
+
+    /**
+     * Undo a revoke (design 2.9, A14: revoking is tier 1, with Undo).
+     *
+     * This puts back what was there a moment ago. It is not a way to grant, so the
+     * rules are the ones that stop it becoming one. Only the person who revoked it
+     * may restore it, and only for {@see self::RESTORE_WINDOW_SECONDS}: without that,
+     * anybody holding `delegation:manage` could bring back an old grant of a
+     * permission they do not hold themselves, in somebody else's name. The grant must
+     * also still be possible today: the grantor must still hold the permission (the
+     * subset invariant, same as {@see self::delegate()}) and the end date must not
+     * have passed.
+     *
+     * @param int $id       The delegation id.
+     * @param int $tenantId The acting tenant (0 = system).
+     * @param int $actor    The profile asking.
+     * @return string|null Null when restored, otherwise one of the `RESTORE_*` reasons.
+     */
+    public function restore(int $id, int $tenantId, int $actor): ?string
+    {
+        $row = $this->repository->findById($id, $tenantId);
+        if ($row === null || $row['revoked_at'] === null) {
+            return self::RESTORE_NOT_FOUND;
+        }
+
+        $revokedAt = strtotime((string) $row['revoked_at'] . ' UTC');
+        if ($row['revoked_by_profile_id'] !== $actor
+            || $revokedAt === false
+            || time() - $revokedAt > self::RESTORE_WINDOW_SECONDS) {
+            return self::RESTORE_TOO_LATE;
+        }
+
+        $expiresAt = $row['expires_at'] !== null ? strtotime((string) $row['expires_at'] . ' UTC') : false;
+        if ($expiresAt !== false && $expiresAt <= time()) {
+            return self::RESTORE_ENDED;
+        }
+
+        $owner = (int) $row['tenant_id'];
+        $permission = (string) $row['permission'];
+        $held = $this->roleChecker->getEffectivePermissionsForProfile((int) $row['grantor_profile_id'], $owner);
+        if (!in_array($permission, $held, true) || !$this->registry->exists($permission)) {
+            return self::RESTORE_NOT_HELD;
+        }
+
+        return $this->repository->restore($id, $owner) > 0 ? null : self::RESTORE_NOT_FOUND;
+    }
+
+    /**
+     * The names a page of delegation rows shows. See {@see DelegationRepository::namesFor()}.
+     *
+     * @param array<int, array<string, mixed>> $rows Normalised delegation rows.
+     * @return array{people: array<string, string>, roles: array<string, string>, units: array<string, string>, permissions: array<string, string>}
+     */
+    public function namesFor(array $rows): array
+    {
+        return $this->repository->namesFor($rows);
     }
 
     /**

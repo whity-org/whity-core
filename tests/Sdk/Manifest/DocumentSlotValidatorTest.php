@@ -69,8 +69,24 @@ final class DocumentSlotValidatorTest extends TestCase
             'documents.slots.Order-Slip: slot names are lowercase letters, digits and underscores, up to 40',
         ];
         yield 'unknown slot key' => [
+            static function (array $m): array { $m['documents']['slots']['order_label']['serial'] = 'per_year'; return $m; },
+            "documents.slots.order_label: unknown key 'serial'",
+        ];
+        yield 'numbering that is not an object' => [
             static function (array $m): array { $m['documents']['slots']['order_label']['numbering'] = 'per_year'; return $m; },
-            "documents.slots.order_label: unknown key 'numbering'",
+            'documents.slots.order_label: numbering must be an object with a pattern and optionally assign',
+        ];
+        yield 'numbering with no sequence' => [
+            static function (array $m): array { $m['documents']['slots']['order_label']['numbering'] = ['pattern' => 'ORD-{YYYY}']; return $m; },
+            'documents.slots.order_label: numbering.pattern must contain {SEQ} exactly once',
+        ];
+        yield 'numbering with an unknown token' => [
+            static function (array $m): array { $m['documents']['slots']['order_label']['numbering'] = ['pattern' => 'ORD-{YEAR}-{SEQ}']; return $m; },
+            'documents.slots.order_label: numbering.pattern may only use {YYYY}, {YY}, {MM}, {SEQ} and {SEQ:n} with n from 1 to 12',
+        ];
+        yield 'numbering assigned at an unknown time' => [
+            static function (array $m): array { $m['documents']['slots']['order_label']['numbering'] = ['pattern' => 'ORD-{SEQ}', 'assign' => 'someday']; return $m; },
+            'documents.slots.order_label: numbering.assign must be one of: on_issue, on_final_approval',
         ];
         yield 'label missing' => [
             static function (array $m): array { unset($m['documents']['slots']['order_label']['label']); return $m; },

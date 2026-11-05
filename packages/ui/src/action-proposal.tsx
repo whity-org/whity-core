@@ -6,6 +6,7 @@ import { ActorChip } from "./actor-chip"
 import { Badge } from "./badge"
 import { Button } from "./button"
 import { Icon } from "./icon"
+import { TechnicalDetails } from "./display-preferences"
 import { cn } from "./utils"
 
 /**
@@ -247,17 +248,19 @@ function ActionProposal({
       <footer className="flex flex-wrap items-center justify-between gap-3">
         <div className="grid min-w-0 gap-0.5 text-sm text-muted-foreground">
           {scope.length > 0 && (
-            <span>
-              {L.uses}{" "}
-              {scope.map((permission) => (
-                <code
-                  key={permission}
-                  className="me-1 rounded-sm bg-muted px-[5px] py-px font-mono text-xs text-foreground"
-                >
-                  {permission}
-                </code>
-              ))}
-            </span>
+            <TechnicalDetails>
+              <span>
+                {L.uses}{" "}
+                {scope.map((permission) => (
+                  <code
+                    key={permission}
+                    className="me-1 rounded-sm bg-muted px-[5px] py-px font-mono text-xs text-foreground"
+                  >
+                    {permission}
+                  </code>
+                ))}
+              </span>
+            </TechnicalDetails>
           )}
           <span>{undoText}</span>
         </div>

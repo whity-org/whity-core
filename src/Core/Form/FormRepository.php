@@ -36,6 +36,8 @@ use Whity\Core\Db\DbBool;
  * Everything AFTER that lookup binds the tenant it returned.
  *
  * NO DELETE. See {@see FormStatus} for the argument: a form is what somebody's
+ * The one exception is {@see deleteUnanswered()}: a form nobody ever answered has no
+ * record to protect, and it can't leave a submission without its explanation.
  * submission was an answer to, and destroying it makes every submission against
  * it unreadable. `archive()` is the operation that gets asked for and it costs
  * nothing.
@@ -49,7 +51,11 @@ final class FormRepository
      * cannot reach one caller and not another.
      */
     private const COLUMNS = 'id, tenant_id, form_key, name, description, submit_label, sections, reference_format, status, version,
-                             route_template_id, created_by_profile_id, created_at, updated_at,
+                             route_template_id,
+                             (SELECT t.name FROM document_route_templates t
+                               WHERE t.id = forms.route_template_id AND t.tenant_id = forms.tenant_id) AS route_template_name,
+                             created_by_profile_id, created_at, updated_at,
+                             open_to_members, members_opened_at, members_opened_by_profile_id,
                              public_enabled, public_slug, public_opens_at, public_closes_at,
                              public_enabled_at, public_enabled_by_profile_id,
                              ' . self::WINDOW_OPEN_SQL . ' AS public_window_open';
@@ -222,6 +228,87 @@ final class FormRepository
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
         return $row === false ? null : self::normalizeRow($row);
+    }
+
+    /**
+     * Delete a form, only if it has never been answered and isn't live.
+     *
+     * Both conditions are in the one statement, so a submission arriving between a
+     * check and the delete can't be taken with it by the cascade.
+     *
+     * @return bool Whether a row went.
+     */
+    public function deleteUnanswered(int $tenantId, int $id): bool
+    {
+        $stmt = $this->db->prepare(
+            'DELETE FROM forms
+              WHERE tenant_id = :tenant_id AND id = :id AND status <> :published
+                AND NOT EXISTS (
+                    SELECT 1 FROM form_submissions fs
+                     WHERE fs.tenant_id = :tenant_id_2 AND fs.form_id = :id_2
+                )'
+        );
+        $stmt->execute([
+            ':tenant_id' => $tenantId,
+            ':id' => $id,
+            ':published' => FormStatus::PUBLISHED,
+            ':tenant_id_2' => $tenantId,
+            ':id_2' => $id,
+        ]);
+
+        return $stmt->rowCount() > 0;
+    }
+
+    /**
+     * The published forms an author opened to this workspace's members, most
+     * recently changed first.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function listOpenToMembers(int $tenantId): array
+    {
+        $stmt = $this->db->prepare(
+            'SELECT ' . self::COLUMNS . '
+               FROM forms
+              WHERE tenant_id = :tenant_id AND status = :status AND open_to_members = TRUE
+              ORDER BY updated_at DESC, id DESC'
+        );
+        $stmt->execute([':tenant_id' => $tenantId, ':status' => FormStatus::PUBLISHED]);
+
+        return array_map([self::class, 'normalizeRow'], $stmt->fetchAll(PDO::FETCH_ASSOC));
+    }
+
+    /**
+     * Open a form to this workspace's members, or close it again.
+     *
+     * Opening a form that is already open keeps who first opened it and when, and
+     * closing clears both, so the columns always describe the current opening.
+     */
+    public function setOpenToMembers(int $tenantId, int $id, bool $open, ?int $byProfileId): void
+    {
+        $stmt = $open
+            ? $this->db->prepare(
+                'UPDATE forms
+                    SET open_to_members = TRUE,
+                        members_opened_at = NOW(),
+                        members_opened_by_profile_id = :opened_by,
+                        updated_at = NOW()
+                  WHERE tenant_id = :tenant_id AND id = :id AND open_to_members = FALSE'
+            )
+            : $this->db->prepare(
+                'UPDATE forms
+                    SET open_to_members = FALSE,
+                        members_opened_at = NULL,
+                        members_opened_by_profile_id = NULL,
+                        updated_at = NOW()
+                  WHERE tenant_id = :tenant_id AND id = :id AND open_to_members = TRUE'
+            );
+
+        $params = [':tenant_id' => $tenantId, ':id' => $id];
+        if ($open) {
+            $params[':opened_by'] = $byProfileId;
+        }
+        $stmt->execute($params);
     }
 
     /**
@@ -579,11 +666,19 @@ final class FormRepository
             'status' => $status,
             'version' => (int) $row['version'],
             'route_template_id' => $row['route_template_id'] === null ? null : (int) $row['route_template_id'],
+            // S5: so the builder can say "Routed to" without `route_templates:read`.
+            'route_template_name' => isset($row['route_template_name']) ? (string) $row['route_template_name'] : null,
             'created_by_profile_id' => $row['created_by_profile_id'] === null
                 ? null
                 : (int) $row['created_by_profile_id'],
             'created_at' => (string) $row['created_at'],
             'updated_at' => (string) $row['updated_at'],
+            // ---- opened to the workspace's members (migration 198) ----
+            'open_to_members' => DbBool::of($row['open_to_members'] ?? false),
+            'members_opened_at' => ($row['members_opened_at'] ?? null) === null ? null : (string) $row['members_opened_at'],
+            'members_opened_by_profile_id' => ($row['members_opened_by_profile_id'] ?? null) === null
+                ? null
+                : (int) $row['members_opened_by_profile_id'],
             // ---- the public link (migration 132) ----
             //
             // Read through DbBool rather than a `(bool)` cast: a BOOLEAN column

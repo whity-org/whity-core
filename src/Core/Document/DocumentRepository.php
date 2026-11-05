@@ -106,6 +106,35 @@ final class DocumentRepository
         )
         SQL;
 
+    /**
+     * What {@see DocumentState} derives a document's state from, read with the row
+     * from the routing trail (WHIT-684). Correlated subqueries rather than joins for
+     * the reason {@see criteriaSql()} gives: a join multiplies a document by its own
+     * routing volume. Each re-binds `:tenant_id`, as {@see VISIBLE_TO_CALLER} does.
+     *
+     * A CASE rather than a bare EXISTS: PostgreSQL returns a boolean and SQLite an
+     * integer, and this gives one shape on both.
+     */
+    private const STATE_FACTS = <<<'SQL'
+        CASE WHEN EXISTS (
+            SELECT 1 FROM document_route_recipients sr
+             WHERE sr.tenant_id = :tenant_id
+               AND sr.document_id = documents.id
+               AND sr.closed_by_event_id IS NULL
+        ) THEN 1 ELSE 0 END AS routing_open,
+        (
+            SELECT se.verdict FROM document_route_events se
+             WHERE se.tenant_id = :tenant_id
+               AND se.document_id = documents.id
+               AND se.verdict IS NOT NULL
+               AND se.route_id = (
+                   SELECT MAX(sroute.id) FROM document_routes sroute
+                    WHERE sroute.tenant_id = :tenant_id AND sroute.document_id = documents.id
+               )
+             ORDER BY se.id DESC LIMIT 1
+        ) AS routing_latest_verdict
+        SQL;
+
     private PDO $db;
 
     public function __construct(PDO $db)
@@ -140,6 +169,7 @@ final class DocumentRepository
      *
      * @param array{document_source_id?: ?int, document_source_version?: ?int, origin_key?: ?string, template_name: string, title: string,
      *              origin_ou_id?: ?int, created_by?: ?int,
+     *              number_pattern?: ?string, record_type?: ?string, record_id?: ?string, slot?: ?string,
      *              variable_data?: ?list<array<string, string>>} $rec
      */
     public function create(int $tenantId, array $rec): int
@@ -149,9 +179,9 @@ final class DocumentRepository
         $stmt = $this->db->prepare(
             'INSERT INTO documents
                  (tenant_id, document_source_id, document_source_version, origin_key, template_name, title, origin_ou_id, created_by,
-                  variable_data, created_at)
+                  number_pattern, record_type, record_id, slot, variable_data, created_at)
              VALUES (:tenant_id, :document_source_id, :document_source_version, :origin_key, :template_name, :title, :origin_ou_id, :created_by,
-                     :variable_data, NOW())'
+                     :number_pattern, :record_type, :record_id, :slot, :variable_data, NOW())'
         );
         $stmt->execute([
             ':tenant_id'            => $tenantId,
@@ -162,6 +192,10 @@ final class DocumentRepository
             ':title'                => $rec['title'],
             ':origin_ou_id'         => $rec['origin_ou_id'] ?? null,
             ':created_by'           => $rec['created_by'] ?? null,
+            ':number_pattern'       => $rec['number_pattern'] ?? null,
+            ':record_type'          => $rec['record_type'] ?? null,
+            ':record_id'            => $rec['record_id'] ?? null,
+            ':slot'                 => $rec['slot'] ?? null,
             // JSON_UNESCAPED_UNICODE, not the default: an Arabic reference or an
             // Arabic recipient name would otherwise be stored as escape
             // sequences. They decode back correctly, but the column stops being
@@ -207,13 +241,31 @@ final class DocumentRepository
         // means "not fetched by this read", never "empty".
         $stmt = $this->db->prepare(
             'SELECT id, tenant_id, document_template_id, document_source_id, document_source_version, origin_key, template_name,
-                    title, origin_ou_id, created_by, variable_data, created_at
+                    title, origin_ou_id, created_by, variable_data, created_at, withdrawn_at, withdrawn_by,
+                    number, number_pattern, number_assigned_at, record_type, record_id, slot,
+                    ' . self::STATE_FACTS . '
              FROM documents WHERE id = :id AND tenant_id = :tenant_id'
         );
         $stmt->execute([':id' => $id, ':tenant_id' => $tenantId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
         return $row !== false ? $this->normalizeRow($row) : null;
+    }
+
+    /**
+     * Stamp a document withdrawn. False when it already was, so two requests
+     * cannot both claim the act; {@see DocumentWithdrawal} is the caller.
+     */
+    public function markWithdrawn(int $id, int $tenantId, int $actorId): bool
+    {
+        $stmt = $this->db->prepare(
+            'UPDATE documents
+                SET withdrawn_at = NOW(), withdrawn_by = :actor
+              WHERE id = :id AND tenant_id = :tenant_id AND withdrawn_at IS NULL'
+        );
+        $stmt->execute([':actor' => $actorId, ':id' => $id, ':tenant_id' => $tenantId]);
+
+        return $stmt->rowCount() > 0;
     }
 
     /**
@@ -241,7 +293,9 @@ final class DocumentRepository
         // unusable once an alias is introduced. An alias here would work on
         // SQLite and fail on production.
         $sql = 'SELECT id, tenant_id, document_template_id, document_source_id, document_source_version, origin_key, template_name, title,
-                       origin_ou_id, created_by, created_at
+                       origin_ou_id, created_by, created_at, withdrawn_at, withdrawn_by,
+                       number, number_pattern, number_assigned_at, record_type, record_id, slot,
+                       ' . self::STATE_FACTS . '
                   FROM documents
                  WHERE tenant_id = :tenant_id';
         $bindings = [];
@@ -511,6 +565,22 @@ final class DocumentRepository
                                           OR pe.to_ou_id IN (' . $in . ')))';
         }
 
+        // What it was issued from (WHIT-684). Only ever narrows: visibility above
+        // still applies, so a record id reveals nothing the caller couldn't list.
+        if ($criteria->recordType !== null && $criteria->recordId !== null) {
+            $sql .= ' AND record_type = :record_type AND record_id = :record_id';
+            $bindings[':record_type'] = $criteria->recordType;
+            $bindings[':record_id'] = $criteria->recordId;
+        }
+        if ($criteria->sourceId !== null) {
+            $sql .= ' AND document_source_id = :source_id';
+            $bindings[':source_id'] = $criteria->sourceId;
+        }
+        if ($criteria->slot !== null) {
+            $sql .= ' AND slot = :slot';
+            $bindings[':slot'] = $criteria->slot;
+        }
+
         if ($criteria->search !== null && $criteria->search !== '') {
             // LOWER(…) LIKE rather than ILIKE: ILIKE is PostgreSQL-only, and a
             // predicate that works on production but not on the engine the unit
@@ -521,7 +591,9 @@ final class DocumentRepository
             // character for LIKE while PostgreSQL's is a backslash — omitting it
             // would make the escaping above work on production and be visible as
             // literal backslashes in the test engine.
-            $sql .= " AND LOWER(title) LIKE :search ESCAPE '\\'";
+            // The number too: people quote a document by it (WHIT-684). A document
+            // with none has a NULL here, which matches nothing and can't hide the title.
+            $sql .= " AND (LOWER(title) LIKE :search ESCAPE '\\' OR LOWER(number) LIKE :search ESCAPE '\\')";
             $escaped = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], strtolower($criteria->search));
             $bindings[':search'] = '%' . $escaped . '%';
         }
@@ -617,6 +689,22 @@ final class DocumentRepository
             'origin_ou_id'         => $row['origin_ou_id'] !== null ? (int) $row['origin_ou_id'] : null,
             'created_by'           => $row['created_by'] !== null ? (int) $row['created_by'] : null,
             'created_at'           => (string) $row['created_at'],
+            // Null on the statements that do not read them, which is the same
+            // answer as a document nobody has withdrawn: withdrawal is only
+            // ever decided on a row read by findById().
+            'withdrawn_at'         => isset($row['withdrawn_at']) ? (string) $row['withdrawn_at'] : null,
+            'withdrawn_by'         => isset($row['withdrawn_by']) ? (int) $row['withdrawn_by'] : null,
+            'number'               => isset($row['number']) ? (string) $row['number'] : null,
+            'number_assigned_at'   => isset($row['number_assigned_at']) ? (string) $row['number_assigned_at'] : null,
+            'record_type'          => isset($row['record_type']) ? (string) $row['record_type'] : null,
+            'record_id'            => isset($row['record_id']) ? (string) $row['record_id'] : null,
+            'slot'                 => isset($row['slot']) ? (string) $row['slot'] : null,
+            'state'                => DocumentState::derive(
+                isset($row['withdrawn_at']),
+                (int) ($row['routing_open'] ?? 0) === 1,
+                isset($row['routing_latest_verdict']) ? (string) $row['routing_latest_verdict'] : null,
+                isset($row['number_pattern']) && !isset($row['number']),
+            ),
         ] + (
             // Present only on the single-document read - see findById(). The key
             // is added rather than defaulted so a consumer can tell "this read

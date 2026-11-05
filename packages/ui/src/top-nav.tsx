@@ -187,7 +187,7 @@ export function TopNav({
           <button
             type="button"
             onClick={onSearchClick}
-            className="flex h-8 w-full items-center justify-between gap-2 rounded-md border border-input bg-background/60 px-3 text-xs text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
+            className="flex h-10 w-full items-center justify-between gap-2 rounded-md border border-input bg-background/60 px-3 text-xs text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
           >
             <div className="flex items-center gap-2 min-w-0 truncate">
               <IconSearch className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />

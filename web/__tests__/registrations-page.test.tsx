@@ -17,6 +17,11 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 // and a regular tenant (1). `mock`-prefixed so the jest factory may close over
 // it. The arrow reads it at call time, so tests set it before render.
 let mockTenantId = 0;
+const mockReplace = jest.fn();
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({ replace: mockReplace }),
+}));
+
 jest.mock('@/lib/auth-context', () => ({
   useAuth: () => ({
     user: { id: 1, email: 'sys@example.com', role: 'admin', tenant_id: mockTenantId },
@@ -76,15 +81,14 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe('PendingRegistrationsPage — access gate', () => {
-  it('shows Access Denied for a non-system tenant even with the permission', async () => {
-    mockTenantId = 1; // regular tenant admin
+  it('sends a non-system tenant to their own tab rather than to a refusal', async () => {
+    mockTenantId = 2;
+    mockReplace.mockClear();
+
     render(<PendingRegistrationsPage />);
 
-    await waitFor(() =>
-      expect(screen.getByTestId('registrations-access-denied')).toBeInTheDocument()
-    );
-    // Must never fetch the pending list when ineligible.
-    expect(global.fetch).not.toHaveBeenCalled();
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/admin/approval-gating/password-resets'));
+    expect(screen.queryByTestId('registrations-access-denied')).toBeNull();
   });
 
   it('shows Access Denied for a system-tenant caller lacking the permission', async () => {
@@ -112,9 +116,9 @@ describe('PendingRegistrationsPage — list and actions', () => {
       expect(screen.getByTestId('registration-row-1002')).toBeInTheDocument()
     );
     expect(screen.getByText('Acme Inc')).toBeInTheDocument();
-    expect(screen.getByText('owner@acme.test')).toBeInTheDocument();
+    expect(screen.getByText(/owner@acme\.test/)).toBeInTheDocument();
     expect(global.fetch).toHaveBeenCalledWith(
-      '/api/v1/registrations/pending',
+      '/api/v1/registrations/pending?page=1&per_page=25',
       expect.objectContaining({ credentials: 'include' })
     );
   });
@@ -157,6 +161,8 @@ describe('PendingRegistrationsPage — list and actions', () => {
       expect(screen.getByTestId('registration-reject-1002')).toBeInTheDocument()
     );
     fireEvent.click(screen.getByTestId('registration-reject-1002'));
+    // Rejecting suspends the account, so it asks first (tier 2).
+    fireEvent.click(await screen.findByRole('button', { name: 'Reject sign-up' }));
 
     await waitFor(() =>
       expect(global.fetch).toHaveBeenCalledWith(

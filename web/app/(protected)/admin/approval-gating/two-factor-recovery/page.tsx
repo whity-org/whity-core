@@ -8,6 +8,11 @@ import { ApprovalGatingTabs } from '@/components/admin/approval-gating-tabs';
 import { Button } from '@whity/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
 import { AccessDenied } from '@whity/ui/access-denied';
+import { Pagination } from '@whity/ui/pagination';
+import { Alert, AlertDescription } from '@whity/ui/alert';
+import { ConfirmAction } from '@whity/ui/confirm-action';
+import { AreaError, LoadingRows } from '@whity/ui/page-states';
+import { useDateDisplay } from '@whity/features/datetime';
 import { IconCheck, IconInbox, IconX } from '@tabler/icons-react';
 import { useTranslation } from '@whity/features/i18n';
 
@@ -25,11 +30,15 @@ import { useTranslation } from '@whity/features/i18n';
  */
 const TWO_FACTOR_RECOVERY_APPROVE = 'two_factor_recovery:approve';
 
+const PER_PAGE = 25;
+
 interface PendingTwoFactorRecovery {
   id: number;
   profile_id: number;
   email: string;
   display_name: string;
+  /** Why they asked, in their own words. Optional, so often null. */
+  reason: string | null;
   created_at: string;
 }
 
@@ -43,13 +52,18 @@ export default function TwoFactorRecoveryApprovalsPage() {
   const [items, setItems] = useState<PendingTwoFactorRecovery[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
   const [busyId, setBusyId] = useState<number | null>(null);
+  // Approving is security-sensitive: type the email to confirm (tier 3).
+  const [approving, setApproving] = useState<typeof items[number] | null>(null);
+  const dates = useDateDisplay();
 
   const load = useCallback(async () => {
     setLoading(true);
     setLoadError(false);
     try {
-      const res = await fetch('/api/v1/2fa-recovery/pending', {
+      const res = await fetch(`/api/v1/2fa-recovery/pending?page=${page}&per_page=${PER_PAGE}`, {
         headers: { 'X-Requested-With': 'XMLHttpRequest' },
         credentials: 'include',
       });
@@ -59,14 +73,16 @@ export default function TwoFactorRecoveryApprovalsPage() {
         return;
       }
       const body = await res.json().catch(() => ({}));
-      setItems(Array.isArray(body?.data) ? (body.data as PendingTwoFactorRecovery[]) : []);
+      const rows = Array.isArray(body?.data) ? (body.data as PendingTwoFactorRecovery[]) : [];
+      setItems(rows);
+      setTotal(typeof body?.pagination?.total === 'number' ? body.pagination.total : rows.length);
     } catch {
       setLoadError(true);
       setItems([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [page]);
 
   useEffect(() => {
     if (!isCapabilitiesLoading && canApprove) {
@@ -170,6 +186,15 @@ export default function TwoFactorRecoveryApprovalsPage() {
         )}
       />
 
+      <Alert variant="warning" data-testid="two-factor-identity-warning">
+        <AlertDescription>
+          {t(
+            'twoFactorRecovery.identityWarning',
+            'Check who is asking before you approve. Approving switches off their two-step sign-in.'
+          )}
+        </AlertDescription>
+      </Alert>
+
       <Card className="border border-border bg-card shadow-sm">
         <CardHeader>
           <CardTitle className="text-lg font-semibold font-heading">
@@ -185,15 +210,18 @@ export default function TwoFactorRecoveryApprovalsPage() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="flex items-center justify-center py-10">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-            </div>
+            <LoadingRows
+              label={t('twoFactorRecovery.loading', 'Loading requests')}
+              headers={[t('twoFactorRecovery.column.person', 'Person'), t('twoFactorRecovery.column.asked', 'Asked')]}
+              rows={3}
+            />
           ) : loadError ? (
-            <div className="text-sm text-destructive" data-testid="two-factor-recovery-load-error">
-              {t('twoFactorRecovery.loadError', 'Failed to load pending 2FA-recovery requests.')}{' '}
-              <button type="button" onClick={() => void load()} className="underline font-medium">
-                {t('twoFactorRecovery.retry', 'Retry')}
-              </button>
+            <div data-testid="two-factor-recovery-load-error">
+              <AreaError
+                message={t('twoFactorRecovery.loadError', 'Failed to load the requests.')}
+                retryLabel={t('twoFactorRecovery.retry', 'Try again')}
+                onRetry={() => void load()}
+              />
             </div>
           ) : items.length === 0 ? (
             <div
@@ -215,19 +243,31 @@ export default function TwoFactorRecoveryApprovalsPage() {
                 >
                   <div className="min-w-0">
                     <p className="font-medium text-foreground truncate">{item.email}</p>
-                    <p className="text-sm text-muted-foreground truncate">{item.display_name}</p>
+                    <p className="text-sm text-foreground" data-testid={`twoFactorRecovery-reason-${item.id}`}>
+                      {item.reason ?? t('twoFactorRecovery.reason.default', 'Lost access to their second step')}
+                    </p>
+                    <p className="text-sm text-muted-foreground truncate">
+                      {[
+                        item.display_name,
+                        dates.dateTime(item.created_at) !== null
+                          ? t('twoFactorRecovery.asked', 'Asked on {date}', { date: dates.dateTime(item.created_at) ?? '' })
+                          : null,
+                      ]
+                        .filter((part) => part)
+                        .join(' · ')}
+                    </p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <Button
                       type="button"
                       size="sm"
                       disabled={busyId === item.id}
-                      onClick={() => void act(item, 'approve')}
+                      onClick={() => setApproving(item)}
                       className="gap-1"
                       data-testid={`two-factor-recovery-approve-${item.id}`}
                     >
                       <IconCheck className="w-4 h-4" />
-                      {t('twoFactorRecovery.action.approve', 'Approve')}
+                      {t('twoFactorRecovery.action.approve', 'Approve…')}
                     </Button>
                     <Button
                       type="button"
@@ -246,8 +286,32 @@ export default function TwoFactorRecoveryApprovalsPage() {
               ))}
             </ul>
           )}
+          {!loading && !loadError && total > PER_PAGE && (
+            <Pagination className="mt-4" page={page} perPage={PER_PAGE} total={total} onPageChange={setPage} />
+          )}
         </CardContent>
       </Card>
+      <ConfirmAction
+        open={approving !== null}
+        onOpenChange={(open) => {
+          if (!open) setApproving(null);
+        }}
+        title={t('twoFactorRecovery.approve.title', 'Approve the two-step reset for {email}?', { email: approving?.email ?? '' })}
+        description={t(
+          'twoFactorRecovery.approve.description',
+          'Their two-step sign-in is switched off, so anyone with their password can sign in. Check their identity first.'
+        )}
+        confirmLabel={t('twoFactorRecovery.approve.confirm', 'Approve request')}
+        cancelLabel={t('twoFactorRecovery.approve.cancel', 'Cancel')}
+        typeToConfirm={{
+          value: approving?.email ?? '',
+          label: t('twoFactorRecovery.approve.typeLabel', 'Type their email to confirm'),
+        }}
+        variant="default"
+        onConfirm={async () => {
+          if (approving !== null) await act(approving, 'approve');
+        }}
+      />
     </div>
   );
 }

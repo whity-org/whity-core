@@ -275,6 +275,13 @@ final class PublicFormsApiRealEngineTest extends TestCase
         self::assertContains('A12', $references);
     }
 
+    public function testAnAnonymousSubmissionTouchesNoDraft(): void
+    {
+        $slug = $this->openLink($this->publishedForm());
+
+        self::assertSame(201, $this->submit($slug, ['full_name' => 'Layla Haddad'])->getStatusCode());
+    }
+
     public function testAPublicSubmissionLeavesOutAQuestionItsConditionHid(): void
     {
         $formId = $this->publishedForm();
@@ -337,6 +344,11 @@ final class PublicFormsApiRealEngineTest extends TestCase
             $this->recipients->hasAnyForProfile(self::TENANT, $documentId, self::APPROVER),
             'the approver the FORM named must have been reached'
         );
+
+        // The library and the record show this, so it is the form's name and not its key.
+        $origin = $this->pdo->query('SELECT template_name FROM documents');
+        self::assertNotFalse($origin);
+        self::assertStringNotContainsString('form:', (string) $origin->fetchColumn());
     }
 
     /**

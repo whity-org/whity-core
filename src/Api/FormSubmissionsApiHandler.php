@@ -4,14 +4,19 @@ declare(strict_types=1);
 
 namespace Whity\Api;
 
+use Whity\Core\Form\FieldType;
 use Whity\Core\Form\FormFieldRepository;
 use Whity\Core\Form\FormRejectedException;
 use Whity\Core\Form\FormRepository;
 use Whity\Core\Form\FormSubmissionRepository;
+use Whity\Core\Form\FormUploadPolicy;
+use Whity\Core\Form\FormUploadRepository;
 use Whity\Core\Form\SubmissionIssuer;
 use Whity\Core\Request;
 use Whity\Core\Response;
 use Whity\Core\Tenant\TenantContext;
+use Whity\Storage\StorageDriverInterface;
+use Whity\Storage\StorageException;
 use Whity\Http\JsonBody;
 
 /**
@@ -23,7 +28,7 @@ use Whity\Http\JsonBody;
  *   `GET /api/v1/form-submissions`         `forms:read`   — the tenant's
  *                                                            submissions.
  *   `GET /api/v1/form-submissions/{id}`    `forms:read`   — one of them.
- *   `GET /api/v1/me/form-submissions`      `forms:submit` — ONLY the caller's own.
+ *   `GET /api/v1/me/form-submissions`      no permission  — ONLY the caller's own.
  *
  * The alternative — one endpoint gated on `forms:submit` that narrows itself to
  * the caller's own rows when they lack `forms:read` — would move the decision
@@ -32,9 +37,9 @@ use Whity\Http\JsonBody;
  * table beside every other rule, where `RbacMiddleware` enforces it and the
  * route-catalogue gate lists it.
  *
- * `/me/…` needs no permission of its own beyond `forms:submit` because the rows
- * it returns already name exactly one person — a tenant-wide permission has
- * nothing left to decide. Same argument migration 113 makes about routing
+ * `/me/…` needs no permission at all because the rows it returns already name
+ * exactly one person — a tenant-wide permission has nothing left to decide, and a
+ * member who filled in a form opened to them (migration 198) holds none. Same argument migration 113 makes about routing
  * ("being a recipient IS the authorization") and #978 about the inbox.
  *
  * THERE IS NO PATCH AND NO DELETE
@@ -53,6 +58,8 @@ final class FormSubmissionsApiHandler
         private readonly FormFieldRepository $fields,
         private readonly FormSubmissionRepository $submissions,
         private readonly SubmissionIssuer $issuer,
+        private readonly FormUploadRepository $uploads,
+        private readonly StorageDriverInterface $storage,
     ) {
     }
 
@@ -191,6 +198,7 @@ final class FormSubmissionsApiHandler
             return Response::json([
                 'data' => $submission + [
                     'fields' => $fields,
+                    'files' => self::publicFiles($this->filesOf($tenantId, (int) $submission['id'], $fields, $submission['data'] ?? null)),
                     // Stated rather than left for a client to compare: an answer
                     // set given against version 3 and read through version 5's
                     // fields is drift, not a bug, and a reader who cannot see the
@@ -203,6 +211,226 @@ final class FormSubmissionsApiHandler
 
             return Response::error('Failed to fetch the submission', 500);
         }
+    }
+
+    /**
+     * GET /api/v1/me/form-submissions/{id} — one of the caller's own submissions.
+     *
+     * No permission, like {@see listMine()}: the route decides whose. Somebody else's is
+     * the same 404 as one that doesn't exist. Only the questions they were asked, and
+     * only their answers to those: what the office recorded has its own permission, and
+     * the applicant has no route to it. A file answer says one was attached, because its
+     * storage key means nothing to a reader and shouldn't leave the system.
+     *
+     * @param array<string, string> $params
+     */
+    public function showMine(Request $request, array $params): Response
+    {
+        try {
+            $tenantId = TenantContext::getTenantId();
+            $profileId = self::actorProfileId($request);
+            if ($tenantId === null || $profileId === null) {
+                return Response::error('Submission not found', 404);
+            }
+
+            $submission = $this->submissions->find($tenantId, (int) ($params['id'] ?? 0), $profileId);
+            if ($submission === null) {
+                return Response::error('Submission not found', 404);
+            }
+
+            $formId = (int) $submission['form_id'];
+            $form = $this->forms->find($tenantId, $formId);
+            $fields = FormFieldRepository::applicantFields($this->fields->listForForm($tenantId, $formId));
+            $asked = array_flip(array_map(static fn (array $field): string => (string) $field['field_key'], $fields));
+            $data = array_intersect_key(is_array($submission['data'] ?? null) ? $submission['data'] : [], $asked);
+            $files = self::publicFiles($this->filesOf($tenantId, (int) $submission['id'], $fields, $data));
+            foreach ($fields as $field) {
+                $key = (string) $field['field_key'];
+                if ($field['field_type'] === FieldType::FILE && isset($data[$key])) {
+                    $data[$key] = true;
+                }
+            }
+
+            return Response::json([
+                'data' => ['data' => (object) $data] + $submission + [
+                    'fields' => $fields,
+                    'files' => $files,
+                    'form_version_now' => $form === null ? null : (int) $form['version'],
+                ],
+            ]);
+        } catch (\Exception $e) {
+            error_log('[FormSubmissionsApiHandler] showMine failed: ' . $e->getMessage());
+
+            return Response::error('Failed to fetch the submission', 500);
+        }
+    }
+
+    /**
+     * GET /api/v1/form-submissions/{id}/files/{fileId} — download a file somebody attached.
+     *
+     * `forms:read`, the same permission that reads the answer it belongs to.
+     *
+     * @param array<string, string> $params
+     */
+    public function fileContent(Request $request, array $params): Response
+    {
+        try {
+            $tenantId = TenantContext::getTenantId();
+            if ($tenantId === null) {
+                return Response::error('File not found', 404);
+            }
+            $submission = $this->submissions->find($tenantId, (int) ($params['id'] ?? 0));
+            if ($submission === null) {
+                return Response::error('File not found', 404);
+            }
+            $fields = $this->fields->listForForm($tenantId, (int) $submission['form_id']);
+
+            return $this->sendFile($this->filesOf($tenantId, (int) $submission['id'], $fields, $submission['data'] ?? null), (int) ($params['fileId'] ?? 0));
+        } catch (\Exception $e) {
+            error_log('[FormSubmissionsApiHandler] fileContent failed: ' . $e->getMessage());
+
+            return Response::error('Failed to fetch the file', 500);
+        }
+    }
+
+    /**
+     * GET /api/v1/me/form-submissions/{id}/files/{fileId} — download a file you attached.
+     *
+     * No permission, like {@see showMine()}: the route decides whose, and somebody else's
+     * is the same 404 as one that doesn't exist. Only files answering a question the
+     * person was asked.
+     *
+     * @param array<string, string> $params
+     */
+    public function myFileContent(Request $request, array $params): Response
+    {
+        try {
+            $tenantId = TenantContext::getTenantId();
+            $profileId = self::actorProfileId($request);
+            if ($tenantId === null || $profileId === null) {
+                return Response::error('File not found', 404);
+            }
+            $submission = $this->submissions->find($tenantId, (int) ($params['id'] ?? 0), $profileId);
+            if ($submission === null) {
+                return Response::error('File not found', 404);
+            }
+            $fields = FormFieldRepository::applicantFields($this->fields->listForForm($tenantId, (int) $submission['form_id']));
+
+            return $this->sendFile($this->filesOf($tenantId, (int) $submission['id'], $fields, $submission['data'] ?? null), (int) ($params['fileId'] ?? 0));
+        } catch (\Exception $e) {
+            error_log('[FormSubmissionsApiHandler] myFileContent failed: ' . $e->getMessage());
+
+            return Response::error('Failed to fetch the file', 500);
+        }
+    }
+
+    /**
+     * The files answering these questions on this submission.
+     *
+     * An upload has to be spent on THIS submission and named by an answer to one of
+     * THESE questions. So the reader's list of questions decides what they can reach,
+     * and an upload id is never a capability by itself.
+     *
+     * @param list<array<string, mixed>> $fields
+     * @return list<array{id: int, field_key: string, storage_key: string, content_type: string, byte_size: int, filename: ?string}>
+     */
+    private function filesOf(int $tenantId, int $submissionId, array $fields, mixed $data): array
+    {
+        $answers = is_array($data) ? $data : [];
+        $uploads = [];
+        foreach ($this->uploads->forSubmission($tenantId, $submissionId) as $upload) {
+            $uploads[$upload['storage_key']] = $upload;
+        }
+
+        $files = [];
+        foreach ($fields as $field) {
+            if (($field['field_type'] ?? null) !== FieldType::FILE) {
+                continue;
+            }
+            $key = (string) $field['field_key'];
+            $answer = $answers[$key] ?? null;
+            foreach (is_array($answer) ? $answer : [$answer] as $reference) {
+                if (!is_string($reference) || !isset($uploads[$reference])) {
+                    continue;
+                }
+                $upload = $uploads[$reference];
+                $files[] = [
+                    'id' => $upload['id'],
+                    'field_key' => $key,
+                    'storage_key' => $upload['storage_key'],
+                    'content_type' => $upload['content_type'],
+                    'byte_size' => $upload['byte_size'],
+                    'filename' => $upload['client_filename'],
+                ];
+            }
+        }
+
+        return $files;
+    }
+
+    /**
+     * The same list without the storage key, which means nothing to a reader.
+     *
+     * @param list<array{id: int, field_key: string, storage_key: string, content_type: string, byte_size: int, filename: ?string}> $files
+     * @return list<array{id: int, field_key: string, content_type: string, byte_size: int, filename: ?string}>
+     */
+    private static function publicFiles(array $files): array
+    {
+        return array_map(static function (array $file): array {
+            unset($file['storage_key']);
+
+            return $file;
+        }, $files);
+    }
+
+    /**
+     * One of the reader's files, always as an attachment.
+     *
+     * The bytes came from whoever filled in the form, possibly a visitor with no account,
+     * and they're served from the application's own origin. `attachment` and `nosniff`
+     * stop a browser running them as a page, and the sandbox policy is there for one that
+     * ignores both. A storage failure is a 503 because the record is real and the bytes
+     * were written, so "not found" would send the reader looking in the wrong place.
+     *
+     * @param list<array{id: int, field_key: string, storage_key: string, content_type: string, byte_size: int, filename: ?string}> $files
+     */
+    private function sendFile(array $files, int $fileId): Response
+    {
+        foreach ($files as $file) {
+            if ($file['id'] !== $fileId) {
+                continue;
+            }
+            try {
+                $bytes = $this->storage->get($file['storage_key']);
+            } catch (StorageException $e) {
+                error_log('[FormSubmissionsApiHandler] reading an attached file failed: ' . $e->getMessage());
+
+                return Response::error('This file is temporarily unavailable', 503);
+            }
+
+            return new Response(200, $bytes, [
+                'Content-Type' => $file['content_type'],
+                'Content-Disposition' => self::attachment($file['filename'], $file['content_type']),
+                'X-Content-Type-Options' => 'nosniff',
+                'Content-Security-Policy' => "default-src 'none'; sandbox",
+                // Somebody's papers, so no shared cache keeps them for the next caller.
+                'Cache-Control' => 'private, no-store',
+            ]);
+        }
+
+        return Response::error('File not found', 404);
+    }
+
+    /** The header naming a download. The name is the sender's, so it can't be trusted in a header. */
+    private static function attachment(?string $filename, string $contentType): string
+    {
+        $name = trim((string) preg_replace('/[\x00-\x1f\x7f"\\\\\/;]+/u', '_', (string) $filename));
+        if ($name === '') {
+            $name = 'attachment.' . FormUploadPolicy::extensionFor($contentType);
+        }
+        $plain = (string) preg_replace('/[^A-Za-z0-9._ -]/u', '_', $name);
+
+        return 'attachment; filename="' . $plain . '"; filename*=UTF-8\'\'' . rawurlencode($name);
     }
 
     /**

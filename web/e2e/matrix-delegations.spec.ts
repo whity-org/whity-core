@@ -69,7 +69,7 @@ test.describe('Delegations (role matrix)', () => {
       page.getByRole('heading', { name: 'Delegations' })
     ).toBeVisible();
     await expect(
-      page.getByRole('button', { name: 'Create Delegation' })
+      page.getByRole('button', { name: 'Delegate' })
     ).toBeVisible();
     await expect(
       page.getByRole('heading', { name: 'Access denied' })
@@ -102,7 +102,6 @@ test.describe('Delegations (role matrix)', () => {
     } finally {
       await api.dispose();
     }
-    const granteeId = throwawayUserId;
 
     await roleSession.shell.clickNav('Delegations');
     await page.waitForURL('**/admin/delegations');
@@ -112,7 +111,7 @@ test.describe('Delegations (role matrix)', () => {
 
     // Open the create modal; its pickers load from /api/permissions,
     // /api/roles, /api/users and /api/ous before the form renders.
-    await page.getByRole('button', { name: 'Create Delegation' }).click();
+    await page.getByRole('button', { name: 'Delegate' }).click();
     const dialog = page.getByRole('dialog');
     await expect(
       dialog.getByText('Grant a subset of your own permissions')
@@ -130,44 +129,46 @@ test.describe('Delegations (role matrix)', () => {
     // One permission the admin grantor holds (the subset invariant is
     // enforced server-side; a non-held permission would 422).
     await dialog
-      .locator('label')
-      .filter({ hasText: /^relations:read$/ })
+      .locator('label[data-permission="relations:read"]')
       .locator('input[type="checkbox"]')
       .check();
 
+    // An end date, picked for real: next month, so it is never in the past. A
+    // picked date that did not reach the server saved a delegation that never ends.
+    await dialog.getByLabel('Until (optional)').click();
+    await page.getByRole('button', { name: 'Next month' }).click();
+    await page.getByRole('button', { name: '15', exact: true }).click();
+
+    const created = page.waitForResponse(
+      (res) =>
+        res.url().endsWith('/api/v1/delegations') &&
+        res.request().method() === 'POST'
+    );
     await dialog.getByRole('button', { name: 'Create Delegation' }).click();
+    const saved = await created;
+    expect(saved.status()).toBe(201);
+    expect(await saved.text()).toMatch(/"expiresAt":"\d{4}-/);
     await expect(
       toastWithText(page, 'Delegation created successfully')
     ).toBeVisible();
 
-    // The refetched list shows the new row: grantee label, permission, Active.
-    // The grantee id is anchored with a no-digit-follows lookahead — a row's
-    // text content has no separators ("User #815Tenant-wide"), so \b would
-    // not stop "User #81" from also matching "User #815".
-    const row = page
-      .getByRole('row')
-      .filter({ hasText: new RegExp(`User #${granteeId}(?!\\d)`) });
+    // The refetched list shows the new row: the grantee is NAMED (the email's
+    // local part), never "User #id"; the permission is in words; status Active.
+    const granteeName = granteeEmail.split('@')[0];
+    const row = page.getByRole('row').filter({ hasText: granteeName });
     await expect(row).toBeVisible();
-    await expect(row).toContainText('relations:read');
+    await expect(row).toContainText('Relations read');
     await expect(row).toContainText('Active');
+    await expect(row).not.toContainText('No end date');
 
-    // Revoke via the row action + confirmation modal.
+    // Revoke happens at once, and the toast offers Undo (tier 1).
     await row.getByRole('button', { name: 'Revoke' }).click();
-    const revokeDialog = page.getByRole('dialog');
     await expect(
-      revokeDialog.getByText('Are you sure you want to revoke this delegation?')
-    ).toBeVisible();
-    await revokeDialog
-      .getByRole('button', { name: 'Revoke Delegation' })
-      .click();
-    await expect(
-      toastWithText(page, 'Delegation revoked successfully')
+      toastWithText(page, 'Delegation revoked. They lost this access straight away.')
     ).toBeVisible();
 
-    // CURRENT BEHAVIOR: GET /api/delegations excludes revoked rows unless
-    // includeRevoked is passed (the page never passes it), so after the
-    // post-revoke refetch the row DISAPPEARS from the list — it does not stay
-    // behind with a "Revoked" badge.
+    // The default view is what is live, so the row leaves it. All keeps it, for the
+    // record.
     await expect(row).toHaveCount(0);
   });
 });

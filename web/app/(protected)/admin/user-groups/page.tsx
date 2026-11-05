@@ -65,6 +65,7 @@ import {
 import { Button } from '@whity/ui/button';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@whity/ui/alert';
+import { AreaError } from '@whity/ui/page-states';
 import { Badge } from '@whity/ui/badge';
 import {
   Dialog,
@@ -131,6 +132,12 @@ interface DraftPreview {
 type ApiClient = ReturnType<typeof useAuth>['apiClient'];
 type AddToast = ReturnType<typeof useToast>['addToast'];
 
+interface GroupUsage {
+  id: number;
+  now: number | null;
+  route_templates: { id: number; name: string }[];
+}
+
 export default function UserGroupsPage() {
   const { apiClient } = useAuth();
   const { addToast } = useToast();
@@ -179,6 +186,17 @@ export default function UserGroupsPage() {
       totalPages: body.pagination?.totalPages ?? 1,
     };
   }, [apiClient, queryString]);
+
+  // The Now and Used in columns, for the rows on screen. Asked for apart from the list
+  // because a count resolves the rule; a failure leaves the two columns blank.
+  const groupIds = (groups.data?.items ?? []).map((group) => group.id).join(',');
+  const usage = useFetch(async () => {
+    if (groupIds === '') return new Map<number, GroupUsage>();
+    const response = await apiClient(`/api/v1/user-groups/usage?ids=${groupIds}`);
+    if (!response.ok) return new Map<number, GroupUsage>();
+    const body = (await response.json()) as { data?: GroupUsage[] };
+    return new Map((body.data ?? []).map((entry) => [entry.id, entry]));
+  }, [apiClient, groupIds]);
 
   /** What a group's definition may name. NOT the route-step list — see the docblock. */
   const rules = useFetch(async () => {
@@ -254,6 +272,33 @@ export default function UserGroupsPage() {
         <span className="text-muted-foreground">{group.description ?? '—'}</span>
       ),
     },
+    {
+      id: 'now',
+      header: t('userGroups.table.now', 'Now'),
+      cell: (group) => {
+        const now = usage.data?.get(group.id)?.now;
+        if (now === undefined || now === null) return <span className="text-muted-foreground">—</span>;
+        return now === 0 ? <span className="text-muted-foreground">{t('userGroups.table.now.none', 'No one')}</span> : now;
+      },
+    },
+    {
+      id: 'usedIn',
+      header: t('userGroups.table.usedIn', 'Used in'),
+      cell: (group) => {
+        const templates = usage.data?.get(group.id)?.route_templates;
+        if (templates === undefined) return <span className="text-muted-foreground">—</span>;
+        if (templates.length === 0) {
+          return <span className="text-muted-foreground">{t('userGroups.table.usedIn.none', 'Not used yet')}</span>;
+        }
+        return (
+          <span title={templates.map((template) => template.name).join(', ')}>
+            {templates.length === 1
+              ? templates[0].name
+              : t('userGroups.table.usedIn.routes', '{count} routes', { count: templates.length })}
+          </span>
+        );
+      },
+    },
   ];
 
   const rowActions = (group: Row) => (
@@ -300,7 +345,11 @@ export default function UserGroupsPage() {
       />
 
       {groups.error !== null ? (
-        <p className="text-sm text-destructive">{groups.error}</p>
+        <AreaError
+          message={groups.error}
+          retryLabel={t('userGroups.tryAgain', 'Try again')}
+          onRetry={() => groups.refetch()}
+        />
       ) : (
         <DataTable
           columns={columns}
@@ -314,6 +363,21 @@ export default function UserGroupsPage() {
           // non-null forever after.
           isLoading={groups.loading && groups.data === null}
           globalFilterPlaceholder={t('userGroups.searchPlaceholder', 'Search user groups…')}
+          emptyState={
+            query.search.value !== ''
+              ? {
+                  title: t('userGroups.empty.filtered', 'No group matches “{term}”', {
+                    term: query.search.value,
+                  }),
+                }
+              : {
+                  title: t('userGroups.empty.title', 'No groups yet'),
+                  description: t(
+                    'userGroups.empty.description',
+                    'A group is a rule that decides who is in it, such as everyone with a role. Nobody is added by hand.'
+                  ),
+                }
+          }
           sorting={query.sorting}
           search={query.search}
           pagination={query.pagination({
@@ -685,9 +749,7 @@ function UserGroupDialog({
                 removeLabel={(personName) =>
                   t('userGroups.form.people.remove', 'Remove {name}', { name: personName })
                 }
-                unknownPersonLabel={(profileId) =>
-                  t('userGroups.form.people.unknown', 'Profile #{id}', { id: profileId })
-                }
+                unknownPersonLabel={() => t('userGroups.form.people.unknown', 'Someone without a name')}
               />
             </div>
           )}
@@ -751,9 +813,7 @@ function UserGroupDialog({
                         <li key={member.profile_id}>
                           <Badge variant="secondary">
                             {member.display_name ??
-                              t('userGroups.preview.unnamed', 'Profile #{id}', {
-                                id: member.profile_id,
-                              })}
+                              t('userGroups.preview.unnamed', 'Someone without a name')}
                           </Badge>
                         </li>
                       ))}

@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
@@ -76,7 +76,7 @@ export default function OUsPage() {
     if (!result.complete) {
       throw new Error(
         result.total === null
-          ? t('ous.error.load', 'Failed to fetch organizational units')
+          ? t('ous.error.loadUnits', 'Failed to fetch units')
           : t(
               'ous.error.partial',
               'Loaded only {loaded} of {total} organizational units.',
@@ -166,7 +166,7 @@ export default function OUsPage() {
   return (
     <div className="space-y-8">
       <AdminHeader
-        title={t('ous.title', 'Organizational Units')}
+        title={t('ous.title', 'Organisational units')}
         description={t(
           'ous.description',
           'Visualize and manage your organizational hierarchy, role assignments, and members.'
@@ -175,7 +175,7 @@ export default function OUsPage() {
           canCreate ? (
             <Button onClick={openCreateRoot} className="gap-2">
               <IconPlus />
-              {t('ous.header.create', 'Create OU')}
+              {t('ous.header.create', 'New unit')}
             </Button>
           ) : undefined
         }
@@ -190,7 +190,7 @@ export default function OUsPage() {
       ) : hasLoadError ? (
         <div className="rounded-lg border border-destructive/50 bg-card p-10 text-center">
           <h2 className="font-heading text-sm font-medium">
-            {t('ous.error.title', 'Could not load the organizational units')}
+            {t('ous.error.title', 'Could not load the units')}
           </h2>
           <p className="mt-1 text-xs text-muted-foreground">{error}</p>
           <p className="mt-1 text-xs text-muted-foreground">
@@ -201,21 +201,21 @@ export default function OUsPage() {
           </p>
           <Button onClick={fetchOUs} variant="outline" className="mt-4 gap-2">
             <IconRefresh />
-            {t('ous.error.retry', 'Retry')}
+            {t('ous.error.retry', 'Try again')}
           </Button>
         </div>
       ) : isEmpty ? (
         <div className="rounded-lg border border-dashed border-border bg-card p-10 text-center">
           <h2 className="font-heading text-sm font-medium">
-            {t('ous.empty.title', 'No organizational units yet')}
+            {t('ous.empty.title', 'No units yet')}
           </h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            {t('ous.empty.description', 'Create an organizational unit to structure your organization.')}
+            {t('ous.empty.description', 'Units are the branches, teams or departments your people belong to.')}
           </p>
           {canCreate && (
             <Button onClick={openCreateRoot} variant="outline" className="mt-4 gap-2">
               <IconPlus />
-              {t('ous.empty.create', 'Create the first OU')}
+              {t('ous.empty.create', 'Add the first unit')}
             </Button>
           )}
         </div>
@@ -246,6 +246,8 @@ export default function OUsPage() {
         onClose={() => setSelectedId(null)}
         onAction={handleAction}
         onChanged={fetchOUs}
+        canWrite={canEdit}
+        canDelete={canDelete}
       />
 
       <CreateOuModal

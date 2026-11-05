@@ -8,6 +8,7 @@ import {
   Controls,
   Handle,
   MarkerType,
+  Panel,
   Position,
   ReactFlow,
   getBezierPath,
@@ -141,6 +142,8 @@ export interface RouteFlowEditorLabels {
   implicit: string;
   /** Marker where a chain stops. */
   ends: string;
+  /** The pill at the top: where a document enters the route. */
+  start?: string;
   /**
    * Marker on a stage that more than one path reaches.
    *
@@ -230,6 +233,7 @@ const DEFAULT_LABELS: RouteFlowEditorLabels = {
   continues: 'Continues',
   implicit: 'implicit',
   ends: 'Ends here',
+  start: 'A document is sent',
   arrivalsMerge: 'Paths merge — 1 item per person',
   inCycle: 'Can come back round — loops',
   quorumAll: 'all must approve',
@@ -561,6 +565,20 @@ function RouteFlowNodeCard({ data }: NodeProps<Node<RouteFlowNodeData>>) {
 
 const nodeTypes: NodeTypes = { routeFlowStep: RouteFlowNodeCard };
 
+/** The app's own theme (the `dark` class on the page), followed live. */
+function useAppColorMode(): 'light' | 'dark' {
+  const [mode, setMode] = React.useState<'light' | 'dark'>('light');
+  React.useEffect(() => {
+    const root = document.documentElement;
+    const read = () => setMode(root.classList.contains('dark') ? 'dark' : 'light');
+    read();
+    const observer = new MutationObserver(read);
+    observer.observe(root, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
+  return mode;
+}
+
 interface RouteFlowEdgeData extends Record<string, unknown> {
   kind: 'drawn' | 'derived';
   on: RouteFlowVerdict | 'continue';
@@ -662,7 +680,8 @@ const edgeTypes: EdgeTypes = { routeFlowTransition: RouteFlowTransitionEdge };
  * This bounds the automatic fit ONLY — the `maxZoom` prop is left at its default
  * so a person can still zoom in past this by hand.
  */
-const FIT_VIEW = { maxZoom: 1, padding: 0.15 };
+// More room above than around: the start pill sits over the first stage.
+const FIT_VIEW = { maxZoom: 1, padding: { top: '56px', right: '24px', bottom: '24px', left: '24px' } as const };
 
 export function RouteFlowEditor({
   graph,
@@ -919,6 +938,8 @@ export function RouteFlowEditor({
     []
   );
 
+  const colorMode = useAppColorMode();
+
   const nodeCount = drawn.length;
   React.useEffect(() => {
     if (nodeCount === 0) return undefined;
@@ -981,8 +1002,20 @@ export function RouteFlowEditor({
           // the `flow` block records it; a route flow with a reject lane is wide
           // enough to hit it sooner.
           minZoom={0.1}
+          // `@xyflow/react` defaults to its own `light` class, and the design
+          // tokens also define a `.light` theme, so in dark mode every card
+          // came out white. The canvas follows the app's theme instead.
+          colorMode={colorMode}
           proOptions={{ hideAttribution: true }}
         >
+          <Panel position="top-center">
+            <span
+              className="whitespace-nowrap rounded-full border border-border bg-card px-3 py-1 text-sm text-foreground"
+              data-slot="route-flow-start"
+            >
+              {labels.start}
+            </span>
+          </Panel>
           <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
           <Controls showInteractive={false} />
         </ReactFlow>

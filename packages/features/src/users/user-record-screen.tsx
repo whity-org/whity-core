@@ -9,21 +9,16 @@
  * domain.
  *
  * @i18n-keys admin
- *   users.record.activity.actor = by user {id}
  *   users.record.activity.empty = Nothing has been recorded against this person yet.
  *   users.record.activity.error = Failed to load this person's history
- *   users.record.activity.heldSince = held since {date}
+ *   users.record.activity.heldSince = Held since {date}
  *   users.record.activity.ou = in unit {id}
  *   users.record.activity.role = role {role}
- *   users.record.activity.subtitle = Every grant and revocation recorded against this person, newest first.
- *   users.record.activity.title = Authority history
- *   users.record.activity.unknownActor = by the system
  *   users.record.back = Back to users
  *   users.record.badge.deactivated = Deactivated
  *   users.record.badge.deactivated.hint = The account is switched off globally, so this person cannot sign in to any tenant.
  *   users.record.badge.invited = Invited
  *   users.record.badge.suspended = Suspended
- *   users.record.cancel = Discard changes
  *   users.record.details.subtitle = Who this person is here, and what they may do.
  *   users.record.details.title = Details
  *   users.record.email.hint = The email is this person's identity across every tenant and cannot be changed here.
@@ -33,12 +28,25 @@
  *   users.record.error.save = Failed to save this person
  *   users.record.error.title = This person could not be loaded
  *   users.record.loading = Loading person…
- *   users.record.memberships.empty = This person belongs to no tenant.
- *   users.record.memberships.error = Failed to load this person's tenants and roles
+ *   users.record.memberships.empty = This person belongs to no workspace.
+ *   users.record.memberships.error = Failed to load this person's workspaces and roles
  *   users.record.memberships.primary = Primary
- *   users.record.memberships.subtitle = Every tenant this person belongs to, and the role they hold in each.
- *   users.record.memberships.title = Tenants and roles
- *   users.record.name.hint = Derived from the email address; there is no separate name to edit.
+ *   users.record.name.shared = The name people see for this person, in every workspace they belong to.
+ *   users.record.changed.name = name
+ *   users.record.fact.lastActive = Active {date}
+ *   users.record.fact.neverActive = Not active yet
+ *   users.record.twoStep.label = Two-step
+ *   users.record.twoStep.on = On
+ *   users.record.twoStep.off = Off
+ *   users.record.twoStep.offRequired = Off, required
+ *   users.record.twoStep.require = Require two-step
+ *   users.record.twoStep.requireStop = Stop requiring two-step
+ *   users.record.twoStep.required = Two-step is now required of {name}.
+ *   users.record.twoStep.notRequired = {name} no longer has a requirement of their own.
+ *   users.record.twoStep.error = Two-step could not be changed.
+ *   users.record.twoStep.confirm.title = Require two-step of {name}?
+ *   users.record.twoStep.confirm.description = If they do not have it on, they have to set it up the next time they sign in.
+ *   users.record.twoStep.confirm.cancel = Cancel
  *   users.record.name.label = Name
  *   users.record.ou.error = Failed to load the organisational units
  *   users.record.ou.incomplete = The organisational units could not be listed in full, so the picker is withheld — a short list would hide units that exist.
@@ -48,11 +56,8 @@
  *   users.record.ou.unknown = Unit #{id}
  *   users.record.password.action = Send reset link
  *   users.record.password.error = Failed to send the password-reset link
- *   users.record.password.hint = The person receives a one-time link by email and chooses their own password. No password is ever shown to you, and using the link signs the account out of every existing session.
  *   users.record.password.sending = Sending…
- *   users.record.password.subtitle = Recovering an account without ever handling a credential.
  *   users.record.password.success = A password-reset link has been sent to {email}
- *   users.record.password.title = Password
  *   users.record.readOnly.noPermission = You don't have permission to edit users, so this record is read-only.
  *   users.record.role.error = Failed to load the roles that can be assigned
  *   users.record.role.label = Role
@@ -60,19 +65,59 @@
  *   users.record.role.placeholder = Select a role
  *   users.record.save = Save changes
  *   users.record.save.success = User updated successfully
- *   users.record.saving = Saving…
- *   users.record.stat.created = Joined
- *   users.record.stat.memberships = Roles held
- *   users.record.stat.ou = Organisational unit
- *   users.record.stat.role = Role in this tenant
  *   users.record.subtitle = User record
- *   users.record.tenant.label = Tenant
+ *   users.record.activity.subtitle = Everything that changed about this person, newest first.
+ *   users.record.activity.title = What changed
+ *   users.record.changed.ou = unit
+ *   users.record.changed.role = role
+ *   users.record.changed.summary = Changed: {fields}
+ *   users.record.deactivate = Deactivate
+ *   users.record.deactivated = {name} was deactivated
+ *   users.record.delete = Delete
+ *   users.record.delete.cancel = Cancel
+ *   users.record.delete.confirm = Delete person
+ *   users.record.delete.description = They lose access to this workspace and their role here is removed. This cannot be undone.
+ *   users.record.delete.error = Failed to delete this person
+ *   users.record.delete.success = {name} was deleted
+ *   users.record.delete.title = Delete {name}?
+ *   users.record.discard = Discard
+ *   users.record.fact.noUnit = No unit
+ *   users.record.history.by = by {id}
+ *   users.record.history.created = Added to the workspace
+ *   users.record.history.deleted = Removed from the workspace
+ *   users.record.history.other = Something changed
+ *   users.record.history.roleAdded = Given the role {role}
+ *   users.record.history.roleRemoved = Role {role} removed
+ *   users.record.history.updated = Details changed
+ *   users.record.memberships.subtitle = Every workspace this person belongs to, and the role they hold in each.
+ *   users.record.memberships.title = Workspaces and roles
+ *   users.record.menu.label = More actions
+ *   users.record.reactivate = Reactivate
+ *   users.record.reactivated = {name} was reactivated
+ *   users.record.status.error = Failed to update this person
+ *   users.record.tab.access = Access
+ *   users.record.tab.history = History
+ *   users.record.tab.overview = Overview
+ *   users.record.undo = Undo
+ *   users.record.was = Was {value}
  */
 
+import { roleLabel } from '../roles/role-label';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
+import { Avatar } from '@whity/ui/avatar';
 import { Badge } from '@whity/ui/badge';
 import { Button } from '@whity/ui/button';
+import { ConfirmAction } from '@whity/ui/confirm-action';
+import { TechnicalDetails } from '@whity/ui/display-preferences';
+import { Input } from '@whity/ui/input';
+import { SaveBar, ChangedField } from '@whity/ui/save-bar';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@whity/ui/dropdown-menu';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
 import {
   Select,
@@ -81,7 +126,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@whity/ui/select';
-import { IconUser } from '@tabler/icons-react';
+import { IconMenu2 } from '@tabler/icons-react';
 
 import {
   RecordCollectionPanel,
@@ -99,7 +144,7 @@ import { useDateDisplay } from '../datetime';
 import type { DateDisplay } from '../datetime';
 import type { RecordBadge, RecordFactsFn } from '../record';
 import { identityTranslate } from '../nav/types';
-import { USERS_WRITE } from './capabilities';
+import { SECURITY_MANAGE, USERS_DELETE, USERS_WRITE } from './capabilities';
 import type {
   OuOptionsResult,
   UserActivityEntry,
@@ -146,6 +191,8 @@ interface UserRecordFields {
   membershipStatus: string;
   /** How many memberships this person holds; null while that request is in flight. */
   membershipCount: number | null;
+  /** The formatted last-active date. Empty when the workspace hides dates. */
+  lastActive: string;
 }
 
 /**
@@ -153,7 +200,7 @@ interface UserRecordFields {
  * record and the dictionary. There is no `can` in scope for it to reach for, and
  * the fields type it receives could not carry one if there were.
  */
-const userFacts: RecordFactsFn<UserRecordFields> = (user, t, dates) => {
+const userFacts: RecordFactsFn<UserRecordFields> = (user, t) => {
   const badges: RecordBadge[] = [];
   if (user.accountStatus === 'inactive') {
     badges.push({
@@ -183,44 +230,17 @@ const userFacts: RecordFactsFn<UserRecordFields> = (user, t, dates) => {
 
   return {
     title: user.name,
-    subtitle: user.email || t('users.record.subtitle', 'User record'),
+    subtitle: [
+      roleLabel(user.role),
+      user.ouId === null
+        ? t('users.record.fact.noUnit', 'No unit')
+        : (user.ouName ?? ''),
+      user.email,
+      user.lastActive,
+    ]
+      .filter((part) => part !== '')
+      .join(' · '),
     badges,
-    stats: [
-      {
-        key: 'role',
-        label: t('users.record.stat.role', 'Role in this tenant'),
-        value: user.role,
-      },
-      {
-        key: 'ou',
-        label: t('users.record.stat.ou', 'Organisational unit'),
-        // Three distinct answers, and the third is the honest one: "the server
-        // says unit 7, and we could not learn its name" is not the same as "no
-        // unit", so it is not rendered as one.
-        value:
-          user.ouId === null
-            ? t('users.record.ou.none', 'None (root)')
-            : (user.ouName ??
-              t('users.record.ou.unknown', 'Unit #{id}', { id: user.ouId })),
-      },
-      {
-        key: 'memberships',
-        label: t('users.record.stat.memberships', 'Roles held'),
-        value: user.membershipCount,
-      },
-      // #1068: the stat GOES when this tenant hides dates. "Joined —" is a
-      // label refusing to answer its own question; an absent stat is a fact
-      // the page simply does not report.
-      ...(dates.hidden
-        ? []
-        : [
-            {
-              key: 'created',
-              label: t('users.record.stat.created', 'Joined'),
-              value: dates.date(user.createdAt),
-            },
-          ]),
-    ],
   };
 };
 
@@ -232,45 +252,32 @@ function metaString(metadata: Record<string, unknown>, key: string): string | nu
   return null;
 }
 
-function metaNumber(metadata: Record<string, unknown>, key: string): number | null {
-  const value = metadata[key];
-  return typeof value === 'number' ? value : null;
+/** For a removed role: how long it was held, which no other record keeps. */
+function heldSince(entry: UserActivityEntry, t: UsersTranslate, dates: DateDisplay): string | undefined {
+  if (entry.action !== 'user.membership.removed') return undefined;
+  // Dropped, not emptied, when the workspace hides dates (#1068).
+  const date = dates.date(metaString(entry.metadata, 'granted_at'));
+  return date === null ? undefined : t('users.record.activity.heldSince', 'Held since {date}', { date });
 }
 
-/**
- * What an authority-history entry CHANGED, when it recorded enough to say.
- *
- * This is the whole reason #889/#890 targeted the audit row at the USER: a
- * revocation DELETES the membership row, so this metadata is the only surviving
- * record of which role was taken away and how long it was held. Rendering it is
- * what turns a list of action keys into "manager, held since 3 March — revoked".
- * Nothing consumed it before this page.
- */
-function activityDetail(
-  entry: UserActivityEntry,
-  t: UsersTranslate,
-  dates: DateDisplay,
-): string | null {
-  const parts: string[] = [];
-
-  const roleName = metaString(entry.metadata, 'role_name');
-  if (roleName !== null) {
-    parts.push(t('users.record.activity.role', 'role {role}', { role: roleName }));
+/** What an audit entry says in words; the code behind it is for Show technical details. */
+function historySentence(entry: UserActivityEntry, t: UsersTranslate): string {
+  const role = roleLabel(metaString(entry.metadata, 'role_name') ?? '');
+  switch (entry.action) {
+    case 'user.created':
+    case 'user.created.async':
+      return t('users.record.history.created', 'Added to the workspace');
+    case 'user.updated':
+      return t('users.record.history.updated', 'Details changed');
+    case 'user.deleted':
+      return t('users.record.history.deleted', 'Removed from the workspace');
+    case 'user.membership.added':
+      return t('users.record.history.roleAdded', 'Given the role {role}', { role });
+    case 'user.membership.removed':
+      return t('users.record.history.roleRemoved', 'Role {role} removed', { role });
+    default:
+      return t('users.record.history.other', 'Something changed');
   }
-
-  const ouId = metaNumber(entry.metadata, 'ou_id');
-  if (ouId !== null) {
-    parts.push(t('users.record.activity.ou', 'in unit {id}', { id: ouId }));
-  }
-
-  // #1068: the clause is DROPPED rather than emptied. "manager, held since —"
-  // reads as a broken sentence; "manager" reads as a complete one.
-  const grantedAt = dates.date(metaString(entry.metadata, 'granted_at'));
-  if (grantedAt !== null) {
-    parts.push(t('users.record.activity.heldSince', 'held since {date}', { date: grantedAt }));
-  }
-
-  return parts.length > 0 ? parts.join(' · ') : null;
 }
 
 /** A field the API does not accept a change to: shown, explained, never faked. */
@@ -326,9 +333,11 @@ export function UserRecordScreen({
     t('users.record.error.load', 'Failed to load this person')
   );
 
+  // Saving a role changes this list, which the Access tab reads.
+  const [membershipsVersion, setMembershipsVersion] = useState(0);
   const memberships = useRecordResource(
     () => adapter.listUserMemberships(userId),
-    [userId],
+    [userId, membershipsVersion],
     t('users.record.memberships.error', "Failed to load this person's tenants and roles")
   );
 
@@ -362,17 +371,19 @@ export function UserRecordScreen({
   // draft would paint one person's role into another person's form for a frame.
   // Stamping the id and ignoring a mismatch makes that frame the skeleton.
   const [saved, setSaved] = useState<UserRecord | null>(null);
-  const [draft, setDraft] = useState<{ id: number; role: string; ouId: number | null } | null>(
+  const [draft, setDraft] = useState<{ id: number; role: string; ouId: number | null; displayName: string } | null>(
     null
   );
+  const [confirmingTwoStep, setConfirmingTwoStep] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isSendingReset, setIsSendingReset] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const record = loaded.status === 'ready' ? loaded.value : null;
   const current = saved !== null && record !== null && saved.id === record.id ? saved : record;
 
   const resetDraft = useCallback((source: UserRecord) => {
-    setDraft({ id: source.id, role: source.role ?? '', ouId: source.ouId });
+    setDraft({ id: source.id, role: source.role ?? '', ouId: source.ouId, displayName: source.displayName });
   }, []);
 
   useEffect(() => {
@@ -413,7 +424,9 @@ export function UserRecordScreen({
   const isDirty =
     current !== null &&
     form !== null &&
-    (form.role !== (current.role ?? '') || form.ouId !== current.ouId);
+    (form.role !== (current.role ?? '') ||
+      form.ouId !== current.ouId ||
+      form.displayName.trim() !== current.displayName);
 
   const back = { label: t('users.record.back', 'Back to users'), onBack };
 
@@ -426,6 +439,7 @@ export function UserRecordScreen({
       const result = await adapter.updateUser(current.id, {
         role: form.role,
         ouId: form.ouId,
+        ...(form.displayName.trim() !== current.displayName ? { displayName: form.displayName.trim() } : {}),
       });
       if (result === 'not-found') {
         onNotify?.(
@@ -438,9 +452,17 @@ export function UserRecordScreen({
       // Re-seat the record on the saved values so the page stops reading dirty
       // without a refetch nobody asked for — and so the stat strip states what
       // was actually persisted.
-      const next: UserRecord = { ...current, role: form.role, ouId: form.ouId };
+      const displayName = form.displayName.trim();
+      const next: UserRecord = {
+        ...current,
+        role: form.role,
+        ouId: form.ouId,
+        displayName,
+        name: displayName !== '' ? displayName : current.name,
+      };
       setSaved(next);
       resetDraft(next);
+      setMembershipsVersion((version) => version + 1);
     } catch (error) {
       onNotify?.(
         error instanceof Error && error.message
@@ -450,6 +472,87 @@ export function UserRecordScreen({
       );
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const changeTwoStep = async (required: boolean) => {
+    if (!current || adapter.setTwoStepRequirement === undefined) return;
+    try {
+      await adapter.setTwoStepRequirement(current.id, current.tenantId, required);
+      onNotify?.(
+        required
+          ? t('users.record.twoStep.required', 'Two-step is now required of {name}.', { name: current.name })
+          : t('users.record.twoStep.notRequired', '{name} no longer has a requirement of their own.', { name: current.name }),
+        'success'
+      );
+      setSaved({
+        ...current,
+        twoStep: {
+          ...current.twoStep,
+          requiredDirectly: required,
+          // A workspace or unit policy may still apply, which only a reload can tell.
+          required: required || current.twoStep.required,
+        },
+      });
+    } catch (error) {
+      onNotify?.(
+        error instanceof Error && error.message
+          ? error.message
+          : t('users.record.twoStep.error', 'Two-step could not be changed.'),
+        'error'
+      );
+    }
+  };
+
+  // Deactivating can be undone, so it happens at once and the toast offers Undo
+  // (tier 1). The Undo is the opposite change, offered once.
+  const changeStatus = async (next: 'active' | 'inactive', offerUndo: boolean) => {
+    if (!current || adapter.setAccountStatus === undefined) return;
+    try {
+      await adapter.setAccountStatus(current.id, next);
+      const message =
+        next === 'inactive'
+          ? t('users.record.deactivated', '{name} was deactivated', { name: current.name })
+          : t('users.record.reactivated', '{name} was reactivated', { name: current.name });
+      const previous = current;
+      const updated: UserRecord = { ...current, accountStatus: next };
+      setSaved(updated);
+      onNotify?.(
+        message,
+        'success',
+        offerUndo
+          ? {
+              label: t('users.record.undo', 'Undo'),
+              onClick: () => {
+                setSaved({ ...previous });
+                void adapter.setAccountStatus?.(previous.id, previous.accountStatus as 'active' | 'inactive');
+              },
+            }
+          : undefined
+      );
+    } catch (error) {
+      onNotify?.(
+        error instanceof Error && error.message
+          ? error.message
+          : t('users.record.status.error', 'Failed to update this person'),
+        'error'
+      );
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!current || adapter.deleteUser === undefined) return;
+    try {
+      await adapter.deleteUser(current.id);
+      onNotify?.(t('users.record.delete.success', '{name} was deleted', { name: current.name }), 'success');
+      onBack();
+    } catch (error) {
+      onNotify?.(
+        error instanceof Error && error.message
+          ? error.message
+          : t('users.record.delete.error', 'Failed to delete this person'),
+        'error'
+      );
     }
   };
 
@@ -509,7 +612,18 @@ export function UserRecordScreen({
     accountStatus: current.accountStatus,
     membershipStatus: current.status,
     membershipCount,
+    lastActive: dates.hidden
+      ? ''
+      : current.lastActiveAt !== null
+        ? t('users.record.fact.lastActive', 'Active {date}', { date: dates.date(current.lastActiveAt) ?? '' })
+        : t('users.record.fact.neverActive', 'Not active yet'),
   };
+
+  const twoStepLabel = current.twoStep.enabled
+    ? t('users.record.twoStep.on', 'On')
+    : current.twoStep.required
+      ? t('users.record.twoStep.offRequired', 'Off, required')
+      : t('users.record.twoStep.off', 'Off');
 
   const primaryMembership =
     memberships.status === 'ready'
@@ -536,10 +650,9 @@ export function UserRecordScreen({
 
   const identityFields = (
     <>
-      {/* Neither of these is a disabled input. `email` is this person's identity
-          across every tenant and `name` has no column behind it at all, so both
-          are STATED with the reason — a greyed-out box invites the reader to
-          look for the permission that would ungrey it. */}
+      {/* Not a disabled input. `email` is this person's identity across every
+          tenant, so it is STATED with the reason — a greyed-out box invites the
+          reader to look for the permission that would ungrey it. */}
       <StaticField
         label={t('users.record.email.label', 'Email')}
         value={current.email}
@@ -548,14 +661,27 @@ export function UserRecordScreen({
           "The email is this person's identity across every tenant and cannot be changed here."
         )}
       />
-      <StaticField
-        label={t('users.record.name.label', 'Name')}
-        value={current.name}
-        hint={t(
-          'users.record.name.hint',
-          'Derived from the email address; there is no separate name to edit.'
-        )}
-      />
+      <ChangedField
+        changed={form.displayName.trim() !== current.displayName}
+        wasLabel={t('users.record.was', 'Was {value}', { value: current.displayName })}
+        className="space-y-1.5"
+      >
+        <label htmlFor="user-record-name" className="block text-sm font-medium text-foreground">
+          {t('users.record.name.label', 'Name')}
+        </label>
+        <Input
+          id="user-record-name"
+          data-testid="user-record-name"
+          value={form.displayName}
+          placeholder={current.name}
+          maxLength={255}
+          onChange={(event) => setDraft({ ...form, displayName: event.target.value })}
+        />
+        <p className="text-sm text-muted-foreground">
+          {t('users.record.name.shared', 'The name people see for this person, in every workspace they belong to.')}
+        </p>
+      </ChangedField>
+      <StaticField label={t('users.record.twoStep.label', 'Two-step')} value={twoStepLabel} />
     </>
   );
 
@@ -566,7 +692,11 @@ export function UserRecordScreen({
           <>
             {identityFields}
 
-            <div className="space-y-1.5">
+            <ChangedField
+              changed={form.role !== (current.role ?? '')}
+              wasLabel={t('users.record.was', 'Was {value}', { value: roleLabel(current.role ?? '') })}
+              className="space-y-1.5"
+            >
               <label
                 htmlFor="user-record-role"
                 className="block text-sm font-medium text-foreground"
@@ -589,14 +719,18 @@ export function UserRecordScreen({
                 <SelectContent>
                   {(roleNames.status === 'ready' ? roleNames.value : []).map((name) => (
                     <SelectItem key={name} value={name}>
-                      {name}
+                      {roleLabel(name)}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </ChangedField>
 
-            <div className="space-y-1.5">
+            <ChangedField
+              changed={form.ouId !== current.ouId}
+              wasLabel={t('users.record.was', 'Was {value}', { value: ouLabelFor(current.ouId) })}
+              className="space-y-1.5"
+            >
               <label htmlFor="user-record-ou" className="block text-sm font-medium text-foreground">
                 {t('users.record.ou.label', 'Organisational unit')}
               </label>
@@ -634,46 +768,10 @@ export function UserRecordScreen({
                   </SelectContent>
                 </Select>
               )}
-            </div>
+            </ChangedField>
           </>
         )}
       </form>
-
-      {/* A LINK, never a credential. The reset path already invalidates every
-          existing session, already rate-limits and already audits; an
-          admin-typed password control here would have to reproduce all of that
-          a second time, and would put a plaintext password into whatever
-          support channel it got read out over. */}
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('users.record.password.title', 'Password')}</CardTitle>
-          <CardDescription>
-            {t(
-              'users.record.password.subtitle',
-              'Recovering an account without ever handling a credential.'
-            )}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          <Button
-            type="button"
-            variant="outline"
-            data-testid="user-record-send-reset-link"
-            disabled={isSendingReset}
-            onClick={() => void handleSendResetLink()}
-          >
-            {isSendingReset
-              ? t('users.record.password.sending', 'Sending…')
-              : t('users.record.password.action', 'Send reset link')}
-          </Button>
-          <p className="text-xs text-muted-foreground">
-            {t(
-              'users.record.password.hint',
-              'The person receives a one-time link by email and chooses their own password. No password is ever shown to you, and using the link signs the account out of every existing session.'
-            )}
-          </p>
-        </CardContent>
-      </Card>
     </div>
   );
 
@@ -707,123 +805,218 @@ export function UserRecordScreen({
           </div>
           <div className="space-y-1.5">
             <dt className="text-sm font-medium text-foreground">
-              {t('users.record.tenant.label', 'Tenant')}
+              {t('users.record.twoStep.label', 'Two-step')}
             </dt>
-            <dd className="text-sm text-foreground">
-              {primaryMembership?.tenantName ?? `#${current.tenantId}`}
-            </dd>
+            <dd className="text-sm text-foreground">{twoStepLabel}</dd>
           </div>
         </dl>
       )}
     </div>
   );
 
-  return (
-    <RecordPageShell
-      testId="user-record"
-      fields={fields}
-      facts={userFacts}
-      t={t}
-      access={access}
-      back={back}
-      icon={<IconUser />}
-      className={className}
-      actions={
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            disabled={!isDirty || isSaving}
-            onClick={() => resetDraft(current)}
-          >
-            {t('users.record.cancel', 'Discard changes')}
-          </Button>
-          <Button type="submit" form="user-record-form" disabled={isSaving || !isDirty}>
-            {isSaving ? t('users.record.saving', 'Saving…') : t('users.record.save', 'Save changes')}
-          </Button>
-        </div>
-      }
-      main={{ editor, readOnly }}
-      side={
-        <>
-          <RecordCollectionPanel
-            testId="user-record-memberships"
-            title={t('users.record.memberships.title', 'Tenants and roles')}
-            subtitle={t(
-              'users.record.memberships.subtitle',
-              'Every tenant this person belongs to, and the role they hold in each.'
-            )}
-            resource={memberships}
-            emptyLabel={t('users.record.memberships.empty', 'This person belongs to no tenant.')}
-          >
-            {(items) => (
-              <RecordList>
-                {items.map((membership) => (
-                  <RecordListItem
-                    key={membership.id}
-                    primary={membership.tenantName}
-                    secondary={membership.role}
-                    action={
-                      membership.isPrimary ? (
-                        <Badge variant="outline">
-                          {t('users.record.memberships.primary', 'Primary')}
-                        </Badge>
-                      ) : undefined
-                    }
-                  />
-                ))}
-              </RecordList>
-            )}
-          </RecordCollectionPanel>
+  const changedFields = [
+    form.role !== (current.role ?? '') ? t('users.record.changed.role', 'role') : null,
+    form.ouId !== current.ouId ? t('users.record.changed.ou', 'unit') : null,
+    form.displayName.trim() !== current.displayName ? t('users.record.changed.name', 'name') : null,
+  ].filter((part): part is string => part !== null);
 
-          <RecordCollectionPanel
-            testId="user-record-activity"
-            title={t('users.record.activity.title', 'Authority history')}
-            subtitle={t(
-              'users.record.activity.subtitle',
-              'Every grant and revocation recorded against this person, newest first.'
+  const canDeactivate = can(USERS_WRITE) && adapter.setAccountStatus !== undefined;
+  const canDelete = can(USERS_DELETE) && adapter.deleteUser !== undefined;
+  const canRequireTwoStep = can(SECURITY_MANAGE) && adapter.setTwoStepRequirement !== undefined;
+
+  const accessTab = (
+    <RecordCollectionPanel
+      testId="user-record-memberships"
+      title={t('users.record.memberships.title', 'Workspaces and roles')}
+      subtitle={t(
+        'users.record.memberships.subtitle',
+        'Every workspace this person belongs to, and the role they hold in each.'
+      )}
+      resource={memberships}
+      emptyLabel={t('users.record.memberships.empty', 'This person belongs to no workspace.')}
+    >
+      {(items) => (
+        <RecordList>
+          {items.map((membership) => (
+            <RecordListItem
+              key={membership.id}
+              primary={membership.tenantName}
+              secondary={roleLabel(membership.role)}
+              action={
+                membership.isPrimary ? (
+                  <Badge variant="outline">{t('users.record.memberships.primary', 'Primary')}</Badge>
+                ) : undefined
+              }
+            />
+          ))}
+        </RecordList>
+      )}
+    </RecordCollectionPanel>
+  );
+
+  const historyTab = (
+    <RecordCollectionPanel
+      testId="user-record-activity"
+      title={t('users.record.activity.title', 'What changed')}
+      subtitle={t(
+        'users.record.activity.subtitle',
+        'Everything that changed about this person, newest first.'
+      )}
+      resource={activity}
+      emptyLabel={t(
+        'users.record.activity.empty',
+        'Nothing has been recorded against this person yet.'
+      )}
+      placeholderRows={3}
+    >
+      {(entries) => (
+        <RecordTimeline>
+          {entries.map((entry) => (
+            <RecordTimelineItem
+              key={entry.id}
+              title={historySentence(entry, t)}
+              detail={heldSince(entry, t, dates)}
+              // The WHEN survives unless the workspace hides dates (#1068). The
+              // WHO is an id, so it and the event code are technical details.
+              meta={
+                <>
+                  {!dates.hidden && (dates.dateTime(entry.createdAt) ?? '—')}
+                  <TechnicalDetails>
+                    {' · '}
+                    <code className="font-mono text-xs">{entry.action}</code>
+                    {entry.actorUserId !== null &&
+                      ` · ${t('users.record.history.by', 'by {id}', { id: entry.actorUserId })}`}
+                  </TechnicalDetails>
+                </>
+              }
+            />
+          ))}
+        </RecordTimeline>
+      )}
+    </RecordCollectionPanel>
+  );
+
+  return (
+    <>
+      <RecordPageShell
+        testId="user-record"
+        fields={fields}
+        facts={userFacts}
+        t={t}
+        access={access}
+        back={back}
+        icon={<Avatar name={current.name || current.email} size={40} />}
+        className={className}
+        actions={
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              data-testid="user-record-send-reset-link"
+              disabled={isSendingReset}
+              onClick={() => void handleSendResetLink()}
+            >
+              {isSendingReset
+                ? t('users.record.password.sending', 'Sending…')
+                : t('users.record.password.action', 'Send reset link')}
+            </Button>
+            {canRequireTwoStep && (
+              <Button
+                type="button"
+                variant="outline"
+                data-testid="user-record-two-step"
+                onClick={() =>
+                  current.twoStep.requiredDirectly ? void changeTwoStep(false) : setConfirmingTwoStep(true)
+                }
+              >
+                {current.twoStep.requiredDirectly
+                  ? t('users.record.twoStep.requireStop', 'Stop requiring two-step')
+                  : t('users.record.twoStep.require', 'Require two-step')}
+              </Button>
             )}
-            resource={activity}
-            emptyLabel={t(
-              'users.record.activity.empty',
-              'Nothing has been recorded against this person yet.'
+            {(canDeactivate || canDelete) && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    aria-label={t('users.record.menu.label', 'More actions')}
+                  >
+                    <IconMenu2 />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {canDeactivate && (
+                    <DropdownMenuItem
+                      onClick={() =>
+                        void changeStatus(current.accountStatus === 'inactive' ? 'active' : 'inactive', true)
+                      }
+                    >
+                      {current.accountStatus === 'inactive'
+                        ? t('users.record.reactivate', 'Reactivate')
+                        : t('users.record.deactivate', 'Deactivate')}
+                    </DropdownMenuItem>
+                  )}
+                  {canDelete && (
+                    <DropdownMenuItem variant="destructive" onClick={() => setConfirmingDelete(true)}>
+                      {t('users.record.delete', 'Delete')}
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
-            placeholderRows={3}
-          >
-            {(entries) => (
-              <RecordTimeline>
-                {entries.map((entry) => (
-                  <RecordTimelineItem
-                    key={entry.id}
-                    // A stable machine identifier (`user.membership.removed`),
-                    // not a source string — it renders verbatim and never enters
-                    // the catalogue, the same rule permission slugs follow.
-                    title={entry.action}
-                    // #1068: the WHO survives, the WHEN goes — the rows are
-                    // still in order, which is what a trail is for.
-                    meta={
-                      <>
-                        {!dates.hidden && (
-                          <>
-                            {dates.dateTime(entry.createdAt) ?? '—'}
-                            {' · '}
-                          </>
-                        )}
-                        {entry.actorUserId !== null
-                          ? t('users.record.activity.actor', 'by user {id}', {
-                              id: entry.actorUserId,
-                            })
-                          : t('users.record.activity.unknownActor', 'by the system')}
-                      </>
-                    }
-                    detail={activityDetail(entry, t, dates) ?? undefined}
-                  />
-                ))}
-              </RecordTimeline>
-            )}
-          </RecordCollectionPanel>
-        </>
-      }
-    />
+          </div>
+        }
+        main={{ editor, readOnly }}
+        tabs={{
+          overviewLabel: t('users.record.tab.overview', 'Overview'),
+          items: [
+            { key: 'access', label: t('users.record.tab.access', 'Access'), content: accessTab },
+            ...(activity.status !== 'forbidden'
+              ? [{ key: 'history', label: t('users.record.tab.history', 'History'), content: historyTab }]
+              : []),
+          ],
+        }}
+        saveBar={
+          <SaveBar
+            dirty={isDirty}
+            summary={t('users.record.changed.summary', 'Changed: {fields}', {
+              fields: changedFields.join(', '),
+            })}
+            discardLabel={t('users.record.discard', 'Discard')}
+            saveLabel={t('users.record.save', 'Save changes')}
+            saving={isSaving}
+            onDiscard={() => resetDraft(current)}
+            onSave={() => void handleSubmit({ preventDefault: () => undefined } as FormEvent)}
+          />
+        }
+      />
+      <ConfirmAction
+        open={confirmingTwoStep}
+        onOpenChange={setConfirmingTwoStep}
+        variant="default"
+        title={t('users.record.twoStep.confirm.title', 'Require two-step of {name}?', { name: current.name })}
+        description={t(
+          'users.record.twoStep.confirm.description',
+          'If they do not have it on, they have to set it up the next time they sign in.'
+        )}
+        confirmLabel={t('users.record.twoStep.require', 'Require two-step')}
+        cancelLabel={t('users.record.twoStep.confirm.cancel', 'Cancel')}
+        onConfirm={() => changeTwoStep(true)}
+      />
+      <ConfirmAction
+        open={confirmingDelete}
+        onOpenChange={setConfirmingDelete}
+        title={t('users.record.delete.title', 'Delete {name}?', { name: current.name })}
+        description={t(
+          'users.record.delete.description',
+          'They lose access to this workspace and their role here is removed. This cannot be undone.'
+        )}
+        confirmLabel={t('users.record.delete.confirm', 'Delete person')}
+        cancelLabel={t('users.record.delete.cancel', 'Cancel')}
+        onConfirm={handleDelete}
+      />
+    </>
   );
 }

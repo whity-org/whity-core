@@ -26,13 +26,16 @@ final class SettingsRegistryTest extends TestCase
              'mcp.always_on_plugin_tools',
              'auth.self_registration_enabled', 'auth.registration_approval_required',
              'auth.registration_payment_required',
-             'auth.self_password_reset_enabled', 'auth.password_reset_approval_required',
+             'auth.self_password_reset_enabled',
+             'maintenance.active', 'maintenance.until',
+             'auth.password_reset_approval_required',
              'auth.self_2fa_recovery_enabled',
              'auth.sso_enabled', 'auth.sso_self_provision_workspace', 'auth.desktop_login_max_hours',
              'storage.driver', 'storage.s3.endpoint', 'storage.s3.region', 'storage.s3.bucket',
              'storage.s3.access_key', 'storage.s3.path_style', 'storage.s3.public_base_url',
              'mail.transport', 'mail.smtp.host', 'mail.smtp.port', 'mail.smtp.encryption',
-             'mail.smtp.username', 'mail.from_address', 'mail.from_name',
+             'mail.smtp.username', 'mail.smtp.auth_mode', 'mail.oauth.provider', 'mail.oauth.client_id',
+             'mail.oauth.microsoft_tenant', 'mail.from_address', 'mail.from_name',
              'mail.events.welcome_enabled', 'mail.events.approval_enabled',
              'mail.events.invitation_enabled', 'mail.events.verification_enabled',
              'mail.events.deletion_enabled', 'mail.events.password_reset_enabled',
@@ -429,7 +432,9 @@ final class SettingsRegistryTest extends TestCase
         // 91 since WHIT-742: documents.slot_bindings.
         // 93 since WHIT-788: three billing.seller_* out, five company.* in.
         // 94 since WHIT-742 slice 3: documents.background_issuing.
-        self::assertCount(94, $describe);
+        // 96 since WHIT-873: maintenance.active and maintenance.until.
+        // 100 since WHIT-901: mail.smtp.auth_mode and three mail.oauth.* keys.
+        self::assertCount(100, $describe);
         self::assertSame(
             ['key' => 'site_name', 'type' => 'string', 'default' => 'Whity'],
             $describe[0]
@@ -441,7 +446,8 @@ final class SettingsRegistryTest extends TestCase
     public function testMailKeysAreGlobalOnly(): void
     {
         foreach (['mail.transport', 'mail.smtp.host', 'mail.smtp.port', 'mail.smtp.encryption',
-                  'mail.smtp.username', 'mail.from_address', 'mail.from_name',
+                  'mail.smtp.username', 'mail.smtp.auth_mode', 'mail.oauth.provider', 'mail.oauth.client_id',
+             'mail.oauth.microsoft_tenant', 'mail.from_address', 'mail.from_name',
                   'mail.events.welcome_enabled', 'mail.events.approval_enabled',
                   'mail.events.invitation_enabled', 'mail.events.verification_enabled',
                   'mail.events.deletion_enabled', 'mail.events.password_reset_enabled',

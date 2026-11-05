@@ -2,6 +2,10 @@
 
 The Whity Core CLI tool provides a command-line interface for common operations staff tasks.
 
+This page is about `bin/whity-cli`, the PHP tool that runs on the server against the
+database. To install or update a self-hosted Whity, use the separate `whity` command
+from [Whity CLI](Whity-CLI.md), which calls this tool inside the containers.
+
 ## Installation
 
 The CLI tool is located at `bin/whity-cli`. Ensure it is executable:

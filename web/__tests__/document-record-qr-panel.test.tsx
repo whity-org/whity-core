@@ -63,6 +63,9 @@ jest.mock('@/lib/api-client', () => ({
 
 const addToast = jest.fn();
 jest.mock('@/lib/toast-context', () => ({ useToast: () => ({ addToast }) }));
+jest.mock('@/hooks/useCapabilities', () => ({
+  useCapabilities: () => ({ has: () => false, hasPermission: () => false, loading: false }),
+}));
 
 // bwip-js draws the symbol through a canvas-free SVG path, but it is still a
 // heavy dependency to run per test and its OUTPUT is not what this file is
@@ -84,6 +87,7 @@ beforeAll(() => {
 });
 
 beforeEach(() => {
+  window.history.replaceState(null, '', '/?tab=verification');
   jest.clearAllMocks();
   params = { id: '5' };
 });
@@ -209,13 +213,10 @@ function serve(options: {
       );
     }
     if (url.includes('/recipients')) return Promise.resolve(jsonResponse({ data: [] }));
-    if (url.startsWith('/api/v1/users')) {
+    if (url.includes('/people')) {
       return Promise.resolve(
         directoryStatus === 200
-          ? jsonResponse({
-              data: [{ id: 10, name: 'amira', email: 'amira@example.test' }],
-              pagination: { page: 1, perPage: 100, total: 1, totalPages: 1 },
-            })
+          ? jsonResponse({ data: { 10: 'amira' } })
           : jsonResponse({ error: 'nope' }, directoryStatus)
       );
     }
@@ -560,7 +561,7 @@ describe('scan history', () => {
     expect(anonymous).not.toHaveTextContent(/unknown|unidentified|guest/i);
     // A signed-in scanner IS named, so the line above is a statement about what
     // is stored rather than a blanket refusal to name anybody.
-    expect(screen.getByTestId('document-record-qr-scan-2')).toHaveTextContent('amira@example.test');
+    expect(screen.getByTestId('document-record-qr-scan-2')).toHaveTextContent('amira');
   });
 
   it('says the absence of a visitor identity is structural, not a gap', async () => {
@@ -639,14 +640,14 @@ describe('scan history', () => {
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
   });
 
-  it('numbers a scanner it may not name, and says which permission would name them', async () => {
+  it('shows no number for a scanner it may not name', async () => {
     serve({ qrPanels: [livePanel({ scans: SCANS })], directoryStatus: 403 });
 
     render(<DocumentRecordPage />);
 
-    // Never a blank and never a guess: the id, plus the sentence naming the
-    // permission, so a reader can tell a policy boundary from a data bug.
-    expect(await screen.findByTestId('document-record-qr-scan-2')).toHaveTextContent('Account #10');
+    // Never a blank, never a guess and never an id. Only a reader of the directory
+    // is told who scanned it, so this says what is known.
+    expect(await screen.findByTestId('document-record-qr-scan-2')).toHaveTextContent('Someone signed in');
     expect(
       within(screen.getByTestId('document-record-section-qr')).getByTestId(
         'document-record-directory-people'
@@ -658,8 +659,8 @@ describe('scan history', () => {
    * ...AND WITHHOLDS THAT SENTENCE WHEN IT NUMBERS NOBODY.
    *
    * A document with no code and no signed-in scanner shows no person at all.
-   * "People are shown by account number" above a panel showing no account
-   * numbers is a true sentence about nothing in front of the reader, which is
+   * "Names could not be loaded" above a panel naming nobody is a true sentence
+   * about nothing in front of the reader, which is
    * the same class of defect as a false one: it sends somebody looking for a
    * permission that would change nothing they can see.
    */
@@ -786,7 +787,7 @@ describe('the region is the server’s decision', () => {
 
     render(<DocumentRecordPage />);
 
-    expect(await screen.findByTestId('document-record-section-document')).toBeInTheDocument();
+    expect(await screen.findByTestId('document-record')).toBeInTheDocument();
     expect(screen.queryByTestId('document-record-section-qr')).not.toBeInTheDocument();
     // The second half of the same rule. Here it holds structurally rather than
     // by a flag: the panel owns its request, and a hidden region is never
@@ -826,7 +827,7 @@ describe('the region is the server’s decision', () => {
     // Absent, not empty-and-broken: there is nothing retired to list.
     expect(screen.queryByTestId('document-record-qr-retired')).not.toBeInTheDocument();
     // The rest of the record survived, which is the point.
-    expect(screen.getByTestId('document-record-section-trail')).toBeInTheDocument();
+    expect(screen.getByTestId('document-record')).toBeInTheDocument();
   });
 
   /**
@@ -875,7 +876,7 @@ describe('the region is the server’s decision', () => {
     expect(screen.getByTestId('document-record-qr-scan-total')).toHaveTextContent('4');
     // What is gone is the ability to act.
     expect(screen.queryByTestId('document-record-qr-actions')).not.toBeInTheDocument();
-    const note = screen.getByTestId('document-record-section-qr-readonly');
+    const note = screen.getByTestId('document-record-readonly-notice');
     expect(note).toHaveTextContent(/Issuing a new one, or withdrawing it/i);
     expect(note).toHaveTextContent("documents:render");
   });
@@ -912,7 +913,7 @@ describe('the region is the server’s decision', () => {
     );
     // The region-level sentence commits to no cause, because the server's
     // predicate is false for three of them and naming one would be wrong in two.
-    expect(screen.getByTestId('document-record-section-qr-readonly')).toHaveTextContent(
+    expect(screen.getByTestId('document-record-readonly-notice')).toHaveTextContent(
       /The reason is below/i
     );
   });

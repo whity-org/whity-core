@@ -103,7 +103,8 @@ describe('Approvals page', () => {
     expect(screen.getByRole('heading', { name: 'Create form 1' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Create form 2' })).not.toBeInTheDocument();
     expect(screen.getAllByText('Billing assistant').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('forms:manage').length).toBeGreaterThan(0);
+    // Permission codes show only with Show technical details.
+    expect(screen.queryByText('forms:manage')).not.toBeInTheDocument();
     expect(screen.getByText("Can't be undone")).toBeInTheDocument();
   });
 

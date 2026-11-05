@@ -8,6 +8,10 @@ import { ApprovalGatingTabs } from '@/components/admin/approval-gating-tabs';
 import { Button } from '@whity/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
 import { AccessDenied } from '@whity/ui/access-denied';
+import { Pagination } from '@whity/ui/pagination';
+import { ConfirmAction } from '@whity/ui/confirm-action';
+import { AreaError, LoadingRows } from '@whity/ui/page-states';
+import { useDateDisplay } from '@whity/features/datetime';
 import { IconCheck, IconInbox, IconX } from '@tabler/icons-react';
 import { useTranslation } from '@whity/features/i18n';
 
@@ -31,11 +35,15 @@ import { useTranslation } from '@whity/features/i18n';
  */
 const PASSWORD_RESETS_APPROVE = 'password_resets:approve';
 
+const PER_PAGE = 25;
+
 interface PendingPasswordReset {
   id: number;
   profile_id: number;
   email: string;
   display_name: string;
+  /** Why they asked, in their own words. Optional, so often null. */
+  reason: string | null;
   created_at: string;
 }
 
@@ -49,13 +57,18 @@ export default function PasswordResetApprovalsPage() {
   const [items, setItems] = useState<PendingPasswordReset[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
   const [busyId, setBusyId] = useState<number | null>(null);
+  // Approving is security-sensitive: type the email to confirm (tier 3).
+  const [approving, setApproving] = useState<typeof items[number] | null>(null);
+  const dates = useDateDisplay();
 
   const load = useCallback(async () => {
     setLoading(true);
     setLoadError(false);
     try {
-      const res = await fetch('/api/v1/password-resets/pending', {
+      const res = await fetch(`/api/v1/password-resets/pending?page=${page}&per_page=${PER_PAGE}`, {
         headers: { 'X-Requested-With': 'XMLHttpRequest' },
         credentials: 'include',
       });
@@ -65,14 +78,16 @@ export default function PasswordResetApprovalsPage() {
         return;
       }
       const body = await res.json().catch(() => ({}));
-      setItems(Array.isArray(body?.data) ? (body.data as PendingPasswordReset[]) : []);
+      const rows = Array.isArray(body?.data) ? (body.data as PendingPasswordReset[]) : [];
+      setItems(rows);
+      setTotal(typeof body?.pagination?.total === 'number' ? body.pagination.total : rows.length);
     } catch {
       setLoadError(true);
       setItems([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [page]);
 
   useEffect(() => {
     if (!isCapabilitiesLoading && canApprove) {
@@ -189,15 +204,18 @@ export default function PasswordResetApprovalsPage() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="flex items-center justify-center py-10">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-            </div>
+            <LoadingRows
+              label={t('passwordResets.loading', 'Loading requests')}
+              headers={[t('passwordResets.column.person', 'Person'), t('passwordResets.column.asked', 'Asked')]}
+              rows={3}
+            />
           ) : loadError ? (
-            <div className="text-sm text-destructive" data-testid="password-resets-load-error">
-              {t('passwordResets.loadError', 'Failed to load pending password-reset requests.')}{' '}
-              <button type="button" onClick={() => void load()} className="underline font-medium">
-                {t('passwordResets.retry', 'Retry')}
-              </button>
+            <div data-testid="password-resets-load-error">
+              <AreaError
+                message={t('passwordResets.loadError', 'Failed to load the requests.')}
+                retryLabel={t('passwordResets.retry', 'Try again')}
+                onRetry={() => void load()}
+              />
             </div>
           ) : items.length === 0 ? (
             <div
@@ -219,19 +237,31 @@ export default function PasswordResetApprovalsPage() {
                 >
                   <div className="min-w-0">
                     <p className="font-medium text-foreground truncate">{item.email}</p>
-                    <p className="text-sm text-muted-foreground truncate">{item.display_name}</p>
+                    <p className="text-sm text-foreground" data-testid={`passwordResets-reason-${item.id}`}>
+                      {item.reason ?? t('passwordResets.reason.default', 'Asked to reset their password')}
+                    </p>
+                    <p className="text-sm text-muted-foreground truncate">
+                      {[
+                        item.display_name,
+                        dates.dateTime(item.created_at) !== null
+                          ? t('passwordResets.asked', 'Asked on {date}', { date: dates.dateTime(item.created_at) ?? '' })
+                          : null,
+                      ]
+                        .filter((part) => part)
+                        .join(' · ')}
+                    </p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <Button
                       type="button"
                       size="sm"
                       disabled={busyId === item.id}
-                      onClick={() => void act(item, 'approve')}
+                      onClick={() => setApproving(item)}
                       className="gap-1"
                       data-testid={`password-reset-approve-${item.id}`}
                     >
                       <IconCheck className="w-4 h-4" />
-                      {t('passwordResets.action.approve', 'Approve')}
+                      {t('passwordResets.action.approve', 'Approve…')}
                     </Button>
                     <Button
                       type="button"
@@ -250,8 +280,32 @@ export default function PasswordResetApprovalsPage() {
               ))}
             </ul>
           )}
+          {!loading && !loadError && total > PER_PAGE && (
+            <Pagination className="mt-4" page={page} perPage={PER_PAGE} total={total} onPageChange={setPage} />
+          )}
         </CardContent>
       </Card>
+      <ConfirmAction
+        open={approving !== null}
+        onOpenChange={(open) => {
+          if (!open) setApproving(null);
+        }}
+        title={t('passwordResets.approve.title', 'Approve the password reset for {email}?', { email: approving?.email ?? '' })}
+        description={t(
+          'passwordResets.approve.description',
+          'Their new password takes effect now and they are signed out everywhere. Check that the request really came from them.'
+        )}
+        confirmLabel={t('passwordResets.approve.confirm', 'Approve request')}
+        cancelLabel={t('passwordResets.approve.cancel', 'Cancel')}
+        typeToConfirm={{
+          value: approving?.email ?? '',
+          label: t('passwordResets.approve.typeLabel', 'Type their email to confirm'),
+        }}
+        variant="default"
+        onConfirm={async () => {
+          if (approving !== null) await act(approving, 'approve');
+        }}
+      />
     </div>
   );
 }

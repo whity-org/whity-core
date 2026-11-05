@@ -7,6 +7,7 @@ namespace Whity\Http;
 use Whity\Sdk\Http\Request;
 use Whity\Sdk\Http\Response;
 use Whity\Core\Audit\AuditContext;
+use Whity\Core\Observability\ErrorReference;
 use Whity\Core\Router;
 use Whity\Core\Tenant\TenantContext;
 
@@ -199,7 +200,7 @@ class HttpKernel
             }
 
             // Execute the complete pipeline
-            return $pipeline($request);
+            return ErrorReference::attach($pipeline($request), $request);
         } finally {
             // Clean up request state after request completes
             $this->resetRequestState();
@@ -281,8 +282,18 @@ class HttpKernel
                 // Create a closure that wraps the handler, passing params
                 $next = fn(Request $req) => $handler($req, $params);
 
+                $recordAccess = $matchedRoute['recordAccess'] ?? null;
+
                 // Pass through RBAC middleware (role + permission).
-                $response = $this->rbacMiddleware->handle($request, $next, $requiredRole, $requiredPermission);
+                $response = $this->rbacMiddleware->handle(
+                    $request,
+                    $next,
+                    $requiredRole,
+                    $requiredPermission,
+                    is_callable($recordAccess)
+                        ? static fn (int $profileId, int $tenantId): bool => $recordAccess($profileId, $tenantId, $params)
+                        : null,
+                );
             } else {
                 // Otherwise, call handler directly with params
                 $response = $handler($request, $params);

@@ -197,7 +197,8 @@ final class SubmissionIssuer
             $document = $this->documents->raise(
                 $tenantId,
                 $actorProfileId,
-                ['name' => 'form:' . (string) ($form['form_key'] ?? '')],
+                // Shown in the library and on the record, so it is the form's name, not its key.
+                ['name' => $title],
                 $title,
                 // `variable_data` stays null. It is the render subsystem's
                 // key/value list for a label sheet, not a general side-channel,
@@ -217,6 +218,14 @@ final class SubmissionIssuer
                 $values,
                 $this->referenceFor($tenantId, $form),
             );
+
+            // In this transaction, so the answers are either a draft or a submission,
+            // and a refused submission leaves the person's draft alone.
+            if ($actorProfileId !== null) {
+                $this->db->prepare(
+                    'DELETE FROM form_drafts WHERE tenant_id = :tenant_id AND form_id = :form_id AND profile_id = :profile_id'
+                )->execute([':tenant_id' => $tenantId, ':form_id' => $formId, ':profile_id' => $actorProfileId]);
+            }
 
             // Attachments BEFORE the route: an artifact that could not be
             // claimed must stop the submission, and stopping it before anybody

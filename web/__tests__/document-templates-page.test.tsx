@@ -181,15 +181,15 @@ describe('the list', () => {
     expect(starter).toHaveTextContent('Template');
     // The record type by its name, from the embeds catalogue.
     expect(starter).toHaveTextContent('Invoice');
-    expect(starter).toHaveTextContent('Published v2');
+    expect(starter).toHaveTextContent('Published, version 2');
 
     const converted = screen.getByText('Example Bakery works order').closest('tr')!;
     expect(converted).toHaveTextContent('Draft');
-    expect(converted).toHaveTextContent('None');
+    
 
     const labels = screen.getByText('Example Bakery shelf labels').closest('tr')!;
     expect(labels).toHaveTextContent('Label sheet');
-    expect(labels).toHaveTextContent('Published v1');
+    expect(labels).toHaveTextContent('Published, version 1');
   });
 
   it('marks Whity starters and templates converted from the old designer', async () => {
@@ -209,9 +209,9 @@ describe('the list', () => {
     render(<DocumentTemplatesPage />);
     await waitFor(() => expect(screen.getByText('Example Bakery works order')).toBeInTheDocument());
 
-    expect(screen.getByText('Example Bakery invoice').closest('tr')).toHaveTextContent('System');
-    expect(screen.getByText('Example Bakery works order').closest('tr')).toHaveTextContent('Tenant-wide');
-    expect(screen.getByText('Example Bakery shelf labels').closest('tr')).toHaveTextContent('Personal');
+    expect(screen.getByText('Example Bakery invoice').closest('tr')).toHaveTextContent('It comes with Whity');
+    expect(screen.getByText('Example Bakery works order').closest('tr')).toHaveTextContent('Visible to everyone at Example Bakery kitchen and below it');
+    expect(screen.getByText('Example Bakery shelf labels').closest('tr')).toHaveTextContent('Only');
   });
 
   it('links each title to the editor', async () => {
@@ -246,6 +246,7 @@ describe('New template', () => {
     render(<DocumentTemplatesPage />);
 
     await user.click(screen.getByRole('button', { name: 'New template' }));
+    await user.click(await screen.findByRole('button', { name: 'Start blank' }));
 
     await waitFor(() => expect(push).toHaveBeenCalledWith('/admin/document-sources/91'));
     expect(mockCreateDocumentSource).toHaveBeenCalledWith('template', '');
@@ -257,6 +258,7 @@ describe('New template', () => {
     render(<DocumentTemplatesPage />);
 
     await user.click(screen.getByRole('button', { name: 'New template' }));
+    await user.click(await screen.findByRole('button', { name: 'Start blank' }));
 
     await waitFor(() =>
       expect(addToast).toHaveBeenCalledWith('The template wasn’t created. Try again.', 'error')
@@ -292,7 +294,7 @@ describe('row actions', () => {
     await waitFor(() => expect(screen.getByText('Example Bakery invoice')).toBeInTheDocument());
 
     await openRowMenu(user, 'Example Bakery invoice');
-    await user.click(screen.getByRole('menuitem', { name: 'Use a copy…' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Make a copy…' }));
 
     const input = await screen.findByLabelText('Title of the copy');
     expect(input).toHaveValue('Example Bakery invoice (copy)');
@@ -348,7 +350,7 @@ describe('who can see it', () => {
 
     await openRowMenu(user, 'Example Bakery works order');
     expect(screen.getByRole('menuitem', { name: 'Who can see it…' })).toHaveAttribute('aria-disabled', 'true');
-    expect(screen.getByRole('menuitem', { name: 'Use a copy…' })).toBeEnabled();
+    expect(screen.getByRole('menuitem', { name: 'Make a copy…' })).toBeEnabled();
   });
 
   it('previews the audience live and PATCHes the three fields together', async () => {

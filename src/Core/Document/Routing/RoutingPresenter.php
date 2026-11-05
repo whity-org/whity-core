@@ -213,6 +213,9 @@ final class RoutingPresenter
             // circulation step, every note, and every event recorded before
             // migration 119. It never means "not approved".
             'verdict' => $event['verdict'] ?? null,
+            // S5: this row closed the route because the document was withdrawn.
+            // Nobody wrote it as a note, so a screen does not show it as one.
+            'withdrawal' => DbBool::of($event['withdrawal'] ?? false),
             'occurred_at' => (string) $event['occurred_at'],
         ];
     }
@@ -242,6 +245,9 @@ final class RoutingPresenter
             'created_by_event_id' => (int) $recipient['created_by_event_id'],
             'closed_by_event_id' => $recipient['closed_by_event_id'],
             'open' => $recipient['closed_by_event_id'] === null,
+            // S5: the document was withdrawn while this waited. Like a delivery,
+            // this is a closed row nobody acted on, and a screen must not say so.
+            'closed_by_withdrawal' => ($recipient['closed_by_withdrawal'] ?? false) === true,
             // #1054. WAS THIS CLOSED BY A PERSON, OR BY THE DOCUMENT REACHING
             // THEM? Without it a delivery step's three hundred rows read exactly
             // like three hundred people who acted, which is the same

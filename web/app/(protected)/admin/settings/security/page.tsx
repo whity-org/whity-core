@@ -93,27 +93,27 @@ export default function SecurityPolicySettingsPage() {
   );
 }
 
-function scopeLabel(
-  policy: TwoFactorPolicy,
-  ous: OuOption[],
-  users: UserOption[],
-  t: TranslateFn
-): string {
+/** Who a rule covers, in words. The server names the scope, so nobody needs to read users to see it. */
+function scopeLabel(policy: TwoFactorPolicy, t: TranslateFn): string {
   if (policy.scope_type === 'tenant') {
-    return t('settings.security.scope.tenant', 'Everyone in this tenant');
+    return t('settings.security.scope.everyone', 'Everyone in this workspace');
   }
-  if (policy.scope_type === 'ou') {
-    const ou = ous.find((o) => o.id === policy.scope_id);
-    return ou
-      ? t('settings.security.scope.ou', '{name} (and its sub-units)', { name: ou.name })
-      : t('settings.security.scope.ouFallback', 'Organizational unit #{id}', {
-          id: String(policy.scope_id),
-        });
+  if (policy.scope_name) {
+    return policy.scope_type === 'ou'
+      ? t('settings.security.scope.ou', '{name} (and its sub-units)', { name: policy.scope_name })
+      : policy.scope_name;
   }
-  const user = users.find((u) => u.id === policy.scope_id);
-  return user
-    ? user.email
-    : t('settings.security.scope.userFallback', 'User #{id}', { id: String(policy.scope_id) });
+  return policy.scope_type === 'ou'
+    ? t('settings.security.scope.ouGone', 'A unit that no longer exists')
+    : t('settings.security.scope.userGone', 'Someone who has left this workspace');
+}
+
+/** The day a rule's grace period ends, which is when it starts to refuse sign-in. */
+function requiredFrom(policy: TwoFactorPolicy): string | null {
+  const created = new Date(policy.created_at.replace(' ', 'T') + (/[zZ]$/.test(policy.created_at) ? '' : 'Z'));
+  if (Number.isNaN(created.getTime())) return null;
+  created.setUTCDate(created.getUTCDate() + policy.grace_period_days);
+  return created.toISOString();
 }
 
 function TwoFactorPoliciesSection({
@@ -124,6 +124,7 @@ function TwoFactorPoliciesSection({
   onPoliciesChanged: () => void;
 }) {
   const t = useTranslation('admin');
+  const dates = useDateDisplay();
   const [adding, setAdding] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<number | null>(null);
 
@@ -257,23 +258,15 @@ function TwoFactorPoliciesSection({
                 <div className="min-w-0 space-y-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-medium text-foreground">
-                      {scopeLabel(policy, ous ?? [], users ?? [], t)}
+                      {scopeLabel(policy, t)}
                     </span>
-                    <Badge variant="secondary" className="text-xs uppercase">
-                      {policy.scope_type}
-                    </Badge>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {policy.grace_period_days === 0
-                      ? t(
-                          'settings.security.policies.gracePeriod.none',
-                          'No grace period — enforced immediately.'
-                        )
-                      : t(
-                          'settings.security.policies.gracePeriod.days',
-                          "{days}-day grace period from the policy's creation.",
-                          { days: policy.grace_period_days }
-                        )}
+                    {policy.grace_period_days === 0 || dates.date(requiredFrom(policy)) === null
+                      ? t('settings.security.policies.requiredNow', 'Required now')
+                      : t('settings.security.policies.requiredFrom', 'Required from {date}', {
+                          date: dates.date(requiredFrom(policy)) ?? '',
+                        })}
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
@@ -510,10 +503,59 @@ function PolicyFormCard({
   );
 }
 
+/** Remind one person, once a day. The server enforces the limit and says when. */
+function RemindButton({
+  entry,
+  addToast,
+  onReminded,
+}: {
+  entry: StatusEntry;
+  addToast: AddToast;
+  onReminded: () => void;
+}) {
+  const t = useTranslation('admin');
+  const [busy, setBusy] = useState(false);
+
+  const remind = async () => {
+    setBusy(true);
+    try {
+      const { error, response } = await api.POST('/api/v1/2fa-policies/remind', {
+        body: { profile_id: entry.profile_id },
+      });
+      if (response.status === 429) {
+        addToast(t('settings.security.remind.already', 'They were already reminded today.'), 'error');
+      } else if (error !== undefined || !response.ok) {
+        addToast(errorMessage(error, t('settings.security.remind.failed', 'The reminder was not sent.')), 'error');
+      } else {
+        addToast(
+          t('settings.security.remind.sent', 'Reminder sent to {name}.', { name: entry.name || entry.email }),
+          'success'
+        );
+      }
+      onReminded();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      disabled={busy}
+      data-testid={`remind-two-factor-${entry.profile_id}`}
+      onClick={() => void remind()}
+    >
+      {t('settings.security.remind.action', 'Remind')}
+    </Button>
+  );
+}
+
 function EnrollmentStatusSection({ refreshKey }: { refreshKey: number }) {
   const t = useTranslation('admin');
   const dates = useDateDisplay();
-  const { data, error } = useFetch<StatusEntry[]>(async () => {
+  const { addToast } = useToast();
+  const { data, error, refetch } = useFetch<StatusEntry[]>(async () => {
     const { data: body, error: statusError } = await api.GET('/api/v1/2fa-policies/status');
     if (body === undefined) {
       throw new Error(
@@ -532,6 +574,12 @@ function EnrollmentStatusSection({ refreshKey }: { refreshKey: number }) {
       accessorKey: 'email',
       header: t('settings.security.status.column.person', 'Person'),
       enableSorting: true,
+      cell: (row) => (
+        <span>
+          <span className="block font-medium">{row.name || row.email}</span>
+          {row.name ? <span className="block text-xs text-muted-foreground">{row.email}</span> : null}
+        </span>
+      ),
     },
     {
       id: 'enrolled',
@@ -564,13 +612,30 @@ function EnrollmentStatusSection({ refreshKey }: { refreshKey: number }) {
         className: 'text-sm text-muted-foreground',
       },
     ]),
+    {
+      id: 'remind',
+      header: t('settings.security.status.column.remind', 'Reminder'),
+      cell: (row) =>
+        row.enrolled ? null : (
+          <div className="flex flex-wrap items-center gap-2">
+            <RemindButton entry={row} addToast={addToast} onReminded={refetch} />
+            {dates.date(row.last_reminded_at) !== null && (
+              <span className="text-xs text-muted-foreground">
+                {t('settings.security.remind.last', 'Last reminded {date}', {
+                  date: dates.date(row.last_reminded_at) ?? '',
+                })}
+              </span>
+            )}
+          </div>
+        ),
+    },
   ];
 
   return (
     <Card className="border border-border bg-card shadow-sm" data-testid="two-factor-status-card">
       <CardHeader>
         <CardTitle className="text-lg font-semibold font-heading">
-          <h2>{t('settings.security.status.title', 'Enrollment status')}</h2>
+          <h2>{t('settings.security.status.titlePlain', 'Who has set it up')}</h2>
         </CardTitle>
         <CardDescription className="text-sm">
           {t(

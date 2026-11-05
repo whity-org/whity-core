@@ -498,7 +498,7 @@ export function InstalledPluginCard({
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-base">
-                <IconArrowBackUp className="size-5 text-amber-600 dark:text-amber-400" />
+                <IconArrowBackUp className="size-5 text-warning-text" />
                 {text.confirmRollbackTitle}
               </DialogTitle>
               <DialogDescription className="text-xs">
@@ -506,7 +506,7 @@ export function InstalledPluginCard({
               </DialogDescription>
             </DialogHeader>
 
-            <div className="rounded-lg bg-amber-500/10 border border-amber-500/30 p-3 text-xs text-amber-950 dark:text-amber-100 space-y-1">
+            <div className="rounded-lg bg-warning-tint border border-warning/30 p-3 text-xs text-warning-text space-y-1">
               <div className="font-semibold flex items-center gap-1.5">
                 <IconAlertCircle className="size-4 shrink-0" />
                 Warning: Version Degradation
@@ -629,7 +629,7 @@ function PluginDetailsModal({
                 <span className="text-muted-foreground">({plugin.reviewCount} reviews)</span>
               </div>
               <div className="flex items-center gap-1.5 rounded-lg border border-border/50 bg-muted/40 px-3 py-1.5 text-xs">
-                <IconShieldCheck className="size-3.5 text-emerald-500" />
+                <IconShieldCheck className="size-3.5 text-success-text" />
                 <span className="font-semibold">{text.securityVerified}</span>
               </div>
             </div>
@@ -744,13 +744,13 @@ function PluginImageGallery({
           kind: "placeholder",
           title: "Configuration & Settings",
           label: "Rule Engine Settings",
-          gradient: "from-blue-600/30 via-slate-800/30 to-muted/80",
+          gradient: "from-info/20 via-muted to-muted/80",
         },
         {
           kind: "placeholder",
           title: "Telemetry & Live Logs",
           label: "Realtime Analytics",
-          gradient: "from-emerald-600/30 via-teal-800/30 to-muted/80",
+          gradient: "from-success/20 via-muted to-muted/80",
         },
       ]
 
@@ -844,5 +844,88 @@ function PluginImageGallery({
         </div>
       )}
     </div>
+  )
+}
+
+export interface PluginTileProps extends Omit<React.ComponentProps<"div">, "title"> {
+  name: string
+  publisher?: string
+  summary?: string
+  version?: string | null
+  tags?: string[]
+  /** What it adds, as chips (section 19). */
+  adds?: string[]
+  /** One line of facts: price, usage, last update. Already formatted by the caller. */
+  facts?: string[]
+  /** Draw the Verified mark. Only ever set from what the server returns. */
+  verified?: boolean
+  verifiedLabel?: string
+  /** The server's trust answer when it isn't Verified, such as "Not verified". */
+  trustLabel?: string
+  icon?: React.ReactNode
+  /** Opens the plugin's page. The name is the keyboard-reachable control; the whole tile is its target. */
+  onOpen: () => void
+  /** The tile's one action, such as Install. */
+  action?: React.ReactNode
+}
+
+/**
+ * A plugin in the store (docs/design/components/PluginCard): the logo, the name,
+ * the publisher, one line, and the tile's one action. No ratings or reviews
+ * (S.4). Hover lifts the tile like any clickable card.
+ */
+export function PluginTile({
+  className,
+  name,
+  publisher,
+  summary,
+  version,
+  tags,
+  adds,
+  facts,
+  verified,
+  verifiedLabel = "Verified",
+  trustLabel,
+  icon,
+  onOpen,
+  action,
+  ...props
+}: PluginTileProps) {
+  return (
+    <Card interactive variant="elevated" className={cn("relative flex h-full flex-col", className)} {...props}>
+      <CardHeader className="space-y-1.5">
+        <div className="flex items-center gap-3">
+          <div className="shrink-0 text-primary [&_svg]:size-8">{icon ?? <IconPuzzle />}</div>
+          <div className="min-w-0 flex-1">
+            <CardTitle className="truncate text-sm font-semibold">
+              <button
+                type="button"
+                onClick={onOpen}
+                className="text-start outline-none after:absolute after:inset-0 focus-visible:underline"
+              >
+                {name}
+              </button>
+            </CardTitle>
+            {publisher ? <CardDescription className="truncate text-xs">{publisher}</CardDescription> : null}
+          </div>
+          {verified ? <Badge variant="default" className="text-xs">{verifiedLabel}</Badge> : null}
+          {!verified && trustLabel ? <Badge variant="outline" className="text-xs">{trustLabel}</Badge> : null}
+        </div>
+      </CardHeader>
+      <CardContent className="flex-1 space-y-3">
+        {summary ? <p className="line-clamp-2 text-sm text-muted-foreground">{summary}</p> : null}
+        <div className="flex flex-wrap items-center gap-1.5">
+          {version ? <Badge variant="secondary" className="text-xs">v{version}</Badge> : null}
+          {(tags ?? []).map((tag) => (
+            <Badge key={tag} variant="outline" className="text-xs">{tag}</Badge>
+          ))}
+          {(adds ?? []).map((label) => (
+            <Badge key={label} variant="secondary" className="text-xs">{label}</Badge>
+          ))}
+        </div>
+        {facts && facts.length > 0 ? <p className="text-xs text-muted-foreground">{facts.join(" · ")}</p> : null}
+      </CardContent>
+      {action ? <CardFooter className="relative justify-end border-t border-border/40 pt-3">{action}</CardFooter> : null}
+    </Card>
   )
 }

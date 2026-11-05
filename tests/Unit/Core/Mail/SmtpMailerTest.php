@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 use Whity\Core\Mail\MailException;
 use Whity\Core\Mail\SmtpConfig;
 use Whity\Core\Mail\SmtpConnection;
+use Whity\Core\Mail\SmtpAuthRejectedException;
 use Whity\Core\Mail\SmtpMailer;
 
 /**
@@ -108,6 +109,91 @@ final class SmtpMailerTest extends TestCase
         self::assertStringContainsString("AUTH LOGIN\r\n", $sent);
         self::assertStringContainsString(base64_encode('ops@acme.com') . "\r\n", $sent);
         self::assertStringContainsString(base64_encode('s3cr3t') . "\r\n", $sent);
+    }
+
+    public function testXoauth2SendsTheExactStringOverTlsAndNotAuthLogin(): void
+    {
+        $conn = new FakeSmtpConnection([
+            '220 ready',
+            '250 hi',
+            '220 go ahead',
+            '250 hi again',
+            '235 accepted',
+            '250 OK',
+            '250 OK',
+            '354 go',
+            '250 queued',
+            '221 bye',
+        ]);
+        $config = (new SmtpConfig('smtp.gmail.com', 587, 'ops@acme.com', 'Acme', 'tls', 'box@acme.com'))
+            ->withAccessToken('ya29.token');
+
+        (new SmtpMailer($config, fn(): SmtpConnection => $conn))->send('bob@example.com', 'Hi', 'body');
+
+        $sent = $conn->written();
+        $expected = 'AUTH XOAUTH2 ' . base64_encode("user=box@acme.com\x01auth=Bearer ya29.token\x01\x01") . "\r\n";
+        self::assertStringContainsString($expected, $sent);
+        self::assertStringNotContainsString('AUTH LOGIN', $sent);
+        self::assertLessThan(strpos($sent, 'AUTH XOAUTH2'), strpos($sent, 'STARTTLS'), 'The token only moves after TLS');
+        self::assertTrue($conn->cryptoEnabled());
+    }
+
+    public function testXoauth2UsesTheFromAddressWhenNoUsernameIsSet(): void
+    {
+        $conn = new FakeSmtpConnection(['220 ready', '250 hi', '235 ok', '250 OK', '250 OK', '354 go', '250 q', '221 bye']);
+        $config = (new SmtpConfig('127.0.0.1', 25, 'ops@acme.com', '', 'none'))->withAccessToken('t');
+
+        (new SmtpMailer($config, fn(): SmtpConnection => $conn))->send('bob@example.com', 'Hi', 'body');
+
+        self::assertStringContainsString(base64_encode("user=ops@acme.com\x01auth=Bearer t\x01\x01"), $conn->written());
+    }
+
+    public function testARefusedTokenAnswersTheChallengeAndLeavesBeforeMailFrom(): void
+    {
+        $conn = new FakeSmtpConnection(['220 ready', '250 hi', '334 eyJzdGF0dXMiOiI0MDEifQ==', '535 no']);
+        $config = (new SmtpConfig('127.0.0.1', 25, 'f@x.com', '', 'none', 'f@x.com'))->withAccessToken('t');
+
+        try {
+            (new SmtpMailer($config, fn(): SmtpConnection => $conn))->send('b@x.com', 'S', 'B');
+            self::fail('The token should have been refused');
+        } catch (SmtpAuthRejectedException $e) {
+            self::assertStringContainsString('535', $e->getMessage());
+            self::assertStringNotContainsString('eyJzdGF0dXMi', $e->getMessage());
+        }
+        self::assertStringEndsWith("\r\n\r\n", $conn->written());
+        self::assertStringNotContainsString('MAIL FROM', $conn->written());
+    }
+
+    public function testAServerWithoutXoauth2IsNotTreatedAsARefusedToken(): void
+    {
+        $conn = new FakeSmtpConnection(['220 ready', '250 hi', '504 unrecognized mechanism']);
+        $config = (new SmtpConfig('127.0.0.1', 25, 'f@x.com', '', 'none', 'f@x.com'))->withAccessToken('t');
+
+        try {
+            (new SmtpMailer($config, fn(): SmtpConnection => $conn))->send('b@x.com', 'S', 'B');
+            self::fail('The sign-in should have failed');
+        } catch (MailException $e) {
+            self::assertNotInstanceOf(SmtpAuthRejectedException::class, $e);
+        }
+    }
+
+    public function testXoauth2RefusesAControlCharacterInTheUsername(): void
+    {
+        $conn = new FakeSmtpConnection(['220 ready', '250 hi']);
+        $config = (new SmtpConfig('127.0.0.1', 25, 'f@x.com', '', 'none', "a\x01auth=Bearer evil"))->withAccessToken('t');
+
+        $this->expectException(MailException::class);
+        (new SmtpMailer($config, fn(): SmtpConnection => $conn))->send('b@x.com', 'S', 'B');
+    }
+
+    public function testADumpOfTheConfigHidesItsSecrets(): void
+    {
+        $config = (new SmtpConfig('h', 25, 'f@x.com', '', 'none', 'u', 'the-password'))->withAccessToken('the-token');
+
+        $dump = print_r($config, true);
+
+        self::assertStringNotContainsString('the-password', $dump);
+        self::assertStringNotContainsString('the-token', $dump);
     }
 
     public function testThrowsOnRejectedRecipient(): void

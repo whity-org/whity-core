@@ -23,6 +23,7 @@ use Whity\Core\Entitlement\MeterService;
 use Whity\Core\Hooks\HookManager;
 use Whity\Core\Settings\SettingsRegistry;
 use Whity\Core\Settings\SettingsService;
+use Whity\Sdk\Documents\DocumentNumberingRule;
 use Whity\Sdk\Hooks\Events;
 use Whity\Sdk\Hooks\HookVetoException;
 use Whity\Storage\StorageException;
@@ -64,6 +65,9 @@ use Whity\Storage\StorageException;
  */
 final class DocumentIssuing
 {
+    /** The field a template prints a document's number with. */
+    public const NUMBER_FIELD = 'issued_document.number';
+
     /** The limits one rendered document spends. */
     public const RENDER_METERS = [
         EntitlementRegistry::DOCUMENTS_RENDER_PER_DAY,
@@ -175,6 +179,7 @@ final class DocumentIssuing
             'source_id' => (int) $source['id'],
             'version' => (int) $version['version'],
             'record' => $request->record,
+            'slot' => $request->slot,
             'origin_key' => $originKey,
             'actor' => $callerId,
         ];
@@ -183,6 +188,9 @@ final class DocumentIssuing
             $event['origin'] = 'plugin:' . $actor->plugin;
         }
         $this->veto(Events::DOCUMENT_ISSUING, $event);
+
+        $numbering = self::rule($source, $request->numbering);
+        $record = TemplateIssuing::parseRecord($request->record);
 
         try {
             $document = $this->issuer->raise(
@@ -193,6 +201,11 @@ final class DocumentIssuing
                     'source_id' => (int) $source['id'],
                     'source_version' => (int) $version['version'],
                     'origin_key' => $originKey,
+                    'number_pattern' => $numbering?->pattern,
+                    'number_now' => $numbering?->assign === DocumentNumberingRule::ON_ISSUE,
+                    'record_type' => $record[0] ?? null,
+                    'record_id' => $record[1] ?? null,
+                    'slot' => $request->slot,
                 ],
                 mb_substr($request->title, 0, 255),
                 // What printed, as the one data row it was raised with; a missing optional value printed blank.
@@ -208,7 +221,7 @@ final class DocumentIssuing
 
             return $this->replay($tenantId, $existing, $source);
         }
-        $event = ['id' => (int) $document['id']] + $event;
+        $event = ['id' => (int) $document['id'], 'number' => $document['number'] ?? null] + $event;
         $this->announce(Events::DOCUMENT_ISSUED, $event);
 
         // The verification code is minted now, with the record, whether or not
@@ -222,6 +235,28 @@ final class DocumentIssuing
         [$outcome, $artifact] = $this->renderAndStore($actor, $source, $version, $values, $request->recordLabel, $document);
 
         return ['document' => $document, 'artifacts' => $artifact !== null ? [$artifact] : [], 'render' => $outcome, 'replayed' => false];
+    }
+
+    /**
+     * The rule a document is numbered by: the template's own, or its slot's. A
+     * stored rule that no longer parses falls back rather than stopping the issue;
+     * the API refuses a bad one on the way in.
+     *
+     * @param array<string, mixed> $source The `document_sources` row.
+     */
+    private static function rule(array $source, ?DocumentNumberingRule $slot): ?DocumentNumberingRule
+    {
+        $own = $source['numbering'] ?? null;
+        if ($own === null) {
+            return $slot;
+        }
+        try {
+            return DocumentNumberingRule::fromArray($own);
+        } catch (\InvalidArgumentException $e) {
+            error_log('[DocumentIssuing] template ' . (string) ($source['id'] ?? '?') . ' has a bad numbering rule: ' . $e->getMessage());
+
+            return $slot;
+        }
     }
 
     /**
@@ -368,6 +403,25 @@ final class DocumentIssuing
     }
 
     /**
+     * Print a number handed out at final approval, when the document's template
+     * prints it: the PDF from before the approval has a blank there. A template that
+     * doesn't use the field has nothing to change, so it spends no render.
+     *
+     * @param array<string, mixed> $source   The `document_sources` row.
+     * @param array<string, mixed> $document The `documents` row, with variable_data.
+     * @return array{attempted: bool, stored: bool, reason: string|null}|null Null when nothing needed printing.
+     */
+    public function reprintNumbered(ActingAs $actor, array $source, array $document): ?array
+    {
+        $version = $this->versions->find((int) $source['id'], $actor->tenantId, (int) $document['document_source_version']);
+        if ($version === null || !str_contains((string) json_encode($version['blocks']), self::NUMBER_FIELD)) {
+            return null;
+        }
+
+        return $this->rerender($actor, $source, $document);
+    }
+
+    /**
      * @param array<string, mixed>   $source
      * @param array<string, mixed>   $version
      * @param array<string, ?string> $values
@@ -390,6 +444,10 @@ final class DocumentIssuing
         if (($effective[SettingsRegistry::DOCUMENTS_PERSIST_ENABLED] ?? 'true') !== 'true') {
             return [['attempted' => false, 'stored' => false, 'reason' => 'persist_disabled'], null];
         }
+
+        // Stored on the record, and read from it for every print: an issue, a
+        // correction and a reprint after final approval all show the same one.
+        $values[self::NUMBER_FIELD] = isset($document['number']) ? (string) $document['number'] : null;
 
         $printer = $this->printer($actor, $source, $values);
         $payload = $this->print->payload(
@@ -414,7 +472,7 @@ final class DocumentIssuing
             $metered = true;
         }
         try {
-            $pdf = $this->renderer->render($tenantId, $payload)->bytes;
+            $rendered = $this->renderer->render($tenantId, $payload);
         } catch (DocumentRenderRejectedException $e) {
             $this->refund($tenantId, $metered);
             error_log('[DocumentIssuing] the render was refused: ' . $e->clientMessage);
@@ -428,7 +486,8 @@ final class DocumentIssuing
         }
 
         try {
-            $artifact = $this->issuer->appendArtifact($tenantId, $callerId, $document, $pdf);
+            $pages = $rendered->pageCount > 0 ? $rendered->pageCount : null;
+            $artifact = $this->issuer->appendArtifact($tenantId, $callerId, $document, $rendered->bytes, pages: $pages);
         } catch (StorageException $e) {
             error_log('[DocumentIssuing] storing the PDF failed: ' . $e->getMessage());
 
@@ -441,6 +500,7 @@ final class DocumentIssuing
             'artifact_id' => (int) $artifact['id'],
             'source_id' => (int) $source['id'],
             'version' => (int) $version['version'],
+            'pages' => $pages,
         ]);
 
         return [['attempted' => true, 'stored' => true, 'reason' => null], $artifact];

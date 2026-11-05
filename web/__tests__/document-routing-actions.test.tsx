@@ -227,7 +227,7 @@ describe('RouteFanout', () => {
     expect(screen.getByText(/this route reached nobody/i)).toBeInTheDocument();
   });
 
-  it('falls back to the profile id rather than inventing a name', () => {
+  it('says someone has left rather than showing an id or inventing a name', () => {
     render(
       <RouteFanout
         route={ROUTE}
@@ -238,7 +238,7 @@ describe('RouteFanout', () => {
       />
     );
 
-    expect(screen.getAllByText('Profile #42').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('A former member').length).toBeGreaterThan(0);
   });
 });
 
@@ -439,8 +439,8 @@ describe('RouteComposer', () => {
   it('states the preview contract instead of offering a roster', () => {
     renderComposer();
 
-    expect(screen.getByText(/each step names a RULE, not people/i)).toBeInTheDocument();
-    expect(screen.getByText(/relative to whoever forwards it/i)).toBeInTheDocument();
+    expect(screen.getByText(/each step says who it is for/i)).toBeInTheDocument();
+    expect(screen.getByText(/gets worked out when the document is sent/i)).toBeInTheDocument();
     // No "who will this reach" affordance at all.
     expect(screen.queryByRole('button', { name: /preview|who will/i })).not.toBeInTheDocument();
   });

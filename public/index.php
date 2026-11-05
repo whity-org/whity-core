@@ -716,16 +716,13 @@ $hookManager->listen('navigation.register', function ($data, $context) {
     $items[] = [
         'id' => 'dashboard',
         'label' => 'Dashboard',
-        'href' => '/admin',
+        'href' => '/dashboard',
         'icon' => 'dashboard',
         'group' => 'overview',
         'order' => 1,
-        // WC-175 (#191): mirrors the dashboard's primary API (GET /api/admin/stats).
-        // #990: that route now gates on `stats:read`, so this moves with it. The two
-        // must agree or the nav either hides a page that works or offers one that
-        // 403s — which is why they are re-gated in the same commit rather than one
-        // at a time.
-        'requiredPermission' => \Whity\Core\RBAC\CorePermissions::STATS_READ,
+        // WHIT-872 (H.1): one home for everyone, built per person. Deliberately
+        // ungated: the page holds nothing beyond what each card's own route allows,
+        // and the plain member's sidebar would otherwise have no way home.
     ];
     $items[] = [
         'id' => 'users',
@@ -868,11 +865,20 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         // the inbox above it, where the entries in `records` are things somebody
         // administers on behalf of the tenant.
         'order' => 4,
-        // Mirrors GET /api/v1/me/form-submissions, gated forms:submit rather than
-        // forms:read — the rows already name exactly one person, so requiring the
-        // tenant-wide read permission would hide this from precisely the people
-        // whose submissions are in it.
-        'requiredPermission' => \Whity\Core\RBAC\CorePermissions::FORMS_SUBMIT,
+        // Not a permission: a member filling in a form opened to them holds none. Shown
+        // to whoever may fill forms in or has already sent one (FormsNavConditions).
+        'visibleIf' => 'forms-own-submissions',
+    ];
+    $items[] = [
+        // The catalogue for a member who can't read it through `forms-catalog`, once
+        // their workspace has opened a form to them. Same page, so never both.
+        'id' => 'member-forms',
+        'label' => 'Forms',
+        'href' => '/admin/x/' . \Whity\Core\Form\FormFrontendFeatures::CATALOG_ID,
+        'icon' => 'forms',
+        'group' => 'overview',
+        'order' => 5,
+        'visibleIf' => 'forms-open-to-member',
     ];
     $items[] = [
         'id' => 'tenants',
@@ -881,6 +887,9 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'icon' => 'building',
         'group' => 'platform',
         'order' => 1,
+        // A workspace admin may hold tenants:read for their own row, but managing
+        // workspaces is the platform's job. /admin/tenants still opens by URL for them.
+        'systemTenantOnly' => true,
         // #990: mirrors GET /api/tenants, now gated on tenants:read (migration
         // 138 grants it to every role that may write or delete a tenant).
         // requiredRole is cleared so the item follows the route it mirrors rather
@@ -917,6 +926,8 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         // 8 — orders are unique within a group, and 7 is billing.
         'order' => 6,
         'requiredPermission' => \Whity\Core\RBAC\CorePermissions::PLANS_MANAGE,
+        // The handler refuses every other tenant, so showing it would only lead to a 403.
+        'systemTenantOnly' => true,
     ];
     $items[] = [
         'id' => 'billing',
@@ -937,6 +948,8 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         // refuses the writes regardless. Showing the catalogue to a tenant admin
         // who cannot change it is better than a link that 403s.
         'requiredPermission' => \Whity\Core\RBAC\CorePermissions::PLANS_MANAGE,
+        // The handler refuses every other tenant, so showing it would only lead to a 403.
+        'systemTenantOnly' => true,
     ];
     $items[] = [
         'id' => 'user-groups',
@@ -978,6 +991,8 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         // (settings:manage + system tenant, enforced in the handler) — so the
         // nav item gates on the same permission. A tenant admin never sees it.
         'requiredPermission' => \Whity\Core\RBAC\CorePermissions::SETTINGS_MANAGE,
+        // The handler refuses every other tenant, so showing it would only lead to a 403.
+        'systemTenantOnly' => true,
     ];
     $items[] = [
         'id' => 'notifications',
@@ -1007,18 +1022,6 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         // permission. The nav item carries the requirement so a permission-aware
         // client can hide it; the page also enforces it server-side via the
         // RBAC-protected API (a 403 renders the access-denied state).
-        'requiredPermission' => \Whity\Core\RBAC\CorePermissions::PLUGINS_READ,
-    ];
-    $items[] = [
-        'id' => 'plugin-store',
-        'label' => 'Plugin Store',
-        'href' => '/admin/plugins/store',
-        'icon' => 'building-store',
-        'group' => 'platform',
-        'order' => 3,
-        // Browse + install from a trusted store. Mirrors GET
-        // /api/plugins/store/catalog (gated plugins:read); the install action on
-        // the page is separately gated plugins:upload server-side.
         'requiredPermission' => \Whity\Core\RBAC\CorePermissions::PLUGINS_READ,
     ];
     $items[] = [
@@ -1165,51 +1168,43 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'order' => 7,
         // WC-password-reset-2fa-recovery: unified admin page (tabs: Signup /
         // Password reset / 2FA auth reset — see web/app/(protected)/admin/
-        // approval-gating/). The first tab, at this href, is the WC-235
-        // pending-registrations queue (folded in unchanged: system-tenant +
-        // registrations:approve). Gated here on the broad 'admin' ROLE rather
-        // than any single one of the three underlying permissions, since a
-        // tenant admin who holds ONLY password_resets:approve or
-        // two_factor_recovery:approve (never registrations:approve, and never
-        // acting in the system tenant) must still see this entry to reach
-        // their own tab — each tab enforces its OWN precise permission +
-        // tenant/system-tenant scope server-side regardless of nav visibility.
-        'requiredRole' => 'admin',
+        // approval-gating/). Three tabs, three permissions, so the entry shows for
+        // whoever holds any of them (design 2.9, A16: the permission, not the role
+        // named admin). Each tab enforces its OWN precise permission + tenant scope
+        // server-side regardless of nav visibility.
+        'requiredAnyPermission' => [
+            \Whity\Core\RBAC\CorePermissions::REGISTRATIONS_APPROVE,
+            \Whity\Core\RBAC\CorePermissions::PASSWORD_RESETS_APPROVE,
+            \Whity\Core\RBAC\CorePermissions::TWO_FACTOR_RECOVERY_APPROVE,
+        ],
     ];
     $items[] = [
         // WHIT-820: every member may use an agent for themselves, so this is
-        // ungated, like the routes behind it (GET /api/me/agents).
+        // ungated, like the routes behind it (GET /api/me/agents). Everyone's
+        // agents is a tab on this page for agents:manage (design 2.9, A20).
         'id' => 'my-agents',
-        'label' => 'My agents',
+        'label' => 'Agents',
         'href' => '/admin/my-agents',
         'icon' => 'robot',
         'group' => 'ai',
         'order' => 1,
     ];
     $items[] = [
-        'id' => 'agents',
-        'label' => 'Agents',
-        'href' => '/admin/agents',
-        'icon' => 'robot',
-        'group' => 'ai',
-        'order' => 2,
-        'requiredPermission' => \Whity\Core\RBAC\CorePermissions::AGENTS_MANAGE,
-    ];
-    $items[] = [
         'id' => 'ai-principals',
-        'label' => 'AI Principals',
+        'label' => 'Connected AI apps',
         'href' => '/admin/ai-principals',
-        'icon' => 'robot',
+        'icon' => 'link',
         'group' => 'ai',
         'order' => 3,
-        // WC-0208ce4d: mirrors GET /api/v1/admin/mcp/tokens, gated on the
-        // mcp:tokens:manage permission. Nav item carries the same requirement so
-        // permission-aware clients can hide it; the page enforces it server-side.
-        'requiredPermission' => \Whity\Core\RBAC\CorePermissions::MCP_TOKENS_MANAGE,
+        // Anyone signed in may connect an AI app to their own account and see,
+        // renew and disconnect their own connections (GET/POST/DELETE
+        // /api/mcp/tokens), so this is ungated like My agents. The list of
+        // everyone's connections stays on mcp:tokens:manage
+        // (GET /api/v1/admin/mcp/tokens) and is a tab on the page.
     ];
     $items[] = [
         'id' => 'mcp-tools',
-        'label' => 'MCP Tools',
+        'label' => 'What AI can do',
         'href' => '/admin/mcp-tools',
         'icon' => 'tools',
         'group' => 'ai',
@@ -1220,18 +1215,64 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'requiredPermission' => \Whity\Core\RBAC\CorePermissions::MCP_TOKENS_MANAGE,
     ];
     $items[] = [
+        'id' => 'system',
+        'label' => 'System',
+        'href' => '/admin/stats',
+        'icon' => 'activity',
+        'group' => 'platform',
+        'order' => 14,
+        // WHIT-872 (H.3): server statistics, for the platform's operators only.
+        // Mirrors GET /api/admin/stats, which takes the same permission and answers
+        // only in the system tenant.
+        'requiredPermission' => \Whity\Core\RBAC\CorePermissions::STATS_READ,
+        'systemTenantOnly' => true,
+    ];
+    $items[] = [
         'id' => 'languages',
         'label' => 'Languages',
         'href' => '/admin/languages',
         'icon' => 'language',
-        'group' => 'settings',
-        'order' => 4,
+        'group' => 'platform',
+        'order' => 10,
         // WC-583: languages are a GLOBAL catalogue (no tenant_id column at
         // all) — create/update/enable/disable is a SYSTEM-TENANT-ONLY
         // PLATFORM capability (mirrors the Feature Flags/Email/Storage
         // settings tabs), so the nav item itself is hidden from every other
         // tenant rather than 403ing on click.
         'requiredPermission' => \Whity\Core\RBAC\CorePermissions::LANGUAGES_MANAGE,
+        'systemTenantOnly' => true,
+    ];
+    // W.2 and the owner's answer to Q1: the install's email, storage and feature flags
+    // live in Platform with Languages. Each page keeps its own address and the same gate
+    // as its settings tab (SettingsApiHandler::TABS).
+    $items[] = [
+        'id' => 'platform-email',
+        'label' => 'Email',
+        'href' => '/admin/settings/email',
+        'icon' => 'mail',
+        'group' => 'platform',
+        'order' => 11,
+        'requiredPermission' => \Whity\Core\RBAC\CorePermissions::SETTINGS_MANAGE,
+        'systemTenantOnly' => true,
+    ];
+    $items[] = [
+        'id' => 'platform-storage',
+        'label' => 'Storage',
+        'href' => '/admin/settings/storage',
+        'icon' => 'database',
+        'group' => 'platform',
+        'order' => 12,
+        'requiredPermission' => \Whity\Core\RBAC\CorePermissions::SETTINGS_MANAGE,
+        'systemTenantOnly' => true,
+    ];
+    $items[] = [
+        'id' => 'platform-feature-flags',
+        'label' => 'Feature flags',
+        'href' => '/admin/settings/feature-flags',
+        'icon' => 'flag',
+        'group' => 'platform',
+        'order' => 13,
+        'requiredPermission' => \Whity\Core\RBAC\CorePermissions::SETTINGS_MANAGE,
         'systemTenantOnly' => true,
     ];
     $items[] = [
@@ -1308,6 +1349,8 @@ $tenantIsolationMiddleware = new EnforceTenantIsolation(
     new \Whity\Auth\ActiveTenantMembershipGuard($db->getPdo()),
     // Admits a plugin's declared webhook only when its own route would run (WHIT-671).
     $router,
+    // A signed-out or superseded session's access token stops working at once.
+    (new TokenValidator($jwtParser, $db->getPdo()))->isAccessTokenLive(...),
 );
 
 // 8. Initialize HTTP kernel and register middleware
@@ -1688,7 +1731,16 @@ $router->register('GET',    '/api/me/sessions',      [$sessionsHandler, 'list'],
 $router->register('DELETE', '/api/me/sessions/{id}', [$sessionsHandler, 'revoke'], null);
 $router->register('DELETE', '/api/me/sessions',      [$sessionsHandler, 'revokeOthers'], null);
 
-$twoFactorHandler = new TwoFactorHandler($db->getPdo(), $totpService, $backupCodesService, $tokenValidator, $auditLogger);
+// Wrong proofs on disable and regenerate count on their own, with the login
+// limits: a stolen session guessing here must not lock the owner out of signing in.
+$twoFactorProofThrottle = new LoginThrottleService(
+    new DatabaseSharedStore($db->getPdo()),
+    (int) ($_ENV['LOGIN_THROTTLE_USER_THRESHOLD']  ?? getenv('LOGIN_THROTTLE_USER_THRESHOLD')  ?: LoginThrottleService::DEFAULT_USER_THRESHOLD),
+    (int) ($_ENV['LOGIN_THROTTLE_IP_THRESHOLD']    ?? getenv('LOGIN_THROTTLE_IP_THRESHOLD')    ?: LoginThrottleService::DEFAULT_IP_THRESHOLD),
+    (int) ($_ENV['LOGIN_THROTTLE_WINDOW_SECONDS']  ?? getenv('LOGIN_THROTTLE_WINDOW_SECONDS')  ?: LoginThrottleService::DEFAULT_WINDOW_SECONDS),
+    'two_factor_proof',
+);
+$twoFactorHandler = new TwoFactorHandler($db->getPdo(), $totpService, $backupCodesService, $tokenValidator, $auditLogger, $twoFactorProofThrottle);
 $router->register('POST', '/api/auth/2fa/setup', [$twoFactorHandler, 'setup'], null);
 $router->register('POST', '/api/auth/2fa/confirm', [$twoFactorHandler, 'confirm'], null);
 $router->register('POST', '/api/auth/2fa/disable', [$twoFactorHandler, 'disable'], null);
@@ -1827,6 +1879,7 @@ $router->register('DELETE', '/api/invitations/{id:\d+}',         [$invitationsHa
 
 // 11. Register API handlers
 $usersHandler = new UsersApiHandler($db->getPdo(), $hookManager);
+$usersBulkHandler = new \Whity\Api\UsersBulkApiHandler($db->getPdo(), $roleChecker, $hookManager, $auditLogger);
 // WC-203: gate users routes on fine-grained permission grants instead of the
 // bare 'admin' role. requiredRole is cleared (null) so the check is driven
 // entirely by requiredPermission; migration 022 grants all three to admin.
@@ -1837,6 +1890,10 @@ $router->register('GET',    '/api/users',           [$usersHandler, 'list'],   n
 // "who is profile 412?" with silence once a tenant passes 100 people. A record
 // page is addressable by definition (a pasted URL must work), so it needs the
 // single-record read rather than a filtered list.
+$router->register('POST',   '/api/users/bulk/role',             [$usersBulkHandler, 'changeRole'],     null, null, CorePermissions::USERS_WRITE);
+$router->register('POST',   '/api/users/bulk/require-two-step', [$usersBulkHandler, 'requireTwoStep'], null, null, CorePermissions::SECURITY_MANAGE);
+$router->register('PUT',    '/api/users/{id:\d+}/two-step-requirement', [$usersBulkHandler, 'setRequirement'],   null, null, CorePermissions::SECURITY_MANAGE);
+$router->register('DELETE', '/api/users/{id:\d+}/two-step-requirement', [$usersBulkHandler, 'clearRequirement'], null, null, CorePermissions::SECURITY_MANAGE);
 $router->register('GET',    '/api/users/{id:\d+}',  [$usersHandler, 'get'],    null, null, CorePermissions::USERS_READ);
 $router->register('POST',   '/api/users',           [$usersHandler, 'create'], null, null, CorePermissions::USERS_WRITE);
 $router->register('PATCH',  '/api/users/{id:\d+}',  [$usersHandler, 'update'], null, null, CorePermissions::USERS_WRITE);
@@ -1939,7 +1996,11 @@ $router->register('GET', '/api/permissions', [$permissionsHandler, 'list'], null
 // => 403) and filters every item per caller against RoleChecker server-side,
 // mirroring /api/frontend/features. Pass the delegation-aware $roleChecker so a
 // live delegation actually unlocks gated items.
-$navigationHandler = new NavigationApiHandler($hookManager, $roleChecker);
+$formsNavConditions = new \Whity\Core\Form\FormsNavConditions($db->getPdo(), $roleChecker);
+$navigationHandler = new NavigationApiHandler($hookManager, $roleChecker, [
+    'forms-open-to-member' => [$formsNavConditions, 'hasFormsOpenToThem'],
+    'forms-own-submissions' => [$formsNavConditions, 'hasOwnSubmissionsToSee'],
+]);
 $router->register('GET', '/api/navigation', [$navigationHandler, 'list']);
 
 // Caller capabilities (WC-176, #205). Registered with NO required
@@ -2105,15 +2166,20 @@ $manifestTestRunner = new \Whity\Core\Plugin\Tenant\ManifestTestRunner(
     $tenantRecordRepository,
     new \Whity\Core\Plugin\Tenant\RecordWriter($db->getPdo(), $tenantRecordRepository, $roleChecker)
 );
+// Verified marks: public keys pinned in code, nothing here can sign.
+$pluginTrust = new \Whity\Core\Plugin\Trust\PluginTrust($db->getPdo(), \Whity\Core\Plugin\Trust\TrustedKeys::pinned(), $auditLogger);
 $tenantPluginVersionsHandler = new \Whity\Api\TenantPluginVersionsApiHandler(
     $tenantPluginRepository,
     $tenantManifestPublisher,
     $manifestImpact,
     $manifestTestRunner,
-    $auditLogger
+    $auditLogger,
+    $pluginTrust
 );
 $router->register('GET', '/api/workspace-plugins', [$tenantPluginVersionsHandler, 'list'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_READ);
 $router->register('POST', '/api/workspace-plugins', [$tenantPluginVersionsHandler, 'publish'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_PUBLISH);
+$router->register('POST', '/api/workspace-plugins/{plugin:[a-z][a-z0-9_]*}/enable', [$tenantPluginVersionsHandler, 'enable'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_ENABLE);
+$router->register('POST', '/api/workspace-plugins/{plugin:[a-z][a-z0-9_]*}/disable', [$tenantPluginVersionsHandler, 'disable'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_DISABLE);
 $router->register('POST', '/api/workspace-plugins/validate', [$tenantPluginVersionsHandler, 'validate'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_BUILD);
 $router->register('POST', '/api/workspace-plugins/impact', [$tenantPluginVersionsHandler, 'impact'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_BUILD);
 $router->register('POST', '/api/workspace-plugins/test', [$tenantPluginVersionsHandler, 'test'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_BUILD);
@@ -2177,7 +2243,8 @@ $statusHandler = new \Whity\Api\StatusApiHandler(
     new \Whity\Core\Health\StatusReport(
         new \Whity\Core\Health\HealthSampleRepository($db->getPdo()),
         $healthProbeRegistry
-    )
+    ),
+    $settingsService
 );
 $router->register('GET', '/api/status', [$statusHandler, 'get'], null);
 
@@ -2252,20 +2319,39 @@ $router->register('POST', '/api/plugins/{name}/disable', [$pluginsHandler, 'disa
 $router->register('POST', '/api/plugins/{id}/re-enable', [$pluginsHandler, 'reEnable'], null, null, CorePermissions::PLUGINS_ENABLE);
 $router->register('POST', '/api/plugins/{id}/uninstall', [$pluginsHandler, 'uninstall'], null, null, CorePermissions::PLUGINS_UNINSTALL);
 $router->register('POST', '/api/plugins/reload', [$pluginsHandler, 'reload'], null, null, CorePermissions::PLUGINS_RELOAD);
+// S.7: kept for 30 days after uninstalling.
+$router->register('GET', '/api/plugins/removed', [$pluginsHandler, 'removed'], null, null, CorePermissions::PLUGINS_READ);
+$router->register('POST', '/api/plugins/{name}/reinstall', [$pluginsHandler, 'reinstall'], null, null, CorePermissions::PLUGINS_INSTALL);
 // WC-install-from-store: fetch a package from a TRUSTED plugin store (host must
 // be on the operator `plugins.store_allowed_hosts` allowlist; empty ⇒ disabled)
 // and stage it through the SAME hardened installer as an upload (lands DISABLED).
-// Same permission as upload — it is the same install action, remotely sourced.
+// S.9: its own permission, plugins:install; upload stays for unreviewed code.
 $installFromStoreHandler = new \Whity\Api\InstallFromStoreApiHandler(
     __DIR__ . '/../plugins',
     $settingsService,
     $pluginLoader,
-    $auditLogger
+    $auditLogger,
+    null,
+    null,
+    new \Whity\Core\Plugin\PluginRecords($db->getPdo()),
+    $tenantManifestPublisher,
+    $tenantPluginRepository,
+    $pluginTrust
 );
-$router->register('POST', '/api/plugins/install-from-store', [$installFromStoreHandler, 'install'], null, null, CorePermissions::PLUGINS_UPLOAD);
+$router->register('POST', '/api/plugins/install-from-store', [$installFromStoreHandler, 'install'], null, null, CorePermissions::PLUGINS_INSTALL);
+// Decision 2: a workspace installs declarative plugins into itself. Data, not code.
+$router->register('POST', '/api/workspace-plugins/install-from-store', [$installFromStoreHandler, 'installDeclarative'], null, null, CorePermissions::PLUGINS_INSTALL);
+// Verified: how fresh the signed revocation list is, and importing one.
+$router->register('GET', '/api/plugins/trust-status', [$installFromStoreHandler, 'trustStatus'], null, null, CorePermissions::PLUGINS_READ);
+$router->register('POST', '/api/plugins/revocations', [$installFromStoreHandler, 'importRevocations'], null, null, CorePermissions::PLUGINS_INSTALL);
+// S.6: updates, always asked for by a person; new access waits for approval.
+$router->register('GET', '/api/plugins/updates', [$installFromStoreHandler, 'availableUpdates'], null, null, CorePermissions::PLUGINS_READ);
+$router->register('POST', '/api/plugins/{name}/update', [$installFromStoreHandler, 'update'], null, null, CorePermissions::PLUGINS_INSTALL);
+$router->register('POST', '/api/plugins/{name}/update/approve', [$installFromStoreHandler, 'approveUpdate'], null, null, CorePermissions::PLUGINS_INSTALL);
+$router->register('POST', '/api/plugins/{name}/update/reject', [$installFromStoreHandler, 'rejectUpdate'], null, null, CorePermissions::PLUGINS_INSTALL);
 // Store BROWSE surface for the admin UI (read-only, allowlist-gated proxy to a
 // trusted store's public catalogue). Gated on PLUGINS_READ — browsing needs no
-// more than the plugins list itself; installing still needs PLUGINS_UPLOAD.
+// more than the plugins list itself; installing needs PLUGINS_INSTALL.
 $router->register('GET', '/api/plugins/store/allowed', [$installFromStoreHandler, 'allowedStores'], null, null, CorePermissions::PLUGINS_READ);
 $router->register('GET', '/api/plugins/store/catalog', [$installFromStoreHandler, 'browseCatalog'], null, null, CorePermissions::PLUGINS_READ);
 
@@ -2297,11 +2383,9 @@ $router->register('GET', '/api/migrations', [$migrationsHandler, 'list'], 'admin
 
 $adminHandler = new AdminApiHandler($db, __DIR__ . '/../database/migrations');
 // #990: gated on `stats:read` (6th positional arg; requiredRole stays null so
-// RbacMiddleware enforces the permission). Migration 157 grants it to every role
-// already holding `users:read` — this endpoint returns an AGGREGATE of rows that
-// permission already exposes one by one, so the grant confers nothing new. The
-// platform-wide tenant count stays restricted by the handler's own $isSystemUser
-// branch, which this does not touch.
+// RbacMiddleware enforces the permission). WHIT-872 (H.3): the handler also refuses
+// every tenant but the system tenant, because the seeded `admin` is one global role
+// held by operators and workspace owners alike, so no grant can tell them apart.
 $router->register('GET', '/api/admin/stats', [$adminHandler, 'stats'], null, null, \Whity\Core\RBAC\CorePermissions::STATS_READ);
 
 // 12. Register OUs API handler. Gated on the seeded ous:* PERMISSIONS (6th
@@ -2407,13 +2491,16 @@ $delegationsHandler = new DelegationsApiHandler($db->getPdo(), $delegationServic
 $router->register('GET', '/api/delegations', [$delegationsHandler, 'list'], null, null, CorePermissions::DELEGATION_MANAGE);
 $router->register('POST', '/api/delegations', [$delegationsHandler, 'create'], null, null, CorePermissions::DELEGATION_MANAGE);
 $router->register('DELETE', '/api/delegations/{id:\d+}', [$delegationsHandler, 'revoke'], null, null, CorePermissions::DELEGATION_MANAGE);
+$router->register('POST', '/api/delegations/{id:\d+}/restore', [$delegationsHandler, 'restore'], null, null, CorePermissions::DELEGATION_MANAGE);
 
 // 13. Register the audit-log read API (WC-34). Gated on the audit:read permission
 // (6th positional arg; requiredRole stays null so RbacMiddleware enforces the
 // permission). Tenant-scoped in the handler: the SYSTEM tenant (id 0) sees all
 // tenants, every other tenant sees only its own entries.
-$auditLogHandler = new AuditLogApiHandler($db->getPdo(), $roleChecker);
+$auditLogHandler = new AuditLogApiHandler($db->getPdo(), $roleChecker, $serverLabels, $auditLogger);
 $router->register('GET', '/api/audit-logs', [$auditLogHandler, 'list'], null, null, CorePermissions::AUDIT_READ);
+$router->register('GET', '/api/audit-logs/facets', [$auditLogHandler, 'facets'], null, null, CorePermissions::AUDIT_READ);
+$router->register('GET', '/api/audit-logs/export', [$auditLogHandler, 'export'], null, null, CorePermissions::AUDIT_READ);
 
 // 13a. Self-service analogue (no permission gate — every authenticated user
 // may see their OWN activity; requiredPermission stays null and listOwn()
@@ -2593,11 +2680,13 @@ $router->register('DELETE', '/api/storage-config', [$tenantStorageConfigHandler,
 $twoFactorPoliciesHandler = new \Whity\Api\TwoFactorPoliciesApiHandler(
     $db->getPdo(),
     $twoFactorPolicyResolver,
-    $auditLogger
+    $auditLogger,
+    $hookManager
 );
 $router->register('GET',    '/api/2fa-policies',        [$twoFactorPoliciesHandler, 'list'],   null, null, CorePermissions::SECURITY_MANAGE);
 $router->register('POST',   '/api/2fa-policies',        [$twoFactorPoliciesHandler, 'create'], null, null, CorePermissions::SECURITY_MANAGE);
 $router->register('GET',    '/api/2fa-policies/status', [$twoFactorPoliciesHandler, 'status'], null, null, CorePermissions::SECURITY_MANAGE);
+$router->register('POST',   '/api/2fa-policies/remind', [$twoFactorPoliciesHandler, 'remind'], null, null, CorePermissions::SECURITY_MANAGE);
 $router->register('PATCH',  '/api/2fa-policies/{id:\d+}', [$twoFactorPoliciesHandler, 'update'], null, null, CorePermissions::SECURITY_MANAGE);
 $router->register('DELETE', '/api/2fa-policies/{id:\d+}', [$twoFactorPoliciesHandler, 'delete'], null, null, CorePermissions::SECURITY_MANAGE);
 
@@ -2823,7 +2912,8 @@ $externalBillingHandler = new \Whity\Api\ExternalBillingApiHandler(
     $db->getPdo(),
     // The payer returns to a frontend page (/billing, /billing/return).
     $frontendUrls->base(),
-    $logger
+    $logger,
+    $auditLogger
 );
 
 $router->register('POST', '/api/billing/checkout', [$externalBillingHandler, 'checkout'], null, null, CorePermissions::BILLING_PAY);
@@ -2840,6 +2930,8 @@ $router->register('GET',  '/api/billing/receipts', [$externalBillingHandler, 're
 // a PLAN swap would mean cancelling and buying again, which either double-charges
 // or leaves a gap, so it is refused rather than faked.
 $router->register('POST', '/api/billing/quantity', [$externalBillingHandler, 'changeQuantity'], null, null, CorePermissions::BILLING_PAY);
+// A tier change moves the subscription we hold; a second checkout would open another.
+$router->register('POST', '/api/billing/change-plan', [$externalBillingHandler, 'changePlan'], null, null, CorePermissions::BILLING_PAY);
 
 // UNAUTHENTICATED, NECESSARILY: the sender is a server and holds no session.
 // Registering it here is only half the job — EnforceTenantIsolation must also
@@ -3010,6 +3102,7 @@ $documentSourcesHandler = new \Whity\Api\DocumentSourcesApiHandler(
     new \Whity\Core\Document\DocumentSourceVersionRepository($db->getPdo()),
     $documentThemeResolver,
     $documentCollab,
+    new \Whity\Core\Document\DocumentPeople($db->getPdo()),
 );
 $router->register('GET',    '/api/document-sources',                [$documentSourcesHandler, 'list'],      null, null, CorePermissions::DOCUMENTS_READ);
 $router->register('POST',   '/api/document-sources',                [$documentSourcesHandler, 'create'],    null, null, CorePermissions::DOCUMENTS_WRITE);
@@ -3207,6 +3300,7 @@ $documentFieldLabels = new \Whity\Core\Document\Fields\FieldLabels($serverLabels
 $documentFieldRegistry->add(new \Whity\Core\Document\Fields\IssuedDocumentFieldProvider($documentRepository, $documentVisibilityPolicy, $documentFieldLabels));
 $documentFieldRegistry->add(new \Whity\Core\Document\Fields\CompanyFieldProvider($settingsService, $documentFieldLabels));
 $documentFieldRegistry->add(new \Whity\Core\Document\Fields\TodayFieldProvider($documentFieldLabels));
+$documentFieldRegistry->add(new \Whity\Core\Document\Fields\IssuedDocumentNumberFieldProvider($documentFieldLabels));
 // WHIT-742: each workspace plugin's record types, in the workspaces where
 // the plugin is published and on (`CakeOrders.order`), so a template can be
 // written for them and a slot can be issued from them.
@@ -3425,6 +3519,7 @@ $reportsHandler = new \Whity\Api\ReportsApiHandler(
 $router->register('GET',  '/api/reports',                            [$reportsHandler, 'index'],    null, null, CorePermissions::DOCUMENTS_RENDER);
 $router->register('POST', '/api/reports/{source:[a-z][a-z0-9_]*}/document', [$reportsHandler, 'document'], null, null, CorePermissions::DOCUMENTS_RENDER);
 
+$documentPeople = new \Whity\Core\Document\DocumentPeople($db->getPdo());
 $documentsHandler = new \Whity\Api\DocumentsApiHandler(
     $documentRepository,
     $documentArtifactRepository,
@@ -3466,7 +3561,8 @@ $documentsHandler = new \Whity\Api\DocumentsApiHandler(
     // commits the record first. Also the `qr` record-page region's predicate.
     $documentQrService,
     // WHIT-742: `slot` in the body names the template through the workspace's bindings.
-    $templateSlotRegistry
+    $templateSlotRegistry,
+    $documentPeople
 );
 // The one issuing path (WHIT-742), registered for plugin code and automations
 // running in a request. BaseCommand registers the same for CLI commands, and
@@ -3484,6 +3580,34 @@ $documentsHandler = new \Whity\Api\DocumentsApiHandler(
     \Whity\app(\Whity\Core\Document\Issuing\TemplateIssuing::class),
     $roleChecker,
 ));
+$documentWithdrawal = new \Whity\Core\Document\DocumentWithdrawal(
+    $db->getPdo(),
+    $documentRepository,
+    $documentQrTokenRepository,
+    $routeRecipientRepository,
+    $routeEventRepository,
+    $auditLogger
+);
+// SDK 1.63 (WHIT-886): plugin files, through the storage resolver built above
+// for the tenant storage routes, and plugin documents, which wrap Documents and
+// use the QR service built earlier.
+\Whity\register_service(\Whity\Sdk\Storage\PluginFiles::class, new \Whity\Core\Plugin\HostPluginFiles(
+    static fn (): \Whity\Storage\TenantStorageResolver => $storageResolver,
+));
+\Whity\register_service(\Whity\Sdk\Documents\PluginDocuments::class, new \Whity\Core\Plugin\HostPluginDocuments(
+    $db->getPdo(),
+    static fn (): \Whity\Sdk\Documents\Documents => \Whity\app(\Whity\Sdk\Documents\Documents::class),
+    $documentQrService,
+    $documentQrScanRepository,
+    $settingsService,
+));
+$documentWithdrawalHandler = new \Whity\Api\DocumentWithdrawalApiHandler(
+    $documentRepository,
+    $documentVisibilityPolicy,
+    $roleChecker,
+    $documentWithdrawal
+);
+$router->register('POST', '/api/documents/{id:\d+}/withdraw', [$documentWithdrawalHandler, 'withdraw'], null, null, CorePermissions::DOCUMENTS_WITHDRAW);
 $documentQrHandler = new \Whity\Api\DocumentQrApiHandler(
     $documentRepository,
     $documentVisibilityPolicy,
@@ -3520,6 +3644,8 @@ $router->register('POST', '/api/documents',                                     
 $router->register('GET',  '/api/documents/{id:\d+}',                                   [$documentsHandler, 'show'],            null, null, CorePermissions::DOCUMENTS_READ);
 $router->register('GET',  '/api/documents/{id:\d+}/content',                           [$documentsHandler, 'content'],         null, null, CorePermissions::DOCUMENTS_READ);
 $router->register('GET',  '/api/documents/{id:\d+}/artifacts/{artifactId:\d+}/content', [$documentsHandler, 'artifactContent'], null, null, CorePermissions::DOCUMENTS_READ);
+// WHIT-902: a person a route reached can open that document with no documents:read.
+\Whity\Core\Document\RecipientDocumentAccess::allowOn($router, $routeRecipientRepository);
 $router->register('POST', '/api/documents/{id:\d+}/render',                            [$documentsHandler, 'rerender'],        null, null, CorePermissions::DOCUMENTS_ISSUE);
 
 // #1036: the document's verification code.
@@ -3581,6 +3707,22 @@ $documentRouter = new \Whity\Core\Document\Routing\DocumentRouter(
     $settingsService,
     $hookManager
 );
+// WHIT-684: a number handed out at final approval goes on the PDF, printed for the
+// approver, when the template prints it. Listening after the commit, so a failed
+// render costs the PDF, never the approval or the number.
+$hookManager->listen(\Whity\Sdk\Hooks\Events::DOCUMENT_NUMBERED, static function (array $event) use ($documentRepository, $documentSourceRepository, $documentIssuing, $roleChecker): void {
+    $tenantId = (int) $event['tenant_id'];
+    $actorId = (int) $event['actor_profile_id'];
+    $document = $documentRepository->findById((int) $event['id'], $tenantId);
+    $source = isset($document['document_source_id']) ? $documentSourceRepository->findById((int) $document['document_source_id'], $tenantId) : null;
+    if ($document !== null && $source !== null) {
+        $documentIssuing->reprintNumbered(
+            new \Whity\Core\Document\Issuing\ActingAs($tenantId, $actorId, \Whity\Core\RBAC\ScopedPermissionSet::forProfile($roleChecker, $actorId, $tenantId)),
+            $source,
+            $document,
+        );
+    }
+});
 // #1031. The route-TEMPLATE store, constructed here rather than beside the
 // templates handler below because BOTH need it: designing a flow and applying one
 // read the same three tables, and a second instance would be a second connection
@@ -3599,7 +3741,8 @@ $documentRoutingHandler = new \Whity\Api\DocumentRoutingApiHandler(
     $documentVisibilityPolicy,
     $roleChecker,
     $routeTemplateRepository,
-    $serverLabels
+    $serverLabels,
+    $documentPeople
 );
 $router->register('GET',  '/api/routing-rules',                                        [$documentRoutingHandler, 'rules'],      null, null, CorePermissions::DOCUMENTS_READ);
 $router->register('POST', '/api/documents/{id:\d+}/routes',                            [$documentRoutingHandler, 'create'],     null, null, CorePermissions::DOCUMENTS_ROUTE);
@@ -3633,6 +3776,7 @@ $router->register('POST', '/api/documents/{id:\d+}/routes/from-template',       
 $router->register('GET',  '/api/documents/{id:\d+}/routes',                            [$documentRoutingHandler, 'list'],       null);
 $router->register('GET',  '/api/documents/{id:\d+}/trail',                             [$documentRoutingHandler, 'trail'],      null);
 $router->register('GET',  '/api/documents/{id:\d+}/recipients',                        [$documentRoutingHandler, 'recipients'], null);
+$router->register('GET',  '/api/documents/{id:\d+}/people',                            [$documentRoutingHandler, 'people'],     null);
 // Deliberately UNPERMISSIONED (null, null): being a recipient IS the
 // authorization — the route named a rule, the rule resolved to you, and the
 // engine wrote the row. Requiring a permission on top would let a route resolve
@@ -3680,6 +3824,7 @@ $userGroupsHandler = new \Whity\Api\UserGroupsApiHandler(
 );
 $router->register('GET',    '/api/group-rules',                    [$userGroupsHandler, 'rules'],         null, null, CorePermissions::GROUPS_READ);
 $router->register('GET',    '/api/user-groups',                    [$userGroupsHandler, 'index'],         null, null, CorePermissions::GROUPS_READ);
+$router->register('GET',    '/api/user-groups/usage',              [$userGroupsHandler, 'usage'],         null, null, CorePermissions::GROUPS_READ);
 $router->register('POST',   '/api/user-groups/preview',            [$userGroupsHandler, 'previewDraft'],  null, null, CorePermissions::GROUPS_WRITE);
 $router->register('POST',   '/api/user-groups',                    [$userGroupsHandler, 'create'],        null, null, CorePermissions::GROUPS_WRITE);
 $router->register('GET',    '/api/user-groups/{id:\d+}/preview',   [$userGroupsHandler, 'preview'],       null, null, CorePermissions::GROUPS_READ);
@@ -3828,6 +3973,9 @@ $router->register('PATCH', '/api/forms/{id:\d+}', [$formsHandler, 'update'], nul
 $router->register('POST', '/api/forms/{id:\d+}/publish', [$formsHandler, 'publish'], null, null, CorePermissions::FORMS_MANAGE);
 $router->register('POST', '/api/forms/{id:\d+}/archive', [$formsHandler, 'archive'], null, null, CorePermissions::FORMS_MANAGE);
 $router->register('GET', '/api/forms/{id:\d+}/render', [$formsHandler, 'render'], null, null, CorePermissions::FORMS_SUBMIT);
+// The author's own look at it, whatever its state, so `forms:manage` and not `forms:submit`.
+$router->register('GET', '/api/forms/{id:\d+}/preview', [$formsHandler, 'preview'], null, null, CorePermissions::FORMS_MANAGE);
+$router->register('DELETE', '/api/forms/{id:\d+}', [$formsHandler, 'delete'], null, null, CorePermissions::FORMS_MANAGE);
 // Opening and closing the PUBLIC LINK (migration 132). Ordinary tenant-scoped
 // routes gated on `forms:manage` — the authoring permission, because opening a
 // form to the entire internet is an act of organisational policy and the single
@@ -3837,6 +3985,9 @@ $router->register('GET', '/api/forms/{id:\d+}/render', [$formsHandler, 'render']
 // body that meant to fix a typo, and the audit must read it as an act.
 $router->register('POST', '/api/forms/{id:\d+}/public-link', [$formsHandler, 'enablePublicLink'], null, null, CorePermissions::FORMS_MANAGE);
 $router->register('DELETE', '/api/forms/{id:\d+}/public-link', [$formsHandler, 'disablePublicLink'], null, null, CorePermissions::FORMS_MANAGE);
+// Opening a form to the workspace's members is authoring, for the same reason.
+$router->register('POST', '/api/forms/{id:\d+}/member-access', [$formsHandler, 'openToMembers'], null, null, CorePermissions::FORMS_MANAGE);
+$router->register('DELETE', '/api/forms/{id:\d+}/member-access', [$formsHandler, 'closeToMembers'], null, null, CorePermissions::FORMS_MANAGE);
 
 $formFieldsHandler = new \Whity\Api\FormFieldsApiHandler($formRepository, $formFieldRepository);
 $router->register('GET', '/api/form-fields', [$formFieldsHandler, 'listByQuery'], null, null, CorePermissions::FORMS_READ);
@@ -3882,7 +4033,9 @@ $formSubmissionsHandler = new \Whity\Api\FormSubmissionsApiHandler(
     $formRepository,
     $formFieldRepository,
     $formSubmissionRepository,
-    $submissionIssuer
+    $submissionIssuer,
+    $formUploadRepository,
+    $storageDriver
 );
 $formSubmissionReviewsHandler = new \Whity\Api\FormSubmissionReviewsApiHandler(
     $formFieldRepository,
@@ -3893,15 +4046,63 @@ $formSubmissionReviewsHandler = new \Whity\Api\FormSubmissionReviewsApiHandler(
 $router->register('POST', '/api/forms/{id:\d+}/submissions', [$formSubmissionsHandler, 'submit'], null, null, CorePermissions::FORMS_SUBMIT);
 $router->register('GET', '/api/form-submissions', [$formSubmissionsHandler, 'list'], null, null, CorePermissions::FORMS_READ);
 $router->register('GET', '/api/form-submissions/{id:\d+}', [$formSubmissionsHandler, 'show'], null, null, CorePermissions::FORMS_READ);
+$router->register('GET', '/api/form-submissions/{id:\d+}/files/{fileId:\d+}', [$formSubmissionsHandler, 'fileContent'], null, null, CorePermissions::FORMS_READ);
 // The office's record on a submission (migration 194). Somebody who can read a
 // submission can read what became of it; recording takes `forms:review`.
 $router->register('GET', '/api/form-submissions/{id:\d+}/review', [$formSubmissionReviewsHandler, 'show'], null, null, CorePermissions::FORMS_READ);
+// What the responses add up to, and the export. `forms:read`, which reads these rows anyway.
+$formResponsesHandler = new \Whity\Api\FormResponsesApiHandler(
+    $formRepository,
+    $formFieldRepository,
+    $formSubmissionRepository,
+    $auditLogger
+);
+$router->register('GET', '/api/forms/{id:\d+}/responses/summary', [$formResponsesHandler, 'summary'], null, null, CorePermissions::FORMS_READ);
+$router->register('GET', '/api/forms/{id:\d+}/responses/export', [$formResponsesHandler, 'export'], null, null, CorePermissions::FORMS_READ);
 $router->register('POST', '/api/form-submissions/{id:\d+}/review', [$formSubmissionReviewsHandler, 'record'], null, null, CorePermissions::FORMS_REVIEW);
 // Only ever the caller's own rows — the ROUTE decides whose, not a query param,
-// so no client can widen it. `forms:submit` rather than `forms:read`: the rows
-// already name exactly one person, so a tenant-wide permission has nothing left
-// to decide (migration 113's "being a recipient IS the authorization").
-$router->register('GET', '/api/me/form-submissions', [$formSubmissionsHandler, 'listMine'], null, null, CorePermissions::FORMS_SUBMIT);
+// so no client can widen it. No permission: the rows already name exactly one
+// person, so a tenant-wide permission has nothing left to decide (migration 113's
+// "being a recipient IS the authorization"), and a member who filled in a form
+// opened to them holds none.
+$router->register('GET', '/api/me/form-submissions', [$formSubmissionsHandler, 'listMine'], null);
+$router->register('GET', '/api/me/form-submissions/{id:\d+}', [$formSubmissionsHandler, 'showMine'], null);
+$router->register('GET', '/api/me/form-submissions/{id:\d+}/files/{fileId:\d+}', [$formSubmissionsHandler, 'myFileContent'], null);
+$formSubmissionWithdrawalHandler = new \Whity\Api\FormSubmissionWithdrawalApiHandler(
+    $db->getPdo(),
+    $formSubmissionRepository,
+    $documentRepository,
+    $documentWithdrawal,
+    $auditLogger
+);
+$router->register('POST', '/api/me/form-submissions/{id:\d+}/withdraw', [$formSubmissionWithdrawalHandler, 'withdraw'], null);
+
+// A FORM OPENED TO THE WORKSPACE'S MEMBERS (migration 198). No permission, like the
+// inbox: being an active member, on a form somebody with `forms:manage` opened, is the
+// authorization, and the handler checks both. Nothing is open until somebody opens it.
+$memberFormsHandler = new \Whity\Api\MemberFormsApiHandler(
+    $db->getPdo(),
+    $formRepository,
+    $formFieldRepository,
+    $formRenderer,
+    $submissionIssuer,
+    $formUploadsHandler
+);
+$formDraftsHandler = new \Whity\Api\FormDraftsApiHandler(
+    $db->getPdo(),
+    $formRepository,
+    $formFieldRepository,
+    new \Whity\Core\Form\FormDraftRepository($db->getPdo()),
+    $roleChecker
+);
+$router->register('GET', '/api/me/form-drafts', [$formDraftsHandler, 'list'], null);
+$router->register('GET', '/api/me/forms/{id:\d+}/draft', [$formDraftsHandler, 'show'], null);
+$router->register('PUT', '/api/me/forms/{id:\d+}/draft', [$formDraftsHandler, 'save'], null);
+$router->register('DELETE', '/api/me/forms/{id:\d+}/draft', [$formDraftsHandler, 'delete'], null);
+$router->register('GET', '/api/me/forms', [$memberFormsHandler, 'list'], null);
+$router->register('GET', '/api/me/forms/{id:\d+}/render', [$memberFormsHandler, 'render'], null);
+$router->register('POST', '/api/me/forms/{id:\d+}/uploads', [$memberFormsHandler, 'upload'], null);
+$router->register('POST', '/api/me/forms/{id:\d+}/submissions', [$memberFormsHandler, 'submit'], null);
 
 // THE PUBLIC END (migration 132). Unauthenticated by construction — the person
 // filling in an external application has no account and the whole point is that
@@ -4503,10 +4704,12 @@ $mailSettingsHandler = new \Whity\Api\MailSettingsApiHandler(
     $globalSettingsRepository,
     $secretStore,
     $roleChecker,
-    $logger
+    $logger,
+    $auditLogger
 );
 $router->register('GET', '/api/settings/mail/status',        [$mailSettingsHandler, 'status'],      null, null, CorePermissions::SETTINGS_MANAGE);
 $router->register('PUT', '/api/settings/mail/smtp-password', [$mailSettingsHandler, 'setPassword'], null, null, CorePermissions::SETTINGS_MANAGE);
+$router->register('PUT', '/api/settings/mail/oauth-credentials', [$mailSettingsHandler, 'setOAuthCredentials'], null, null, CorePermissions::SETTINGS_MANAGE);
 $router->register('POST', '/api/settings/mail/test',         [$mailSettingsHandler, 'test'],        null, null, CorePermissions::SETTINGS_MANAGE);
 
 // 13c. Register the Tenant Branding API (WC-233). Public GET /api/v1/branding
@@ -4703,8 +4906,10 @@ $router->register('POST', '/api/relations', [$relationsHandler, 'create'], null,
 $router->register('DELETE', '/api/relations/{id:\d+}', [$relationsHandler, 'delete'], null, null, CorePermissions::RELATIONS_MANAGE);
 
 // WC-2686308f: MCP token management endpoints (issue / list / revoke).
-// WC-149b2fc9: create and revoke are gated by mcp:tokens:manage so an admin
-// controls who may mint AI credentials. List is read-only and ungated.
+// #1623: a person manages their own AI connections, so these have no route
+// permission: each handler acts only on the caller's own tokens, and a token never
+// does more than its owner. mcp:tokens:manage is for the admin routes below, which
+// reach everyone's. Undeclared on purpose, which keeps them off the agent surface.
 $mcpTokenService = new McpTokenService($db->getPdo(), $jwtParser);
 // WHIT-832: the grant screen needs the operations an agent could be offered,
 // with their gates; derived once per worker from the same catalogue as tools/list.
@@ -4719,11 +4924,11 @@ $mcpTokenHandler = new McpTokenHandler(
     },
     $auditLogger,
 );
-$router->register('POST',   '/api/mcp/tokens',       [$mcpTokenHandler, 'create'], null, null, CorePermissions::MCP_TOKENS_MANAGE);
+$router->register('POST',   '/api/mcp/tokens',       [$mcpTokenHandler, 'create']);
 $router->register('GET',    '/api/mcp/tokens',       [$mcpTokenHandler, 'list']);
-$router->register('DELETE', '/api/mcp/tokens/{jti}', [$mcpTokenHandler, 'revoke'], null, null, CorePermissions::MCP_TOKENS_MANAGE);
+$router->register('DELETE', '/api/mcp/tokens/{jti}', [$mcpTokenHandler, 'revoke']);
 $router->register('GET',    '/api/mcp/tokens/{jti}/grant', [$mcpTokenHandler, 'grant']);
-$router->register('PATCH',  '/api/mcp/tokens/{jti}/grant', [$mcpTokenHandler, 'updateGrant'], null, null, CorePermissions::MCP_TOKENS_MANAGE);
+$router->register('PATCH',  '/api/mcp/tokens/{jti}/grant', [$mcpTokenHandler, 'updateGrant']);
 
 // WC-0208ce4d: AI-principal admin endpoints (tenant-scoped, admin surface).
 // Gated by mcp:tokens:manage so only admins who hold the credential-management
@@ -4809,6 +5014,19 @@ $mcpAgentOperations = static function () use ($toolDeriver, $authoredMcpTools): 
         ...\Whity\Mcp\Auth\AgentGrantView::operationsFrom($authoredMcpTools->toolObjects(), $authoredMcpTools->accessMap()),
     ];
 };
+// WHIT-867: every tool in plain words, by name. Read per request: a plugin's tools
+// come and go while a worker lives.
+$mcpToolCatalogue = static function () use ($toolDeriver, $authoredMcpTools): array {
+    $catalogue = [];
+    foreach ([[$toolDeriver->deriveTools(), $toolDeriver->buildAccessMap()], [$authoredMcpTools->toolObjects(), $authoredMcpTools->accessMap()]] as [$tools, $access]) {
+        foreach ($tools as $tool) {
+            $name = (string) ($tool['name'] ?? '');
+            $permission = $access[$name]['requiredPermission'] ?? null;
+            $catalogue[$name] = \Whity\Mcp\Tools\ToolCatalogue::describe($tool, is_string($permission) ? $permission : null);
+        }
+    }
+    return $catalogue;
+};
 // WC-0208ce4d: admin read-only view of the MCP tools and their access
 // requirements, plugin-authored tools included (WHIT-754).
 $mcpToolsAdminHandler = new McpToolsAdminHandler($toolDeriver, $roleChecker, $authoredMcpTools, $mcpEnabledPluginAlwaysOn);
@@ -4837,17 +5055,46 @@ $mcpToolsCallHandler = new ToolsCallHandler($toolDeriver, $router, $roleChecker,
 // an agent must not be able to approve its own proposal.
 // WHIT-816: a workspace agent's proposal runs under the person's assignment as it is now.
 $agentAssignments = new \Whity\Core\Agent\AgentAssignmentRepository($db->getPdo());
-$agentProposalsHandler = new \Whity\Api\AgentProposalsApiHandler($agentProposals, $mcpToolsCallHandler, $auditLogger, $agentAssignments, $agentActions);
+$agentProposalsHandler = new \Whity\Api\AgentProposalsApiHandler($agentProposals, $mcpToolsCallHandler, $auditLogger, $agentAssignments, $agentActions, $mcpToolCatalogue);
 $router->register('GET',  '/api/me/agent-proposals',                    [$agentProposalsHandler, 'list'],    null);
 $router->register('POST', '/api/me/agent-proposals/{id:\d+}/approve',  [$agentProposalsHandler, 'approve'], null);
 $router->register('POST', '/api/me/agent-proposals/{id:\d+}/decline',  [$agentProposalsHandler, 'decline'], null);
+// WHIT-872 (H.2): every inbox source and the caller's proposals in one list, oldest
+// first. Session-gated and self-scoped like the two surfaces it reads.
+$meWaitingHandler = new \Whity\Api\MeWaitingApiHandler($inboxSourceRegistry, $agentProposals, $agentAssignments);
+$router->register('GET', '/api/me/waiting', [$meWaitingHandler, 'list'], null);
+// WHIT-872 (H.4): the cards apps add to the caller's home. The handler lists only
+// what the caller holds the permission for, and each card's data is its own route.
+$homeCardsHandler = new \Whity\Api\HomeCardsApiHandler($db->getPdo(), $roleChecker, $pluginLoader, $tenantManifestHost, $tenantRecordRepository, $router);
+$router->register('GET', '/api/me/home-cards', [$homeCardsHandler, 'list'], null);
+// WHIT-872: Your recent documents (the caller's own rows, so no permission) and
+// Finish setting up (for people who can change the workspace).
+$meHomeHandler = new \Whity\Api\MeHomeApiHandler($db->getPdo());
+$router->register('GET', '/api/me/recent-documents', [$meHomeHandler, 'recentDocuments'], null);
+$router->register('GET', '/api/me/setup-steps', [$meHomeHandler, 'setupSteps'], null, null, CorePermissions::SETTINGS_WRITE);
+$router->register('PUT', '/api/me/home-cards/{key:[A-Za-z][A-Za-z0-9_]*}/hidden', [$homeCardsHandler, 'setHidden'], null);
 // WHIT-815: workspace agents (persona, toolsets, starting grant) and the
 // presets they start from. Gated on agents:manage, which migration 180 grants
 // to every role holding mcp:tokens:manage. Writes are agentPolicy refuse.
+// WHIT-867: "today" on the agents pages starts at midnight in the workspace's zone.
+$agentTodayFrom = static function (int $tenantId) use ($settingsService): string {
+    try {
+        $zone = new \DateTimeZone((string) ($settingsService->effective($tenantId)[\Whity\Core\Settings\SettingsRegistry::TIMEZONE] ?? 'UTC'));
+    } catch (\Exception) {
+        $zone = new \DateTimeZone('UTC');
+    }
+    return \Whity\Core\Agent\AgentStatsRepository::todayStart($zone);
+};
+$agentReadableSource = static fn (int $id, int $tenantId, int $profileId): ?array => $documentSourcesHandler->visibleRow($id, $tenantId, $profileId);
+$agentStats = new \Whity\Core\Agent\AgentStatsRepository($db->getPdo());
 $agentsHandler = new \Whity\Api\AgentsApiHandler(
     new \Whity\Core\Agent\AgentRepository($db->getPdo()),
     $agentPresetRegistry,
     $auditLogger,
+    $agentStats,
+    $agentTodayFrom,
+    $mcpAgentOperations,
+    $agentReadableSource,
 );
 $router->register('GET',   '/api/agents',                      [$agentsHandler, 'list'],    null, null, CorePermissions::AGENTS_MANAGE);
 $router->register('POST',  '/api/agents',                      [$agentsHandler, 'create'],  null, null, CorePermissions::AGENTS_MANAGE);
@@ -4855,6 +5102,17 @@ $router->register('GET',   '/api/agents/{id:\d+}',             [$agentsHandler, 
 $router->register('PATCH', '/api/agents/{id:\d+}',             [$agentsHandler, 'update'],  null, null, CorePermissions::AGENTS_MANAGE);
 $router->register('POST',  '/api/agents/{id:\d+}/archive',     [$agentsHandler, 'archive'], null, null, CorePermissions::AGENTS_MANAGE);
 $router->register('POST',  '/api/agents/{id:\d+}/restore',     [$agentsHandler, 'restore'], null, null, CorePermissions::AGENTS_MANAGE);
+$router->register('POST',  '/api/agents/{id:\d+}/pause',       [$agentsHandler, 'pause'],   null, null, CorePermissions::AGENTS_MANAGE);
+$router->register('POST',  '/api/agents/{id:\d+}/resume',      [$agentsHandler, 'resume'],  null, null, CorePermissions::AGENTS_MANAGE);
+// WHIT-867: everything the workspace's agents did and proposed, for the people
+// who manage them. Never on the MCP surface: an agent doesn't read over its
+// colleagues' shoulders.
+$agentActivityHandler = new \Whity\Api\AgentActivityApiHandler(
+    new \Whity\Core\Agent\AgentActivityRepository($db->getPdo()),
+    $agentProposals,
+    $mcpToolCatalogue,
+);
+$router->register('GET',   '/api/agent-activity',              [$agentActivityHandler, 'list'], null, null, CorePermissions::AGENTS_MANAGE);
 $router->register('GET',   '/api/agent-presets',               [$agentsHandler, 'presets'], null, null, CorePermissions::AGENTS_MANAGE);
 // WHIT-816: a person's use of the workspace's agents. Session-only (every
 // member may use one; no `agents:use` permission) and never on the MCP
@@ -4866,8 +5124,12 @@ $myAgentsHandler = new \Whity\Api\MyAgentsApiHandler(
     $roleChecker,
     $mcpAgentOperations,
     $auditLogger,
+    $agentStats,
+    $agentTodayFrom,
+    $agentReadableSource,
 );
 $router->register('GET',    '/api/me/agents',                              [$myAgentsHandler, 'list'],        null);
+$router->register('GET',    '/api/me/agent-toolsets',                      [$myAgentsHandler, 'toolsets'],    null);
 $router->register('POST',   '/api/me/agents/{id:\d+}/assignment',          [$myAgentsHandler, 'assign'],      null);
 $router->register('DELETE', '/api/me/agents/{id:\d+}/assignment',          [$myAgentsHandler, 'unassign'],    null);
 $router->register('GET',    '/api/me/agents/{id:\d+}/assignment/grant',    [$myAgentsHandler, 'grant'],       null);
@@ -4875,7 +5137,7 @@ $router->register('PATCH',  '/api/me/agents/{id:\d+}/assignment/grant',    [$myA
 $router->register('POST',   '/api/me/agents/{id:\d+}/credentials',         [$myAgentsHandler, 'credential'],  null);
 // WHIT-812: what agents did for you, and undoing it inside its window. Same
 // rule as the inbox: never on the MCP surface.
-$agentActionsHandler = new \Whity\Api\AgentActionsApiHandler($agentActions, $mcpToolsCallHandler, $agentProposals, $auditLogger);
+$agentActionsHandler = new \Whity\Api\AgentActionsApiHandler($agentActions, $mcpToolsCallHandler, $agentProposals, $auditLogger, $mcpToolCatalogue);
 $router->register('GET',  '/api/me/agent-actions',                      [$agentActionsHandler, 'list'], null);
 $router->register('POST', '/api/me/agent-actions/{id:\d+}/undo',        [$agentActionsHandler, 'undo'], null);
 $mcpHandlers = [
@@ -4892,8 +5154,12 @@ $mcpHandlers = [
     'prompts/get'             => new PromptsGetHandler($promptRegistry, $roleChecker, $tokenValidator),
 ];
 // WHIT-697: "last used", which the connect wizard waits on.
-$mcpRecordTokenUse = static function (\Whity\Mcp\Auth\McpPrincipal $principal) use ($mcpTokenService): void {
+$mcpRecordTokenUse = static function (\Whity\Mcp\Auth\McpPrincipal $principal) use ($mcpTokenService, $agentAssignments): void {
     $mcpTokenService->recordUse($principal->jti, $principal->tenantId);
+    // WHIT-867: when a workspace agent was last active, however it signed in.
+    if ($principal->principalKind === \Whity\Mcp\Auth\AgentScopeGrant::AGENT_KIND) {
+        $agentAssignments->recordActivity($principal->agentPrincipalId(), $principal->tenantId);
+    }
 };
 // WHIT-707, WHIT-750: /mcp?tools=discover answers tools/list with
 // search_operations and call_operation, which search and call the real
@@ -4952,12 +5218,24 @@ $mcpDiscovery = new DiscoveryTools(
             new \Whity\Core\Agent\AgentRepository($mcpBriefingPdo),
         ),
         // WHIT-824: a person's own connection names the agents they granted.
+        // (Not a paused agent: it can't be connected to until it is resumed.)
         static function (int $profileId, int $tenantId) use ($agentAssignments, $mcpBriefingPdo): array {
             $mine = $agentAssignments->activeForPerson($profileId, $tenantId);
             return $mine === [] ? [] : array_values(array_filter(
                 (new \Whity\Core\Agent\AgentRepository($mcpBriefingPdo))->list($tenantId),
-                static fn (array $agent): bool => isset($mine[$agent['id']]),
+                static fn (array $agent): bool => isset($mine[$agent['id']]) && $agent['paused_at'] === null,
             ));
+        },
+        // WHIT-867: what the agent keeps for reference, as far as this person can read it.
+        static function (array $ids, int $profileId, int $tenantId) use ($agentReadableSource): array {
+            $readable = [];
+            foreach ($ids as $id) {
+                $row = $agentReadableSource((int) $id, $tenantId, $profileId);
+                if (is_array($row)) {
+                    $readable[] = ['id' => (int) $id, 'title' => (string) ($row['title'] ?? '')];
+                }
+            }
+            return $readable;
         },
     ),
     // WHIT-754: a plugin's always-on tool is listed only once this workspace's
@@ -5067,8 +5345,9 @@ $router->registerUnversioned('GET',  '/mcp/agents/{agent:[a-z0-9][a-z0-9-]*}', [
 $router->registerUnversioned('POST', '/mcp/{split:[a-z0-9][a-z0-9_.-]*}', [$mcpTransportHandler, 'handlePost']);
 $router->registerUnversioned('GET',  '/mcp/{split:[a-z0-9][a-z0-9_.-]*}', [$mcpTransportHandler, 'handleGet']);
 
-// WHIT-697: the "Connect an AI app" wizard. Gated like token issuance, which
-// is where the wizard ends. The preview runs the tools/list filter itself.
+// WHIT-697: the "Connect an AI app" wizard. No route permission, like token
+// issuance, where the wizard ends (#1623). The preview runs the tools/list filter
+// itself, so it shows only what the caller could already do.
 $mcpConnectHandler = new McpConnectHandler(
     $tokenValidator,
     $mcpToolsListHandler,
@@ -5077,8 +5356,8 @@ $mcpConnectHandler = new McpConnectHandler(
     $mcpServerEnabled,
     McpConnectHandler::endpointFor((string) ($_ENV['APP_URL'] ?? getenv('APP_URL') ?: '')),
 );
-$router->register('GET',  '/api/mcp/connect',         [$mcpConnectHandler, 'info'],    null, null, CorePermissions::MCP_TOKENS_MANAGE);
-$router->register('POST', '/api/mcp/connect/preview', [$mcpConnectHandler, 'preview'], null, null, CorePermissions::MCP_TOKENS_MANAGE);
+$router->register('GET',  '/api/mcp/connect',         [$mcpConnectHandler, 'info']);
+$router->register('POST', '/api/mcp/connect/preview', [$mcpConnectHandler, 'preview']);
 
 // Load plugins AFTER every core route (WC-169): the Router refuses duplicate
 // method+path registrations (first wins), so core routes can never be
@@ -5221,13 +5500,15 @@ if ($isWorker) {
             } catch (\Throwable $e) {
                 // Handle any uncaught exceptions
                 try {
-                    $errorResponse = Response::error('Internal server error', 500);
+                    $requestId = \Whity\Core\Observability\ErrorReference::mint();
+                    $errorResponse = Response::json(['error' => 'Internal server error', 'reference' => $requestId], 500);
                     // The 500 path is a response a client can receive, so it gets the
                     // hardening headers too (WC-187).
                     $errorHeaders = array_merge(
                         $errorResponse->getHeaders(),
                         Cors::headers($_SERVER['HTTP_ORIGIN'] ?? null),
-                        $securityHeaders
+                        $securityHeaders,
+                        [\Whity\Core\Observability\ErrorReference::HEADER => $requestId]
                     );
                     $errorResponse = new Response(500, $errorResponse->getBody(), $errorHeaders);
                     $errorResponse->send();
@@ -5235,7 +5516,6 @@ if ($isWorker) {
                     // If send also fails, just log it
                     error_log('Failed to send error response: ' . $sendError->getMessage());
                 }
-                $requestId = \Whity\Core\Observability\ErrorContext::newRequestId();
                 try {
                     $errorTracker->captureException(
                         $e,
@@ -5354,13 +5634,15 @@ if ($isWorker) {
     } catch (\Throwable $e) {
         // Handle any uncaught exceptions
         try {
-            $errorResponse = Response::error('Internal server error', 500);
+            $requestId = \Whity\Core\Observability\ErrorReference::mint();
+            $errorResponse = Response::json(['error' => 'Internal server error', 'reference' => $requestId], 500);
             // The 500 path is a response a client can receive, so it gets the
             // hardening headers too (WC-187).
             $errorHeaders = array_merge(
                 $errorResponse->getHeaders(),
                 Cors::headers($_SERVER['HTTP_ORIGIN'] ?? null),
-                $securityHeaders
+                $securityHeaders,
+                [\Whity\Core\Observability\ErrorReference::HEADER => $requestId]
             );
             $errorResponse = new Response(500, $errorResponse->getBody(), $errorHeaders);
             $errorResponse->send();
@@ -5368,7 +5650,6 @@ if ($isWorker) {
             // If send also fails, just log it
             error_log('Failed to send error response: ' . $sendError->getMessage());
         }
-        $requestId = \Whity\Core\Observability\ErrorContext::newRequestId();
         try {
             $errorTracker->captureException(
                 $e,

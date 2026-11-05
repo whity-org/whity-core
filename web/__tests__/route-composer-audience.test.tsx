@@ -201,10 +201,10 @@ describe('RouteComposer — naming a user group', () => {
 
     // #999's endpoint, not a second preview mechanism invented here.
     expect(mockApiClient).toHaveBeenCalledWith('/api/v1/user-groups/7/preview');
-    // A sample, said to be a sample, with the id standing in for the name the
+    // A sample, said to be a sample, with no id standing in for the name the
     // caller may not read.
     expect(screen.getByText(/a sample, not the whole set/i)).toBeInTheDocument();
-    expect(screen.getByText('Profile #12')).toBeInTheDocument();
+    expect(screen.getByText('Someone in this workspace')).toBeInTheDocument();
     // And the membership-is-not-stored caveat, on screen and not behind a click.
     expect(
       screen.getByText(/a group is a rule, not a saved list of people/i)

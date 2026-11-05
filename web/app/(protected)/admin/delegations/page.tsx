@@ -1,17 +1,22 @@
-﻿'use client';
+'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Avatar } from '@whity/ui/avatar';
+import { TechnicalDetails } from '@whity/ui/display-preferences';
+import { useDateDisplay } from '@whity/features/datetime';
 import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { Button } from '@whity/ui/button';
 import { Badge } from '@whity/ui/badge';
+import { ToggleGroup } from '@whity/ui/toggle-group';
 import { ErrorState } from '@whity/ui/empty-state';
 import { IconPlus, IconShare, IconShieldLock } from '@tabler/icons-react';
 import { useTranslation } from '@whity/features/i18n';
 import { CreateDelegationModal } from './create-modal';
-import { RevokeDelegationModal } from './revoke-modal';
+import { roleLabel } from '@whity/features/roles';
+import { permissionInWords } from './permission-words';
 import type { Delegation } from './types';
 
 /**
@@ -22,8 +27,14 @@ import type { Delegation } from './types';
 interface DelegationRow {
   id: number;
   permission: string;
+  /** Who gave it, by name, or a plain word when there is none to show. */
+  grantor: string;
+  /** The grantee's name, or a plain word when there is none to show. */
   grantee: string;
+  granteeIsRole: boolean;
   scope: string;
+  grantedAt: string | null;
+  until: string;
   status: string;
   source: Delegation;
 }
@@ -37,8 +48,9 @@ export default function DelegationsPage() {
   const [isForbidden, setIsForbidden] = useState(false);
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [isRevokeOpen, setIsRevokeOpen] = useState(false);
-  const [selected, setSelected] = useState<Delegation | null>(null);
+  // Ended delegations stay listed under All, for the record.
+  const [showAll, setShowAll] = useState(false);
+  const dates = useDateDisplay();
 
   // Sort/filter/pagination all still run CLIENT-side over a single fetch —
   // fetching the backend's own page-size ceiling (100) rather than its default
@@ -58,7 +70,7 @@ export default function DelegationsPage() {
         // per_page (a spec gap — see the migration note above), but the
         // controller runs through the same PaginationParams helper as the
         // other list endpoints and honors it identically.
-        params: { query: { per_page: 100 } as never },
+        params: { query: { per_page: 100, ...(showAll ? { includeRevoked: true } : {}) } as never },
       });
 
       if (response.status === 403) {
@@ -84,7 +96,7 @@ export default function DelegationsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [addToast, t]);
+  }, [addToast, t, showAll]);
 
   useEffect(() => {
     void (async () => {
@@ -97,56 +109,134 @@ export default function DelegationsPage() {
       delegations.map((d) => ({
         id: d.id,
         permission: d.permission,
+        grantor: d.grantorName ?? t('delegations.grantee.user', 'A person'),
         grantee:
-          d.granteeType === 'role'
-            ? t('delegations.grantee.role', 'Role #{id}', { id: d.granteeId })
-            : t('delegations.grantee.user', 'User #{id}', { id: d.granteeId }),
+          d.granteeName ??
+          (d.granteeType === 'role'
+            ? t('delegations.grantee.role', 'A role')
+            : t('delegations.grantee.user', 'A person')),
+        granteeIsRole: d.granteeType === 'role',
         scope:
           d.ouId !== null
-            ? t('delegations.scope.ou', 'OU #{id}', { id: d.ouId })
-            : t('delegations.scope.tenantWide', 'Tenant-wide'),
+            ? (d.ouName ?? t('delegations.scope.ou', 'One unit'))
+            : t('delegations.scope.tenantWide', 'Whole workspace'),
+        grantedAt: d.grantedAt,
+        until:
+          d.expiresAt !== null && d.expiresAt !== undefined
+            ? (dates.date(d.expiresAt) ?? '')
+            : t('delegations.until.none', 'No end date'),
         status:
-          d.revokedAt !== null
+          d.status === 'revoked'
             ? t('delegations.status.revoked', 'Revoked')
-            : t('delegations.status.active', 'Active'),
+            : d.status === 'expired'
+              ? t('delegations.status.ended', 'Ended')
+              : t('delegations.status.active', 'Active'),
         source: d,
       })),
-    [delegations, t]
+    [delegations, t, dates]
   );
 
   const columns: DataTableColumn<DelegationRow>[] = [
     {
-      accessorKey: 'permission',
-      header: t('delegations.table.permission', 'Permission'),
+      accessorKey: 'grantor',
+      header: t('delegations.table.grantor', 'From'),
       enableSorting: true,
-      enableColumnFilter: true,
+      cell: (row) => (
+        <div className="flex items-center gap-3">
+          <Avatar name={row.grantor} size={28} />
+          <span className="font-medium text-foreground">{row.grantor}</span>
+        </div>
+      ),
     },
     {
       accessorKey: 'grantee',
-      header: t('delegations.table.grantee', 'Grantee'),
+      header: t('delegations.table.grantee', 'To'),
       enableSorting: true,
-      enableColumnFilter: true,
+      cell: (row) => (
+        <div className="flex items-center gap-3">
+          {row.granteeIsRole ? (
+            <Badge variant="outline">{row.granteeIsRole ? roleLabel(row.grantee) : row.grantee}</Badge>
+          ) : (
+            <>
+              <Avatar name={row.grantee} size={28} />
+              <span className="font-medium text-foreground">{row.grantee}</span>
+            </>
+          )}
+        </div>
+      ),
     },
-    { accessorKey: 'scope', header: t('delegations.table.scope', 'Scope'), enableSorting: true },
-    { accessorKey: 'status', header: t('delegations.table.status', 'Status'), enableSorting: true },
+    {
+      accessorKey: 'permission',
+      header: t('delegations.table.permission', 'What'),
+      enableSorting: true,
+      cell: (row) => (
+        <div>
+          <p className="text-foreground">{permissionInWords(row.permission)}</p>
+          <TechnicalDetails>
+            <p className="font-mono text-xs text-muted-foreground">{row.permission}</p>
+          </TechnicalDetails>
+        </div>
+      ),
+    },
+    { accessorKey: 'scope', header: t('delegations.table.scope', 'Where'), enableSorting: true },
+    { accessorKey: 'until', header: t('delegations.table.until', 'Until'), enableSorting: true },
+    ...dates.dateColumns<DelegationRow>([
+      {
+        id: 'grantedAt',
+        header: t('delegations.table.grantedAt', 'Since'),
+        value: (row) => row.grantedAt,
+        enableSorting: true,
+      },
+    ]),
+    {
+      accessorKey: 'status',
+      header: t('delegations.table.status', 'Status'),
+      enableSorting: true,
+      cell: (row) => (
+        <Badge variant={row.source.status === 'active' ? 'success' : 'secondary'}>{row.status}</Badge>
+      ),
+    },
   ];
 
-  const handleRevokeClick = (delegation: Delegation) => {
-    setSelected(delegation);
-    setIsRevokeOpen(true);
+  const handleUndo = async (delegation: Delegation) => {
+    const { error, response } = await api.POST('/api/v1/delegations/{id}/restore', {
+      params: { path: { id: delegation.id } },
+    });
+    if (error !== undefined || !response.ok) {
+      addToast(
+        response.status === 409
+          ? t('delegations.undo.tooLate', 'This can no longer be undone. To give the access back, delegate it again.')
+          : t('delegations.undo.error', 'The revoke could not be undone.'),
+        'error'
+      );
+      return;
+    }
+    addToast(t('delegations.undo.success', 'Delegation put back.'), 'success');
+    void fetchDelegations();
+  };
+
+  // Revoking can be undone for a while, so it happens at once and the toast offers
+  // Undo (tier 1).
+  const handleRevoke = async (delegation: Delegation) => {
+    const { error, response } = await api.DELETE('/api/v1/delegations/{id}', {
+      params: { path: { id: delegation.id } },
+    });
+    if (error !== undefined || !response.ok) {
+      addToast(error?.error ?? t('delegations.revoke.error', 'Failed to revoke delegation'), 'error');
+      return;
+    }
+    addToast(t('delegations.revoked', 'Delegation revoked. They lost this access straight away.'), 'success', 10000, {
+      label: t('delegations.undo', 'Undo'),
+      onClick: () => void handleUndo(delegation),
+    });
+    void fetchDelegations();
   };
 
   const rowActions = (row: DelegationRow) => {
-    if (row.source.revokedAt !== null) {
-      return <Badge variant="outline">{t('delegations.status.revoked', 'Revoked')}</Badge>;
-    }
+    // Ended delegations stay listed, for the record, with nothing left to do.
+    if (row.source.status !== 'active') return null;
     return (
-      <Button
-        variant="ghost"
-        size="sm"
-        className="text-destructive hover:text-destructive"
-        onClick={() => handleRevokeClick(row.source)}
-      >
+      <Button variant="outline" size="sm" onClick={() => void handleRevoke(row.source)}>
         {t('delegations.action.revoke', 'Revoke')}
       </Button>
     );
@@ -174,19 +264,32 @@ export default function DelegationsPage() {
                 'Delegate a subset of your permissions to roles or users.'
               )
             : t(
-                'delegations.description',
-                'Delegate a subset of your permissions to roles or users, scoped to a tenant or an organizational unit.'
+                'delegations.description.unit',
+                'Delegate a subset of your permissions to roles or users, across the workspace or in one unit.'
               )
         }
         action={
           isForbidden ? undefined : (
             <Button onClick={() => setIsCreateOpen(true)} className="gap-2">
               <IconPlus size={18} />
-              {t('delegations.header.create', 'Create Delegation')}
+              {t('delegations.header.create', 'Delegate')}
             </Button>
           )
         }
       />
+
+      {!isForbidden && (
+        <ToggleGroup
+          required
+          label={t('delegations.filter.label', 'Show')}
+          value={showAll ? 'all' : 'active'}
+          options={[
+            { value: 'active', label: t('delegations.filter.active', 'Active') },
+            { value: 'all', label: t('delegations.filter.all', 'All') },
+          ]}
+          onChange={(value) => setShowAll(value === 'all')}
+        />
+      )}
 
       <DataTable
         columns={columns}
@@ -229,19 +332,6 @@ export default function DelegationsPage() {
           void fetchDelegations();
         }}
       />
-
-      {selected && (
-        <RevokeDelegationModal
-          isOpen={isRevokeOpen}
-          onOpenChange={setIsRevokeOpen}
-          delegation={selected}
-          onSuccess={() => {
-            setIsRevokeOpen(false);
-            setSelected(null);
-            void fetchDelegations();
-          }}
-        />
-      )}
     </div>
   );
 }

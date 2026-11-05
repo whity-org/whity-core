@@ -44,6 +44,58 @@ final class StorageKey
     }
 
     /**
+     * The prefix under which one plugin keeps its files in one tenant:
+     * `tenants/{tenantId}/{plugin}/`. Every key {@see self::pluginPath()} builds
+     * starts with it, so listing the prefix lists exactly that plugin's files.
+     *
+     * @throws \InvalidArgumentException for a bad tenant id or plugin slug.
+     */
+    public static function pluginPrefix(int $tenantId, string $plugin): string
+    {
+        if ($tenantId <= 0) {
+            throw new \InvalidArgumentException('A plugin file needs a workspace (tenant id above zero).');
+        }
+        if (preg_match('/^[a-z][a-z0-9_]{0,63}$/', $plugin) !== 1) {
+            throw new \InvalidArgumentException('Plugin slug is not a usable storage segment.');
+        }
+
+        return sprintf('tenants/%d/%s/', $tenantId, $plugin);
+    }
+
+    /**
+     * The key for a file a plugin names inside its own prefix, strictly.
+     *
+     * Unlike {@see self::build()}, which quietly sanitises, this REJECTS: a
+     * relative path with `..`, `.`, empty segments, a backslash, a NUL, a leading
+     * slash or a control character never becomes a key, so a caller that asked for
+     * `../other-plugin/x` learns that it was refused rather than being written
+     * somewhere else. Each segment must start with a letter or digit, so no
+     * segment can be a dot-name.
+     *
+     * @param string $relativePath e.g. `invoices/2026/march.pdf`
+     *
+     * @throws \InvalidArgumentException when the path is not a plain relative path.
+     */
+    public static function pluginPath(int $tenantId, string $plugin, string $relativePath): string
+    {
+        $prefix = self::pluginPrefix($tenantId, $plugin);
+
+        if ($relativePath === '' || strlen($relativePath) > 512) {
+            throw new \InvalidArgumentException('File path must be 1 to 512 bytes.');
+        }
+        if (str_contains($relativePath, '\\') || str_contains($relativePath, "\0")) {
+            throw new \InvalidArgumentException('File path may not contain backslashes or NUL bytes.');
+        }
+        foreach (explode('/', $relativePath) as $segment) {
+            if (preg_match('/^[A-Za-z0-9][A-Za-z0-9._ -]{0,127}$/', $segment) !== 1) {
+                throw new \InvalidArgumentException('File path segments must be plain names (letters, digits, dot, dash, underscore, space).');
+            }
+        }
+
+        return $prefix . $relativePath;
+    }
+
+    /**
      * Extract the tenant ID from a key built by {@see self::build()}.
      *
      * Returns null if the key does not match the expected format

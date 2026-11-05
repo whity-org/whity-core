@@ -29,7 +29,8 @@ import { createDocumentSource } from '@/lib/documents/sources';
 import { ScopeDialog } from './scope-dialog';
 import { DeleteDialog } from './delete-dialog';
 import { CopyDialog } from './copy-dialog';
-import { ScopeBadge } from './audience';
+import { describeAudience } from './audience';
+import { NewTemplateDialog } from './new-template-dialog';
 import { ForbiddenError, editorHref, listTemplates } from './api';
 import type { OuOption, PermissionOption, PermissionSource, TemplateRow } from './types';
 
@@ -120,6 +121,7 @@ export default function DocumentTemplatesPage() {
   const [scoping, setScoping] = useState<TemplateRow | null>(null);
   const [deleting, setDeleting] = useState<TemplateRow | null>(null);
   const [creating, setCreating] = useState(false);
+  const [starting, setStarting] = useState(false);
 
   const nameOf = useCallback(
     (row: TemplateRow) => (row.title.trim() === '' ? t('documentTemplates.untitled', 'Untitled') : row.title),
@@ -153,7 +155,7 @@ export default function DocumentTemplatesPage() {
     () => [
       {
         accessorKey: 'title',
-        header: t('documentTemplates.table.title', 'Title'),
+        header: t('documentTemplates.table.title', 'Template'),
         enableSorting: true,
         enableColumnFilter: true,
         cell: (row) => (
@@ -171,26 +173,14 @@ export default function DocumentTemplatesPage() {
             {row.legacy_template_id !== null && (
               <Badge variant="outline">{t('documentTemplates.badge.converted', 'Converted')}</Badge>
             )}
+            <span className="basis-full text-sm text-muted-foreground">
+              {row.kind === 'label'
+                ? t('documentTemplates.kind.label', 'Label sheet')
+                : t('documentTemplates.kind.template', 'Template')}
+              {row.record_type !== null && ` · ${recordTypeNames?.[row.record_type] ?? row.record_type}`}
+            </span>
           </span>
         ),
-      },
-      {
-        id: 'kind',
-        header: t('documentTemplates.table.kind', 'Kind'),
-        cell: (row) =>
-          row.kind === 'label'
-            ? t('documentTemplates.kind.label', 'Label sheet')
-            : t('documentTemplates.kind.template', 'Template'),
-      },
-      {
-        id: 'recordType',
-        header: t('documentTemplates.table.recordType', 'Record type'),
-        cell: (row) =>
-          row.record_type === null ? (
-            <span className="text-muted-foreground">{t('documentTemplates.table.noRecordType', 'None')}</span>
-          ) : (
-            (recordTypeNames?.[row.record_type] ?? row.record_type)
-          ),
       },
       {
         id: 'status',
@@ -200,22 +190,24 @@ export default function DocumentTemplatesPage() {
             <Badge variant="secondary">{t('documentTemplates.status.draft', 'Draft')}</Badge>
           ) : (
             <Badge variant="success">
-              {t('documentTemplates.status.published', 'Published v{version}', { version: row.published_version })}
+              {t('documentTemplates.status.published', 'Published, version {version}', { version: row.published_version })}
             </Badge>
           ),
       },
       {
         id: 'visibility',
-        header: t('documentTemplates.table.visibility', 'Visible to'),
+        header: t('documentTemplates.table.visibility', 'Who can see it'),
         cell: (row) => (
-          <ScopeBadge row={row} ouName={ouName(row.owner_ou_id)} viewerProfileId={viewerProfileId} />
+          <span className="text-sm text-muted-foreground">
+            {describeAudience(row, { ouName: ouName(row.owner_ou_id), viewerProfileId }, t)}
+          </span>
         ),
       },
       // The "Updated" column goes when this tenant hides dates (#1068).
       ...dates.dateColumns<TemplateRow>([
         {
           id: 'updated_at',
-          header: t('documentTemplates.table.updated', 'Updated'),
+          header: t('documentTemplates.table.updated', 'Changed'),
           value: (row) => row.updated_at,
           enableSorting: true,
           className: 'text-muted-foreground',
@@ -250,7 +242,7 @@ export default function DocumentTemplatesPage() {
         {/* Copying needs write, not publish: the copy lands personal, the one
             scope everybody with write already has. */}
         <DropdownMenuItem onClick={() => setCopying(row)} disabled={!canWrite}>
-          {t('documentTemplates.rowActions.copy', 'Use a copy…')}
+          {t('documentTemplates.rowActions.copy', 'Make a copy…')}
         </DropdownMenuItem>
         {/* Every field in the scope dialog is a publish action server-side,
             so the entry is gated rather than opening a dialog whose save 403s. */}
@@ -272,14 +264,14 @@ export default function DocumentTemplatesPage() {
   return (
     <div className="space-y-8">
       <AdminHeader
-        title={t('documentTemplates.title', 'Document templates')}
+        title={t('documentTemplates.title', 'Templates')}
         description={t(
           'documentTemplates.subtitle',
           'The templates and label sheets documents are issued from, and who can see each one. A document is issued from the published version.'
         )}
         action={
           canWrite ? (
-            <Button icon="plus" loading={creating} disabled={creating} onClick={() => void createTemplate()}>
+            <Button icon="plus" loading={creating} disabled={creating} onClick={() => setStarting(true)}>
               {t('documentTemplates.new', 'New template')}
             </Button>
           ) : undefined
@@ -300,6 +292,7 @@ export default function DocumentTemplatesPage() {
         data={templates.data ?? []}
         getRowId={(row) => String(row.id)}
         rowActions={rowActions}
+        onRowClick={(row) => router.push(editorHref(row.id))}
         isLoading={templates.loading}
         overrideContent={
           forbidden ? (
@@ -313,7 +306,7 @@ export default function DocumentTemplatesPage() {
             />
           ) : undefined
         }
-        ariaLabel={t('documentTemplates.title', 'Document templates')}
+        ariaLabel={t('documentTemplates.title', 'Templates')}
         enableGlobalFilter
         globalFilterPlaceholder={t('documentTemplates.searchTemplates', 'Search templates…')}
         emptyState={{
@@ -330,6 +323,22 @@ export default function DocumentTemplatesPage() {
         }
         pagination={{ pageSize: 25 }}
       />
+
+      {starting && (
+        <NewTemplateDialog
+          templates={templates.data ?? []}
+          nameOf={nameOf}
+          onClose={() => setStarting(false)}
+          onBlank={() => {
+            setStarting(false);
+            void createTemplate();
+          }}
+          onFrom={(row) => {
+            setStarting(false);
+            setCopying(row);
+          }}
+        />
+      )}
 
       {copying !== null && (
         <CopyDialog

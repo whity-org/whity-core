@@ -61,18 +61,16 @@
  * ─────────────────────────────────────────────────────────────────────────────
  * NAMES, AND WHAT HAPPENS WHEN THIS CALLER MAY NOT SEE THEM
  * ─────────────────────────────────────────────────────────────────────────────
- * The trail and the recipient rows are made of ids. Turning `actor_profile_id`
- * into a person needs `users:read` and turning `origin_ou_id` into a unit needs
- * `ous:read` — two gates that have nothing to do with `documents:read`, and
- * migration 101 removed `ous:read` from the plain user role, so a reader with
- * neither is an ordinary state.
+ * The trail and the recipient rows are made of ids. The people come from
+ * `GET .../people` (S5), which names everybody on this record to anybody who may
+ * read it, so no directory permission is involved. Turning `origin_ou_id` into a
+ * unit needs `ous:read`, and migration 101 removed that from the plain user role,
+ * so a reader without it is an ordinary state.
  *
- * So the directory is fetched best-effort and its ABSENCE IS REPORTED. Ids
- * render as `Account #42` / `Unit #7` with a notice above the region saying which
- * permission would have named them — the pattern the organizer next door already
- * uses for the same reason. Printing a bare `#7` with no explanation is what
- * #951 is about: the reader cannot tell a permission boundary from a data bug,
- * and the one who could have fixed it is usually the one who cannot tell.
+ * So the units are fetched best-effort and their ABSENCE IS REPORTED: they render
+ * as `Unit #7` with a notice above the region saying which permission would have
+ * named them. Printing a bare `#7` with no explanation is what #951 is about: the
+ * reader cannot tell a permission boundary from a data bug.
  */
 
 import { useCallback, useMemo, useState } from 'react';
@@ -87,13 +85,19 @@ import {
 } from '@whity/features/record';
 import type { RecordFactsFn, RecordSectionSpec } from '@whity/features/record';
 import { useTranslation } from '@whity/features/i18n';
+import { formNameFrom } from '@/lib/documents/template-name';
+import { Tabs, TabsList, TabsTrigger } from '@whity/ui/tabs';
+import { Alert, AlertDescription, AlertTitle } from '@whity/ui/alert';
+import { Button } from '@whity/ui/button';
+import { useDateDisplay } from '@whity/features/datetime';
 import { useAuth } from '@/lib/auth-context';
 import { fetchAllPages } from '@/lib/api/fetch-all-pages';
 import { DocumentViewer } from '@/components/plugin/blocks/document-viewer';
 
-import { DocumentTrail, unitName } from './trail';
-import { OpenRecipients } from './recipients';
+import { DocumentTrail, personName, unitName } from './trail';
 import { DocumentQrPanel } from './qr';
+import { DocumentHeaderActions } from './header-actions';
+import { DocumentRoutingPanel } from '@/components/documents/document-routing-panel';
 import type {
   Directory,
   DocumentRecord,
@@ -124,6 +128,7 @@ interface DocumentRecordFields {
   templateName: string;
   createdAt: string;
   versionCount: number;
+  raisedBy: string | null;
   /**
    * Already resolved to a NAME by the screen, so the projection needs no
    * directory — and NULL while the directory is still in flight.
@@ -184,8 +189,14 @@ const documentFacts: RecordFactsFn<DocumentRecordFields> = (document, t, dates) 
         ]),
     {
       key: 'unit',
-      label: t('record.stat.unit', 'Raised from'),
-      value: document.originUnit,
+      label: t('record.stat.raisedBy', 'Raised by'),
+      value:
+        document.raisedBy !== null && document.originUnit !== null
+          ? t('record.stat.raisedByUnit', '{person}, {unit}', {
+              person: document.raisedBy,
+              unit: document.originUnit,
+            })
+          : (document.raisedBy ?? document.originUnit),
     },
     {
       key: 'awaiting',
@@ -270,6 +281,9 @@ function localizeDenial(
 /** One page of trail events. Bumped by the pager, and part of the fetch key. */
 const FIRST_PAGE = 1;
 
+const RECORD_TABS = ['document', 'routing', 'history', 'verification'] as const;
+type RecordTab = (typeof RECORD_TABS)[number];
+
 export interface DocumentRecordScreenProps {
   documentId: number;
   onBack: () => void;
@@ -278,7 +292,26 @@ export interface DocumentRecordScreenProps {
 export function DocumentRecordScreen({ documentId, onBack }: DocumentRecordScreenProps) {
   const { apiClient, user } = useAuth();
   const t = useTranslation('documents');
+  const dates = useDateDisplay();
   const [trailPage, setTrailPage] = useState(FIRST_PAGE);
+  // Bumped when the Routing tab changes who holds the document, so the Awaiting
+  // tile and the names beside it are read again.
+  const [routingVersion, setRoutingVersion] = useState(0);
+  // The address names the tab (`?tab=routing`), so a link and the old
+  // circulation address land on it. The tab body only renders once the record
+  // has loaded, so reading it here cannot disagree with the server render.
+  const [tab, setTabState] = useState<RecordTab>(() => {
+    if (typeof window === 'undefined') return 'document';
+    const requested = new URLSearchParams(window.location.search).get('tab');
+    return RECORD_TABS.includes(requested as RecordTab) ? (requested as RecordTab) : 'document';
+  });
+  const setTab = useCallback((next: string) => {
+    setTabState(next as RecordTab);
+    const url = new URL(window.location.href);
+    url.searchParams.set('tab', next);
+    window.history.replaceState(null, '', url);
+  }, []);
+
 
   const back = useMemo(
     () => ({ label: t('record.back', 'Back to documents'), onBack }),
@@ -390,7 +423,7 @@ export function DocumentRecordScreen({ documentId, onBack }: DocumentRecordScree
       const body = (await response.json()) as { data?: RouteRecipient[] };
       return body.data ?? [];
     },
-    [documentId, recipientsVisible],
+    [documentId, recipientsVisible, routingVersion],
     t('record.error.recipients', 'Failed to load who has this document')
   );
 
@@ -402,21 +435,17 @@ export function DocumentRecordScreen({ documentId, onBack }: DocumentRecordScree
   // readable with ids in place of names.
   const directory = useRecordResource<Directory>(
     async () => {
-      const [peopleResult, unitsResult] = await Promise.all([
-        fetchAllPages<{ id: number; name?: string; email?: string }>(apiClient, '/api/v1/users'),
+      const [peopleResponse, unitsResult] = await Promise.all([
+        // The people on THIS record (S5), so naming them needs no directory.
+        apiClient(`/api/v1/documents/${documentId}/people`),
         fetchAllPages<{ id: number; name: string }>(apiClient, '/api/v1/ous'),
       ]);
 
       const people = new Map<number, string>();
-      if (peopleResult.complete) {
-        for (const person of peopleResult.items) {
-          // The email, falling back to the derived `name` the users endpoint
-          // synthesises from its local part. There is no name column in the
-          // identity model, so the email IS how a person is identified here.
-          const label = person.email !== undefined && person.email !== '' ? person.email : person.name;
-          if (label !== undefined && label !== '') {
-            people.set(person.id, label);
-          }
+      if (peopleResponse.ok) {
+        const body = (await peopleResponse.json()) as { data?: Record<string, string> };
+        for (const [id, name] of Object.entries(body.data ?? {})) {
+          people.set(Number(id), name);
         }
       }
 
@@ -430,14 +459,12 @@ export function DocumentRecordScreen({ documentId, onBack }: DocumentRecordScree
       return {
         people,
         units,
-        // A PARTIAL walk counts as unavailable, not as available-and-short. A
-        // directory missing rows would name some ids and silently number
-        // others, which reads as "these two people were deleted".
-        peopleAvailable: peopleResult.complete,
+        peopleAvailable: peopleResponse.ok,
+        // A PARTIAL walk counts as unavailable, not as available-and-short.
         unitsAvailable: unitsResult.complete,
       };
     },
-    [documentId],
+    [documentId, routingVersion],
     t('record.error.directory', 'Failed to load names')
   );
 
@@ -504,11 +531,23 @@ export function DocumentRecordScreen({ documentId, onBack }: DocumentRecordScree
   const recipientsSettled = recipients.status === 'ready';
   const recipientRows: readonly RouteRecipient[] = recipientsSettled ? recipients.value : [];
 
+  const withdrawn = (record.withdrawn_at ?? null) !== null;
+  const withdrawnBy = personName(t, resolvedDirectory, record.withdrawn_by ?? null);
+  const withdrawnWhen = dates.dateTime(record.withdrawn_at);
+  // Only once the answer is in, so the notice does not flash while it loads.
+  const namesFailed = directory.status !== 'loading' && !resolvedDirectory.peopleAvailable;
+
   const fields: DocumentRecordFields = {
     title: record.title,
-    templateName: record.template_name,
+    templateName: (formNameFrom(record.template_name) !== null ? t('organizer.template.fromForm', 'Form: {name}', { name: formNameFrom(record.template_name) ?? '' }) : record.template_name),
     createdAt: record.created_at,
     versionCount: record.artifacts.length,
+    raisedBy:
+      record.created_by === null || directory.status === 'ready'
+        ? record.created_by === null
+          ? null
+          : personName(t, resolvedDirectory, record.created_by)
+        : null,
     // The name once the directory has answered, and nothing before that. A unit
     // with no id at all is a real answer ("No unit") and is not withheld.
     originUnit:
@@ -566,7 +605,7 @@ export function DocumentRecordScreen({ documentId, onBack }: DocumentRecordScree
     access: trailAccess,
     editor: (
       <div className="space-y-3">
-        {!resolvedDirectory.peopleAvailable && <DirectoryNotice kind="people" t={t} />}
+        {namesFailed && <DirectoryNotice kind="people" t={t} />}
         {!resolvedDirectory.unitsAvailable && <DirectoryNotice kind="units" t={t} />}
         {trail.status === 'error' ? (
           <p className="text-sm text-destructive">{trail.message}</p>
@@ -597,61 +636,16 @@ export function DocumentRecordScreen({ documentId, onBack }: DocumentRecordScree
     // would have to happen for there to be a trail at all.
     readOnly: (
       <p className="text-sm text-muted-foreground" data-testid="document-record-no-trail">
-        {t(
-          'record.trail.none',
-          'Nothing has been recorded against this document. A trail begins when it is sent into a route, and every step it takes is appended here.'
-        )}
+        {withdrawn
+          ? t('record.trail.noneWithdrawn', 'It was withdrawn without ever being sent into a route.')
+          : t(
+              'record.trail.none',
+              'Nothing has been recorded against this document. A trail begins when it is sent into a route, and every step it takes is appended here.'
+            )}
       </p>
     ),
   };
 
-  const recipientsBody = (awaitingViewer: boolean) => (
-    <div className="space-y-3">
-      {!resolvedDirectory.peopleAvailable && <DirectoryNotice kind="people" t={t} />}
-      {recipients.status === 'error' ? (
-        <p className="text-sm text-destructive">{recipients.message}</p>
-      ) : recipients.status === 'loading' ? (
-        <p className="text-sm text-muted-foreground">
-          {t('record.recipients.loading', 'Checking who has it…')}
-        </p>
-      ) : recipientRows.length === 0 ? (
-        // No rows at all: this document was never sent to anybody. Distinct
-        // from "everyone has acted", which `OpenRecipients` reports.
-        <p className="text-sm text-muted-foreground" data-testid="document-record-no-recipients">
-          {t(
-            'record.recipients.none',
-            'This document has not been sent to anyone, so nobody is holding it.'
-          )}
-        </p>
-      ) : (
-        <OpenRecipients
-          recipients={recipientRows}
-          directory={resolvedDirectory}
-          // `user.id` IS the profile id: `GET /api/me` returns the
-          // `profile_id` claim under that name, and ADR 0005's hard cutover
-          // made profile the canonical identity everywhere. Used only to mark
-          // which row is the reader's, never to decide whether they may act.
-          viewerProfileId={typeof user?.id === 'number' ? user.id : null}
-          awaitingViewer={awaitingViewer}
-        />
-      )}
-    </div>
-  );
-
-  /**
-   * The verification-code panel, built ONCE and used as both renderings.
-   *
-   * The same element object for `editor` and `readOnly` is deliberate: it is one
-   * subtree, so `RecordSection`'s ternary can never swap one instance for
-   * another and remount a panel mid-interaction — which would throw away an open
-   * confirm and the payload behind it. What the two states differ by is
-   * `canWrite`, and that is a prop, not a different component.
-   *
-   * It is NOT fetched here. The panel owns its own request, so a hidden region
-   * makes no request by construction — `RecordSection` returns null and the
-   * effect never runs — rather than by this screen remembering a boolean. See
-   * the panel's own docblock for the other half of that decision.
-   */
   const qrBody = (
     <DocumentQrPanel
       documentId={record.id}
@@ -661,16 +655,14 @@ export function DocumentRecordScreen({ documentId, onBack }: DocumentRecordScree
       // column to disagree with.
       versionCount={record.artifacts.length}
       directory={resolvedDirectory}
-      canWrite={qrAccess.state === 'editable'}
+      canWrite={qrAccess.state === 'editable' && !withdrawn}
       // Handed DOWN rather than rendered here, unlike the two regions above.
       // Those always list people; this one often lists none — a document with no
       // code and no signed-in scanner numbers nobody — and a notice explaining
       // why ids are showing, above a panel showing no ids, is a true sentence
       // about nothing on screen. The panel renders it when it has somebody to
       // number, and the copy still lives in one place.
-      directoryNotice={
-        resolvedDirectory.peopleAvailable ? undefined : <DirectoryNotice kind="people" t={t} />
-      }
+      directoryNotice={namesFailed ? <DirectoryNotice kind="people" t={t} /> : undefined}
       apiClient={apiClient}
     />
   );
@@ -687,25 +679,84 @@ export function DocumentRecordScreen({ documentId, onBack }: DocumentRecordScree
     readOnly: qrBody,
   };
 
-  const recipientsSection: RecordSectionSpec = {
-    key: 'recipients',
-    title: t('record.recipients.title', 'Where it is now'),
-    description: t(
-      'record.recipients.subtitle',
-      'Everyone a route reached who has not acted yet. A row closes when they do.'
-    ),
-    access: recipientsAccess,
-    // `editable` for this region means one thing and one thing only: an open row
-    // names you. The two renderings differ by saying so — see `OpenRecipients`
-    // for why the act buttons themselves are the inbox's and not this page's.
-    editor: recipientsBody(true),
-    readOnly: recipientsBody(false),
+  // The Routing tab shows the routes whether or not the recipient list is
+  // readable: the panel states its own refusals, so the region is never hidden.
+  const routingBody = (
+    <DocumentRoutingPanel
+      documentId={record.id}
+      documentTitle={record.title}
+      withdrawn={withdrawn}
+      onChanged={() => setRoutingVersion((v) => v + 1)}
+    />
+  );
+  const routingSection: RecordSectionSpec = {
+    key: 'routing',
+    title: t('record.routing.title', 'Routing'),
+    access: recipientsAccess.state === 'hidden' ? { state: 'read-only', readOnlyReason: null } : recipientsAccess,
+    editor: routingBody,
+    readOnly: routingBody,
   };
+
+  const awaitingYou =
+    recipientsAccess.state === 'editable' &&
+    recipientsSettled &&
+    typeof user?.id === 'number' &&
+    recipientRows.some((recipient) => recipient.open && recipient.profile_id === user.id);
+
+  const tabStrip = (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Tabs value={tab} onValueChange={setTab}>
+          <TabsList className="overflow-visible" aria-label={t('record.tabs.label', 'Sections of this document')}>
+            <TabsTrigger value="document">{t('record.tabs.document', 'Document')}</TabsTrigger>
+            <TabsTrigger value="routing">{t('record.tabs.routing', 'Routing')}</TabsTrigger>
+            <TabsTrigger value="history">{t('record.tabs.history', 'History')}</TabsTrigger>
+            <TabsTrigger value="verification">
+              {t('record.tabs.verification', 'Verification')}
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+        <DocumentHeaderActions record={record} onWithdrawn={() => window.location.reload()} />
+      </div>
+      {awaitingYou && (
+        <p
+          className="flex flex-wrap items-center gap-3 rounded-lg border border-primary/40 bg-primary/5 px-4 py-3 text-sm text-foreground"
+          data-testid="document-record-awaiting-you"
+        >
+          {t('record.awaitingYou', 'Waiting for your decision')}
+          {tab !== 'routing' && (
+            <Button variant="outline" size="sm" onClick={() => setTab('routing')}>
+              {t('record.awaitingYou.open', 'Open Routing')}
+            </Button>
+          )}
+        </p>
+      )}
+      {withdrawn && (
+        <Alert variant="destructive" data-testid="document-record-withdrawn">
+          <AlertTitle>{t('record.withdrawn.title', 'This document was withdrawn')}</AlertTitle>
+          <AlertDescription>
+            {withdrawnWhen === null
+              ? t(
+                  'record.withdrawn.bodyNoDate',
+                  '{who} withdrew it. The record is kept, but its codes no longer confirm anything and nothing further can happen on its routes.',
+                  { who: withdrawnBy }
+                )
+              : t(
+                  'record.withdrawn.body',
+                  '{who} withdrew it on {when}. The record is kept, but its codes no longer confirm anything and nothing further can happen on its routes.',
+                  { who: withdrawnBy, when: withdrawnWhen }
+                )}
+          </AlertDescription>
+        </Alert>
+      )}
+      {legacyNotice(record, t)}
+    </div>
+  );
 
   return (
     <RecordPageShell
       testId="document-record"
-      notices={legacyNotice(record, t)}
+      notices={tabStrip}
       fields={fields}
       facts={documentFacts}
       t={t}
@@ -718,7 +769,15 @@ export function DocumentRecordScreen({ documentId, onBack }: DocumentRecordScree
       // header and the body cannot disagree.
       // The server's own declaration order (`DocumentsApiHandler::recordSections`):
       // what it is, what happened to it, where it is now, and what confirms it.
-      sections={[documentSection, trailSection, recipientsSection, qrSection]}
+      sections={
+        tab === 'document'
+          ? [documentSection]
+          : tab === 'routing'
+          ? [routingSection]
+          : tab === 'history'
+          ? [trailSection]
+          : [qrSection]
+      }
     />
   );
 }
@@ -741,7 +800,7 @@ function DirectoryNotice({ kind, t }: { kind: 'people' | 'units'; t: Translate }
       {kind === 'people'
         ? t(
             'record.directory.people',
-            'People are shown by account number: naming them needs the users:read permission.'
+            'The names of the people on this document could not be loaded just now.'
           )
         : t(
             'record.directory.units',

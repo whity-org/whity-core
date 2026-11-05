@@ -159,6 +159,16 @@ describe('what a customer is told', () => {
     expect(screen.queryByTestId('pay-7')).not.toBeInTheDocument();
   });
 
+  /** They are told why Pay is missing, instead of left to look for it. */
+  it('says that the viewer can see billing but not pay', async () => {
+    hasPermission.mockImplementation((slug: string) => slug !== 'billing:pay');
+    routeApi({ '/api/v1/billing/invoices': [OPEN_INVOICE] });
+
+    render(<BillingPage />);
+
+    expect(await screen.findByText('You can see billing but not pay')).toBeInTheDocument();
+  });
+
   /** And none on an invoice that cannot take one. */
   it('hides the pay button on an invoice that is already paid', async () => {
     routeApi({

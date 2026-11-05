@@ -51,6 +51,7 @@ import {
 } from '@whity/features/record';
 import { useDateDisplay } from '@whity/features/datetime';
 import { Button } from '@whity/ui/button';
+import { TechnicalDetails } from '@whity/ui/display-preferences';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
 import { Input } from '@/components/ui/input';
 import { IconBuildingCommunity } from '@tabler/icons-react';
@@ -134,6 +135,30 @@ const tenantFacts: RecordFactsFn<TenantRecordFields> = (tenant, t, dates) => ({
   ],
 });
 
+/**
+ * What each enforcement mode does when a workspace lapses.
+ *
+ * @i18n-keys admin
+ *   tenants.record.billing.enforcement.off = Nothing is blocked
+ *   tenants.record.billing.enforcement.warn = Shows a warning, blocks nothing
+ *   tenants.record.billing.enforcement.block_writes = People can read but not change anything
+ *   tenants.record.billing.enforcement.block_all = Blocks everything
+ */
+function enforcementWords(mode: string, t: (key: string, fallback: string) => string): string {
+  switch (mode) {
+    case 'off':
+      return t('tenants.record.billing.enforcement.off', 'Nothing is blocked');
+    case 'warn':
+      return t('tenants.record.billing.enforcement.warn', 'Shows a warning, blocks nothing');
+    case 'block_writes':
+      return t('tenants.record.billing.enforcement.block_writes', 'People can read but not change anything');
+    case 'block_all':
+      return t('tenants.record.billing.enforcement.block_all', 'Blocks everything');
+    default:
+      return mode;
+  }
+}
+
 export interface TenantRecordScreenProps {
   tenantId: number;
   /** Whether the caller holds `tenants:write`. */
@@ -142,6 +167,8 @@ export interface TenantRecordScreenProps {
   callerTenantId: number | null;
   onNotify: (message: string, tone: 'success' | 'error' | 'info' | 'warning') => void;
   onBack: () => void;
+  /** Where Back goes, in words. Defaults to the workspaces list. */
+  backLabel?: string;
 }
 
 export function TenantRecordScreen({
@@ -150,6 +177,7 @@ export function TenantRecordScreen({
   callerTenantId,
   onNotify,
   onBack,
+  backLabel,
 }: TenantRecordScreenProps) {
   const t = useTranslation('admin');
 
@@ -260,7 +288,7 @@ export function TenantRecordScreen({
     pristine !== null &&
     (form.name !== pristine.name || form.slug !== pristine.slug);
 
-  const back = { label: t('tenants.record.back', 'Back to workspaces'), onBack };
+  const back = { label: backLabel ?? t('tenants.record.back', 'Back to workspaces'), onBack };
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -272,7 +300,10 @@ export function TenantRecordScreen({
       onNotify(t('tenants.record.name.required', 'A name is required.'), 'error');
       return;
     }
-    if (!SLUG_PATTERN.test(slug)) {
+    // A workspace created without a slug can still be renamed: an empty slug that
+    // was already empty is left alone rather than rejected.
+    const leaveSlug = slug === '' && (pristine?.slug ?? '') === '';
+    if (!leaveSlug && !SLUG_PATTERN.test(slug)) {
       setSlugError(
         t(
           'tenants.record.slug.invalid',
@@ -287,7 +318,7 @@ export function TenantRecordScreen({
       setIsSaving(true);
       const response = await apiClient(`/api/v1/tenants/${current.id}`, {
         method: 'PATCH',
-        body: JSON.stringify({ name, slug }),
+        body: JSON.stringify(leaveSlug ? { name } : { name, slug }),
       });
       if (response.status === 409) {
         onNotify(
@@ -537,10 +568,17 @@ function BillingPanel({ subscription }: { subscription: RecordResource<Subscript
             />
             <RecordListItem
               primary={t('tenants.record.billing.enforcement', 'Enforcement')}
-              // A machine value the operator sets and reads back verbatim
-              // (`block_writes`), not prose — rendered as itself, the same rule
-              // permission slugs follow.
-              secondary={value.effective_enforcement_mode}
+              // In words; the machine value (`block_writes`) is kept for technical details.
+              secondary={
+                <>
+                  {enforcementWords(value.effective_enforcement_mode, t)}
+                  <TechnicalDetails>
+                    <code className="ms-2 text-xs" dir="ltr">
+                      {value.effective_enforcement_mode}
+                    </code>
+                  </TechnicalDetails>
+                </>
+              }
             />
             {/*
               #1068: the whole ROW goes, not just its value. "Current period

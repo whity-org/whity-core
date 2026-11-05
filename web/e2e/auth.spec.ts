@@ -9,8 +9,10 @@ test.describe('Authentication flow', () => {
     await login.submit(ADMIN);
 
     await page.waitForURL('**/dashboard');
-    await expect(page.getByRole('heading', { name: 'Welcome back!' })).toBeVisible();
-    await expect(page.getByText(`You're logged in as`)).toContainText(ADMIN.email);
+    await expect(page.getByRole('heading', { name: /^Good (morning|afternoon|evening)/ })).toBeVisible();
+    // The signed-in person is shown in the sidebar footer; the home no longer repeats it.
+    await expect(page.getByText('Logged in as')).toBeVisible();
+    await expect(page.getByText(ADMIN.email, { exact: true })).toBeVisible();
   });
 
   test('invalid password keeps the user on /login and shows an error (WC-98)', async ({
@@ -30,7 +32,7 @@ test.describe('Authentication flow', () => {
     // The app must NOT navigate away from /login on bad credentials.
     await expect(page).toHaveURL(/\/login$/);
     // The dashboard heading must never appear.
-    await expect(page.getByRole('heading', { name: 'Welcome back!' })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: /^Good (morning|afternoon|evening)/ })).toHaveCount(0);
 
     // WC-98: the login page also surfaces a persistent destructive "Invalid
     // credentials" inline alert on bad credentials, kept alongside the toast.
@@ -82,7 +84,7 @@ test.describe('Authentication flow', () => {
     // After reload, the app re-hydrates the session from the httpOnly cookie
     // (via /api/me) and should stay on the dashboard, not bounce to /login.
     await expect(page).toHaveURL(/\/dashboard$/);
-    await expect(page.getByRole('heading', { name: 'Welcome back!' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /^Good (morning|afternoon|evening)/ })).toBeVisible();
     await new AppShell(page).expectLoggedInAs(ADMIN.email);
   });
 });

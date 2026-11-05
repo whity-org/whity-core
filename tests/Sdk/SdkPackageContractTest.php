@@ -242,9 +242,22 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsOneEightForInteractiveBlocks(): void
     {
         $this->assertSame(
-            '1.61.0',
+            '1.65.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.61 ADDS AGENT PRESETS: PluginAgentPresetsInterface and agentPresets in plugin.json ship '
+            'SDK 1.65 ADDS DOCUMENT NUMBERS: DocumentNumberingRule says when a document is numbered and what the '
+            . 'number looks like, on a slot or in a manifest; IssueResult returns the number and document.numbered '
+            . 'says one was handed out at final approval (WHIT-684). Purely additive. '
+            . 'SDK 1.64 ADDS PLUGIN AGENTS: PluginAgentsInterface lets a plugin declare or customize agents under its '
+            . 'own toolset root (persona, toolsets, grant start, host feature flags); another plugin\'s or core\'s agent, '
+            . 'a write at Allowed and an unknown feature are refused. Purely additive. '
+            . 'SDK 1.63 ADDS PLUGIN FILES AND DOCUMENT TRACKING: the host services PluginFiles and PluginDocuments '
+            . 'give a plugin its own files per workspace (a generic upload and download controller included) and '
+            . 'its own documents, recorded as issued by that plugin, with a QR code and tracking for those documents only '
+            . '(WHIT-886). Purely additive. '
+            . 'SDK 1.62 ADDS HOME CARDS: PluginHomeCardInterface and homeCard in plugin.json add one card to the '
+            . 'home page, reading a GET route the plugin registered under the same permission or counting a '
+            . 'record type in a workspace plugin (WHIT-872). Purely additive. '
+            . 'SDK 1.61 ADDS AGENT PRESETS: PluginAgentPresetsInterface and agentPresets in plugin.json ship '
             . 'ready-made agent templates (persona in English and Arabic, toolsets, where a grant starts); a preset '
             . 'may start a read at Allowed but never a write (WHIT-818). Purely additive. '
             . 'SDK 1.60 ADDS PLUGIN SECRETS: the host service PluginSecrets gives a plugin its own SecretStore, '

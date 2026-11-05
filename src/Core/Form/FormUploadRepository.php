@@ -78,6 +78,37 @@ final class FormUploadRepository
     }
 
     /**
+     * What was attached to one submission. Bound to the tenant as well as the id, so a
+     * submission id alone can't reach another workspace's files.
+     *
+     * @return list<array{id: int, storage_key: string, content_type: string,
+     *                    byte_size: int, client_filename: ?string}>
+     */
+    public function forSubmission(int $tenantId, int $submissionId): array
+    {
+        $stmt = $this->db->prepare(
+            'SELECT id, storage_key, content_type, byte_size, client_filename
+               FROM form_uploads
+              WHERE tenant_id = :tenant_id AND submission_id = :submission_id
+              ORDER BY id'
+        );
+        $stmt->execute([':tenant_id' => $tenantId, ':submission_id' => $submissionId]);
+
+        $files = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $files[] = [
+                'id' => (int) $row['id'],
+                'storage_key' => (string) $row['storage_key'],
+                'content_type' => (string) $row['content_type'],
+                'byte_size' => (int) $row['byte_size'],
+                'client_filename' => isset($row['client_filename']) ? (string) $row['client_filename'] : null,
+            ];
+        }
+
+        return $files;
+    }
+
+    /**
      * Spend one upload against one submission, and describe what was spent.
      *
      * Returns null for EVERY reason the answer is not a live upload of this

@@ -150,11 +150,10 @@ class TotpService
      * already been consumed by an earlier login — a captured valid code could
      * otherwise authenticate more than once within that window (the classic
      * TOTP replay weakness RFC 6238 recommends guarding against). The caller
-     * (currently only {@see \Whity\Auth\AuthHandler::handle2fa()}) uses the
-     * returned step to atomically advance a per-profile "last accepted step"
-     * floor (`profiles.two_factor_last_used_step`) and rejects the login when
-     * that atomic advance loses the race — i.e. the step (or a later one) was
-     * already consumed.
+     * uses the returned step to atomically advance a per-profile "last accepted
+     * step" floor ({@see TotpStepFloor}) and rejects the code when that atomic
+     * advance loses the race — i.e. the step (or a later one) was already
+     * consumed.
      *
      * @param string $encrypted The encrypted TOTP secret
      * @param string $code The TOTP code to check (6 digits)

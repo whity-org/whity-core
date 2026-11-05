@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 /**
  * The document RECORD page (#993) — `/admin/document-library/[id]`.
@@ -49,6 +49,9 @@ jest.mock('@/lib/api-client', () => ({
 
 const addToast = jest.fn();
 jest.mock('@/lib/toast-context', () => ({ useToast: () => ({ addToast }) }));
+jest.mock('@/hooks/useCapabilities', () => ({
+  useCapabilities: () => ({ has: () => true, hasPermission: () => true, loading: false, permissions: [] }),
+}));
 
 import DocumentRecordPage from '@/app/(protected)/admin/document-library/[id]/page';
 
@@ -63,6 +66,7 @@ beforeAll(() => {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  window.history.replaceState(null, '', '/');
   params = {};
   authUser = { id: 10, tenant_id: 1 };
 });
@@ -70,6 +74,11 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
+
+/** The record opens on the tab the address names, as the old circulation address does. */
+function openTab(name: string): void {
+  window.history.replaceState(null, '', `/?tab=${name}`);
+}
 
 function jsonResponse(body: unknown, status = 200): Response {
   return {
@@ -165,6 +174,7 @@ function serve(options: {
   trail?: unknown[];
   recipients?: unknown[];
   directoryStatus?: number;
+  peopleStatus?: number;
   /** Extra fields on the record itself (what it was issued from, M4c). */
   record?: Record<string, unknown>;
 }) {
@@ -174,6 +184,7 @@ function serve(options: {
     trail = [TRAIL_EVENT],
     recipients = [OPEN_RECIPIENT],
     directoryStatus = 200,
+    peopleStatus = 200,
     record = {},
   } = options;
 
@@ -188,17 +199,11 @@ function serve(options: {
       );
     }
     if (url.includes('/recipients')) return Promise.resolve(jsonResponse({ data: recipients }));
-    if (url.startsWith('/api/v1/users')) {
+    if (url.includes('/people')) {
       return Promise.resolve(
-        directoryStatus === 200
-          ? jsonResponse({
-              data: [
-                { id: 10, name: 'amira', email: 'amira@example.test' },
-                { id: 11, name: 'yusuf', email: 'yusuf@example.test' },
-              ],
-              pagination: { page: 1, perPage: 100, total: 2, totalPages: 1 },
-            })
-          : jsonResponse({ error: 'nope' }, directoryStatus)
+        peopleStatus === 200
+          ? jsonResponse({ data: { 10: 'amira', 11: 'yusuf' } })
+          : jsonResponse({ error: 'nope' }, peopleStatus)
       );
     }
     if (url.startsWith('/api/v1/ous')) {
@@ -245,7 +250,7 @@ describe('the record is built from the URL alone', () => {
     render(<DocumentRecordPage />);
 
     expect(await screen.findByTestId('document-record')).toBeInTheDocument();
-    expect(screen.getByText('PO 4471')).toBeInTheDocument();
+    expect(screen.getAllByText('PO 4471').length).toBeGreaterThan(0);
     // The record's own request carried the id from the URL and nothing else.
     expect(requestedPaths()).toContain('/api/v1/documents/5');
     // Nothing navigated. A record page that pushed a route to render itself
@@ -344,19 +349,25 @@ describe('a document issued from the old Document designer (editor M4c)', () => 
 });
 
 describe('per-region verdicts (#975) decide what is on the page', () => {
-  it('renders all three regions when the server reports all three', async () => {
+  it('shows one region per tab, each from the server verdict', async () => {
     params = { id: '5' };
     serve({});
 
     render(<DocumentRecordPage />);
 
     expect(await screen.findByTestId('document-record-section-document')).toBeInTheDocument();
-    expect(screen.getByTestId('document-record-section-trail')).toBeInTheDocument();
-    expect(screen.getByTestId('document-record-section-recipients')).toBeInTheDocument();
+    expect(screen.queryByTestId('document-record-section-trail')).not.toBeInTheDocument();
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'History' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'History' }));
+    expect(await screen.findByTestId('document-record-section-trail')).toBeInTheDocument();
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Routing' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Routing' }));
+    expect(await screen.findByTestId('document-record-section-routing')).toBeInTheDocument();
   });
 
   it('leaves a region OUT of the DOM when its key is absent, and never requests its data', async () => {
     params = { id: '5' };
+    openTab('history');
     // `recipients` withheld. Absence is the whole wire representation of hidden
     // — there is no `{state: "hidden"}` to send.
     serve({
@@ -418,7 +429,7 @@ describe('per-region verdicts (#975) decide what is on the page', () => {
     // The screen's own localized sentence wins over the server's prose, and the
     // operator-grade `detail` the server chose to send is appended verbatim —
     // the client never re-decides that audience (#968).
-    const note = screen.getByTestId('document-record-section-document-readonly');
+    const note = screen.getByTestId('document-record-readonly-notice');
     expect(note).toHaveTextContent('Issuing a corrected version');
     expect(note).toHaveTextContent("changing this requires the 'documents:render' permission");
   });
@@ -441,7 +452,7 @@ describe('per-region verdicts (#975) decide what is on the page', () => {
     // Correctly read-only with a vague explanation beats correctly read-only
     // with a blank space where the explanation goes.
     expect(
-      await screen.findByTestId('document-record-section-document-readonly')
+      await screen.findByTestId('document-record-readonly-notice')
     ).toHaveTextContent('A newer server said this.');
   });
 });
@@ -453,6 +464,7 @@ describe('per-region verdicts (#975) decide what is on the page', () => {
 describe('a document with no route says so', () => {
   it('renders the not-circulated sentence instead of an empty trail', async () => {
     params = { id: '5' };
+    openTab('history');
     serve({
       sections: {
         document: { state: 'editable', denial: null },
@@ -484,7 +496,7 @@ describe('a document with no route says so', () => {
     expect(screen.queryByTestId('document-record-trail')).not.toBeInTheDocument();
 
     // The region's own read-only line carries the server's reason.
-    expect(screen.getByTestId('document-record-section-trail-readonly')).toHaveTextContent(
+    expect(screen.getByTestId('document-record-readonly-notice')).toHaveTextContent(
       'not been put into circulation'
     );
 
@@ -499,73 +511,41 @@ describe('a document with no route says so', () => {
 describe('the trail and the recipients render the ids they were given', () => {
   it('names people and units, and shows the movement between them', async () => {
     params = { id: '5' };
+    openTab('history');
     serve({});
 
     render(<DocumentRecordPage />);
 
     const trail = await screen.findByTestId('document-record-trail');
     expect(trail).toHaveTextContent('Forwarded');
-    expect(trail).toHaveTextContent('amira@example.test');
+    expect(trail).toHaveTextContent('amira');
     expect(trail).toHaveTextContent('Registry');
     expect(trail).toHaveTextContent('Finance');
     expect(trail).toHaveTextContent('Please check the totals.');
   });
 
-  it('shows ids WITH THE REASON when the directory is refused, never a bare number', async () => {
+  it('names people without the directory, and says so when names could not load', async () => {
     params = { id: '5' };
+    openTab('history');
     serve({ directoryStatus: 403 });
 
-    render(<DocumentRecordPage />);
+    const first = render(<DocumentRecordPage />);
 
-    const trail = await screen.findByTestId('document-record-trail');
-    expect(trail).toHaveTextContent('Account #10');
-    // #951: a screen that degrades silently makes a permission boundary
-    // indistinguishable from a data bug, and the person who cannot tell them
-    // apart is usually the one who could have granted it.
-    expect(screen.getAllByTestId('document-record-directory-people')[0]).toHaveTextContent(
-      'users:read'
-    );
+    // S5: a viewer who cannot read the directory still reads names, and is not
+    // told about a permission.
+    const named = await screen.findByTestId('document-record-trail');
+    expect(named).toHaveTextContent('amira');
+    expect(screen.queryByTestId('document-record-directory-people')).not.toBeInTheDocument();
     expect(screen.getByTestId('document-record-directory-units')).toHaveTextContent('ous:read');
-  });
+    first.unmount();
 
-  it('lists who it is awaiting and counts who has already acted', async () => {
-    params = { id: '5' };
-    serve({
-      recipients: [
-        OPEN_RECIPIENT,
-        {
-          ...OPEN_RECIPIENT,
-          id: 61,
-          profile_id: 10,
-          closed_by_event_id: 1,
-          open: false,
-        },
-      ],
-    });
-
+    // Names that failed to load are unknown, not "a former member".
+    serve({ peopleStatus: 503 });
     render(<DocumentRecordPage />);
-
-    const panel = await screen.findByTestId('document-record-recipients');
-    expect(panel).toHaveTextContent('yusuf@example.test');
-    // A closed row is something already done, and is counted rather than listed
-    // — the trail below has what each of them actually did.
-    expect(screen.getByTestId('document-record-recipients-closed')).toHaveTextContent('1');
-    // The open count reaches the stat strip. `filter(open)`, not `length`.
-    expect(screen.getByTestId('document-record-stat-awaiting')).toHaveTextContent('1');
-  });
-
-  it('reports "everyone has acted" separately from "never sent to anyone"', async () => {
-    params = { id: '5' };
-    serve({
-      recipients: [{ ...OPEN_RECIPIENT, closed_by_event_id: 1, open: false }],
-    });
-
-    render(<DocumentRecordPage />);
-
-    // Two different facts about a document, and they must not collapse into one
-    // empty panel: this one WAS circulated and is finished.
-    expect(await screen.findByTestId('document-record-recipients-settled')).toBeInTheDocument();
-    expect(screen.queryByTestId('document-record-no-recipients')).not.toBeInTheDocument();
+    const trail = await screen.findByTestId('document-record-trail');
+    await screen.findAllByTestId('document-record-directory-people');
+    expect(trail).toHaveTextContent('Someone in this workspace');
+    expect(trail).not.toHaveTextContent('#10');
   });
 
   it('says the document is awaiting YOU only when the server said the region is editable', async () => {
@@ -576,7 +556,6 @@ describe('the trail and the recipients render the ids they were given', () => {
     render(<DocumentRecordPage />);
 
     expect(await screen.findByTestId('document-record-awaiting-you')).toBeInTheDocument();
-    expect(screen.getByTestId('document-record-recipient-you')).toBeInTheDocument();
   });
 
   it('does not claim the document is awaiting you when the server said read-only', async () => {
@@ -601,7 +580,8 @@ describe('the trail and the recipients render the ids they were given', () => {
 
     // The row is still listed — the reader may see who has it — but the page
     // makes no claim about their own standing that the server did not make.
-    expect(await screen.findByTestId('document-record-recipients')).toBeInTheDocument();
+    await screen.findByTestId('document-record');
+    await waitFor(() => expect(screen.getByTestId('document-record-stat-awaiting')).toHaveTextContent('1'));
     expect(screen.queryByTestId('document-record-awaiting-you')).not.toBeInTheDocument();
   });
 });

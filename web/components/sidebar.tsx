@@ -26,7 +26,11 @@ import {
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useNavItemLabels } from '@/lib/nav-item-labels';
 import { WAITING_CHANGED_EVENT } from '@/lib/waiting-changed';
-import { SETTINGS_AREA_NAV_IDS, SETTINGS_AREA_PREFIXES } from '@/components/settings/settings-area';
+import {
+  PLATFORM_SETTINGS_TABS,
+  SETTINGS_AREA_NAV_IDS,
+  SETTINGS_AREA_PREFIXES,
+} from '@/components/settings/settings-area';
 import type { Icon } from '@tabler/icons-react';
 
 /**
@@ -349,9 +353,11 @@ export function Sidebar() {
             label: t('sidebar.item.settings', 'Settings'),
             href: settingsEntry.href,
             icon: <IconSettings size={20} />,
-            active: SETTINGS_AREA_PREFIXES.some(
-              (prefix) => pathname === prefix || (pathname ?? '').startsWith(`${prefix}/`),
-            ),
+            active:
+              !Object.values(PLATFORM_SETTINGS_TABS).includes(pathname ?? '') &&
+              SETTINGS_AREA_PREFIXES.some(
+                (prefix) => pathname === prefix || (pathname ?? '').startsWith(`${prefix}/`),
+              ),
           },
         ],
       },
@@ -441,13 +447,13 @@ export function Sidebar() {
       */}
       {isI18nEnabled && !collapsed && (
         <div
-          className="flex w-full items-center gap-2 rounded-lg border border-input bg-input/20 px-3 py-2"
+          className="flex h-10 w-full items-center gap-2 rounded-lg border border-input bg-input/20 px-3"
           data-testid="language-switcher"
         >
           <IconWorld size={20} className="shrink-0 text-muted-foreground" />
           <LanguageSwitcher
             variant="dropdown"
-            className="h-7 min-w-0 flex-1 cursor-pointer border-0 bg-transparent text-sm font-medium text-foreground outline-none"
+            className="h-full min-w-0 flex-1 cursor-pointer border-0 bg-transparent text-sm font-medium text-foreground outline-none"
           />
         </div>
       )}

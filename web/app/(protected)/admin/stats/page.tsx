@@ -1,6 +1,8 @@
 ﻿"use client";
 
 import { useEffect, useState } from "react";
+import { NoAccess } from "@/components/no-access";
+import { humanizeCode } from "@/lib/plain-words";
 import { AdminHeader } from "@/components/admin/admin-header";
 import {
   Card,
@@ -115,6 +117,8 @@ export default function AdminStats() {
   const [stats, setStats] = useState<StatsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  // The request was refused: no access, which is not the same as a failed or slow one.
+  const [denied, setDenied] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
   // Null means "not shown", and it is reached by every failure path — a 403, a
   // timeout, a network error, a malformed body. See the effect below for why
@@ -139,6 +143,8 @@ export default function AdminStats() {
         if (response.ok) {
           const data = await response.json();
           if (!cancelled) setStats(data.stats);
+        } else if (response.status === 403) {
+          setDenied(true);
         } else {
           setError(true);
         }
@@ -214,40 +220,44 @@ export default function AdminStats() {
 
   const statCards = [
     {
-      title: t("stats.card.users.title", "Total Users"),
+      title: t("stats.card.users.title", "Total users"),
       value: stats?.totals.users ?? "--",
       description: t("stats.card.users.description", "Registered accounts"),
       icon: IconUsers,
-      color: "text-blue-500",
+      color: "text-primary",
     },
     {
-      title: t("stats.card.roles.title", "Active Roles"),
+      title: t("stats.card.roles.title", "Active roles"),
       value: stats?.totals.roles ?? "--",
       description: t("stats.card.roles.description", "Configured permissions"),
       icon: IconUserShield,
-      color: "text-purple-500",
+      color: "text-primary",
     },
     {
-      title: t("stats.card.tenants.title", "Total Tenants"),
+      title: t("stats.card.tenants.title", "Total tenants"),
       value: stats?.totals.tenants ?? "--",
       description: t("stats.card.tenants.description", "Organizations"),
       icon: IconBuildingCommunity,
-      color: "text-orange-500",
+      color: "text-primary",
     },
     {
       title: t("stats.card.permissions.title", "Permissions"),
       value: stats?.totals.permissions ?? "--",
       description: t("stats.card.permissions.description", "Available actions"),
       icon: IconLock,
-      color: "text-green-500",
+      color: "text-primary",
     },
   ];
+
+  if (denied) {
+    return <NoAccess area={t("stats.access.area", "system statistics")} permission="admin" />;
+  }
 
   return (
     <div className="space-y-8">
       {/* Header */}
       <AdminHeader
-        title={t("stats.title", "System Statistics")}
+        title={t("stats.title", "System statistics")}
         description={t("stats.description", "Real-time overview of system-wide metrics")}
       />
 
@@ -300,7 +310,7 @@ export default function AdminStats() {
         {/* Role Breakdown */}
         <Card className="lg:col-span-1">
           <CardHeader>
-            <CardTitle>{t("stats.roles.title", "Users per Role")}</CardTitle>
+            <CardTitle>{t("stats.roles.title", "Users per role")}</CardTitle>
             <CardDescription>
               {t("stats.roles.description", "Distribution of users across system roles")}
             </CardDescription>
@@ -326,7 +336,7 @@ export default function AdminStats() {
                     <div key={role.name} className="space-y-1">
                       <div className="flex items-center justify-between text-sm">
                         <span className="font-medium capitalize">
-                          {role.name}
+                          {humanizeCode(role.name)}
                         </span>
                         <span className="text-muted-foreground">
                           {t("stats.roles.userCount", "{count} users", {
@@ -351,7 +361,7 @@ export default function AdminStats() {
         {/* Growth Charts */}
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle>{t("stats.growth.title", "Growth Trends")}</CardTitle>
+            <CardTitle>{t("stats.growth.title", "Growth trends")}</CardTitle>
             <CardDescription>
               {t("stats.growth.description", "Last 7 days registration activity")}
             </CardDescription>
@@ -408,7 +418,7 @@ export default function AdminStats() {
             </div>
             <div>
               <CardTitle>{t("stats.database.title", "Database")}</CardTitle>
-              <CardDescription>{t("stats.database.subtitle", "PostgreSQL Status")}</CardDescription>
+              <CardDescription>{t("stats.database.subtitle", "PostgreSQL status")}</CardDescription>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -472,7 +482,7 @@ export default function AdminStats() {
               <>
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-muted-foreground">
-                    {t("stats.system.coreVersion", "Core Version")}
+                    {t("stats.system.coreVersion", "Core version")}
                   </span>
                   <span className="font-medium">{platform.core_version}</span>
                 </div>
@@ -486,7 +496,7 @@ export default function AdminStats() {
             )}
             <div className="flex justify-between items-center text-sm">
               <span className="text-muted-foreground">
-                {t("stats.system.phpVersion", "PHP Version")}
+                {t("stats.system.phpVersion", "PHP version")}
               </span>
               <span className="font-medium">
                 {stats?.system.php_version ?? "--"}
@@ -494,7 +504,7 @@ export default function AdminStats() {
             </div>
             <div className="flex justify-between items-center text-sm">
               <span className="text-muted-foreground">
-                {t("stats.system.memoryUsage", "Memory Usage")}
+                {t("stats.system.memoryUsage", "Memory usage")}
               </span>
               <span className="font-medium">
                 {stats?.system.memory_usage ?? "--"}
@@ -502,7 +512,7 @@ export default function AdminStats() {
             </div>
             <div className="flex justify-between items-center text-sm">
               <span className="text-muted-foreground">
-                {t("stats.system.peakMemory", "Peak Memory")}
+                {t("stats.system.peakMemory", "Peak memory")}
               </span>
               <span className="font-medium">
                 {stats?.system.peak_memory ?? "--"}
@@ -520,7 +530,7 @@ export default function AdminStats() {
             <div>
               <CardTitle>{t("stats.environment.title", "Environment")}</CardTitle>
               <CardDescription>
-                {t("stats.environment.subtitle", "Server Details")}
+                {t("stats.environment.subtitle", "Server details")}
               </CardDescription>
             </div>
           </CardHeader>
@@ -531,7 +541,7 @@ export default function AdminStats() {
             </div>
             <div className="flex justify-between items-center text-sm">
               <span className="text-muted-foreground">
-                {t("stats.environment.server", "Server Software")}
+                {t("stats.environment.server", "Server software")}
               </span>
               <span className="font-medium truncate max-w-[150px]">
                 {stats?.system.server ?? "--"}

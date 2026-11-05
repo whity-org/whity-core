@@ -45,7 +45,7 @@ test.describe('OU Management Hub (admin)', () => {
   async function gotoHub(adminPage: { shell: { clickNav: (l: string) => Promise<void> } }, page: import('@playwright/test').Page) {
     await adminPage.shell.clickNav('Organizational Units');
     await page.waitForURL('**/admin/ous');
-    await expect(page.getByRole('heading', { name: 'Organizational Units' }).first()).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Organisational units' }).first()).toBeVisible();
     // The hub renders a Tree | Graph toggle.
     await expect(page.getByRole('group', { name: 'View mode' })).toBeVisible();
   }
@@ -225,8 +225,10 @@ test.describe('OU Management Hub (admin)', () => {
     await node.click();
     const drawer = page.getByRole('dialog');
     await expect(drawer.getByRole('heading', { name })).toBeVisible();
-    await expect(drawer.getByRole('heading', { name: 'Roles', exact: true })).toBeVisible();
+    // Members is the first tab; the roles that apply here are one click away.
     await expect(drawer.getByRole('heading', { name: 'Members', exact: true })).toBeVisible();
+    await drawer.getByRole('tab', { name: 'Roles here' }).click();
+    await expect(drawer.getByRole('heading', { name: 'Roles', exact: true })).toBeVisible();
   });
 
   test('assign a role to an OU in the drawer, see it listed, then remove it', async ({
@@ -241,12 +243,13 @@ test.describe('OU Management Hub (admin)', () => {
 
     await gotoHub(adminPage, page);
     const tree = page.getByRole('tree');
-    // Select the OU to open the drawer (the select button's name is exactly the
-    // OU name; the action button is "Actions for {name}", so use exact match).
-    await tree.getByRole('button', { name, exact: true }).click();
+    // Select the OU to open the drawer (the select button's name starts with the
+    // OU name, then its member count; the action button is "Actions for {name}").
+    await tree.getByRole('button', { name: new RegExp(`^${name}\\b`) }).click();
 
     const drawer = page.getByRole('dialog');
     await expect(drawer.getByRole('heading', { name })).toBeVisible();
+    await drawer.getByRole('tab', { name: 'Roles here' }).click();
     await expect(drawer.getByText('No roles assigned to this OU.')).toBeVisible();
 
     // Pick a role and assign it.
@@ -276,7 +279,7 @@ test.describe('OU Management Hub (admin)', () => {
     created.push(id);
 
     await gotoHub(adminPage, page);
-    await page.getByRole('tree').getByRole('button', { name, exact: true }).click();
+    await page.getByRole('tree').getByRole('button', { name: new RegExp(`^${name}\\b`) }).click();
 
     const drawer = page.getByRole('dialog');
     await expect(drawer.getByRole('heading', { name: 'Members', exact: true })).toBeVisible();

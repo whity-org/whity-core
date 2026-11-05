@@ -45,7 +45,9 @@
  * rows has recreated the problem the rule exists to avoid.
  */
 
+import { humanizeCode } from '@/lib/plain-words';
 import { useMemo, useState } from 'react';
+import { IconCheck } from '@tabler/icons-react';
 import { Badge } from '@whity/ui/badge';
 import { useTranslation } from '@whity/features/i18n';
 import type { DocumentRoute, RouteRecipient, RouteStep } from './routing-wire';
@@ -73,9 +75,8 @@ export interface RouteFanoutProps {
   /**
    * Display names by profile id, best-effort.
    *
-   * A missing entry renders as the profile id, never as a blank and never as an
-   * invented name (#756). Naming people needs `users:read`, which a person who
-   * may route a document does not necessarily hold — see the host page.
+   * A missing entry is somebody no longer in this workspace (S5), which says so
+   * rather than showing a blank or an invented name (#756).
    */
   profileNames: Map<number, string>;
   /** Role names by role id, best-effort; a missing entry renders as the id. */
@@ -141,14 +142,22 @@ export function describeStepRule(
   const roleName =
     roleId === null
       ? null
-      : (roleNames.get(roleId) ?? t('routing.role.byId', 'Role #{id}', { id: roleId }));
+      : (roleNames.get(roleId) ?? t('routing.role.byId', 'A role', { id: roleId }));
+
+  // Kinds that name no single role read as a sentence, never as their code.
+  if (step.rule_kind === 'explicit') {
+    return t('routing.rule.kind.explicit', 'Specific people, chosen by name');
+  }
+  if (step.rule_kind === 'group') {
+    return t('routing.rule.kind.group', 'Everyone in a user group');
+  }
 
   if (roleName === null) {
     // A kind this client does not know how to describe. Its OWN key is the
     // honest answer — it is what the author picked and what the engine will
     // resolve — rather than a generic "custom rule", which would hide which
-    // rule a route actually names.
-    return step.rule_kind;
+    // rule a route actually names. Shown as words, not as the stored code.
+    return humanizeCode(step.rule_kind);
   }
 
   if (step.rule_kind === 'role_below_actor') {
@@ -168,7 +177,7 @@ function personLabel(
   viewerProfileId: number | null,
   t: (key: string, fallback?: string, vars?: Record<string, string | number>) => string
 ): string {
-  const name = profileNames.get(profileId) ?? t('routing.profile.byId', 'Profile #{id}', { id: profileId });
+  const name = profileNames.get(profileId) ?? t('routing.profile.former', 'A former member');
   return profileId === viewerProfileId ? t('routing.profile.you', '{name} (you)', { name }) : name;
 }
 
@@ -220,7 +229,8 @@ export function RouteFanout({
    * made only of deliveries was delivered, one made only of acts was acted on,
    * and a mixed route says the one thing true of both.
    */
-  const settledClaim: 'acted' | 'delivered' | 'closed' = useMemo(() => {
+  const settledClaim: 'acted' | 'delivered' | 'closed' | 'withdrawn' = useMemo(() => {
+    if (forRoute.some((r) => r.closed_by_withdrawal === true)) return 'withdrawn';
     const touched = new Set(forRoute.map((r) => r.step_id));
     const kinds = new Set(
       route.steps.filter((s) => touched.has(s.id)).map((s) => s.satisfied_by ?? 'act')
@@ -243,7 +253,12 @@ export function RouteFanout({
       <div className="rounded-md border border-border bg-muted/30 p-4">
         <p className="text-sm text-foreground">
           {openTotal === 0
-            ? settledClaim === 'delivered'
+            ? settledClaim === 'withdrawn'
+              ? t(
+                  'routing.fanout.settledWithdrawn',
+                  'Nobody has this open. The document was withdrawn, which closed anything still waiting on this route.'
+                )
+              : settledClaim === 'delivered'
               ? t(
                   'routing.fanout.settledDelivered',
                   'Nobody has this open. Every chain of this route has been delivered.'
@@ -281,16 +296,27 @@ export function RouteFanout({
           {route.steps.map((step) => {
             const rows = byStep.get(step.id) ?? [];
             const open = rows.filter((r) => r.open);
-            const done = rows.length - open.length;
+            const closedByWithdrawal = rows.filter((r) => r.closed_by_withdrawal === true).length;
+            const done = rows.length - open.length - closedByWithdrawal;
             const sample = open.slice(0, SAMPLE_LIMIT);
 
             return (
               <li
                 key={step.id}
-                className="rounded-md border border-border p-3"
+                className={`rounded-md border p-3 ${
+                  open.length > 0
+                    ? 'border-primary bg-primary/5'
+                    : rows.length > 0
+                      ? 'border-success-text/40 bg-success-tint/40'
+                      : 'border-border bg-muted/30'
+                }`}
                 data-slot="route-fanout-step"
+                data-stage={open.length > 0 ? 'current' : rows.length > 0 ? 'done' : 'next'}
               >
                 <div className="flex flex-wrap items-baseline gap-2">
+                  {open.length === 0 && rows.length > 0 && (
+                    <IconCheck className="size-4 self-center text-success-text" aria-hidden />
+                  )}
                   <span className="text-xs font-medium text-muted-foreground">
                     {/*
                       "Step N" is the authoring ordinal — the number the author
@@ -320,6 +346,13 @@ export function RouteFanout({
                       {open.length > 0 && (
                         <Badge variant="warning">
                           {t('routing.fanout.step.open', '{count} awaiting', { count: open.length })}
+                        </Badge>
+                      )}
+                      {closedByWithdrawal > 0 && (
+                        <Badge variant="secondary">
+                          {t('routing.fanout.step.withdrawn', '{count} closed by the withdrawal', {
+                            count: closedByWithdrawal,
+                          })}
                         </Badge>
                       )}
                       {done > 0 && (
@@ -481,6 +514,8 @@ function ChainBranch({
         </span>
         {node.recipient.open ? (
           <Badge variant="warning">{t('routing.fanout.chain.open', 'Has it open')}</Badge>
+        ) : node.recipient.closed_by_withdrawal === true ? (
+          <Badge variant="secondary">{t('routing.fanout.chain.withdrawn', 'Closed by the withdrawal')}</Badge>
         ) : node.recipient.closed_by_delivery ? (
           // A delivery row was closed the moment it was created. Saying "Acted"
           // here told a technician who had merely been SENT a copy that they had

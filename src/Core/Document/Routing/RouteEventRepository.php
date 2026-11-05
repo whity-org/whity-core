@@ -107,6 +107,30 @@ final class RouteEventRepository
     }
 
     /**
+     * The row that closes a route's open items when its document is withdrawn
+     * (S5). `noted`, flagged: see migration 201 for why it is not a new action.
+     * TRUE is written in the statement because PDO would bind a PHP bool as an
+     * empty string on PostgreSQL.
+     */
+    public function appendWithdrawal(int $tenantId, int $documentId, int $routeId, int $actorId): int
+    {
+        $stmt = $this->db->prepare(
+            'INSERT INTO document_route_events
+                 (tenant_id, document_id, route_id, actor_profile_id, action, withdrawal, occurred_at)
+             VALUES (:tenant_id, :document_id, :route_id, :actor_profile_id, :action, TRUE, NOW())'
+        );
+        $stmt->execute([
+            ':tenant_id' => $tenantId,
+            ':document_id' => $documentId,
+            ':route_id' => $routeId,
+            ':actor_profile_id' => $actorId,
+            ':action' => RouteAction::NOTED,
+        ]);
+
+        return (int) $this->db->lastInsertId();
+    }
+
+    /**
      * One event, tenant-scoped.
      *
      * @return array<string, mixed>|null
@@ -139,7 +163,7 @@ final class RouteEventRepository
     {
         $stmt = $this->db->prepare(
             'SELECT id, tenant_id, document_id, route_id, step_id, actor_profile_id,
-                    action, from_ou_id, to_ou_id, note, verdict, occurred_at
+                    action, from_ou_id, to_ou_id, note, verdict, withdrawal, occurred_at
                FROM document_route_events
               WHERE tenant_id = :tenant_id AND document_id = :document_id
               ORDER BY id ASC
@@ -228,6 +252,20 @@ final class RouteEventRepository
         return $counts;
     }
 
+    /** The newest verdict on a route, or null when nobody has decided anything on it. */
+    public function latestVerdictOnRoute(int $routeId, int $tenantId): ?string
+    {
+        $stmt = $this->db->prepare(
+            'SELECT verdict FROM document_route_events
+              WHERE tenant_id = :tenant_id AND route_id = :route_id AND verdict IS NOT NULL
+              ORDER BY id DESC LIMIT 1'
+        );
+        $stmt->execute([':tenant_id' => $tenantId, ':route_id' => $routeId]);
+        $verdict = $stmt->fetchColumn();
+
+        return is_string($verdict) ? $verdict : null;
+    }
+
     /**
      * Map a raw row to the typed shape the presenter serialises.
      *
@@ -250,6 +288,7 @@ final class RouteEventRepository
             // NULL means "this act said nothing about approval", never "not
             // approved". See append().
             'verdict' => isset($row['verdict']) && $row['verdict'] !== null ? (string) $row['verdict'] : null,
+            'withdrawal' => $row['withdrawal'] ?? false,
             'occurred_at' => (string) $row['occurred_at'],
         ];
     }

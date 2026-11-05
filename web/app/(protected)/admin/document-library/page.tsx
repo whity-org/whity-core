@@ -1,15 +1,20 @@
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
+import { NoAccess } from '@/components/no-access';
+import { ForbiddenError, throwUnlessOk } from '@/lib/forbidden';
+import { TechnicalDetails } from '@whity/ui/display-preferences';
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/lib/toast-context';
 import { useFetch } from '@/hooks/useFetch';
 import { fetchAllPages } from '@/lib/api/fetch-all-pages';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
+import { Badge } from '@whity/ui/badge';
 import { Button } from '@whity/ui/button';
 import { IconFilePlus } from '@tabler/icons-react';
 import { useTranslation } from '@whity/features/i18n';
+import { formNameFrom } from '@/lib/documents/template-name';
 import { useDateDisplay } from '@whity/features/datetime';
 import { useRouter } from 'next/navigation';
 import { useCapabilities } from '@/hooks/useCapabilities';
@@ -165,7 +170,7 @@ function storedLayout(): LibraryLayout {
 }
 
 export default function DocumentLibraryPage() {
-  const { apiClient } = useAuth();
+  const { apiClient, user } = useAuth();
   const { addToast } = useToast();
   const t = useTranslation('documents');
   const dates = useDateDisplay();
@@ -209,9 +214,7 @@ export default function DocumentLibraryPage() {
 
   const views = useFetch<DocumentViewsResponse>(async () => {
     const response = await apiClient('/api/v1/documents/views');
-    if (!response.ok) {
-      throw new Error(t('organizer.error.views', 'Failed to load the document folders'));
-    }
+    throwUnlessOk(response, t('organizer.error.views', 'Failed to load the document folders'));
     return (await response.json()) as DocumentViewsResponse;
   }, [apiClient]);
 
@@ -318,6 +321,7 @@ export default function DocumentLibraryPage() {
     }
 
     const response = await apiClient(`/api/v1/documents?${params.toString()}`);
+    if (response.status === 403) throw new ForbiddenError();
     if (!response.ok) {
       // A 422 carries the server's own reason — "you do not belong to an
       // organizational unit" — and surfacing it verbatim is the point: a
@@ -328,6 +332,9 @@ export default function DocumentLibraryPage() {
     }
     return (await response.json()) as DocumentListResponse;
   }, [apiClient, viewKey, collectionId, anchorOuId, page, appliedSearch, sortField, sortDirection]);
+
+  // Who these rows name, sent with the page (S5), so no directory is needed.
+  const people = useMemo(() => documents.data?.people ?? {}, [documents.data]);
 
   // `refetch` is stable (useFetch memoises it with no deps); the fetch RESULT
   // object is not, so the mutations below depend on these rather than on
@@ -561,7 +568,7 @@ export default function DocumentLibraryPage() {
     () => [
       {
         id: 'title',
-        header: t('organizer.table.title', 'Title'),
+        header: t('organizer.table.title', 'Document'),
         // No `enableSorting`. The shared table sorts CLIENT-side, which in
         // server-pagination mode would sort the twenty five rows it was handed
         // and present the result as a sorted library. Sorting is the toolbar's,
@@ -569,25 +576,37 @@ export default function DocumentLibraryPage() {
         cell: (row) => (
           <div className="flex min-w-0 items-center gap-2">
             <StarButton row={row} busy={busy} onToggleStar={toggleStar} />
-            <DocumentTitle row={row} />
+            <div className="min-w-0">
+              <DocumentTitle row={row} />
+              <span dir="auto" className="block truncate text-sm text-muted-foreground">
+                {(formNameFrom(row.template_name) !== null ? t('organizer.template.fromForm', 'Form: {name}', { name: formNameFrom(row.template_name) ?? '' }) : row.template_name)}
+                {(row.withdrawn_at ?? null) !== null && (
+                  <Badge variant="destructive" className="ms-2" data-testid="library-withdrawn">
+                    {t('organizer.table.withdrawn', 'Withdrawn')}
+                  </Badge>
+                )}
+              </span>
+            </div>
           </div>
         ),
       },
       {
-        id: 'template_name',
-        header: t('organizer.table.template', 'Template'),
+        id: 'created_by',
+        header: t('organizer.table.raisedBy', 'Raised by'),
         cell: (row) => (
-          <span dir="auto" className="truncate">
-            {row.template_name}
+          <span dir="auto">
+            {row.created_by === null
+              ? '—'
+              : row.created_by === user?.id
+                ? t('organizer.table.you', 'You')
+                : people[String(row.created_by)] ?? t('organizer.table.former', 'A former member')}
           </span>
         ),
       },
       {
         id: 'origin_ou_id',
         header: t('organizer.table.raisedFrom', 'Raised from'),
-        cell: (row) => (
-          <span dir="auto">{ouName(row.origin_ou_id)}</span>
-        ),
+        cell: (row) => <span dir="auto">{ouName(row.origin_ou_id)}</span>,
       },
       // #1068: the "Created" column goes when this tenant hides dates. The
       // organizer is a file manager — title, template, unit and version count
@@ -596,7 +615,7 @@ export default function DocumentLibraryPage() {
       ...dates.dateColumns<DocumentRow>([
         {
           id: 'created_at',
-          header: t('organizer.table.created', 'Created'),
+          header: t('organizer.table.issued', 'Issued'),
           value: (row) => row.created_at,
         },
       ]),
@@ -608,7 +627,7 @@ export default function DocumentLibraryPage() {
         cell: (row) => String(row.artifacts.length),
       },
     ],
-    [busy, dates, ouName, t, toggleStar]
+    [busy, dates, ouName, people, t, toggleStar, user?.id]
   );
 
   const listError = documents.error;
@@ -631,7 +650,7 @@ export default function DocumentLibraryPage() {
         title={t('organizer.title', 'Documents')}
         description={t(
           'organizer.description',
-          'Every folder here is a query over what documents record — nothing stores where a document lives. Collections are your own.'
+          'Every folder here is a saved search over your documents. Collections are your own; adding a document to one does not move it.'
         )}
         action={
           // Gated on `documents:issue`, the capability the create route
@@ -658,12 +677,17 @@ export default function DocumentLibraryPage() {
         onChoose={(template) => router.push(issueHref(template.id))}
       />
 
-      {views.error && (
-        <p className="mb-4 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
-          {views.error}
-        </p>
+      {views.forbidden || documents.forbidden ? (
+        <NoAccess area={t('organizer.area', 'documents')} permission="documents:read" />
+      ) : (
+        views.error && (
+          <p className="mb-4 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+            {views.error}
+          </p>
+        )
       )}
 
+      {!(views.forbidden || documents.forbidden) && (
       <div className="flex gap-8">
         <ViewRail
           views={views.data?.data ?? []}
@@ -733,10 +757,11 @@ export default function DocumentLibraryPage() {
 
           {ous.error && (
             <p className="mb-3 text-sm text-muted-foreground">
-              {t(
-                'organizer.ous.unavailable',
-                'Unit names could not be loaded, so units are shown by id. Listing units needs the ous:read permission.'
-              )}
+              {t('organizer.ous.unavailable', 'Unit names could not be loaded, so they are not shown.')}
+              <TechnicalDetails>
+                {' '}
+                {t('organizer.ous.permission', 'Listing units needs the ous:read permission.')}
+              </TechnicalDetails>
             </p>
           )}
 
@@ -775,6 +800,7 @@ export default function DocumentLibraryPage() {
               getRowId={(row) => String(row.id)}
               isLoading={documents.loading}
               ariaLabel={tableLabel}
+              onRowClick={(row) => router.push(`/admin/document-library/${row.id}`)}
               rowActions={(row) => <DocumentActions row={row} handlers={itemHandlers} />}
               emptyState={{
                 title: emptyState.title,
@@ -803,6 +829,7 @@ export default function DocumentLibraryPage() {
           )}
         </div>
       </div>
+      )}
 
       <CreateCollectionDialog
         open={creatingCollection}

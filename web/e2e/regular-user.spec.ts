@@ -6,8 +6,8 @@ import { REGULAR_USER } from './support/constants';
  *
  * Verified live against the new RBAC-filtered navigation (WC-175 #191):
  * `GET /api/navigation` is now filtered server-side per caller, so the regular
- * user's sidebar shows ONLY "Settings" (every other section is gated on a
- * permission/role the plain user lacks). The admin-only data pages are no
+ * user's sidebar shows only what needs no permission, such as Dashboard (every
+ * other section is gated on a permission/role the plain user lacks). The admin-only data pages are no
  * longer reachable from the sidebar at all — there is no link to click — so
  * this flow asserts the NAV-LEVEL difference (gated links absent) instead of
  * the old data-layer 403 surface.
@@ -15,10 +15,10 @@ import { REGULAR_USER } from './support/constants';
 test.describe('Regular user (non-admin)', () => {
   test('can log in and reach the dashboard', async ({ userPage, page }) => {
     await expect(page).toHaveURL(/\/dashboard$/);
-    await expect(page.getByRole('heading', { name: 'Welcome back!' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /^Good (morning|afternoon|evening)/ })).toBeVisible();
     await userPage.shell.expectLoggedInAs(REGULAR_USER.email);
-    // The dashboard reflects the user's role.
-    await expect(page.getByText('User', { exact: true })).toBeVisible();
+    // Waiting for you is always the first card; with nothing waiting it is one line.
+    await expect(page.getByText(/Waiting for you|Nothing is waiting for you\./).first()).toBeVisible();
   });
 
   test('the sidebar hides every gated section and shows only Settings', async ({
@@ -30,7 +30,7 @@ test.describe('Regular user (non-admin)', () => {
     // Every gated nav link is filtered out server-side for the plain user
     // (no role grant, no delegated permission), so none render in the sidebar.
     const hidden = [
-      'Dashboard',
+      'System',
       'Users',
       'Roles',
       'Organizational Units',
@@ -43,6 +43,9 @@ test.describe('Regular user (non-admin)', () => {
     for (const label of hidden) {
       await expect(userPage.shell.navLink(label)).toHaveCount(0);
     }
+
+    // The home is everyone's (H.1), so its link is always there.
+    await expect(userPage.shell.navLink('Dashboard')).toBeVisible();
 
     // The workspace Settings area is gated, so a plain user has no Settings
     // entry; their own account is always reachable from the user row.
@@ -70,7 +73,6 @@ test.describe('Regular user (non-admin)', () => {
     await page.goto('/admin/roles');
     await page.waitForURL('**/admin/roles');
     await expect(page.getByRole('heading', { name: 'Roles' })).toBeVisible();
-    await expect(page.getByText('No data available')).toBeVisible();
     await expect(page.getByText('Failed to fetch roles').first()).toBeVisible();
 
     // A second admin page proves the screen-layer 403 handling is not specific
@@ -78,8 +80,12 @@ test.describe('Regular user (non-admin)', () => {
     await page.goto('/admin/users');
     await page.waitForURL('**/admin/users');
     await expect(page.getByRole('heading', { name: 'Users' })).toBeVisible();
-    await expect(page.getByText('No data available')).toBeVisible();
-    await expect(page.getByText('Failed to fetch users').first()).toBeVisible();
+    // A refused request (403) is "no access" in plain words, not a failure with
+    // Try again and not an empty list (design 2.9, the access-denied state).
+    await expect(page.getByText('You don’t have access to the people in this workspace')).toBeVisible();
+    await expect(page.getByText('Failed to fetch users')).toHaveCount(0);
+    // Nothing to retry: the server answered, and the answer was no.
+    await expect(page.getByRole('button', { name: 'Try again' })).toHaveCount(0);
   });
 
   test('settings page is accessible and shows the user role', async ({ userPage, page }) => {
@@ -99,6 +105,8 @@ test.describe('Regular user (non-admin)', () => {
     // enrolled, keeping user@example.com a plain-login account for other specs.
     await userPage.shell.openAccountSettings();
     await page.waitForURL('**/settings');
+    // Two-step sign-in lives in the account page's Sign-in and security tab.
+    await page.getByRole('tab', { name: 'Sign-in and security' }).click();
 
     const enable = page.getByRole('button', { name: 'Enable 2FA' });
     await expect(enable).toBeVisible();
@@ -111,16 +119,16 @@ test.describe('Regular user (non-admin)', () => {
     await expect(wizard).toBeHidden();
   });
 
-  test('the dashboard reports the user id, role badge and email', async ({
+  test('the home greets the person and shows what is waiting for them', async ({
     userPage,
     page,
   }) => {
     await expect(page).toHaveURL(/\/dashboard$/);
-    await expect(page.getByText('Your User ID')).toBeVisible();
-    await expect(page.getByText('Your Role')).toBeVisible();
-    // The role badge renders the capitalised role.
-    await expect(page.getByText('User', { exact: true })).toBeVisible();
-    await expect(page.getByText(REGULAR_USER.email).first()).toBeVisible();
+    await expect(page.getByRole('heading', { name: /^Good (morning|afternoon|evening)/ })).toBeVisible();
+    // Waiting for you collapses to one line when nothing waits, so one of the two shows.
+    await expect(
+      page.getByText(/Waiting for you|Nothing is waiting for you\./).first()
+    ).toBeVisible();
     // The footer also reflects the logged-in regular user.
     await userPage.shell.expectLoggedInAs(REGULAR_USER.email);
   });

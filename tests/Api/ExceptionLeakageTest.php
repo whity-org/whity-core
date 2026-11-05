@@ -59,7 +59,7 @@ final class ExceptionLeakageTest extends TestCase
      */
     public function testAdminStatsDoesNotLeakExceptionMessage(): void
     {
-        MockRequestFactory::setTestTenant(1);
+        MockRequestFactory::setTestTenant(0);
 
         $database = Database::withFactory(fn (): PDO => $this->throwingPdo());
         $handler = new AdminApiHandler($database, sys_get_temp_dir());

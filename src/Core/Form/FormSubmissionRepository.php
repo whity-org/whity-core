@@ -36,7 +36,8 @@ use PDO;
 final class FormSubmissionRepository
 {
     private const COLUMNS = 's.id, s.tenant_id, s.form_id, s.form_version, s.submitted_by_profile_id,
-                             s.document_id, s.data, s.reference, s.submitted_at, s.created_at';
+                             s.document_id, s.data, s.reference, s.submitted_at, s.created_at, s.withdrawn_at,
+                             p.display_name AS submitted_by_name';
 
     public function __construct(private readonly PDO $db)
     {
@@ -61,6 +62,7 @@ final class FormSubmissionRepository
      */
     private const ROUTE_STATE = ",
                        CASE
+                         WHEN s.withdrawn_at IS NOT NULL THEN 'withdrawn'
                          WHEN s.document_id IS NULL THEN 'not routed'
                          WHEN NOT EXISTS (
                            SELECT 1 FROM document_routes dr
@@ -161,6 +163,7 @@ final class FormSubmissionRepository
         $sql = 'SELECT ' . self::COLUMNS . ', f.form_key, f.name AS form_name' . self::ROUTE_STATE . '
                   FROM form_submissions s
                   JOIN forms f ON f.id = s.form_id AND f.tenant_id = s.tenant_id
+                  LEFT JOIN profiles p ON p.id = s.submitted_by_profile_id
                  WHERE s.tenant_id = :tenant_id';
         $params = [':tenant_id' => $tenantId];
 
@@ -207,6 +210,7 @@ final class FormSubmissionRepository
         $sql = 'SELECT ' . self::COLUMNS . ', f.form_key, f.name AS form_name' . self::ROUTE_STATE . '
                   FROM form_submissions s
                   JOIN forms f ON f.id = s.form_id AND f.tenant_id = s.tenant_id
+                  LEFT JOIN profiles p ON p.id = s.submitted_by_profile_id
                  WHERE s.tenant_id = :tenant_id AND s.id = :id';
         $params = [':tenant_id' => $tenantId, ':id' => $id];
 
@@ -224,12 +228,81 @@ final class FormSubmissionRepository
     }
 
     /**
+     * Take back the author's own submission, unless somebody has already decided on it.
+     *
+     * One statement, so a review or the last approval can't land between the check and
+     * the write. False means nothing changed; the row says why.
+     */
+    public function markWithdrawn(int $tenantId, int $id, int $profileId): bool
+    {
+        $stmt = $this->db->prepare(
+            'UPDATE form_submissions
+                SET withdrawn_at = NOW(), withdrawn_by_profile_id = :withdrawn_by
+              WHERE tenant_id = :tenant_id AND id = :id
+                AND submitted_by_profile_id = :profile_id
+                AND withdrawn_at IS NULL
+                AND NOT EXISTS (
+                    SELECT 1 FROM form_submission_reviews r
+                     WHERE r.submission_id = form_submissions.id AND r.tenant_id = form_submissions.tenant_id
+                )
+                AND NOT (
+                    EXISTS (
+                        SELECT 1 FROM document_routes dr
+                         WHERE dr.document_id = form_submissions.document_id AND dr.tenant_id = form_submissions.tenant_id
+                    )
+                    AND NOT EXISTS (
+                        SELECT 1 FROM document_route_recipients rc
+                         WHERE rc.document_id = form_submissions.document_id AND rc.tenant_id = form_submissions.tenant_id
+                           AND rc.closed_by_event_id IS NULL
+                    )
+                )'
+        );
+        $stmt->execute([
+            ':withdrawn_by' => $profileId,
+            ':tenant_id' => $tenantId,
+            ':id' => $id,
+            ':profile_id' => $profileId,
+        ]);
+
+        return $stmt->rowCount() === 1;
+    }
+
+    /**
      * How many submissions a form has received.
      *
      * Asked by the builder so an author about to change a published form can see
      * that thirty people have already answered it — the cheapest possible way to
      * turn "I'll just rename this field" into a decision rather than a reflex.
      */
+    /**
+     * Response counts for several forms at once, so a list of forms doesn't ask once
+     * per row. A form with none is absent from the map.
+     *
+     * @param list<int> $formIds
+     * @return array<int, int> Form id to count.
+     */
+    public function countForForms(int $tenantId, array $formIds): array
+    {
+        if ($formIds === []) {
+            return [];
+        }
+
+        $placeholders = implode(', ', array_fill(0, count($formIds), '?'));
+        $stmt = $this->db->prepare(
+            'SELECT form_id, COUNT(*) AS total FROM form_submissions
+              WHERE tenant_id = ? AND form_id IN (' . $placeholders . ')
+              GROUP BY form_id'
+        );
+        $stmt->execute([$tenantId, ...$formIds]);
+
+        $counts = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $counts[(int) $row['form_id']] = (int) $row['total'];
+        }
+
+        return $counts;
+    }
+
     public function countForForm(int $tenantId, int $formId): int
     {
         $stmt = $this->db->prepare(
@@ -284,6 +357,9 @@ final class FormSubmissionRepository
             // 127 for both cases.
             'document_id' => $row['document_id'] === null ? null : (int) $row['document_id'],
             'reference' => ($row['reference'] ?? null) === null ? null : (string) $row['reference'],
+            // Null with no submitter (a public link, a service principal) or when the
+            // profile has since gone. A name, so a screen never has to show an id.
+            'submitted_by_name' => ($row['submitted_by_name'] ?? null) === null ? null : (string) $row['submitted_by_name'],
             // `{}` rather than `[]` for a submission with no answers (every field
             // optional, none filled in). Same reason as
             // {@see FormFieldRepository}'s `validation`: PHP cannot tell an empty
@@ -291,6 +367,7 @@ final class FormSubmissionRepository
             // published schema declares an object.
             'data' => $data === [] ? new \stdClass() : $data,
             'submitted_at' => (string) $row['submitted_at'],
+            'withdrawn_at' => $row['withdrawn_at'] ?? null,
             'created_at' => (string) $row['created_at'],
         ];
 

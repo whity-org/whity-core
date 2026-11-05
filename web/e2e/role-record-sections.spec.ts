@@ -56,18 +56,19 @@ test.describe('Role record regions (#910)', () => {
     // seeded admin holds `roles:write`, `roles:manage` and `permissions:read`
     // (migration 110 grants the last two to whoever already held the first).
     const details = page.getByTestId('role-record-section-details');
-    const permissions = page.getByTestId('role-record-section-permissions');
     await expect(details).toHaveAttribute('data-section-state', 'editable');
-    await expect(permissions).toHaveAttribute('data-section-state', 'editable');
     await expect(page.getByTestId('role-record-readonly-notice')).toHaveCount(0);
     await expect(page.getByTestId('role-record-section-details-readonly')).toHaveCount(0);
-    await expect(page.getByTestId('role-record-section-permissions-readonly')).toHaveCount(0);
 
     // One save, reaching BOTH regions — the granularity must not have cost the
-    // ordinary case its single submit.
+    // ordinary case its single submit. Details live on Overview, permissions on
+    // the Access tab; the draft survives switching between them.
     await page.getByLabel('Description').fill('Region probe, edited');
-    const rolesRead = page.getByTestId('perm-grid').locator('label', { hasText: 'roles:read' });
-    await rolesRead.click();
+    await page.getByRole('tab', { name: 'Access' }).click();
+    const permissions = page.getByTestId('role-record-section-permissions');
+    await expect(permissions).toHaveAttribute('data-section-state', 'editable');
+    await expect(page.getByTestId('role-record-section-permissions-readonly')).toHaveCount(0);
+    await page.getByTestId('perm-grid').getByRole('checkbox', { name: 'Roles: See' }).click();
     await page.getByRole('button', { name: 'Save changes' }).click();
     await expect(page.getByText('Role updated successfully')).toBeVisible();
 
@@ -105,6 +106,7 @@ test.describe('Role record regions (#910)', () => {
       'data-section-state',
       'read-only'
     );
+    await page.getByRole('tab', { name: 'Access' }).click();
     await expect(page.getByTestId('role-record-section-permissions')).toHaveAttribute(
       'data-section-state',
       'read-only'
@@ -115,12 +117,14 @@ test.describe('Role record regions (#910)', () => {
 
     // A state, not a disabled form: no inputs at all, and no save.
     await expect(page.getByRole('button', { name: 'Save changes' })).toHaveCount(0);
-    await expect(page.getByTestId('role-record-section-details').locator('input')).toHaveCount(0);
     await expect(
       page.getByTestId('role-record-section-permissions').locator('input[type="checkbox"]')
     ).toHaveCount(0);
+    await page.getByRole('tab', { name: 'Overview' }).click();
+    await expect(page.getByTestId('role-record-section-details').locator('input')).toHaveCount(0);
 
     // The region still SHOWS the role's grants — read-only means "may look".
+    await page.getByRole('tab', { name: 'Access' }).click();
     await expect(page.getByTestId('role-record-section-permissions')).toBeVisible();
   });
 });

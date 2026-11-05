@@ -7,6 +7,7 @@ namespace Whity\Api;
 use Whity\Auth\RoleChecker;
 use Whity\Core\Document\Collab\DocumentCollab;
 use Whity\Core\Document\DocumentAccessPolicy;
+use Whity\Core\Document\DocumentPeople;
 use Whity\Core\Document\DocumentSourceFileStore;
 use Whity\Core\Document\DocumentSourceRepository;
 use Whity\Core\Document\DocumentSourceVersionRepository;
@@ -24,6 +25,7 @@ use Whity\Core\Response;
 use Whity\Core\Tenant\TenantContext;
 use Whity\Http\JsonBody;
 use Whity\Http\UploadedFilePart;
+use Whity\Sdk\Documents\DocumentNumberingRule;
 use Whity\Http\UploadedFilePartException;
 use Whity\Storage\StorageException;
 
@@ -86,6 +88,8 @@ final class DocumentSourcesApiHandler
         private readonly ?DocumentThemeResolver $themes = null,
         // Its open suggestions and comment threads (editor M5), served with it.
         private readonly ?DocumentCollab $collab = null,
+        // S5: names for "Written by", from the rows being served.
+        private readonly ?DocumentPeople $people = null,
     ) {
         $this->repo = $repo;
         $this->policy = $policy;
@@ -113,7 +117,13 @@ final class DocumentSourcesApiHandler
             $this->ouReach->reachFor($tenantId, $callerId),
         );
 
-        return Response::json(['data' => array_values($visible)]);
+        $rows = array_values($visible);
+        $names = $this->people?->names($tenantId, array_values(array_filter(
+            array_map(static fn (array $row): ?int => isset($row['created_by']) ? (int) $row['created_by'] : null, $rows),
+            static fn (?int $id): bool => $id !== null,
+        ))) ?? [];
+
+        return Response::json(['data' => $rows, 'people' => $names === [] ? new \stdClass() : $names]);
     }
 
     /**
@@ -333,8 +343,23 @@ final class DocumentSourcesApiHandler
             }
             $fields['owner_ou_id'] = $parsed;
         }
-        if ($fields === []) {
-            return Response::error('Send scope, required_permission or owner_ou_id', 422);
+        // Numbers go on paper people keep, so choosing how is a publish action (WHIT-684).
+        $hasNumbering = array_key_exists('numbering', $body);
+        $numbering = null;
+        if ($hasNumbering) {
+            if (!$this->permissionResolver($callerId, $tenantId)(CorePermissions::DOCUMENTS_PUBLISH)) {
+                return Response::error('Changing how documents are numbered requires documents:publish', 403);
+            }
+            if ($body['numbering'] !== null) {
+                $problem = DocumentNumberingRule::problem($body['numbering']);
+                if ($problem !== null) {
+                    return Response::error($problem, 422);
+                }
+                $numbering = DocumentNumberingRule::fromArray($body['numbering'])->toArray();
+            }
+        }
+        if ($fields === [] && !$hasNumbering) {
+            return Response::error('Send scope, required_permission, owner_ou_id or numbering', 422);
         }
 
         $changes = (array_key_exists('scope', $fields) && $fields['scope'] !== $row['scope'])
@@ -350,6 +375,9 @@ final class DocumentSourcesApiHandler
         }
 
         $this->repo->updateAudience($id, $tenantId, $fields);
+        if ($hasNumbering) {
+            $this->repo->updateNumbering($id, $tenantId, $numbering);
+        }
 
         return Response::json(['data' => $this->repo->findById($id, $tenantId)]);
     }

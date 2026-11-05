@@ -8,6 +8,8 @@ use Whity\Core\Container\HostWiredService;
 use Whity\Core\RBAC\CorePermissions;
 use Whity\Mcp\Tools\CoreToolsets;
 use Whity\Mcp\Tools\ToolSurface;
+use Whity\Sdk\Manifest\AgentDeclarationValidator;
+use Whity\Sdk\Manifest\AgentFeatures;
 use Whity\Sdk\Manifest\AgentPresetValidator;
 use Whity\Sdk\Manifest\PluginManifest;
 
@@ -20,6 +22,11 @@ use Whity\Sdk\Manifest\PluginManifest;
  * workspace's switched-on Whity Builder plugins are read per call from its live
  * manifests, so one workspace's presets never reach another. Both are keyed
  * `<plugin toolset root>.<key>`. A plugin that is off contributes none.
+ *
+ * WHIT-867: a preset also says what it does, for the gallery: three short things
+ * in each language, an icon, and what it needs. Core's are in their files and
+ * all work with Whity alone. A plugin's need that plugin and, until the SDK
+ * carries them, say nothing more than the role.
  *
  * A preset is never live: creating an agent from one copies it into the
  * workspace's `agents` table, so a new preset version never changes an agent
@@ -40,6 +47,9 @@ use Whity\Sdk\Manifest\PluginManifest;
 final class AgentPresetRegistry implements HostWiredService
 {
     public const CORE_PREFIX = 'core.';
+
+    private const THINGS_IT_DOES = 3;
+    private const THING_MAX      = 120;
 
     /** @var array<string, array<string, mixed>> key => preset */
     private array $presets = [];
@@ -110,6 +120,47 @@ final class AgentPresetRegistry implements HostWiredService
                 array_push($refused, ...$errors);
                 continue;
             }
+            $kept[$normal['key']] = $normal;
+        }
+        $this->plugins[$pluginKey] = $kept;
+
+        return $refused;
+    }
+
+    /**
+     * A code plugin's agents, declared under PluginAgentsInterface (SDK 1.64,
+     * WHIT-893). They join the plugin's presets, so a workspace starts an agent
+     * from one exactly as from a preset: a copy, never a live link. A
+     * declaration under the same key with a higher version replaces the earlier
+     * one for new agents; agents already created keep what they were given.
+     *
+     * Returns why any was refused. A refused declaration is dropped and the
+     * plugin keeps loading.
+     *
+     * @param list<mixed>            $declared        what getAgents() returned
+     * @param callable(string): bool $permissionExists
+     * @return list<string>
+     */
+    public function registerPluginAgents(string $pluginKey, array $declared, callable $permissionExists): array
+    {
+        $root = CoreToolsets::pluginToolsetIdForClass($pluginKey);
+        [$accepted, $refused] = AgentDeclarationValidator::check($declared, $root, $permissionExists);
+
+        $kept = $this->plugins[$pluginKey] ?? [];
+        foreach ($accepted as $agent) {
+            $features = $agent['features'] ?? [];
+            unset($agent['features']);
+            $key = is_string($agent['key'] ?? null) ? $agent['key'] : '';
+            unset($agent['key']);
+            [$normal, $errors] = self::normalize($root, $key, $agent, $permissionExists);
+            if ($normal === null) {
+                array_push($refused, ...$errors);
+                continue;
+            }
+            $normal['features'] = array_filter(
+                array_intersect_key((array) $features, array_flip(AgentFeatures::ALL)),
+                'is_bool',
+            );
             $kept[$normal['key']] = $normal;
         }
         $this->plugins[$pluginKey] = $kept;
@@ -227,6 +278,10 @@ final class AgentPresetRegistry implements HostWiredService
             'language'        => $fields['language'] ?? 'auto',
             'toolsets'        => $fields['toolsets'] ?? [],
             'grant'           => $fields['grant'] ?? [],
+            'does'            => [],
+            'does_ar'         => [],
+            'icon'            => null,
+            'needs'           => $root,
         ], []];
     }
 
@@ -254,6 +309,16 @@ final class AgentPresetRegistry implements HostWiredService
                 $errors[] = "{$required} is required for a core preset";
             }
         }
+        foreach (['does', 'does_ar'] as $list) {
+            $things = $raw[$list] ?? null;
+            if (!is_array($things) || !array_is_list($things) || count($things) !== self::THINGS_IT_DOES
+                || array_filter($things, static fn (mixed $t): bool => !is_string($t) || trim($t) === '' || mb_strlen($t) > self::THING_MAX) !== []) {
+                $errors[] = "{$list} must be " . self::THINGS_IT_DOES . ' short sentences of at most ' . self::THING_MAX . ' characters';
+            }
+        }
+        if (!is_string($raw['icon'] ?? null) || $raw['icon'] === '') {
+            $errors[] = 'icon is required for a core preset';
+        }
         if ($errors !== []) {
             throw new \LogicException("Agent preset {$name}: " . implode('; ', $errors));
         }
@@ -272,6 +337,10 @@ final class AgentPresetRegistry implements HostWiredService
             'language'        => $fields['language'] ?? 'auto',
             'toolsets'        => $fields['toolsets'] ?? [],
             'grant'           => $fields['grant'] ?? [],
+            'does'            => $raw['does'],
+            'does_ar'         => $raw['does_ar'],
+            'icon'            => $raw['icon'],
+            'needs'           => null,
         ];
     }
 }

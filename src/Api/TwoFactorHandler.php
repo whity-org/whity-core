@@ -9,8 +9,12 @@ use Whity\Core\Response;
 use Whity\Http\JsonBody;
 use Whity\Auth\TotpService;
 use Whity\Auth\BackupCodesService;
+use Whity\Auth\LoginThrottleService;
 use Whity\Auth\TokenValidator;
+use Whity\Auth\TotpStepFloor;
 use Whity\Core\Audit\AuditLogger;
+use Whity\Core\Identity\AuthMethod;
+use Whity\Core\RateLimit\ClientIp;
 use PDO;
 use Whity\Core\Db\DbBool;
 
@@ -18,7 +22,8 @@ use Whity\Core\Db\DbBool;
  * Two-Factor Authentication API Handler
  *
  * Handles 2FA setup, confirmation, disable, regeneration, and status endpoints.
- * All endpoints require valid access token authentication.
+ * All endpoints require valid access token authentication. Disable and
+ * regenerate also require fresh proof, {@see self::refuseWithoutProof()}.
  *
  * Endpoints:
  * - POST /api/auth/2fa/setup - Generate secret and QR code for 2FA setup
@@ -40,6 +45,9 @@ class TwoFactorHandler
      */
     private ?AuditLogger $auditLogger;
 
+    /** Counts wrong proofs. Null only in contexts that do not throttle. */
+    private ?LoginThrottleService $proofThrottle;
+
     /**
      * Constructor
      *
@@ -48,19 +56,22 @@ class TwoFactorHandler
      * @param BackupCodesService $backupCodesService Backup codes service
      * @param TokenValidator $tokenValidator Token validator for access tokens
      * @param AuditLogger|null $auditLogger Optional audit-trail writer (WC-34).
+     * @param LoginThrottleService|null $proofThrottle Counts wrong proofs on disable and regenerate.
      */
     public function __construct(
         PDO $db,
         TotpService $totpService,
         BackupCodesService $backupCodesService,
         TokenValidator $tokenValidator,
-        ?AuditLogger $auditLogger = null
+        ?AuditLogger $auditLogger = null,
+        ?LoginThrottleService $proofThrottle = null
     ) {
         $this->db = $db;
         $this->totpService = $totpService;
         $this->backupCodesService = $backupCodesService;
         $this->tokenValidator = $tokenValidator;
         $this->auditLogger = $auditLogger;
+        $this->proofThrottle = $proofThrottle;
     }
 
     /**
@@ -192,6 +203,107 @@ class TwoFactorHandler
                  WHERE id = ?'
             )->execute([$encryptedSecretOrNull, $enabled ? 1 : 0, $profileId]);
         }
+    }
+
+    /**
+     * Read what a proof is checked against. Kept apart from readIdentityRow() so
+     * the secret and the password hash are only loaded when a proof needs them.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function readProofRow(int $profileId): ?array
+    {
+        // @tenant-guard-ignore: profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
+        $stmt = $this->db->prepare(
+            'SELECT two_factor_secret, two_factor_backup_codes_version, password_hash, auth_method
+             FROM profiles WHERE id = ? LIMIT 1'
+        );
+        $stmt->execute([$profileId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return is_array($row) && $row !== [] ? $row : null;
+    }
+
+    /**
+     * Whether this profile can prove itself with a password. An account signed
+     * in through an identity provider has none, and a service principal is not a
+     * login, so those can only use a code ({@see AuthMethod}).
+     *
+     * @param array<string, mixed> $row From readProofRow().
+     */
+    private static function passwordCanProve(array $row): bool
+    {
+        return AuthMethod::holdsLocalCredential((string) ($row['auth_method'] ?? ''))
+            && (string) ($row['password_hash'] ?? '') !== '';
+    }
+
+    /**
+     * Check a current code: an authenticator code first, then a backup code, the
+     * same order as login. Both are single-use, so a code seen once cannot be
+     * replayed here, and a backup code spent here stays spent.
+     *
+     * @param array<string, mixed> $row From readProofRow().
+     */
+    private function codeProves(int $profileId, array $row, string $code): bool
+    {
+        $secret = (string) ($row['two_factor_secret'] ?? '');
+        if ($secret !== '') {
+            $step = $this->totpService->matchedStep($secret, $code);
+            if ($step !== null && TotpStepFloor::advance($this->db, $profileId, $step)) {
+                return true;
+            }
+        }
+
+        $version = (int) ($row['two_factor_backup_codes_version'] ?? 0);
+
+        return $version > 0 && $this->backupCodesService->validateCode($profileId, $code, $version);
+    }
+
+    /**
+     * Refuse a change that would hand over or remove the second factor unless the
+     * caller proves, now, that they are the account holder.
+     *
+     * A session alone is not enough: it can be borrowed or stolen, and it is
+     * exactly what the second factor exists to distrust. Regenerate needs this as
+     * much as disable does, because fresh backup codes would otherwise pass this
+     * very check. Proof is a current code or backup code, or the password on an
+     * account that has one.
+     *
+     * Wrong answers answer 403, not 401: the web client treats a 401 as an expired
+     * session and replays the request, which would spend a second attempt.
+     *
+     * @return Response|null The refusal, or null when the caller has proved it.
+     */
+    private function refuseWithoutProof(Request $request, int $profileId): ?Response
+    {
+        $ip = ClientIp::fromRequest($request);
+        if ($this->proofThrottle?->isThrottled($profileId, $ip) === true) {
+            return Response::error('Too many attempts', 429, ['reason' => 'throttled']);
+        }
+
+        $body = JsonBody::parsed($request);
+        $code = is_string($body['code'] ?? null) ? trim($body['code']) : '';
+        $password = is_string($body['password'] ?? null) ? $body['password'] : '';
+
+        if ($code === '' && $password === '') {
+            return Response::error('A code or your password is required', 403, ['reason' => 'proof_required']);
+        }
+
+        $row = $this->readProofRow($profileId) ?? [];
+        $proved = $code !== ''
+            ? $this->codeProves($profileId, $row, $code)
+            : self::passwordCanProve($row) && password_verify($password, (string) $row['password_hash']);
+
+        if (!$proved) {
+            $this->proofThrottle?->recordFailure($profileId, $ip);
+            $this->audit('auth.2fa.verify_failure', $profileId);
+
+            return Response::error('That code or password is not correct', 403, ['reason' => 'proof_invalid']);
+        }
+
+        $this->proofThrottle?->clearUser($profileId);
+
+        return null;
     }
 
     /**
@@ -371,8 +483,9 @@ class TwoFactorHandler
      * POST /api/auth/2fa/disable - Disable 2FA for user
      *
      * Disables 2FA by setting two_factor_enabled = false and invalidating backup codes.
+     * Requires fresh proof, {@see self::refuseWithoutProof()}.
      *
-     * @param Request $request The incoming request
+     * @param Request $request The incoming request, with `code` or `password` in the body
      * @return Response JSON response confirming disable
      */
     public function disable(Request $request): Response
@@ -393,7 +506,20 @@ class TwoFactorHandler
             // profiles (ADR 0005 §1) via readIdentityRow().
             $user = $this->readIdentityRow($profileId);
 
-            if ($user && (int) $user['two_factor_backup_codes_version'] > 0) {
+            if (!$user) {
+                return Response::error('User not found', 404);
+            }
+
+            if (!self::dbTruthy($user['two_factor_enabled'])) {
+                return Response::error('2FA is not enabled for this user', 400);
+            }
+
+            $refusal = $this->refuseWithoutProof($request, $profileId);
+            if ($refusal !== null) {
+                return $refusal;
+            }
+
+            if ((int) $user['two_factor_backup_codes_version'] > 0) {
                 // Invalidate all backup codes for this version. backup_codes is
                 // keyed on profile_id (migration 038). Cast the version to int:
                 // under PostgreSQL (and the RealEngine SQLite harness with
@@ -426,8 +552,9 @@ class TwoFactorHandler
      *
      * Invalidates all old backup codes and generates 15 new ones.
      * Increments the backup_codes_version to ensure old codes are unusable.
+     * Requires fresh proof, {@see self::refuseWithoutProof()}.
      *
-     * @param Request $request The incoming request
+     * @param Request $request The incoming request, with `code` or `password` in the body
      * @return Response JSON response with new backup codes
      */
     public function regenerateCodes(Request $request): Response
@@ -455,6 +582,11 @@ class TwoFactorHandler
             // this guard and let a user WITHOUT 2FA regenerate/insert backup codes.
             if (!self::dbTruthy($user['two_factor_enabled'])) {
                 return Response::error('2FA is not enabled for this user', 400);
+            }
+
+            $refusal = $this->refuseWithoutProof($request, $profileId);
+            if ($refusal !== null) {
+                return $refusal;
             }
 
             // Get current version.
@@ -545,7 +677,9 @@ class TwoFactorHandler
                 // both directions, which would report enabled=true for EVERY user
                 // (including those with 2FA disabled). {@see DbBool}.
                 'enabled' => self::dbTruthy($user['two_factor_enabled']),
-                'backup_codes_available' => $codeCount
+                'backup_codes_available' => $codeCount,
+                // Whether the settings page may offer a password as proof.
+                'password_available' => self::passwordCanProve($this->readProofRow($profileId) ?? []),
             ], 200);
         } catch (\Exception $e) {
             error_log('[TwoFactorHandler] status failed: ' . $e->getMessage());

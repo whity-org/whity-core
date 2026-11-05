@@ -1,7 +1,9 @@
-﻿'use client';
+'use client';
 
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api/client';
+import { TechnicalDetails } from '@whity/ui/display-preferences';
+import { permissionText } from './permission-words';
 import {
   fetchAllPagesTyped,
   type FetchAllPagesResult,
@@ -16,6 +18,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@whity/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -26,6 +29,7 @@ import {
 import { Skeleton } from '@whity/ui/skeleton';
 import { Alert, AlertDescription } from '@whity/ui/alert';
 import { useRichTranslation, useTranslation } from '@whity/features/i18n';
+import { groupOf, roleLabel, titleCase } from '@whity/features/roles';
 import type {
   GranteeType,
   OuOption,
@@ -132,6 +136,9 @@ export function CreateDelegationModal({
   const [granteeId, setGranteeId] = useState<string>('');
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
   const [ouId, setOuId] = useState<string>('');
+  // Empty is no end date.
+  const [until, setUntil] = useState<string>('');
+  const [permissionQuery, setPermissionQuery] = useState('');
 
   const loadOptions = useCallback(async () => {
     try {
@@ -236,6 +243,8 @@ export function CreateDelegationModal({
           granteeId: Number(granteeId),
           permissions: selectedPermissions,
           ouId: ouId === '' ? null : Number(ouId),
+          // The end of the day chosen, in the reader's own time.
+          expiresAt: until === '' ? null : new Date(`${until}T23:59:59`).toISOString(),
         },
       });
 
@@ -271,7 +280,7 @@ export function CreateDelegationModal({
 
   const granteeOptions =
     granteeType === 'role'
-      ? roles.map((r) => ({ value: String(r.id), label: r.name }))
+      ? roles.map((r) => ({ value: String(r.id), label: roleLabel(r.name) }))
       : users.map((u) => ({ value: String(u.id), label: u.email }));
 
   /**
@@ -301,6 +310,46 @@ export function CreateDelegationModal({
           { loaded: failure.loaded, total: failure.total }
         );
   };
+
+  // A permission in words, in the person's language: its description if it has a
+  // real one, otherwise the area and what it allows ("Workspaces: See"), the same
+  // words the role's Access tab uses. The code stays behind Show technical details.
+  const permissionWords = (permission: Permission): string => {
+    const own = permissionText(permission.name, permission.description);
+    if (permission.description && !permission.description.includes(permission.name)) return own;
+    const actions = (permission.actions ?? []) as string[];
+    if (actions.length === 0) return own;
+    const areaKey = permission.area ?? groupOf(permission.name);
+    // @i18n-dynamic-ignore: the same keys, declared in permission-area-grid.tsx.
+    const area = t(`permissions.area.${areaKey}`, permission.areaLabel ?? titleCase(areaKey));
+    // @i18n-dynamic-ignore: the same keys, declared in permission-area-grid.tsx.
+    const verbs = actions.map((a) => t(`permissions.action.${a}`, a.charAt(0).toUpperCase() + a.slice(1)));
+    return `${area}: ${verbs.join(', ')}`;
+  };
+
+  // About ninety permissions: by area as on a role's Access tab, and findable.
+  const query = permissionQuery.trim().toLowerCase();
+  const permissionAreas = [
+    ...permissions
+      .filter(
+        (permission) =>
+          query === '' ||
+          permissionWords(permission).toLowerCase().includes(query) ||
+          permission.name.toLowerCase().includes(query)
+      )
+      .reduce((areas, permission) => {
+        const key = permission.area ?? groupOf(permission.name);
+        const area = areas.get(key) ?? {
+          key,
+          // @i18n-dynamic-ignore: the same keys, declared in permission-area-grid.tsx.
+          label: t(`permissions.area.${key}`, permission.areaLabel ?? titleCase(key)),
+          permissions: [] as Permission[],
+        };
+        area.permissions.push(permission);
+        return areas.set(key, area);
+      }, new Map<string, { key: string; label: string; permissions: Permission[] }>())
+      .values(),
+  ].sort((a, b) => a.label.localeCompare(b.label));
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -406,6 +455,24 @@ export function CreateDelegationModal({
               ) : null}
             </div>
 
+            {/* Until (optional) */}
+            <div className="space-y-2">
+              <label htmlFor="delegation-until" className="text-sm font-medium">
+                {t('delegations.create.until', 'Until (optional)')}
+              </label>
+              <Input
+                id="delegation-until"
+                type="date"
+                data-testid="delegation-until"
+                min={new Date().toISOString().slice(0, 10)}
+                value={until}
+                onChange={(event) => setUntil(event.target.value)}
+              />
+              <p className="text-sm text-muted-foreground">
+                {t('delegations.create.until.hint', 'It ends at the end of this day. Leave it empty for no end date.')}
+              </p>
+            </div>
+
             {/* OU scope (optional) */}
             <div className="space-y-2">
               {/*
@@ -428,12 +495,12 @@ export function CreateDelegationModal({
               >
                 <SelectTrigger>
                   <SelectValue
-                    placeholder={t('delegations.create.ou.tenantWide', 'Tenant-wide')}
+                    placeholder={t('delegations.scope.tenantWide', 'Whole workspace')}
                   />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">
-                    {t('delegations.create.ou.tenantWide', 'Tenant-wide')}
+                    {t('delegations.scope.tenantWide', 'Whole workspace')}
                   </SelectItem>
                   {ous.map((ou) => (
                     <SelectItem key={ou.id} value={String(ou.id)}>
@@ -461,8 +528,8 @@ export function CreateDelegationModal({
                           { loaded: failures.ous.loaded, total: failures.ous.total }
                         )}{' '}
                     {t(
-                      'delegations.create.ou.loadFailed',
-                      'Scoping is unavailable: a partial list would hide units that exist, and delegating tenant-wide instead grants more than an OU scope would.'
+                      'delegations.create.ou.loadFailedUnit',
+                      'Choosing a unit is unavailable: a partial list would hide units that exist, and delegating across the whole workspace instead grants more than one unit would.'
                     )}
                   </AlertDescription>
                 </Alert>
@@ -470,9 +537,8 @@ export function CreateDelegationModal({
                 <Alert variant="info">
                   <AlertDescription>
                     {t(
-                      'delegations.create.ou.hint',
-                      'When set, the delegation applies only to grantees within that OU ' +
-                        'or its descendants.'
+                      'delegations.create.ou.hintUnit',
+                      'When set, the delegation applies only to people in that unit and the units under it.'
                     )}
                   </AlertDescription>
                 </Alert>
@@ -524,7 +590,17 @@ export function CreateDelegationModal({
                   </AlertDescription>
                 </Alert>
               ) : (
-                <div className="max-h-56 space-y-1 overflow-y-auto rounded-md border border-border p-2">
+                <div className="space-y-2">
+                {permissions.length > 0 && (
+                  <Input
+                    type="search"
+                    value={permissionQuery}
+                    onChange={(event) => setPermissionQuery(event.target.value)}
+                    placeholder={t('delegations.create.permissions.search', 'Find a permission')}
+                    aria-label={t('delegations.create.permissions.search', 'Find a permission')}
+                  />
+                )}
+                <div className="max-h-80 space-y-3 overflow-y-auto rounded-md border border-border p-2">
                   {permissions.length === 0 ? (
                     // A genuinely empty catalogue, which the walk COMPLETED —
                     // distinct from the failure above, and the distinction is
@@ -532,12 +608,20 @@ export function CreateDelegationModal({
                     <p className="px-2 py-4 text-center text-sm text-muted-foreground">
                       {t('delegations.create.permissions.empty', 'No permissions available.')}
                     </p>
+                  ) : permissionAreas.length === 0 ? (
+                    <p className="px-2 py-4 text-center text-sm text-muted-foreground">
+                      {t('delegations.create.permissions.noMatch', 'No permission matches that.')}
+                    </p>
                   ) : (
-                    permissions.map((permission) => (
+                    permissionAreas.map((area) => (
+                      <section key={area.key} data-testid={`delegation-area-${area.key}`} className="space-y-1">
+                        <h4 className="px-2 text-sm font-semibold text-foreground">{area.label}</h4>
+                        {area.permissions.map((permission) => (
                       <label
                         // Registry-only permissions carry id: null — the name is
                         // the stable identity (it is the catalogue's merge key).
                         key={permission.name}
+                        data-permission={permission.name}
                         className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted"
                       >
                         <input
@@ -546,12 +630,23 @@ export function CreateDelegationModal({
                           onChange={() => togglePermission(permission.name)}
                           className="size-4 rounded border-border"
                         />
-                        <span className="text-sm font-medium">
-                          {permission.name}
+                        <span className="min-w-0">
+                          {/* In words first; the code is a technical detail. */}
+                          <span className="block text-sm font-medium">
+                            {permissionWords(permission)}
+                          </span>
+                          <TechnicalDetails>
+                            <span className="block font-mono text-xs text-muted-foreground">
+                              {permission.name}
+                            </span>
+                          </TechnicalDetails>
                         </span>
                       </label>
+                        ))}
+                      </section>
                     ))
                   )}
+                </div>
                 </div>
               )}
             </div>

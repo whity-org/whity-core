@@ -1,4 +1,5 @@
 import { test, expect } from './support/fixtures';
+import { systemStatePath } from './support/storage';
 
 /**
  * Organizational Units + Tenants smoke flows against the live backend.
@@ -23,10 +24,10 @@ test.describe('Organizational Units (admin)', () => {
     await adminPage.shell.clickNav('Organizational Units');
     await page.waitForURL('**/admin/ous');
     await expect(
-      page.getByRole('heading', { name: 'Organizational Units' }).first()
+      page.getByRole('heading', { name: 'Organisational units' }).first()
     ).toBeVisible();
     await expect(page.getByRole('group', { name: 'View mode' })).toBeVisible();
-    await expect(page.getByRole('button', { name: /Create (the first )?OU/ }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /New unit|Add the first unit/ }).first()).toBeVisible();
   });
 });
 
@@ -43,42 +44,16 @@ test.describe('Organizational Units (admin)', () => {
  * expected to fail server-side and leave the data untouched.
  */
 test.describe('Tenants (admin)', () => {
+  // Workspaces are the system tenant's to manage (design 2.9, W.2): a workspace
+  // admin gets no access, so these flows run as the system admin.
+  test.use({ storageState: systemStatePath });
+
   test('tenants list shows the Default Tenant', async ({ adminPage, page }) => {
-    await adminPage.shell.clickNav('Tenants');
-    await page.waitForURL('**/admin/tenants');
+    await page.goto('/admin/tenants');
     await expect(page.getByRole('heading', { name: 'Tenants' })).toBeVisible();
     await expect(
       page.getByRole('cell', { name: 'Default Tenant', exact: true })
     ).toBeVisible();
-  });
-
-  test('create form auto-generates a slug from the name and validates a bad slug', async ({
-    adminPage,
-    page,
-  }) => {
-    await adminPage.shell.clickNav('Tenants');
-    await page.waitForURL('**/admin/tenants');
-
-    await page.getByRole('button', { name: 'Create Tenant' }).click();
-    const dialog = page.getByRole('dialog');
-    await expect(dialog.getByText('Create New Tenant')).toBeVisible();
-
-    // Typing the Name auto-fills the Slug (lowercased, hyphenated).
-    await dialog.getByLabel('Name').fill('Acme Widgets Co');
-    await expect(dialog.getByLabel('Slug')).toHaveValue('acme-widgets-co');
-
-    // Overwrite with an invalid slug (spaces/uppercase) and submit: the zod
-    // regex rejects it with a field error and nothing is created.
-    await dialog.getByLabel('Slug').fill('Invalid Slug!');
-    await dialog.getByRole('button', { name: 'Create Tenant' }).click();
-    await expect(
-      dialog.getByText('Slug must contain only lowercase letters, numbers, and hyphens')
-    ).toBeVisible();
-    await expect(page.getByText('Tenant created successfully')).toHaveCount(0);
-
-    // Cancel without persisting — we deliberately never create a real tenant.
-    await dialog.getByRole('button', { name: 'Cancel' }).click();
-    await expect(dialog).toBeHidden();
   });
 
   /**
@@ -92,8 +67,7 @@ test.describe('Tenants (admin)', () => {
     adminPage,
     page,
   }) => {
-    await adminPage.shell.clickNav('Tenants');
-    await page.waitForURL('**/admin/tenants');
+    await page.goto('/admin/tenants');
 
     const row = page.getByRole('row', { name: /Default Tenant/ });
     await row.getByRole('button', { name: 'Row actions' }).click();
@@ -126,8 +100,7 @@ test.describe('Tenants (admin)', () => {
     adminPage,
     page,
   }) => {
-    await adminPage.shell.clickNav('Tenants');
-    await page.waitForURL('**/admin/tenants');
+    await page.goto('/admin/tenants');
 
     // Reach the record by clicking the row's own NAME — the affordance a list
     // gets once its records have addresses.
@@ -159,15 +132,16 @@ test.describe('Tenants (admin)', () => {
     adminPage,
     page,
   }) => {
-    await adminPage.shell.clickNav('Tenants');
-    await page.waitForURL('**/admin/tenants');
+    await page.goto('/admin/tenants');
 
     const row = page.getByRole('row', { name: /Default Tenant/ });
     await row.getByRole('button', { name: 'Row actions' }).click();
     await page.getByRole('menuitem', { name: 'Delete' }).click();
 
-    const deleteDialog = page.getByRole('dialog');
-    await expect(deleteDialog.getByRole('heading', { name: 'Delete Tenant' })).toBeVisible();
+    // Tier 3 (design 2.9): an alert dialog that names the consequence and asks
+    // for the workspace's name before the button enables.
+    const deleteDialog = page.getByRole('alertdialog');
+    await expect(deleteDialog.getByRole('heading', { name: 'Delete Default Tenant?' })).toBeVisible();
 
     // WC-122: the modal's "this tenant has N associated users" warning now
     // renders. The list API previously returned the count as `usercount` (the
@@ -180,18 +154,53 @@ test.describe('Tenants (admin)', () => {
       deleteDialog.getByText(/This tenant has \d+ associated users?\. Deleting it may impact those users\./)
     ).toBeVisible();
 
-    await deleteDialog.getByRole('button', { name: 'Delete Tenant' }).click();
+    const confirm = deleteDialog.getByRole('button', { name: 'Delete Tenant' });
+    await expect(confirm).toBeDisabled();
+    await deleteDialog.getByLabel('Type Default Tenant to confirm').fill('Default Tenant');
+    await confirm.click();
 
     // Backend guard: tenant 1 is occupied (and is the caller's own tenant) so
-    // the delete is rejected. The UI must show an error toast; the delete fails
-    // so the dialog stays open. We never actually remove the seeded tenant.
+    // the delete is rejected. The UI must show an error toast; the dialog
+    // closes either way. We never actually remove the seeded tenant.
     await expect(page.getByText(/Failed to delete tenant|forbidden/i)).toBeVisible();
-
-    // Close the (still-open) dialog and confirm the tenant is still listed.
-    await deleteDialog.getByRole('button', { name: 'Cancel' }).click();
     await expect(deleteDialog).toBeHidden();
     await expect(
       page.getByRole('cell', { name: 'Default Tenant', exact: true })
     ).toBeVisible();
+  });
+});
+
+/**
+ * Only the system tenant may create a workspace, so this runs as its admin. It still
+ * never persists one: the invalid slug stops it and the dialog is cancelled.
+ */
+test.describe('Tenants (system admin)', () => {
+  test.use({ storageState: systemStatePath });
+
+  test('create form auto-generates a slug from the name and validates a bad slug', async ({
+    page,
+  }) => {
+    await page.goto('/admin/tenants');
+
+    await page.getByRole('button', { name: 'Create Tenant' }).click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByText('Create New Tenant')).toBeVisible();
+
+    // Typing the Name auto-fills the Slug (lowercased, hyphenated).
+    await dialog.getByLabel('Name').fill('Acme Widgets Co');
+    await expect(dialog.getByLabel('Slug')).toHaveValue('acme-widgets-co');
+
+    // Overwrite with an invalid slug (spaces/uppercase) and submit: the zod
+    // regex rejects it with a field error and nothing is created.
+    await dialog.getByLabel('Slug').fill('Invalid Slug!');
+    await dialog.getByRole('button', { name: 'Create Tenant' }).click();
+    await expect(
+      dialog.getByText('Slug must contain only lowercase letters, numbers, and hyphens')
+    ).toBeVisible();
+    await expect(page.getByText('Tenant created successfully')).toHaveCount(0);
+
+    // Cancel without persisting — we deliberately never create a real tenant.
+    await dialog.getByRole('button', { name: 'Cancel' }).click();
+    await expect(dialog).toBeHidden();
   });
 });

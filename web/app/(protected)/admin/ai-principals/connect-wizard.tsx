@@ -27,7 +27,9 @@ import {
   SelectValue,
 } from '@whity/ui/select';
 import { IconAlertCircle, IconCircleCheck, IconPlugConnected } from '@tabler/icons-react';
-import { useTranslation } from '@whity/features/i18n';
+import { Stepper } from '@whity/ui/stepper';
+import { TechnicalDetails } from '@whity/ui/display-preferences';
+import { useFormattingLocale, useTranslation } from '@whity/features/i18n';
 import { titleCase } from '@whity/features/roles';
 import {
   MCP_CLIENTS,
@@ -301,6 +303,17 @@ export function ConnectWizard({
           </DialogDescription>
         </DialogHeader>
 
+        <Stepper
+          label={t('aiPrincipals.connect.steps', 'Steps to connect an AI app')}
+          current={step === 'app' ? 0 : step === 'access' ? 1 : 2}
+          stepOfLabel={(n, total) => t('aiPrincipals.connect.stepOf', 'Step {n} of {total}', { n, total })}
+          steps={[
+            { label: t('aiPrincipals.connect.step.app', 'App') },
+            { label: t('aiPrincipals.connect.step.access', 'What it may do') },
+            { label: t('aiPrincipals.connect.step.setup', 'Set up') },
+          ]}
+        />
+
         <Preflight info={info} infoError={infoError} />
 
         {step === 'app' && (
@@ -315,7 +328,7 @@ export function ConnectWizard({
               >
                 <span>{c.id === 'other' ? otherLabel : c.name}</span>
                 {c.requiresSignIn === true && (
-                  <Badge variant="secondary">{t('aiPrincipals.connect.app.comingSoon', 'Coming with sign-in')}</Badge>
+                  <Badge variant="secondary">{t('aiPrincipals.connect.app.comingSoon', 'Coming soon')}</Badge>
                 )}
               </button>
             ))}
@@ -450,7 +463,7 @@ export function ConnectWizard({
             </>
           )}
           {step === 'connect' && (
-            <Button type="button" onClick={() => close(false)}>
+            <Button type="button" variant={connected ? 'default' : 'outline'} onClick={() => close(false)}>
               {connected ? t('aiPrincipals.connect.done', 'Done') : t('aiPrincipals.connect.finishLater', 'Close')}
             </Button>
           )}
@@ -491,11 +504,19 @@ function Preflight({ info, infoError }: { info: McpConnectInfo | null; infoError
       <Alert variant="warning">
         <IconAlertCircle />
         <AlertTitle>{t('aiPrincipals.connect.preflight.serverOffTitle', 'AI apps are turned off on this server')}</AlertTitle>
-        <AlertDescription>
-          {t(
-            'aiPrincipals.connect.preflight.serverOff',
-            'Whoever runs this server needs to set MCP_ENABLED=true and restart it. Until then no app can connect.'
-          )}
+        <AlertDescription className="space-y-2">
+          <span className="block">
+            {t(
+              'aiPrincipals.connect.preflight.serverOff',
+              'Only the person who runs this Whity server can turn AI apps on. Changing a setting in Whity will not do it. Until they do, no app can connect, so ask them.'
+            )}
+          </span>
+          <TechnicalDetails>
+            <span className="block text-xs">
+              {t('aiPrincipals.connect.preflight.serverOffCode', 'For whoever runs the server: set')}{' '}
+              <code dir="ltr" className="font-mono">MCP_ENABLED=true</code> {t('aiPrincipals.connect.preflight.serverOffRestart', 'and restart it.')}
+            </span>
+          </TechnicalDetails>
         </AlertDescription>
       </Alert>
     );
@@ -506,7 +527,7 @@ function Preflight({ info, infoError }: { info: McpConnectInfo | null; infoError
         <IconAlertCircle />
         <AlertTitle>{t('aiPrincipals.connect.preflight.tenantOffTitle', 'AI apps are turned off for this organization')}</AlertTitle>
         <AlertDescription>
-          {t('aiPrincipals.connect.preflight.tenantOff', 'Turn on the Model Context Protocol endpoint under Settings, Integrations, then come back. If it is already on, the plan for this organization does not include AI apps.')}{' '}
+          {t('aiPrincipals.connect.preflight.tenantOff', 'An administrator of your organization can turn on the MCP endpoint under Settings, Integrations. If it is already on, the plan for this organization does not include AI apps.')}{' '}
           <Link href="/admin/settings" className="underline">
             {t('aiPrincipals.connect.preflight.openSettings', 'Open settings')}
           </Link>
@@ -532,6 +553,7 @@ function Preflight({ info, infoError }: { info: McpConnectInfo | null; infoError
 
 function PreviewPanel({ scope, tools, loading }: { scope: string[] | null; tools: McpPreviewTool[] | null; loading: boolean }) {
   const t = useTranslation('admin');
+  const arabic = useFormattingLocale() === 'ar';
   const [expanded, setExpanded] = useState(false);
   if (scope === null) {
     return (
@@ -556,7 +578,7 @@ function PreviewPanel({ scope, tools, loading }: { scope: string[] | null; tools
       </p>
       <ul className="space-y-1 text-xs text-muted-foreground">
         {shown.map((tool) => (
-          <li key={tool.name}>{tool.description !== '' ? tool.description : tool.name}</li>
+          <li key={tool.name}>{(arabic && tool.plainNameAr) || tool.plainName}</li>
         ))}
       </ul>
       {tools.length > shown.length && (

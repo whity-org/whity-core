@@ -1,0 +1,222 @@
+import { keyFrom, pickText } from "./text"
+import type { FieldCondition, FieldDraft, FieldKind, FieldOption, LocalizedMap } from "./types"
+
+/** Kinds that carry choices the author writes. */
+export const CHOICE_KINDS: readonly string[] = ["select", "multiselect"]
+
+/** The kinds the builder can offer, in the order the picker shows them. */
+export const KIND_ORDER: readonly FieldKind[] = [
+  "text",
+  "textarea",
+  "number",
+  "date",
+  "select",
+  "multiselect",
+  "checkbox",
+  "file",
+  "profile_ref",
+  "ou_ref",
+  "repeating",
+  "signature",
+]
+
+/** Kinds a condition can read: the answer is one of a short, known list. */
+export function canControl(field: Pick<FieldDraft, "field_type">): boolean {
+  return field.field_type === "select" || field.field_type === "multiselect" || field.field_type === "checkbox"
+}
+
+export function newField(kind: FieldKind, fields: readonly FieldDraft[], sectionKey: string | null): FieldDraft {
+  const taken = new Set(fields.map((f) => f.field_key))
+  const base: FieldDraft = {
+    field_key: keyFrom("", taken, "question"),
+    field_type: kind,
+    label: {},
+    help_text_i18n: {},
+    is_required: false,
+    options: [],
+    validation: [],
+    prefill_source: null,
+    section_key: sectionKey,
+    visible_when: null,
+    audience: "applicant",
+  }
+  if (kind === "select" || kind === "multiselect") base.options = [blankOption([])]
+  if (kind === "repeating") {
+    base.validation = {
+      columns: [{ key: "column_1", type: "text", label: {}, required: false }],
+    }
+  }
+  return base
+}
+
+export function blankOption(existing: readonly FieldOption[]): FieldOption {
+  const taken = new Set(existing.map((o) => o.value))
+  return { value: keyFrom("", taken, "choice"), label: {} }
+}
+
+/** The value an option is stored under, from the words the author wrote for it. */
+export function optionValueFrom(label: LocalizedMap, existing: readonly FieldOption[], self: string): string {
+  const words = (label.en ?? "").trim() || (label.ar ?? "").trim() || pickText(label, null).trim()
+  const taken = new Set(existing.filter((o) => o.value !== self).map((o) => o.value))
+  if (words === "") return self
+  let candidate = words.slice(0, 120)
+  let n = 2
+  while (taken.has(candidate)) {
+    candidate = `${words.slice(0, 110)} ${n}`
+    n += 1
+  }
+  return candidate
+}
+
+/**
+ * A question's key, from its wording. Only a question that has not been saved
+ * may change key: answers already stored are filed under it. Rules in other
+ * questions that read it follow.
+ */
+export function relabel(fields: readonly FieldDraft[], index: number, label: LocalizedMap): FieldDraft[] {
+  const target = fields[index]
+  const next = fields.map((f) => ({ ...f }))
+  next[index] = { ...target, label }
+  if (target.id !== undefined) return next
+  const words = (label.en ?? "").trim() || (label.ar ?? "").trim()
+  if (words === "") return next
+  const taken = new Set(fields.filter((_, i) => i !== index).map((f) => f.field_key))
+  const key = keyFrom(words, taken, "question")
+  if (key === target.field_key) return next
+  next[index] = { ...next[index], field_key: key }
+  return next.map((f) =>
+    f.visible_when !== null && f.visible_when.field === target.field_key
+      ? { ...f, visible_when: { ...f.visible_when, field: key } as FieldCondition }
+      : f
+  )
+}
+
+/** Questions before this one that a condition may read. */
+export function controllersFor(fields: readonly FieldDraft[], index: number): FieldDraft[] {
+  return fields.slice(0, index).filter(canControl)
+}
+
+/** Remove a question, and any rule that read it. */
+export function removeField(fields: readonly FieldDraft[], index: number): FieldDraft[] {
+  const key = fields[index].field_key
+  return fields.filter((_, i) => i !== index).map((f) => (f.visible_when?.field === key ? { ...f, visible_when: null } : f))
+}
+
+/** A copy of a question, with its own key and no history. */
+export function duplicateField(fields: readonly FieldDraft[], index: number): FieldDraft[] {
+  const source = fields[index]
+  const taken = new Set(fields.map((f) => f.field_key))
+  const copy: FieldDraft = { ...source, id: undefined, field_key: keyFrom(`${source.field_key}_copy`, taken, "question") }
+  const next = [...fields]
+  next.splice(index + 1, 0, copy)
+  return next
+}
+
+/**
+ * Move a question one place within its section: swap it with the nearest
+ * neighbour that shares the section, so the order saved matches the order seen.
+ */
+export function moveField(fields: readonly FieldDraft[], index: number, direction: -1 | 1): FieldDraft[] {
+  const section = fields[index].section_key
+  let j = index + direction
+  while (j >= 0 && j < fields.length && fields[j].section_key !== section) j += direction
+  if (j < 0 || j >= fields.length) return [...fields]
+  const next = [...fields]
+  ;[next[index], next[j]] = [next[j], next[index]]
+  return next
+}
+
+/**
+ * Drag a question onto another: it takes that question's place, and its section,
+ * so dropping into a section is how a question changes section.
+ */
+export function reorder(fields: readonly FieldDraft[], from: number, to: number): FieldDraft[] {
+  if (from === to || from < 0 || to < 0 || from >= fields.length || to >= fields.length) return [...fields]
+  const next = [...fields]
+  const [moved] = next.splice(from, 1)
+  next.splice(to, 0, { ...moved, section_key: fields[to].section_key })
+  return next
+}
+
+function sortedKeys(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(sortedKeys)
+  if (value === null || typeof value !== "object") return value
+  const source = value as Record<string, unknown>
+  return Object.fromEntries(
+    Object.keys(source)
+      .sort()
+      .map((key) => [key, sortedKeys(source[key])])
+  )
+}
+
+/**
+ * What a changed form would save: stable text, for comparing against what was loaded.
+ *
+ * Objects compare by their keys and values, never their order: the server stores labels
+ * as JSONB, which reorders keys, so `{ en, ar }` comes back as `{ ar, en }`. Comparing
+ * those as different kept the builder saving the same form forever. A list's order does
+ * mean something, so it stays.
+ */
+export function snapshot(value: unknown): string {
+  return JSON.stringify(sortedKeys(value))
+}
+
+/** Questions shown with a bar per section: unsectioned first, then each section in order. */
+export function groupBySection<T extends { section_key: string | null }>(
+  fields: readonly T[],
+  sectionKeys: readonly string[]
+): Array<{ key: string | null; items: Array<{ field: T; index: number }> }> {
+  const groups: Array<{ key: string | null; items: Array<{ field: T; index: number }> }> = [{ key: null, items: [] }]
+  for (const key of sectionKeys) groups.push({ key, items: [] })
+  fields.forEach((field, index) => {
+    const group = groups.find((g) => g.key === field.section_key) ?? groups[0]
+    group.items.push({ field, index })
+  })
+  return groups.filter((g, i) => i > 0 || g.items.length > 0)
+}
+
+export type ProblemCode = "noName" | "noWording" | "noChoices" | "blankChoice" | "noColumns" | "missingLanguage"
+
+export interface Problem {
+  code: ProblemCode
+  /** The question it is about, or null for the form. */
+  index: number | null
+  /** A blocking problem stops saving; the rest are only worth knowing before publishing. */
+  blocking: boolean
+  /** The language that is empty, for `missingLanguage`. */
+  language?: "en" | "ar"
+}
+
+const filled = (value: string | undefined): boolean => (value ?? "").trim() !== ""
+const anyText = (map: LocalizedMap | [] | undefined): boolean => !Array.isArray(map) && map !== undefined && Object.values(map).some(filled)
+
+/** What is missing from a form, in the order the questions are asked. */
+export function problemsOf(fields: readonly FieldDraft[], name: LocalizedMap, languages: readonly ("en" | "ar")[] = ["en", "ar"]): Problem[] {
+  const problems: Problem[] = []
+  if (!anyText(name)) problems.push({ code: "noName", index: null, blocking: true })
+  fields.forEach((field, index) => {
+    if (!anyText(field.label)) problems.push({ code: "noWording", index, blocking: true })
+    if (CHOICE_KINDS.includes(field.field_type) && !field.options.some((o) => anyText(o.label))) {
+      problems.push({ code: "noChoices", index, blocking: true })
+    } else if (CHOICE_KINDS.includes(field.field_type) && field.options.some((o) => !anyText(o.label))) {
+      // The server refuses a choice with no wording, so a save waits until it is written.
+      problems.push({ code: "blankChoice", index, blocking: true })
+    }
+    if (field.field_type === "repeating") {
+      const columns = Array.isArray(field.validation) ? [] : (field.validation.columns ?? [])
+      if (columns.length === 0 || columns.some((c) => !anyText(c.label))) problems.push({ code: "noColumns", index, blocking: true })
+    }
+    const label = field.label
+    if (anyText(label) && !Array.isArray(label)) {
+      if (languages.includes("ar") && !filled(label.ar)) problems.push({ code: "missingLanguage", index, blocking: false, language: "ar" })
+      else if (languages.includes("en") && !filled(label.en)) problems.push({ code: "missingLanguage", index, blocking: false, language: "en" })
+    }
+  })
+  return problems
+}
+
+/** The question a server message is about, from `fields[3].label` style text. */
+export function questionIndexIn(message: string): number | null {
+  const match = /fields\[(\d+)\]/.exec(message)
+  return match === null ? null : Number(match[1])
+}

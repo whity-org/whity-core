@@ -136,8 +136,9 @@ describe('Translations console — the untranslated gap', () => {
 
     // The key exists only in English; the Arabic side is empty and asking for it
     // is the whole point of the screen.
-    await screen.findByText('translations.title');
-    expect(screen.getByText('Translations', { selector: 'td' })).toBeInTheDocument();
+    expect(await screen.findByText('Translations', { selector: 'td' })).toBeInTheDocument();
+    // The key is a technical detail: not shown unless the person turned it on.
+    expect(screen.queryByText('translations.title')).toBeNull();
     expect(screen.getByText('English source')).toBeInTheDocument();
 
     await waitFor(() => {

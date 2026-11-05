@@ -23,7 +23,7 @@ use Whity\Core\Db\DbBool;
  */
 final class DocumentSourceRepository
 {
-    private const COLUMNS = 'id, tenant_id, kind, title, lang, default_view, full_width, page, record_type, blocks, own_fields, theme,
+    private const COLUMNS = 'id, tenant_id, kind, title, lang, default_view, full_width, page, record_type, blocks, own_fields, theme, numbering,
         draft_version, published_version, scope, required_permission, created_by, owner_ou_id, updated_by,
         starter_key, legacy_template_id, created_at, updated_at';
 
@@ -273,6 +273,25 @@ final class DocumentSourceRepository
         $stmt->execute($params);
     }
 
+    /**
+     * A template's own numbering rule (WHIT-684), or null to use its slot's or none.
+     * It takes effect for documents issued from now on: an issued document keeps the
+     * rule it was raised with.
+     *
+     * @param array{pattern: string, assign: string}|null $numbering
+     */
+    public function updateNumbering(int $id, int $tenantId, ?array $numbering): void
+    {
+        $stmt = $this->db->prepare(
+            'UPDATE document_sources SET numbering = :numbering, updated_at = NOW() WHERE id = :id AND tenant_id = :tenant_id'
+        );
+        $stmt->execute([
+            ':numbering' => $numbering !== null ? $this->encode($numbering) : null,
+            ':id' => $id,
+            ':tenant_id' => $tenantId,
+        ]);
+    }
+
     public function delete(int $id, int $tenantId): void
     {
         $stmt = $this->db->prepare('DELETE FROM document_sources WHERE id = :id AND tenant_id = :tenant_id');
@@ -288,6 +307,7 @@ final class DocumentSourceRepository
         $page = $row['page'] !== null ? json_decode((string) $row['page'], true) : null;
         $ownFields = $row['own_fields'] !== null ? json_decode((string) $row['own_fields'], true) : null;
         $theme = $row['theme'] !== null ? json_decode((string) $row['theme'], true) : null;
+        $numbering = isset($row['numbering']) ? json_decode((string) $row['numbering'], true) : null;
         $out = [
             'id'                  => (int) $row['id'],
             'tenant_id'           => (int) $row['tenant_id'],
@@ -300,6 +320,7 @@ final class DocumentSourceRepository
             'record_type'         => $row['record_type'] !== null ? (string) $row['record_type'] : null,
             'own_fields'          => is_array($ownFields) ? array_values($ownFields) : [],
             'theme'               => is_array($theme) ? $theme : null,
+            'numbering'           => is_array($numbering) ? $numbering : null,
             'draft_version'       => (int) $row['draft_version'],
             'published_version'   => $row['published_version'] !== null ? (int) $row['published_version'] : null,
             'scope'               => (string) $row['scope'],

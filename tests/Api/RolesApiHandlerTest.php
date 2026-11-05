@@ -428,8 +428,12 @@ class RolesApiHandlerTest extends TestCase
         // permissions are fetched, because it is an input to the per-region
         // verdicts that decide whether the permissions are fetched AT ALL. A
         // consecutive-return mock encodes call ORDER, so this is the order.
+        $people = $this->createMock(PDOStatement::class);
+        $people->method('execute')->willReturn(true);
+        $people->method('fetchColumn')->willReturn(3);
+
         $pdo = $this->createMock(PDO::class);
-        $pdo->method('prepare')->willReturnOnConsecutiveCalls($visibility, $roleRow, $manageable, $perms);
+        $pdo->method('prepare')->willReturnOnConsecutiveCalls($visibility, $roleRow, $people, $manageable, $perms);
 
         $handler = new RolesApiHandler($pdo, $this->passthroughHookManager());
         $response = $handler->get(new Request('GET', '/api/roles/5'), ['id' => '5']);
@@ -437,6 +441,7 @@ class RolesApiHandlerTest extends TestCase
         $this->assertSame(200, $response->getStatusCode());
         $data = json_decode($response->getBody(), true)['data'];
         $this->assertSame('Editor', $data['name']);
+        $this->assertSame(3, $data['peopleCount']);
         $this->assertCount(1, $data['permissions']);
         $this->assertSame('posts:read', $data['permissions'][0]['name']);
         $this->assertTrue($data['manageable'], 'A record page reached by URL reads editability from here.');

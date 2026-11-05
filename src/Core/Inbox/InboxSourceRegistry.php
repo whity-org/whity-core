@@ -37,7 +37,8 @@ use Whity\Core\Support\SourceSlug;
  *   3. pagination across sources (concatenating page 1 of each is #867 one
  *      level up).
  *
- * None of them is answered here, deliberately. The read surface is ONE SOURCE
+ * None of them is answered here, deliberately ({@see \Whity\Api\MeWaitingApiHandler}
+ * answers them for the merged list, WHIT-872). This read surface is ONE SOURCE
  * AT A TIME (`GET /api/me/inbox?source=…`), and `source` is REQUIRED — an
  * unsourced request is a 422, not "core's only source", because answering it
  * would silently become wrong the day a second source registers, and the caller

@@ -82,12 +82,12 @@ test.describe('Auth transitions', () => {
     // page is in it (#1007) — so open the groups before asserting visibility.
     // The count-0 assertions above need no such step: navLink is a CSS locator
     // and counts a hidden link, so absence there still means RBAC removed it.
-    await shell.expandAllNavGroups();
+    await shell.revealNavLink('Delegations');
     await expect(shell.navLink('Delegations')).toBeVisible();
     await shell.clickNav('Delegations');
     await page.waitForURL('**/admin/delegations');
     await expect(
-      page.getByRole('button', { name: 'Create Delegation' })
+      page.getByRole('button', { name: 'Delegate' })
     ).toBeVisible();
     await expect(
       page.getByRole('heading', { name: 'Access denied' })

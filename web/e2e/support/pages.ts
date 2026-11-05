@@ -64,7 +64,7 @@ export class LoginPage {
     expect(res.status(), 'login should succeed (200)').toBe(200);
     await this.page.waitForURL('**/dashboard', { timeout: 45_000 });
     await expect(
-      this.page.getByRole('heading', { name: 'Welcome back!' })
+      this.page.getByRole('heading', { name: /^Good (morning|afternoon|evening)/ })
     ).toBeVisible();
   }
 
@@ -77,7 +77,7 @@ export class LoginPage {
 
   /** The authenticator-code input shown after a 202 challenge. */
   get twoFactorCodeInput(): Locator {
-    return this.page.locator('#twoFactorCode');
+    return this.page.getByRole('group', { name: /Authenticator Code/ }).locator('input').first();
   }
 
   /** The recovery-code input shown after switching to backup-code mode. */
@@ -101,7 +101,9 @@ export class LoginPage {
 
   /** Enter a 6-digit authenticator code and click Verify. */
   async submitTwoFactorCode(code: string): Promise<void> {
-    await this.twoFactorCodeInput.fill(code);
+    await this.twoFactorCodeInput.click();
+    // Six boxes: typing moves on to the next one.
+    await this.page.keyboard.type(code);
     await this.page.getByRole('button', { name: 'Verify', exact: true }).click();
   }
 
@@ -155,7 +157,7 @@ export class AppShell {
     // them whether or not that filtering still works. A CSS/text locator counts
     // the hidden link, so absence keeps meaning what those specs read it to
     // mean. VISIBILITY is a separate question and still needs the group open —
-    // call expandAllNavGroups() before asserting it.
+    // call revealNavLink() before asserting it.
     const nav = this.sidebar.getByRole('navigation');
     const section = SIDEBAR_SECTIONS.find((s) => s.label === label);
     if (section) {
@@ -165,36 +167,38 @@ export class AppShell {
   }
 
   /**
-   * Open every collapsed nav group, so any link can be seen or clicked.
+   * Open the group that holds a link, so it can be seen or clicked.
    *
-   * The sidebar opens only the group holding the current page, which is the
-   * point of grouping 22 links — but it means a link elsewhere is present and
-   * hidden. Idempotent: a group already open is left alone.
+   * The sidebar keeps ONLY the current group open (design 2.9, section 21):
+   * opening one folds the others, so "open every group" no longer exists. A link
+   * elsewhere is present and hidden until its own group is opened, which is what
+   * this does. Idempotent: a group already open is left alone.
    */
-  async expandAllNavGroups(): Promise<void> {
-    // Wait for the nav to RENDER before counting anything. `/api/navigation` is
-    // fetched client-side, so on a freshly loaded page there is a window where
-    // the sidebar chrome exists and holds no items yet — counting then returns
-    // zero toggles, this method does nothing at all, and the caller's next
-    // assertion or click waits on a link that is present but inside a closed
-    // group, so it never becomes visible. That is a silent no-op, not an
-    // error, which is what made it cost a full CI cycle to see.
-    //
-    // Anchored on a LINK rather than on a toggle: a caller whose role can see
-    // only the ungrouped account link has no group toggles at all, and waiting
-    // for one would hang for them. Every authenticated caller gets `Settings`,
-    // which registers with no role or permission gate.
-    const nav = this.sidebar.getByRole('navigation');
-    await nav.locator('a').first().waitFor({ state: 'attached' });
+  async revealNavLink(label: string): Promise<void> {
+    // Wait for the nav to RENDER before looking for the link. `/api/navigation`
+    // is fetched client-side, so on a freshly loaded page the sidebar chrome
+    // exists and holds no items yet; acting then is a silent no-op.
+    const link = this.navLink(label);
+    await link.waitFor({ state: 'attached' });
 
-    const toggles = this.sidebar.locator('[data-slot="app-sidebar-group-toggle"]');
-    const count = await toggles.count();
-    for (let i = 0; i < count; i++) {
-      const toggle = toggles.nth(i);
-      if ((await toggle.getAttribute('aria-expanded')) === 'false') {
-        await toggle.click();
+    // The group body carries the id its toggle's `aria-controls` names.
+    const bodyId = await link.evaluate((el) => {
+      let node: Element | null = el.parentElement;
+      while (node !== null) {
+        if (node.id !== '' && document.querySelector(`[aria-controls="${node.id}"]`)) {
+          return node.id;
+        }
+        node = node.parentElement;
       }
+      return null;
+    });
+    if (bodyId === null) return; // ungrouped link: always visible
+
+    const toggle = this.sidebar.locator(`[aria-controls="${bodyId}"]`);
+    if ((await toggle.getAttribute('aria-expanded')) === 'false') {
+      await toggle.click();
     }
+    await link.waitFor({ state: 'visible' });
   }
 
   /** The nav's filter box (#1007), present only when the sidebar is expanded. */
@@ -242,13 +246,13 @@ export class AppShell {
   async clickNav(label: string): Promise<void> {
     // Wait for the nav to exist before expanding. `/api/navigation` is fetched
     // client-side, so on a fresh page there is a window where no group toggle
-    // has rendered yet: expandAllNavGroups() would find nothing to click, and
+    // has rendered yet: revealNavLink() would find nothing to click, and
     // the click below would then wait for a link that is present but sits in a
     // closed group — never becoming visible, so it times out rather than
     // resolving. Waiting for the link to attach first closes that window.
     await this.navLink(label).waitFor({ state: 'attached' });
-    // Expand: the target link may sit in a group this page did not open.
-    await this.expandAllNavGroups();
+    // The target link may sit in a group this page did not open.
+    await this.revealNavLink(label);
     await this.navLink(label).click();
   }
 
@@ -284,7 +288,8 @@ export class SettingsPage {
   }
 
   async goto(): Promise<void> {
-    await this.page.goto('/settings');
+    // Two-step sign-in is on the account page's Sign-in and security tab.
+    await this.page.goto('/settings?tab=security');
     await expect(this.page.getByRole('heading', { name: 'Settings' })).toBeVisible();
   }
 
@@ -348,6 +353,15 @@ export class SettingsPage {
  */
 export function toastWithText(page: Page, text: string | RegExp): Locator {
   return page.getByText(text);
+}
+
+/**
+ * Choose an option in a design-system select (a Radix combobox, not a native
+ * `<select>`): open it, then click the option by its visible label.
+ */
+export async function chooseOption(page: Page, trigger: Locator, label: string | RegExp): Promise<void> {
+  await trigger.click();
+  await page.getByRole('option', { name: label, exact: typeof label === 'string' }).click();
 }
 
 function escapeRegExp(value: string): string {

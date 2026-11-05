@@ -53,15 +53,67 @@ final class TenantPluginVersionsApiHandler
         private readonly ManifestImpact $impact,
         private readonly ManifestTestRunner $tests,
         private readonly ?AuditLogger $audit = null,
+        private readonly ?\Whity\Core\Plugin\Trust\PluginTrust $trust = null,
     ) {
     }
 
     public function list(Request $request): Response
     {
         return $this->guarded(fn (int $tenantId): Response => Response::json(['data' => array_map(
-            static fn (array $p): array => ['slug' => PluginNamespace::slug($p['plugin'])] + $p,
+            function (array $p): array {
+                $verified = $this->trust?->isVerified($p['plugin'], $p['version'], $p['hash']) ?? false;
+                unset($p['hash']);
+
+                return ['slug' => PluginNamespace::slug($p['plugin']), 'trust' => $verified ? 'verified' : 'unverified'] + $p;
+            },
             $this->plugins->plugins($tenantId),
         )]));
+    }
+
+    /**
+     * POST /api/workspace-plugins/{plugin}/enable and /disable: this workspace's
+     * switch. A slug another workspace owns answers 404.
+     *
+     * @param array<string, string> $params
+     */
+    public function enable(Request $request, array $params = []): Response
+    {
+        return $this->setEnabled($request, $params, true);
+    }
+
+    /** @param array<string, string> $params */
+    public function disable(Request $request, array $params = []): Response
+    {
+        return $this->setEnabled($request, $params, false);
+    }
+
+    /** @param array<string, string> $params */
+    private function setEnabled(Request $request, array $params, bool $enabled): Response
+    {
+        return $this->guarded(function (int $tenantId) use ($request, $params, $enabled): Response {
+            $plugin = $this->plugins->pluginKey($tenantId, (string) ($params['plugin'] ?? ''));
+            if ($plugin === null) {
+                return self::notFound();
+            }
+            if ($enabled && $this->trust !== null) {
+                foreach ($this->plugins->plugins($tenantId) as $row) {
+                    if ($row['plugin'] === $plugin && $this->trust->isKilled($plugin, $row['version'])) {
+                        return Response::error('This version was withdrawn for a security reason.', 409);
+                    }
+                }
+            }
+            if (!$this->plugins->setEnabled($tenantId, $plugin, $enabled)) {
+                return self::notFound();
+            }
+            $this->audit?->record($enabled ? 'tenant_plugin.enabled' : 'tenant_plugin.disabled', [
+                'tenant_id' => $tenantId,
+                'actor_user_id' => self::profileId($request),
+                'target_type' => 'tenant_plugin',
+                'metadata' => ['plugin' => $plugin],
+            ]);
+
+            return Response::json(['data' => ['plugin' => $plugin, 'enabled' => $enabled]]);
+        });
     }
 
     public function validate(Request $request): Response

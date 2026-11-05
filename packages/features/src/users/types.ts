@@ -18,14 +18,14 @@
 /**
  * One person, as `GET /api/users/{id}` describes them in the caller's tenant.
  *
- * `id` is the canonical `profile_id`. `name` has no column behind it — the
- * server derives it from the email's local part — which is why the record page
- * presents it as read-only rather than as an editable field that silently
- * discards what you type.
+ * `id` is the canonical `profile_id`. `name` is what to show: the display name,
+ * or the email's local part when there is none. `displayName` is the stored value
+ * the record page edits, and may be empty.
  */
 export interface UserRecord {
   id: number;
   name: string;
+  displayName: string;
   email: string;
   /** The PRIMARY role held in this tenant. */
   role: string;
@@ -44,6 +44,9 @@ export interface UserRecord {
   status: string;
   /** The GLOBAL account switch (`profiles.status`): `active` | `inactive`. */
   accountStatus: string;
+  /** Latest session activity in this workspace. Null when there is none. */
+  lastActiveAt: string | null;
+  twoStep: { enabled: boolean; required: boolean; requiredDirectly: boolean };
 }
 
 /** One tenant this person belongs to, and the role they hold there. */
@@ -109,6 +112,8 @@ export interface UserUpdateInput {
   role: string;
   /** Null clears the OU (root). */
   ouId: number | null;
+  /** Sent only when it changed: it is global, and the server can refuse it. */
+  displayName?: string;
 }
 
 /** The injected data-source adapter the user record screen consumes. */
@@ -136,6 +141,12 @@ export interface UsersAdapter {
    * password in an administrator's hands.
    */
   sendPasswordResetLink(id: number): Promise<void>;
+  /** Require two-step of this person, or remove the policy naming them. */
+  setTwoStepRequirement?(id: number, tenantId: number, required: boolean): Promise<void>;
+  /** Switch the account on or off. Optional: a host that omits it gets no Deactivate. */
+  setAccountStatus?(id: number, status: 'active' | 'inactive'): Promise<void>;
+  /** Remove the person from this workspace. Optional: a host that omits it gets no Delete. */
+  deleteUser?(id: number): Promise<void>;
   /** GET /me/capabilities — the caller's effective permission slugs. */
   getCapabilities(): Promise<string[]>;
 }
@@ -165,7 +176,12 @@ export interface UserRecordScreenProps {
   /** Optional translator; defaults to identity (keys render as literals). */
   t?: UsersTranslate;
   /** Optional notifier; web wires ToastProvider. */
-  onNotify?: (message: string, type: 'success' | 'error') => void;
+  /** `action` is an Undo the toast offers for a few seconds. */
+  onNotify?: (
+    message: string,
+    type: 'success' | 'error',
+    action?: { label: string; onClick: () => void }
+  ) => void;
   /** Navigate back to the users list (host-supplied, same seam as the roles page). */
   onBack: () => void;
   className?: string;

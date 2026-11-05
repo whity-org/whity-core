@@ -88,6 +88,15 @@ final class SettingsRegistry
     //     valid token, must an admin approve it before the new password takes
     //     effect? Default 'false' (frictionless).
     public const SELF_PASSWORD_RESET_ENABLED = 'auth.self_password_reset_enabled';
+
+    /**
+     * A maintenance window the operator announces (TplSystemStates). A signal for
+     * the status page and the web app, not a gate: the API keeps answering, so an
+     * operator is never locked out of turning it off.
+     */
+    public const MAINTENANCE_ACTIVE = 'maintenance.active';
+    /** When it's expected to end, as ISO 8601; empty when nobody can say. */
+    public const MAINTENANCE_UNTIL = 'maintenance.until';
     public const PASSWORD_RESET_APPROVAL_REQUIRED = 'auth.password_reset_approval_required';
 
     // How long a tenant invitation stays usable (WHIT-417). Deliberately NOT
@@ -164,6 +173,13 @@ final class SettingsRegistry
     public const MAIL_SMTP_PORT = 'mail.smtp.port';
     public const MAIL_SMTP_ENCRYPTION = 'mail.smtp.encryption';
     public const MAIL_SMTP_USERNAME = 'mail.smtp.username';
+    // WHIT-901: how SMTP signs in, 'password' or 'oauth2'. The default keeps every
+    // existing install on its password. The client secret and refresh token, like
+    // the password, are not registry settings: see Mail\OAuth\SmtpOAuthStore.
+    public const MAIL_SMTP_AUTH_MODE = 'mail.smtp.auth_mode';
+    public const MAIL_OAUTH_PROVIDER = 'mail.oauth.provider';
+    public const MAIL_OAUTH_CLIENT_ID = 'mail.oauth.client_id';
+    public const MAIL_OAUTH_MICROSOFT_TENANT = 'mail.oauth.microsoft_tenant';
     public const MAIL_FROM_ADDRESS = 'mail.from_address';
     public const MAIL_FROM_NAME = 'mail.from_name';
     public const MAIL_EVENT_WELCOME = 'mail.events.welcome_enabled';
@@ -719,6 +735,8 @@ final class SettingsRegistry
      * @var list<string>
      */
     private const GLOBAL_ONLY_KEYS = [
+        self::MAINTENANCE_ACTIVE,
+        self::MAINTENANCE_UNTIL,
         self::ERROR_TRACKING_ENABLED,
         self::ERROR_TRACKING_PROVIDER,
         self::ERROR_TRACKING_ENVIRONMENT,
@@ -744,6 +762,10 @@ final class SettingsRegistry
         self::MAIL_SMTP_PORT,
         self::MAIL_SMTP_ENCRYPTION,
         self::MAIL_SMTP_USERNAME,
+        self::MAIL_SMTP_AUTH_MODE,
+        self::MAIL_OAUTH_PROVIDER,
+        self::MAIL_OAUTH_CLIENT_ID,
+        self::MAIL_OAUTH_MICROSOFT_TENANT,
         self::MAIL_FROM_ADDRESS,
         self::MAIL_FROM_NAME,
         self::MAIL_EVENT_WELCOME,
@@ -787,6 +809,7 @@ final class SettingsRegistry
      * @var list<string>
      */
     private const BOOL_KEYS = [
+        self::MAINTENANCE_ACTIVE,
         self::ERROR_TRACKING_ENABLED,
         self::ERROR_TRACKING_NOTIFY_ADMINS,
         self::MCP_ENABLED,
@@ -855,6 +878,7 @@ final class SettingsRegistry
      * @var list<string>
      */
     private const FEATURE_FLAG_KEYS = [
+        self::MAINTENANCE_ACTIVE,
         self::ERROR_TRACKING_ENABLED,
         self::MCP_ENABLED,
         self::SELF_REGISTRATION_ENABLED,
@@ -879,6 +903,8 @@ final class SettingsRegistry
     private const ENUM_OPTIONS = [
         self::MAIL_TRANSPORT => ['none', 'log', 'smtp'],
         self::MAIL_SMTP_ENCRYPTION => ['none', 'tls', 'ssl'],
+        self::MAIL_SMTP_AUTH_MODE => ['password', 'oauth2'],
+        self::MAIL_OAUTH_PROVIDER => ['google', 'microsoft'],
         // Payment-wall strictness the wall applies to a LAPSED tenant. 'warn' is
         // the safe global default (never blocks); the operator raises it globally
         // or per-tenant. Kept in sync with SubscriptionService enforcement modes.
@@ -938,6 +964,8 @@ final class SettingsRegistry
         // and expected (OPEN by default), and approval is an opt-in extra gate
         // (OFF by default — frictionless self-service unless a tenant opts in).
         self::SELF_PASSWORD_RESET_ENABLED => 'true',
+        self::MAINTENANCE_ACTIVE => 'false',
+        self::MAINTENANCE_UNTIL => '',
         self::PASSWORD_RESET_APPROVAL_REQUIRED => 'false',
         // Permissive by default: the flow is already unconditionally
         // approval-gated (see TwoFactorRecoveryService), so a locked-out user
@@ -962,6 +990,10 @@ final class SettingsRegistry
         self::MAIL_SMTP_PORT => '587',
         self::MAIL_SMTP_ENCRYPTION => 'tls',
         self::MAIL_SMTP_USERNAME => '',
+        self::MAIL_SMTP_AUTH_MODE => 'password',
+        self::MAIL_OAUTH_PROVIDER => 'google',
+        self::MAIL_OAUTH_CLIENT_ID => '',
+        self::MAIL_OAUTH_MICROSOFT_TENANT => 'common',
         self::MAIL_FROM_ADDRESS => '',
         self::MAIL_FROM_NAME => '',
         // Notification toggles default ON: once a transport is configured, the
@@ -1371,6 +1403,8 @@ final class SettingsRegistry
             self::REGISTRATION_APPROVAL_REQUIRED => self::validateBoolean($value, self::REGISTRATION_APPROVAL_REQUIRED),
             self::REGISTRATION_PAYMENT_REQUIRED => self::validateBoolean($value, self::REGISTRATION_PAYMENT_REQUIRED),
             self::SELF_PASSWORD_RESET_ENABLED => self::validateBoolean($value, self::SELF_PASSWORD_RESET_ENABLED),
+            self::MAINTENANCE_ACTIVE => self::validateBoolean($value, self::MAINTENANCE_ACTIVE),
+            self::MAINTENANCE_UNTIL => self::validateMaintenanceUntil($value),
             self::PASSWORD_RESET_APPROVAL_REQUIRED => self::validateBoolean($value, self::PASSWORD_RESET_APPROVAL_REQUIRED),
             self::SELF_2FA_RECOVERY_ENABLED => self::validateBoolean($value, self::SELF_2FA_RECOVERY_ENABLED),
             self::SSO_ENABLED => self::validateBoolean($value, self::SSO_ENABLED),
@@ -1384,7 +1418,12 @@ final class SettingsRegistry
             self::STORAGE_S3_ACCESS_KEY,
             self::STORAGE_S3_PUBLIC_BASE_URL => null, // free-form strings (validated at driver build)
             self::MAIL_TRANSPORT,
-            self::MAIL_SMTP_ENCRYPTION => self::validateEnum($key, $value),
+            self::MAIL_SMTP_ENCRYPTION,
+            self::MAIL_SMTP_AUTH_MODE,
+            self::MAIL_OAUTH_PROVIDER => self::validateEnum($key, $value),
+            self::MAIL_OAUTH_MICROSOFT_TENANT => \Whity\Core\Mail\OAuth\SmtpOAuthProvider::isValidMicrosoftTenant($value)
+                ? null
+                : self::MAIL_OAUTH_MICROSOFT_TENANT . ' must be a directory ID, or common, organizations or consumers.',
             self::MAIL_SMTP_PORT => self::validatePort($value),
             self::MAIL_FROM_ADDRESS => self::validateFromAddress($value),
             self::MAIL_EVENT_WELCOME,
@@ -1417,6 +1456,7 @@ final class SettingsRegistry
             self::DOCUMENTS_BACKGROUND_ISSUING => BackgroundIssuing::validate($value),
             self::MAIL_SMTP_HOST,
             self::MAIL_SMTP_USERNAME,
+            self::MAIL_OAUTH_CLIENT_ID,
             self::MAIL_FROM_NAME,
             self::MAIL_FOOTER_TEXT,
             self::PLUGINS_STORE_ALLOWED_HOSTS => null, // free-form strings
@@ -1797,6 +1837,15 @@ final class SettingsRegistry
         }
 
         return null;
+    }
+
+    private static function validateMaintenanceUntil(string $value): ?string
+    {
+        if ($value === '' || \DateTimeImmutable::createFromFormat(\DATE_ATOM, $value) !== false) {
+            return null;
+        }
+
+        return 'maintenance.until must be an ISO 8601 date and time with an offset (or empty).';
     }
 
     private static function validateSupportEmail(string $value): ?string

@@ -10,6 +10,9 @@
  *
  * @i18n-keys admin
  *   roles.action.clone = Clone
+ *   roles.empty.description = A role decides what the people who hold it may do.
+ *   roles.empty.filtered = No role matches “{term}”
+ *   roles.empty.title = No roles yet
  *   roles.action.delete = Delete
  *   roles.action.delete.disabled = Global base roles can only be deleted by the system tenant.
  *   roles.action.edit = Edit
@@ -20,12 +23,15 @@
  *   roles.description = Manage roles and their permissions
  *   roles.error.load = Failed to fetch roles
  *   roles.header.create = Create Role
- *   roles.scope.global = Global
+ *   roles.scope.builtIn = Built in
+ *   roles.table.people = People
+ *   roles.table.people.none = No one
+ *   roles.table.permissionCount.of = {count} of {total}
  *   roles.scope.global.hint = Shared by every tenant on this deployment. Editing it changes it everywhere.
  *   roles.searchPlaceholder = Search roles…
  *   roles.table.description = Description
  *   roles.table.name = Name
- *   roles.table.permissionCount = Permission Count
+ *   roles.table.permissions = Permissions
  *   roles.title = Roles
  * @i18n-keys common
  *   ui.pagination.entries = {count} entries
@@ -36,7 +42,6 @@
  *   ui.pagination.previous = Previous page
  *   ui.table.actions = Actions
  *   ui.table.columnFilter = Filter…
- *   ui.table.empty = No data available
  */
 
 import { useEffect, useState } from 'react';
@@ -54,11 +59,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@whity/ui/dropdown-menu';
-import { IconMenu2, IconPlus } from '@tabler/icons-react';
+import { IconLock, IconMenu2, IconPlus } from '@tabler/icons-react';
 import { identityTranslate } from '../nav/types';
 import { ROLES_WRITE, ROLES_DELETE } from './capabilities';
 import { CreateRoleModal } from './create-modal';
 import { DeleteRoleModal } from './delete-modal';
+import { roleLabel } from './role-label';
 import type { Role, RolesScreenProps, RolesTranslate } from './types';
 
 /**
@@ -99,6 +105,22 @@ export function RolesScreen({
    */
   const [everLoaded, setEverLoaded] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  // For "24 of 61". Only for somebody who may read the catalogue; otherwise the count alone.
+  const [catalogueSize, setCatalogueSize] = useState<number | null>(null);
+  const canReadCatalogue = can('permissions:read');
+  useEffect(() => {
+    if (!canReadCatalogue) return;
+    let cancelled = false;
+    adapter
+      .listPermissions()
+      .then((permissions) => {
+        if (!cancelled) setCatalogueSize(permissions.length);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [adapter, canReadCatalogue]);
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -222,18 +244,19 @@ export function RolesScreen({
             onClick={() => onOpenRecord(role)}
             className="text-start font-medium text-primary underline-offset-4 hover:underline"
           >
-            {role.name}
+            {roleLabel(role.name)}
           </button>
           {role.global && (
             <Badge
-              variant="warning"
+              variant="secondary"
               data-testid="role-row-global-badge"
               title={t(
                 'roles.scope.global.hint',
                 'Shared by every tenant on this deployment. Editing it changes it everywhere.'
               )}
             >
-              {t('roles.scope.global', 'Global')}
+              <IconLock size={14} aria-hidden="true" />
+              {t('roles.scope.builtIn', 'Built in')}
             </Badge>
           )}
         </span>
@@ -245,13 +268,31 @@ export function RolesScreen({
       enableSorting: true,
     },
     {
+      accessorKey: 'peopleCount',
+      header: t('roles.table.people', 'People'),
+      enableSorting: false,
+      cell: (role) =>
+        (role.peopleCount ?? 0) > 0 ? (
+          role.peopleCount
+        ) : (
+          <span className="text-muted-foreground">{t('roles.table.people.none', 'No one')}</span>
+        ),
+    },
+    {
       // Not sortable, and now for a second reason as well: the endpoint's
       // ListSpec offers no key for it, because it is a COUNT over a join rather
       // than a column. A header wired to a key the server does not know would
       // click and reorder nothing.
       accessorKey: 'permissionCount',
-      header: t('roles.table.permissionCount', 'Permission Count'),
+      header: t('roles.table.permissions', 'Permissions'),
       enableSorting: false,
+      cell: (role) =>
+        catalogueSize !== null
+          ? t('roles.table.permissionCount.of', '{count} of {total}', {
+              count: role.permissionCount ?? 0,
+              total: catalogueSize,
+            })
+          : (role.permissionCount ?? 0),
     },
   ];
 
@@ -360,6 +401,7 @@ export function RolesScreen({
         columns={columns}
         data={roles}
         getRowId={(role) => String(role.id)}
+        onRowClick={onOpenRecord}
         rowActions={rowActions}
         rowActionsLabel={t('ui.table.actions', 'Actions')}
         isLoading={isLoading && !everLoaded}
@@ -368,7 +410,14 @@ export function RolesScreen({
         // screen's translation of a shared-table string, and a caller that adds
         // a filterable column back would otherwise silently get English.
         columnFilterPlaceholder={t('ui.table.columnFilter', 'Filter…')}
-        emptyStateTitle={t('ui.table.empty', 'No data available')}
+        emptyState={
+          query.search.value !== ''
+            ? { title: t('roles.empty.filtered', 'No role matches “{term}”', { term: query.search.value }) }
+            : {
+                title: t('roles.empty.title', 'No roles yet'),
+                description: t('roles.empty.description', 'A role decides what the people who hold it may do.'),
+              }
+        }
         sorting={query.sorting}
         search={query.search}
         pagination={query.pagination({ total, totalPages })}

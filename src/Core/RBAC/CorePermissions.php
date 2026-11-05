@@ -26,14 +26,13 @@ final class CorePermissions
     public const SOURCE = 'core';
 
     /**
-     * Read the admin dashboard aggregates (#990).
+     * Read the server statistics (#990, WHIT-872).
      *
-     * Its own slug rather than a reuse of `users:read`, because the Dashboard
-     * NAV ITEM must gate on the same thing as the route it points at, and
-     * `/admin` redirects to `/admin/stats` — so this pair decides whether the
-     * console has a landing page. Migration 157 grants it to whoever already
-     * holds `users:read`, since the endpoint aggregates rows that permission
-     * already exposes one by one.
+     * Holding it isn't enough: `GET /api/admin/stats` and the System nav item
+     * answer only in the system tenant (H.3), because the seeded `admin` is one
+     * global role held in every workspace. Migration 157 granted it to whoever
+     * held `users:read`; it no longer follows that permission, and migration 199
+     * took it off the roles workspaces own.
      */
     public const STATS_READ = 'stats:read';
 
@@ -76,6 +75,8 @@ final class CorePermissions
     public const PLUGINS_ENABLE = 'plugins:enable';
     public const PLUGINS_DISABLE = 'plugins:disable';
     public const PLUGINS_UPLOAD = 'plugins:upload';
+    // S.9: installing from a trusted store, apart from uploading unreviewed code.
+    public const PLUGINS_INSTALL = 'plugins:install';
     public const PLUGINS_UNINSTALL = 'plugins:uninstall';
     public const PLUGINS_RELOAD = 'plugins:reload';
 
@@ -125,9 +126,8 @@ final class CorePermissions
     public const SETTINGS_WRITE = 'settings:write';
     public const SETTINGS_MANAGE = 'settings:manage';
 
-    // MCP token management (WC-149b2fc9). Gates the mint and revoke operations
-    // for MCP credentials so an admin can control which users are allowed to
-    // authenticate AI clients to the MCP endpoint.
+    // MCP token administration (WC-149b2fc9): seeing and revoking everyone's AI
+    // connections in the workspace. A person's own tokens need no permission (#1623).
     public const MCP_TOKENS_MANAGE = 'mcp:tokens:manage';
 
     // Workspace agents (WHIT-815). Creates, edits and archives the workspace's
@@ -240,6 +240,9 @@ final class CorePermissions
     // DOCUMENTS_RENDER, which now only previews a PDF and stores nothing.
     // Migration 166 grants it to every role that held render.
     public const DOCUMENTS_ISSUE = 'documents:issue';
+    // Taking an issued document back (S5, migration 201). Its own permission
+    // because issuing is an everyday act and withdrawing is not.
+    public const DOCUMENTS_WITHDRAW = 'documents:withdraw';
     // Workspace document themes (editor M4d, E.44): create, edit and archive
     // them, and set the workspace's default theme. Two segments only
     // (PermissionRegistry). Migration 172 grants it to every role that held
@@ -486,6 +489,7 @@ final class CorePermissions
             self::PLUGINS_ENABLE,
             self::PLUGINS_DISABLE,
             self::PLUGINS_UPLOAD,
+            self::PLUGINS_INSTALL,
             self::PLUGINS_UNINSTALL,
             self::PLUGINS_RELOAD,
             self::PLUGINS_BUILD,
@@ -517,6 +521,7 @@ final class CorePermissions
             self::DOCUMENTS_PUBLISH,
             self::DOCUMENTS_RENDER,
             self::DOCUMENTS_ISSUE,
+            self::DOCUMENTS_WITHDRAW,
             self::DOCUMENTS_THEMES,
             self::DOCUMENTS_SUGGEST,
             self::DOCUMENTS_COMMENT,

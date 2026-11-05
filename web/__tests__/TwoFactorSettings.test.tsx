@@ -32,24 +32,7 @@ jest.mock('@whity/ui/dialog', () => ({
   DialogHeader: ({ children }: React.PropsWithChildren) => <div>{children}</div>,
   DialogTitle: ({ children }: React.PropsWithChildren) => <h2>{children}</h2>,
   DialogDescription: ({ children }: React.PropsWithChildren) => <p>{children}</p>,
-}));
-
-// Mock alert-dialog component — renders a simple controlled dialog with
-// Cancel and Action buttons so tests can interact with it.
-jest.mock('@whity/ui/alert-dialog', () => ({
-  AlertDialog: ({ children, open }: React.PropsWithChildren<{ open?: boolean }>) =>
-    open ? <div data-testid="alert-dialog">{children}</div> : null,
-  AlertDialogContent: ({ children }: React.PropsWithChildren) => <div>{children}</div>,
-  AlertDialogHeader: ({ children }: React.PropsWithChildren) => <div>{children}</div>,
-  AlertDialogFooter: ({ children }: React.PropsWithChildren) => <div>{children}</div>,
-  AlertDialogTitle: ({ children }: React.PropsWithChildren) => <h2>{children}</h2>,
-  AlertDialogDescription: ({ children }: React.PropsWithChildren) => <p>{children}</p>,
-  AlertDialogCancel: ({ children, onClick }: React.PropsWithChildren<{ onClick?: React.MouseEventHandler<HTMLButtonElement> }>) => (
-    <button data-testid="alert-dialog-cancel" onClick={onClick}>{children}</button>
-  ),
-  AlertDialogAction: ({ children, onClick, className }: React.PropsWithChildren<{ onClick?: React.MouseEventHandler<HTMLButtonElement>; className?: string }>) => (
-    <button data-testid="alert-dialog-action" className={className} onClick={onClick}>{children}</button>
-  ),
+  DialogFooter: ({ children }: React.PropsWithChildren) => <div>{children}</div>,
 }));
 
 // Mock button component. The real Button has a custom `variant` prop that is
@@ -91,6 +74,13 @@ document.createElement = jest.fn((tagName: string) => {
   }
   return originalCreateElement(tagName);
 }) as typeof document.createElement;
+
+/** Type a code into the open proof dialog and send it. */
+async function submitProof(code: string) {
+  const field = await screen.findByLabelText('Authenticator code or backup code');
+  fireEvent.change(field, { target: { value: code } });
+  fireEvent.submit(field.closest('form') as HTMLFormElement);
+}
 
 describe('TwoFactorSettings', () => {
   let mockApiClient: jest.Mock;
@@ -273,6 +263,78 @@ describe('TwoFactorSettings', () => {
     });
   });
 
+  describe('Proof before changing the second factor', () => {
+    const openDisable = async (passwordAvailable: boolean) => {
+      mockApiClient.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ enabled: true, backup_codes_available: 10, password_available: passwordAvailable }),
+      });
+      render(<TwoFactorSettings />);
+      fireEvent.click(await screen.findByRole('button', { name: /Disable 2FA/i }));
+    };
+
+    test('names the consequence and sends nothing until a code is typed', async () => {
+      await openDisable(true);
+
+      expect(await screen.findByText(/sign in without a code/)).toBeInTheDocument();
+      const submit = screen.getAllByRole('button', { name: /Disable 2FA/i }).pop() as HTMLButtonElement;
+      expect(submit).toBeDisabled();
+      expect(mockApiClient).toHaveBeenCalledTimes(1);
+    });
+
+    test('stays open and says so when the code is wrong', async () => {
+      await openDisable(true);
+      mockApiClient.mockResolvedValueOnce({
+        ok: false,
+        json: async () => ({ error: 'nope', details: { reason: 'proof_invalid' } }),
+      });
+
+      await submitProof('000000');
+
+      expect(await screen.findByText(/That code is not correct/)).toBeInTheDocument();
+      expect(screen.getByLabelText('Authenticator code or backup code')).toHaveValue('');
+      expect(screen.getByText('Enabled')).toBeInTheDocument();
+    });
+
+    test('says when there have been too many wrong tries', async () => {
+      await openDisable(true);
+      mockApiClient.mockResolvedValueOnce({
+        ok: false,
+        json: async () => ({ error: 'Too many attempts', details: { reason: 'throttled' } }),
+      });
+
+      await submitProof('000000');
+
+      expect(await screen.findByText(/Too many wrong tries/)).toBeInTheDocument();
+    });
+
+    test('can use the password instead', async () => {
+      await openDisable(true);
+      mockApiClient.mockResolvedValueOnce({ ok: true, json: async () => ({ message: 'done' }) });
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Use my password instead' }));
+      const field = await screen.findByLabelText('Your password');
+      expect(field).toHaveAttribute('type', 'password');
+      fireEvent.change(field, { target: { value: 'the password' } });
+      fireEvent.submit(field.closest('form') as HTMLFormElement);
+
+      await waitFor(() => {
+        expect(mockApiClient).toHaveBeenCalledWith('/api/v1/auth/2fa/disable', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: 'the password' }),
+        });
+      });
+    });
+
+    test('does not offer a password to an account that has none', async () => {
+      await openDisable(false);
+
+      await screen.findByLabelText('Authenticator code or backup code');
+      expect(screen.queryByRole('button', { name: 'Use my password instead' })).not.toBeInTheDocument();
+    });
+  });
+
   describe('Disable 2FA', () => {
     test('testDisables2FAWithConfirmation', async () => {
       mockApiClient.mockResolvedValueOnce({
@@ -291,12 +353,13 @@ describe('TwoFactorSettings', () => {
       fireEvent.click(disableButton);
 
       // AlertDialog should now be open — click the confirm action
-      const confirmButton = await screen.findByTestId('alert-dialog-action');
-      fireEvent.click(confirmButton);
+      await submitProof('123456');
 
       await waitFor(() => {
         expect(mockApiClient).toHaveBeenCalledWith('/api/v1/auth/2fa/disable', {
           method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: '123456' }),
         });
       });
     });
@@ -317,8 +380,7 @@ describe('TwoFactorSettings', () => {
       const disableButton = await screen.findByRole('button', { name: /Disable 2FA/i });
       fireEvent.click(disableButton);
 
-      const confirmButton = await screen.findByTestId('alert-dialog-action');
-      fireEvent.click(confirmButton);
+      await submitProof('123456');
 
       await waitFor(() => {
         expect(screen.getByRole('button', { name: /Enable 2FA/i })).toBeInTheDocument();
@@ -341,8 +403,7 @@ describe('TwoFactorSettings', () => {
       const disableButton = await screen.findByRole('button', { name: /Disable 2FA/i });
       fireEvent.click(disableButton);
 
-      const confirmButton = await screen.findByTestId('alert-dialog-action');
-      fireEvent.click(confirmButton);
+      await submitProof('123456');
 
       await waitFor(() => {
         expect(screen.getByTestId('alert-destructive')).toBeInTheDocument();
@@ -360,8 +421,8 @@ describe('TwoFactorSettings', () => {
       const disableButton = await screen.findByRole('button', { name: /Disable 2FA/i });
       fireEvent.click(disableButton);
 
-      // Click Cancel in the AlertDialog — API should not be called
-      const cancelButton = await screen.findByTestId('alert-dialog-cancel');
+      // Click Cancel in the proof dialog — API should not be called
+      const cancelButton = await screen.findByRole('button', { name: 'Cancel' });
       fireEvent.click(cancelButton);
 
       await waitFor(() => {
@@ -392,12 +453,13 @@ describe('TwoFactorSettings', () => {
       });
       fireEvent.click(regenerateButton);
 
-      const confirmButton = await screen.findByTestId('alert-dialog-action');
-      fireEvent.click(confirmButton);
+      await submitProof('123456');
 
       await waitFor(() => {
         expect(mockApiClient).toHaveBeenCalledWith('/api/v1/auth/2fa/regenerate-codes', {
           method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: '123456' }),
         });
       });
     });
@@ -425,8 +487,7 @@ describe('TwoFactorSettings', () => {
       });
       fireEvent.click(regenerateButton);
 
-      const confirmButton = await screen.findByTestId('alert-dialog-action');
-      fireEvent.click(confirmButton);
+      await submitProof('123456');
 
       await waitFor(() => {
         expect(mockClick).toHaveBeenCalled();
@@ -455,8 +516,7 @@ describe('TwoFactorSettings', () => {
       });
       fireEvent.click(regenerateButton);
 
-      const confirmButton = await screen.findByTestId('alert-dialog-action');
-      fireEvent.click(confirmButton);
+      await submitProof('123456');
 
       await waitFor(
         () => {
@@ -487,8 +547,7 @@ describe('TwoFactorSettings', () => {
       });
       fireEvent.click(regenerateButton);
 
-      const confirmButton = await screen.findByTestId('alert-dialog-action');
-      fireEvent.click(confirmButton);
+      await submitProof('123456');
 
       await waitFor(() => {
         expect(screen.getByTestId('alert-destructive')).toBeInTheDocument();
@@ -508,8 +567,8 @@ describe('TwoFactorSettings', () => {
       });
       fireEvent.click(regenerateButton);
 
-      // Click Cancel in the AlertDialog — API should not be called
-      const cancelButton = await screen.findByTestId('alert-dialog-cancel');
+      // Click Cancel in the proof dialog — API should not be called
+      const cancelButton = await screen.findByRole('button', { name: 'Cancel' });
       fireEvent.click(cancelButton);
 
       await waitFor(() => {

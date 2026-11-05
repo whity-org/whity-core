@@ -84,6 +84,7 @@ final class EditorTemplateFixture
         $this->fields = new DocumentFieldRegistry();
         $this->fields->add(new IssuedDocumentFieldProvider($documents, $visibility));
         $this->fields->add(new CompanyFieldProvider($settings));
+        $this->fields->add(new \Whity\Core\Document\Fields\IssuedDocumentNumberFieldProvider());
         $this->fields->add(new TodayFieldProvider(null, static fn (): \DateTimeImmutable => new \DateTimeImmutable('2026-10-29 10:00:00')));
 
         $this->hooks = new HookManager();

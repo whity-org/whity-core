@@ -83,6 +83,9 @@ interface WireUser {
   createdAt?: string | null;
   status?: string;
   accountStatus?: string;
+  displayName?: string;
+  lastActiveAt?: string | null;
+  twoStep?: { enabled: boolean; required: boolean; requiredDirectly: boolean };
 }
 
 /**
@@ -98,6 +101,7 @@ function toUserRecord(row: WireUser): UserRecord {
   return {
     id: row.id,
     name: row.name ?? '',
+    displayName: row.displayName ?? '',
     email: row.email ?? '',
     role: row.role ?? '',
     tenantId: row.tenantId ?? 0,
@@ -105,6 +109,8 @@ function toUserRecord(row: WireUser): UserRecord {
     createdAt: row.createdAt ?? null,
     status: row.status ?? '',
     accountStatus: row.accountStatus ?? 'active',
+    lastActiveAt: row.lastActiveAt ?? null,
+    twoStep: row.twoStep ?? { enabled: false, required: false, requiredDirectly: false },
   };
 }
 
@@ -224,6 +230,7 @@ export function createUsersAdapter(transport: Transport): UsersAdapter {
       const { status, body } = await transport.request('PATCH', `/api/v1/users/${id}`, {
         role: input.role,
         ou_id: input.ouId,
+        ...(input.displayName !== undefined ? { displayName: input.displayName } : {}),
       });
       // 404 ⇒ the profile has no membership in this tenant any more; the record
       // page says so in its own words rather than surfacing a bare failure.
@@ -239,6 +246,33 @@ export function createUsersAdapter(transport: Transport): UsersAdapter {
         'POST',
         `/api/v1/users/${id}/password-reset`
       );
+      if (!isOk(status)) {
+        throw new Error(serverMessage(body));
+      }
+    },
+
+    async setTwoStepRequirement(id: number, tenantId: number, required: boolean): Promise<void> {
+      const { status, body } = await transport.request(
+        required ? 'PUT' : 'DELETE',
+        `/api/v1/users/${id}/two-step-requirement`,
+        { tenant_id: tenantId }
+      );
+      if (!isOk(status)) {
+        throw new Error(serverMessage(body));
+      }
+    },
+
+    async setAccountStatus(id: number, status: 'active' | 'inactive'): Promise<void> {
+      const { status: code, body } = await transport.request('PATCH', `/api/v1/users/${id}`, {
+        accountStatus: status,
+      });
+      if (!isOk(code)) {
+        throw new Error(serverMessage(body));
+      }
+    },
+
+    async deleteUser(id: number): Promise<void> {
+      const { status, body } = await transport.request('DELETE', `/api/v1/users/${id}`);
       if (!isOk(status)) {
         throw new Error(serverMessage(body));
       }

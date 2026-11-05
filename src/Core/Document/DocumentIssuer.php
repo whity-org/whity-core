@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Whity\Core\Document;
 
 use PDO;
+use Whity\Core\Document\Numbering\DocumentNumbering;
 use Whity\Core\Ou\PrimaryMembershipOu;
 use Whity\Storage\StorageException;
 
@@ -77,12 +78,15 @@ use Whity\Storage\StorageException;
  */
 final class DocumentIssuer
 {
+    private readonly DocumentNumbering $numbering;
+
     public function __construct(
         private readonly PDO $db,
         private readonly DocumentRepository $documents,
         private readonly DocumentArtifactRepository $artifacts,
         private readonly DocumentArtifactStore $store,
     ) {
+        $this->numbering = new DocumentNumbering($db);
     }
 
     /**
@@ -190,6 +194,11 @@ final class DocumentIssuer
 
         try {
             $documentId = $this->insertRecord($tenantId, $actorId, $template, $title, $variableData);
+            // In the record's transaction: the number and the record commit together,
+            // so a raise that fails takes its number back with it (WHIT-684).
+            if (($template['number_now'] ?? false) === true) {
+                $this->numbering->assign($tenantId, $documentId);
+            }
             $document = $this->documents->findById($documentId, $tenantId);
 
             if ($ownTransaction) {
@@ -242,6 +251,11 @@ final class DocumentIssuer
             'title'                => $title,
             'origin_ou_id'         => $actorId !== null ? $this->originOuFor($tenantId, $actorId) : null,
             'created_by'           => $actorId,
+            // How it is numbered, and what it was issued from (WHIT-684).
+            'number_pattern'       => isset($template['number_pattern']) ? (string) $template['number_pattern'] : null,
+            'record_type'          => isset($template['record_type']) ? (string) $template['record_type'] : null,
+            'record_id'            => isset($template['record_id']) ? (string) $template['record_id'] : null,
+            'slot'                 => isset($template['slot']) ? (string) $template['slot'] : null,
             // The values a person typed, and the only place they survive when
             // there is no artifact to bake them into. Migration 118.
             'variable_data'        => $variableData,
@@ -270,6 +284,7 @@ final class DocumentIssuer
         string $bytes,
         string $contentType = 'application/pdf',
         string $extension = 'pdf',
+        ?int $pages = null,
     ): array {
         $documentId = (int) $document['id'];
 
@@ -279,7 +294,7 @@ final class DocumentIssuer
         }
 
         try {
-            $artifactId = $this->storeArtifact($tenantId, $documentId, $actorId, $bytes, $contentType, $extension);
+            $artifactId = $this->storeArtifact($tenantId, $documentId, $actorId, $bytes, $contentType, $extension, $pages);
             $artifact = $this->artifacts->findById($artifactId, $documentId, $tenantId);
 
             if ($ownTransaction) {
@@ -310,6 +325,7 @@ final class DocumentIssuer
         string $bytes,
         string $contentType,
         string $extension,
+        ?int $pages = null,
     ): int {
         $stored = $this->store->put($tenantId, $documentId, $bytes, $contentType, $extension);
 
@@ -320,6 +336,7 @@ final class DocumentIssuer
             'byte_size'       => $stored->byteSize,
             'checksum_sha256' => $stored->checksumSha256,
             'rendered_by'     => $actorId,
+            'pages'           => $pages,
         ]);
     }
 

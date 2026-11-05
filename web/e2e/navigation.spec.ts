@@ -7,8 +7,9 @@ test.describe('Sidebar navigation (admin)', () => {
     // The sidebar now opens only the group holding the current page (#1007),
     // so open them all first — otherwise this asserts the disclosure state
     // rather than the RBAC-filtered set it exists to check.
-    await adminPage.shell.expandAllNavGroups();
     for (const section of SIDEBAR_SECTIONS) {
+      // Opening a group folds the others, so each link opens its own.
+      await adminPage.shell.revealNavLink(section.label);
       // navLink resolves by unique href, so "Settings" vs "Website Settings"
       // (both end in "Settings") don't collide under strict mode.
       await expect(adminPage.shell.navLink(section.label)).toBeVisible();
@@ -28,7 +29,7 @@ test.describe('Sidebar navigation (admin)', () => {
     // violation and leave the second.
     const usersTable = page.getByRole('table', { name: 'Users' });
     await expect(usersTable).toBeVisible();
-    await expect(usersTable.getByRole('columnheader', { name: 'Email' })).toBeVisible();
+    await expect(usersTable.getByRole('columnheader', { name: 'Person' })).toBeVisible();
   });
 
   test('Roles section loads its page with heading, table and Create button', async ({
@@ -40,24 +41,31 @@ test.describe('Sidebar navigation (admin)', () => {
     await expect(page.getByRole('heading', { name: 'Roles' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Create Role' })).toBeVisible();
     await expect(page.getByRole('table')).toBeVisible();
-    await expect(page.getByRole('columnheader', { name: 'Permission Count' })).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: 'Permissions' })).toBeVisible();
   });
 
   test('Organizational Units section loads its page', async ({ adminPage, page }) => {
     await adminPage.shell.clickNav('Organizational Units');
     await page.waitForURL('**/admin/ous');
     await expect(
-      page.getByRole('heading', { name: 'Organizational Units' }).first()
+      page.getByRole('heading', { name: 'Organisational units' }).first()
     ).toBeVisible();
-    await expect(page.getByRole('button', { name: /Create (the first )?OU/ }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /New unit|Add the first unit/ }).first()).toBeVisible();
   });
 
-  test('Tenants section loads its page with heading and table', async ({ adminPage, page }) => {
-    await adminPage.shell.clickNav('Tenants');
-    await page.waitForURL('**/admin/tenants');
-    await expect(page.getByRole('heading', { name: 'Tenants' })).toBeVisible();
-    await expect(page.getByRole('table')).toBeVisible();
-    await expect(page.getByRole('columnheader', { name: 'Slug' })).toBeVisible();
+  test("Tenants is not in a workspace admin's sidebar, and the URL says they have no access", async ({ adminPage, page }) => {
+    await page.goto('/admin/tenants');
+    await expect(adminPage.shell.navLink('Tenants')).toHaveCount(0);
+    await expect(page.getByText('You don’t have access to workspaces')).toBeVisible();
+    await expect(page.getByRole('table')).toHaveCount(0);
+  });
+
+  test('Settings General leads a workspace admin to their workspace record', async ({ adminPage, page }) => {
+    await adminPage.shell.clickNav('Settings');
+    await page.waitForURL('**/admin/settings');
+    await page.getByRole('link', { name: 'Open workspace record' }).click();
+    await page.waitForURL(/\/admin\/tenants\/\d+$/);
+    await expect(page.getByText('This workspace could not be loaded')).toHaveCount(0);
   });
 
   test('Settings opens the Settings area, whose sub-nav reaches the data pages too', async ({
@@ -81,19 +89,22 @@ test.describe('Sidebar navigation (admin)', () => {
     await page.waitForURL('**/settings');
     await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
     // The Account Information card became the editable Profile card (WC-64).
-    await expect(page.getByText('Profile', { exact: true })).toBeVisible();
-    await expect(page.getByText('Security', { exact: true })).toBeVisible();
+    // The account page is in tabs (Profile, Sign-in and security, Sessions and devices, Preferences).
+    await expect(page.getByRole('tab', { name: 'Profile' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Sign-in and security' })).toBeVisible();
   });
 
-  test('Dashboard section loads the admin landing page (redirects to stats)', async ({
+  test('Dashboard section loads the home page', async ({
     adminPage,
     page,
   }) => {
-    // The "Dashboard" sidebar item points at /admin, which server-redirects to
-    // /admin/stats (the System Statistics page).
+    // The "Dashboard" sidebar item opens the one home. Server statistics live on
+    // /admin/stats (System).
     await adminPage.shell.clickNav('Dashboard');
-    await page.waitForURL('**/admin/stats');
-    await expect(page.getByRole('heading', { name: 'System Statistics' })).toBeVisible();
+    await page.waitForURL('**/dashboard');
+    await expect(
+      page.getByRole('heading', { name: /^Good (morning|afternoon|evening)/ })
+    ).toBeVisible();
   });
 
   test('sidebar collapses and expands via the header toggle', async ({ adminPage }) => {
@@ -155,12 +166,12 @@ test.describe('Sidebar navigation (admin)', () => {
     await expect(ai).toHaveAttribute('aria-expanded', 'false');
 
     // Present but hidden — the distinction the RBAC specs depend on.
-    await expect(shell.navLink('AI Principals')).toHaveCount(1);
-    await expect(shell.navLink('AI Principals')).toBeHidden();
+    await expect(shell.navLink('Connected AI apps')).toHaveCount(1);
+    await expect(shell.navLink('Connected AI apps')).toBeHidden();
 
     await ai.click();
     await expect(ai).toHaveAttribute('aria-expanded', 'true');
-    await expect(shell.navLink('AI Principals')).toBeVisible();
+    await expect(shell.navLink('Connected AI apps')).toBeVisible();
   });
 
   test('the nav filter reaches a page sitting in a closed group', async ({
@@ -171,11 +182,11 @@ test.describe('Sidebar navigation (admin)', () => {
     await page.goto('/admin/users');
     await expect(page.getByRole('heading', { name: 'Users' })).toBeVisible();
 
-    await expect(shell.navLink('AI Principals')).toBeHidden();
+    await expect(shell.navLink('Connected AI apps')).toBeHidden();
 
-    await shell.navSearch.fill('principals');
+    await shell.navSearch.fill('connected');
     // Reached without knowing which group holds it, and without opening it.
-    await expect(shell.navLink('AI Principals')).toBeVisible();
+    await expect(shell.navLink('Connected AI apps')).toBeVisible();
     // A query narrows to matches, so a non-matching link leaves the DOM.
     await expect(shell.navLink('Users')).toHaveCount(0);
 

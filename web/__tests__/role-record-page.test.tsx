@@ -27,6 +27,7 @@
 
 import React from 'react';
 import { render, screen, waitFor, within } from '@testing-library/react';
+import { DisplayPreferencesContextProvider } from '@whity/ui/display-preferences';
 import userEvent from '@testing-library/user-event';
 import { RoleRecordScreen } from '@whity/features/roles';
 import type {
@@ -62,11 +63,11 @@ const EDITABLE_SECTIONS = {
 };
 
 const CATALOGUE: Permission[] = [
-  { id: 1, name: 'users:read', description: 'Read users' },
-  { id: 2, name: 'users:write', description: 'Write users' },
-  { id: 3, name: 'roles:read', description: 'Read roles' },
-  { id: 4, name: 'roles:write', description: 'Write roles' },
-  { id: 5, name: 'ous:read', description: 'Read OUs' },
+  { id: 1, name: 'users:read', description: 'Read users', area: 'users', areaLabel: 'Users', areaGroup: 'people', actions: ['see'] },
+  { id: 2, name: 'users:write', description: 'Write users', area: 'users', areaLabel: 'Users', areaGroup: 'people', actions: ['create', 'change'] },
+  { id: 3, name: 'roles:read', description: 'Read roles', area: 'roles', areaLabel: 'Roles', areaGroup: 'people', actions: ['see'] },
+  { id: 4, name: 'roles:write', description: 'Write roles', area: 'roles', areaLabel: 'Roles', areaGroup: 'people', actions: ['create', 'change'] },
+  { id: 5, name: 'ous:read', description: 'Read OUs', area: 'units', areaLabel: 'Organisational units', areaGroup: 'people', actions: ['see'] },
 ];
 
 const TENANT_ROLE: RoleWithPermissions = {
@@ -128,15 +129,22 @@ function renderRecord(props: Partial<React.ComponentProps<typeof RoleRecordScree
   const adapter = props.adapter ?? fakeAdapter();
   const onBack = props.onBack ?? jest.fn();
   render(
-    <RoleRecordScreen
-      adapter={adapter}
-      roleId={props.roleId ?? 10}
-      t={t}
-      onNotify={props.onNotify}
-      onBack={onBack}
-    />
+    <DisplayPreferencesContextProvider value={{ textSize: 'standard', showTechnicalDetails: true, update: () => {} }}>
+      <RoleRecordScreen
+        adapter={adapter}
+        roleId={props.roleId ?? 10}
+        t={t}
+        onNotify={props.onNotify}
+        onBack={onBack}
+      />
+    </DisplayPreferencesContextProvider>
   );
   return { adapter, onBack };
+}
+
+/** Record tabs: the content of the other tabs is not mounted until opened. */
+async function openTab(name: string) {
+  await userEvent.click(await screen.findByRole('tab', { name }));
 }
 
 describe('RoleRecordScreen — the record and its form', () => {
@@ -150,27 +158,19 @@ describe('RoleRecordScreen — the record and its form', () => {
     expect(adapter.getRole).toHaveBeenCalledTimes(1);
   });
 
-  it('shows the whole permission catalogue grouped by resource, with the role\'s own set ticked', async () => {
+  it('shows areas by action, with the role\'s own set ticked', async () => {
     renderRecord();
 
+    await openTab('Access');
     await screen.findByTestId('perm-grid');
-    // One section per resource prefix, all present at once.
-    expect(screen.getByTestId('perm-grid-group-users')).toBeInTheDocument();
-    expect(screen.getByTestId('perm-grid-group-roles')).toBeInTheDocument();
-    expect(screen.getByTestId('perm-grid-group-ous')).toBeInTheDocument();
+    expect(screen.getByTestId('perm-grid-area-users')).toBeInTheDocument();
+    expect(screen.getByTestId('perm-grid-area-roles')).toBeInTheDocument();
+    expect(screen.getByTestId('perm-grid-area-units')).toBeInTheDocument();
 
-    const usersGroup = screen.getByTestId('perm-grid-group-users');
-    const usersRead = within(usersGroup)
-      .getByText('users:read')
-      .closest('label')
-      ?.querySelector('input[type="checkbox"]');
-    const usersWrite = within(usersGroup)
-      .getByText('users:write')
-      .closest('label')
-      ?.querySelector('input[type="checkbox"]');
-
-    expect(usersRead).toBeChecked();
-    expect(usersWrite).not.toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Users: See' })).toBeChecked();
+    // One permission fills two cells, so both follow it.
+    expect(screen.getByRole('checkbox', { name: 'Users: Create' })).not.toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Users: Change' })).not.toBeChecked();
   });
 
   /**
@@ -182,6 +182,7 @@ describe('RoleRecordScreen — the record and its form', () => {
   it('renders the permissions with no height cap and no nested scroll container', async () => {
     renderRecord();
 
+    await openTab('Access');
     const grid = await screen.findByTestId('perm-grid');
     const offenders = grid.querySelectorAll(
       '[class*="max-h-"], [class*="overflow-y-auto"], [class*="overflow-auto"]'
@@ -194,11 +195,12 @@ describe('RoleRecordScreen — the record and its form', () => {
     const user = userEvent.setup();
     renderRecord();
 
+    await openTab('Access');
     await screen.findByTestId('perm-grid');
     await user.type(screen.getByTestId('perm-grid-search'), 'ous');
 
-    expect(screen.getByTestId('perm-grid-group-ous')).toBeInTheDocument();
-    expect(screen.queryByTestId('perm-grid-group-users')).not.toBeInTheDocument();
+    expect(screen.getByTestId('perm-grid-area-units')).toBeInTheDocument();
+    expect(screen.queryByTestId('perm-grid-area-users')).not.toBeInTheDocument();
   });
 
   it('saves name, description and the permission set through the adapter', async () => {
@@ -211,9 +213,8 @@ describe('RoleRecordScreen — the record and its form', () => {
     await user.clear(nameInput);
     await user.type(nameInput, 'Support Tier 2');
 
-    const usersGroup = screen.getByTestId('perm-grid-group-users');
-    const usersWrite = within(usersGroup).getByText('users:write');
-    await user.click(usersWrite);
+    await openTab('Access');
+    await user.click(screen.getByRole('checkbox', { name: 'Users: Change' }));
 
     await user.click(screen.getByRole('button', { name: 'Save changes' }));
 
@@ -234,7 +235,7 @@ describe('RoleRecordScreen — the record and its form', () => {
     await user.clear(nameInput);
     await user.type(nameInput, 'Changed');
 
-    await user.click(screen.getByRole('button', { name: 'Discard changes' }));
+    await user.click(screen.getByRole('button', { name: 'Discard' }));
 
     expect(await screen.findByDisplayValue('Support')).toBeInTheDocument();
     expect(adapter.getRole).toHaveBeenCalledTimes(1);
@@ -310,10 +311,12 @@ describe('RoleRecordScreen — context a modal cannot carry', () => {
       }),
     });
 
-    expect(await screen.findByTestId('role-record-stat-holders')).toHaveTextContent('12');
+    // The headcount is in the facts line under the title (no stat tiles).
+    expect(await screen.findByText(/People: 12/)).toBeInTheDocument();
+    await openTab('People');
     // The most recent assignment is the first row — "latest role assignment was
     // to user3".
-    const holders = screen.getByTestId('role-record-holders');
+    const holders = await screen.findByTestId('role-record-holders');
     expect(within(holders).getAllByRole('listitem')[0]).toHaveTextContent('user3');
     expect(within(holders).getByText('and 10 more')).toBeInTheDocument();
   });
@@ -321,9 +324,10 @@ describe('RoleRecordScreen — context a modal cannot carry', () => {
   it('says nobody holds the role rather than showing an empty panel', async () => {
     renderRecord();
 
+    await openTab('People');
     const holders = await screen.findByTestId('role-record-holders');
     expect(within(holders).getByText('Nobody holds this role yet.')).toBeInTheDocument();
-    expect(await screen.findByTestId('role-record-stat-holders')).toHaveTextContent('0');
+    expect(await screen.findByText(/People: 0/)).toBeInTheDocument();
   });
 
   it('keeps the record usable when the holders panel fails', async () => {
@@ -336,7 +340,8 @@ describe('RoleRecordScreen — context a modal cannot carry', () => {
     // The record still rendered — a supplementary panel's failure is not the
     // page's failure.
     expect(await screen.findByDisplayValue('Support')).toBeInTheDocument();
-    const holders = screen.getByTestId('role-record-holders');
+    await openTab('People');
+    const holders = await screen.findByTestId('role-record-holders');
     expect(within(holders).getByText('Failed to load who holds this role')).toBeInTheDocument();
   });
 
@@ -355,9 +360,11 @@ describe('RoleRecordScreen — context a modal cannot carry', () => {
       }),
     });
 
+    await openTab('History');
     const activity = await screen.findByTestId('role-record-activity');
+    // In words, with the code and the actor under Show technical details (on here).
+    expect(within(activity).getByText('Role changed')).toBeInTheDocument();
     expect(within(activity).getByText('role.updated')).toBeInTheDocument();
-    expect(within(activity).getByText(/by user 42/)).toBeInTheDocument();
   });
 
   it('OMITS the history panel entirely when the caller lacks audit:read', async () => {
@@ -439,6 +446,7 @@ describe('RoleRecordScreen — read-only is a state, not a disabled form', () =>
     // The localized sentence, with the server's operator-grade `detail`
     // appended — the composition the shell owns so every screen does it the
     // same way (#968).
+    await openTab('Access');
     expect(
       screen.getByText(
         "You may see what this role grants, but not change it. " +
@@ -449,18 +457,19 @@ describe('RoleRecordScreen — read-only is a state, not a disabled form', () =>
   });
 
   /**
-   * A read-only page shows the ROLE'S permissions, never the installation's
-   * whole catalogue — otherwise a viewer reads "this role can do everything".
+   * A read-only page shows the whole grid with this role's ticks, so a viewer sees
+   * what it cannot do as well as what it can, and can change neither.
    */
-  it('shows only the role\'s own permissions when read-only', async () => {
+  it('ticks only the role\'s own permissions when read-only, and nothing can change', async () => {
     renderRecord({ adapter: fakeAdapter({ getRole: jest.fn().mockResolvedValue(GLOBAL_ROLE) }) });
 
+    await openTab('Access');
     await screen.findByTestId('perm-grid');
-    expect(screen.getByText('users:read')).toBeInTheDocument();
-    expect(screen.getByText('roles:read')).toBeInTheDocument();
-    // In the catalogue, not on the role.
-    expect(screen.queryByText('users:write')).not.toBeInTheDocument();
-    expect(screen.queryByText('ous:read')).not.toBeInTheDocument();
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Users: See: allowed' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Roles: See: allowed' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Users: Change: not allowed' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Organisational units: See: not allowed' })).toBeInTheDocument();
   });
 });
 

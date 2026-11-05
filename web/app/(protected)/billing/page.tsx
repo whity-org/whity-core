@@ -10,6 +10,9 @@ import { AdminHeader } from '@/components/admin/admin-header';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { Button } from '@whity/ui/button';
 import { Badge } from '@whity/ui/badge';
+import { ReadOnlyNotice } from '@whity/ui/page-states';
+import { LoadProblem } from '@/components/load-problem';
+import { throwUnlessOk } from '@/lib/forbidden';
 import {
   Dialog,
   DialogContent,
@@ -150,11 +153,9 @@ export default function BillingPage() {
   const t = useTranslation('admin');
   const canPay = hasPermission(BILLING_PAY);
 
-  const { data, loading, error, refetch } = useFetch(async () => {
+  const { data, loading, error, forbidden, refetch } = useFetch(async () => {
     const res = await apiClient('/api/v1/billing/invoices');
-    if (!res.ok) {
-      throw new Error(t('billing.invoices.error.load', 'Failed to load invoices'));
-    }
+    throwUnlessOk(res, t('billing.invoices.error.load', 'Failed to load invoices'));
     return ((await res.json()).data ?? []) as Invoice[];
   }, [apiClient]);
 
@@ -200,7 +201,7 @@ export default function BillingPage() {
     },
     {
       accessorKey: 'balance_minor',
-      header: t('billing.invoices.column.balance', 'Outstanding'),
+      header: t('billing.invoices.column.balance', 'Still to pay'),
       cell: (row) => (
         <span className={row.balance_minor > 0 ? 'font-medium' : 'text-muted-foreground'}>
           {money(row.balance_minor, row.currency)}
@@ -249,23 +250,42 @@ export default function BillingPage() {
           workspace opens a SECOND subscription and charges them twice a month.
           Payment history lives here too, because a tenant billed externally has
           no LOCAL invoice and the table below is empty for them by design. */}
-      <SubscriptionPanel />
+      {!forbidden && <SubscriptionPanel />}
 
       {/* A LOAD FAILURE IS SAID OUT LOUD. An empty table and a failed request
           look identical, and "no invoices" is a far more comforting thing to
           read than "we could not fetch them" — so a customer who owes money
           would be told the opposite of the truth. */}
       {error && (
-        <p className="text-sm text-destructive" data-testid="invoices-unreadable">
-          {t('billing.invoices.error.load', 'Failed to load invoices')}
-        </p>
+        <div data-testid="invoices-unreadable">
+          <LoadProblem
+            forbidden={forbidden}
+            message={t('billing.invoices.error.load', 'Failed to load invoices')}
+            onRetry={() => void refetch()}
+            area={t('billing.invoices.area', 'billing')}
+          />
+        </div>
       )}
 
+      {/* Everything is shown to someone who cannot pay; only Pay is missing, and
+          they are told so rather than left to look for it. */}
+      {!canPay && !error && (
+        <ReadOnlyNotice
+          title={t('billing.invoices.readOnly.title', 'You can see billing but not pay')}
+          description={t(
+            'billing.invoices.readOnly.description',
+            'Ask an owner of this workspace to pay an invoice.'
+          )}
+        />
+      )}
+
+      {!error && (
       <DataTable
         columns={columns}
         data={data ?? []}
         isLoading={loading}
         rowActions={rowActions}
+        onRowClick={(row) => void openDetail(row)}
         emptyState={{
           title: t('billing.invoices.empty', 'No invoices yet'),
           description: t(
@@ -274,6 +294,7 @@ export default function BillingPage() {
           ),
         }}
       />
+      )}
 
       {detail && (
         <InvoiceDetailDialog

@@ -9,9 +9,11 @@ name: Mutation Testing (scheduled)
 # A mutation-coverage regression therefore surfaces on the next scheduled run
 # after merge rather than blocking the PR.
 #
-# The `changes` guard skips the run when `main` has had no new commits since the
-# previous window ("only if there is new code") — no point re-mutating an
-# unchanged tree every 6 hours. `workflow_dispatch` always runs (manual force).
+# The `changes` guard skips the run when Infection already executed on the tip
+# ("only if there is new code") — no point re-mutating an unchanged tree every 6
+# hours. It asks what was last tested rather than how recent the tip is, so a late
+# or dropped schedule can't walk past a commit (WHIT-896).
+# `workflow_dispatch` always runs (manual force).
 #
 # Why there is a gate job below (WC-877)
 # --------------------------------------
@@ -34,9 +36,9 @@ name: Mutation Testing (scheduled)
 #
 # A skipped window therefore inherits the verdict of the last window that really
 # executed — including its red — and says in the run summary exactly which run
-# that was. A tip that no run has ever mutated (a dropped cron walks the 6h30m
-# window past a commit) is red as stale, which is the general form of the bug:
-# a gate that has not executed is indistinguishable from one that always passes.
+# that was. A tip that no run has ever mutated is red as stale, which is the
+# general form of the bug: a gate that has not executed is indistinguishable from
+# one that always passes.
 # The logic lives in scripts/ci-mutation-gate.py so it can be replayed against
 # any historical run id, because a gate nobody has watched fail is not known to
 # work.
@@ -53,48 +55,30 @@ permissions:
 
 jobs:
   changes:
-    name: Gate on new commits since last window
+    name: Gate on the tip not yet being tested
     runs-on: ubuntu-latest
     outputs:
       should_run: ${{ steps.check.outputs.should_run }}
     steps:
-      - name: Checkout main with recent history
+      - name: Checkout main
         uses: actions/checkout@v7
-        with:
-          fetch-depth: 100
 
-      - name: Determine whether main moved since the last window
+      - name: Determine whether the tip still needs testing
         id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "Manual dispatch — running regardless of new commits."
+            echo "Manual dispatch — running regardless of what was last tested."
             echo "should_run=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          # 390 minutes = 6h30m: a 30-minute overlap over the 6h cron so a commit
-          # landing near a window boundary is never missed (an occasional harmless
-          # double-run on the same commit is fine; a missed commit is not).
-          if [ -n "$(git log --since='390 minutes ago' --format=%H)" ]; then
-            echo "New commits on main in the last 6h30m — running mutation tests."
-            echo "should_run=true" >> "$GITHUB_OUTPUT"
-            {
-              echo "## Mutation window"
-              echo
-              echo "RUNNING — main moved in the last 6h30m (tip \`$(git rev-parse --short HEAD)\`)."
-            } >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "No new commits since the last window — skipping mutation run."
-            echo "should_run=false" >> "$GITHUB_OUTPUT"
-            # Say it on the run page, not only in this job's log. The run
-            # conclusion cannot express "did not run", so the summary has to.
-            {
-              echo "## Mutation window"
-              echo
-              echo "SKIPPED — main has not moved since the last window"
-              echo "(tip \`$(git rev-parse --short HEAD)\`). The Infection job did NOT run;"
-              echo "see the Mutation gate job below for what this run actually verified."
-            } >> "$GITHUB_STEP_SUMMARY"
-          fi
+          python3 scripts/ci-mutation-gate.py \
+            --repo "${{ github.repository }}" \
+            --run-id "${{ github.run_id }}" \
+            --head-sha "${{ github.sha }}" \
+            --should-run \
+            --output "$GITHUB_OUTPUT"
 
   mutation-testing:
     name: Infection mutation testing (Auth/Tenant/Delegation)

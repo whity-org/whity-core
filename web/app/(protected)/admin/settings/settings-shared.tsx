@@ -23,6 +23,7 @@ import type { components } from '@/lib/api/schema';
 import type { useToast } from '@/lib/toast-context';
 import { Badge } from '@whity/ui/badge';
 import { Input } from '@/components/ui/input';
+import { FieldSelect } from '@/components/field-select';
 import { Switch } from '@whity/ui/switch';
 import { useTranslation, type TranslateFn } from '@whity/features/i18n';
 
@@ -171,6 +172,13 @@ export function fieldMeta(t: TranslateFn): Record<string, FieldMeta> {
         'Stop showing dates and times anywhere in the interface. Everything is still recorded — timestamps stay in the database, in the audit trail and in the API, and turning this off brings them all back. The public document-verification page is not affected; it has its own setting.'
       ),
     },
+    'maintenance.active': {
+      label: t('settings.meta.maintenance.active.label', 'Announce maintenance'),
+      help: t(
+        'settings.meta.maintenance.active.help',
+        'Tell everyone the service is being updated, on the status page and at the top of every page. It does not stop anybody working.'
+      ),
+    },
     'error_tracking.enabled': {
       label: t('settings.meta.error_tracking.enabled.label', 'Record errors'),
       help: t(
@@ -279,6 +287,20 @@ export function fieldMeta(t: TranslateFn): Record<string, FieldMeta> {
         'Master switch for federated sign-in. When off, every configured identity provider is disabled instance-wide.'
       ),
     },
+    'auth.self_2fa_recovery_enabled': {
+      label: t('settings.meta.auth.self_2fa_recovery_enabled.label', 'Self-service two-step recovery'),
+      help: t(
+        'settings.meta.auth.self_2fa_recovery_enabled.help',
+        'Let people who lost their two-step device ask to get back in themselves. Requests still go through the approval gate.'
+      ),
+    },
+    'auth.sso_self_provision_workspace': {
+      label: t('settings.meta.auth.sso_self_provision_workspace.label', 'Workspace on first single sign-on'),
+      help: t(
+        'settings.meta.auth.sso_self_provision_workspace.help',
+        'Give a person who signs in through an operator identity provider, and belongs to no workspace, a new workspace of their own.'
+      ),
+    },
     'storage.driver': {
       label: t('settings.meta.storage.driver.label', 'Storage driver'),
       help: t(
@@ -333,6 +355,31 @@ export function fieldMeta(t: TranslateFn): Record<string, FieldMeta> {
         'Optional — leave blank for unauthenticated relays.'
       ),
     },
+    'mail.smtp.auth_mode': {
+      label: t('settings.meta.mail.smtp.auth_mode.label', 'How to sign in'),
+      help: t(
+        'settings.meta.mail.smtp.auth_mode.help',
+        'Google and Microsoft mailboxes usually need OAuth. Other mail servers usually use a password.'
+      ),
+    },
+    'mail.oauth.provider': {
+      label: t('settings.meta.mail.oauth.provider.label', 'Provider'),
+      help: t('settings.meta.mail.oauth.provider.help', 'Who runs this mailbox.'),
+    },
+    'mail.oauth.client_id': {
+      label: t('settings.meta.mail.oauth.client_id.label', 'Client ID'),
+      help: t(
+        'settings.meta.mail.oauth.client_id.help',
+        "From the app you registered with the provider."
+      ),
+    },
+    'mail.oauth.microsoft_tenant': {
+      label: t('settings.meta.mail.oauth.microsoft_tenant.label', 'Microsoft directory'),
+      help: t(
+        'settings.meta.mail.oauth.microsoft_tenant.help',
+        'Your directory ID. Use common if your app accepts accounts from any directory.'
+      ),
+    },
     'mail.from_address': {
       label: t('settings.meta.mail.from_address.label', 'From address'),
       help: t(
@@ -373,6 +420,13 @@ export function fieldMeta(t: TranslateFn): Record<string, FieldMeta> {
       help: t(
         'settings.meta.i18n.enabled.help',
         'Let people choose the language the interface is shown in, and mirror it for right-to-left languages. Off means everyone sees the default language, left-to-right, with no language control anywhere — stored preferences and translations are kept, so turning it back on restores them.'
+      ),
+    },
+    'plugins.store_allowed_hosts': {
+      label: t('settings.meta.plugins.store_allowed_hosts.label', 'Trusted plugin stores'),
+      help: t(
+        'settings.meta.plugins.store_allowed_hosts.help',
+        'The addresses of the stores people may install plugins from, separated by commas, for example store.example.com. Only secure (https) stores on the public internet are accepted when a plugin is installed. Leave this empty to keep the plugin store off.'
       ),
     },
     'plugins.store_enabled': {
@@ -453,6 +507,15 @@ export function settingsSections(t: TranslateFn): readonly SectionDef[] {
         'Machine-facing endpoints and connected tooling.'
       ),
       keys: ['mcp.enabled'],
+    },
+    {
+      id: 'plugin-store',
+      title: t('settings.section.pluginStore.title', 'Plugin store'),
+      description: t(
+        'settings.section.pluginStore.description',
+        'Which stores plugins can be installed from. The plugin marketplace switch is in Feature flags.'
+      ),
+      keys: ['plugins.store_allowed_hosts'],
     },
     {
       id: 'storage',
@@ -650,10 +713,7 @@ function timezoneOptions(): string[] {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-const NATIVE_SELECT_CLASS =
-  'h-7 w-full min-w-0 rounded-md border border-input bg-input/20 px-2 text-sm transition-colors outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive/20';
-
-interface NativeSelectProps {
+interface SelectFieldProps {
   id: string;
   value: string;
   disabled: boolean;
@@ -662,51 +722,34 @@ interface NativeSelectProps {
   onChange: (value: string) => void;
 }
 
-/** Native <select> of IANA timezone identifiers. */
-function TimezoneSelect({ id, value, disabled, invalid, describedBy, onChange }: NativeSelectProps) {
+/** Choice of IANA timezone identifiers. */
+function TimezoneSelect({ id, value, disabled, invalid, describedBy, onChange }: SelectFieldProps) {
   return (
-    <select
+    <FieldSelect
       id={id}
       value={value}
       disabled={disabled}
-      aria-invalid={invalid || undefined}
-      aria-describedby={describedBy}
-      onChange={(e) => onChange(e.target.value)}
-      className={NATIVE_SELECT_CLASS}
-    >
-      {timezoneOptions().map((tz) => (
-        <option key={tz} value={tz}>
-          {tz}
-        </option>
-      ))}
-    </select>
+      invalid={invalid}
+      describedBy={describedBy}
+      onChange={onChange}
+      options={timezoneOptions().map((tz) => ({ value: tz, label: tz }))}
+    />
   );
 }
 
-/** Native <select> of short locale codes; keeps an out-of-list value selectable. */
-function LocaleSelect({ id, value, disabled, invalid, describedBy, onChange }: NativeSelectProps) {
+/** Choice of short locale codes; keeps an out-of-list value selectable. */
+function LocaleSelect({ id, value, disabled, invalid, describedBy, onChange }: SelectFieldProps) {
   const t = useTranslation('admin');
-  const options = localeOptions(t);
-
   return (
-    <select
+    <FieldSelect
       id={id}
       value={value}
       disabled={disabled}
-      aria-invalid={invalid || undefined}
-      aria-describedby={describedBy}
-      onChange={(e) => onChange(e.target.value)}
-      className={NATIVE_SELECT_CLASS}
-    >
-      {!options.some((o) => o.value === value) && value !== '' && (
-        <option value={value}>{value}</option>
-      )}
-      {options.map((o) => (
-        <option key={o.value} value={o.value}>
-          {o.label}
-        </option>
-      ))}
-    </select>
+      invalid={invalid}
+      describedBy={describedBy}
+      onChange={onChange}
+      options={localeOptions(t)}
+    />
   );
 }
 
@@ -805,11 +848,13 @@ interface SettingsFieldProps {
   onChange: (value: string) => void;
   /** Optional inherited/overridden indicator (tenant form only). */
   status?: 'overridden' | 'inherited';
+  /** How an enum option reads, for a screen that translates its own choices. */
+  optionLabel?: (option: string) => string;
 }
 
 /**
  * A single label-associated form control for the fixed per-tenant key set.
- * timezone/locale render as native <select> elements; everything else is an
+ * timezone/locale render as fixed-choice selects; everything else is an
  * input. (The global page uses {@link RegistrySettingControl}, which is
  * registry-driven and also renders boolean toggles.)
  */
@@ -867,6 +912,8 @@ interface RegistrySettingControlProps {
   /** A per-field validation message (e.g. from a 422), shown under the control. */
   error?: string;
   status?: 'overridden' | 'inherited';
+  /** How an enum option reads, for a screen that translates its own choices. */
+  optionLabel?: (option: string) => string;
   onChange: (value: string) => void;
 }
 
@@ -884,6 +931,7 @@ export function RegistrySettingControl({
   disabled = false,
   error,
   status,
+  optionLabel = enumOptionLabel,
   onChange,
 }: RegistrySettingControlProps) {
   const t = useTranslation('admin');
@@ -1004,26 +1052,15 @@ export function RegistrySettingControl({
           onChange={onChange}
         />
       ) : type === 'enum' && entry.options && entry.options.length > 0 ? (
-        <select
+        <FieldSelect
           id={id}
           value={value}
           disabled={disabled}
-          aria-invalid={error ? true : undefined}
-          aria-describedby={describedBy}
-          onChange={(e) => onChange(e.target.value)}
-          className={NATIVE_SELECT_CLASS}
-        >
-          {/* Keep an out-of-range stored value selectable rather than silently
-              snapping it to the first option. */}
-          {!entry.options.includes(value) && value !== '' && (
-            <option value={value}>{value}</option>
-          )}
-          {entry.options.map((option) => (
-            <option key={option} value={option}>
-              {enumOptionLabel(option)}
-            </option>
-          ))}
-        </select>
+          invalid={Boolean(error)}
+          describedBy={describedBy}
+          onChange={onChange}
+          options={entry.options.map((option) => ({ value: option, label: optionLabel(option) }))}
+        />
       ) : (
         <Input
           id={id}

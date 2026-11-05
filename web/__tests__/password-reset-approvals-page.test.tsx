@@ -10,6 +10,10 @@ import React from 'react';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 
 const hasPermission = jest.fn<boolean, [string]>();
+jest.mock('@/lib/auth-context', () => ({
+  useAuth: () => ({ user: { tenant_id: 3 } }),
+}));
+
 jest.mock('@/hooks/useCapabilities', () => ({
   useCapabilities: () => ({ hasPermission, loading: false, permissions: [] }),
 }));
@@ -65,7 +69,7 @@ describe('PasswordResetApprovalsPage — list and actions', () => {
     await waitFor(() => expect(screen.getByTestId('password-reset-row-501')).toBeInTheDocument());
     expect(screen.getByText('requester@acme.test')).toBeInTheDocument();
     expect(global.fetch).toHaveBeenCalledWith(
-      '/api/v1/password-resets/pending',
+      '/api/v1/password-resets/pending?page=1&per_page=25',
       expect.objectContaining({ credentials: 'include' })
     );
   });
@@ -84,6 +88,9 @@ describe('PasswordResetApprovalsPage — list and actions', () => {
 
     await waitFor(() => expect(screen.getByTestId('password-reset-approve-501')).toBeInTheDocument());
     fireEvent.click(screen.getByTestId('password-reset-approve-501'));
+    // Approving is tier 3: the dialog asks for the email to be typed.
+    fireEvent.change(await screen.findByLabelText('Type their email to confirm'), { target: { value: 'requester@acme.test' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Approve request' }));
 
     await waitFor(() =>
       expect(global.fetch).toHaveBeenCalledWith(

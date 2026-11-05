@@ -21,6 +21,7 @@ versions**, released on their own cadence:
 | `@whity/features` | `packages/features` | npm (public) | client-safe feature UI (adapter pattern, nav contract, sync UI) for non-Next clients (Tauri/Vite SPA, Flutter) |
 | `@whity/tokens` | `packages/tokens` | npm (public) | design tokens (CSS vars, Dart/Flutter export) |
 | `@whity/api-client` | `packages/api-client` | npm (public) | typed client for the Whity API, generated from the OpenAPI spec |
+| `@whity/cli` | `packages/cli` | npm (public) | the `whity` command: installs and updates a self-hosted Whity ([Whity CLI](Whity-CLI.md)) |
 | `whity/plugin-sdk` | `sdk` | Composer | PHP SDK for plugin authors |
 | `web` | `web` | — (private) | the reference app; deployed, never published |
 
@@ -65,7 +66,7 @@ only publishes a genuinely new version — bumps release, incidental edits don't
 
 ## Where the packages are published: public npm, `@whity` scope
 
-The four JS packages are published to the public npm registry
+The five JS packages are published to the public npm registry
 (`https://registry.npmjs.org`) under the **`@whity`** npm organisation. Each
 `package.json` says so in its `publishConfig`
 (`{ "access": "public", "registry": "https://registry.npmjs.org" }`), and its
@@ -78,6 +79,7 @@ npm needs to match a provenance statement to the source.
 | `@whity/ui` | `.github/workflows/publish-ui.yml` |
 | `@whity/features` | `.github/workflows/publish-features.yml` |
 | `@whity/api-client` | `.github/workflows/publish-api-client.yml` |
+| `@whity/cli` | `.github/workflows/publish-cli.yml` |
 
 Before WHIT-834 the packages were named `@whity-org/*` and went to GitHub
 Packages. Nothing is published there any more.
@@ -106,7 +108,8 @@ npm organisation does this once, from a clean checkout of `main`:
 1. **First publish, by hand.** Sign in with `npm login` (2FA on), then from
    each package directory run `npm publish --access public`. Publish in
    dependency order: `packages/tokens`, then `packages/ui` (depends on tokens),
-   then `packages/features` (depends on ui), then `packages/api-client`. Publish
+   then `packages/features` (depends on ui), then `packages/api-client` and
+   `packages/cli`, which depend on none of them. Publish
    the version that is already in `package.json`; the workflow's version gate
    then skips it and publishes from the next bump on.
 2. **Configure the Trusted Publisher on npmjs.com.** For each package, open

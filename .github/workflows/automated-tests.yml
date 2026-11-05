@@ -194,6 +194,8 @@ jobs:
               # inside every consumer's build — yet a packages-only PR used to
               # skip this job entirely and ship unverified.
               - 'packages/**'
+              # @whity/cli bundles a copy of this file and tests it for drift.
+              - 'docker/production/**'
               # #1050. `web/jest.config.mjs` roots ALREADY reach into this tree
               # (added with #932), so its nine suites — 90 tests, all green —
               # run under the `web` job below. But nothing in this filter
@@ -552,10 +554,9 @@ jobs:
           key: phpstan-${{ github.sha }}
           restore-keys: phpstan-
 
-      # The paths and the memory limit live in ONE place — the `phpstan` script
-      # in composer.json — and this step, scripts/ci-local.sh and any hand-run
-      # all go through it (#934). They used to disagree three ways: 1G here,
-      # 512M in ci-local.sh, and PHP's 128M default in a plain dev container.
+      # The paths live in ONE place — the `phpstan` script in composer.json — and
+      # this step, scripts/ci-local.sh and any hand-run all go through it (#934).
+      # The memory limit does too, except that this step raises it: see below.
       #
       # 1G, not 512M. PHPStan runs parallel workers and each holds its own
       # analysis state, so the ceiling is per-worker rather than total — 512M
@@ -567,6 +568,12 @@ jobs:
       # still — the summary line reads "Found 7 errors", and every one of them
       # is a crashed worker rather than a finding.
       #
+      # 2G here, not the script's 1G. A cold analysis of this tree used 2.01 GB in
+      # one process (1.71 GB a week earlier, with files up by the same 17%, so it
+      # is growth and not a leak). Split between a few workers that sits close to
+      # 1G each, and a warm result cache hides it, so it only crashes some runs.
+      # The later --memory-limit wins.
+      #
       # The runner has ~7GB, so this is not near anything.
       #
       # `ops` is in the path list (see the composer script) because
@@ -574,7 +581,7 @@ jobs:
       # that fatals is a probe that reports nothing, and nothing was analysing
       # it (WC-766).
       - name: Run PHPStan
-        run: composer phpstan
+        run: composer phpstan -- --memory-limit=2G
 
       - name: Plugin-load smoke
         run: php scripts/ci-plugin-smoke.php
@@ -1786,6 +1793,12 @@ jobs:
         run: |
           npm run typecheck
           npm test
+
+      # The installer and updater. node:test against a scripted Docker, so
+      # every failure path runs without containers.
+      - name: Unit tests (@whity/cli)
+        working-directory: packages/cli
+        run: npm test
 
       # The committed design-token outputs must match the generator (base.json
       # is the single source of truth for styling variables).

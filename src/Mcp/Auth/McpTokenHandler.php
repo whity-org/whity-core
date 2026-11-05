@@ -20,9 +20,13 @@ use Whity\Core\RBAC\PermissionRegistry;
  *   GET    /api/mcp/tokens/{jti}/grant — an agent credential's grant, explained (WHIT-832)
  *   PATCH  /api/mcp/tokens/{jti}/grant — change it: Off, Ask first or Allowed per permission
  *
- * All endpoints require a valid access token cookie (human user performing
- * the action). The issued MCP tokens are then used as Bearer tokens on
- * POST /mcp (machine-to-machine calls from AI clients).
+ * All endpoints require a signed-in person (the access token cookie, or a bearer
+ * access token), and each acts only on that person's own tokens, so none needs a
+ * route permission (#1623). A token never does more than its owner: the scope
+ * rules check it at issue and RBAC checks every call. Administration across a
+ * workspace is /api/admin/mcp/tokens, on mcp:tokens:manage. The issued MCP tokens
+ * are then used as Bearer tokens on POST /mcp (machine-to-machine calls from AI
+ * clients).
  *
  * Post-cutover (step E): session tokens carry only profile_id / active_tenant_id.
  * The caller's profile_id and tenantId are resolved exclusively from those claims.
@@ -53,7 +57,7 @@ final class McpTokenHandler
     /** @param array<string, mixed> $params */
     public function create(Request $request, array $params = []): Response
     {
-        $claims = $this->tokenValidator->validateAccessToken();
+        $claims = $this->callerClaims($request);
         if ($claims === null) {
             return Response::error('Unauthenticated', 401);
         }
@@ -130,7 +134,7 @@ final class McpTokenHandler
      */
     public function list(Request $request, array $params = []): Response
     {
-        $claims = $this->tokenValidator->validateAccessToken();
+        $claims = $this->callerClaims($request);
         if ($claims === null) {
             return Response::error('Unauthenticated', 401);
         }
@@ -157,7 +161,7 @@ final class McpTokenHandler
      */
     public function revoke(Request $request, array $params = []): Response
     {
-        $claims = $this->tokenValidator->validateAccessToken();
+        $claims = $this->callerClaims($request);
         if ($claims === null) {
             return Response::error('Unauthenticated', 401);
         }
@@ -192,7 +196,7 @@ final class McpTokenHandler
      */
     public function grant(Request $request, array $params = []): Response
     {
-        $found = $this->agentCredential($params);
+        $found = $this->agentCredential($request, $params);
         if ($found instanceof Response) {
             return $found;
         }
@@ -213,7 +217,7 @@ final class McpTokenHandler
      */
     public function updateGrant(Request $request, array $params = []): Response
     {
-        $found = $this->agentCredential($params);
+        $found = $this->agentCredential($request, $params);
         if ($found instanceof Response) {
             return $found;
         }
@@ -264,14 +268,36 @@ final class McpTokenHandler
     }
 
     /**
+     * The signed-in caller: the auth cookie, or a bearer access token from a
+     * client signed in with `X-Auth-Mode: token` (a native app, or a headless
+     * frontend's server). Only an access token passes, so an MCP token can't
+     * mint, revoke or re-grant anything.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function callerClaims(Request $request): ?array
+    {
+        $claims = $this->tokenValidator->validateAccessToken();
+        if ($claims !== null) {
+            return $claims;
+        }
+        $header = $request->getHeader('Authorization') ?? '';
+        if (stripos($header, 'Bearer ') !== 0) {
+            return null;
+        }
+        $token = trim(substr($header, 7));
+        return $token !== '' ? $this->tokenValidator->validateAccessTokenFromBearer($token) : null;
+    }
+
+    /**
      * The caller's active agent credential named by the route, with who they are.
      *
      * @param array<string, mixed> $params
      * @return array{0: array<string, mixed>, 1: int, 2: int}|Response
      */
-    private function agentCredential(array $params): array|Response
+    private function agentCredential(Request $request, array $params): array|Response
     {
-        $claims = $this->tokenValidator->validateAccessToken();
+        $claims = $this->callerClaims($request);
         if ($claims === null) {
             return Response::error('Unauthenticated', 401);
         }

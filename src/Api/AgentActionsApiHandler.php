@@ -20,7 +20,7 @@ use Whity\Mcp\Tools\Undo\UndoConflictException;
  * What agents did for you, and undoing it (WHIT-812; register 7.5c Undo).
  *
  *   GET  /api/me/agent-actions             what agents did for the caller, newest first
- *                                          (?since=<UTC time>&status=done|undone|expired)
+ *                                          (?since=<UTC time>&status=done|undone|expired&principal=agent:<id>)
  *   POST /api/me/agent-actions/{id}/undo   undo one, inside its window
  *
  * Only actions an agent took on the caller's behalf are visible or undoable.
@@ -43,6 +43,8 @@ final class AgentActionsApiHandler
         private readonly ToolsCallHandler $toolsCall,
         private readonly ?AgentProposalRepository $proposals = null,
         private readonly ?AuditLoggerInterface $audit = null,
+        // WHIT-867: an action's plain name and area, by tool name.
+        private readonly ?\Closure $toolInfo = null,
     ) {
     }
 
@@ -62,10 +64,17 @@ final class AgentActionsApiHandler
         ], true) ? $query['status'] : null;
         $since = is_string($query['since'] ?? null) && ($time = strtotime($query['since'])) !== false ? gmdate('Y-m-d H:i:s', $time) : null;
 
-        $rows  = $this->actions->listFor($tenantId, $profileId, 100, $since, $status);
+        $principal = is_string($query['principal'] ?? null) && $query['principal'] !== '' ? $query['principal'] : null;
+
+        $rows  = $this->actions->listFor($tenantId, $profileId, 100, $since, $status, $principal);
         $names = $this->names($tenantId, $rows);
 
-        return Response::json(['data' => array_map(static fn (array $row): array => self::present($row, $names), $rows)], 200);
+        $catalogue = $this->toolInfo !== null ? ($this->toolInfo)() : [];
+
+        return Response::json(['data' => array_map(
+            static fn (array $row): array => self::present($row, $names) + ['toolInfo' => $catalogue[$row['tool']] ?? null],
+            $rows,
+        )], 200);
     }
 
     /** @param array<string, string> $params */

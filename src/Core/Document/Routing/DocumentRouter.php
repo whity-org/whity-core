@@ -8,10 +8,12 @@ use InvalidArgumentException;
 use PDO;
 use Throwable;
 use Whity\Core\Audience\ActiveMemberFilter;
+use Whity\Core\Document\Numbering\DocumentNumbering;
 use Whity\Core\Hooks\HookManager;
 use Whity\Core\Ou\PrimaryMembershipOu;
 use Whity\Core\Settings\SettingsRegistry;
 use Whity\Core\Settings\SettingsService;
+use Whity\Sdk\Hooks\Events;
 use Whity\Sdk\Routing\ResolvedRecipient;
 use Whity\Sdk\Routing\RoutingRuleContext;
 
@@ -152,6 +154,8 @@ use Whity\Sdk\Routing\RoutingRuleContext;
  */
 final class DocumentRouter
 {
+    private readonly DocumentNumbering $numbering;
+
     public function __construct(
         private readonly PDO $db,
         private readonly RouteRepository $routes,
@@ -163,6 +167,7 @@ final class DocumentRouter
         private readonly SettingsService $settings,
         private readonly ?HookManager $hooks = null,
     ) {
+        $this->numbering = new DocumentNumbering($db);
     }
 
     /**
@@ -223,6 +228,8 @@ final class DocumentRouter
         }
 
         try {
+            $this->assertNotWithdrawn($tenantId, $documentId);
+
             $routeId = $this->routes->create($tenantId, $documentId, $title, $actorId, $templateId, $templateName);
 
             $stepIds = [];
@@ -406,6 +413,8 @@ final class DocumentRouter
         $routeId = (int) $route['id'];
         $documentId = (int) $route['document_id'];
 
+        $this->assertNotWithdrawn($tenantId, $documentId);
+
         if ($action === RouteAction::NOTED) {
             if ($verdict !== null) {
                 throw RoutingRejectedException::because(
@@ -519,6 +528,8 @@ final class DocumentRouter
         }
 
         try {
+            $this->assertNotWithdrawn($tenantId, $documentId);
+
             $eventId = $this->events->append($tenantId, $documentId, [
                 'route_id' => $routeId,
                 // The step the actor was acting AT, not the one they are sending
@@ -605,6 +616,9 @@ final class DocumentRouter
 
             $event = $this->events->findById($eventId, $tenantId);
 
+            // In this transaction: the approval and the number it earned commit together.
+            $number = $this->numberOnFinalApproval($tenantId, $documentId, $routeId);
+
             if ($ownTransaction) {
                 $this->db->commit();
             }
@@ -617,6 +631,14 @@ final class DocumentRouter
 
         if ($event === null) {
             throw new \RuntimeException('Routing event was appended but could not be read back.');
+        }
+
+        if ($number !== null) {
+            $this->broadcast(Events::DOCUMENT_NUMBERED, $tenantId, $documentId, [
+                'number' => $number,
+                'route_id' => $routeId,
+                'actor_profile_id' => $actorId,
+            ]);
         }
 
         $this->broadcast('document.route_acted', $tenantId, $documentId, [
@@ -649,6 +671,26 @@ final class DocumentRouter
     }
 
     // -- internals ----------------------------------------------------------
+
+    /**
+     * Hand out a number waiting on final approval (WHIT-684), derived from the
+     * trail: nothing is open on this route any more, and the newest verdict on it is
+     * an approval. A route that decides nothing never numbers a document.
+     *
+     * Null unless this call handed it out, so a replay or a second approver finishing
+     * at the same moment announces nothing; {@see DocumentNumbering} makes it once.
+     */
+    private function numberOnFinalApproval(int $tenantId, int $documentId, int $routeId): ?string
+    {
+        if (!$this->numbering->isPending($tenantId, $documentId)
+            || $this->recipients->hasOpenOnRoute($tenantId, $routeId)
+            || $this->events->latestVerdictOnRoute($routeId, $tenantId) !== RouteVerdict::APPROVED) {
+            return null;
+        }
+        $assigned = $this->numbering->assign($tenantId, $documentId);
+
+        return $assigned['minted'] ? $assigned['number'] : null;
+    }
 
     /**
      * Refuse an act that does not match the KIND of step it is being made on
@@ -955,6 +997,30 @@ final class DocumentRouter
         $default = SettingsRegistry::defaults()[SettingsRegistry::DOCUMENTS_ROUTING_APPROVAL_QUORUM] ?? null;
 
         return is_string($default) && RouteQuorum::isValid($default) ? $default : RouteQuorum::ALL;
+    }
+
+    /**
+     * Refuse to move a withdrawn document (S5).
+     *
+     * Here rather than in the API handler because convening and plugins reach the
+     * router without passing through it. FOR SHARE on PostgreSQL so that an act
+     * already in flight and a withdrawal wait for each other: otherwise an act
+     * could commit a new open item just after the withdrawal closed them all.
+     */
+    private function assertNotWithdrawn(int $tenantId, int $documentId): void
+    {
+        $lock = $this->db->inTransaction() && $this->db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'pgsql'
+            ? ' FOR SHARE'
+            : '';
+        $stmt = $this->db->prepare(
+            'SELECT withdrawn_at FROM documents WHERE id = :id AND tenant_id = :tenant_id' . $lock
+        );
+        $stmt->execute([':id' => $documentId, ':tenant_id' => $tenantId]);
+
+        $withdrawnAt = $stmt->fetchColumn();
+        if ($withdrawnAt !== false && $withdrawnAt !== null) {
+            throw RoutingRejectedException::because('This document has been withdrawn, so nothing further can happen on its routes.');
+        }
     }
 
     /**

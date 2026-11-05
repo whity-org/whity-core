@@ -24,12 +24,14 @@ import { cn } from '@/lib/utils';
 import { api } from '@/lib/api/client';
 import { useFetch } from '@/hooks/useFetch';
 import { useNavigation } from '@/lib/navigation-context';
+import { useCapabilities } from '@/hooks/useCapabilities';
+import { LICENSING_VIEW } from '@/lib/capabilities';
 import { useTranslation } from '@whity/features/i18n';
 import type { components } from '@/lib/api/schema';
 
 type SettingsTab = components['schemas']['SettingsTab'];
 
-type GroupId = 'workspace' | 'security' | 'email' | 'data' | 'advanced';
+type GroupId = 'workspace' | 'security' | 'email' | 'data' | 'advanced' | 'devices';
 
 /** D1's groups, in order. A page the server adds later lands in Advanced. */
 const GROUP_OF: Readonly<Record<string, GroupId>> = {
@@ -49,22 +51,36 @@ const GROUP_OF: Readonly<Record<string, GroupId>> = {
   'error-tracking': 'advanced',
 };
 
-const GROUP_ORDER: GroupId[] = ['workspace', 'security', 'email', 'data', 'advanced'];
+const GROUP_ORDER: GroupId[] = ['workspace', 'security', 'email', 'data', 'advanced', 'devices'];
+
+/** Licensed devices keep their own route, `/licensing`, and their own permission. */
+const DEVICES_HREF = '/licensing';
 
 /**
  * The data pages that keep their own routes but belong to this area, by the
  * id their navigation item registers under. Exported so the sidebar can fold
  * them into its single Settings entry.
  */
-export const SETTINGS_AREA_NAV_IDS = ['tags', 'tag-groups', 'languages', 'translations'] as const;
+export const SETTINGS_AREA_NAV_IDS = ['tags', 'tag-groups', 'translations'] as const;
+
+/**
+ * Settings pages that live in the sidebar's Platform group for the system tenant
+ * (W.2). They keep their addresses, so they leave this sub-nav and don't light up the
+ * Settings entry.
+ */
+export const PLATFORM_SETTINGS_TABS: Readonly<Record<string, string>> = {
+  email: '/admin/settings/email',
+  storage: '/admin/settings/storage',
+  'feature-flags': '/admin/settings/feature-flags',
+};
 
 /** Every route prefix that opens inside the Settings area. */
 export const SETTINGS_AREA_PREFIXES = [
   '/admin/settings',
   '/admin/tags',
   '/admin/tag-groups',
-  '/admin/languages',
   '/admin/translations',
+  DEVICES_HREF,
 ] as const;
 
 export interface SettingsAreaLink {
@@ -85,6 +101,8 @@ export function SettingsArea({ children }: { children: ReactNode }) {
   const tc = useTranslation('common');
   const pathname = usePathname() ?? '';
   const { items: navItems } = useNavigation();
+  const { has } = useCapabilities();
+  const canSeeDevices = has(LICENSING_VIEW);
 
   const { data: tabs } = useFetch<SettingsTab[]>(async () => {
     const { data: body } = await api.GET('/api/v1/settings/tabs');
@@ -98,6 +116,7 @@ export function SettingsArea({ children }: { children: ReactNode }) {
       email: t('settingsArea.group.email', 'Email'),
       data: t('settingsArea.group.data', 'Data'),
       advanced: t('settingsArea.group.advanced', 'Advanced'),
+      devices: t('settingsArea.group.devices', 'Devices'),
     };
 
     const dataLabels: Record<string, string> = {
@@ -109,11 +128,17 @@ export function SettingsArea({ children }: { children: ReactNode }) {
 
     const links: (SettingsAreaLink & { group: GroupId })[] = [];
     for (const tab of tabs ?? []) {
+      if (tab.id in PLATFORM_SETTINGS_TABS) continue;
       links.push({ id: tab.id, href: tab.href, label: tab.label, group: GROUP_OF[tab.id] ?? 'advanced' });
     }
     for (const id of SETTINGS_AREA_NAV_IDS) {
+      // Tag groups are on the Tags page now, so they get no link of their own.
+      if (id === 'tag-groups') continue;
       const item = navItems.find((nav) => nav.id === id);
       if (item) links.push({ id, href: item.href, label: dataLabels[id] ?? item.label, group: 'data' });
+    }
+    if (canSeeDevices) {
+      links.push({ id: 'devices', href: DEVICES_HREF, label: t('settingsArea.devices', 'Licensed devices'), group: 'devices' });
     }
     // Within a group, the order GROUP_OF lists them in.
     const rank = (id: string) => {
@@ -125,7 +150,7 @@ export function SettingsArea({ children }: { children: ReactNode }) {
       label: groupLabels[group],
       links: links.filter((link) => link.group === group).sort((a, b) => rank(a.id) - rank(b.id)),
     })).filter((group) => group.links.length > 0);
-  }, [tabs, navItems, t, tc]);
+  }, [tabs, navItems, canSeeDevices, t, tc]);
 
   return (
     <div className="grid gap-6 md:grid-cols-[200px_minmax(0,1fr)] md:gap-8">

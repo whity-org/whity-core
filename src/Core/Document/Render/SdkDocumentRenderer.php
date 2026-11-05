@@ -233,7 +233,7 @@ final class SdkDocumentRenderer implements SdkRenderer, HostWiredService
         }
 
         try {
-            $artifact = $this->issuer->appendArtifact($tenantId, $actorId, $record, $rendered->bytes);
+            $artifact = $this->issuer->appendArtifact($tenantId, $actorId, $record, $rendered->bytes, pages: $rendered->pageCount > 0 ? $rendered->pageCount : null);
             $this->issuing?->storedBuilt($tenantId, $documentId, $artifact);
         } catch (StorageException $e) {
             error_log('[SdkDocumentRenderer] storing document ' . $documentId . ' failed: ' . $e->getMessage());

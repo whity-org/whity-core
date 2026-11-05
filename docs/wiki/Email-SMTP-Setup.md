@@ -19,7 +19,7 @@ app — it degrades to sending nothing.
 - The transport is chosen by the `mail.transport` global setting: `none`
   (default, email off), `log` (write to the app log, for debugging), or `smtp`.
 - The `smtp` transport speaks standard SMTP submission:
-  `EHLO → [STARTTLS] → [AUTH LOGIN] → MAIL FROM → RCPT TO → DATA → QUIT`.
+  `EHLO → [STARTTLS] → [AUTH LOGIN or XOAUTH2] → MAIL FROM → RCPT TO → DATA → QUIT`.
 - All mail settings are **global-only** (system tenant, id 0). A regular tenant
   admin can never see or change them.
 - The **SMTP password is write-only**: it is stored encrypted at rest and is
@@ -39,12 +39,64 @@ Settings → Email**, or the settings API.
 | `mail.from_address` | the visible From address (must be a real mailbox on the domain) |
 | `mail.from_name` | the visible From display name |
 | SMTP password | write-only, encrypted at rest — set via the password field / `PUT /mail/smtp-password` |
+| `mail.smtp.auth_mode` | `password` (default) \| `oauth2` — see [Signing in with OAuth2](#signing-in-with-oauth2-google-and-microsoft) |
+| `mail.oauth.provider` | `google` \| `microsoft` |
+| `mail.oauth.client_id` | the client ID of the app registered with the provider |
+| `mail.oauth.microsoft_tenant` | Microsoft only: directory ID, or `common` / `organizations` / `consumers` |
+| OAuth client secret, refresh token | write-only, encrypted at rest — set via `PUT /mail/oauth-credentials` |
 | `mail.events.*` | per-notification toggles (welcome / approval / invitation / verification) |
 
 > **TLS is verified.** Whity validates the server's certificate and does **not**
 > allow a silent downgrade. Always use a hostname the certificate actually
 > covers (see the cPanel note below) — pointing at a bare IP or a hostname the
 > cert doesn't match will fail the connection.
+
+---
+
+## Signing in with OAuth2 (Google and Microsoft)
+
+Set **How to sign in** to OAuth when the mailbox will not accept a password. Whity
+sends with `AUTH XOAUTH2` and keeps the short-lived access token up to date itself.
+Existing installs stay on `password` until someone changes this.
+
+| Provider | SMTP host | Encryption | SMTP username |
+|---|---|---|---|
+| Google | `smtp.gmail.com` | TLS on 587 or SSL on 465 | the mailbox address |
+| Microsoft 365 | `smtp.office365.com` | TLS on 587 | the mailbox address |
+| Outlook.com | `smtp-mail.outlook.com` | TLS on 587 | the mailbox address |
+
+What you need from the provider:
+
+- **Google:** an OAuth client in Google Cloud, and a refresh token granted by the
+  mailbox for the scope `https://mail.google.com/`. A client still in "Testing"
+  gets refresh tokens that expire after seven days, so publish it first.
+- **Microsoft:** an app registration in Entra with the delegated permission
+  `SMTP.Send`, a client secret, and a refresh token granted by the mailbox for
+  `https://outlook.office365.com/SMTP.Send offline_access`. SMTP AUTH must be on for
+  the mailbox. A single-directory app needs its directory ID in **Microsoft directory**.
+
+Whity does not run the consent screen itself yet: you get the refresh token from
+the provider and paste it in.
+
+Then press **Send test email**. The status above the fields says where the
+connection stands, in plain words.
+
+**How it is kept safe:**
+
+- The client secret, refresh token and cached access token are encrypted at rest
+  with the instance encryption key. No API returns them, and they stay out of logs
+  and audit entries. The audit entry only says which fields changed.
+- Token endpoints come from a fixed list in the code. No setting can change them.
+- The SMTP host must be one of the provider's servers above (or loopback, for local
+  fakes), and the connection must be encrypted. Otherwise anyone with
+  `settings:manage` could read a token by pointing the host at their own server.
+- Plugins never see any of this. They send through core.
+
+**When it stops working:** if the provider revokes or expires the refresh token,
+sends fail rather than vanish, the queue keeps retrying them, the status says the
+account needs reconnecting, and the log gets one error. Whity pauses asking the
+provider for 15 minutes between tries, and pressing **Send test email** asks again
+straight away. Saving a new refresh token clears the failure.
 
 ---
 

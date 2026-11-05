@@ -22,7 +22,7 @@ use Whity\Sdk\Http\Request;
 class Router
 {
     /**
-     * @var array<array{method: string, path: string, pattern: string, handler: callable, requiredRole: ?string, requiredPermission: ?string, namespacePrefix: ?string, schema: array<string, mixed>|null}> Registered routes
+     * @var array<array{method: string, path: string, pattern: string, handler: callable, requiredRole: ?string, requiredPermission: ?string, namespacePrefix: ?string, schema: array<string, mixed>|null, recordAccess?: callable|null}> Registered routes
      */
     private array $routes = [];
 
@@ -148,9 +148,34 @@ class Router
             'requiredPermission' => $requiredPermission,
             'namespacePrefix' => $namespacePrefix,
             'schema' => $schema,
+            'recordAccess' => null,
         ];
 
         return true;
+    }
+
+    /**
+     * Let the HTTP gate pass a caller who lacks the route's permission when this says
+     * the record is theirs ({@see \Whity\Core\Document\RecipientDocumentAccess}). The
+     * route keeps its permission for everything else that reads it (MCP, OpenAPI,
+     * permitted-actions), and the handler still authorizes the record. Throws for a
+     * route that isn't registered, so a renamed path can't silently lose its access.
+     *
+     * @param string $path As registered, without the version prefix.
+     * @param callable(int, int, array<string, string>): bool $check Profile id, tenant id, route params.
+     */
+    public function allowRecordAccess(string $method, string $path, callable $check): void
+    {
+        $versioned = $this->versionPrefix !== '' ? $this->versionPrefix($path) : $path;
+        foreach ($this->routes as $i => $route) {
+            if ($route['method'] === $method && $route['path'] === $versioned) {
+                $this->routes[$i]['recordAccess'] = $check;
+
+                return;
+            }
+        }
+
+        throw new \LogicException("allowRecordAccess names no route: {$method} {$path}");
     }
 
     /**
@@ -221,7 +246,7 @@ class Router
      * parameters are percent-DECODED — see the note inside.
      *
      * @param Request $request Request object
-     * @return array{handler: callable, params: array<string, string>, requiredRole: ?string, requiredPermission: ?string, namespacePrefix: ?string, schema: array<string, mixed>|null, path: string}|null Array if matched, null otherwise
+     * @return array{handler: callable, params: array<string, string>, requiredRole: ?string, requiredPermission: ?string, namespacePrefix: ?string, schema: array<string, mixed>|null, recordAccess: callable|null, path: string}|null Array if matched, null otherwise
      */
     public function match(Request $request): ?array
     {
@@ -297,6 +322,7 @@ class Router
                     'requiredPermission' => $route['requiredPermission'] ?? null,
                     'namespacePrefix' => $route['namespacePrefix'] ?? null,
                     'schema' => $route['schema'] ?? null,
+                    'recordAccess' => $route['recordAccess'] ?? null,
                     // The registered pattern ('/api/v1/things/{id:\d+}'), for
                     // callers that look the route up elsewhere by it — MCP's
                     // resources/read asks the ResourceDeriver whether it is

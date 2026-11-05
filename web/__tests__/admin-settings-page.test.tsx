@@ -1,5 +1,6 @@
 import React from 'react';
 import { render, screen, waitFor, fireEvent, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
 /**
  * Unit/behaviour tests for the settings pages under
@@ -187,7 +188,7 @@ describe('AdminSettingsPage (General) — RBAC gating', () => {
   it('renders Access Denied when the caller lacks settings:read', () => {
     grant(); // no permissions
     render(<AdminSettingsPage />);
-    expect(screen.getByRole('heading', { name: /access denied/i })).toBeInTheDocument();
+    expect(screen.getByText('You don’t have access to settings')).toBeInTheDocument();
     expect(mockApiGet).not.toHaveBeenCalledWith('/api/v1/settings/global');
   });
 
@@ -199,6 +200,27 @@ describe('AdminSettingsPage (General) — RBAC gating', () => {
     expect(screen.getByLabelText(/^support email$/i)).toBeInTheDocument();
     // Locale moved to the Branding tab.
     expect(screen.queryByLabelText(/^locale$/i)).not.toBeInTheDocument();
+  });
+
+  it('links a workspace admin to their own workspace record', async () => {
+    mockTenantId = 5;
+    grant('settings:read', 'tenants:read');
+    render(<AdminSettingsPage />);
+    expect(await screen.findByRole('link', { name: 'Open workspace record' })).toHaveAttribute('href', '/admin/tenants/5');
+  });
+
+  it('gives no workspace record link to the system tenant or without tenants:read', async () => {
+    grant('settings:read', 'tenants:read');
+    const { unmount } = render(<AdminSettingsPage />);
+    await screen.findByLabelText(/^site name$/i).catch(() => undefined);
+    expect(screen.queryByRole('link', { name: 'Open workspace record' })).not.toBeInTheDocument();
+    unmount();
+
+    mockTenantId = 5;
+    grant('settings:read');
+    render(<AdminSettingsPage />);
+    expect(await screen.findByLabelText(/^site name$/i)).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Open workspace record' })).not.toBeInTheDocument();
   });
 
   it('makes the tenant form read-only without settings:write', async () => {
@@ -354,13 +376,12 @@ describe('AdminSettingsPage — plugin-declared settings (#713 item 1)', () => {
     const control = screen.getByLabelText(/^sync mode$/i);
     // A free-text box here would let an operator type a value the backend
     // refuses; the declared options are what make it a selector.
-    expect(control.tagName.toLowerCase()).toBe('select');
+    expect(control).toHaveAttribute('role', 'combobox');
     // Option labels are humanised by the shared control (`Incremental`), while
     // the VALUE stays exactly what the plugin declared — the backend validates
     // the value, so it must survive the round trip untouched.
-    const values = Array.from(control.querySelectorAll('option')).map((o) => o.getAttribute('value'));
-    expect(values).toEqual(['off', 'incremental', 'full']);
-    expect(screen.getByRole('option', { name: 'Incremental' })).toBeInTheDocument();
+    await userEvent.click(control);
+    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual(['Off', 'Incremental', 'Full']);
   });
 
   it('PATCHes a changed plugin key under its namespaced key', async () => {
@@ -370,7 +391,8 @@ describe('AdminSettingsPage — plugin-declared settings (#713 item 1)', () => {
     render(<AdminSettingsPage />);
 
     await screen.findByTestId('settings-section-plugins');
-    fireEvent.change(screen.getByLabelText(/^sync mode$/i), { target: { value: 'full' } });
+    await userEvent.click(screen.getByLabelText(/^sync mode$/i));
+    await userEvent.click(screen.getByRole('option', { name: 'Full' }));
     fireEvent.click(screen.getByRole('button', { name: /save platform defaults/i }));
 
     await waitFor(() =>
@@ -388,6 +410,39 @@ describe('AdminSettingsPage — plugin-declared settings (#713 item 1)', () => {
 
     await screen.findByRole('heading', { name: /platform defaults/i });
     expect(screen.queryByTestId('settings-section-plugins')).not.toBeInTheDocument();
+  });
+});
+
+describe('AdminSettingsPage — trusted plugin stores', () => {
+  const STORE_REGISTRY = [
+    ...REGISTRY,
+    { key: 'plugins.store_allowed_hosts', type: 'string', default: '' },
+  ];
+
+  it('offers the field, in plain words, to the platform operator and saves what they type', async () => {
+    setTenant(0);
+    grant('settings:read', 'settings:write', 'settings:manage');
+    routeGet(['site_name'], true, STORE_REGISTRY, { ...GLOBAL, 'plugins.store_allowed_hosts': '' });
+    render(<AdminSettingsPage />);
+
+    const section = await screen.findByTestId('settings-section-plugin-store');
+    // Not the raw key, and not under "Other settings".
+    expect(within(section).getByLabelText('Trusted plugin stores')).toBeInTheDocument();
+    expect(screen.queryByTestId('settings-section-other')).not.toBeInTheDocument();
+
+    fireEvent.change(within(section).getByLabelText('Trusted plugin stores'), {
+      target: { value: 'store.example.com' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /save platform defaults/i }));
+
+    await waitFor(() =>
+      expect(mockApiPatch).toHaveBeenCalledWith(
+        '/api/v1/settings/global',
+        expect.objectContaining({
+          body: { settings: { 'plugins.store_allowed_hosts': 'store.example.com' } },
+        })
+      )
+    );
   });
 });
 
@@ -532,7 +587,7 @@ describe('BrandingSettingsPage — RBAC gating and locale', () => {
   it('renders Access Denied when the caller lacks settings:read', () => {
     grant();
     render(<BrandingSettingsPage />);
-    expect(screen.getByRole('heading', { name: /access denied/i })).toBeInTheDocument();
+    expect(screen.getByText('You don’t have access to branding')).toBeInTheDocument();
   });
 
   it('renders the locale field for a settings:read caller', async () => {
@@ -547,7 +602,8 @@ describe('BrandingSettingsPage — RBAC gating and locale', () => {
     render(<BrandingSettingsPage />);
     const locale = await screen.findByLabelText(/^locale$/i);
 
-    fireEvent.change(locale, { target: { value: 'fr' } });
+    await userEvent.click(locale);
+    await userEvent.click(screen.getByRole('option', { name: /fr/i }));
     fireEvent.click(screen.getByRole('button', { name: /save language/i }));
 
     await waitFor(() =>

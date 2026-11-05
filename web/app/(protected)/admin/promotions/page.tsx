@@ -10,6 +10,9 @@ import { AdminHeader } from '@/components/admin/admin-header';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { Button } from '@whity/ui/button';
 import { Input } from '@/components/ui/input';
+import { MoneyInput } from '@whity/ui/money/money-input';
+import { AccessDeniedPanel, AreaError } from '@whity/ui/page-states';
+import { parseMoney, toDecimalString } from '@whity/ui/money/currency';
 import { Badge } from '@whity/ui/badge';
 import {
   Dialog,
@@ -56,6 +59,9 @@ interface Promotion {
   redemption_count: number;
 }
 
+/** The list route answered 403: a different thing from a failed load or an empty list. */
+const FORBIDDEN = 'forbidden';
+
 export default function PromotionsPage() {
   const { apiClient } = useAuth();
   const { addToast } = useToast();
@@ -65,6 +71,9 @@ export default function PromotionsPage() {
 
   const { data, loading, error, refetch } = useFetch(async () => {
     const res = await apiClient('/api/v1/promotions');
+    if (res.status === 403) {
+      throw new Error(FORBIDDEN);
+    }
     if (!res.ok) {
       throw new Error(t('promotions.error.load', 'Failed to load promotions'));
     }
@@ -81,7 +90,9 @@ export default function PromotionsPage() {
     discount:
       p.percent_off !== null
         ? `${p.percent_off}%`
-        : `${p.amount_off} ${p.currency ?? ''}`.trim(),
+        : p.amount_off !== null && p.currency
+          ? `${p.currency} ${toDecimalString(p.amount_off, p.currency)}`
+          : '',
     // "3 of 50" or just "3" when the allocation is unlimited — a bare count
     // against no cap tells an operator nothing they can act on.
     taken:
@@ -167,21 +178,35 @@ export default function PromotionsPage() {
         }
       />
 
-      {error && <p className="text-sm text-destructive">{error}</p>}
-
-      <DataTable
-        columns={columns}
-        data={rows}
-        isLoading={loading}
-        rowActions={rowActions}
-        emptyState={{
-          title: t('promotions.empty.title', 'No promotions yet'),
-          description: t(
-            'promotions.empty.description',
-            'An early bird applies automatically to whoever qualifies; a promo code has to be typed. Both are made here.'
-          ),
-        }}
-      />
+      {error === FORBIDDEN ? (
+        <AccessDeniedPanel
+          title={t('promotions.denied.title', 'You don’t have access to promotions')}
+          description={t(
+            'promotions.denied.description',
+            'Promotions are managed by the people who run this Whity installation. Ask them if you need an offer set up.'
+          )}
+        />
+      ) : error ? (
+        <AreaError
+          message={error}
+          retryLabel={t('promotions.error.retry', 'Try again')}
+          onRetry={refetch}
+        />
+      ) : (
+        <DataTable
+          columns={columns}
+          data={rows}
+          isLoading={loading}
+          rowActions={rowActions}
+          emptyState={{
+            title: t('promotions.empty.title', 'No promotions yet'),
+            description: t(
+              'promotions.empty.description',
+              'An early bird applies automatically to whoever qualifies; a promo code has to be typed. Both are made here.'
+            ),
+          }}
+        />
+      )}
 
       {creating && (
         <CreatePromotionDialog
@@ -215,17 +240,25 @@ function CreatePromotionDialog({ onClose, onSaved }: { onClose: () => void; onSa
   const [kind, setKind] = useState<'percent' | 'amount'>('percent');
   const [percent, setPercent] = useState('');
   const [amount, setAmount] = useState('');
-  const [currency, setCurrency] = useState('SAR');
+  const [currency, setCurrency] = useState('JOD');
   const [endsAt, setEndsAt] = useState('');
   const [maxRedemptions, setMaxRedemptions] = useState('');
   const [saving, setSaving] = useState(false);
 
   const percentValue = Number(percent);
-  const amountValue = Number(amount);
+  // Typed in normal units ("5.000"); the API takes minor units.
+  let amountValue = 0;
+  if (amount.trim() !== '' && /^[A-Z]{3}$/.test(currency)) {
+    try {
+      amountValue = parseMoney(amount, currency);
+    } catch {
+      amountValue = 0;
+    }
+  }
   const valueUsable =
     kind === 'percent'
       ? percent.trim() !== '' && Number.isInteger(percentValue) && percentValue > 0 && percentValue <= 100
-      : amount.trim() !== '' && Number.isInteger(amountValue) && amountValue > 0;
+      : amountValue > 0;
   const canSave = name.trim() !== '' && valueUsable;
 
   return (
@@ -296,16 +329,18 @@ function CreatePromotionDialog({ onClose, onSaved }: { onClose: () => void; onSa
           ) : (
             <div className="flex gap-2">
               <label className="block flex-1 space-y-1">
-                <span className="text-sm">
-                  {t('promotions.field.amount', 'Amount in minor units (5000 = 50.00)')}
-                </span>
-                <Input
-                  type="number"
-                  min={1}
-                  step={1}
+                <span className="text-sm">{t('promotions.field.amount', 'Amount off')}</span>
+                <MoneyInput
+                  currency={currency}
                   value={amount}
                   data-testid="promo-amount"
-                  onChange={(e) => setAmount(e.target.value)}
+                  onValueChange={setAmount}
+                  tooManyDecimalsLabel={(decimals, code) =>
+                    t('promotions.field.tooManyDecimals', 'No more than {decimals} decimals for {currency}.', {
+                      decimals,
+                      currency: code,
+                    })
+                  }
                 />
               </label>
               <label className="block w-24 space-y-1">

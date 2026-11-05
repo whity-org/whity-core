@@ -76,6 +76,22 @@ export function parseWireDate(value: string | null | undefined): Date | null {
 }
 
 /**
+ * The house style for dates (decision register: "27 Oct 2026", 24-hour times,
+ * Western digits). The month is a word, so 3/11 is never read as March or
+ * November, and the day leads in English the way it does in Arabic.
+ */
+const SHORT_DATE: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short', year: 'numeric' }
+
+/**
+ * The language to format in: English as day-first (en-GB order), every
+ * language with Western digits (`-u-nu-latn`), whatever else the locale says.
+ */
+function shortStyleLocale(locale: DateLocale): string {
+  const base = locale === undefined || locale.startsWith('en') ? 'en-GB' : locale.split('-u-')[0]
+  return `${base}-u-nu-latn`
+}
+
+/**
  * A calendar date, or null when the value is absent or unparseable.
  *
  * NULL RATHER THAN THE RAW VALUE, which is the one behavioural change from the
@@ -89,8 +105,10 @@ export function parseWireDate(value: string | null | undefined): Date | null {
  */
 export function formatDate(value: string | null | undefined, locale: DateLocale): string | null {
   const parsed = parseWireDate(value)
+  // A bare date names a day rather than an instant, so it stays that day in every zone.
+  const options = /^\d{4}-\d{2}-\d{2}$/.test((value ?? '').trim()) ? { ...SHORT_DATE, timeZone: 'UTC' } : SHORT_DATE
 
-  return parsed === null ? null : parsed.toLocaleDateString(locale)
+  return parsed === null ? null : parsed.toLocaleDateString(shortStyleLocale(locale), options)
 }
 
 /**
@@ -100,14 +118,18 @@ export function formatDate(value: string | null | undefined, locale: DateLocale)
 export function formatTime(value: string | null | undefined, locale: DateLocale): string | null {
   const parsed = parseWireDate(value)
 
-  return parsed === null ? null : parsed.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', hour12: false })
+  return parsed === null
+    ? null
+    : parsed.toLocaleTimeString(shortStyleLocale(locale), { hour: '2-digit', minute: '2-digit', hour12: false })
 }
 
 /** A date and a time, under {@see formatDate}'s rules. */
 export function formatDateTime(value: string | null | undefined, locale: DateLocale): string | null {
   const parsed = parseWireDate(value)
 
-  return parsed === null ? null : parsed.toLocaleString(locale)
+  return parsed === null
+    ? null
+    : parsed.toLocaleString(shortStyleLocale(locale), { ...SHORT_DATE, hour: '2-digit', minute: '2-digit', hour12: false })
 }
 
 /** The coarsest unit in which an age still reads as a duration. */

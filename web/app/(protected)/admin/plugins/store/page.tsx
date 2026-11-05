@@ -1,378 +1,276 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { NoAccess } from '@/components/no-access';
+import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api/client';
-import type { components } from '@/lib/api/schema';
-import { useToast } from '@/lib/toast-context';
 import { useCapabilities } from '@/hooks/useCapabilities';
-import { useRichTranslation, useTranslation } from '@whity/features/i18n';
+import { useAuth } from '@/lib/auth-context';
+import { SYSTEM_TENANT_ID } from '@/app/(protected)/admin/settings/settings-shared';
+import { useTranslation } from '@whity/features/i18n';
 import { AdminHeader } from '@/components/admin/admin-header';
+import { PluginsTabs } from '@/components/plugins/plugins-tabs';
+import { InstallPluginDialog } from '@/components/plugins/install-plugin-dialog';
+import { InstallButton, type CataloguePlugin, usePluginAddsLabels, usePriceLabel, useUsageLabel } from '@/components/plugins/plugin-facts';
 import { Button } from '@whity/ui/button';
-import { Badge } from '@whity/ui/badge';
-import { PermissionButton } from '@/components/rbac/permission-button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@whity/ui/card';
-import { AccessDenied } from '@whity/ui/access-denied';
-import {
-  IconBuildingStore,
-  IconSearch,
-  IconDownload,
-  IconRefresh,
-  IconKey,
-} from '@tabler/icons-react';
+import { PluginTile } from '@whity/ui/plugin-card';
+import { SearchField } from '@whity/ui/search-field';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@whity/ui/select';
+import { AreaError, EmptyFiltered, EmptyFirstTime } from '@whity/ui/page-states';
+import { Skeleton } from '@whity/ui/skeleton';
 
-// Read access to the store browser mirrors the plugins console (plugins:read);
-// the per-plugin Install action is separately gated on plugins:upload.
+// Read access to the store matches the Installed tab (plugins:read). Install is
+// plugins:install, and only for operators: a code plugin is install-wide (Q4).
 const PLUGINS_READ = 'plugins:read';
-const PLUGINS_UPLOAD = 'plugins:upload';
-
-type CataloguePlugin = components['schemas']['StoreCataloguePlugin'];
 
 export default function PluginStorePage() {
-  const { addToast } = useToast();
-  const { hasPermission, loading: isCapabilitiesLoading } = useCapabilities();
   const t = useTranslation('admin');
-  const rt = useRichTranslation('admin');
+  const router = useRouter();
+  const addsLabels = usePluginAddsLabels();
+  const priceLabel = usePriceLabel();
+  const usageLabel = useUsageLabel();
+  const { hasPermission, loading: isCapabilitiesLoading } = useCapabilities();
   const hasAccess = hasPermission(PLUGINS_READ);
+  const { user } = useAuth();
+  const isOperator = user?.tenant_id === SYSTEM_TENANT_ID;
 
   const [allowedHosts, setAllowedHosts] = useState<string[]>([]);
   const [featureEnabled, setFeatureEnabled] = useState<boolean | null>(null);
+  const [canInstall, setCanInstall] = useState(false);
+  const [canInstallDeclarative, setCanInstallDeclarative] = useState(false);
   const [storeUrl, setStoreUrl] = useState('');
-  const [token, setToken] = useState('');
   const [search, setSearch] = useState('');
+  const [category, setCategory] = useState<string | null>(null);
 
   const [plugins, setPlugins] = useState<CataloguePlugin[]>([]);
   const [browsing, setBrowsing] = useState(false);
-  const [installingSlug, setInstallingSlug] = useState<string | null>(null);
   const [hasBrowsed, setHasBrowsed] = useState(false);
-  const [mintingToken, setMintingToken] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [installing, setInstalling] = useState<CataloguePlugin | null>(null);
 
-  // Load the operator's trusted store hosts once, to populate the picker.
+  // Load the operator's trusted store hosts once.
+  const loadHosts = useCallback(async () => {
+    const { data, error } = await api.GET('/api/v1/plugins/store/allowed');
+    if (error || !data) {
+      setLoadError(error?.error || t('pluginStore.error.loadStores', 'Could not load the configured stores.'));
+      return;
+    }
+    setLoadError(null);
+    setAllowedHosts(data.data.hosts);
+    setFeatureEnabled(data.data.enabled);
+    setCanInstall(data.data.can_install);
+    setCanInstallDeclarative(data.data.can_install_declarative);
+    // Preselect the first store so a one-store deployment needs no click.
+    if (data.data.hosts.length > 0) {
+      setStoreUrl(`https://${data.data.hosts[0]}`);
+    }
+  }, [t]);
+
   useEffect(() => {
     if (!hasAccess) return;
-    let active = true;
-    (async () => {
-      const { data, error } = await api.GET('/api/v1/plugins/store/allowed');
-      if (!active) return;
-      if (error || !data) {
-        addToast(
-          error?.error ||
-            t('pluginStore.error.loadStores', 'Could not load the configured stores.'),
-          'error'
-        );
-        return;
-      }
-      setAllowedHosts(data.data.hosts);
-      setFeatureEnabled(data.data.enabled);
-      // Preselect the only store so a one-store deployment is one click away.
-      if (data.data.hosts.length > 0) {
-        setStoreUrl(`https://${data.data.hosts[0]}`);
-      }
-    })();
-    return () => {
-      active = false;
-    };
-  }, [hasAccess, addToast, t]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loads once on mount
+    void loadHosts();
+  }, [hasAccess, loadHosts]);
 
-  const browse = useCallback(async () => {
-    if (!storeUrl) {
-      addToast(t('pluginStore.error.noStore', 'Choose a store first.'), 'error');
-      return;
-    }
-    setBrowsing(true);
-    try {
-      const { data, error } = await api.GET('/api/v1/plugins/store/catalog', {
-        params: { query: { store_url: storeUrl, q: search || undefined } },
-      });
-      if (error || !data) {
-        addToast(
-          error?.error ||
-            t('pluginStore.error.catalogue', 'The store catalogue could not be loaded.'),
-          'error'
-        );
-        return;
-      }
-      setPlugins(data.data);
-      setHasBrowsed(true);
-    } finally {
-      setBrowsing(false);
-    }
-  }, [storeUrl, search, addToast, t]);
-
-  const install = useCallback(
-    async (plugin: CataloguePlugin) => {
-      const version = plugin.latest_version;
-      if (!version) {
-        addToast(
-          t('pluginStore.error.noVersion', '"{name}" has no published version to install.', {
-            name: plugin.name,
-          }),
-          'error'
-        );
-        return;
-      }
-      setInstallingSlug(plugin.slug);
+  const browse = useCallback(
+    async (term: string) => {
+      if (!storeUrl) return;
+      setBrowsing(true);
       try {
-        const { data, error } = await api.POST('/api/v1/plugins/install-from-store', {
-          body: { store_url: storeUrl, slug: plugin.slug, version, token: token || undefined },
+        const { data, error } = await api.GET('/api/v1/plugins/store/catalog', {
+          params: { query: { store_url: storeUrl, q: term || undefined } },
         });
-        if (error) {
-          // Surface the ACTUAL backend reason (e.g. "A valid store download
-          // token is required", "already installed", allowlist rejection) —
-          // a generic message left every failure equally unexplained,
-          // including the common case of installing without a token.
-          addToast(
-            error.error ||
-              t('pluginStore.error.install', 'Failed to install "{name}".', { name: plugin.name }),
-            'error',
-          );
+        if (error || !data) {
+          setLoadError(error?.error || t('pluginStore.error.catalogue', 'The store catalogue could not be loaded.'));
           return;
         }
-        addToast(
-          t(
-            'pluginStore.toast.installed',
-            '"{name}" v{version} installed (disabled). Enable it from Plugins.',
-            { name: plugin.name, version: data?.data.version ?? version },
-          ),
-          'success',
-        );
+        setLoadError(null);
+        setPlugins(data.data);
+        setHasBrowsed(true);
       } finally {
-        setInstallingSlug(null);
+        setBrowsing(false);
       }
     },
-    [storeUrl, token, addToast, t],
+    [storeUrl, t],
   );
 
-  /**
-   * Convenience for the common case: the store being browsed IS this instance
-   * itself (the operator's own deployment), so the browser already carries a
-   * session on it. Mints a download token via the store's own token-mint route
-   * and fills it in — sparing the operator a separate curl/API call before
-   * every install. This route is plugin-declared (whity-plugin-store), not part
-   * of this instance's OWN OpenAPI contract, so it is called directly rather
-   * than through the typed client; the backend's own admin-role gate is the
-   * real authority regardless of what this button does.
-   */
-  const mintToken = useCallback(async () => {
-    if (!storeUrl) {
-      addToast(t('pluginStore.error.noStore', 'Choose a store first.'), 'error');
-      return;
-    }
-    setMintingToken(true);
-    try {
-      const res = await fetch(`${storeUrl}/api/v1/plugin-store/tokens`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-        body: JSON.stringify({ label: 'admin-store-page' }),
-      });
-      const body = await res.json().catch(() => null);
-      if (!res.ok || !body?.data?.token) {
-        addToast(
-          body?.error ||
-            t('pluginStore.error.mint', 'Could not mint a store token for this store.'),
-          'error'
-        );
-        return;
-      }
-      setToken(body.data.token);
-      addToast(t('pluginStore.toast.minted', 'Store token minted and filled in below.'), 'success');
-    } catch {
-      addToast(
-        t('pluginStore.error.mintUnreachable', 'Could not reach the store to mint a token.'),
-        'error'
-      );
-    } finally {
-      setMintingToken(false);
-    }
-  }, [storeUrl, addToast, t]);
+  // The store shows its plugins as soon as it is chosen.
+  useEffect(() => {
+    if (!storeUrl || featureEnabled === false) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loads when the store changes
+    void browse('');
+  }, [storeUrl, featureEnabled, browse]);
+
+  const categories = useMemo(() => {
+    const tags = new Set<string>();
+    plugins.forEach((p) => (p.tags ?? []).forEach((tag) => tags.add(tag)));
+    return [...tags].sort();
+  }, [plugins]);
+
+  const visible = category ? plugins.filter((p) => (p.tags ?? []).includes(category)) : plugins;
+
+  const openPlugin = (plugin: CataloguePlugin) => {
+    router.push(
+      `/admin/plugins/store/${encodeURIComponent(plugin.slug)}?store=${encodeURIComponent(storeUrl)}`,
+    );
+  };
 
   if (isCapabilitiesLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
+    return <Skeleton className="mx-auto h-64 max-w-7xl" />;
   }
 
   if (!hasAccess) {
     return (
-      <AccessDenied
-        description={t(
-          'pluginStore.accessDenied',
-          'You do not have the required permission (`plugins:read`) to browse the Plugin Store.'
-        )}
-        action={
-          <Button onClick={() => window.history.back()} variant="outline">
-            {t('pluginStore.goBack', 'Go Back')}
-          </Button>
-        }
-      />
+      <NoAccess area={t('access.area.pluginStore.accessDenied', 'the plugin store')} permission="plugins:read" />
     );
   }
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto px-4 md:px-0 pb-16">
+    <div className="mx-auto max-w-7xl space-y-6 px-4 pb-16 md:px-0">
       <AdminHeader
-        title={t('pluginStore.title', 'Plugin Store')}
-        description={t(
-          'pluginStore.description',
-          'Browse a trusted store and install plugins into this instance.'
-        )}
+        title={t('plugins.title', 'Plugins')}
+        description={
+          isOperator
+            ? t('pluginStore.description', 'Browse a trusted store. A plugin installed here runs for every workspace on this deployment.')
+            : t('pluginStore.description.workspace', 'Browse a trusted store.')
+        }
       />
+      <PluginsTabs />
 
-      {featureEnabled === false ? (
-        <Card className="border border-border/80 bg-card/50">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <IconBuildingStore className="w-5 h-5" />{' '}
-              {t('pluginStore.disabled.title', 'Plugin store disabled')}
-            </CardTitle>
-            <CardDescription>
-              {rt(
-                'pluginStore.disabled.description',
-                'Installing from a store is disabled on this instance. An operator can turn it ' +
-                  'on from <0>plugins.store_enabled</0> (Admin → Settings → Feature flags), and ' +
-                  'must configure at least one trusted host in <1>plugins.store_allowed_hosts</1> ' +
-                  '(global settings).',
-                undefined,
-                [<code key="flag" />, <code key="hosts" />]
-              )}
-            </CardDescription>
-          </CardHeader>
-        </Card>
+      {loadError ? (
+        <AreaError
+          message={loadError}
+          retryLabel={t('plugins.tryAgain', 'Try again')}
+          onRetry={() => void (featureEnabled === null ? loadHosts() : browse(search))}
+        />
+      ) : featureEnabled === false ? (
+        <EmptyFirstTime
+          icon="plugin"
+          title={t('pluginStore.disabled.title', 'Plugin store disabled')}
+          description={
+            isOperator
+              ? t(
+                  'pluginStore.disabled.description',
+                  'Installing from a store is turned off on this instance. It needs the plugin marketplace switched on in Feature flags and at least one trusted store added under Plugin store in the global settings.',
+                )
+              : t(
+                  'pluginStore.disabled.description.workspace',
+                  'Installing from a store is turned off on this instance. Ask the person who runs the platform to turn it on.',
+                )
+          }
+        />
       ) : (
         <>
-          {/* Store picker + search */}
-          <Card className="border border-border/80 bg-card/50 shadow-sm">
-            <CardContent className="flex flex-col gap-4 pt-6 md:flex-row md:items-end">
-              <label className="flex flex-1 flex-col gap-1 text-sm">
-                <span className="font-medium text-muted-foreground">
-                  {t('pluginStore.field.store', 'Store')}
-                </span>
-                <select
-                  value={storeUrl}
-                  onChange={(e) => setStoreUrl(e.target.value)}
-                  className="h-10 rounded-md border border-input bg-background px-3 text-sm"
-                >
-                  <option value="" disabled>
-                    {t('pluginStore.field.storePlaceholder', 'Choose a store…')}
-                  </option>
+          <div className="flex flex-col gap-3 md:flex-row md:items-center">
+            <SearchField
+              className="flex-1"
+              value={search}
+              onValueChange={setSearch}
+              onSearch={(value) => void browse(value)}
+              label={t('pluginStore.field.search', 'Search')}
+              clearLabel={t('plugins.clearSearch', 'Clear search')}
+              placeholder={t('pluginStore.field.searchPlaceholder', 'name, slug, tag…')}
+              name="plugin-store-search"
+              autoComplete="off"
+            />
+            {allowedHosts.length > 1 ? (
+              <Select value={storeUrl} onValueChange={setStoreUrl}>
+                <SelectTrigger aria-label={t('pluginStore.field.store', 'Store')} className="md:w-64">
+                  <SelectValue placeholder={t('pluginStore.field.storePlaceholder', 'Choose a store…')} />
+                </SelectTrigger>
+                <SelectContent>
                   {allowedHosts.map((h) => (
-                    <option key={h} value={`https://${h}`}>
+                    <SelectItem key={h} value={`https://${h}`}>
                       {h}
-                    </option>
+                    </SelectItem>
                   ))}
-                </select>
-              </label>
-              <label className="flex flex-1 flex-col gap-1 text-sm">
-                <span className="font-medium text-muted-foreground">
-                  {t('pluginStore.field.search', 'Search')}
-                </span>
-                <div className="flex items-center gap-2 rounded-md border border-input bg-background px-3 h-10">
-                  <IconSearch className="w-4 h-4 text-muted-foreground" />
-                  <input
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') browse();
-                    }}
-                    placeholder={t('pluginStore.field.searchPlaceholder', 'name, slug, tag…')}
-                    type="search"
-                    name="plugin-store-search"
-                    autoComplete="off"
-                    className="flex-1 bg-transparent text-sm outline-none"
-                  />
-                </div>
-              </label>
-              <label className="flex flex-1 flex-col gap-1 text-sm">
-                <span className="font-medium text-muted-foreground">
-                  {t('pluginStore.field.token', 'Access token')}
-                </span>
-                <div className="flex items-center gap-1.5">
-                  <input
-                    value={token}
-                    onChange={(e) => setToken(e.target.value)}
-                    type="password"
-                    name="plugin-store-access-token"
-                    autoComplete="new-password"
-                    placeholder={t('pluginStore.field.tokenPlaceholder', 'required to install')}
-                    className="h-10 flex-1 rounded-md border border-input bg-background px-3 text-sm"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={mintToken}
-                    disabled={mintingToken || !storeUrl}
-                    title={t(
-                      'pluginStore.field.mintTitle',
-                      'Mint a download token from this store (requires an admin session on it)'
-                    )}
-                    className="h-10 w-10 shrink-0 p-0"
-                  >
-                    <IconKey className={`w-4 h-4 ${mintingToken ? 'animate-pulse' : ''}`} />
-                  </Button>
-                </div>
-              </label>
-              <Button onClick={browse} disabled={browsing || !storeUrl} className="gap-2 h-10">
-                <IconRefresh className={`w-4 h-4 ${browsing ? 'animate-spin' : ''}`} />
-                {t('pluginStore.action.browse', 'Browse')}
-              </Button>
-            </CardContent>
-          </Card>
+                </SelectContent>
+              </Select>
+            ) : null}
+          </div>
 
-          {/* Results */}
-          {plugins.length === 0 ? (
-            <p className="text-sm text-muted-foreground px-1">
-              {hasBrowsed
-                ? t('pluginStore.empty.noMatches', 'No plugins matched your search.')
-                : t(
-                    'pluginStore.empty.notBrowsed',
-                    'Choose a store and press Browse to see its plugins.'
-                  )}
-            </p>
+          {categories.length > 0 ? (
+            <div className="flex flex-wrap gap-2" role="group" aria-label={t('pluginStore.categories', 'Categories')}>
+              <Button
+                size="sm"
+                variant={category === null ? 'default' : 'outline'}
+                aria-pressed={category === null}
+                onClick={() => setCategory(null)}
+              >
+                {t('pluginStore.category.all', 'All')}
+              </Button>
+              {categories.map((tag) => (
+                <Button
+                  key={tag}
+                  size="sm"
+                  variant={category === tag ? 'default' : 'outline'}
+                  aria-pressed={category === tag}
+                  onClick={() => setCategory(tag)}
+                >
+                  {tag}
+                </Button>
+              ))}
+            </div>
+          ) : null}
+
+          {browsing && !hasBrowsed ? (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3" aria-busy="true">
+              {[1, 2, 3].map((n) => (
+                <Skeleton key={n} className="h-40" />
+              ))}
+            </div>
+          ) : visible.length === 0 ? (
+            search || category ? (
+              <EmptyFiltered
+                title={t('pluginStore.empty.noMatches', 'No plugins matched your search.')}
+                clearLabel={t('plugins.clearFilters', 'Clear filters')}
+                onClear={() => {
+                  setSearch('');
+                  setCategory(null);
+                  void browse('');
+                }}
+              />
+            ) : (
+              <EmptyFirstTime
+                icon="plugin"
+                title={t('pluginStore.empty.none', 'This store has no plugins yet.')}
+              />
+            )
           ) : (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {plugins.map((plugin) => (
-                <Card key={plugin.slug} className="flex flex-col border border-border/80 bg-card/50 shadow-sm">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base font-heading">{plugin.name}</CardTitle>
-                    <CardDescription className="font-mono text-xs">{plugin.slug}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="flex-1 space-y-3">
-                    {plugin.description ? (
-                      <p className="text-sm text-muted-foreground line-clamp-3">{plugin.description}</p>
-                    ) : null}
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      {plugin.latest_version ? (
-                        <Badge variant="secondary">v{plugin.latest_version}</Badge>
-                      ) : null}
-                      {(plugin.tags ?? []).map((tag) => (
-                        <Badge key={tag} variant="outline">
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
-                  </CardContent>
-                  <CardFooter className="justify-between">
-                    <span className="text-xs text-muted-foreground">{plugin.author || '—'}</span>
-                    <PermissionButton
-                      permission={PLUGINS_UPLOAD}
-                      onClick={() => install(plugin)}
-                      disabled={installingSlug === plugin.slug || !plugin.latest_version}
-                      className="gap-2"
-                    >
-                      <IconDownload className="w-4 h-4" />
-                      {installingSlug === plugin.slug
-                        ? t('pluginStore.action.installing', 'Installing…')
-                        : t('pluginStore.action.install', 'Install')}
-                    </PermissionButton>
-                  </CardFooter>
-                </Card>
+              {visible.map((plugin) => (
+                <PluginTile
+                  key={plugin.slug}
+                  name={plugin.name}
+                  publisher={plugin.author}
+                  summary={plugin.description}
+                  version={plugin.latest_version}
+                  tags={plugin.tags}
+                  adds={addsLabels(plugin)}
+                  trustLabel={t('pluginStore.notVerified', 'Not verified')}
+                  facts={[priceLabel(plugin), usageLabel(plugin)].filter((fact): fact is string => fact !== null)}
+                  onOpen={() => openPlugin(plugin)}
+                  action={
+                    <InstallButton
+                      canInstall={plugin.kind === 'declarative' ? canInstallDeclarative : canInstall}
+                      disabled={!plugin.latest_version}
+                      onClick={() => setInstalling(plugin)}
+                    />
+                  }
+                />
               ))}
             </div>
           )}
         </>
       )}
+
+      <InstallPluginDialog
+        plugin={installing}
+        storeUrl={storeUrl}
+        onOpenChange={(open) => {
+          if (!open) setInstalling(null);
+        }}
+      />
     </div>
   );
 }

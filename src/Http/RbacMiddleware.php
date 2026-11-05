@@ -65,7 +65,8 @@ class RbacMiddleware
         Request $request,
         callable $next,
         ?string $requiredRole = null,
-        ?string $requiredPermission = null
+        ?string $requiredPermission = null,
+        ?callable $recordAccess = null
     ): Response {
         // Fail-open: routes with no role/permission requirement are unprotected.
         if ($requiredRole === null && $requiredPermission === null) {
@@ -82,7 +83,8 @@ class RbacMiddleware
         // EnforceTenantIsolation middleware when present (a stashed null means
         // the token was already checked and rejected). Parse only when the
         // attribute is absent, i.e. standalone use outside the kernel pipeline.
-        if ($request->hasAttribute(Request::ATTR_JWT_CLAIMS)) {
+        $stashedClaims = $request->hasAttribute(Request::ATTR_JWT_CLAIMS);
+        if ($stashedClaims) {
             // Fail closed on any non-array stash (defense-in-depth against a
             // buggy writer): treat it exactly like an invalid token.
             $stashed = $request->getAttribute(Request::ATTR_JWT_CLAIMS);
@@ -93,6 +95,17 @@ class RbacMiddleware
             $payload = $this->jwtParser->parse($token);
         }
         if ($payload === null) {
+            return Response::error('Invalid or expired token', 401);
+        }
+
+        // Only a session's access token may pass a route's gate. An MCP tool call
+        // stashes its own `mcp` claims in process after checking the principal, so
+        // that type counts only when stashed, never when parsed from a request. See
+        // EnforceTenantIsolation::signedInClaims() for why a signature isn't enough;
+        // an absent type can only come from a stubbed parser.
+        if (array_key_exists('type', $payload)
+            && $payload['type'] !== 'access'
+            && !($stashedClaims && $payload['type'] === 'mcp')) {
             return Response::error('Invalid or expired token', 401);
         }
 
@@ -117,7 +130,10 @@ class RbacMiddleware
 
         // Enforce the required permission against the authoritative store.
         if ($requiredPermission !== null) {
-            if (!$this->roleChecker->hasPermissionForProfile($profileId, $requiredPermission, $tenantId)) {
+            // A route may pass a caller whose access comes from the record rather than
+            // a role (Router::allowRecordAccess). The answer for anyone else is unchanged.
+            if (!$this->roleChecker->hasPermissionForProfile($profileId, $requiredPermission, $tenantId)
+                && ($recordAccess === null || $recordAccess($profileId, $tenantId) !== true)) {
                 return $this->forbidden($requiredPermission);
             }
         }

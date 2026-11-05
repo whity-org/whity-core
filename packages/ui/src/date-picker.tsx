@@ -87,6 +87,10 @@ const DAY_NAMES = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"]
 function parseDateValue(val?: Date | string): Date | null {
   if (!val) return null
   if (val instanceof Date) return isNaN(val.getTime()) ? null : val
+  // A day with no time is that day here. new Date() would read it as midnight UTC,
+  // which is the day before anywhere west of UTC.
+  const day = /^(\d{4})-(\d{2})-(\d{2})$/.exec(val)
+  if (day) return new Date(Number(day[1]), Number(day[2]) - 1, Number(day[3]))
   const parsed = new Date(val)
   return isNaN(parsed.getTime()) ? null : parsed
 }

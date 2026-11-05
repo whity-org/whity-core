@@ -469,8 +469,11 @@ final class DocumentRouterRealEngineTest extends TestCase
             [
                 '__construct',
                 'append',
+            'appendWithdrawal',
                 'countForDocument',
                 'findById',
+                // WHIT-684. A READ: how a route ended, for a number waiting on final approval.
+                'latestVerdictOnRoute',
                 'listForDocument',
                 // #1037. A READ: `SELECT … GROUP BY step_id`, deriving the lap
                 // count from the verdict rows already in the trail. Listed here

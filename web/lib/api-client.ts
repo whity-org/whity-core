@@ -9,35 +9,14 @@
  * 5. On 402 (the payment wall), sends the reader to the page where they can pay
  */
 
+import { refreshSession } from '@/lib/session-refresh';
+
 export interface ApiClientOptions extends RequestInit {
   /**
    * If true, prevents automatic token refresh on 401 response.
    * Used to prevent infinite loops on refresh endpoint itself.
    */
   skipRefresh?: boolean;
-}
-
-/**
- * Attempts to refresh the access token
- * @returns true if refresh succeeded, false otherwise
- */
-async function refreshAccessToken(): Promise<boolean> {
-  try {
-    // Use relative URL to go through Next.js proxy (handles CORS with credentials)
-    const response = await fetch('/api/v1/auth/refresh', {
-      method: 'POST',
-      credentials: 'include',
-      // CSRF defense (WC-160): the backend rejects auth POSTs without this
-      // custom header, which cross-site forms cannot set.
-      headers: { 'X-Requested-With': 'XMLHttpRequest' },
-    });
-
-    // Refresh successful if response is 200-399
-    return response.ok;
-  } catch {
-    // Network errors or other failures - refresh failed
-    return false;
-  }
 }
 
 /**
@@ -103,6 +82,23 @@ function redirectToBilling(): void {
   window.location.replace(BILLING_PATH);
 }
 
+/**
+ * The reference the server gave its last 5xx. The 500 page has no response to read
+ * and Next.js only gives server errors a digest, so a crash in the browser after a
+ * failed call would otherwise have nothing to quote to support.
+ */
+let lastErrorReference: string | null = null;
+
+function noteErrorReference(response: Response): void {
+  if (response.status >= 500) {
+    lastErrorReference = response.headers?.get?.('X-Error-Reference') ?? lastErrorReference;
+  }
+}
+
+export function latestErrorReference(): string | null {
+  return lastErrorReference;
+}
+
 export async function apiClient(
   url: string,
   options?: ApiClientOptions
@@ -145,6 +141,7 @@ export async function apiClient(
 
   // Make the initial request
   const response = await fetch(fullUrl, requestInit);
+  noteErrorReference(response);
 
   // The payment wall. Handled BEFORE the 401 branch below because it is not an
   // authentication problem and refreshing a token cannot resolve it — the
@@ -161,7 +158,7 @@ export async function apiClient(
   }
 
   // We have a 401 and skipRefresh is false, attempt refresh
-  const refreshSucceeded = await refreshAccessToken();
+  const refreshSucceeded = (await refreshSession()) === 'renewed';
 
   if (!refreshSucceeded) {
     // Refresh failed, return the original 401 response

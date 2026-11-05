@@ -14,16 +14,18 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
+import { NoAccess } from '@/components/no-access';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { useToast } from '@/lib/toast-context';
 import { useTranslation, type TranslateFn } from '@whity/features/i18n';
 import { useDateDisplay } from '@whity/features/datetime';
 import type { DateDisplay } from '@whity/features/datetime';
 import { Button } from '@whity/ui/button';
+import { TechnicalDetails } from '@whity/ui/display-preferences';
 import { Badge } from '@whity/ui/badge';
 import { EmptyState } from '@whity/ui/empty-state';
+import { AccessDeniedPanel, AreaError } from '@whity/ui/page-states';
 import { Skeleton } from '@whity/ui/skeleton';
-import { AccessDenied } from '@whity/ui/access-denied';
 
 type ErrorStatus = 'unresolved' | 'resolved' | 'ignored';
 
@@ -96,6 +98,8 @@ export default function ErrorsPage() {
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<number | null>(null);
+  // A refused request and a failed one are not an empty inbox.
+  const [problem, setProblem] = useState<'denied' | 'failed' | null>(null);
 
   const load = useCallback(async (status: ErrorStatus) => {
     setLoading(true);
@@ -106,11 +110,19 @@ export default function ErrorsPage() {
       const res = await fetch(`/api/v1/errors?status=${status}`, {
         headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
       });
+      if (res.status === 403) {
+        setProblem('denied');
+        setGroups([]);
+        return;
+      }
       if (!res.ok) throw new Error(String(res.status));
       const body = (await res.json()) as ListResponse;
+      setProblem(null);
       setGroups(body.data ?? []);
       setCounts(body.counts ?? {});
     } catch {
+      setProblem('failed');
+      setGroups([]);
       addToast(t('errors.toast.loadFailed', 'Could not load errors'), 'error');
     } finally {
       setLoading(false);
@@ -156,12 +168,7 @@ export default function ErrorsPage() {
 
   if (!canManage) {
     return (
-      <AccessDenied
-        description={t(
-          'errors.accessDenied',
-          'You do not have the required permissions (`settings:manage`) to view the error inbox.'
-        )}
-      />
+      <NoAccess area={t('access.area.errors.accessDenied', 'the error inbox')} permission="settings:manage" />
     );
   }
 
@@ -200,6 +207,20 @@ export default function ErrorsPage() {
           <Skeleton className="h-16 w-full" />
           <Skeleton className="h-16 w-full" />
         </div>
+      ) : problem === 'denied' ? (
+        <AccessDeniedPanel
+          title={t('errors.denied.title', 'You don’t have access to the error inbox')}
+          description={t(
+            'errors.denied.description',
+            'Errors are shown to the people who run this Whity installation.'
+          )}
+        />
+      ) : problem === 'failed' ? (
+        <AreaError
+          message={t('errors.toast.loadFailed', 'Could not load errors')}
+          retryLabel={t('errors.retry', 'Try again')}
+          onRetry={() => void load(tab)}
+        />
       ) : groups.length === 0 ? (
         <EmptyState
           title={
@@ -230,13 +251,15 @@ export default function ErrorsPage() {
                   aria-expanded={expanded === g.id}
                 >
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium">{g.type}</span>
+                    <TechnicalDetails>
+                      <span className="font-medium">{g.type}</span>
+                    </TechnicalDetails>
                     {g.environment ? <Badge variant="outline">{g.environment}</Badge> : null}
                     <Badge variant={g.occurrences > 1 ? 'default' : 'outline'}>
                       {t('errors.row.occurrences', '{count}×', { count: g.occurrences })}
                     </Badge>
                   </div>
-                  <p className="mt-1 truncate text-sm text-muted-foreground">{g.message}</p>
+                  <p className="mt-1 truncate text-sm font-medium text-foreground">{g.message}</p>
                   {/*
                     #1068: the LOCATION survives on its own. It is what an
                     operator needs to find the code; "· last seen —" would be a
@@ -249,14 +272,18 @@ export default function ErrorsPage() {
                     const lastSeen = when(g.last_seen_at, t, dates);
 
                     return (
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {lastSeen === null
-                          ? location
-                          : t('errors.row.lastSeen', '{location} · last seen {when}', {
-                              location,
-                              when: lastSeen,
-                            })}
-                      </p>
+                      <>
+                        {lastSeen !== null && (
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {t('errors.row.lastSeenOnly', 'Last seen {when}', { when: lastSeen })}
+                          </p>
+                        )}
+                        <TechnicalDetails>
+                          <p className="mt-1 font-mono text-xs text-muted-foreground" dir="ltr">
+                            {location}
+                          </p>
+                        </TechnicalDetails>
+                      </>
                     );
                   })()}
                 </button>
