@@ -584,11 +584,11 @@
         },
         {
             "name": "whity/plugin-sdk",
-            "version": "1.46.0",
+            "version": "1.63.0",
             "dist": {
                 "type": "path",
                 "url": "sdk",
-                "reference": "6ffd134f6d6c02ba9f406e7c40ac3f243be2b6e7"
+                "reference": "d67fe00cf751acaf615c7674b85ccbfb38401319"
             },
             "require": {
                 "php": ">=8.4"
@@ -3754,20 +3754,21 @@
         },
         {
             "name": "symfony/filesystem",
-            "version": "v8.0.15",
+            "version": "v8.1.11",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/filesystem.git",
-                "reference": "3d190c51f717870eed9aa5e9c7cb927ffc911d05"
+                "reference": "58f57b6a33e3495f7f41e01258f1ae5ef76cccd2"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/filesystem/zipball/3d190c51f717870eed9aa5e9c7cb927ffc911d05",
-                "reference": "3d190c51f717870eed9aa5e9c7cb927ffc911d05",
+                "url": "https://api.github.com/repos/symfony/filesystem/zipball/58f57b6a33e3495f7f41e01258f1ae5ef76cccd2",
+                "reference": "58f57b6a33e3495f7f41e01258f1ae5ef76cccd2",
                 "shasum": ""
             },
             "require": {
-                "php": ">=8.4",
+                "php": ">=8.4.1",
+                "symfony/deprecation-contracts": "^2.5|^3",
                 "symfony/polyfill-ctype": "~1.8",
                 "symfony/polyfill-mbstring": "~1.8"
             },
@@ -3800,7 +3801,7 @@
             "description": "Provides basic utilities for the filesystem",
             "homepage": "https://symfony.com",
             "support": {
-                "source": "https://github.com/symfony/filesystem/tree/v8.0.15"
+                "source": "https://github.com/symfony/filesystem/tree/v8.1.11"
             },
             "funding": [
                 {
@@ -3820,7 +3821,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-07-22T15:20:43+00:00"
+            "time": "2026-11-04T08:39:20+00:00"
         },
         {
             "name": "symfony/finder",
