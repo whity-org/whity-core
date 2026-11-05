@@ -199,6 +199,7 @@ final class DocumentRouterVerdictRealEngineTest extends TestCase
     public function testTheNumberedEventFiresOnceWithTheNumber(): void
     {
         $hooks = new \Whity\Core\Hooks\HookManager();
+        /** @var \ArrayObject<int, array<string, mixed>> $fired */
         $fired = new \ArrayObject();
         $hooks->listen(\Whity\Sdk\Hooks\Events::DOCUMENT_NUMBERED, static function (array $event) use ($fired): array {
             $fired->append($event);
@@ -220,13 +221,13 @@ final class DocumentRouterVerdictRealEngineTest extends TestCase
         $route = $this->issueGate($documentId, 'Approval');
 
         $router->act(self::TENANT, self::HEAD_A, $route, RouteAction::ACKNOWLEDGED, null, RouteVerdict::APPROVED);
-        self::assertCount(0, $fired);
+        self::assertSame(0, $fired->count());
         $router->act(self::TENANT, self::TECH_A, $route, RouteAction::ACKNOWLEDGED, null);
         $router->act(self::TENANT, self::TECH_A, $route, RouteAction::NOTED, 'Filed');
 
-        self::assertCount(1, $fired);
-        $event = $fired->getArrayCopy()[0];
-        self::assertIsArray($event);
+        self::assertSame(1, $fired->count());
+        $event = $fired->offsetGet(0);
+        self::assertNotNull($event);
         self::assertSame('MIN-' . gmdate('Y') . '-001', $event['number']);
         self::assertSame($documentId, $event['id']);
         self::assertSame(self::TECH_A, $event['actor_profile_id']);
