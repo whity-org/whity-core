@@ -98,6 +98,12 @@ final class Events
     // Before a document is issued: a listener may veto with HookVetoException,
     // and nothing is written. Payload: tenant_id, source_id, version, record,
     // origin_key, actor — ids only, never field values.
+    //
+    // SDK 1.66: it also fires for a preflight, with `check_only: true`, `checks: []`
+    // and `missing_fields` in the payload, and nothing will be issued. Change
+    // nothing, append {label, ok, why?} to `checks` for each thing you check, and
+    // return the payload, so a person sees every reason at once. A veto still counts,
+    // as one failed check. The real issue fires this again, so check again there.
     public const DOCUMENT_ISSUING = 'document.issuing';
     // A document was issued (its record exists, with its QR code when the
     // tenant has them on). Payload as above, plus id.

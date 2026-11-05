@@ -16,6 +16,7 @@ use Whity\Sdk\Documents\DocumentNotIssuedException;
 use Whity\Sdk\Documents\Documents;
 use Whity\Sdk\Documents\IssueRequest;
 use Whity\Sdk\Documents\IssueResult;
+use Whity\Sdk\Documents\PreflightResult;
 
 /**
  * The SDK's {@see Documents} (SDK 1.56, WHIT-742): a plugin issues through
@@ -103,6 +104,28 @@ final class SdkDocuments implements Documents, HostWiredService
             is_string($document['content_url'] ?? null) ? $document['content_url'] : null,
             is_string($document['number'] ?? null) ? $document['number'] : null,
         );
+    }
+
+    public function preflight(IssueRequest $request): PreflightResult
+    {
+        $actor = $this->actor();
+        if ($actor === null) {
+            throw new DocumentNotIssuedException(
+                DocumentNotIssuedException::NO_ACTOR,
+                'There is no person to issue this document for; plugins issue in a request, as the person making it',
+            );
+        }
+        $answer = $this->issuing()->preflight($actor, new IssueInput(
+            slot: $request->template->slot,
+            sourceId: $request->template->sourceId,
+            record: $request->record,
+            values: $request->values === [] ? null : $request->values,
+            title: $request->title,
+            originKey: $request->originKey,
+            render: $request->render,
+        ));
+
+        return new PreflightResult($answer['ok'], $answer['checks'], $answer['missing_fields'], $answer['replays_document_id']);
     }
 
     private function actor(): ?ActingAs

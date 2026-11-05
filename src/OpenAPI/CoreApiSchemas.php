@@ -5620,6 +5620,20 @@ final class CoreApiSchemas
             // absent = "render if this instance can", true = "I require an
             // artifact" (503 when it cannot), false = "record only". Omitting it
             // is what a client that does not care should do.
+            'DocumentPreflightCheck' => self::object([
+                'code' => self::str() + ['description' => '`template`, `record`, `values`, `fields`, `origin_key` or `render` from core; `plugin` from a listener'],
+                'label' => self::str() + ['description' => 'What was checked, in the reader\'s language'],
+                'ok' => self::bool(),
+                'why' => self::str() + ['description' => 'Why it failed, for a person. Absent when it passed.'],
+                'reason' => self::str() + ['description' => 'The refusal code the real issue would give. Core\'s checks only.'],
+                'detail' => self::str() + ['description' => 'The refusal\'s own English sentence, for a developer. Core\'s checks only.'],
+            ], ['code', 'label', 'ok']),
+            'DocumentPreflightResponse' => self::object([
+                'ok' => self::bool() + ['description' => 'Whether an issue would go through now'],
+                'checks' => ['type' => 'array', 'items' => SchemaBuilder::ref('DocumentPreflightCheck')],
+                'missing_fields' => ['type' => 'array', 'items' => self::str(), 'description' => 'Required fields with no value'],
+                'replays_document_id' => self::int(true) + ['description' => 'The document `origin_key` already names. An issue would return it instead of raising one, and no listener would be asked.'],
+            ], ['ok', 'checks', 'missing_fields', 'replays_document_id']),
             'DocumentCreateRequest' => self::object([
                 'document_source_id' => self::int() + ['description' => 'The template to issue the document from (see GET /api/document-sources?kind=template): its published version is issued. A letter or report (a copy made to edit before issuing) is issued as it is now, frozen as a version. Send this or `slot`.'],
                 'slot' => self::str() + ['description' => 'A template slot key such as `bakery.order_confirmation` (GET /api/document-template-slots): the template the workspace bound to it is issued, so a plugin needn\'t know which one. Send this or `document_source_id`. 409 `slot_unavailable` when its plugin is off, `slot_unbound` when nothing is bound, `slot_misfit` when the bound template no longer fits.'],
@@ -11739,6 +11753,20 @@ final class CoreApiSchemas
                     503 => self::errorResponse(
                         'render:true was requested and rendering or persistence is disabled on this instance'
                     ),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/documents/preflight', 'documents:issue', [
+                'summary' => 'Whether a document would issue, and every reason it would not',
+                // It writes nothing, so asking is safe where issuing isn't.
+                'mcp' => ['agentPolicy' => 'allow'],
+                'description' =>
+                    'The body is the same as POST /api/documents. Runs the same checks and `document.issuing` '
+                    . 'listeners (with `check_only: true`), but writes nothing, renders nothing and allocates no '
+                    . 'number. Always 200: `ok` is the answer and `checks` says why. A real issue checks everything again.',
+                'tags' => ['documents'],
+                'request' => 'DocumentCreateRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The answer', 'DocumentPreflightResponse'),
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('GET', '/api/documents', 'documents:read', [

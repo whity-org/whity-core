@@ -250,6 +250,10 @@ The no-code plugin builder (`WHITY-BUILDER.md`, separate session) needs three th
 - **Pages.** `document_artifacts.pages` keeps what the render service reports, returned on each artifact and on `document.rendered`.
 - **Older rows** have no number, no record and null pages, and are `issued` unless their routing says otherwise.
 
+### 3.13 Preflight (#1629)
+
+`POST /api/documents/preflight` and `Documents::preflight()` take an issue's body and say whether it would go through, and every reason it wouldn't. They run `TemplateIssuing`'s own steps, so they can't drift from an issue, and don't stop at the first problem. Nothing is written: a letter's draft is read rather than frozen, no number is allocated, nothing renders. `document.issuing` listeners get `check_only: true` and answer by appending `{label, ok, why?}` to `checks`; a veto counts as one failed check. A key naming an existing document is reported as `replays_document_id`, since the issue would return it. The real issue checks everything again.
+
 ## 4. Phasing
 
 | Phase | What | Depends on |
