@@ -1,6 +1,6 @@
 import type { useAuth } from '@/lib/auth-context';
 import type { useToast } from '@/lib/toast-context';
-import type { DocumentScope, TemplateKind, TemplateRow } from './types';
+import type { DocumentNumberingRule, DocumentScope, TemplateKind, TemplateRow } from './types';
 
 export type ApiClient = ReturnType<typeof useAuth>['apiClient'];
 export type AddToast = ReturnType<typeof useToast>['addToast'];
@@ -21,6 +21,14 @@ export class ForbiddenError extends Error {
 async function errorOf(response: Response, fallback: string): Promise<string> {
   const parsed = (await response.json().catch(() => null)) as { error?: unknown } | null;
   return typeof parsed?.error === 'string' && parsed.error !== '' ? parsed.error : fallback;
+}
+
+function toNumberingRule(raw: unknown): DocumentNumberingRule | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const { pattern, assign } = raw as { pattern?: unknown; assign?: unknown };
+  if (typeof pattern !== 'string' || pattern === '') return null;
+
+  return { pattern, assign: assign === 'on_final_approval' ? 'on_final_approval' : 'on_issue' };
 }
 
 /**
@@ -47,6 +55,7 @@ export function toTemplateRow(raw: Record<string, unknown>): TemplateRow {
     updated_at: typeof raw.updated_at === 'string' ? raw.updated_at : '',
     starter_key: str(raw.starter_key),
     legacy_template_id: num(raw.legacy_template_id),
+    numbering: toNumberingRule(raw.numbering),
   };
 }
 
@@ -72,7 +81,12 @@ export async function listTemplates(apiClient: ApiClient, fallback: string): Pro
 export async function patchTemplate(
   apiClient: ApiClient,
   id: number,
-  body: { scope?: DocumentScope; required_permission?: string | null; owner_ou_id?: number | null },
+  body: {
+    scope?: DocumentScope;
+    required_permission?: string | null;
+    owner_ou_id?: number | null;
+    numbering?: DocumentNumberingRule | null;
+  },
   fallback: string
 ): Promise<string | null> {
   const response = await apiClient(`${BASE}/${id}`, { method: 'PATCH', body: JSON.stringify(body) });

@@ -83,7 +83,8 @@ import {
   sectionAccessFrom,
   useRecordResource,
 } from '@whity/features/record';
-import type { RecordFactsFn, RecordSectionSpec } from '@whity/features/record';
+import type { RecordBadge, RecordFactsFn, RecordSectionSpec } from '@whity/features/record';
+import type { DocumentState } from '../types';
 import { useTranslation } from '@whity/features/i18n';
 import { formNameFrom } from '@/lib/documents/template-name';
 import { Tabs, TabsList, TabsTrigger } from '@whity/ui/tabs';
@@ -114,6 +115,22 @@ type Translate = (
   vars?: Record<string, string | number>
 ) => string;
 
+/** The header says where the document is. Withdrawn also has its notice below. */
+function stateBadges(state: DocumentState, t: Translate): RecordBadge[] {
+  switch (state) {
+    case 'draft':
+      return [{ key: 'state', label: t('organizer.state.draft', 'Draft') }];
+    case 'in_review':
+      return [{ key: 'state', label: t('organizer.state.inReview', 'In review'), tone: 'info' }];
+    case 'superseded':
+      return [{ key: 'state', label: t('organizer.state.superseded', 'Replaced'), tone: 'warning' }];
+    case 'withdrawn':
+      return [{ key: 'state', label: t('organizer.table.withdrawn', 'Withdrawn'), tone: 'danger' }];
+    default:
+      return [{ key: 'state', label: t('organizer.state.issued', 'Issued'), tone: 'success' }];
+  }
+}
+
 /**
  * The record's FIELDS — what the SERVER says the document IS.
  *
@@ -125,6 +142,10 @@ type Translate = (
  */
 interface DocumentRecordFields {
   title: string;
+  number: string | null;
+  state: DocumentState;
+  /** The newest version's page count, to compare with a paper copy. */
+  pages: number | null;
   templateName: string;
   createdAt: string;
   versionCount: number;
@@ -170,7 +191,16 @@ interface DocumentRecordFields {
 const documentFacts: RecordFactsFn<DocumentRecordFields> = (document, t, dates) => ({
   title: document.title,
   subtitle: t('record.subtitle', 'Issued from {template}', { template: document.templateName }),
+  badges: stateBadges(document.state, t),
   stats: [
+    // Only when it has one: an older document or one with no rule isn't missing it.
+    // Isolated, because a code stays left to right in an Arabic page.
+    ...(document.number !== null
+      ? [{ key: 'number', label: t('record.stat.number', 'Number'), value: `⁦${document.number}⁩` }]
+      : []),
+    ...(document.pages !== null
+      ? [{ key: 'pages', label: t('record.stat.pages', 'Pages'), value: document.pages }]
+      : []),
     {
       key: 'versions',
       label: t('record.stat.versions', 'Versions issued'),
@@ -539,6 +569,10 @@ export function DocumentRecordScreen({ documentId, onBack }: DocumentRecordScree
 
   const fields: DocumentRecordFields = {
     title: record.title,
+    number: record.number ?? null,
+    state: record.state ?? (withdrawn ? 'withdrawn' : 'issued'),
+    // Newest first, as the server sends them.
+    pages: record.artifacts[0]?.pages ?? null,
     templateName: (formNameFrom(record.template_name) !== null ? t('organizer.template.fromForm', 'Form: {name}', { name: formNameFrom(record.template_name) ?? '' }) : record.template_name),
     createdAt: record.created_at,
     versionCount: record.artifacts.length,
