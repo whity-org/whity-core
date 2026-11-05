@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
+import { roleLabel } from '@whity/features/roles';
 
 /**
  * A selectable role option for the user create/edit dropdowns.
@@ -16,15 +17,13 @@ export interface RoleOption {
 }
 
 /**
- * Title-case a role name for display (e.g. `admin` -> `Admin`). The underlying
- * value submitted to the API is always the raw, lower-case role name so the
+ * A role name for display: `admin` -> `Admin`, `hello_viewer` -> `Hello viewer`.
+ * The underlying value submitted to the API is always the raw role name, so the
  * server-side name resolution matches the seeded roles exactly.
  */
 function toLabel(name: string): string {
-  if (name.length === 0) {
-    return name;
-  }
-  return name.charAt(0).toUpperCase() + name.slice(1);
+  const words = roleLabel(name);
+  return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
 /**

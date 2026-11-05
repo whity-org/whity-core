@@ -58,6 +58,7 @@ import { useToast } from '@/lib/toast-context';
 import { useFetch } from '@/hooks/useFetch';
 import { useDirection } from '@/lib/direction-context';
 import { useTranslation } from '@whity/features/i18n';
+import { roleLabel } from '@whity/features/roles';
 import { Button } from '@whity/ui/button';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@whity/ui/alert';
@@ -328,7 +329,7 @@ function RouteFlowBody({
       if (ROLE_KINDS.has(step.ruleKind)) {
         const roleId = step.ruleConfig.role_id;
         const role = roles.find((r) => r.id === roleId);
-        return role !== undefined ? `${base}: ${role.name}` : base;
+        return role !== undefined ? `${base}: ${roleLabel(role.name)}` : base;
       }
       if (step.ruleKind === GROUP_KIND) {
         const groupId = step.ruleConfig.group_id;
@@ -438,7 +439,10 @@ function RouteFlowBody({
   const sentence = routeSentence(
     graph.steps,
     (step) => {
-      if (ROLE_KINDS.has(step.ruleKind)) return roles.find((r) => r.id === step.ruleConfig.role_id)?.name ?? null;
+      if (ROLE_KINDS.has(step.ruleKind)) {
+        const role = roles.find((r) => r.id === step.ruleConfig.role_id);
+        return role !== undefined ? roleLabel(role.name) : null;
+      }
       if (step.ruleKind === GROUP_KIND) return groups.find((g) => g.id === step.ruleConfig.group_id)?.name ?? null;
       return rules.find((r) => r.kind === step.ruleKind)?.label ?? null;
     },
@@ -742,7 +746,7 @@ function StageInspector({
               <SelectContent>
                 {roles.map((role) => (
                   <SelectItem key={role.id} value={String(role.id)}>
-                    {role.name}
+                    {roleLabel(role.name)}
                   </SelectItem>
                 ))}
               </SelectContent>
