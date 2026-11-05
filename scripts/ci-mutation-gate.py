@@ -33,9 +33,10 @@ as this run's verdict:
     skipped, last real run FAILED
                             -> RED, for as long as it stays broken
     skipped, main has moved since the last real execution
-                            -> RED: this tree has never been mutation-tested
-                               (a dropped scheduled run walks the 6h30m window
-                               past a commit, and nothing else notices)
+                            -> RED: this tree has never been mutation-tested.
+                               `--should-run` makes this unreachable on a
+                               scheduled run, so seeing it means that decision
+                               is wrong, and nothing else would notice
     skipped, no real execution found in the lookback
                             -> RED: the gate is stale, which is the general
                                case of "a gate that never runs is
@@ -55,6 +56,23 @@ gate nobody has watched fail is not known to work.
 
 Exit 0 = the current tip of main has passed mutation testing. Exit 1 = it has
 not, or that cannot be established.
+
+Whether to run at all (WHIT-896)
+--------------------------------
+    scripts/ci-mutation-gate.py --repo OWNER/NAME --run-id 12345 --should-run \
+        [--head-sha SHA] [--output "$GITHUB_OUTPUT"]
+
+Prints should_run=true unless the last real execution was on this same commit.
+This used to be "main has a commit from the last 6h30m", which missed commits
+twice over: a merge-queue commit is dated when the queue built it, not when it
+landed, and GitHub drops and delays scheduled runs. Runs 41931117902 and
+41970351495 went red that way: fa15af84 was dated 16:36:32, the 18:00 run never
+came, and the 23:07 run's window opened about 16:37. Asking what was last tested
+has no time in it, so a late run still tests the tip.
+
+Always exits 0, because this only decides whether to run. When the history can't
+be read it answers true: an extra run costs minutes, and a skipped one is the
+failure being fixed.
 """
 
 from __future__ import annotations
@@ -113,6 +131,61 @@ def job_conclusion(repo: str, run_id: int, job_name: str) -> str | None:
     return None
 
 
+def last_execution(
+    repo: str, workflow: str, job: str, run_id: int, started_at: str, lookback: int
+) -> tuple[dict, str] | None:
+    """The most recent earlier run in which the job really executed, with its conclusion."""
+    runs = gh_api(f"repos/{repo}/actions/workflows/{workflow}/runs?per_page={lookback}")
+    assert isinstance(runs, dict)
+    for candidate in runs.get("workflow_runs", []):
+        if candidate.get("id") == run_id:
+            continue
+        # Strictly the PAST. In CI this run is the newest one and the
+        # filter is a no-op; replaying an old run id locally, it is what
+        # keeps the answer honest instead of leaking hindsight in.
+        if started_at and (candidate.get("created_at") or "") >= started_at:
+            continue
+        conclusion = job_conclusion(repo, candidate["id"], job)
+        if conclusion in EXECUTED:
+            return candidate, conclusion
+    return None
+
+
+def should_run(args: argparse.Namespace) -> int:
+    """Decide whether this window tests the tip. See "Whether to run at all"."""
+    try:
+        this_run = gh_api(f"repos/{args.repo}/actions/runs/{args.run_id}")
+        assert isinstance(this_run, dict)
+        head_sha = args.head_sha or this_run.get("head_sha")
+        previous = last_execution(
+            args.repo, args.workflow, args.job, args.run_id,
+            this_run.get("created_at") or "", args.lookback,
+        )
+        if previous is None:
+            answer, why = True, f"Infection has not executed in the last {args.lookback} runs."
+        else:
+            run, conclusion = previous
+            answer = run.get("head_sha") != head_sha
+            where = f"run {run['id']} @ {short(run.get('head_sha'))}, {conclusion}"
+            why = (
+                f"{short(head_sha)} has not been tested; the last real execution was {where}."
+                if answer
+                else f"{short(head_sha)} was already tested ({where})."
+            )
+    except ApiError as exc:
+        answer, why = True, f"Could not read the run history, so running anyway: {exc}"
+
+    print(why)
+    print(f"should_run={'true' if answer else 'false'}")
+    if args.output:
+        with open(args.output, "a", encoding="utf-8") as fh:
+            fh.write(f"should_run={'true' if answer else 'false'}\n")
+    if args.summary:
+        with open(args.summary, "a", encoding="utf-8") as fh:
+            fh.write(f"## Mutation window\n\n{'RUNNING' if answer else 'SKIPPED'}: {why}\n\n")
+    return 0
+
+
 def short(sha: str | None) -> str:
     return (sha or "unknown")[:8]
 
@@ -149,7 +222,16 @@ def main() -> int:
         help="how many previous runs to search for a real execution (~10 days at 4/day)",
     )
     ap.add_argument("--summary", default=os.environ.get("GITHUB_STEP_SUMMARY"))
+    ap.add_argument(
+        "--should-run",
+        action="store_true",
+        help="decide whether this window tests the tip, instead of reporting a verdict",
+    )
+    ap.add_argument("--output", default=None, help="file to append should_run=... to")
     args = ap.parse_args()
+
+    if args.should_run:
+        return should_run(args)
 
     lines: list[str] = []
     annotations: list[tuple[str, str]] = []
@@ -198,25 +280,9 @@ def main() -> int:
                 "so the last window that DID execute decides this run's verdict."
             )
 
-            runs = gh_api(
-                f"repos/{args.repo}/actions/workflows/{args.workflow}/runs"
-                f"?per_page={args.lookback}"
+            previous = last_execution(
+                args.repo, args.workflow, args.job, args.run_id, started_at, args.lookback
             )
-            assert isinstance(runs, dict)
-
-            previous = None
-            for candidate in runs.get("workflow_runs", []):
-                if candidate.get("id") == args.run_id:
-                    continue
-                # Strictly the PAST. In CI this run is the newest one and the
-                # filter is a no-op; replaying an old run id locally, it is what
-                # keeps the answer honest instead of leaking hindsight in.
-                if started_at and (candidate.get("created_at") or "") >= started_at:
-                    continue
-                conclusion = job_conclusion(args.repo, candidate["id"], args.job)
-                if conclusion in EXECUTED:
-                    previous = (candidate, conclusion)
-                    break
 
             if previous is None:
                 verdict = (
@@ -248,8 +314,9 @@ def main() -> int:
                     verdict = (
                         f"STALE: main is at {short(head_sha)} but the last real execution was "
                         f"on {short(run.get('head_sha'))} ({where}), and this window skipped. "
-                        "The current tip has never been mutation-tested — a scheduled run was "
-                        "dropped, or a commit fell outside the 6h30m window."
+                        "The current tip has never been mutation-tested, and this window "
+                        "should have tested it: check the --should-run decision in this run's "
+                        "first job."
                     )
                     say(verdict)
                     annotate("error", verdict)
