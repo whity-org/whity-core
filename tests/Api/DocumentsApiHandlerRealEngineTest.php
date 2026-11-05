@@ -39,6 +39,25 @@ use Whity\Core\Tenant\TenantContext;
 use Whity\Database\Database;
 use Whity\Sdk\Http\Response;
 use Whity\Storage\LocalStorageDriver;
+use Whity\Auth\JwtParser;
+use Whity\Core\Audience\ExplicitRuleResolver;
+use Whity\Core\Document\RecipientDocumentAccess;
+use Whity\Core\Document\Routing\DocumentRouter;
+use Whity\Core\Document\Routing\RoleBelowActorRuleResolver;
+use Whity\Core\Document\Routing\RoleRuleResolver;
+use Whity\Core\Document\Routing\RouteAction;
+use Whity\Core\Document\Routing\RouteEdgeRepository;
+use Whity\Core\Document\Routing\RouteEventRepository;
+use Whity\Core\Document\Routing\RouteRepository;
+use Whity\Core\Document\Routing\RouteStepRepository;
+use Whity\Core\Document\Routing\RoutingRejectedException;
+use Whity\Core\Document\Routing\RoutingRuleRegistry;
+use Whity\Core\Group\GroupResolver;
+use Whity\Core\Group\GroupRuleResolver;
+use Whity\Core\Group\UserGroupRepository;
+use Whity\Core\Router;
+use Whity\Http\RbacMiddleware;
+use Whity\Mcp\McpExposure;
 
 /**
  * Real-engine tests for {@see DocumentsApiHandler} (#947 item 1) — issued
@@ -77,6 +96,9 @@ final class DocumentsApiHandlerRealEngineTest extends TestCase
     private const VIEWER = 11;  // documents:read + documents:render, NOT read:all
     private const AUDITOR = 12; // documents:read + documents:read:all
     private const OTHER_TENANT_ADMIN = 20;
+    /** The default role's shape: no documents permission at all. Also a member of tenant 2. */
+    private const MEMBER = 13;
+    private const OTHER_MEMBER = 14;
 
     private PDO $pdo;
     private FakeRenderServiceClient $fakeRender;
@@ -826,7 +848,187 @@ final class DocumentsApiHandlerRealEngineTest extends TestCase
         self::assertCount($before, $this->fakeRender->flowCalls);
     }
 
+    // ── a person a route reached can open it (WHIT-902) ──────────────────────
+
+    public function testARecipientWithNoDocumentsPermissionCanReadItAndItsContentAndAct(): void
+    {
+        $id = $this->issue(self::OWNER, 'Routed');
+        $route = $this->routeTo($id, self::MEMBER);
+
+        $show = $this->throughGate(self::MEMBER, "/api/documents/{$id}");
+        self::assertSame(200, $show->getStatusCode(), $show->getBody());
+        self::assertSame('in_review', self::data($show)['state']);
+
+        $artifact = $this->artifactRepo->findLatestForDocument($id, self::TENANT);
+        self::assertNotNull($artifact);
+        self::assertSame(200, $this->throughGate(self::MEMBER, "/api/documents/{$id}/content")->getStatusCode());
+        self::assertSame(200, $this->throughGate(self::MEMBER, "/api/documents/{$id}/artifacts/{$artifact['id']}/content")->getStatusCode());
+
+        $this->router()->act(self::TENANT, self::MEMBER, $route, RouteAction::ACKNOWLEDGED, null);
+
+        // Done with it, and it still reached them: the inbox's history links here.
+        self::assertSame(200, $this->throughGate(self::MEMBER, "/api/documents/{$id}")->getStatusCode());
+    }
+
+    public function testEveryoneElseWithNoDocumentsPermissionGetsTheSameRefusalAsBefore(): void
+    {
+        $id = $this->issue(self::OWNER, 'Routed');
+        $this->routeTo($id, self::MEMBER);
+
+        $refused = $this->throughGate(self::OTHER_MEMBER, "/api/documents/{$id}");
+        self::assertSame(403, $refused->getStatusCode());
+        self::assertSame(403, $this->throughGate(self::OTHER_MEMBER, "/api/documents/{$id}/content")->getStatusCode());
+
+        // The same answer for an id that doesn't exist, so a refusal reveals nothing.
+        self::assertSame($refused->getBody(), $this->throughGate(self::OTHER_MEMBER, '/api/documents/999999')->getBody());
+        self::assertSame($refused->getStatusCode(), $this->throughGate(self::MEMBER, '/api/documents/999999')->getStatusCode());
+    }
+
+    public function testBeingARecipientOfOneDocumentOpensOnlyThatOne(): void
+    {
+        $routed = $this->issue(self::OWNER, 'Routed');
+        $other = $this->issue(self::OWNER, 'Other');
+        $this->routeTo($routed, self::MEMBER);
+
+        self::assertSame(200, $this->throughGate(self::MEMBER, "/api/documents/{$routed}")->getStatusCode());
+        self::assertSame(403, $this->throughGate(self::MEMBER, "/api/documents/{$other}")->getStatusCode());
+    }
+
+    public function testOnlyBeingARecipientPassesTheGateNotBeingTheCreatorOrHoldingARole(): void
+    {
+        $mine = $this->issue(self::OWNER, 'Theirs now');
+        $this->pdo->exec('UPDATE documents SET created_by = ' . self::MEMBER . ' WHERE id = ' . $mine);
+
+        self::assertSame(403, $this->throughGate(self::MEMBER, "/api/documents/{$mine}")->getStatusCode());
+    }
+
+    public function testARecipientInOneWorkspaceIsNotAnsweredInAnother(): void
+    {
+        $id = $this->issue(self::OWNER, 'Routed');
+        $this->routeTo($id, self::MEMBER);
+
+        // The same person, in a workspace they also belong to, asking for the same id.
+        $res = $this->throughGate(self::MEMBER, "/api/documents/{$id}", self::OTHER_TENANT);
+
+        self::assertSame(403, $res->getStatusCode());
+    }
+
+    public function testAPastRecipientReadsAWithdrawnDocumentAndCanActOnNothing(): void
+    {
+        $id = $this->issue(self::OWNER, 'Taken back');
+        $route = $this->routeTo($id, self::MEMBER);
+        $this->pdo->exec('UPDATE documents SET withdrawn_at = CURRENT_TIMESTAMP WHERE id = ' . $id);
+
+        $show = $this->throughGate(self::MEMBER, "/api/documents/{$id}");
+        self::assertSame(200, $show->getStatusCode());
+        self::assertSame('withdrawn', self::data($show)['state']);
+
+        $this->expectException(RoutingRejectedException::class);
+        $this->router()->act(self::TENANT, self::MEMBER, $route, RouteAction::ACKNOWLEDGED, null);
+    }
+
+    /**
+     * What keeps agents where they were: tools/call and the MCP surface read a
+     * route's permission, and it is still there.
+     */
+    public function testTheRoutesKeepTheirPermissionAndWritesGetNoPass(): void
+    {
+        $id = $this->issue(self::OWNER, 'Routed');
+        $this->routeTo($id, self::MEMBER);
+        $router = $this->gatedRouter();
+
+        foreach (["/api/v1/documents/{$id}", "/api/v1/documents/{$id}/content", "/api/v1/documents/{$id}/artifacts/1/content"] as $path) {
+            $match = $router->match(new Request('GET', $path));
+            self::assertNotNull($match);
+            self::assertSame(CorePermissions::DOCUMENTS_READ, $match['requiredPermission']);
+            self::assertTrue(McpExposure::exposes($match));
+        }
+        $render = $router->match(new Request('POST', "/api/v1/documents/{$id}/render"));
+        self::assertNotNull($render);
+        self::assertNull($render['recordAccess']);
+    }
+
+    public function testNamingARouteThatDoesNotExistFailsLoudly(): void
+    {
+        $this->expectException(\LogicException::class);
+        (new Router())->allowRecordAccess('GET', '/api/documents/{id:\d+}', static fn (): bool => true);
+    }
+
     // ── helpers ──────────────────────────────────────────────────────────────
+
+    private function gatedRouter(): Router
+    {
+        $router = new Router();
+        $router->register('GET', '/api/documents/{id:\d+}', [$this->handler, 'show'], null, null, CorePermissions::DOCUMENTS_READ);
+        $router->register('GET', '/api/documents/{id:\d+}/content', [$this->handler, 'content'], null, null, CorePermissions::DOCUMENTS_READ);
+        $router->register('GET', '/api/documents/{id:\d+}/artifacts/{artifactId:\d+}/content', [$this->handler, 'artifactContent'], null, null, CorePermissions::DOCUMENTS_READ);
+        $router->register('POST', '/api/documents/{id:\d+}/render', [$this->handler, 'rerender'], null, null, CorePermissions::DOCUMENTS_ISSUE);
+        RecipientDocumentAccess::allowOn($router, new RouteRecipientRepository($this->pdo));
+
+        return $router;
+    }
+
+    /** A request through the real route table and RBAC gate, as HttpKernel runs them. */
+    private function throughGate(int $actor, string $path, int $tenant = self::TENANT): Response
+    {
+        RoleChecker::clearCache();
+        TenantContext::reset();
+        TenantContext::setTenantId($tenant);
+        $versioned = str_replace('/api/', '/api/v1/', $path);
+        $req = new Request('GET', $versioned, ['Authorization' => 'Bearer test'], '');
+        $req->setAttribute(Request::ATTR_JWT_CLAIMS, ['profile_id' => $actor, 'active_tenant_id' => $tenant]);
+        $match = $this->gatedRouter()->match($req);
+        self::assertNotNull($match, $versioned);
+        $params = $match['params'];
+        $recordAccess = $match['recordAccess'];
+        self::assertIsCallable($recordAccess);
+        $rbac = new RbacMiddleware($this->createMock(JwtParser::class), new RoleChecker($this->wrapSqlite($this->pdo), new PermissionRegistry()));
+
+        return $rbac->handle(
+            $req,
+            static fn (Request $r): Response => ($match['handler'])($r, $params),
+            $match['requiredRole'],
+            $match['requiredPermission'],
+            static fn (int $profileId, int $tenantId): bool => $recordAccess($profileId, $tenantId, $params),
+        );
+    }
+
+    private function router(): DocumentRouter
+    {
+        $settings = $this->settingsService;
+        $rules = new RoutingRuleRegistry();
+        $registry = $rules;
+        $rules->registerCoreRoutingRules(
+            new RoleRuleResolver($this->pdo),
+            new RoleBelowActorRuleResolver($this->pdo),
+            new ExplicitRuleResolver(),
+            new GroupRuleResolver(new GroupResolver($this->pdo, new UserGroupRepository($this->pdo), static fn (): RoutingRuleRegistry => $registry)),
+        );
+
+        return new DocumentRouter(
+            $this->pdo,
+            new RouteRepository($this->pdo),
+            new RouteStepRepository($this->pdo),
+            new RouteEventRepository($this->pdo),
+            new RouteRecipientRepository($this->pdo),
+            new RouteEdgeRepository($this->pdo),
+            $rules,
+            $settings,
+            null,
+        );
+    }
+
+    /** @return array<string, mixed> The route. */
+    private function routeTo(int $documentId, int $profileId): array
+    {
+        TenantContext::reset();
+        TenantContext::setTenantId(self::TENANT);
+
+        return $this->router()->issue(self::TENANT, self::OWNER, ['id' => $documentId], 'Review', [[
+            'rule_kind' => RoutingRuleRegistry::KIND_EXPLICIT,
+            'rule_config' => ['profile_ids' => [$profileId]],
+        ]])['route'];
+    }
 
     /** A published template that prints its number, with its own numbering rule. */
     private function numberedTemplate(string $pattern, string $assign = 'on_issue'): int
@@ -965,7 +1167,9 @@ final class DocumentsApiHandlerRealEngineTest extends TestCase
         $pdo->exec("INSERT OR IGNORE INTO roles (id, name, description, tenant_id, created_at) VALUES (1, 'admin', '', NULL, datetime('now'))");
         $pdo->exec("INSERT INTO roles (id, name, description, tenant_id, created_at) VALUES
             (101, 'viewer', '', 1, datetime('now')),
-            (102, 'auditor', '', 1, datetime('now'))");
+            (102, 'auditor', '', 1, datetime('now')),
+            (103, 'member', '', 1, datetime('now')),
+            (104, 'member', '', 2, datetime('now'))");
 
         foreach ([CorePermissions::DOCUMENTS_READ, CorePermissions::DOCUMENTS_RENDER] as $permission) {
             $this->grant($pdo, 101, $permission);
@@ -978,6 +1182,8 @@ final class DocumentsApiHandlerRealEngineTest extends TestCase
                 (10, 'owner',   'x', false, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
                 (11, 'viewer',  'x', false, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
                 (12, 'auditor', 'x', false, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+                (13, 'member', 'x', false, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+                (14, 'other-member', 'x', false, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
                 (20, 'other-admin', 'x', false, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         ");
         // Only the owner belongs to a unit — so the origin-OU test can prove
@@ -987,7 +1193,10 @@ final class DocumentsApiHandlerRealEngineTest extends TestCase
                 (1000, 10, 1, 1,   7,    true,  'active', datetime('now')),
                 (1001, 11, 1, 101, NULL, true,  'active', datetime('now')),
                 (1002, 12, 1, 102, NULL, true,  'active', datetime('now')),
-                (1003, 20, 2, 1,   NULL, true,  'active', datetime('now'))
+                (1003, 20, 2, 1,   NULL, true,  'active', datetime('now')),
+                (1004, 13, 1, 103, NULL, true,  'active', datetime('now')),
+                (1005, 14, 1, 103, NULL, true,  'active', datetime('now')),
+                (1006, 13, 2, 104, NULL, true,  'active', datetime('now'))
         ");
 
         return $pdo;

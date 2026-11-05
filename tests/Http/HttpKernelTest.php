@@ -729,4 +729,31 @@ class HttpKernelTest extends TestCase
             }
         }
     }
+
+    public function testARoutesRecordAccessReachesTheGateWithItsPathParameters(): void
+    {
+        $rbacMiddlewareMock = $this->createMock(RbacMiddleware::class);
+        $kernel = new HttpKernel($this->router, $rbacMiddlewareMock);
+        $this->router->register('GET', '/things/{id:\d+}', static fn (Request $r): Response => Response::json([]), null, null, 'things:read');
+        $asked = [];
+        $this->router->allowRecordAccess('GET', '/things/{id:\d+}', static function (int $profile, int $tenant, array $params) use (&$asked): bool {
+            $asked = [$profile, $tenant, $params['id']];
+
+            return true;
+        });
+        $rbacMiddlewareMock
+            ->expects($this->once())
+            ->method('handle')
+            ->willReturnCallback(function (Request $req, callable $next, ?string $role, ?string $permission, ?callable $recordAccess) {
+                $this->assertSame('things:read', $permission);
+                $this->assertNotNull($recordAccess);
+                $this->assertTrue($recordAccess(7, 3));
+
+                return $next($req);
+            });
+
+        $kernel->handle(new Request('GET', '/things/42'));
+
+        $this->assertSame([7, 3, '42'], $asked);
+    }
 }
