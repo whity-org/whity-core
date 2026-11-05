@@ -1438,6 +1438,9 @@ $publicFormGate = new \Whity\Http\Middleware\PublicFormGate(
     $publicFormKeyRepository,
     new DatabaseSharedStore($db->getPdo()),
     $publicFormBotCheck,
+    null,
+    // A plugin's public GET (WHIT-704) is served only when the operator says so.
+    \Whity\Http\Middleware\PublicFormGate::readsEnabledFromEnv($_ENV),
 );
 $kernel->use($publicFormGate);
 $kernel->use(new RequestBodyValidator());

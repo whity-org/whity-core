@@ -103,3 +103,40 @@ With no provider chosen, every public form is refused, so a form can't go public
 hCaptcha and reCAPTCHA aren't offered yet. They're one entry each in `BotCheck::PROVIDERS`.
 
 **Workspace admin, for each site.** In **Settings → Public forms**, issue a key for the form and list the sites that may send it. You need `public_form_keys:manage`, which every role holding `settings:write` gets when upgrading. The key is shown once and stored only as a hash. If it's lost, revoke it and issue another. Revoking takes effect at once and can't be undone.
+
+## Public reads (SDK 1.69)
+
+A plugin can also answer a GET from anybody holding a link: a public status page, a "where is my order" lookup, a public price list. Declare `'public' => 'read'`. It uses the same keys, the same tenant rule and the same allowed sites as a form. Needs SDK 1.69 and core 0.2.26.
+
+```php
+use Whity\Sdk\Http\PublicRead;
+
+[
+    'method'  => 'GET',
+    'path'    => '/api/arcline/public/opening-hours/{key}',
+    'public'  => 'read',
+    'handler' => function (Request $request): Response {
+        $read = PublicRead::from($request); // $read->tenantId, never the request's say-so
+        return Response::json(['data' => $this->hours->forTenant($read->tenantId)]);
+    },
+]
+```
+
+The route must be GET, at exactly `/api/<your slug>/public/<name>/{key}`, with `<name>` as for a form and not the name of one of your forms, and with no `requiredPermission` or `requiredRole`. Anything else isn't registered, and the reason is logged. A workspace admin issues the key in **Settings → Public forms**, where the read is listed beside the forms.
+
+**Off by default.** Public reads are served only when the operator sets `PLUGIN_PUBLIC_READS=on` for the instance. Until then the route is private: an anonymous request is asked to sign in, and a signed-in one still gets 404, because only the host's checks can open it.
+
+What the host does before your handler, in this order:
+
+| Check | Refusal |
+|---|---|
+| Removes `Cookie`, `Authorization` and `X-Tenant-Id`. No session is read, and any `Set-Cookie` you return is dropped | |
+| 600 requests an hour from one address, for this read | 429 with `Retry-After` |
+| The key: live, and issued for this plugin and this name | 404, the same for every reason |
+| `Origin`, when the caller sends one: on the key's list or the instance's `CORS_ALLOWED_ORIGINS` | 403 |
+| 6,000 requests an hour for this read in this workspace, across all addresses | 429 with `Retry-After` |
+
+There is no bot check, since a read changes nothing. A link opened directly sends no `Origin` and is served; only an allowed site gets the headers that let its page read the answer with `fetch`. Send no custom headers from the page, so the browser doesn't need a preflight.
+
+**Return only what anybody with the link may see.** Treat the key as visible to everyone who has the page. Don't put anything private behind a public read, don't throw on bad input (return a 4xx), and remember the handler's cost is multiplied by the limits above.
+

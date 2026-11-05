@@ -1,0 +1,1 @@
+- Plugins can declare public GET routes (`'public' => 'read'` on `/api/<slug>/public/<name>/{key}`, SDK 1.69) without editing core. They use the same workspace keys, tenant rule and allowed sites as public forms, are rate-limited per address and per workspace, and stay off until the operator sets `PLUGIN_PUBLIC_READS=on` (#522).

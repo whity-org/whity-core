@@ -98,6 +98,20 @@ interface PluginInterface
      *   the route or keeps it private, so it is never public by accident: use
      *   {@see PluginRequirementsInterface::getCoreConstraint()} to refuse to load there.
      *
+     *   `'read'` (SDK 1.69, WHIT-704) is the third, for something anybody holding a
+     *   link may see. Accepted for exactly one shape: method GET, path
+     *   `/api/<your plugin's slug>/public/<name>/{key}` (<name> as above, and not
+     *   the name of one of your forms), and no requiredPermission or requiredRole;
+     *   anything else is NOT registered, with a logged reason. The key is the same
+     *   kind a form uses, issued by a workspace admin. Before your handler runs the
+     *   host resolves the tenant from `{key}`, applies a per-IP limit and a ceiling
+     *   per read and tenant, checks the Origin when the caller sends one, and strips
+     *   cookies and Authorization. Read the tenant from
+     *   {@see Http\PublicRead::from()}, never from the request. OFF BY DEFAULT: the
+     *   route stays private (sign-in required, and then still refused) until the
+     *   instance's operator sets `PLUGIN_PUBLIC_READS=on`. Return only what anybody
+     *   with the link may see, and a 4xx on bad input rather than a throw.
+     *
      * @return array<array{method: string, path: string, handler: callable, requiredRole?: ?string, requiredPermission?: ?string, schema?: array<string, mixed>}>
      */
     public function getRoutes(): array;
