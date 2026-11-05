@@ -807,7 +807,10 @@ class UsersApiHandler
      * permission). It is deliberately GLOBAL (unlike the membership-lifecycle
      * `status` in the response, which stays per-tenant): toggling it blocks/
      * restores login for the profile everywhere it holds a membership, not just
-     * in the caller's tenant. `name` is derived/read-only and `tenantId` is out
+     * in the caller's tenant. Because email, password, account status and
+     * display name are global, a non-system tenant may change them only for a
+     * person who belongs to it alone (409 `shared_profile` otherwise, WHIT-909).
+     * `name` is derived/read-only and `tenantId` is out
      * of scope; both are ignored if sent. Tenant-scoped + ownership-checked: a
      * non-system tenant may edit ONLY a profile with a membership in its own
      * tenant (else 404), the
@@ -1008,6 +1011,26 @@ class UsersApiHandler
                     $newAccountStatus = $requestedAccountStatus;
                     $accountStatusChanged = true;
                 }
+            }
+
+            // Email, password and account status live on the GLOBAL profile, like
+            // the display name above, so a change here is a change in every
+            // workspace the person belongs to. A workspace may change them for
+            // its own people only: a membership here can be obtained for a person
+            // another workspace already relies on (adding them by email attaches
+            // the existing profile), and that must not make their sign-in this
+            // workspace's to rewrite. The person changes it themselves, or the
+            // system tenant does. Checked before any write, so a refused field
+            // leaves the rest of the request unapplied too.
+            if (($emailChanged || $passwordChanged || $accountStatusChanged)
+                && $currentTenantId !== self::SYSTEM_TENANT_ID
+                && $this->belongsToAnotherTenant($profileId, $currentTenantId)
+            ) {
+                return Response::error(
+                    'This person also belongs to another workspace, so only they can change how they sign in',
+                    409,
+                    ['reason' => 'shared_profile']
+                );
             }
 
             // A true no-op (nothing genuinely changed) still returns a sensible 200.

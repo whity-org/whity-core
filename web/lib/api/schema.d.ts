@@ -13012,12 +13012,12 @@ export interface components {
             displayName?: string;
             /**
              * Format: email
-             * @description New sign-in email address.
+             * @description New sign-in email address. Refused with 409 when they also belong to another workspace, unless the caller is the system tenant.
              */
             email?: string;
             /**
              * Format: password
-             * @description New password; must satisfy the site password policy.
+             * @description New password; must satisfy the site password policy. Refused with 409 when they also belong to another workspace, unless the caller is the system tenant.
              */
             password?: string;
             /** @description Replacement role in this tenant, by name or numeric id. */
@@ -13027,7 +13027,7 @@ export interface components {
             /** @description Organizational unit to move the user to. An explicit null removes them from their unit. */
             ou_id?: number | null;
             /**
-             * @description `inactive` blocks sign-in for this person everywhere; `active` restores it.
+             * @description `inactive` blocks sign-in for this person everywhere; `active` restores it. Refused with 409 when they also belong to another workspace, unless the caller is the system tenant.
              * @enum {string}
              */
             accountStatus?: "active" | "inactive";

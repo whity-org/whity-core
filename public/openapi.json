@@ -71281,14 +71281,14 @@
                         "type": "string",
                         "format": "email",
                         "maxLength": 255,
-                        "description": "New sign-in email address."
+                        "description": "New sign-in email address. Refused with 409 when they also belong to another workspace, unless the caller is the system tenant."
                     },
                     "password": {
                         "type": "string",
                         "format": "password",
                         "minLength": 8,
                         "maxLength": 72,
-                        "description": "New password; must satisfy the site password policy."
+                        "description": "New password; must satisfy the site password policy. Refused with 409 when they also belong to another workspace, unless the caller is the system tenant."
                     },
                     "role": {
                         "oneOf": [
@@ -71326,7 +71326,7 @@
                             "active",
                             "inactive"
                         ],
-                        "description": "`inactive` blocks sign-in for this person everywhere; `active` restores it."
+                        "description": "`inactive` blocks sign-in for this person everywhere; `active` restores it. Refused with 409 when they also belong to another workspace, unless the caller is the system tenant."
                     },
                     "allowLocalPasswordOnIdpAccount": {
                         "type": "boolean",

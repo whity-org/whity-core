@@ -831,11 +831,13 @@ final class UsersApiHandlerRealEngineTest extends TestCase
     }
 
     /**
-     * Deactivating a profile is GLOBAL (ADR 0005 §1): it is not scoped to one
-     * tenant's membership row. A profile with memberships in two tenants is
-     * deactivated everywhere by a single tenant's admin action.
+     * Deactivating a profile is GLOBAL (ADR 0005 §1), so a workspace may do it
+     * only for people who belong to it alone (WHIT-909). A profile with
+     * memberships in two tenants is refused with the same `shared_profile` 409
+     * as a rename, and stays active everywhere; the person, or the system
+     * tenant, changes it instead.
      */
-    public function testDeactivateAffectsProfileAcrossAllItsTenantMemberships(): void
+    public function testDeactivatingAProfileSharedWithAnotherTenantIsRefused(): void
     {
         $this->seedProfile(204, 'multi-tenant@example.com');
         $this->seedMembership(204, 1, 2);
@@ -843,15 +845,17 @@ final class UsersApiHandlerRealEngineTest extends TestCase
 
         MockRequestFactory::setTestTenant(1);
         $handler = $this->handler();
-        $handler->update(
+        $response = $handler->update(
             $this->authedRequest('PATCH', '/api/users/204', ['accountStatus' => 'inactive']),
             ['id' => '204']
         );
 
+        $this->assertSame(409, $response->getStatusCode(), $response->getBody());
+        $this->assertSame('shared_profile', json_decode($response->getBody(), true)['details']['reason'] ?? null);
         $this->assertSame(
-            'inactive',
+            'active',
             (string) $this->pdo->query('SELECT status FROM profiles WHERE id = 204')->fetchColumn(),
-            'The GLOBAL profile status must reflect the deactivation regardless of which tenant acted.'
+            'A profile another tenant also relies on must stay active.'
         );
     }
 

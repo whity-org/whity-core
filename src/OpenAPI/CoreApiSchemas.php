@@ -7340,14 +7340,14 @@ final class CoreApiSchemas
             ], ['email', 'password']),
             'UserUpdateRequest' => self::object([
                 'displayName' => self::str() + ['description' => 'The name shown for this person. Refused with 409 when they also belong to another workspace, unless the caller is the system tenant.'],
-                'email' => self::email() + ['description' => 'New sign-in email address.'],
-                'password' => self::password() + ['description' => 'New password; must satisfy the site password policy.'],
+                'email' => self::email() + ['description' => 'New sign-in email address. Refused with 409 when they also belong to another workspace, unless the caller is the system tenant.'],
+                'password' => self::password() + ['description' => 'New password; must satisfy the site password policy. Refused with 409 when they also belong to another workspace, unless the caller is the system tenant.'],
                 'role' => $permissionRef + ['description' => 'Replacement role in this tenant, by name or numeric id.'],
                 'role_id' => self::reference('/api/roles', 'name') + ['description' => 'Replacement role, by id (see GET /api/roles). Takes precedence over `role`.'],
                 // array_key_exists, not isset: an explicit null CLEARS the OU.
                 'ou_id' => self::reference('/api/ous', 'name', nullable: true) + ['description' => 'Organizational unit to move the user to. An explicit null removes them from their unit.'],
                 // WC-user-status: the admin deactivate/reactivate control.
-                'accountStatus' => ['type' => 'string', 'enum' => ['active', 'inactive'], 'description' => '`inactive` blocks sign-in for this person everywhere; `active` restores it.'],
+                'accountStatus' => ['type' => 'string', 'enum' => ['active', 'inactive'], 'description' => '`inactive` blocks sign-in for this person everywhere; `active` restores it. Refused with 409 when they also belong to another workspace, unless the caller is the system tenant.'],
                 // #917: permits `password` against an account whose credentials
                 // belong to an identity provider (`authMethod: 'idp'`), which is
                 // otherwise refused with 409. Taking it moves the account to
