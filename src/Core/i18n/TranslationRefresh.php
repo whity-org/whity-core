@@ -62,6 +62,7 @@ final class TranslationRefresh
     private function hasTranslationTables(): bool
     {
         try {
+            // @tenant-guard-ignore: probes that the table exists, and matches no rows.
             $this->pdo->query('SELECT 1 FROM translations WHERE 1 = 0');
             $this->pdo->query('SELECT 1 FROM languages WHERE 1 = 0');
 
