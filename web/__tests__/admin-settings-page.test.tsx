@@ -188,7 +188,7 @@ describe('AdminSettingsPage (General) — RBAC gating', () => {
   it('renders Access Denied when the caller lacks settings:read', () => {
     grant(); // no permissions
     render(<AdminSettingsPage />);
-    expect(screen.getByRole('heading', { name: /access denied/i })).toBeInTheDocument();
+    expect(screen.getByText('You don’t have access to settings')).toBeInTheDocument();
     expect(mockApiGet).not.toHaveBeenCalledWith('/api/v1/settings/global');
   });
 
@@ -554,7 +554,7 @@ describe('BrandingSettingsPage — RBAC gating and locale', () => {
   it('renders Access Denied when the caller lacks settings:read', () => {
     grant();
     render(<BrandingSettingsPage />);
-    expect(screen.getByRole('heading', { name: /access denied/i })).toBeInTheDocument();
+    expect(screen.getByText('You don’t have access to branding')).toBeInTheDocument();
   });
 
   it('renders the locale field for a settings:read caller', async () => {

@@ -157,7 +157,7 @@ describe('PluginsPage RBAC page gate', () => {
 
     render(<PluginsPage />);
 
-    expect(screen.getByText('You cannot manage plugins')).toBeInTheDocument();
+    expect(screen.getByText('You don’t have access to plugins')).toBeInTheDocument();
   });
 });
 

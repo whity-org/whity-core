@@ -1,6 +1,7 @@
 ﻿'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { NoAccess } from '@/components/no-access';
 import Link from 'next/link';
 import { api } from '@/lib/api/client';
 import type { components } from '@/lib/api/schema';
@@ -21,7 +22,7 @@ import { Badge } from '@whity/ui/badge';
 import { DataTable, type DataTableColumn } from '@whity/ui/data-table';
 import { ConfirmAction } from '@whity/ui/confirm-action';
 import { TechnicalDetails } from '@whity/ui/display-preferences';
-import { AccessDeniedPanel, AreaError, EmptyFirstTime, LoadingRows, ReadOnlyNotice } from '@whity/ui/page-states';
+import { AreaError, EmptyFirstTime, LoadingRows, ReadOnlyNotice } from '@whity/ui/page-states';
 import { Skeleton } from '@whity/ui/skeleton';
 import {
   Dialog,
@@ -197,14 +198,7 @@ export default function PluginsPage() {
   // RBAC gate: Access Denied if user lacks plugins:read
   if (!hasAccess) {
     return (
-      <AccessDeniedPanel
-        title={t('plugins.accessDenied.title', 'You cannot manage plugins')}
-        description={t(
-          'plugins.accessDenied',
-          'You do not have the required permissions (`plugins:read`) to access the Plugin ' +
-            'Management Console.'
-        )}
-      />
+      <NoAccess area={t('access.area.plugins.accessDenied', 'plugins')} permission="plugins:read" />
     );
   }
 

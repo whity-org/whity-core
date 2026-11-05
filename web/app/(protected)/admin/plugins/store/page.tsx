@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { NoAccess } from '@/components/no-access';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api/client';
 import { useCapabilities } from '@/hooks/useCapabilities';
@@ -13,7 +14,7 @@ import { Button } from '@whity/ui/button';
 import { PluginTile } from '@whity/ui/plugin-card';
 import { SearchField } from '@whity/ui/search-field';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@whity/ui/select';
-import { AccessDeniedPanel, AreaError, EmptyFiltered, EmptyFirstTime } from '@whity/ui/page-states';
+import { AreaError, EmptyFiltered, EmptyFirstTime } from '@whity/ui/page-states';
 import { Skeleton } from '@whity/ui/skeleton';
 
 // Read access to the store matches the Installed tab (plugins:read). Install is
@@ -116,13 +117,7 @@ export default function PluginStorePage() {
 
   if (!hasAccess) {
     return (
-      <AccessDeniedPanel
-        title={t('pluginStore.accessDenied.title', 'You cannot browse the plugin store')}
-        description={t(
-          'pluginStore.accessDenied',
-          'You do not have the required permission (`plugins:read`) to browse the Plugin Store.',
-        )}
-      />
+      <NoAccess area={t('access.area.pluginStore.accessDenied', 'the plugin store')} permission="plugins:read" />
     );
   }
 

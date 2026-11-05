@@ -709,8 +709,8 @@ it('offers no search, sort or layout switch to a caller who cannot read the fold
   render(<DocumentLibraryPage />);
 
   // Positive control: this render happened, and it reached both failure paths.
-  expect(await screen.findByText('Failed to load the document folders')).toBeInTheDocument();
-  expect(await screen.findByText('Insufficient permissions')).toBeInTheDocument();
+  expect(await screen.findByText('You don’t have access to documents')).toBeInTheDocument();
+  expect(screen.queryByText('Insufficient permissions')).not.toBeInTheDocument();
 
   // Only now is the absence evidence.
   expect(screen.queryByLabelText('Sort by')).not.toBeInTheDocument();

@@ -193,7 +193,7 @@ describe('states', () => {
     capabilities = [];
     render(<NotificationsAdminPage />);
 
-    expect(screen.getByText(/do not have the required permissions/i)).toBeInTheDocument();
+    expect(screen.getByText(/don’t have access to/)).toBeInTheDocument();
     expect(global.fetch).not.toHaveBeenCalled();
   });
 

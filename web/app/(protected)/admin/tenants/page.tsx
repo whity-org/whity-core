@@ -1,6 +1,9 @@
 ﻿'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { NoAccess } from '@/components/no-access';
+import { LoadProblem } from '@/components/load-problem';
+import { throwUnlessOk } from '@/lib/forbidden';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { useFetch } from '@/hooks/useFetch';
@@ -11,7 +14,7 @@ import { AdminHeader } from '@/components/admin/admin-header';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { Button } from '@whity/ui/button';
 import { SearchField } from '@whity/ui/search-field';
-import { AreaError, EmptyFiltered, EmptyFirstTime } from '@whity/ui/page-states';
+import { EmptyFiltered, EmptyFirstTime } from '@whity/ui/page-states';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -86,13 +89,11 @@ export default function TenantsPage() {
     return () => clearTimeout(timer);
   }, [query]);
 
-  const { data, loading: isLoading, error, refetch: fetchTenants } = useFetch(async () => {
+  const { data, loading: isLoading, error, forbidden, refetch: fetchTenants } = useFetch(async () => {
     const params = new URLSearchParams({ per_page: '100' });
     if (searched !== '') params.set('q', searched);
     const response = await apiClient(`/api/v1/tenants?${params.toString()}`);
-    if (!response.ok) {
-      throw new Error(t('tenants.error.load', 'Failed to fetch tenants'));
-    }
+    throwUnlessOk(response, t('tenants.error.load', 'Failed to fetch tenants'));
     const data = await response.json();
     return (data.data ?? []) as Tenant[];
   }, [apiClient, searched]);
@@ -208,13 +209,19 @@ export default function TenantsPage() {
     );
   };
 
+  // Workspaces are managed from the Platform group, which is the system tenant's
+  // (design 2.9, W.2). A workspace's own name and basics are in its Settings.
+  if (user && user.tenant_id !== 0) {
+    return <NoAccess area={t('tenants.access.area', 'workspaces')} permission="tenants:read" />;
+  }
+
   return (
     <div className="space-y-8">
       <AdminHeader
         title={t('tenants.title', 'Tenants')}
         description={t('tenants.description', 'The workspaces on this installation.')}
         action={
-          canCreate ? (
+          canCreate && !forbidden ? (
             <Button
               onClick={() => setIsCreateModalOpen(true)}
               className="gap-2"
@@ -236,10 +243,11 @@ export default function TenantsPage() {
       />
 
       {error ? (
-        <AreaError
+        <LoadProblem
+          forbidden={forbidden}
           message={t('tenants.error.load', 'Failed to fetch tenants')}
-          retryLabel={t('tenants.error.retry', 'Try again')}
           onRetry={fetchTenants}
+          area={t('tenants.area', 'workspaces')}
         />
       ) : !isLoading && tenants.length === 0 ? (
         searched !== '' ? (
