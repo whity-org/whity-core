@@ -199,7 +199,7 @@ test.describe('Plugin upload + RBAC visibility (WC-221)', () => {
       await page.goto(PLUGINS_URL);
       // plugins:read is held, so the console renders (not Access Denied).
       await expect(page.getByRole('heading', { name: 'Plugins', exact: true })).toBeVisible();
-      await expect(page.getByText('You cannot manage plugins')).toHaveCount(0);
+      await expect(page.getByText('You don’t have access to plugins')).toHaveCount(0);
 
       // Actions this person cannot use are not drawn: no operator menu.
       await expect(page.getByRole('button', { name: 'Operator tools' })).toHaveCount(0);

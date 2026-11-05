@@ -57,16 +57,18 @@ test.describe('Core admin areas (role matrix)', () => {
     }
   });
 
-  test('Tenants opens by URL for a workspace admin, with no way to create one; no role here has the nav link', async ({
+  test('Tenants is refused by URL for a workspace admin; no role here has the nav link', async ({
     roleSession,
     role,
     page,
   }) => {
     if (role === 'admin') {
+      // Workspaces are the system tenant's (design 2.9, W.2): a workspace admin
+      // opening the URL is told they have no access, and sees no list.
       await page.goto('/admin/tenants');
-      await expect(page.getByRole('heading', { name: 'Tenants' })).toBeVisible();
-      await expect(page.getByRole('table')).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Create Tenant' })).toHaveCount(0);
+      await expect(page.getByText('You don’t have access to workspaces')).toBeVisible();
+      await expect(page.getByRole('table')).toHaveCount(0);
+      await expect(page.getByRole('button', { name: 'Create tenant' })).toHaveCount(0);
     }
     // systemTenantOnly — the link is filtered out server-side.
     await expect(roleSession.shell.navLink('Tenants')).toHaveCount(0);

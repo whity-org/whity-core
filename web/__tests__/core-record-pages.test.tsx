@@ -240,19 +240,40 @@ describe('/admin/tenants/[id] — the workspace record', () => {
     expect(rawApiClient.mock.calls.some((call) => call[1]?.method === 'PATCH')).toBe(false);
   });
 
-  it('refuses a caller outside the system tenant: workspaces are managed from the Platform group', async () => {
+  it('names the CAPABILITY gate first when the caller fails both', async () => {
     params = { id: '7' };
-    // A workspace admin, even one holding tenants:write, has no workspace record
-    // page: their own name and basics are in Settings (design 2.9, W.2).
+    // No tenants:write, and standing in a tenant that is neither 0 nor 7.
+    authUser = { tenant_id: 3 };
+    mockTenantBackend();
+
+    render(<TenantRecordPage />);
+
+    const notice = await screen.findByTestId('tenant-record-readonly-notice');
+    expect(notice).toHaveTextContent(/permission to edit workspaces/i);
+    // One notice, and only the first refusal: two sentences saying overlapping
+    // things is one sentence too many.
+    expect(notice).not.toHaveTextContent(/system workspace/i);
+    expect(screen.queryByTestId('tenant-record-save')).not.toBeInTheDocument();
+  });
+
+  it('explains the CROSS-TENANT rule to a caller who does hold the capability', async () => {
+    params = { id: '7' };
     authUser = { tenant_id: 3 };
     grant(TENANTS_WRITE);
     mockTenantBackend();
 
     render(<TenantRecordPage />);
 
-    expect(await screen.findByText('You don’t have access to workspaces')).toBeInTheDocument();
-    expect(screen.queryByTestId('tenant-record-save')).not.toBeInTheDocument();
+    expect(await screen.findByTestId('tenant-record-readonly-notice')).toHaveTextContent(
+      /only an operator in the system workspace/i
+    );
+    // Read-only is a distinct RENDERING, not a disabled form: there is no input
+    // at all, and the values are STATED. The slug is on the page twice on
+    // purpose — once in the stat strip, once as a stated field — which is why
+    // this counts rather than expecting one.
     expect(screen.queryByTestId('tenant-record-name')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('tenant-record-slug')).not.toBeInTheDocument();
+    expect(screen.getAllByText('acme').length).toBeGreaterThan(0);
   });
 
   it('keeps the URL and names the cause when no such workspace is visible', async () => {
