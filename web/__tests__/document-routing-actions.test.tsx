@@ -439,8 +439,8 @@ describe('RouteComposer', () => {
   it('states the preview contract instead of offering a roster', () => {
     renderComposer();
 
-    expect(screen.getByText(/each step names a RULE, not people/i)).toBeInTheDocument();
-    expect(screen.getByText(/relative to whoever forwards it/i)).toBeInTheDocument();
+    expect(screen.getByText(/each step says who it is for/i)).toBeInTheDocument();
+    expect(screen.getByText(/gets worked out when the document is sent/i)).toBeInTheDocument();
     // No "who will this reach" affordance at all.
     expect(screen.queryByRole('button', { name: /preview|who will/i })).not.toBeInTheDocument();
   });

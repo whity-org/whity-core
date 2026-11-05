@@ -8,6 +8,7 @@ import { TechnicalDetails } from '@whity/ui/display-preferences';
 import { Icon } from '@whity/ui/icon';
 import { AccessDeniedPanel, AreaError, EmptyFirstTime, LoadingRows } from '@whity/ui/page-states';
 import { SearchField } from '@whity/ui/search-field';
+import { Tabs, TabsList, TabsTrigger } from '@whity/ui/tabs';
 import { useTranslation } from '@whity/features/i18n';
 import { useDateDisplay } from '@whity/features/datetime';
 import { useAuth } from '@/lib/auth-context';
@@ -20,7 +21,7 @@ import { AdminHeader } from '@/components/admin/admin-header';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { ConnectWizard } from './connect-wizard';
 import { RevokeAiPrincipalModal } from './revoke-modal';
-import type { AiPrincipal, AiPrincipalListResponse } from './types';
+import type { AiPrincipal, AiPrincipalListResponse, OwnMcpTokenRow } from './types';
 
 /** Scope entries that don't narrow what an app reaches: capabilities and the agent's grant. */
 const NOT_NARROWING = ['tools:call', 'resources:read', 'prompts:read', 'grant:'];
@@ -43,25 +44,48 @@ export default function AiPrincipalsPage() {
   const [renewing, setRenewing] = useState<AiPrincipal | null>(null);
   const [revoking, setRevoking] = useState<AiPrincipal | null>(null);
   const [query, setQuery] = useState('');
+  // Everyone may see and manage their own connections; the list of everyone's is for `mcp:tokens:manage`.
+  const [chosenView, setChosenView] = useState<'mine' | 'everyone'>('mine');
+  const view = canManage ? chosenView : 'mine';
 
   // Sort and search run on the client over one fetch of the server's largest
   // page; `GET /api/v1/admin/mcp/tokens` also accepts `sort`, `dir` and `q`
   // (#1102) when this table is wired for server-side paging.
   const { data, loading, error, refetch } = useFetch(async () => {
+    if (view === 'mine') {
+      const response = await apiClient('/api/v1/mcp/tokens');
+      if (!response.ok) throw new Error(t('aiPrincipals.error.load', 'The connected apps could not be loaded.'));
+      const body = (await response.json()) as { tokens?: OwnMcpTokenRow[] };
+      return (body.tokens ?? []).map(
+        (row, index): AiPrincipal => ({
+          id: index,
+          jti: row.jti,
+          userId: user?.id ?? 0,
+          tenantId: 0,
+          name: row.name,
+          principalKind: row.principal_kind,
+          scope: row.scope,
+          expiresAt: row.expires_at,
+          createdAt: row.created_at,
+          lastUsedAt: row.last_used_at,
+        }),
+      );
+    }
     const response = await apiClient('/api/v1/admin/mcp/tokens?per_page=100');
     if (response.status === 403) throw new Error('forbidden');
     if (!response.ok) throw new Error(t('aiPrincipals.error.load', 'The connected apps could not be loaded.'));
     return ((await response.json()) as AiPrincipalListResponse).data ?? [];
-  }, [apiClient]);
+  }, [apiClient, view, user?.id]);
 
-  // Names, never ids: the people the apps are for. Left empty when the viewer
-  // can't read users, and the column then says so rather than showing a number.
+  // Names, never ids: the people the apps are for. Only the list of everyone's
+  // shows them, and only someone who may read users can resolve them.
   const people = useFetch<Record<number, string>>(async () => {
+    if (view !== 'everyone') return {};
     const result = await fetchAllPages<{ id: number; name?: string; email?: string }>(apiClient, '/api/v1/users');
     const names: Record<number, string> = {};
     for (const person of result.items) names[person.id] = person.name || person.email || '';
     return names;
-  }, [apiClient]);
+  }, [apiClient, view]);
 
   const principals = useMemo(() => data ?? [], [data]);
   const shown = useMemo(() => {
@@ -89,7 +113,7 @@ export default function AiPrincipalsPage() {
     return narrowing.every(isReadPermission) ? t('aiPrincipals.mayDo.readOnly', 'Only looks things up') : t('aiPrincipals.mayDo.some', 'Some areas only');
   };
 
-  const columns: DataTableColumn<AiPrincipal>[] = [
+  const allColumns: DataTableColumn<AiPrincipal>[] = [
     {
       accessorKey: 'name',
       header: t('aiPrincipals.table.app', 'App'),
@@ -154,8 +178,10 @@ export default function AiPrincipalsPage() {
     ]),
   ];
 
+  // Everyone's own list is all for the same person, so it has no For column.
+  const columns = view === 'mine' ? allColumns.filter((column) => column.id !== 'for') : allColumns;
+
   const rowActions = (principal: AiPrincipal) => {
-    if (!canManage) return null;
     return (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -189,9 +215,21 @@ export default function AiPrincipalsPage() {
     <div className="space-y-6">
       <AdminHeader
         title={t('aiPrincipals.title', 'Connected AI apps')}
-        description={t('aiPrincipals.description', 'Outside AI apps signed in to Whity, each for one person. An app can never do more than that person can.')}
-        action={canManage ? connect : undefined}
+        description={
+          view === 'mine'
+            ? t('aiPrincipals.description.mine', 'The AI apps connected to your account. An app can never do more than you can, and you can disconnect it at any time.')
+            : t('aiPrincipals.description', 'Outside AI apps signed in to Whity, each for one person. An app can never do more than that person can.')
+        }
+        action={connect}
       />
+      {canManage && (
+        <Tabs value={view} onValueChange={(value) => setChosenView(value as 'mine' | 'everyone')}>
+          <TabsList aria-label={t('aiPrincipals.tabs.label', 'Connected AI apps')}>
+            <TabsTrigger value="mine">{t('aiPrincipals.tabs.mine', 'My apps')}</TabsTrigger>
+            <TabsTrigger value="everyone">{t('aiPrincipals.tabs.everyone', 'Everyone’s apps')}</TabsTrigger>
+          </TabsList>
+        </Tabs>
+      )}
 
       {error === 'forbidden' ? (
         <AccessDeniedPanel
@@ -202,7 +240,7 @@ export default function AiPrincipalsPage() {
         <AreaError message={error} retryLabel={t('agents.retry', 'Try again')} onRetry={refetch} />
       ) : loading ? (
         <LoadingRows
-          headers={[t('aiPrincipals.table.app', 'App'), t('aiPrincipals.table.for', 'For'), t('aiPrincipals.table.lastUsed', 'Last used')]}
+          headers={[t('aiPrincipals.table.app', 'App'), t('aiPrincipals.table.lastUsed', 'Last used')]}
           label={t('agents.loading', 'Loading…')}
         />
       ) : principals.length === 0 ? (
@@ -225,7 +263,7 @@ export default function AiPrincipalsPage() {
             columns={columns}
             data={shown}
             getRowId={(principal) => String(principal.id)}
-            rowActions={canManage ? rowActions : undefined}
+            rowActions={rowActions}
             pagination={{ pageSize: 10 }}
             emptyState={{
               title: t('aiPrincipals.filtered.title', 'No apps match'),
@@ -250,6 +288,7 @@ export default function AiPrincipalsPage() {
           isOpen
           onOpenChange={(open) => !open && setRevoking(null)}
           principal={revoking}
+          own={view === 'mine'}
           onSuccess={() => {
             setRevoking(null);
             refetch();
