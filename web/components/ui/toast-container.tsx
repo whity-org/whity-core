@@ -90,7 +90,7 @@ export function ToastContainer({
                 toast.action?.onClick();
                 removeToast(toast.id);
               }}
-              className="shrink-0 rounded-sm text-sm font-medium text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+              className="inline-flex min-h-8 shrink-0 items-center rounded-sm px-2 text-sm font-medium text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
             >
               {toast.action.label}
             </button>

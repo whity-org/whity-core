@@ -15,6 +15,7 @@ import { ErrorState } from '@whity/ui/empty-state';
 import { IconPlus, IconShare, IconShieldLock } from '@tabler/icons-react';
 import { useTranslation } from '@whity/features/i18n';
 import { CreateDelegationModal } from './create-modal';
+import { roleLabel } from '@whity/features/roles';
 import { permissionInWords } from './permission-words';
 import type { Delegation } from './types';
 
@@ -154,7 +155,7 @@ export default function DelegationsPage() {
       cell: (row) => (
         <div className="flex items-center gap-3">
           {row.granteeIsRole ? (
-            <Badge variant="outline">{row.grantee}</Badge>
+            <Badge variant="outline">{row.granteeIsRole ? roleLabel(row.grantee) : row.grantee}</Badge>
           ) : (
             <>
               <Avatar name={row.grantee} size={28} />
@@ -263,8 +264,8 @@ export default function DelegationsPage() {
                 'Delegate a subset of your permissions to roles or users.'
               )
             : t(
-                'delegations.description',
-                'Delegate a subset of your permissions to roles or users, scoped to a tenant or an organizational unit.'
+                'delegations.description.unit',
+                'Delegate a subset of your permissions to roles or users, across the workspace or in one unit.'
               )
         }
         action={

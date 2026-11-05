@@ -150,6 +150,24 @@ describe('UsersPage bulk bar', () => {
     );
   });
 
+  it('says this person when one is selected, and keeps its words while closing', async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    render(<UsersPage />);
+    await screen.findByText('Rana');
+    await user.click(screen.getAllByRole('checkbox', { name: /Select/ })[1]);
+
+    await user.click(await screen.findByTestId('users-bulk-role'));
+    await user.click(await screen.findByRole('menuitem', { name: 'Baker' }));
+    const dialog = await screen.findByRole('alertdialog');
+    expect(within(dialog).getByText('Change this person to Baker?')).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole('button', { name: 'Change role' }));
+
+    await waitFor(() => expect(bulkCall()).toBeDefined());
+    expect(screen.queryByText(/Change the 0 selected/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/to \?$/)).not.toBeInTheDocument();
+  });
+
   it('offers only what the reader may do', async () => {
     mockHasPermission.mockImplementation((slug: string) => slug !== 'security:manage');
     const user = userEvent.setup({ pointerEventsCheck: 0 });

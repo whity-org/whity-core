@@ -1,5 +1,6 @@
 'use client';
 
+import { roleLabel } from '@whity/features/roles';
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api/client';
 import type { components } from '@/lib/api/schema';
@@ -268,7 +269,7 @@ export function MembershipsModal({
                       {membership.tenantName}
                     </div>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <span className="truncate">{membership.role}</span>
+                      <span className="truncate">{roleLabel(membership.role)}</span>
                       {membership.isPrimary && (
                         <Badge variant="outline">
                           {t('users.memberships.primary', 'Primary')}
