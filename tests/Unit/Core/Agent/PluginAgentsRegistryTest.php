@@ -18,7 +18,10 @@ final class PluginAgentsRegistryTest extends TestCase
     private const PLUGIN = 'Plugins\\Acme\\Collections\\CollectionsPlugin';
     private const OTHER  = 'Plugins\\Other\\Thing\\ThingPlugin';
 
-    /** @return array<string, mixed> */
+    /**
+     * @param array<string, mixed> $overrides
+     * @return array<string, mixed>
+     */
     private static function agent(string $key, array $overrides = []): array
     {
         return array_merge([
@@ -115,6 +118,7 @@ final class PluginAgentsRegistryTest extends TestCase
 
         $root   = CoreToolsets::pluginToolsetIdForClass(self::PLUGIN);
         $preset = $registry->find(1, $root . '.clerk');
+        assert($preset !== null);
         self::assertSame(2, $preset['version']);
         self::assertSame(['suggestions' => false, 'proposals' => true], $preset['features']);
     }

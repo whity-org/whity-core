@@ -17,7 +17,10 @@ final class AgentDeclarationValidatorTest extends TestCase
 {
     private const ROOT = 'acme.collections';
 
-    /** @return array<string, mixed> */
+    /**
+     * @param array<string, mixed> $overrides
+     * @return array<string, mixed>
+     */
     private function agent(string $key, array $overrides = []): array
     {
         return array_merge([
@@ -28,7 +31,11 @@ final class AgentDeclarationValidatorTest extends TestCase
         ], $overrides);
     }
 
-    /** @param list<string> $permissions */
+    /**
+     * @param list<array<string, mixed>> $declared
+     * @param list<string>               $permissions
+     * @return array{0: array<string, array<string, mixed>>, 1: list<string>}
+     */
     private function check(array $declared, array $permissions = ['documents:read', 'documents:issue']): array
     {
         return AgentDeclarationValidator::check(
@@ -57,7 +64,7 @@ final class AgentDeclarationValidatorTest extends TestCase
         [$accepted] = $this->check([$this->agent('clerk')]);
 
         foreach (array_keys($accepted) as $id) {
-            $this->assertStringStartsWith(self::ROOT . '.', $id);
+            $this->assertStringStartsWith(self::ROOT . '.', (string) $id);
         }
     }
 

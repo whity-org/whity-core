@@ -157,7 +157,10 @@ final class PluginAgentsRealEngineTest extends TestCase
         return CoreToolsets::pluginToolsetIdForClass(self::PLUGIN) . '.clerk';
     }
 
-    /** @param array<string, mixed> $body @return array<string, mixed> */
+    /**
+     * @param array<string, mixed> $body
+     * @return array<string, mixed>
+     */
     private function create(int $tenantId, array $body): array
     {
         $this->switchTo($tenantId);
@@ -171,7 +174,7 @@ final class PluginAgentsRealEngineTest extends TestCase
     private function storedFeatures(int $id, int $tenantId = self::BAKERY): array
     {
         $row = $this->agents->find($id, $tenantId);
-        self::assertNotNull($row);
+        assert($row !== null);
 
         // JSONB does not keep key order, so compare the flags sorted by name.
         $features = $row['features'];
