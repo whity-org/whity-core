@@ -75,6 +75,8 @@
         "blockEditor.blockerSuggestionsHint": "Accept or reject them first.",
         "blockEditor.blockerTheme": "This document uses a theme the workspace doesn’t have: {ref}",
         "blockEditor.blockerThemeHint": "Choose another theme or restore it.",
+        "blockEditor.blockerTooLarge": "This template is too large to print: {size}, and the limit is {max}",
+        "blockEditor.blockerTooLargeHint": "Use smaller images or fewer of them, then publish again.",
         "blockEditor.bold": "Bold",
         "blockEditor.calloutImportant": "Important",
         "blockEditor.calloutNote": "Note",

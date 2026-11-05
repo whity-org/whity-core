@@ -55997,7 +55997,8 @@
                             "missing-plugin",
                             "block-without-print-view",
                             "unknown-field",
-                            "theme-unavailable"
+                            "theme-unavailable",
+                            "too-large"
                         ]
                     },
                     "count": {
@@ -56015,6 +56016,14 @@
                     "ref": {
                         "type": "string",
                         "description": "With theme-unavailable: the theme the document names that the workspace doesn't have"
+                    },
+                    "bytes": {
+                        "type": "integer",
+                        "description": "With too-large: what printing the template sends Whity Render, in bytes, before any record's values"
+                    },
+                    "max": {
+                        "type": "integer",
+                        "description": "With too-large: the render size ceiling (documents.flow_max_bytes), in bytes"
                     }
                 },
                 "required": [

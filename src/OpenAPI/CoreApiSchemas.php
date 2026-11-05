@@ -6845,12 +6845,14 @@ final class CoreApiSchemas
                 'data' => ['type' => 'array', 'items' => self::object(['id' => self::str(), 'label' => self::str()], ['id', 'label'])],
             ], ['data']),
             'DocumentPublishBlocker' => self::object([
-                'kind' => ['type' => 'string', 'enum' => ['open-suggestions', 'missing-plugin', 'block-without-print-view', 'unknown-field', 'theme-unavailable']],
+                'kind' => ['type' => 'string', 'enum' => ['open-suggestions', 'missing-plugin', 'block-without-print-view', 'unknown-field', 'theme-unavailable', 'too-large']],
                 'count' => self::int(),
                 'plugin' => self::str(),
                 'blockId' => self::str(),
                 'path' => self::str(),
                 'ref' => self::str() + ['description' => 'With theme-unavailable: the theme the document names that the workspace doesn\'t have'],
+                'bytes' => self::int() + ['description' => 'With too-large: what printing the template sends Whity Render, in bytes, before any record\'s values'],
+                'max' => self::int() + ['description' => 'With too-large: the render size ceiling (documents.flow_max_bytes), in bytes'],
             ], ['kind']),
             'DocumentPublishCheckResponse' => self::object([
                 'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('DocumentPublishBlocker')],
