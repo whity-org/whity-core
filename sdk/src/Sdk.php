@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.67).
+ * SDK identity (v1.68).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -975,12 +975,17 @@ namespace Whity\Sdk;
  * older host the route is not public (WHIT-906).
  *
  * Purely additive.)
+ *
+ * 1.68 (DOCUMENT REVISIONS: {@see Hooks\Events::DOCUMENT_REVISED} says a revision replaced
+ * a document (WHIT-888).
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.67.0';
+    public const VERSION = '1.68.0';
 
     /**
      * Static identity only — never instantiated.

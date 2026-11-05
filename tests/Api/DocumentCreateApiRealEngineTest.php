@@ -68,6 +68,9 @@ use Whity\Sdk\Hooks\HookVetoException;
 use Whity\Sdk\Http\Response;
 use Whity\Sdk\Manifest\PluginManifest;
 use Whity\Storage\LocalStorageDriver;
+use Whity\Core\Document\DocumentState;
+use Whity\Core\Document\Qr\QrRevocationReason;
+use Whity\Core\Plugin\PluginDocumentLinks;
 
 /**
  * `POST /api/documents` — the create path (#947 item 1), issuing from editor
@@ -1286,6 +1289,233 @@ final class DocumentCreateApiRealEngineTest extends TestCase
         $stmt->execute([':tenant' => $tenantId, ':title' => $title, ':by' => $createdBy]);
 
         return (int) $this->pdo->lastInsertId();
+    }
+
+    // ── revisions (WHIT-888, #1625) ───────────────────────────────────────────
+
+    public function testARevisionKeepsTheNumberTakesTheNextLetterAndReplacesTheOriginal(): void
+    {
+        $this->settings->setTenant(self::TENANT, SettingsRegistry::DOCUMENTS_QR_ENABLED, 'true');
+        [$original, $about] = $this->issuedFromARecord('CRT-{SEQ:4}');
+        $code = $this->qr->ensure(self::TENANT, $original, self::RAISER);
+        self::assertNotNull($code);
+        $this->pdo->exec("UPDATE documents SET title = 'Carton 1, reworked' WHERE id = {$about}");
+        $counters = $this->counterTotal();
+        $revised = [];
+        $this->editor->hooks->listen(Events::DOCUMENT_REVISED, static function (array $data) use (&$revised): array {
+            $revised[] = $data;
+
+            return $data;
+        });
+
+        $res = $this->revise(self::RAISER, $original, ['reason' => 'Two units were reworked']);
+
+        self::assertSame(201, $res->getStatusCode(), $res->getBody());
+        $body = self::decode($res);
+        $new = $body['data'];
+        self::assertNotSame($original, $new['id']);
+        self::assertSame('CRT-0001', $new['number']);
+        self::assertSame('B', $new['revision']);
+        self::assertSame($original, $new['supersedes_id']);
+        self::assertSame('Two units were reworked', $new['revision_reason']);
+        self::assertSame('issued', $new['state']);
+        self::assertSame('document', $new['record_type']);
+        self::assertSame($counters, $this->counterTotal(), 'one numbering record: no number was minted');
+
+        $old = $this->documents->findById($original, self::TENANT);
+        self::assertNotNull($old);
+        self::assertSame('superseded', $old['state']);
+        self::assertSame($new['id'], $old['superseded_by']);
+        self::assertNotNull($old['superseded_on']);
+
+        // The paper it replaces stops verifying; the new one has its own code.
+        $retired = $this->qr->resolve((string) $code['token']);
+        self::assertNotNull($retired);
+        self::assertSame(QrRevocationReason::SUPERSEDED, $retired['revoked_reason']);
+        self::assertNotNull($this->qr->active(self::TENANT, (int) $new['id']));
+
+        self::assertSame(['from' => 'Carton 1', 'to' => 'Carton 1, reworked'], $body['diff']['changed']['document.title']);
+        self::assertSame([], $body['diff']['removed']);
+
+        self::assertCount(1, $revised);
+        self::assertSame((int) $new['id'], $revised[0]['id']);
+        self::assertSame($original, $revised[0]['supersedes_id']);
+        self::assertSame('Two units were reworked', $revised[0]['reason']);
+        self::assertSame(self::RAISER, $revised[0]['actor']);
+
+        // And the next one is C, of the newest.
+        $next = $this->revise(self::RAISER, (int) $new['id'], ['reason' => 'Again']);
+        self::assertSame('C', self::decode($next)['data']['revision']);
+        self::assertSame('CRT-0001', self::decode($next)['data']['number']);
+    }
+
+    public function testARevisionUsesTheVersionItPrintedUnlessAskedForTheLatest(): void
+    {
+        [$original, , $template] = $this->issuedFromARecord('CRT-{SEQ:4}');
+        $this->editor->redraft(self::TENANT, $template, ['blocks' => [$this->editor->para('Second wording')]], self::RAISER);
+        $this->editor->publish(self::TENANT, $template, self::RAISER);
+
+        $pinned = self::decode($this->revise(self::RAISER, $original, ['reason' => 'Pinned']))['data'];
+        self::assertSame(1, $pinned['document_source_version']);
+
+        $latest = self::decode($this->revise(self::RAISER, (int) $pinned['id'], ['reason' => 'Latest', 'template' => 'latest']))['data'];
+        self::assertSame(2, $latest['document_source_version']);
+
+        self::assertSame(422, $this->revise(self::RAISER, (int) $latest['id'], ['reason' => 'x', 'template' => 'newest'])->getStatusCode());
+    }
+
+    public function testARevisionIsRefusedWithAClearReason(): void
+    {
+        // A person's letter, with no record.
+        $letter = $this->editor->draft(self::TENANT, self::RAISER, 'Letter', [], ['kind' => 'letter', 'scope' => 'personal']);
+        $issued = self::decode($this->create(self::RAISER, ['document_source_id' => $letter, 'render' => false]))['data'];
+        self::assertSame('no_record', self::decode($this->revise(self::RAISER, (int) $issued['id'], ['reason' => 'x']))['details']['code'] ?? null);
+
+        [$withdrawn] = $this->issuedFromARecord('W-{SEQ}');
+        $this->pdo->exec("UPDATE documents SET withdrawn_at = CURRENT_TIMESTAMP WHERE id = {$withdrawn}");
+        self::assertSame('withdrawn', self::decode($this->revise(self::RAISER, $withdrawn, ['reason' => 'x']))['details']['code'] ?? null);
+
+        [$original] = $this->issuedFromARecord('R-{SEQ}');
+        self::assertSame(422, $this->revise(self::RAISER, $original, [])->getStatusCode(), 'a reason is required');
+        self::assertSame(422, $this->revise(self::RAISER, $original, ['reason' => '   '])->getStatusCode());
+        self::assertSame(422, $this->revise(self::RAISER, $original, ['reason' => 'x', 'record' => 'document:999'])->getStatusCode(), 'the wrong record');
+
+        self::assertSame(201, $this->revise(self::RAISER, $original, ['reason' => 'x'])->getStatusCode());
+        $again = $this->revise(self::RAISER, $original, ['reason' => 'y']);
+        self::assertSame(409, $again->getStatusCode());
+        self::assertSame('already_revised', self::decode($again)['details']['code'] ?? null);
+    }
+
+    public function testADocumentInReviewIsNotRevised(): void
+    {
+        [$original] = $this->issuedFromARecord('V-{SEQ}');
+        $this->pdo->exec("INSERT INTO document_routes (tenant_id, document_id, title, created_at) VALUES (1, {$original}, 'R', CURRENT_TIMESTAMP)");
+        $route = (int) $this->pdo->lastInsertId();
+        $this->pdo->exec("INSERT INTO document_route_steps (tenant_id, route_id, position, rule_kind, rule_config) VALUES (1, {$route}, 1, 'explicit', '{}')");
+        $step = (int) $this->pdo->lastInsertId();
+        $this->pdo->exec("INSERT INTO document_route_events (tenant_id, document_id, route_id, step_id, actor_profile_id, action, occurred_at) VALUES (1, {$original}, {$route}, {$step}, " . self::RAISER . ", 'issued', CURRENT_TIMESTAMP)");
+        $event = (int) $this->pdo->lastInsertId();
+        $this->pdo->exec("INSERT INTO document_route_recipients (tenant_id, document_id, route_id, step_id, profile_id, created_by_event_id) VALUES (1, {$original}, {$route}, {$step}, " . self::RAISER . ", {$event})");
+
+        $res = $this->revise(self::RAISER, $original, ['reason' => 'x']);
+
+        self::assertSame(409, $res->getStatusCode(), $res->getBody());
+        self::assertSame('in_review', self::decode($res)['details']['code'] ?? null);
+    }
+
+    public function testAVetoWritesNothingAndLeavesTheOriginalStanding(): void
+    {
+        [$original] = $this->issuedFromARecord('N-{SEQ}');
+        $code = $this->qr->ensure(self::TENANT, $original, self::RAISER);
+        self::assertNotNull($code);
+        $this->editor->hooks->listen(Events::DOCUMENT_ISSUING, static function (array $data): array {
+            throw new HookVetoException(Events::DOCUMENT_ISSUING, 'Not yet');
+        });
+        $count = $this->countDocuments();
+
+        self::assertSame(409, $this->revise(self::RAISER, $original, ['reason' => 'x'])->getStatusCode());
+
+        self::assertSame($count, $this->countDocuments());
+        self::assertSame('issued', $this->documents->findById($original, self::TENANT)['state'] ?? null);
+        self::assertNotNull($this->qr->active(self::TENANT, $original));
+    }
+
+    public function testTwoRevisionsOfOneDocumentCannotBothStand(): void
+    {
+        [$original] = $this->issuedFromARecord('U-{SEQ}');
+        self::assertSame(201, $this->revise(self::RAISER, $original, ['reason' => 'First'])->getStatusCode());
+
+        // What a racing second request meets once it is past its own read.
+        $this->expectException(\PDOException::class);
+        $this->documents->create(self::TENANT, ['template_name' => 'T', 'title' => 'Second', 'supersedes_id' => $original, 'revision' => 2]);
+    }
+
+    public function testAReplacedDocumentCannotGetALiveCodeOrACorrection(): void
+    {
+        [$original] = $this->issuedFromARecord('Q-{SEQ}');
+        $this->revise(self::RAISER, $original, ['reason' => 'x']);
+
+        self::assertNull($this->qr->mint(self::TENANT, $original, self::RAISER), 'new code on old paper');
+        self::assertNull($this->qr->ensure(self::TENANT, $original, self::RAISER));
+
+        TenantContext::reset();
+        TenantContext::setTenantId(self::TENANT);
+        $this->settings->setGlobal(SettingsRegistry::DOCUMENTS_RENDER_ENABLED, 'true');
+        $req = new Request('POST', "/api/documents/{$original}/render", [], '');
+        $req->user = (object) ['profile_id' => self::RAISER, 'active_tenant_id' => self::TENANT];
+        self::assertSame(409, $this->handler->rerender($req, ['id' => (string) $original])->getStatusCode());
+    }
+
+    public function testARevisionStaysWithThePluginThatIssuedTheOriginal(): void
+    {
+        [$original] = $this->issuedFromARecord('P-{SEQ}');
+        $links = new PluginDocumentLinks($this->pdo);
+        $links->claim(self::TENANT, 'courier', $original);
+
+        $new = (int) self::decode($this->revise(self::RAISER, $original, ['reason' => 'x']))['data']['id'];
+
+        self::assertTrue($links->owns(self::TENANT, 'courier', $new));
+    }
+
+    public function testAnotherWorkspaceCannotReviseOrSeeARevision(): void
+    {
+        [$original] = $this->issuedFromARecord('T-{SEQ}');
+
+        TenantContext::reset();
+        TenantContext::setTenantId(self::OTHER_TENANT);
+        $req = new Request('POST', "/api/documents/{$original}/revisions", [], (string) json_encode(['reason' => 'x']));
+        $req->user = (object) ['profile_id' => self::OTHER_TENANT_ADMIN, 'active_tenant_id' => self::OTHER_TENANT];
+        self::assertSame(404, $this->handler->revise($req, ['id' => (string) $original])->getStatusCode());
+
+        self::assertSame('issued', $this->documents->findById($original, self::TENANT)['state'] ?? null);
+        self::assertNull($this->documents->findById($original, self::OTHER_TENANT));
+    }
+
+    public function testACallerWhoCannotSeeADocumentCannotReviseIt(): void
+    {
+        [$original] = $this->issuedFromARecord('H-{SEQ}');
+
+        self::assertSame(404, $this->revise(self::SECRETARY, $original, ['reason' => 'x'])->getStatusCode());
+    }
+
+    public function testRevisionLetters(): void
+    {
+        self::assertSame('A', DocumentState::revisionLetter(1));
+        self::assertSame('Z', DocumentState::revisionLetter(26));
+        self::assertSame('AA', DocumentState::revisionLetter(27));
+    }
+
+    /** @return array{0: int, 1: int, 2: int} The document, the record it came from, its template. */
+    private function issuedFromARecord(string $pattern): array
+    {
+        $about = $this->seedDocument(self::RAISER, 'Carton 1');
+        $template = $this->editor->published(self::TENANT, self::RAISER, 'Packing list ' . bin2hex(random_bytes(3)), [
+            $this->editor->para($this->editor->field('document.title')),
+        ], ['record_type' => 'document', 'scope' => 'personal']);
+        $this->editor->sourceRepo->updateNumbering($template, self::TENANT, ['pattern' => $pattern, 'assign' => 'on_issue']);
+        $res = $this->create(self::RAISER, ['document_source_id' => $template, 'record' => 'document:' . $about, 'render' => false]);
+        self::assertSame(201, $res->getStatusCode(), 'fixture: ' . $res->getBody());
+
+        return [(int) self::decode($res)['data']['id'], $about, $template];
+    }
+
+    /** @param array<string, mixed> $body */
+    private function revise(int $actorId, int $documentId, array $body): Response
+    {
+        TenantContext::reset();
+        TenantContext::setTenantId(self::TENANT);
+        $req = new Request('POST', "/api/documents/{$documentId}/revisions", [], (string) json_encode($body));
+        $req->user = (object) ['profile_id' => $actorId, 'active_tenant_id' => self::TENANT];
+
+        return $this->handler->revise($req, ['id' => (string) $documentId]);
+    }
+
+    private function counterTotal(): int
+    {
+        $stmt = $this->pdo->query('SELECT COALESCE(SUM(value), 0) FROM sequence_counters');
+        self::assertNotFalse($stmt);
+
+        return (int) $stmt->fetchColumn();
     }
 
     public function testASlotThatCantBeIssuedFromSaysWhyAndWritesNothing(): void

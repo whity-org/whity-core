@@ -1070,6 +1070,10 @@
     "en": "Rebuild a document's file and keep the old ones",
     "ar": "إعادة إنشاء ملف المستند مع الاحتفاظ بالقديم"
   },
+  "post_api_documents_id_revisions": {
+    "en": "Issue a revision that replaces a document",
+    "ar": "إصدار مراجعة تحل محل مستند"
+  },
   "post_api_documents_id_routes": {
     "en": "Send a document along a route of steps",
     "ar": "إرسال مستند عبر مسار من خطوات"
@@ -1083,6 +1087,10 @@
   },
   "post_api_documents_id_withdraw": {
     "ar": "سحب مستند صادر"
+  },
+  "post_api_documents_preflight": {
+    "en": "Check whether a document would issue, without issuing it",
+    "ar": "التحقق من إمكانية إصدار مستند دون إصداره"
   },
   "post_api_email_domains": {
     "en": "Add an email domain",

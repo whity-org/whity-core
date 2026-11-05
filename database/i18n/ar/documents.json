@@ -422,6 +422,7 @@
         "fields.inWords.ar": "{field} كتابةً (بالعربية)",
         "fields.inWords.en": "{field} كتابةً (بالإنجليزية)",
         "fields.issuedDocument.number": "رقم هذا المستند",
+        "fields.issuedDocument.revision": "مراجعة هذا المستند",
         "fields.month.april": "أبريل",
         "fields.month.august": "أغسطس",
         "fields.month.december": "ديسمبر",

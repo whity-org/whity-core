@@ -22,6 +22,8 @@ final class IssueRequest
      * @param string|null            $originKey   The caller's name for what this document is.
      * @param string|null            $slot        The slot it is issued through.
      * @param DocumentNumberingRule|null $numbering The slot's rule; the template's own wins over it.
+     * @param array<string, mixed>|null  $revisionOf The `documents` row this replaces.
+     * @param string|null                $revisionReason Why, when it is a revision.
      */
     public function __construct(
         public readonly array $source,
@@ -34,6 +36,8 @@ final class IssueRequest
         public readonly ?string $originKey = null,
         public readonly ?string $slot = null,
         public readonly ?DocumentNumberingRule $numbering = null,
+        public readonly ?array $revisionOf = null,
+        public readonly ?string $revisionReason = null,
     ) {
     }
 }

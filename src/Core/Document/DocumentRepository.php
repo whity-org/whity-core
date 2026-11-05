@@ -132,7 +132,19 @@ final class DocumentRepository
                     WHERE sroute.tenant_id = :tenant_id AND sroute.document_id = documents.id
                )
              ORDER BY se.id DESC LIMIT 1
-        ) AS routing_latest_verdict
+        ) AS routing_latest_verdict,
+        (
+            SELECT sn.id FROM documents sn
+             WHERE sn.tenant_id = :tenant_id AND sn.supersedes_id = documents.id
+        ) AS superseded_by,
+        (
+            SELECT sn.revision FROM documents sn
+             WHERE sn.tenant_id = :tenant_id AND sn.supersedes_id = documents.id
+        ) AS superseded_by_revision,
+        (
+            SELECT sn.created_at FROM documents sn
+             WHERE sn.tenant_id = :tenant_id AND sn.supersedes_id = documents.id
+        ) AS superseded_on
         SQL;
 
     private PDO $db;
@@ -170,6 +182,7 @@ final class DocumentRepository
      * @param array{document_source_id?: ?int, document_source_version?: ?int, origin_key?: ?string, template_name: string, title: string,
      *              origin_ou_id?: ?int, created_by?: ?int,
      *              number_pattern?: ?string, record_type?: ?string, record_id?: ?string, slot?: ?string,
+     *              number?: ?string, number_assigned_at?: ?string, supersedes_id?: ?int, revision?: int, revision_reason?: ?string,
      *              variable_data?: ?list<array<string, string>>} $rec
      */
     public function create(int $tenantId, array $rec): int
@@ -179,9 +192,11 @@ final class DocumentRepository
         $stmt = $this->db->prepare(
             'INSERT INTO documents
                  (tenant_id, document_source_id, document_source_version, origin_key, template_name, title, origin_ou_id, created_by,
-                  number_pattern, record_type, record_id, slot, variable_data, created_at)
+                  number_pattern, record_type, record_id, slot, number, number_assigned_at, supersedes_id, revision, revision_reason,
+                  variable_data, created_at)
              VALUES (:tenant_id, :document_source_id, :document_source_version, :origin_key, :template_name, :title, :origin_ou_id, :created_by,
-                     :number_pattern, :record_type, :record_id, :slot, :variable_data, NOW())'
+                     :number_pattern, :record_type, :record_id, :slot, :number, :number_assigned_at, :supersedes_id, :revision, :revision_reason,
+                     :variable_data, NOW())'
         );
         $stmt->execute([
             ':tenant_id'            => $tenantId,
@@ -196,6 +211,12 @@ final class DocumentRepository
             ':record_type'          => $rec['record_type'] ?? null,
             ':record_id'            => $rec['record_id'] ?? null,
             ':slot'                 => $rec['slot'] ?? null,
+            // A revision carries its original's number; nothing is minted for it.
+            ':number'               => $rec['number'] ?? null,
+            ':number_assigned_at'   => $rec['number_assigned_at'] ?? null,
+            ':supersedes_id'        => $rec['supersedes_id'] ?? null,
+            ':revision'             => $rec['revision'] ?? 1,
+            ':revision_reason'      => $rec['revision_reason'] ?? null,
             // JSON_UNESCAPED_UNICODE, not the default: an Arabic reference or an
             // Arabic recipient name would otherwise be stored as escape
             // sequences. They decode back correctly, but the column stops being
@@ -242,7 +263,7 @@ final class DocumentRepository
         $stmt = $this->db->prepare(
             'SELECT id, tenant_id, document_template_id, document_source_id, document_source_version, origin_key, template_name,
                     title, origin_ou_id, created_by, variable_data, created_at, withdrawn_at, withdrawn_by,
-                    number, number_pattern, number_assigned_at, record_type, record_id, slot,
+                    number, number_pattern, number_assigned_at, record_type, record_id, slot, supersedes_id, revision, revision_reason,
                     ' . self::STATE_FACTS . '
              FROM documents WHERE id = :id AND tenant_id = :tenant_id'
         );
@@ -294,7 +315,7 @@ final class DocumentRepository
         // SQLite and fail on production.
         $sql = 'SELECT id, tenant_id, document_template_id, document_source_id, document_source_version, origin_key, template_name, title,
                        origin_ou_id, created_by, created_at, withdrawn_at, withdrawn_by,
-                       number, number_pattern, number_assigned_at, record_type, record_id, slot,
+                       number, number_pattern, number_assigned_at, record_type, record_id, slot, supersedes_id, revision, revision_reason,
                        ' . self::STATE_FACTS . '
                   FROM documents
                  WHERE tenant_id = :tenant_id';
@@ -696,11 +717,19 @@ final class DocumentRepository
             'withdrawn_by'         => isset($row['withdrawn_by']) ? (int) $row['withdrawn_by'] : null,
             'number'               => isset($row['number']) ? (string) $row['number'] : null,
             'number_assigned_at'   => isset($row['number_assigned_at']) ? (string) $row['number_assigned_at'] : null,
+            'number_pattern'       => isset($row['number_pattern']) ? (string) $row['number_pattern'] : null,
+            'supersedes_id'        => isset($row['supersedes_id']) ? (int) $row['supersedes_id'] : null,
+            'revision'             => isset($row['revision']) ? (int) $row['revision'] : 1,
+            'revision_reason'      => isset($row['revision_reason']) ? (string) $row['revision_reason'] : null,
+            'superseded_by'        => isset($row['superseded_by']) ? (int) $row['superseded_by'] : null,
+            'superseded_by_revision' => isset($row['superseded_by_revision']) ? (int) $row['superseded_by_revision'] : null,
+            'superseded_on'        => isset($row['superseded_on']) ? (string) $row['superseded_on'] : null,
             'record_type'          => isset($row['record_type']) ? (string) $row['record_type'] : null,
             'record_id'            => isset($row['record_id']) ? (string) $row['record_id'] : null,
             'slot'                 => isset($row['slot']) ? (string) $row['slot'] : null,
             'state'                => DocumentState::derive(
                 isset($row['withdrawn_at']),
+                isset($row['superseded_by']),
                 (int) ($row['routing_open'] ?? 0) === 1,
                 isset($row['routing_latest_verdict']) ? (string) $row['routing_latest_verdict'] : null,
                 isset($row['number_pattern']) && !isset($row['number']),

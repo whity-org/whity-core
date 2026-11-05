@@ -242,9 +242,11 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsOneEightForInteractiveBlocks(): void
     {
         $this->assertSame(
-            '1.67.0',
+            '1.68.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.67 ADDS PUBLIC FORMS: a route declared public => form takes anonymous browser submissions, with the '
+            'SDK 1.68 ADDS DOCUMENT REVISIONS: document.revised says a revision replaced a document (WHIT-888). '
+            . 'Purely additive. '
+            . 'SDK 1.67 ADDS PUBLIC FORMS: a route declared public => form takes anonymous browser submissions, with the '
             . 'tenant from a key and the checks run by the host; Http\\PublicForm carries the result (WHIT-906). Purely additive. '
             . 'SDK 1.66 ADDS DOCUMENT PREFLIGHT: Documents::preflight and PluginDocumentStore::preflight say whether a '
             . 'document would issue and every reason it would not, writing nothing; document.issuing listeners get '

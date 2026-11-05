@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Whity\Core\Document\Issuing;
 
+use Whity\Core\Document\DocumentState;
 use Whity\Core\Document\Fields\DocumentFieldRegistry;
 use Whity\Core\Document\Fields\FieldLabels;
 use Whity\Core\Document\Slots\BackgroundIssuing;
@@ -31,6 +32,9 @@ final class TemplateIssuing
 {
     /** How many unknown or conflicting fields a refusal names. */
     private const FIELDS_REPORTED = 10;
+
+    /** How long a revision's reason may be. */
+    private const REASON_MAX = 1000;
 
     /** What a person reads for each refusal in a preflight (WHIT-892). */
     private const WHY = [
@@ -167,6 +171,134 @@ final class TemplateIssuing
                 'document_id' => $e->documentId,
             ]);
         }
+    }
+
+    /**
+     * Issue a revision of a document (WHIT-888, #1625): a new document, through the one
+     * issuing path, from the record as it is now, with the same number and the next
+     * letter. Values the record doesn't resolve (a template's own fields) carry over.
+     * The original's state becomes `superseded`, derived from the new row, and its codes
+     * stop verifying with the same commit.
+     *
+     * A document with no record has nothing to read again, so it is refused rather than
+     * half done; so is a withdrawn one, one already replaced, and one still in review,
+     * whose open items would otherwise keep asking people to decide on old paper.
+     *
+     * @param array<string, mixed> $document The `documents` row, with variable_data.
+     * @param mixed $template 'pinned' (default, the version it printed) or 'latest'.
+     * @param mixed $record   If sent, it must be the record the document was issued from.
+     * @return array{document: array<string, mixed>, artifacts: list<array<string, mixed>>, render: array<string, mixed>, replayed: bool,
+     *               diff: array{added: array<string, string>, removed: array<string, string>, changed: array<string, array{from: string, to: string}>}}
+     * @throws DocumentIssueRefused
+     */
+    public function revise(ActingAs $actor, array $document, mixed $reason, mixed $template = null, mixed $record = null): array
+    {
+        $this->fields->resetRequest();
+        $tenantId = $actor->tenantId;
+
+        if (($document['withdrawn_at'] ?? null) !== null) {
+            throw new DocumentIssueRefused('withdrawn', 'A withdrawn document cannot be revised; issue a new one', 409, ['code' => 'withdrawn']);
+        }
+        if (($document['superseded_by'] ?? null) !== null) {
+            throw new DocumentIssueRefused('already_revised', 'This document has already been replaced; revise the latest revision', 409, [
+                'code' => 'already_revised',
+                'superseded_by' => $document['superseded_by'],
+            ]);
+        }
+        if (($document['state'] ?? null) === DocumentState::IN_REVIEW) {
+            throw new DocumentIssueRefused('in_review', 'This document is still in review; finish its route before revising it', 409, ['code' => 'in_review']);
+        }
+        if (($document['record_id'] ?? null) === null || ($document['record_type'] ?? null) === null) {
+            throw new DocumentIssueRefused('no_record', 'This document was not issued from a record, so there is nothing to read again; issue a new one', 422, ['code' => 'no_record']);
+        }
+        if (($document['document_source_id'] ?? null) === null) {
+            throw new DocumentIssueRefused('no_source', 'This document has no template to issue a revision from', 422, ['code' => 'no_source']);
+        }
+        $issuedFrom = $document['record_type'] . ':' . $document['record_id'];
+        if ($record !== null && $record !== $issuedFrom) {
+            throw DocumentIssueRefused::invalid('record must be the one this document was issued from: ' . $issuedFrom);
+        }
+        if (!is_string($reason) || trim($reason) === '' || mb_strlen($reason) > self::REASON_MAX) {
+            throw DocumentIssueRefused::invalid("'reason' is required, at most " . self::REASON_MAX . ' characters');
+        }
+        if ($template !== null && $template !== 'pinned' && $template !== 'latest') {
+            throw DocumentIssueRefused::invalid("'template' must be 'pinned' or 'latest'");
+        }
+
+        $source = $this->visible($actor, (int) $document['document_source_id']);
+        $type = $source['record_type'] !== null ? (string) $source['record_type'] : null;
+        if ($type !== $document['record_type']) {
+            throw new DocumentIssueRefused('record_type_changed', 'This template no longer issues documents for this kind of record', 409, ['code' => 'record_type_changed']);
+        }
+        if ($template === 'latest') {
+            $version = $this->publishedVersion($tenantId, $source);
+        } else {
+            $version = isset($document['document_source_version'])
+                ? $this->issuing()->version($tenantId, (int) $source['id'], (int) $document['document_source_version'])
+                : null;
+            if ($version === null) {
+                throw new DocumentIssueRefused('version_gone', 'The template version this document printed is no longer available; revise from the latest', 409, ['code' => 'version_gone']);
+            }
+        }
+
+        [, $resolved] = $this->readRecord($actor, $type, new IssueInput(record: $issuedFrom));
+
+        $rows = is_array($document['variable_data'] ?? null) ? $document['variable_data'] : [];
+        $before = [];
+        foreach (is_array($rows[0] ?? null) ? $rows[0] : [] as $path => $value) {
+            $before[(string) $path] = is_scalar($value) ? (string) $value : '';
+        }
+        // What the record says now, whatever it said then; the rest was given at issue.
+        $values = $resolved['values'] + $before;
+
+        $missing = $this->issuing()->missing(new IssueRequest($source, $version, $values, ''), $actor);
+        if ($missing !== []) {
+            throw new DocumentIssueRefused('missing_fields', 'Required fields have no value for this record', 422, ['missing' => $missing]);
+        }
+
+        try {
+            $issued = $this->issuing()->issue(new IssueRequest(
+                source: $source,
+                version: $version,
+                values: $values,
+                title: (string) $document['title'],
+                recordLabel: $resolved['label'],
+                record: $issuedFrom,
+                slot: isset($document['slot']) ? (string) $document['slot'] : null,
+                revisionOf: $document,
+                revisionReason: trim($reason),
+            ), $actor);
+        } catch (HookVetoException $e) {
+            throw new DocumentIssueRefused('vetoed', $e->reason(), 409, ['code' => 'vetoed', 'reason' => 'blocked_by_plugin']);
+        } catch (DocumentRevisionConflictException $e) {
+            throw new DocumentIssueRefused('already_revised', 'This document has already been replaced; revise the latest revision', 409, [
+                'code' => 'already_revised',
+                'superseded_by' => $e->documentId,
+            ]);
+        }
+
+        return $issued + ['diff' => self::diff($before, array_map(static fn (?string $v): string => $v ?? '', $values))];
+    }
+
+    /**
+     * What a revision says differently. An empty value is no value, as it printed.
+     *
+     * @param array<string, string> $before
+     * @param array<string, string> $after
+     * @return array{added: array<string, string>, removed: array<string, string>, changed: array<string, array{from: string, to: string}>}
+     */
+    private static function diff(array $before, array $after): array
+    {
+        $before = array_filter($before, static fn (string $v): bool => $v !== '');
+        $after = array_filter($after, static fn (string $v): bool => $v !== '');
+        $changed = [];
+        foreach (array_intersect_key($after, $before) as $path => $value) {
+            if ($before[$path] !== $value) {
+                $changed[$path] = ['from' => $before[$path], 'to' => $value];
+            }
+        }
+
+        return ['added' => array_diff_key($after, $before), 'removed' => array_diff_key($before, $after), 'changed' => $changed];
     }
 
     /**
@@ -518,7 +650,7 @@ final class TemplateIssuing
         foreach ($values as $path => $value) {
             $path = (string) $path;
             // Core hands the number out; nobody names their own.
-            if ($path === DocumentIssuing::NUMBER_FIELD) {
+            if ($path === DocumentIssuing::NUMBER_FIELD || $path === DocumentIssuing::REVISION_FIELD) {
                 $conflicts[] = $path;
                 continue;
             }

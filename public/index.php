@@ -3659,6 +3659,7 @@ $router->register('GET',  '/api/documents',                                     
 // questions, and the handler renders opportunistically. See
 // DocumentsApiHandler::create().
 $router->register('POST', '/api/documents',                                            [$documentsHandler, 'create'],          null, null, CorePermissions::DOCUMENTS_ISSUE);
+$router->register('POST', '/api/documents/{id:\d+}/revisions',                         [$documentsHandler, 'revise'],          null, null, CorePermissions::DOCUMENTS_ISSUE);
 $router->register('POST', '/api/documents/preflight',                                  [$documentsHandler, 'preflight'],       null, null, CorePermissions::DOCUMENTS_ISSUE);
 $router->register('GET',  '/api/documents/{id:\d+}',                                   [$documentsHandler, 'show'],            null, null, CorePermissions::DOCUMENTS_READ);
 $router->register('GET',  '/api/documents/{id:\d+}/content',                           [$documentsHandler, 'content'],         null, null, CorePermissions::DOCUMENTS_READ);

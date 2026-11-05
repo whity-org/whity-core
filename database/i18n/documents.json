@@ -421,6 +421,7 @@
         "fields.inWords.ar": "{field} in words (Arabic)",
         "fields.inWords.en": "{field} in words (English)",
         "fields.issuedDocument.number": "This document's number",
+        "fields.issuedDocument.revision": "This document's revision",
         "fields.month.april": "April",
         "fields.month.august": "August",
         "fields.month.december": "December",

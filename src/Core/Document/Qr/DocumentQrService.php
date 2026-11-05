@@ -248,14 +248,17 @@ final class DocumentQrService
 
     private function isWithdrawn(int $tenantId, int $documentId): bool
     {
+        // Or replaced (WHIT-888): a new code on old paper would verify paper a later
+        // revision took the place of.
         $stmt = $this->db->prepare(
-            'SELECT withdrawn_at FROM documents WHERE id = :id AND tenant_id = :tenant_id'
+            'SELECT 1 FROM documents d
+              WHERE d.tenant_id = :tenant_id AND d.id = :id
+                AND (d.withdrawn_at IS NOT NULL
+                     OR EXISTS (SELECT 1 FROM documents n WHERE n.tenant_id = :tenant_id AND n.supersedes_id = d.id))'
         );
-        $stmt->execute([':id' => $documentId, ':tenant_id' => $tenantId]);
+        $stmt->execute([':tenant_id' => $tenantId, ':id' => $documentId]);
 
-        $withdrawnAt = $stmt->fetchColumn();
-
-        return $withdrawnAt !== false && $withdrawnAt !== null;
+        return $stmt->fetchColumn() !== false;
     }
 
     /**

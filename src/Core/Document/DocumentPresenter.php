@@ -93,6 +93,15 @@ final class DocumentPresenter
             'record_type'          => $document['record_type'] ?? null,
             'record_id'            => $document['record_id'] ?? null,
             'slot'                 => $document['slot'] ?? null,
+            // Its place among revisions (WHIT-888): the number stays, the letter moves.
+            'revision'             => DocumentState::revisionLetter((int) ($document['revision'] ?? 1)),
+            'revision_reason'      => $document['revision_reason'] ?? null,
+            'supersedes_id'        => $document['supersedes_id'] ?? null,
+            'superseded_by'        => $document['superseded_by'] ?? null,
+            'superseded_by_revision' => isset($document['superseded_by_revision'])
+                ? DocumentState::revisionLetter((int) $document['superseded_by_revision'])
+                : null,
+            'superseded_on'        => $document['superseded_on'] ?? null,
             'template_name'        => $document['template_name'],
             'title'                => $document['title'],
             'origin_ou_id'         => $document['origin_ou_id'],

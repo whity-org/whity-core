@@ -5613,10 +5613,16 @@ final class CoreApiSchemas
                 'record_type' => self::str(true) + ['description' => 'The type of the business record it was issued from'],
                 'record_id' => self::str(true) + ['description' => 'The id of that record'],
                 'slot' => self::str(true) + ['description' => 'The template slot it was issued through'],
+                'revision' => self::str() + ['description' => 'Its revision letter. The number stays the same across revisions: INV-2026-0142 rev B.'],
+                'revision_reason' => self::str(true) + ['description' => 'Why this revision was issued'],
+                'supersedes_id' => self::int(true) + ['description' => 'The document this revision replaces'],
+                'superseded_by' => self::int(true) + ['description' => 'The revision that replaced this document'],
+                'superseded_by_revision' => self::str(true) + ['description' => 'That revision\'s letter'],
+                'superseded_on' => self::str(true) + ['description' => 'When it was replaced'],
                 'state' => [
                     'type' => 'string',
                     'enum' => ['draft', 'in_review', 'issued', 'superseded', 'withdrawn'],
-                    'description' => 'Where it is, derived from the routing trail and never stored. `in_review`: a route has an open item. `draft`: its newest route ended rejected, or it waits for final approval to be numbered. `withdrawn`: taken back; the record stays. `issued`: everything else. Absent where a route did not read it.',
+                    'description' => 'Where it is, derived from the routing trail and never stored. `in_review`: a route has an open item. `draft`: its newest route ended rejected, or it waits for final approval to be numbered. `superseded`: a later revision replaced it. `withdrawn`: taken back; the record stays. `issued`: everything else. Absent where a route did not read it.',
                 ],
                 'template_name' => self::str(),
                 'title' => self::str(),
@@ -5712,6 +5718,20 @@ final class CoreApiSchemas
             // absent = "render if this instance can", true = "I require an
             // artifact" (503 when it cannot), false = "record only". Omitting it
             // is what a client that does not care should do.
+            'DocumentRevisionRequest' => self::object([
+                'reason' => self::str() + ['description' => 'Why it is being replaced, at most 1000 characters'],
+                'template' => ['type' => 'string', 'enum' => ['pinned', 'latest'], 'description' => 'The version it printed (default), or the template\'s latest published version'],
+                'record' => self::str() + ['description' => 'If sent, it must be the record the document was issued from, as `type:id`'],
+            ], ['reason']),
+            'DocumentRevisionResponse' => self::object([
+                'data' => SchemaBuilder::ref('Document'),
+                'render' => ['type' => 'object', 'description' => 'Whether a PDF was stored, as on POST /api/documents'],
+                'diff' => self::object([
+                    'added' => ['type' => 'object', 'additionalProperties' => ['type' => 'string'], 'description' => 'Field path => value, new in this revision'],
+                    'removed' => ['type' => 'object', 'additionalProperties' => ['type' => 'string'], 'description' => 'Field path => value, gone from this revision'],
+                    'changed' => ['type' => 'object', 'additionalProperties' => self::object(['from' => self::str(), 'to' => self::str()], ['from', 'to']), 'description' => 'Field path => what it said and says now'],
+                ], ['added', 'removed', 'changed']),
+            ], ['data', 'render', 'diff']),
             'DocumentPreflightCheck' => self::object([
                 'code' => self::str() + ['description' => '`template`, `record`, `values`, `fields`, `origin_key` or `render` from core; `plugin` from a listener'],
                 'label' => self::str() + ['description' => 'What was checked, in the reader\'s language'],
@@ -11905,6 +11925,26 @@ final class CoreApiSchemas
                     503 => self::errorResponse(
                         'render:true was requested and rendering or persistence is disabled on this instance'
                     ),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/documents/{id:\d+}/revisions', 'documents:issue', [
+                'summary' => 'Issue a revision that replaces this document, from its record as it is now',
+                // Like issuing, it can't be undone, so an agent only ever proposes it.
+                'mcp' => ['agentPolicy' => 'propose'],
+                'description' =>
+                    'A new document with the same number and the next revision letter, linked by `supersedes_id`. '
+                    . 'The fields are read again from the record; a template\'s own fields carry over. The original\'s '
+                    . 'state becomes `superseded` and its verification codes stop verifying. `diff` says what changed. '
+                    . 'Refused for a document with no record (`no_record`), a withdrawn one (`withdrawn`), one already '
+                    . 'replaced (`already_revised`) and one still in review (`in_review`).',
+                'tags' => ['documents'],
+                'request' => 'DocumentRevisionRequest',
+                'responses' => [
+                    201 => self::jsonResponse('The new revision, whether it was rendered, and what changed', 'DocumentRevisionResponse'),
+                    404 => self::errorResponse('No such document or template, or the caller can\'t see it'),
+                    409 => self::errorResponse('`withdrawn`, `already_revised`, `in_review`, `vetoed`, `version_gone`, `template_unpublished` or `record_type_changed`'),
+                    422 => self::errorResponse('`no_record`, `no_source`, a missing or too long reason, or required fields with no value'),
+                    503 => self::errorResponse('The revision could not be created'),
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('POST', '/api/documents/preflight', 'documents:issue', [
