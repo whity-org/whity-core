@@ -365,6 +365,7 @@ abstract class BaseCommand implements CliCommand, CommandHelp
         $documentFieldRegistry->add(new \Whity\Core\Document\Fields\IssuedDocumentFieldProvider($embedDocuments, $embedVisibility));
         $documentFieldRegistry->add(new \Whity\Core\Document\Fields\CompanyFieldProvider($settingsService));
         $documentFieldRegistry->add(new \Whity\Core\Document\Fields\TodayFieldProvider());
+        $documentFieldRegistry->add(new \Whity\Core\Document\Fields\IssuedDocumentNumberFieldProvider());
         \Whity\register_service(\Whity\Core\Document\Fields\DocumentFieldRegistry::class, $documentFieldRegistry);
 
         $dataTypeLifecycle = new \Whity\Core\DataType\DataTypeLifecycleService(

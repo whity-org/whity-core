@@ -16,6 +16,8 @@ final class IssueResult
         public readonly string $title,
         public readonly bool $replayed,
         public readonly ?string $contentUrl,
+        // SDK 1.65: null with no numbering rule, or until final approval hands it out.
+        public readonly ?string $number = null,
     ) {
     }
 }

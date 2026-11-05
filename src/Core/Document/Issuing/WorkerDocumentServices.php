@@ -87,6 +87,7 @@ final class WorkerDocumentServices
         $fields->add(new IssuedDocumentFieldProvider($documents, $visibility));
         $fields->add(new CompanyFieldProvider($settings));
         $fields->add(new TodayFieldProvider());
+        $fields->add(new \Whity\Core\Document\Fields\IssuedDocumentNumberFieldProvider());
         $fields->addTenantSource(static fn (int $tenantId): array => TenantRecordFieldProvider::forManifests(
             $liveManifests($tenantId),
             $records,

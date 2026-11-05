@@ -101,6 +101,7 @@ final class SdkDocuments implements Documents, HostWiredService
             (string) $document['title'],
             $issued['replayed'],
             is_string($document['content_url'] ?? null) ? $document['content_url'] : null,
+            is_string($document['number'] ?? null) ? $document['number'] : null,
         );
     }
 

@@ -108,6 +108,14 @@ final class Events
     public const DOCUMENT_RENDERED = 'document.rendered';
     public const DOCUMENT_RENDERED_ASYNC = 'document.rendered.async';
 
+    /**
+     * SDK 1.65: a number handed out at final approval, once per document. A document
+     * numbered at issue carries its number on `document.issued` instead. Payload:
+     * `id`, `number`, `route_id`, `actor_profile_id`.
+     */
+    public const DOCUMENT_NUMBERED = 'document.numbered';
+    public const DOCUMENT_NUMBERED_ASYNC = 'document.numbered.async';
+
     // ---- platform ----
     public const NAVIGATION_REGISTER = 'navigation.register';
     public const PERMISSION_REGISTERED = 'permission.registered';

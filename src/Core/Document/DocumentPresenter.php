@@ -86,6 +86,13 @@ final class DocumentPresenter
             'document_source_id'   => $document['document_source_id'] ?? null,
             'document_source_version' => $document['document_source_version'] ?? null,
             'origin_key'           => $document['origin_key'] ?? null,
+            // What people quote it by, and what it was issued from (WHIT-684). All
+            // null on a document issued before these existed, or with no rule or record.
+            'number'               => $document['number'] ?? null,
+            'number_assigned_at'   => $document['number_assigned_at'] ?? null,
+            'record_type'          => $document['record_type'] ?? null,
+            'record_id'            => $document['record_id'] ?? null,
+            'slot'                 => $document['slot'] ?? null,
             'template_name'        => $document['template_name'],
             'title'                => $document['title'],
             'origin_ou_id'         => $document['origin_ou_id'],
@@ -103,7 +110,7 @@ final class DocumentPresenter
                 static fn (array $a): array => self::artifact($a),
                 $artifacts
             ),
-        ] + $filing;
+        ] + (isset($document['state']) ? ['state' => $document['state']] : []) + $filing;
     }
 
     /**
@@ -160,6 +167,7 @@ final class DocumentPresenter
             'checksum_sha256' => $artifact['checksum_sha256'],
             'rendered_by'     => $artifact['rendered_by'],
             'rendered_at'     => $artifact['rendered_at'],
+            'pages'           => $artifact['pages'] ?? null,
             'content_url'     => self::artifactContentUrl((int) $artifact['document_id'], (int) $artifact['id']),
         ];
     }

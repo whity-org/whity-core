@@ -242,9 +242,12 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsOneEightForInteractiveBlocks(): void
     {
         $this->assertSame(
-            '1.63.0',
+            '1.65.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.63 ADDS PLUGIN FILES AND DOCUMENT TRACKING: the host services PluginFiles and PluginDocuments '
+            'SDK 1.65 ADDS DOCUMENT NUMBERS: DocumentNumberingRule says when a document is numbered and what the '
+            . 'number looks like, on a slot or in a manifest; IssueResult returns the number and document.numbered '
+            . 'says one was handed out at final approval (WHIT-684). Purely additive. '
+            . 'SDK 1.63 ADDS PLUGIN FILES AND DOCUMENT TRACKING: the host services PluginFiles and PluginDocuments '
             . 'give a plugin its own files per workspace (a generic upload and download controller included) and '
             . 'its own documents, recorded as issued by that plugin, with a QR code and tracking for those documents only '
             . '(WHIT-886). Purely additive. '

@@ -252,6 +252,20 @@ final class RouteEventRepository
         return $counts;
     }
 
+    /** The newest verdict on a route, or null when nobody has decided anything on it. */
+    public function latestVerdictOnRoute(int $routeId, int $tenantId): ?string
+    {
+        $stmt = $this->db->prepare(
+            'SELECT verdict FROM document_route_events
+              WHERE tenant_id = :tenant_id AND route_id = :route_id AND verdict IS NOT NULL
+              ORDER BY id DESC LIMIT 1'
+        );
+        $stmt->execute([':tenant_id' => $tenantId, ':route_id' => $routeId]);
+        $verdict = $stmt->fetchColumn();
+
+        return is_string($verdict) ? $verdict : null;
+    }
+
     /**
      * Map a raw row to the typed shape the presenter serialises.
      *

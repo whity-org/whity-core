@@ -34,7 +34,7 @@ The owner's ask: "we also want an sdk to enable plugins to trigger and create do
 
 `POST /api/document-sources/{id}/print-labels` (label kind, `{records}` up to 500 or `{csv, columns}` up to 5,000 rows and 2 MB, parsed by `LabelCsv`) streams one PDF and writes **no** `documents` row; the CSV isn't kept.
 
-`documents` (migration 108) has no status by design (lifecycle comes from routing), no number (WHIT-684; `SequenceAllocator` exists in the SDK), and no source columns.
+`documents` (migration 108) has no status by design (lifecycle comes from routing). Since this was written it has gained source columns (migration 165) and, with WHIT-684 (migration 216), a stored `number`, the record it was issued from and a derived `state` (3.12).
 
 ### 1.3 Events, jobs, identity
 
@@ -75,7 +75,7 @@ public function issue(IssueRequest $request, ActingAs $actor): IssueResult;
 3. Check `originKey`: if a document with that key exists, return it (200, `replayed: true`), no second render.
 4. Resolve merge data (3.3); 422 listing missing required and fiscal fields (E.27).
 5. Dispatch `document.issuing` (sync, veto allowed).
-6. Raise the record (source id and version, title, values, origin key, actor columns), mint the QR, allocate the number when WHIT-684 lands.
+6. Raise the record (source id and version, title, values, origin key, actor columns, record, slot), hand out the number when the rule says on issue (3.12), and mint the QR.
 7. Render through Whity Render with the version's frozen theme (`DOCUMENT-THEMES.md` 4.3) and store the artifact. Spend one render unit; refund on failure.
 8. Dispatch `document.issued` (and `document.rendered` when bytes were stored), sync and `.async`, after commit.
 
@@ -92,7 +92,7 @@ A slot is a named place a plugin (or core) needs a template.
 | `recordType` | `acme.invoice` | Must be a record type a field provider serves |
 | `kinds` | `template`, `label` | Which document kinds can fill it |
 | `starter` | `acme_invoicing.invoice_standard` | The plugin's starter (WHIT-687), seeded as a `document_sources` row with `starter_key`; the default binding |
-| `numbering` | `per_year` · `none` | When WHIT-684 lands |
+| `numbering` | `{ "pattern": "INV-{YYYY}-{SEQ:4}", "assign": "on_issue" }` | Optional, see 3.12. A template bound to the slot may carry its own rule, which wins |
 
 Bindings are tenant settings (`documents.slot_bindings`, a map of slot key → source id), set by holders of `documents:publish`. The binding API refuses a template whose record type or kind doesn't match, or which isn't published. An unbound slot uses its starter; a slot whose plugin is off can't be issued from (409 naming the plugin), matching E.19.
 
@@ -237,6 +237,18 @@ The no-code plugin builder (`WHITY-BUILDER.md`, separate session) needs three th
 - **Declarative data.** Slots and starters have a canonical JSON form validated by JSON Schema, loadable from `resources/document-slots/*.json` and `resources/document-starters/*.json` without plugin PHP. A starter is a `WhityDocument` (plus `slot` and `theme.ref`). Field providers are the exception: they read records, so a builder-made plugin gets them from the records it declares (its data types), not from code it writes.
 - **A render step in a flow.** An automation step "issue from slot X for this record" is a call to `DocumentIssuing` with merge data and an `originKey` derived from the flow run and step, under the acting principal's permissions; in the background it needs the allow-list in 3.7.
 - **Export.** A workspace template exports as starter JSON (blocks, page, own fields, theme ref, slot) and a theme as theme JSON, so builder-made pieces move into a code plugin unchanged.
+
+### 3.12 Numbers, records, state and pages (WHIT-684)
+
+- **Numbering rule.** `{pattern, assign}` on a slot (manifest or `TemplateSlot`) or on a template (`PATCH /api/document-sources/{id}`, `documents:publish`); the template's wins. `pattern` uses the form-reference tokens. `assign` is `on_issue` or `on_final_approval`: the ticket said final approval, the plugin asked for issue, and both are real, so it is a setting. Copied onto the document when raised, so a changed rule doesn't change a waiting document.
+- **Exactly once.** `DocumentNumbering` claims the row with a guarded update before touching `sequence_counters`, in one transaction with the record (on issue) or the approval (on final approval). A retry, a replay or two approvers finishing together get the one number, and a lost race burns none. Numbers are unique and may skip, as `SequenceAllocator` says.
+- **Stored, dated at assignment.** The date is the instant it was handed out, in UTC, and the number is never recomputed. The counter follows the pattern with its dates filled in, so a pattern with `{YYYY}` restarts each year.
+- **Final approval** comes from the trail: nothing open on the route, and its newest verdict is an approval. A route with no decision step never numbers a document. `document.numbered` fires once, and the document is reprinted when its template prints the field.
+- **Printing.** `issued_document.number` is offered to every template and filled from the record for each print. A caller can't supply it.
+- **Record.** `record_type` and `record_id` are stored from the issue request and filter with `?record=<type>:<id>`, beside `?source_id=` and `?slot=`. `q` searches the number too. Which plugin issued a document is `plugin_document_links`, a separate question.
+- **State.** `DocumentState` derives it on every read: `withdrawn`, then `superseded` (revisions, #1625), then `in_review` (an open item), then `draft` (the newest route ended rejected, or waiting to be numbered), else `issued`. No column. A document with no PDF isn't a draft, which leaves WHIT-679's question open.
+- **Pages.** `document_artifacts.pages` keeps what the render service reports, returned on each artifact and on `document.rendered`.
+- **Older rows** have no number, no record and null pages, and are `issued` unless their routing says otherwise.
 
 ## 4. Phasing
 

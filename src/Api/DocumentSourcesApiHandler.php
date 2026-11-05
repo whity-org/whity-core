@@ -25,6 +25,7 @@ use Whity\Core\Response;
 use Whity\Core\Tenant\TenantContext;
 use Whity\Http\JsonBody;
 use Whity\Http\UploadedFilePart;
+use Whity\Sdk\Documents\DocumentNumberingRule;
 use Whity\Http\UploadedFilePartException;
 use Whity\Storage\StorageException;
 
@@ -342,8 +343,23 @@ final class DocumentSourcesApiHandler
             }
             $fields['owner_ou_id'] = $parsed;
         }
-        if ($fields === []) {
-            return Response::error('Send scope, required_permission or owner_ou_id', 422);
+        // Numbers go on paper people keep, so choosing how is a publish action (WHIT-684).
+        $hasNumbering = array_key_exists('numbering', $body);
+        $numbering = null;
+        if ($hasNumbering) {
+            if (!$this->permissionResolver($callerId, $tenantId)(CorePermissions::DOCUMENTS_PUBLISH)) {
+                return Response::error('Changing how documents are numbered requires documents:publish', 403);
+            }
+            if ($body['numbering'] !== null) {
+                try {
+                    $numbering = DocumentNumberingRule::fromArray($body['numbering'])->toArray();
+                } catch (\InvalidArgumentException $e) {
+                    return Response::error($e->getMessage(), 422);
+                }
+            }
+        }
+        if ($fields === [] && !$hasNumbering) {
+            return Response::error('Send scope, required_permission, owner_ou_id or numbering', 422);
         }
 
         $changes = (array_key_exists('scope', $fields) && $fields['scope'] !== $row['scope'])
@@ -359,6 +375,9 @@ final class DocumentSourcesApiHandler
         }
 
         $this->repo->updateAudience($id, $tenantId, $fields);
+        if ($hasNumbering) {
+            $this->repo->updateNumbering($id, $tenantId, $numbering);
+        }
 
         return Response::json(['data' => $this->repo->findById($id, $tenantId)]);
     }

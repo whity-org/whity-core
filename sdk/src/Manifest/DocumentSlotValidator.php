@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Whity\Sdk\Manifest;
 
+use Whity\Sdk\Documents\DocumentNumberingRule;
+
 /**
  * The `documents` section of `plugin.json` (SDK 1.55, WHIT-742): template
  * slots, the named places a workspace plugin needs a document template.
@@ -14,7 +16,8 @@ namespace Whity\Sdk\Manifest;
  *     "order_confirmation": {
  *       "label": { "en": "Order confirmation", "ar": "تأكيد الطلب" },
  *       "record": "order",
- *       "kinds": ["template"]
+ *       "kinds": ["template"],
+ *       "numbering": { "pattern": "ORD-{YYYY}-{SEQ:4}", "assign": "on_issue" }
  *     }
  *   }
  * }
@@ -24,7 +27,8 @@ namespace Whity\Sdk\Manifest;
  * plugin's slot (DOCUMENT-AUTOMATION.md 3.2). `record` must name one of this
  * manifest's own record types, which the host serves as the document field
  * record type `<plugin name>.<record>`. `kinds` defaults to `["template"]`.
- * A slot has no starter yet: a workspace manifest is one JSON document with
+ * `numbering` (SDK 1.65) is optional; see {@see DocumentNumberingRule}. A slot has
+ * no starter yet: a workspace manifest is one JSON document with
  * no files beside it, so starters arrive with WHIT-687 in their own form, and
  * until then an unbound slot has no template.
  */
@@ -84,11 +88,19 @@ final class DocumentSlotValidator
                 continue;
             }
             foreach (array_keys($slot) as $key) {
-                if (!in_array($key, ['label', 'record', 'kinds'], true)) {
+                if (!in_array($key, ['label', 'record', 'kinds', 'numbering'], true)) {
                     $errors[] = "{$path}: unknown key '{$key}'";
                 }
             }
             $label($slot['label'] ?? null, "{$path}.label", 200, true, $errors);
+
+            if (array_key_exists('numbering', $slot)) {
+                try {
+                    DocumentNumberingRule::fromArray($slot['numbering']);
+                } catch (\InvalidArgumentException $e) {
+                    $errors[] = "{$path}: " . $e->getMessage();
+                }
+            }
 
             $record = $slot['record'] ?? null;
             if (!is_string($record) || $record === '') {

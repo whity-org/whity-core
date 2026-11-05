@@ -126,6 +126,11 @@ final class DocumentCriteria
         public readonly ?array $routedThroughOuIds = null,
         public readonly ?string $search = null,
         public readonly bool $matchesNothing = false,
+        // What it was issued from (WHIT-684): the request's filters, not a view's.
+        public readonly ?string $recordType = null,
+        public readonly ?string $recordId = null,
+        public readonly ?int $sourceId = null,
+        public readonly ?string $slot = null,
     ) {
     }
 
@@ -170,6 +175,35 @@ final class DocumentCriteria
             routedThroughOuIds: $this->routedThroughOuIds,
             search: $search,
             matchesNothing: $this->matchesNothing,
+            recordType: $this->recordType,
+            recordId: $this->recordId,
+            sourceId: $this->sourceId,
+            slot: $this->slot,
+        );
+    }
+
+    /**
+     * Narrowed to what a document was issued from. Filters only: everything already
+     * set stays, so this can't widen a view or the caller's visibility.
+     */
+    public function withIssueFilters(?string $recordType, ?string $recordId, ?int $sourceId, ?string $slot): self
+    {
+        return new self(
+            restrictToCreator: $this->restrictToCreator,
+            createdBy: $this->createdBy,
+            originOuIds: $this->originOuIds,
+            inCollectionId: $this->inCollectionId,
+            awaitingProfileId: $this->awaitingProfileId,
+            actedOnByProfileId: $this->actedOnByProfileId,
+            verdictByProfileId: $this->verdictByProfileId,
+            verdict: $this->verdict,
+            routedThroughOuIds: $this->routedThroughOuIds,
+            search: $this->search,
+            matchesNothing: $this->matchesNothing,
+            recordType: $recordType,
+            recordId: $recordId,
+            sourceId: $sourceId,
+            slot: $slot,
         );
     }
 }

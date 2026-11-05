@@ -28,6 +28,8 @@ final class TemplateSlot
         public readonly array $label,
         public readonly string $recordType,
         public readonly array $kinds = ['template'],
+        // SDK 1.65: how its documents are numbered. A template bound to the slot may carry its own rule, which wins.
+        public readonly ?DocumentNumberingRule $numbering = null,
     ) {
         if (preg_match('/^[a-z][a-z0-9_]{0,39}$/', $name) !== 1) {
             throw new \InvalidArgumentException("Slot name '{$name}': lowercase letters, digits and underscores, up to 40");

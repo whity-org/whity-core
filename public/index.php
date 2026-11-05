@@ -3281,6 +3281,7 @@ $documentFieldLabels = new \Whity\Core\Document\Fields\FieldLabels($serverLabels
 $documentFieldRegistry->add(new \Whity\Core\Document\Fields\IssuedDocumentFieldProvider($documentRepository, $documentVisibilityPolicy, $documentFieldLabels));
 $documentFieldRegistry->add(new \Whity\Core\Document\Fields\CompanyFieldProvider($settingsService, $documentFieldLabels));
 $documentFieldRegistry->add(new \Whity\Core\Document\Fields\TodayFieldProvider($documentFieldLabels));
+$documentFieldRegistry->add(new \Whity\Core\Document\Fields\IssuedDocumentNumberFieldProvider($documentFieldLabels));
 // WHIT-742: each workspace plugin's record types, in the workspaces where
 // the plugin is published and on (`CakeOrders.order`), so a template can be
 // written for them and a slot can be issued from them.
@@ -3684,6 +3685,22 @@ $documentRouter = new \Whity\Core\Document\Routing\DocumentRouter(
     $settingsService,
     $hookManager
 );
+// WHIT-684: a number handed out at final approval goes on the PDF, printed for the
+// approver, when the template prints it. Listening after the commit, so a failed
+// render costs the PDF, never the approval or the number.
+$hookManager->listen(\Whity\Sdk\Hooks\Events::DOCUMENT_NUMBERED, static function (array $event) use ($documentRepository, $documentSourceRepository, $documentIssuing, $roleChecker): void {
+    $tenantId = (int) $event['tenant_id'];
+    $actorId = (int) $event['actor_profile_id'];
+    $document = $documentRepository->findById((int) $event['id'], $tenantId);
+    $source = isset($document['document_source_id']) ? $documentSourceRepository->findById((int) $document['document_source_id'], $tenantId) : null;
+    if ($document !== null && $source !== null) {
+        $documentIssuing->reprintNumbered(
+            new \Whity\Core\Document\Issuing\ActingAs($tenantId, $actorId, \Whity\Core\RBAC\ScopedPermissionSet::forProfile($roleChecker, $actorId, $tenantId)),
+            $source,
+            $document,
+        );
+    }
+});
 // #1031. The route-TEMPLATE store, constructed here rather than beside the
 // templates handler below because BOTH need it: designing a flow and applying one
 // read the same three tables, and a second instance would be a second connection
