@@ -2549,16 +2549,7 @@ class AuthHandler
      */
     private function consumeTotpStep(int $profileId, int $step): bool
     {
-        // @tenant-guard-ignore: profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
-        $stmt = $this->db->prepare(
-            'UPDATE profiles
-                SET two_factor_last_used_step = :step, updated_at = CURRENT_TIMESTAMP
-              WHERE id = :pid
-                AND (two_factor_last_used_step IS NULL OR two_factor_last_used_step < :step2)'
-        );
-        $stmt->execute([':step' => $step, ':pid' => $profileId, ':step2' => $step]);
-
-        return $stmt->rowCount() === 1;
+        return TotpStepFloor::advance($this->db, $profileId, $step);
     }
 
     /**
