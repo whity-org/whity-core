@@ -203,6 +203,7 @@ final class DocumentsApiHandler
         private readonly ?TemplateSlotRegistry $slots = null,
         // S5: names for the library's "Raised by", from the page being served.
         private readonly ?DocumentPeople $people = null,
+        private readonly ?\Whity\Core\Document\Fields\FieldLabels $fieldLabels = null,
     ) {
     }
 
@@ -215,6 +216,7 @@ final class DocumentsApiHandler
             $this->settings,
             fn (int $id, int $tenantId, int $callerId): ?array => $this->sources->visibleRow($id, $tenantId, $callerId),
             $this->slots,
+            labels: $this->fieldLabels,
         );
     }
 
@@ -276,6 +278,25 @@ final class DocumentsApiHandler
             'render' => $issued['render'],
             'replayed' => $issued['replayed'],
         ], $issued['replayed'] ? 200 : 201);
+    }
+
+    /**
+     * POST /api/documents/preflight — would this issue, and if not, why? The body is
+     * an issue's. Nothing is written and no number is allocated. Always 200 with the
+     * answer, since "no, because" is what was asked for.
+     */
+    public function preflight(Request $request): Response
+    {
+        $ctx = $this->context($request);
+        if ($ctx instanceof Response) {
+            return $ctx;
+        }
+        [$tenantId, $callerId] = $ctx;
+
+        return Response::json($this->templateIssuing()->preflight(
+            new ActingAs($tenantId, $callerId, $this->permissionResolver($callerId, $tenantId)),
+            IssueInput::fromBody(JsonBody::parsed($request)),
+        ));
     }
 
     /**

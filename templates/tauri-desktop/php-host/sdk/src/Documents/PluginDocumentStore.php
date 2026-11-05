@@ -25,6 +25,13 @@ interface PluginDocumentStore
     public function issue(IssueRequest $request): IssueResult;
 
     /**
+     * Would {@see issue()} go through, and if not, why (SDK 1.66)? Writes nothing.
+     *
+     * @throws DocumentNotIssuedException when there is nobody to ask for.
+     */
+    public function preflight(IssueRequest $request): PreflightResult;
+
+    /**
      * The verification URL to print as a QR code on a document this plugin
      * issued, minting the code if the document has none yet. Null when the
      * document is not this plugin's, or when this instance cannot mint a code

@@ -1079,6 +1079,215 @@ final class DocumentCreateApiRealEngineTest extends TestCase
         self::assertSame('OWN-01', self::decode($own)['data']['number']);
     }
 
+    // ── preflight (WHIT-892) ─────────────────────────────────────────────────
+
+    public function testAPreflightThatWouldPassSaysSoAndWritesNothing(): void
+    {
+        $template = $this->editor->published(self::TENANT, self::RAISER, 'Clean');
+        $this->editor->sourceRepo->updateNumbering($template, self::TENANT, ['pattern' => 'CLN-{SEQ:4}', 'assign' => 'on_issue']);
+        $before = $this->tableCounts();
+        $renders = count($this->fakeRender->calls);
+
+        $answer = $this->preflight(self::RAISER, ['document_source_id' => $template]);
+
+        self::assertTrue($answer['ok'], (string) json_encode($answer));
+        self::assertSame([], $answer['missing_fields']);
+        self::assertSame($before, $this->tableCounts(), 'a preflight writes nothing');
+        self::assertCount($renders, $this->fakeRender->calls, 'a preflight renders nothing');
+
+        // It allocated no number: the first real issue gets the first one.
+        $issued = $this->create(self::RAISER, ['document_source_id' => $template, 'render' => false]);
+        self::assertSame('CLN-0001', self::decode($issued)['data']['number']);
+    }
+
+    public function testAPreflightGivesEveryReasonAtOnceAndTheIssueStillRefuses(): void
+    {
+        $template = $this->editor->published(self::TENANT, self::RAISER, 'Needs a field', [
+            $this->editor->para($this->editor->field('document.number')),
+        ], ['record_type' => 'document', 'scope' => 'tenant']);
+        $this->editor->hooks->listen(Events::DOCUMENT_ISSUING, static function (array $data): array {
+            if (($data['check_only'] ?? false) === true) {
+                $data['checks'][] = ['label' => 'All 4 units installed', 'ok' => true];
+                $data['checks'][] = ['label' => 'The customer has signed', 'ok' => false, 'why' => 'The customer signs first'];
+                $data['checks'][] = ['nonsense' => true];
+
+                return $data;
+            }
+
+            throw new HookVetoException(Events::DOCUMENT_ISSUING, 'The customer signs first');
+        });
+        $about = $this->seedDocument(self::RAISER, 'About');
+
+        $answer = $this->preflight(self::RAISER, ['document_source_id' => $template, 'record' => 'document:' . $about, 'origin_key' => 'bad key!', 'values' => ['nope' => 'x']]);
+
+        self::assertFalse($answer['ok']);
+        $byLabel = array_column($answer['checks'], null, 'label');
+        self::assertTrue($byLabel['All 4 units installed']['ok']);
+        self::assertFalse($byLabel['The customer has signed']['ok']);
+        self::assertSame('The customer signs first', $byLabel['The customer has signed']['why']);
+        $codes = array_column(array_filter($answer['checks'], static fn (array $c): bool => $c['ok'] === false), 'code');
+        self::assertContains('values', $codes, 'an unknown value');
+        self::assertContains('origin_key', $codes, 'a bad key');
+        self::assertContains('plugin', $codes, 'and the plugin all at once');
+        self::assertCount(3 + 3, $answer['checks'], 'the malformed check is dropped');
+
+        self::assertSame(409, $this->create(self::RAISER, ['document_source_id' => $template, 'record' => 'document:' . $about])->getStatusCode(), 'the real issue checks again');
+    }
+
+    public function testAPreflightNamesMissingFields(): void
+    {
+        $template = $this->editor->published(self::TENANT, self::RAISER, 'Letter', [
+            $this->editor->para($this->editor->field('company.tax_number')),
+        ]);
+        $real = $this->create(self::RAISER, ['document_source_id' => $template, 'render' => false]);
+        $missing = self::decode($real)['details']['missing'] ?? [];
+        self::assertNotSame([], $missing, 'fixture: the real issue must refuse this for a missing field');
+
+        $answer = $this->preflight(self::RAISER, ['document_source_id' => $template]);
+
+        self::assertFalse($answer['ok']);
+        self::assertSame($missing, $answer['missing_fields']);
+        $fields = array_column($answer['checks'], null, 'code')['fields'];
+        self::assertFalse($fields['ok']);
+        self::assertSame('missing_fields', $fields['reason']);
+    }
+
+    public function testAListenerThatOnlyVetoesCountsAsOneFailedCheck(): void
+    {
+        $template = $this->editor->published(self::TENANT, self::RAISER, 'Vetoed');
+        $this->editor->hooks->listen(Events::DOCUMENT_ISSUING, static function (array $data): array {
+            throw new HookVetoException(Events::DOCUMENT_ISSUING, 'Not on Sundays');
+        });
+
+        $answer = $this->preflight(self::RAISER, ['document_source_id' => $template]);
+
+        self::assertFalse($answer['ok']);
+        $plugin = array_column($answer['checks'], null, 'code')['plugin'];
+        self::assertSame('Not on Sundays', $plugin['why']);
+        self::assertTrue(array_column($answer['checks'], null, 'code')['template']['ok'], 'core checks still answer');
+    }
+
+    public function testAPreflightOfALetterDoesNotFreezeItsDraft(): void
+    {
+        $letter = $this->editor->draft(self::TENANT, self::RAISER, 'Letter', [], ['kind' => 'letter', 'scope' => 'personal']);
+
+        self::assertTrue($this->preflight(self::RAISER, ['document_source_id' => $letter])['ok']);
+
+        self::assertNull($this->editor->sourceRepo->findById($letter, self::TENANT)['published_version'] ?? null, 'no version was frozen');
+    }
+
+    public function testAPreflightReportsAnUnboundSlotAndAMissingTemplate(): void
+    {
+        $this->registerSlot();
+        $unbound = $this->preflight(self::RAISER, ['slot' => 'Courier.receipt']);
+        self::assertFalse($unbound['ok']);
+        self::assertSame('slot_unbound', $unbound['checks'][0]['reason']);
+        self::assertCount(1, $unbound['checks'], 'nothing more can be asked with no template');
+
+        self::assertSame('template_not_found', $this->preflight(self::RAISER, ['document_source_id' => 999999])['checks'][0]['reason']);
+    }
+
+    public function testAPreflightCannotSeeAnotherTenantsTemplateOrRecord(): void
+    {
+        $theirs = $this->editor->published(self::OTHER_TENANT, self::OTHER_TENANT_ADMIN, 'Their template');
+        $answer = $this->preflight(self::RAISER, ['document_source_id' => $theirs]);
+        self::assertFalse($answer['ok']);
+        self::assertSame('template_not_found', $answer['checks'][0]['reason'], 'the same answer as a template that does not exist');
+
+        $template = $this->editor->published(self::TENANT, self::RAISER, 'For a record', [], ['record_type' => 'document', 'scope' => 'tenant']);
+        $theirDocument = $this->seedDocumentIn(self::OTHER_TENANT, self::OTHER_TENANT_ADMIN, 'Their document');
+        $answer = $this->preflight(self::RAISER, ['document_source_id' => $template, 'record' => 'document:' . $theirDocument]);
+        self::assertSame('record_not_found', array_column($answer['checks'], null, 'code')['record']['reason']);
+    }
+
+    public function testAPreflightSaysWhenTheOriginKeyWouldReplay(): void
+    {
+        $template = $this->editor->published(self::TENANT, self::RAISER, 'Once');
+        $other = $this->editor->published(self::TENANT, self::RAISER, 'Other');
+        $id = self::decode($this->create(self::RAISER, ['document_source_id' => $template, 'origin_key' => 'order:1', 'render' => false]))['data']['id'];
+        $fired = 0;
+        $this->editor->hooks->listen(Events::DOCUMENT_ISSUING, static function (array $data) use (&$fired): array {
+            $fired++;
+
+            return $data;
+        });
+
+        $answer = $this->preflight(self::RAISER, ['document_source_id' => $template, 'origin_key' => 'order:1']);
+        self::assertTrue($answer['ok']);
+        self::assertSame($id, $answer['replays_document_id']);
+        self::assertSame(0, $fired, 'an issue would ask no listener, so neither does this');
+
+        $conflict = $this->preflight(self::RAISER, ['document_source_id' => $other, 'origin_key' => 'order:1']);
+        self::assertFalse($conflict['ok']);
+        self::assertSame('origin_key_conflict', array_column($conflict['checks'], null, 'code')['origin_key']['reason']);
+    }
+
+    public function testThePluginFacadeAnswersAPreflight(): void
+    {
+        $roleChecker = new RoleChecker($this->wrapSqlite($this->pdo), new PermissionRegistry());
+        $documents = new SdkDocuments(new TemplateIssuing(
+            $this->editor->issuing,
+            $this->editor->fields,
+            $this->settings,
+            fn (int $id, int $tenantId, int $callerId): ?array => $this->editor->sources->visibleRow($id, $tenantId, $callerId),
+            $this->slots,
+        ), $roleChecker);
+        $template = $this->editor->published(self::TENANT, self::RAISER, 'Facade');
+        TenantContext::reset();
+        TenantContext::setTenantId(self::TENANT);
+        AuditContext::reset();
+        AuditContext::set(self::RAISER, null);
+        try {
+            $result = $documents->preflight(new \Whity\Sdk\Documents\IssueRequest(\Whity\Sdk\Documents\TemplateRef::source($template)));
+        } finally {
+            AuditContext::reset();
+        }
+
+        self::assertTrue($result->ok);
+        self::assertSame([], $result->missingFields);
+    }
+
+    /**
+     * @param array<string, mixed> $body
+     * @return array<string, mixed>
+     */
+    private function preflight(int $actorId, array $body): array
+    {
+        TenantContext::reset();
+        TenantContext::setTenantId(self::TENANT);
+        $req = new Request('POST', '/api/documents/preflight', [], (string) json_encode($body));
+        $req->user = (object) ['profile_id' => $actorId, 'active_tenant_id' => self::TENANT];
+
+        $res = $this->handler->preflight($req);
+        self::assertSame(200, $res->getStatusCode(), $res->getBody());
+
+        return self::decode($res);
+    }
+
+    /** @return array<string, int> */
+    private function tableCounts(): array
+    {
+        $counts = [];
+        foreach (['documents', 'document_artifacts', 'document_source_versions', 'sequence_counters', 'document_qr_tokens', 'event_outbox'] as $table) {
+            $stmt = $this->pdo->query('SELECT COUNT(*) FROM ' . $table);
+            self::assertNotFalse($stmt);
+            $counts[$table] = (int) $stmt->fetchColumn();
+        }
+
+        return $counts;
+    }
+
+    private function seedDocumentIn(int $tenantId, int $createdBy, string $title): int
+    {
+        $stmt = $this->pdo->prepare(
+            "INSERT INTO documents (tenant_id, template_name, title, created_by, created_at)
+             VALUES (:tenant, 'T', :title, :by, '2026-01-01 00:00:00')"
+        );
+        $stmt->execute([':tenant' => $tenantId, ':title' => $title, ':by' => $createdBy]);
+
+        return (int) $this->pdo->lastInsertId();
+    }
+
     public function testASlotThatCantBeIssuedFromSaysWhyAndWritesNothing(): void
     {
         $about = $this->seedDocument(self::RAISER, 'Order 4812');

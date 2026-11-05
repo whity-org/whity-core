@@ -15884,6 +15884,103 @@
                 ]
             }
         },
+        "/api/v1/documents/preflight": {
+            "post": {
+                "operationId": "post_api_v1_documents_preflight",
+                "summary": "Whether a document would issue, and every reason it would not",
+                "tags": [
+                    "documents"
+                ],
+                "description": "The body is the same as POST /api/documents. Runs the same checks and `document.issuing` listeners (with `check_only: true`), but writes nothing, renders nothing and allocates no number. Always 200: `ok` is the answer and `checks` says why. A real issue checks everything again.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DocumentCreateRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The answer",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DocumentPreflightResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/documents/views": {
             "get": {
                 "operationId": "get_api_v1_documents_views",
@@ -54323,6 +54420,72 @@
                 "required": [
                     "key",
                     "label"
+                ]
+            },
+            "DocumentPreflightCheck": {
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "type": "string",
+                        "description": "`template`, `record`, `values`, `fields`, `origin_key` or `render` from core; `plugin` from a listener"
+                    },
+                    "label": {
+                        "type": "string",
+                        "description": "What was checked, in the reader's language"
+                    },
+                    "ok": {
+                        "type": "boolean"
+                    },
+                    "why": {
+                        "type": "string",
+                        "description": "Why it failed, for a person. Absent when it passed."
+                    },
+                    "reason": {
+                        "type": "string",
+                        "description": "The refusal code the real issue would give. Core's checks only."
+                    },
+                    "detail": {
+                        "type": "string",
+                        "description": "The refusal's own English sentence, for a developer. Core's checks only."
+                    }
+                },
+                "required": [
+                    "code",
+                    "label",
+                    "ok"
+                ]
+            },
+            "DocumentPreflightResponse": {
+                "type": "object",
+                "properties": {
+                    "ok": {
+                        "type": "boolean",
+                        "description": "Whether an issue would go through now"
+                    },
+                    "checks": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/DocumentPreflightCheck"
+                        }
+                    },
+                    "missing_fields": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Required fields with no value"
+                    },
+                    "replays_document_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "The document `origin_key` already names. An issue would return it instead of raising one, and no listener would be asked."
+                    }
+                },
+                "required": [
+                    "ok",
+                    "checks",
+                    "missing_fields",
+                    "replays_document_id"
                 ]
             },
             "DocumentPreviewResponse": {

@@ -174,19 +174,7 @@ final class DocumentIssuing
             }
         }
 
-        $event = [
-            'tenant_id' => $tenantId,
-            'source_id' => (int) $source['id'],
-            'version' => (int) $version['version'],
-            'record' => $request->record,
-            'slot' => $request->slot,
-            'origin_key' => $originKey,
-            'actor' => $callerId,
-        ];
-        if ($actor->plugin !== null) {
-            // A plugin in the background: no person, and which plugin it was.
-            $event['origin'] = 'plugin:' . $actor->plugin;
-        }
+        $event = self::issuingEvent($request, $actor);
         $this->veto(Events::DOCUMENT_ISSUING, $event);
 
         $numbering = self::rule($source, $request->numbering);
@@ -235,6 +223,100 @@ final class DocumentIssuing
         [$outcome, $artifact] = $this->renderAndStore($actor, $source, $version, $values, $request->recordLabel, $document);
 
         return ['document' => $document, 'artifacts' => $artifact !== null ? [$artifact] : [], 'render' => $outcome, 'replayed' => false];
+    }
+
+    /**
+     * What `document.issuing` carries, for an issue and for a preflight alike.
+     *
+     * @return array<string, mixed>
+     */
+    private static function issuingEvent(IssueRequest $request, ActingAs $actor): array
+    {
+        $event = [
+            'tenant_id' => $actor->tenantId,
+            'source_id' => (int) $request->source['id'],
+            'version' => (int) $request->version['version'],
+            'record' => $request->record,
+            'slot' => $request->slot,
+            'origin_key' => $request->originKey,
+            'actor' => $actor->issuerId(),
+        ];
+        if ($actor->plugin !== null) {
+            // A plugin in the background: no person, and which plugin it was.
+            $event['origin'] = 'plugin:' . $actor->plugin;
+        }
+
+        return $event;
+    }
+
+    /**
+     * The document this request's origin key already names, when an issue would
+     * return it instead of raising one.
+     *
+     * @throws DocumentOriginKeyConflictException When the key names a document from another template.
+     */
+    public function replaysDocument(IssueRequest $request): ?int
+    {
+        if ($request->originKey === null) {
+            return null;
+        }
+        $existing = $this->documents?->findByOriginKey($request->originKey, (int) $request->source['tenant_id']);
+        if ($existing === null) {
+            return null;
+        }
+        if (($existing['document_source_id'] ?? null) !== (int) $request->source['id']) {
+            throw new DocumentOriginKeyConflictException((int) $existing['id']);
+        }
+
+        return (int) $existing['id'];
+    }
+
+    /**
+     * Ask `document.issuing` listeners, without issuing (WHIT-892). The payload is an
+     * issue's plus `check_only: true`, `checks: []` and `missing_fields`. A listener
+     * that knows the flag appends `{label, ok, why?}` to `checks` and returns the
+     * payload, so it can give every reason. One that doesn't know it may still veto,
+     * which is reported as a failed check and can't hide core's own.
+     *
+     * @param list<string> $missing
+     * @param callable(string, string): string $label
+     * @return list<array<string, mixed>>
+     */
+    public function listenerChecks(IssueRequest $request, ActingAs $actor, array $missing, callable $label): array
+    {
+        if ($this->hooks === null) {
+            return [];
+        }
+        $payload = self::issuingEvent($request, $actor) + ['check_only' => true, 'checks' => [], 'missing_fields' => $missing];
+        try {
+            $answer = $this->hooks->dispatch(Events::DOCUMENT_ISSUING, $payload);
+        } catch (HookVetoException $e) {
+            return [[
+                'code' => 'plugin',
+                'label' => $label('preflight.check.plugin', 'A plugin\'s own check'),
+                'ok' => false,
+                'why' => $e->reason(),
+            ]];
+        } catch (Throwable $e) {
+            error_log('[DocumentIssuing] a listener on ' . Events::DOCUMENT_ISSUING . ' failed a preflight: ' . $e->getMessage());
+
+            return [];
+        }
+
+        $checks = [];
+        foreach (is_array($answer['checks'] ?? null) ? $answer['checks'] : [] as $check) {
+            if (!is_array($check) || !is_string($check['label'] ?? null) || trim($check['label']) === '' || !is_bool($check['ok'] ?? null)) {
+                error_log('[DocumentIssuing] a preflight listener returned a check with no label or no ok');
+                continue;
+            }
+            $row = ['code' => 'plugin', 'label' => mb_substr(trim($check['label']), 0, HookVetoException::REASON_MAX_LENGTH), 'ok' => $check['ok']];
+            if (!$check['ok'] && is_string($check['why'] ?? null) && trim($check['why']) !== '') {
+                $row['why'] = mb_substr(trim($check['why']), 0, HookVetoException::REASON_MAX_LENGTH);
+            }
+            $checks[] = $row;
+        }
+
+        return $checks;
     }
 
     /**

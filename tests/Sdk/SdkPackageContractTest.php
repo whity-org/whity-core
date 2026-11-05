@@ -242,9 +242,12 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsOneEightForInteractiveBlocks(): void
     {
         $this->assertSame(
-            '1.65.0',
+            '1.66.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.65 ADDS DOCUMENT NUMBERS: DocumentNumberingRule says when a document is numbered and what the '
+            'SDK 1.66 ADDS DOCUMENT PREFLIGHT: Documents::preflight and PluginDocumentStore::preflight say whether a '
+            . 'document would issue and every reason it would not, writing nothing; document.issuing listeners get '
+            . 'check_only and answer with checks (WHIT-892). Purely additive. '
+            . 'SDK 1.65 ADDS DOCUMENT NUMBERS: DocumentNumberingRule says when a document is numbered and what the '
             . 'number looks like, on a slot or in a manifest; IssueResult returns the number and document.numbered '
             . 'says one was handed out at final approval (WHIT-684). Purely additive. '
             . 'SDK 1.63 ADDS PLUGIN FILES AND DOCUMENT TRACKING: the host services PluginFiles and PluginDocuments '
