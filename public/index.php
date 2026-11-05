@@ -1193,13 +1193,14 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'id' => 'ai-principals',
         'label' => 'Connected AI apps',
         'href' => '/admin/ai-principals',
-        'icon' => 'robot',
+        'icon' => 'link',
         'group' => 'ai',
         'order' => 3,
-        // WC-0208ce4d: mirrors GET /api/v1/admin/mcp/tokens, gated on the
-        // mcp:tokens:manage permission. Nav item carries the same requirement so
-        // permission-aware clients can hide it; the page enforces it server-side.
-        'requiredPermission' => \Whity\Core\RBAC\CorePermissions::MCP_TOKENS_MANAGE,
+        // Anyone signed in may connect an AI app to their own account and see,
+        // renew and disconnect their own connections (GET/POST/DELETE
+        // /api/mcp/tokens), so this is ungated like My agents. The list of
+        // everyone's connections stays on mcp:tokens:manage
+        // (GET /api/v1/admin/mcp/tokens) and is a tab on the page.
     ];
     $items[] = [
         'id' => 'mcp-tools',
