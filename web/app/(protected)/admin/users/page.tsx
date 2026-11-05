@@ -82,7 +82,11 @@ export default function UsersPage() {
   const [statusFilter, setStatusFilter] = useState('active');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   // The role chosen in the bulk bar, waiting on the confirmation that names it.
+  // Kept after the dialog closes, along with the count, so it does not read
+  // "Change the 0 selected to ?" while it fades out.
   const [bulkRole, setBulkRole] = useState<{ id: number; name: string } | null>(null);
+  const [isBulkRoleOpen, setIsBulkRoleOpen] = useState(false);
+  const [bulkCount, setBulkCount] = useState(0);
   const [isBulkTwoStepOpen, setIsBulkTwoStepOpen] = useState(false);
 
   /**
@@ -529,7 +533,11 @@ export default function UsersPage() {
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" className="max-h-80 overflow-y-auto">
                                 {(roleOptions.data ?? []).map((role) => (
-                                  <DropdownMenuItem key={role.id} onClick={() => setBulkRole(role)}>
+                                  <DropdownMenuItem key={role.id} onClick={() => {
+                                    setBulkRole(role);
+                                    setBulkCount(targets.length);
+                                    setIsBulkRoleOpen(true);
+                                  }}>
                                     {roleLabel(role.name)}
                                   </DropdownMenuItem>
                                 ))}
@@ -537,7 +545,10 @@ export default function UsersPage() {
                             </DropdownMenu>
                           )}
                           {canRequireTwoStep && (
-                            <Button variant="outline" size="sm" data-testid="users-bulk-two-step" onClick={() => setIsBulkTwoStepOpen(true)}>
+                            <Button variant="outline" size="sm" data-testid="users-bulk-two-step" onClick={() => {
+                              setBulkCount(targets.length);
+                              setIsBulkTwoStepOpen(true);
+                            }}>
                               {t('users.bulk.twoStep', 'Require two-step')}
                             </Button>
                           )}
@@ -600,15 +611,17 @@ export default function UsersPage() {
 
       {/* Hard to undo in one step, so it asks and says how many it reaches (tier 2). */}
       <ConfirmAction
-        open={bulkRole !== null}
-        onOpenChange={(open) => {
-          if (!open) setBulkRole(null);
-        }}
+        open={isBulkRoleOpen}
+        onOpenChange={setIsBulkRoleOpen}
         variant="default"
-        title={t('users.bulk.role.ask', 'Change the {count} selected to {role}?', {
-          count: targets.length,
-          role: roleLabel(bulkRole?.name ?? ''),
-        })}
+        title={
+          bulkCount === 1
+            ? t('users.bulk.role.askOne', 'Change this person to {role}?', { role: roleLabel(bulkRole?.name ?? '') })
+            : t('users.bulk.role.ask', 'Change the {count} selected to {role}?', {
+                count: bulkCount,
+                role: roleLabel(bulkRole?.name ?? ''),
+              })
+        }
         description={t(
           'users.bulk.role.description',
           'They lose what their current role gives them straight away. If any of them cannot be changed, nobody is.'
@@ -624,7 +637,11 @@ export default function UsersPage() {
         open={isBulkTwoStepOpen}
         onOpenChange={setIsBulkTwoStepOpen}
         variant="default"
-        title={t('users.bulk.twoStep.title', 'Require two-step of the {count} selected?', { count: targets.length })}
+        title={
+          bulkCount === 1
+            ? t('users.bulk.twoStep.titleOne', 'Require two-step of this person?')
+            : t('users.bulk.twoStep.title', 'Require two-step of the {count} selected?', { count: bulkCount })
+        }
         description={t(
           'users.bulk.twoStep.description',
           'Anyone without it has to set it up the next time they sign in. They stay signed in until then.'

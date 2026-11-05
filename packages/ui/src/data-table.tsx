@@ -1021,7 +1021,7 @@ export function DataTable<TData>({
                             }
                             placeholder={columnFilterPlaceholder}
                             aria-label={`Filter ${label}`}
-                            className="h-6 text-xs font-normal normal-case tracking-normal"
+                            className="h-8 text-xs font-normal normal-case tracking-normal"
                           />
                         ) : null}
                       </TableHead>

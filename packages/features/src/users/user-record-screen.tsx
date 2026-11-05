@@ -102,6 +102,7 @@
  *   users.record.was = Was {value}
  */
 
+import { roleLabel } from '../roles/role-label';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { Avatar } from '@whity/ui/avatar';
@@ -230,7 +231,7 @@ const userFacts: RecordFactsFn<UserRecordFields> = (user, t) => {
   return {
     title: user.name,
     subtitle: [
-      user.role,
+      roleLabel(user.role),
       user.ouId === null
         ? t('users.record.fact.noUnit', 'No unit')
         : (user.ouName ?? ''),
@@ -261,7 +262,7 @@ function heldSince(entry: UserActivityEntry, t: UsersTranslate, dates: DateDispl
 
 /** What an audit entry says in words; the code behind it is for Show technical details. */
 function historySentence(entry: UserActivityEntry, t: UsersTranslate): string {
-  const role = metaString(entry.metadata, 'role_name') ?? '';
+  const role = roleLabel(metaString(entry.metadata, 'role_name') ?? '');
   switch (entry.action) {
     case 'user.created':
     case 'user.created.async':
@@ -332,9 +333,11 @@ export function UserRecordScreen({
     t('users.record.error.load', 'Failed to load this person')
   );
 
+  // Saving a role changes this list, which the Access tab reads.
+  const [membershipsVersion, setMembershipsVersion] = useState(0);
   const memberships = useRecordResource(
     () => adapter.listUserMemberships(userId),
-    [userId],
+    [userId, membershipsVersion],
     t('users.record.memberships.error', "Failed to load this person's tenants and roles")
   );
 
@@ -459,6 +462,7 @@ export function UserRecordScreen({
       };
       setSaved(next);
       resetDraft(next);
+      setMembershipsVersion((version) => version + 1);
     } catch (error) {
       onNotify?.(
         error instanceof Error && error.message
@@ -690,7 +694,7 @@ export function UserRecordScreen({
 
             <ChangedField
               changed={form.role !== (current.role ?? '')}
-              wasLabel={t('users.record.was', 'Was {value}', { value: current.role ?? '' })}
+              wasLabel={t('users.record.was', 'Was {value}', { value: roleLabel(current.role ?? '') })}
               className="space-y-1.5"
             >
               <label
@@ -715,7 +719,7 @@ export function UserRecordScreen({
                 <SelectContent>
                   {(roleNames.status === 'ready' ? roleNames.value : []).map((name) => (
                     <SelectItem key={name} value={name}>
-                      {name}
+                      {roleLabel(name)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -837,7 +841,7 @@ export function UserRecordScreen({
             <RecordListItem
               key={membership.id}
               primary={membership.tenantName}
-              secondary={membership.role}
+              secondary={roleLabel(membership.role)}
               action={
                 membership.isPrimary ? (
                   <Badge variant="outline">{t('users.record.memberships.primary', 'Primary')}</Badge>

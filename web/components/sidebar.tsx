@@ -447,13 +447,13 @@ export function Sidebar() {
       */}
       {isI18nEnabled && !collapsed && (
         <div
-          className="flex w-full items-center gap-2 rounded-lg border border-input bg-input/20 px-3 py-2"
+          className="flex h-10 w-full items-center gap-2 rounded-lg border border-input bg-input/20 px-3"
           data-testid="language-switcher"
         >
           <IconWorld size={20} className="shrink-0 text-muted-foreground" />
           <LanguageSwitcher
             variant="dropdown"
-            className="h-7 min-w-0 flex-1 cursor-pointer border-0 bg-transparent text-sm font-medium text-foreground outline-none"
+            className="h-full min-w-0 flex-1 cursor-pointer border-0 bg-transparent text-sm font-medium text-foreground outline-none"
           />
         </div>
       )}

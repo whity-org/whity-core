@@ -300,6 +300,23 @@ describe('UserRecordScreen — editing', () => {
     expect(onNotify).toHaveBeenCalledWith('User updated successfully', 'success');
   });
 
+  it('reads the workspaces and roles again after saving, so Access shows the new role', async () => {
+    const user = userEvent.setup();
+    const updateUser = jest.fn().mockResolvedValue('ok');
+    const listUserMemberships = jest.fn().mockResolvedValue(MEMBERSHIPS);
+    const onNotify = jest.fn();
+    renderRecord({ adapter: fakeAdapter({ updateUser, listUserMemberships }), onNotify });
+
+    await screen.findByTestId('user-record-role');
+    await user.click(screen.getByTestId('user-record-role'));
+    await user.click(await screen.findByRole('option', { name: 'approver' }));
+
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    await waitFor(() => expect(updateUser).toHaveBeenCalled());
+    await waitFor(() => expect(listUserMemberships).toHaveBeenCalledTimes(2));
+  });
+
   it('cannot save an unchanged record — Save is inert until something differs', async () => {
     renderRecord();
 
