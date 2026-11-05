@@ -245,6 +245,7 @@ export default function AuditLogsPage() {
           'Everything people and agents did that changes access, settings or records.'
         )}
         action={
+          loadFailed === 'denied' ? undefined : (
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => void fetchEntries()} className="gap-2">
               <IconRefresh size={18} />
@@ -255,9 +256,11 @@ export default function AuditLogsPage() {
               {t('auditLogs.action.export', 'Export')}
             </Button>
           </div>
+          )
         }
       />
 
+      {loadFailed !== 'denied' && (
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <div className="flex flex-col gap-1">
           <label htmlFor="audit-who" className="text-sm font-medium text-muted-foreground">
@@ -310,6 +313,7 @@ export default function AuditLogsPage() {
           </div>
         </TechnicalDetails>
       </div>
+      )}
 
       {body()}
     </div>

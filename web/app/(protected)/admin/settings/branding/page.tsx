@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { NoAccess } from '@/components/no-access';
 import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import { useAuth } from '@/lib/auth-context';
@@ -10,7 +11,6 @@ import { AdminHeader } from '@/components/admin/admin-header';
 import { Button } from '@whity/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
 import { IconDeviceFloppy } from '@tabler/icons-react';
-import { AccessDenied } from '@whity/ui/access-denied';
 import { BrandingSettings } from '@/components/branding-settings';
 import { useTranslation } from '@whity/features/i18n';
 import {
@@ -57,18 +57,7 @@ export default function BrandingSettingsPage() {
 
   if (!canRead) {
     return (
-      <AccessDenied
-        description={t(
-          'settings.branding.accessDenied',
-          'You do not have the required permission ({permission}) to view Branding.',
-          { permission: SETTINGS_READ }
-        )}
-        action={
-          <Button onClick={() => window.history.back()} variant="outline">
-            {t('settings.branding.goBack', 'Go Back')}
-          </Button>
-        }
-      />
+      <NoAccess area={t('access.area.settings.branding.accessDenied', 'branding')} permission="settings:read" />
     );
   }
 

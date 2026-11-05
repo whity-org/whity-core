@@ -42,8 +42,10 @@ export default function Page() {
     // push, not back(): a record reached from a pasted link has no history entry
     // to go back TO, and back() there leaves the operator wherever they came
     // from — which may be another site.
-    router.push('/admin/tenants');
-  }, [router]);
+    // A workspace admin has no workspaces list (design 2.9, W.2): their record is
+    // reached from, and goes back to, Settings.
+    router.push(user && user.tenant_id !== 0 ? '/admin/settings' : '/admin/tenants');
+  }, [router, user]);
 
   // A non-numeric segment never reaches a fetch. The route pattern admits it
   // (Next does not constrain dynamic segments), and Number('abc') is NaN, which

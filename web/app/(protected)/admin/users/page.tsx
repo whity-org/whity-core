@@ -1,6 +1,8 @@
 'use client';
 
 import { useCallback, useState } from 'react';
+import { LoadProblem } from '@/components/load-problem';
+import { throwUnlessOk } from '@/lib/forbidden';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api-client';
 import { api } from '@/lib/api/client';
@@ -29,7 +31,6 @@ import {
 import { Avatar } from '@whity/ui/avatar';
 import { roleLabel } from '@whity/features/roles';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@whity/ui/tabs';
-import { AreaError } from '@whity/ui/page-states';
 import { ConfirmAction } from '@whity/ui/confirm-action';
 import { ToggleGroup } from '@whity/ui/toggle-group';
 import { IconMenu2, IconPlus } from '@tabler/icons-react';
@@ -143,11 +144,9 @@ export default function UsersPage() {
   // safe to call after a create/edit/delete: `refetch` re-runs THIS closure, so
   // the refetch carries the page, sort and term the operator was looking at
   // rather than dropping them back to an unfiltered page 1.
-  const { data, loading, error, refetch: fetchUsers } = useFetch(async () => {
+  const { data, loading, error, forbidden, refetch: fetchUsers } = useFetch(async () => {
     const response = await apiClient(`/api/v1/users?${queryString}`);
-    if (!response.ok) {
-      throw new Error(t('users.error.load', 'Failed to fetch users'));
-    }
+    throwUnlessOk(response, t('users.error.load', 'Failed to fetch users'));
     const body: UsersResponse = await response.json();
     const rows = body.data ?? [];
     return {
@@ -411,7 +410,7 @@ export default function UsersPage() {
         title={t('users.title', 'Users')}
         description={t('users.description', 'The people in your workspace, and what each of them may do.')}
         action={
-          canCreate ? (
+          canCreate && !forbidden ? (
             <div className="flex items-center gap-2">
               <Button
                 onClick={() => {
@@ -452,10 +451,11 @@ export default function UsersPage() {
 
         <TabsContent value="people" className="mt-6">
           {firstLoadFailed ? (
-            <AreaError
+            <LoadProblem
+              forbidden={forbidden}
               message={error}
-              retryLabel={t('users.tryAgain', 'Try again')}
               onRetry={() => fetchUsers()}
+              area={t('users.area', 'the people in this workspace')}
             />
           ) : (
             <div className="space-y-4">

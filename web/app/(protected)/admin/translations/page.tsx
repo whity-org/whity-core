@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { NoAccess } from '@/components/no-access';
 import { api } from '@/lib/api/client';
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/lib/toast-context';
@@ -21,7 +22,6 @@ import {
   SelectValue,
 } from '@whity/ui/select';
 import { Alert, AlertDescription } from '@whity/ui/alert';
-import { AccessDenied } from '@whity/ui/access-denied';
 import { IconPlus } from '@tabler/icons-react';
 import { useI18nAvailability, useTranslation } from '@whity/features/i18n';
 import { EditableTranslationCell } from './editable-cell';
@@ -186,18 +186,7 @@ export default function TranslationsPage() {
 
   if (!canManage) {
     return (
-      <AccessDenied
-        description={t(
-          'translations.accessDenied',
-          'You do not have the required permission ({permission}) to view Translations.',
-          { permission: TRANSLATIONS_MANAGE }
-        )}
-        action={
-          <Button onClick={() => window.history.back()} variant="outline">
-            {t('translations.goBack', 'Go Back')}
-          </Button>
-        }
-      />
+      <NoAccess area={t('access.area.translations.accessDenied', 'translations')} permission="translations:manage" />
     );
   }
 

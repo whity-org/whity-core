@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { NoAccess } from '@/components/no-access';
 import { TechnicalDetails } from '@whity/ui/display-preferences';
 import Link from 'next/link';
 import { api } from '@/lib/api/client';
@@ -11,7 +12,6 @@ import { useFetch } from '@/hooks/useFetch';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { Button } from '@whity/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
-import { AccessDenied } from '@whity/ui/access-denied';
 import { IconDeviceFloppy } from '@tabler/icons-react';
 import { useTranslation } from '@whity/features/i18n';
 import { TENANTS_READ } from '@/lib/capabilities';
@@ -62,18 +62,7 @@ export default function AdminSettingsPage() {
 
   if (!canRead) {
     return (
-      <AccessDenied
-        description={t(
-          'settings.accessDenied',
-          'You do not have the required permission ({permission}) to view Website Settings.',
-          { permission: SETTINGS_READ }
-        )}
-        action={
-          <Button onClick={() => window.history.back()} variant="outline">
-            {t('settings.goBack', 'Go Back')}
-          </Button>
-        }
-      />
+      <NoAccess area={t('access.area.settings.accessDenied', 'settings')} permission="settings:read" />
     );
   }
 

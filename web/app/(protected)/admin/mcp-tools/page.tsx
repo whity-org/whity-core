@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { LoadProblem } from '@/components/load-problem';
+import { throwUnlessOk } from '@/lib/forbidden';
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/lib/toast-context';
 import { useFetch } from '@/hooks/useFetch';
@@ -8,7 +10,7 @@ import { AdminHeader } from '@/components/admin/admin-header';
 import { Badge } from '@whity/ui/badge';
 import { Card, CardContent } from '@whity/ui/card';
 import { TechnicalDetails, useDisplayPreferences } from '@whity/ui/display-preferences';
-import { AreaError, EmptyFiltered, LoadingRows } from '@whity/ui/page-states';
+import { EmptyFiltered, LoadingRows } from '@whity/ui/page-states';
 import { SearchField } from '@whity/ui/search-field';
 import { Switch } from '@whity/ui/switch';
 import { ToggleGroup } from '@whity/ui/toggle-group';
@@ -48,11 +50,9 @@ export default function McpToolsPage() {
   const [policy, setPolicy] = useState<PolicyFilter>('all');
   const [area, setArea] = useState(ALL_AREAS);
 
-  const { data, loading: isLoading, error, refetch } = useFetch(async () => {
+  const { data, loading: isLoading, error, forbidden, refetch } = useFetch(async () => {
     const response = await apiClient('/api/v1/admin/mcp/tools');
-    if (!response.ok) {
-      throw new Error(t('mcpTools.error.load', 'What AI can do could not be loaded.'));
-    }
+    throwUnlessOk(response, t('mcpTools.error.load', 'What AI can do could not be loaded.'));
     return (await response.json()) as McpToolListResponse;
   }, [apiClient]);
 
@@ -67,8 +67,8 @@ export default function McpToolsPage() {
   }, [tools, arabic]);
 
   useEffect(() => {
-    if (error) addToast(error, 'error');
-  }, [error, addToast]);
+    if (error && !forbidden) addToast(error, 'error');
+  }, [error, forbidden, addToast]);
 
   const shown = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -263,7 +263,7 @@ export default function McpToolsPage() {
       </TechnicalDetails>
 
       {error !== null ? (
-        <AreaError message={error} retryLabel={t('agents.retry', 'Try again')} onRetry={refetch} />
+        <LoadProblem forbidden={forbidden} message={error} onRetry={refetch} area={t('mcpTools.area', 'what AI can do')} />
       ) : isLoading ? (
         <LoadingRows
           headers={[t('mcpTools.table.action', 'Action'), t('mcpTools.table.area', 'Area'), t('mcpTools.table.agentPolicy', 'Agents')]}

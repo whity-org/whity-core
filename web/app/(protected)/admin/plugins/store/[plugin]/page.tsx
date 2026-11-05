@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, useCallback, useEffect, useState } from 'react';
+import { NoAccess } from '@/components/no-access';
 import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api/client';
@@ -11,7 +12,7 @@ import { InstallPluginDialog } from '@/components/plugins/install-plugin-dialog'
 import { InstallButton, type CataloguePlugin, usePluginAddsLabels, usePriceLabel, useUsageLabel } from '@/components/plugins/plugin-facts';
 import { Badge } from '@whity/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@whity/ui/card';
-import { AccessDeniedPanel, AreaError, EmptyFirstTime } from '@whity/ui/page-states';
+import { AreaError, EmptyFirstTime } from '@whity/ui/page-states';
 import { Skeleton } from '@whity/ui/skeleton';
 import { TechnicalDetails } from '@whity/ui/display-preferences';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@whity/ui/tabs';
@@ -82,13 +83,7 @@ function PluginDetail() {
   }
   if (!hasAccess) {
     return (
-      <AccessDeniedPanel
-        title={t('pluginStore.accessDenied.title', 'You cannot browse the plugin store')}
-        description={t(
-          'pluginStore.accessDenied',
-          'You do not have the required permission (`plugins:read`) to browse the Plugin Store.',
-        )}
-      />
+      <NoAccess area={t('access.area.pluginStore.accessDenied', 'the plugin store')} permission="plugins:read" />
     );
   }
 

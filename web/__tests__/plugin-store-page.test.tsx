@@ -78,7 +78,7 @@ test('shows Access Denied without plugins:read', () => {
   hasPermission.mockImplementation((p: string) => p !== 'plugins:read');
   routeGet();
   render(<PluginStorePage />);
-  expect(screen.getByText('You cannot browse the plugin store')).toBeInTheDocument();
+  expect(screen.getByText('You don’t have access to the plugin store')).toBeInTheDocument();
 });
 
 test('shows the disabled state when no stores are configured', async () => {

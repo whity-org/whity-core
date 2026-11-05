@@ -14,6 +14,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
+import { NoAccess } from '@/components/no-access';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { useToast } from '@/lib/toast-context';
 import { useTranslation, type TranslateFn } from '@whity/features/i18n';
@@ -25,7 +26,6 @@ import { Badge } from '@whity/ui/badge';
 import { EmptyState } from '@whity/ui/empty-state';
 import { AccessDeniedPanel, AreaError } from '@whity/ui/page-states';
 import { Skeleton } from '@whity/ui/skeleton';
-import { AccessDenied } from '@whity/ui/access-denied';
 
 type ErrorStatus = 'unresolved' | 'resolved' | 'ignored';
 
@@ -168,12 +168,7 @@ export default function ErrorsPage() {
 
   if (!canManage) {
     return (
-      <AccessDenied
-        description={t(
-          'errors.accessDenied',
-          'You do not have the required permissions (`settings:manage`) to view the error inbox.'
-        )}
-      />
+      <NoAccess area={t('access.area.errors.accessDenied', 'the error inbox')} permission="settings:manage" />
     );
   }
 

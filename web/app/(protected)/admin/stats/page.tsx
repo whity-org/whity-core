@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useState } from "react";
+import { NoAccess } from "@/components/no-access";
 import { humanizeCode } from "@/lib/plain-words";
 import { AdminHeader } from "@/components/admin/admin-header";
 import {
@@ -116,6 +117,8 @@ export default function AdminStats() {
   const [stats, setStats] = useState<StatsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  // The request was refused: no access, which is not the same as a failed or slow one.
+  const [denied, setDenied] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
   // Null means "not shown", and it is reached by every failure path — a 403, a
   // timeout, a network error, a malformed body. See the effect below for why
@@ -140,6 +143,8 @@ export default function AdminStats() {
         if (response.ok) {
           const data = await response.json();
           if (!cancelled) setStats(data.stats);
+        } else if (response.status === 403) {
+          setDenied(true);
         } else {
           setError(true);
         }
@@ -243,6 +248,10 @@ export default function AdminStats() {
       color: "text-primary",
     },
   ];
+
+  if (denied) {
+    return <NoAccess area={t("stats.access.area", "system statistics")} permission="admin" />;
+  }
 
   return (
     <div className="space-y-8">

@@ -44,6 +44,10 @@ test.describe('Organizational Units (admin)', () => {
  * expected to fail server-side and leave the data untouched.
  */
 test.describe('Tenants (admin)', () => {
+  // Workspaces are the system tenant's to manage (design 2.9, W.2): a workspace
+  // admin gets no access, so these flows run as the system admin.
+  test.use({ storageState: systemStatePath });
+
   test('tenants list shows the Default Tenant', async ({ adminPage, page }) => {
     await page.goto('/admin/tenants');
     await expect(page.getByRole('heading', { name: 'Tenants' })).toBeVisible();
