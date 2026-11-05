@@ -440,6 +440,8 @@ final class CorePermissions
     // `forms:read`, because reading a submission must not be enough to change its
     // outcome, and from `forms:manage`, because recording decisions is not authoring.
     public const FORMS_REVIEW = 'forms:review';
+    // Issue and revoke the keys that open a plugin's public form (migration 217).
+    public const PUBLIC_FORM_KEYS_MANAGE = 'public_form_keys:manage';
     // CONVENING (migrations 130/131). Deliberative BODIES that meet, minute a
     // numbered decision, and — where the agenda item carried a document — drive
     // that document's existing approval route with the decision.
@@ -550,6 +552,7 @@ final class CorePermissions
             self::FORMS_MANAGE,
             self::FORMS_SUBMIT,
             self::FORMS_REVIEW,
+            self::PUBLIC_FORM_KEYS_MANAGE,
             self::CONVENING_READ,
             self::CONVENING_MANAGE,
             self::CONVENING_DECIDE,

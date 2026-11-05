@@ -1540,6 +1540,12 @@ A workspace plugin has no routes, so its `homeCard` names a `record` type instea
 
 ---
 
+## Step 12c — Take a form from an anonymous visitor (SDK 1.67)
+
+Declare `'public' => 'form'` on POST `/api/<your slug>/forms/<name>/{key}`. The host resolves the workspace from the key and runs its limits, allowed-sites check and bot check before your handler, so you don't run a proxy that checks a bot token and signs requests. Your handler validates the form's content and reads the workspace from `Whity\Sdk\Http\PublicForm::from($request)`.
+
+See [Public forms for plugins](Plugin-Public-Forms.md).
+
 ## Step 13 — Declare it in `plugin.json` instead (SDK 1.47)
 
 Everything a plugin only *declares* can live in a JSON file instead of PHP methods: its identity and requirements, permissions, roles, `blocks` screens, owned tables, data types and limits. Put `plugin.json` next to an empty class:

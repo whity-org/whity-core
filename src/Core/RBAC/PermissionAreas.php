@@ -57,6 +57,7 @@ final class PermissionAreas
         'mcp' => ['connected_ai', 'Connected AI apps', self::GROUP_AI],
         'tenants' => ['workspaces', 'Workspaces', self::GROUP_WORKSPACE],
         'settings' => ['settings', 'Settings', self::GROUP_WORKSPACE],
+        'public_form_keys' => ['settings', 'Settings', self::GROUP_WORKSPACE],
         'notifications' => ['notifications', 'Notifications', self::GROUP_WORKSPACE],
         'notification_settings' => ['notifications', 'Notifications', self::GROUP_WORKSPACE],
         'audit' => ['audit', 'Audit log', self::GROUP_WORKSPACE],

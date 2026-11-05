@@ -17,6 +17,8 @@ Every ask needs both languages (English and Arabic, RTL) and both themes, and fo
 | WHIT-821 | **Preset gallery card** | One preset from core, a plugin or a Whity Builder plugin: name, role, what it may use, where it comes from. | Core, plugin, workspace plugin | Nothing yet; the API is `/api/agent-presets` |
 | WHIT-821 | **whity-agent, the desktop app** | Tray menu; first run (sign in, tools found, choose and consent); a tool row (connected as me or as an agent, Disconnect, Put the file back); the review sheet (the command, or the file before and after); chat window and quick ask; settings; update prompt. Windows, macOS and Linux. | No workspace, no tools found, a tool that needs the bridge, a file left alone (comments, or changed since review), signed in without a keychain | Plain screens from the tokens and the Button recipe in `whity-org/whity-agent` |
 
+| WHIT-906 | **Settings: Public forms** | Keys that open a plugin's public form for a workspace: issue (form, name, allowed sites), the key shown once to copy, edit, revoke. For operators, the instance's bot check: provider, site key, write-only secret, and the switch to allow forms with no bot check. | No plugin has a form; no keys; a revoked key; forms closed because no bot check is set; workspace admin against operator | Cards on the Email domains pattern, with `ConfirmAction` to revoke |
+
 The Whity ID consent line for acting as an agent ("Claude Code wants to act as Finance clerk for you") is built with Whity ID's existing consent screen (whity-id #26), so it needs a look rather than a new design. Background for the agents asks: `AGENT-PERSONAS-AND-WHITY-AGENT.md` §8.
 
 ## Waiting on the brand team, not an ask
