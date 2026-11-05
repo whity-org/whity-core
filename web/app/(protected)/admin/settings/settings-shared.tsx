@@ -341,6 +341,31 @@ export function fieldMeta(t: TranslateFn): Record<string, FieldMeta> {
         'Optional — leave blank for unauthenticated relays.'
       ),
     },
+    'mail.smtp.auth_mode': {
+      label: t('settings.meta.mail.smtp.auth_mode.label', 'How to sign in'),
+      help: t(
+        'settings.meta.mail.smtp.auth_mode.help',
+        'Google and Microsoft mailboxes usually need OAuth. Other mail servers usually use a password.'
+      ),
+    },
+    'mail.oauth.provider': {
+      label: t('settings.meta.mail.oauth.provider.label', 'Provider'),
+      help: t('settings.meta.mail.oauth.provider.help', 'Who runs this mailbox.'),
+    },
+    'mail.oauth.client_id': {
+      label: t('settings.meta.mail.oauth.client_id.label', 'Client ID'),
+      help: t(
+        'settings.meta.mail.oauth.client_id.help',
+        "From the app you registered with the provider."
+      ),
+    },
+    'mail.oauth.microsoft_tenant': {
+      label: t('settings.meta.mail.oauth.microsoft_tenant.label', 'Microsoft directory'),
+      help: t(
+        'settings.meta.mail.oauth.microsoft_tenant.help',
+        'Your directory ID. Use common if your app accepts accounts from any directory.'
+      ),
+    },
     'mail.from_address': {
       label: t('settings.meta.mail.from_address.label', 'From address'),
       help: t(
@@ -793,6 +818,8 @@ interface SettingsFieldProps {
   onChange: (value: string) => void;
   /** Optional inherited/overridden indicator (tenant form only). */
   status?: 'overridden' | 'inherited';
+  /** How an enum option reads, for a screen that translates its own choices. */
+  optionLabel?: (option: string) => string;
 }
 
 /**
@@ -855,6 +882,8 @@ interface RegistrySettingControlProps {
   /** A per-field validation message (e.g. from a 422), shown under the control. */
   error?: string;
   status?: 'overridden' | 'inherited';
+  /** How an enum option reads, for a screen that translates its own choices. */
+  optionLabel?: (option: string) => string;
   onChange: (value: string) => void;
 }
 
@@ -872,6 +901,7 @@ export function RegistrySettingControl({
   disabled = false,
   error,
   status,
+  optionLabel = enumOptionLabel,
   onChange,
 }: RegistrySettingControlProps) {
   const t = useTranslation('admin');
@@ -999,7 +1029,7 @@ export function RegistrySettingControl({
           invalid={Boolean(error)}
           describedBy={describedBy}
           onChange={onChange}
-          options={entry.options.map((option) => ({ value: option, label: enumOptionLabel(option) }))}
+          options={entry.options.map((option) => ({ value: option, label: optionLabel(option) }))}
         />
       ) : (
         <Input

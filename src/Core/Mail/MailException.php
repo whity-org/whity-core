@@ -11,7 +11,7 @@ namespace Whity\Core\Mail;
  *
  * The message is safe to log; it never contains the password or the message body.
  */
-final class MailException extends \RuntimeException
+class MailException extends \RuntimeException
 {
     /**
      * A short, safe, operator-facing hint describing the likely cause, derived

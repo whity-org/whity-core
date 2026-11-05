@@ -124,6 +124,7 @@ final class RouteCatalogueCompletenessTest extends TestCase
         // live send-test. OpenAPI schema to follow in a documentation task.
         'GET /api/settings/mail/status',
         'PUT /api/settings/mail/smtp-password',
+        'PUT /api/settings/mail/oauth-credentials',
         'POST /api/settings/mail/test',
         // WC-jobs-api: generic async-job submission + status API. OpenAPI schema
         // (JobCreateRequest / JobResponse / JobListResponse components) to follow

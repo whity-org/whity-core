@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@whity/ui/badge';
 import { AccessDenied } from '@whity/ui/access-denied';
 import { Alert, AlertDescription } from '@whity/ui/alert';
+import { ConfirmAction } from '@whity/ui/confirm-action';
 import {
   IconDeviceFloppy,
   IconMail,
@@ -24,6 +25,7 @@ import {
   SETTINGS_MANAGE,
   SYSTEM_TENANT_ID,
   RegistrySettingControl,
+  enumOptionLabel,
   errorMessage,
   fieldErrorsFrom,
   type RegistryEntry,
@@ -49,6 +51,10 @@ const MAIL_KEYS = {
   port: 'mail.smtp.port',
   encryption: 'mail.smtp.encryption',
   username: 'mail.smtp.username',
+  authMode: 'mail.smtp.auth_mode',
+  oauthProvider: 'mail.oauth.provider',
+  oauthClientId: 'mail.oauth.client_id',
+  oauthMicrosoftTenant: 'mail.oauth.microsoft_tenant',
   fromAddress: 'mail.from_address',
   fromName: 'mail.from_name',
   welcome: 'mail.events.welcome_enabled',
@@ -65,6 +71,10 @@ const FALLBACK_ENTRIES: Record<string, RegistryEntry> = {
   [MAIL_KEYS.port]: { key: MAIL_KEYS.port, type: 'string', default: '' },
   [MAIL_KEYS.encryption]: { key: MAIL_KEYS.encryption, type: 'enum', default: 'tls', options: ['none', 'tls', 'ssl'] },
   [MAIL_KEYS.username]: { key: MAIL_KEYS.username, type: 'string', default: '' },
+  [MAIL_KEYS.authMode]: { key: MAIL_KEYS.authMode, type: 'enum', default: 'password', options: ['password', 'oauth2'] },
+  [MAIL_KEYS.oauthProvider]: { key: MAIL_KEYS.oauthProvider, type: 'enum', default: 'google', options: ['google', 'microsoft'] },
+  [MAIL_KEYS.oauthClientId]: { key: MAIL_KEYS.oauthClientId, type: 'string', default: '' },
+  [MAIL_KEYS.oauthMicrosoftTenant]: { key: MAIL_KEYS.oauthMicrosoftTenant, type: 'string', default: 'common' },
   [MAIL_KEYS.fromAddress]: { key: MAIL_KEYS.fromAddress, type: 'string', default: '' },
   [MAIL_KEYS.fromName]: { key: MAIL_KEYS.fromName, type: 'string', default: '' },
   [MAIL_KEYS.welcome]: { key: MAIL_KEYS.welcome, type: 'bool', default: 'false' },
@@ -83,8 +93,116 @@ const SMTP_FIELD_KEYS = [
 
 const NOTIFICATION_KEYS = [MAIL_KEYS.welcome, MAIL_KEYS.approval, MAIL_KEYS.invitation] as const;
 
+type OAuthState =
+  | 'not_connected'
+  | 'not_yet_used'
+  | 'connected'
+  | 'needs_reconnect'
+  | 'client_rejected'
+  | 'token_service_unavailable'
+  | 'smtp_rejected'
+  | 'credentials_unreadable'
+  | 'smtp_host_not_allowed'
+  | 'insecure_connection';
+
 interface MailStatus {
   has_smtp_password: boolean;
+  oauth: {
+    has_client_secret: boolean;
+    has_refresh_token: boolean;
+    state: OAuthState;
+  };
+}
+
+const NO_MAIL_STATUS: MailStatus = {
+  has_smtp_password: false,
+  oauth: { has_client_secret: false, has_refresh_token: false, state: 'not_connected' },
+};
+
+/** Where the connection stands, in plain words, with what to do about it. */
+function oauthStateMessage(
+  state: OAuthState,
+  t: TranslateFn
+): { variant: 'info' | 'success' | 'warning' | 'destructive'; text: string } {
+  switch (state) {
+    case 'connected':
+      return {
+        variant: 'success',
+        text: t('settings.email.oauth.state.connected', 'Connected. The last email went out using this account.'),
+      };
+    case 'not_yet_used':
+      return {
+        variant: 'info',
+        text: t(
+          'settings.email.oauth.state.notYetUsed',
+          'Ready to try. Send a test email below to check that the connection works.'
+        ),
+      };
+    case 'needs_reconnect':
+      return {
+        variant: 'destructive',
+        text: t(
+          'settings.email.oauth.state.needsReconnect',
+          'Email is not going out. The provider says the refresh token was revoked or has expired. Get a new refresh token and save it here.'
+        ),
+      };
+    case 'client_rejected':
+      return {
+        variant: 'destructive',
+        text: t(
+          'settings.email.oauth.state.clientRejected',
+          'Email is not going out. The provider refused the client ID or client secret. Check both, because client secrets can expire.'
+        ),
+      };
+    case 'token_service_unavailable':
+      return {
+        variant: 'warning',
+        text: t(
+          'settings.email.oauth.state.tokenServiceUnavailable',
+          'The provider could not be reached a moment ago. Email will try again on its own.'
+        ),
+      };
+    case 'smtp_rejected':
+      return {
+        variant: 'destructive',
+        text: t(
+          'settings.email.oauth.state.smtpRejected',
+          'Email is not going out. The mail server refused the sign-in. Check that the SMTP username is the mailbox that granted access, and that SMTP sign-in is turned on for it.'
+        ),
+      };
+    case 'credentials_unreadable':
+      return {
+        variant: 'destructive',
+        text: t(
+          'settings.email.oauth.state.credentialsUnreadable',
+          'Email is not going out. The saved credentials can no longer be read, usually because the encryption key changed. Enter them again.'
+        ),
+      };
+    case 'smtp_host_not_allowed':
+      return {
+        variant: 'destructive',
+        text: t(
+          'settings.email.oauth.state.hostNotAllowed',
+          'Email is not going out. The SMTP host is not a mail server of this provider, so the sign-in token is not sent to it.'
+        ),
+      };
+    case 'insecure_connection':
+      return {
+        variant: 'destructive',
+        text: t(
+          'settings.email.oauth.state.insecure',
+          'Email is not going out. OAuth needs an encrypted connection. Set Encryption to TLS or SSL.'
+        ),
+      };
+    default:
+      return {
+        variant: 'info',
+        text: t(
+          'settings.email.oauth.state.notConnected',
+          'Not connected yet. Enter the client ID, client secret and refresh token.'
+        ),
+      };
+  }
 }
 
 export default function EmailSettingsPage() {
@@ -148,15 +266,20 @@ function EmailSettingsForm({
 
   const { data: status, refetch: refetchStatus } = useFetch<MailStatus>(async () => {
     const res = await apiClient('/api/v1/settings/mail/status');
-    if (!res.ok) return { has_smtp_password: false };
+    if (!res.ok) return NO_MAIL_STATUS;
     const body: unknown = await res.json();
     // The API wraps payloads in a { data: ... } envelope.
     const payload =
       body && typeof body === 'object' ? (body as { data?: unknown }).data : undefined;
+    if (!payload || typeof payload !== 'object') return NO_MAIL_STATUS;
+    const { has_smtp_password, oauth } = payload as { has_smtp_password?: unknown; oauth?: Partial<MailStatus['oauth']> };
     return {
-      has_smtp_password: Boolean(
-        payload && typeof payload === 'object' && (payload as { has_smtp_password?: unknown }).has_smtp_password
-      ),
+      has_smtp_password: Boolean(has_smtp_password),
+      oauth: {
+        has_client_secret: Boolean(oauth?.has_client_secret),
+        has_refresh_token: Boolean(oauth?.has_refresh_token),
+        state: oauth?.state ?? 'not_connected',
+      },
     };
   }, []);
 
@@ -170,6 +293,11 @@ function EmailSettingsForm({
 
   const [passwordInput, setPasswordInput] = useState('');
   const [savingPassword, setSavingPassword] = useState(false);
+
+  const [clientSecretInput, setClientSecretInput] = useState('');
+  const [refreshTokenInput, setRefreshTokenInput] = useState('');
+  const [savingOAuth, setSavingOAuth] = useState(false);
+  const [confirmDisconnect, setConfirmDisconnect] = useState(false);
 
   const [testTo, setTestTo] = useState(adminEmail);
   const [testing, setTesting] = useState(false);
@@ -190,11 +318,30 @@ function EmailSettingsForm({
   const transport = valueOf(MAIL_KEYS.transport);
   const dirty = Object.keys(draft).length > 0;
   const hasPassword = status?.has_smtp_password ?? false;
+  const authMode = valueOf(MAIL_KEYS.authMode);
+  const provider = valueOf(MAIL_KEYS.oauthProvider);
+  const oauth = status?.oauth ?? NO_MAIL_STATUS.oauth;
+  const oauthMessage = oauthStateMessage(oauth.state, t);
 
   useEffect(() => {
     // Surface a load failure; the page still renders with client defaults.
     if (error) addToast(error, 'error');
   }, [error, addToast]);
+
+  const optionLabel = (option: string): string => {
+    switch (option) {
+      case 'password':
+        return t('settings.email.authMode.password', 'Password');
+      case 'oauth2':
+        return t('settings.email.authMode.oauth2', 'OAuth');
+      case 'google':
+        return t('settings.email.provider.google', 'Google');
+      case 'microsoft':
+        return t('settings.email.provider.microsoft', 'Microsoft');
+      default:
+        return enumOptionLabel(option);
+    }
+  };
 
   const control = (key: string, disabled = false) => (
     <RegistrySettingControl
@@ -204,6 +351,7 @@ function EmailSettingsForm({
       value={valueOf(key)}
       error={fieldErrors[key]}
       disabled={disabled}
+      optionLabel={optionLabel}
       onChange={(v) => setField(key, v)}
     />
   );
@@ -226,6 +374,7 @@ function EmailSettingsForm({
       addToast(t('settings.email.saved', 'Email settings saved.'), 'success');
       setDraft({});
       refetch();
+      refetchStatus();
     } catch (err) {
       addToast(
         err instanceof Error
@@ -270,6 +419,55 @@ function EmailSettingsForm({
     }
   };
 
+  /** Send only what was typed: a blank field keeps what is stored. */
+  const putOAuthCredentials = async (body: Record<string, string | null>, successMessage: string) => {
+    setSavingOAuth(true);
+    try {
+      const res = await apiClient('/api/v1/settings/mail/oauth-credentials', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok && res.status !== 204) {
+        addToast(
+          await readError(res, t('settings.email.oauth.error.save', 'Could not save the credentials'), t),
+          'error'
+        );
+        return;
+      }
+      addToast(successMessage, 'success');
+      setClientSecretInput('');
+      setRefreshTokenInput('');
+      refetchStatus();
+    } finally {
+      setSavingOAuth(false);
+    }
+  };
+
+  const handleSaveOAuth = async () => {
+    const body: Record<string, string> = {};
+    if (clientSecretInput.trim() !== '') body.client_secret = clientSecretInput.trim();
+    if (refreshTokenInput.trim() !== '') body.refresh_token = refreshTokenInput.trim();
+    if (Object.keys(body).length === 0) return;
+    await putOAuthCredentials(body, t('settings.email.oauth.saved', 'Credentials saved.'));
+  };
+
+  const handleDisconnect = async () => {
+    await putOAuthCredentials(
+      { client_secret: null, refresh_token: null },
+      t('settings.email.oauth.disconnected', 'Mail account disconnected.')
+    );
+    setConfirmDisconnect(false);
+  };
+
+  const secretStatusBadge = (isSet: boolean, testId: string) => (
+    <Badge data-testid={testId} variant={isSet ? 'secondary' : 'outline'} className="text-xs">
+      {isSet
+        ? t('settings.email.oauth.status.set', 'Saved')
+        : t('settings.email.oauth.status.unset', 'Not set')}
+    </Badge>
+  );
+
   const handleSendTest = async () => {
     if (testTo.trim() === '') {
       addToast(
@@ -298,6 +496,8 @@ function EmailSettingsForm({
       );
     } finally {
       setTesting(false);
+      // A test send is what moves the OAuth connection's status, either way.
+      refetchStatus();
     }
   };
 
@@ -369,8 +569,118 @@ function EmailSettingsForm({
             {control(MAIL_KEYS.port)}
             {control(MAIL_KEYS.encryption)}
             {control(MAIL_KEYS.username)}
+            {control(MAIL_KEYS.authMode)}
+
+            {authMode === 'oauth2' && (
+              <div className="space-y-5" data-testid="email-oauth-fields">
+                <Alert variant={oauthMessage.variant} data-testid="email-oauth-state" data-state={oauth.state}>
+                  <AlertDescription>{oauthMessage.text}</AlertDescription>
+                </Alert>
+                {control(MAIL_KEYS.oauthProvider)}
+                <p className="text-xs text-muted-foreground" data-testid="email-oauth-host-help">
+                  {provider === 'microsoft'
+                    ? t(
+                        'settings.email.oauth.hostHelp.microsoft',
+                        'Set the SMTP host to smtp.office365.com, or smtp-mail.outlook.com for an Outlook.com mailbox. Use the mailbox address as the SMTP username.'
+                      )
+                    : t(
+                        'settings.email.oauth.hostHelp.google',
+                        'Set the SMTP host to smtp.gmail.com. Use the mailbox address as the SMTP username.'
+                      )}
+                </p>
+                {provider === 'microsoft' && control(MAIL_KEYS.oauthMicrosoftTenant)}
+                {control(MAIL_KEYS.oauthClientId)}
+
+                {/* Write-only secrets: they show only whether one is saved. */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <label htmlFor="email-oauth-client-secret" className="text-sm font-medium text-foreground">
+                      {t('settings.email.oauth.clientSecret.label', 'Client secret')}
+                    </label>
+                    {secretStatusBadge(oauth.has_client_secret, 'email-oauth-client-secret-status')}
+                  </div>
+                  <Input
+                    id="email-oauth-client-secret"
+                    type="password"
+                    autoComplete="new-password"
+                    placeholder={
+                      oauth.has_client_secret
+                        ? t('settings.email.oauth.placeholder.set', '•••••••• (unchanged)')
+                        : undefined
+                    }
+                    value={clientSecretInput}
+                    disabled={savingOAuth}
+                    onChange={(e) => setClientSecretInput(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <label htmlFor="email-oauth-refresh-token" className="text-sm font-medium text-foreground">
+                      {t('settings.email.oauth.refreshToken.label', 'Refresh token')}
+                    </label>
+                    {secretStatusBadge(oauth.has_refresh_token, 'email-oauth-refresh-token-status')}
+                  </div>
+                  <Input
+                    id="email-oauth-refresh-token"
+                    type="password"
+                    autoComplete="new-password"
+                    placeholder={
+                      oauth.has_refresh_token
+                        ? t('settings.email.oauth.placeholder.set', '•••••••• (unchanged)')
+                        : undefined
+                    }
+                    value={refreshTokenInput}
+                    disabled={savingOAuth}
+                    onChange={(e) => setRefreshTokenInput(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {t(
+                      'settings.email.oauth.help',
+                      'Both are stored encrypted and never shown again. Whity keeps the short-lived access token up to date by itself.'
+                    )}
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => void handleSaveOAuth()}
+                    disabled={
+                      savingOAuth || (clientSecretInput.trim() === '' && refreshTokenInput.trim() === '')
+                    }
+                    data-testid="email-oauth-save"
+                  >
+                    {savingOAuth
+                      ? t('settings.email.oauth.saving', 'Saving…')
+                      : t('settings.email.oauth.save', 'Save credentials')}
+                  </Button>
+                  {(oauth.has_client_secret || oauth.has_refresh_token) && (
+                    <Button
+                      variant="outline"
+                      onClick={() => setConfirmDisconnect(true)}
+                      disabled={savingOAuth}
+                      data-testid="email-oauth-disconnect"
+                    >
+                      {t('settings.email.oauth.disconnect', 'Disconnect')}
+                    </Button>
+                  )}
+                </div>
+                <ConfirmAction
+                  open={confirmDisconnect}
+                  onOpenChange={setConfirmDisconnect}
+                  title={t('settings.email.oauth.disconnect.title', 'Disconnect this mail account?')}
+                  description={t(
+                    'settings.email.oauth.disconnect.description',
+                    'Email stops going out until you enter a new client secret and refresh token. The provider keeps its own record of this access until you remove it there.'
+                  )}
+                  confirmLabel={t('settings.email.oauth.disconnect', 'Disconnect')}
+                  cancelLabel={t('settings.email.oauth.disconnect.cancel', 'Cancel')}
+                  onConfirm={handleDisconnect}
+                />
+              </div>
+            )}
 
             {/* Write-only password: shows only whether one is set. */}
+            {authMode !== 'oauth2' && (
             <div className="space-y-1.5" data-testid="email-password-field">
               <div className="flex items-center justify-between gap-2">
                 <label htmlFor="email-smtp-password" className="text-sm font-medium text-foreground">
@@ -418,6 +728,7 @@ function EmailSettingsForm({
                 )}
               </p>
             </div>
+            )}
 
             {control(MAIL_KEYS.fromAddress)}
             {control(MAIL_KEYS.fromName)}
