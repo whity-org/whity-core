@@ -373,7 +373,10 @@ function PlatformDefaultsSection({ addToast }: { addToast: AddToast }) {
   const sections = useMemo(
     () =>
       groupRegistry(registry, t).filter(
-        (s) => s.section.id === 'general' || s.section.id === 'integrations' || s.section.id === 'plugins'
+        (s) => s.section.id === 'general' ||
+          s.section.id === 'integrations' ||
+          s.section.id === 'plugin-store' ||
+          s.section.id === 'plugins'
       ),
     [registry, t]
   );

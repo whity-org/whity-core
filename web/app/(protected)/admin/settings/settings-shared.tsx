@@ -422,6 +422,13 @@ export function fieldMeta(t: TranslateFn): Record<string, FieldMeta> {
         'Let people choose the language the interface is shown in, and mirror it for right-to-left languages. Off means everyone sees the default language, left-to-right, with no language control anywhere — stored preferences and translations are kept, so turning it back on restores them.'
       ),
     },
+    'plugins.store_allowed_hosts': {
+      label: t('settings.meta.plugins.store_allowed_hosts.label', 'Trusted plugin stores'),
+      help: t(
+        'settings.meta.plugins.store_allowed_hosts.help',
+        'The addresses of the stores people may install plugins from, separated by commas, for example store.example.com. Only secure (https) stores on the public internet are accepted when a plugin is installed. Leave this empty to keep the plugin store off.'
+      ),
+    },
     'plugins.store_enabled': {
       label: t('settings.meta.plugins.store_enabled.label', 'Plugin marketplace'),
       help: t(
@@ -500,6 +507,15 @@ export function settingsSections(t: TranslateFn): readonly SectionDef[] {
         'Machine-facing endpoints and connected tooling.'
       ),
       keys: ['mcp.enabled'],
+    },
+    {
+      id: 'plugin-store',
+      title: t('settings.section.pluginStore.title', 'Plugin store'),
+      description: t(
+        'settings.section.pluginStore.description',
+        'Which stores plugins can be installed from. The plugin marketplace switch is in Feature flags.'
+      ),
+      keys: ['plugins.store_allowed_hosts'],
     },
     {
       id: 'storage',

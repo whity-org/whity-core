@@ -76,6 +76,9 @@ export default function Page() {
       callerTenantId={user?.tenant_id ?? null}
       onNotify={addToast}
       onBack={handleBack}
+      backLabel={
+        user && user.tenant_id !== 0 ? t('tenants.record.backToSettings', 'Back to settings') : undefined
+      }
     />
   );
 }

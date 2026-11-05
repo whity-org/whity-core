@@ -311,6 +311,22 @@ export function CreateDelegationModal({
         );
   };
 
+  // A permission in words, in the person's language: its description if it has a
+  // real one, otherwise the area and what it allows ("Workspaces: See"), the same
+  // words the role's Access tab uses. The code stays behind Show technical details.
+  const permissionWords = (permission: Permission): string => {
+    const own = permissionText(permission.name, permission.description);
+    if (permission.description && !permission.description.includes(permission.name)) return own;
+    const actions = (permission.actions ?? []) as string[];
+    if (actions.length === 0) return own;
+    const areaKey = permission.area ?? groupOf(permission.name);
+    // @i18n-dynamic-ignore: the same keys, declared in permission-area-grid.tsx.
+    const area = t(`permissions.area.${areaKey}`, permission.areaLabel ?? titleCase(areaKey));
+    // @i18n-dynamic-ignore: the same keys, declared in permission-area-grid.tsx.
+    const verbs = actions.map((a) => t(`permissions.action.${a}`, a.charAt(0).toUpperCase() + a.slice(1)));
+    return `${area}: ${verbs.join(', ')}`;
+  };
+
   // About ninety permissions: by area as on a role's Access tab, and findable.
   const query = permissionQuery.trim().toLowerCase();
   const permissionAreas = [
@@ -318,7 +334,7 @@ export function CreateDelegationModal({
       .filter(
         (permission) =>
           query === '' ||
-          permissionText(permission.name, permission.description).toLowerCase().includes(query) ||
+          permissionWords(permission).toLowerCase().includes(query) ||
           permission.name.toLowerCase().includes(query)
       )
       .reduce((areas, permission) => {
@@ -617,7 +633,7 @@ export function CreateDelegationModal({
                         <span className="min-w-0">
                           {/* In words first; the code is a technical detail. */}
                           <span className="block text-sm font-medium">
-                            {permissionText(permission.name, permission.description)}
+                            {permissionWords(permission)}
                           </span>
                           <TechnicalDetails>
                             <span className="block font-mono text-xs text-muted-foreground">
