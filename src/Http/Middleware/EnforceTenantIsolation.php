@@ -401,6 +401,13 @@ class EnforceTenantIsolation
          * (WHIT-671). Null admits no plugin webhook at all.
          */
         private readonly ?\Whity\Core\Router $router = null,
+        /**
+         * Whether an access token's session still stands (not revoked, epoch
+         * current). Null skips that check, for CLI wiring and unit tests.
+         *
+         * @var (\Closure(array<string, mixed>): bool)|null
+         */
+        private readonly ?\Closure $accessTokenLive = null,
     ) {
         $this->jwtParser = $jwtParser;
         $this->logger = $logger ?? new NullLogger();
@@ -434,6 +441,7 @@ class EnforceTenantIsolation
         // stashed claims instead of re-decoding the token.
         $token = $this->extractToken($request);
         $payload = $token === null ? null : $this->jwtParser->parse($token);
+        $payload = $this->signedInClaims($payload, $path);
         $request->setAttribute(Request::ATTR_JWT_CLAIMS, $payload);
 
         // Dual-claim membership gate (WC-d4340daf, ADR 0005 §5): when the token
@@ -740,6 +748,48 @@ class EnforceTenantIsolation
      * @param Request $request The incoming HTTP request.
      * @return string|null The token, or null when none is present.
      */
+    /**
+     * The claims of a token that may act as a signed-in person on this path, or
+     * null, which every later step treats as an invalid token (401).
+     *
+     * A valid signature only proves Whity issued the token, not what for. Every
+     * token type carries the same identity claims, so without this a password
+     * step's `temp` token skips the second factor, and a refresh, device or MCP
+     * token acts with the person's full permissions, past its scope and its
+     * revocation. MCP tokens authenticate on /mcp, which returns before here.
+     *
+     * JwtParser::parse() refuses a token with no `type`, so an absent type can
+     * only come from a stubbed parser.
+     *
+     * @param array<string, mixed>|null $payload
+     * @return array<string, mixed>|null
+     */
+    private function signedInClaims(?array $payload, string $path): ?array
+    {
+        if ($payload === null || !array_key_exists('type', $payload)) {
+            return $payload;
+        }
+
+        $type = $payload['type'];
+        if ($type === 'access') {
+            return $this->accessTokenLive === null || ($this->accessTokenLive)($payload) ? $payload : null;
+        }
+
+        // Required two-step setup runs before a session exists, on these routes only.
+        if ($type === 'two_factor_enrollment'
+            && preg_match('#^/api(?:/v1)?/auth/2fa/(?:setup|confirm|status)$#', $path) === 1) {
+            return $payload;
+        }
+
+        $this->logger->warning('Tenant isolation: token type refused as a sign-in', [
+            'event' => 'tenant_isolation.token_type_refused',
+            'type'  => is_string($type) ? $type : 'invalid',
+            'path'  => $path,
+        ]);
+
+        return null;
+    }
+
     private function extractToken(Request $request): ?string
     {
         $authHeader = $request->getHeader('Authorization');
