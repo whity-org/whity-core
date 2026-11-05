@@ -70,7 +70,7 @@ final class FormResponsesApiHandler
 
             $total = 0;
             $weeks = [];
-            $routing = ['not routed' => 0, 'in progress' => 0, 'completed' => 0];
+            $routing = ['not routed' => 0, 'in progress' => 0, 'completed' => 0, 'withdrawn' => 0];
 
             foreach ($this->rows($tenantId, $formId) as $row) {
                 $total++;
@@ -80,6 +80,11 @@ final class FormResponsesApiHandler
                 $week = self::weekOf((string) ($row['submitted_at'] ?? ''));
                 if ($week !== null) {
                     $weeks[$week] = ($weeks[$week] ?? 0) + 1;
+                }
+
+                // Still a response received, but its author no longer stands behind these answers.
+                if ($state === 'withdrawn') {
+                    continue;
                 }
 
                 $data = is_array($row['data'] ?? null) ? $row['data'] : [];
@@ -104,6 +109,7 @@ final class FormResponsesApiHandler
                     'not_routed' => $routing['not routed'],
                     'in_progress' => $routing['in progress'],
                     'completed' => $routing['completed'],
+                    'withdrawn' => $routing['withdrawn'],
                 ],
                 'questions' => array_values(array_map([self::class, 'presentQuestion'], $questions)),
             ]]);

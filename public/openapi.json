@@ -26748,6 +26748,98 @@
                 }
             }
         },
+        "/api/v1/me/form-submissions/{id}/withdraw": {
+            "post": {
+                "operationId": "post_api_v1_me_form_submissions_id_withdraw",
+                "summary": "Withdraw one of the caller's own submissions",
+                "tags": [
+                    "forms"
+                ],
+                "description": "Keeps the row and its answers, and withdraws the document it produced in the same transaction. Somebody else's submission is a 404. Refused with a 409 once a review is recorded or the route has finished (`details.reason` `already_decided`), or if already withdrawn (`already_withdrawn`). There is no undo.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The withdrawn submission",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/FormSubmissionWithdrawnResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not one of the caller's submissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Already decided or already withdrawn",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/me/forms": {
             "get": {
                 "operationId": "get_api_v1_me_forms",
@@ -58001,12 +58093,16 @@
                                     },
                                     "completed": {
                                         "type": "integer"
+                                    },
+                                    "withdrawn": {
+                                        "type": "integer"
                                     }
                                 },
                                 "required": [
                                     "not_routed",
                                     "in_progress",
-                                    "completed"
+                                    "completed",
+                                    "withdrawn"
                                 ]
                             },
                             "questions": {
@@ -58208,6 +58304,10 @@
                     "submitted_at": {
                         "type": "string"
                     },
+                    "withdrawn_at": {
+                        "type": "string",
+                        "nullable": true
+                    },
                     "created_at": {
                         "type": "string"
                     },
@@ -58401,6 +58501,17 @@
                                 }
                             }
                         }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "FormSubmissionWithdrawnResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/FormSubmission"
                     }
                 },
                 "required": [
