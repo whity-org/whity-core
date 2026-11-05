@@ -1702,8 +1702,8 @@ export interface paths {
         options?: never;
         head?: never;
         /**
-         * Change who can see an editor document
-         * @description Its scope, the permission a reader needs and the unit it is filed at (A31). Not part of the draft: it changes without a publish. Making a document shared needs documents:publish; a value sent back unchanged is not a change.
+         * Change who can see an editor document, or how its documents are numbered
+         * @description Its scope, the permission a reader needs and the unit it is filed at (A31). Not part of the draft: it changes without a publish. Making a document shared needs documents:publish; a value sent back unchanged is not a change. `numbering` also needs documents:publish, and applies to documents issued from now on; null uses the slot's rule or none.
          */
         patch: operations["patch_api_v1_document_sources_id"];
         trace?: never;
@@ -8202,6 +8202,21 @@ export interface components {
             document_source_id?: number | null;
             document_source_version?: number | null;
             origin_key?: string | null;
+            /** @description What people quote it by, such as INV-2026-0142. Stored when handed out and never recomputed. Null with no numbering rule, before final approval on a final-approval rule, and on a document issued before numbers existed. */
+            number?: string | null;
+            /** @description When the number was handed out, in UTC */
+            number_assigned_at?: string | null;
+            /** @description The type of the business record it was issued from */
+            record_type?: string | null;
+            /** @description The id of that record */
+            record_id?: string | null;
+            /** @description The template slot it was issued through */
+            slot?: string | null;
+            /**
+             * @description Where it is, derived from the routing trail and never stored. `in_review`: a route has an open item. `draft`: its newest route ended rejected, or it waits for final approval to be numbered. `withdrawn`: taken back; the record stays. `issued`: everything else. Absent where a route did not read it.
+             * @enum {string}
+             */
+            state?: "draft" | "in_review" | "issued" | "superseded" | "withdrawn";
             template_name: string;
             title: string;
             origin_ou_id?: number | null;
@@ -8240,6 +8255,8 @@ export interface components {
             checksum_sha256: string;
             rendered_by?: number | null;
             rendered_at: string;
+            /** @description How many pages these bytes have, to compare with a paper copy. Null on an artifact stored before this was kept. */
+            pages?: number | null;
             content_url: string;
         };
         DocumentBackgroundIssuer: {
@@ -8504,6 +8521,15 @@ export interface components {
             /** @description The primary email, when there is one */
             email?: string;
         };
+        DocumentNumbering: {
+            /** @description Literal text with `{YYYY}`, `{YY}`, `{MM}`, and `{SEQ}` or `{SEQ:n}` exactly once, such as `INV-{YYYY}-{SEQ:4}`. A pattern with `{YYYY}` restarts each year. */
+            pattern: string;
+            /**
+             * @description When a number is handed out. Defaults to on_issue.
+             * @enum {string}
+             */
+            assign?: "on_issue" | "on_final_approval";
+        };
         DocumentOwnField: {
             /** @description Lowercase letters, digits and underscores, at most 40; the field is `template.<key>`. */
             key: string;
@@ -8652,6 +8678,8 @@ export interface components {
             rejection_count: number;
         };
         DocumentSource: {
+            /** @description How documents from this template are numbered, when it has its own rule */
+            numbering?: components["schemas"]["DocumentNumbering"];
             id: number;
             tenant_id: number;
             /** @enum {string} */
@@ -8695,6 +8723,8 @@ export interface components {
             updated_at: string;
         };
         DocumentSourceAudienceRequest: {
+            /** @description How documents from this template are numbered; it wins over a slot's rule. Needs documents:publish. */
+            numbering?: components["schemas"]["DocumentNumbering"];
             /**
              * @description Who can see the document: `personal` (only its creator), `tenant`, `global` or `system`. Anything but personal needs documents:publish.
              * @enum {string}
@@ -8996,6 +9026,8 @@ export interface components {
             kinds: ("template" | "label")[];
             /** @description The plugin's starter for the slot, once starters are seeded (WHIT-687) */
             starter: string | null;
+            /** @description How the slot's documents are numbered, unless the bound template has its own rule */
+            numbering?: components["schemas"]["DocumentNumbering"];
             /** @description The template bound to the slot, or null */
             binding: {
                 template_id: number;
@@ -21651,7 +21683,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Sharing a document requires documents:publish */
+            /** @description Sharing a document or changing its numbering requires documents:publish */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -24877,8 +24909,14 @@ export interface operations {
                 ou_id?: number;
                 /** @description Required by the "collection" view */
                 collection_id?: number;
-                /** @description Case-insensitive substring of the document title */
+                /** @description Case-insensitive substring of the document title or number */
                 q?: string;
+                /** @description Only documents issued from this record, as `<type>:<id>`. A malformed value is a 400. */
+                record?: string;
+                /** @description Only documents issued from this template. A malformed value is a 400. */
+                source_id?: number;
+                /** @description Only documents issued through this slot, as `<plugin>.<slot>` */
+                slot?: string;
                 /** @description Order by one of "title", "created_at" or "template_name". Omit for the order documents were recorded in, newest first. An unknown value is a 400 rather than an ignored parameter, so a client can never draw a sort indicator on a column the rows are not ordered by. */
                 sort?: string;
                 /** @description "asc" or "desc". Defaults per field — ascending for the two text columns, descending for created_at — and the order actually applied is echoed back in `sort`. Requires `sort`. */
