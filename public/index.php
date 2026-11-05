@@ -3562,7 +3562,8 @@ $documentsHandler = new \Whity\Api\DocumentsApiHandler(
     $documentQrService,
     // WHIT-742: `slot` in the body names the template through the workspace's bindings.
     $templateSlotRegistry,
-    $documentPeople
+    $documentPeople,
+    $documentFieldLabels
 );
 // The one issuing path (WHIT-742), registered for plugin code and automations
 // running in a request. BaseCommand registers the same for CLI commands, and
@@ -3573,6 +3574,7 @@ $documentsHandler = new \Whity\Api\DocumentsApiHandler(
     $settingsService,
     static fn (int $id, int $tenantId, int $profileId): ?array => $documentSourcesHandler->visibleRow($id, $tenantId, $profileId),
     $templateSlotRegistry,
+    labels: $documentFieldLabels,
 ));
 // The SDK's Documents (1.56): plugins issue through the same service, as the
 // person whose request it is.
@@ -3641,6 +3643,7 @@ $router->register('GET',  '/api/documents',                                     
 // questions, and the handler renders opportunistically. See
 // DocumentsApiHandler::create().
 $router->register('POST', '/api/documents',                                            [$documentsHandler, 'create'],          null, null, CorePermissions::DOCUMENTS_ISSUE);
+$router->register('POST', '/api/documents/preflight',                                  [$documentsHandler, 'preflight'],       null, null, CorePermissions::DOCUMENTS_ISSUE);
 $router->register('GET',  '/api/documents/{id:\d+}',                                   [$documentsHandler, 'show'],            null, null, CorePermissions::DOCUMENTS_READ);
 $router->register('GET',  '/api/documents/{id:\d+}/content',                           [$documentsHandler, 'content'],         null, null, CorePermissions::DOCUMENTS_READ);
 $router->register('GET',  '/api/documents/{id:\d+}/artifacts/{artifactId:\d+}/content', [$documentsHandler, 'artifactContent'], null, null, CorePermissions::DOCUMENTS_READ);

@@ -12,6 +12,7 @@ use Whity\Sdk\Documents\DocumentTracking;
 use Whity\Sdk\Documents\Documents;
 use Whity\Sdk\Documents\IssueRequest;
 use Whity\Sdk\Documents\IssueResult;
+use Whity\Sdk\Documents\PreflightResult;
 use Whity\Sdk\Documents\PluginDocumentStore;
 
 /**
@@ -68,6 +69,19 @@ final class HostPluginDocumentStore implements PluginDocumentStore
         }
 
         return $result;
+    }
+
+    public function preflight(IssueRequest $request): PreflightResult
+    {
+        // The same scoped key issue() uses, or a replay would go unseen.
+        return ($this->documents)()->preflight(new IssueRequest(
+            $request->template,
+            $request->record,
+            $request->values,
+            $request->title,
+            $request->originKey === null ? null : 'plugin:' . $this->slug . ':' . $request->originKey,
+            $request->render,
+        ));
     }
 
     public function qrVerificationUrl(int $documentId): ?string

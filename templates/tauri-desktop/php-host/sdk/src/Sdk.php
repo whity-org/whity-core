@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.65).
+ * SDK identity (v1.66).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -961,12 +961,20 @@ namespace Whity\Sdk;
  * approval (WHIT-684).
  *
  * Purely additive.)
+ *
+ * 1.66 (DOCUMENT PREFLIGHT: {@see Documents\Documents::preflight()} and
+ * {@see Documents\PluginDocumentStore::preflight()} say whether a document would
+ * issue and every reason it wouldn't, writing nothing and allocating no number, in a
+ * {@see Documents\PreflightResult}. `document.issuing` listeners get `check_only` and
+ * can answer with `checks` (WHIT-892). Only the host implements these interfaces.
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.65.0';
+    public const VERSION = '1.66.0';
 
     /**
      * Static identity only — never instantiated.

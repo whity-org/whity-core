@@ -2386,6 +2386,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/documents/preflight": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Whether a document would issue, and every reason it would not
+         * @description The body is the same as POST /api/documents. Runs the same checks and `document.issuing` listeners (with `check_only: true`), but writes nothing, renders nothing and allocates no number. Always 200: `ok` is the answer and `checks` says why. A real issue checks everything again.
+         */
+        post: operations["post_api_v1_documents_preflight"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/documents/views": {
         parameters: {
             query?: never;
@@ -8651,6 +8671,28 @@ export interface components {
             label: string;
             /** @description An example value, at most 200 characters. */
             sample?: string;
+        };
+        DocumentPreflightCheck: {
+            /** @description `template`, `record`, `values`, `fields`, `origin_key` or `render` from core; `plugin` from a listener */
+            code: string;
+            /** @description What was checked, in the reader's language */
+            label: string;
+            ok: boolean;
+            /** @description Why it failed, for a person. Absent when it passed. */
+            why?: string;
+            /** @description The refusal code the real issue would give. Core's checks only. */
+            reason?: string;
+            /** @description The refusal's own English sentence, for a developer. Core's checks only. */
+            detail?: string;
+        };
+        DocumentPreflightResponse: {
+            /** @description Whether an issue would go through now */
+            ok: boolean;
+            checks: components["schemas"]["DocumentPreflightCheck"][];
+            /** @description Required fields with no value */
+            missing_fields: string[];
+            /** @description The document `origin_key` already names. An issue would return it instead of raising one, and no listener would be asked. */
+            replays_document_id: number | null;
         };
         DocumentPreviewResponse: {
             data: {
@@ -25359,6 +25401,84 @@ export interface operations {
                 };
             };
             /** @description No such code, or the document it names is not visible to the caller */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_documents_preflight: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DocumentCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description The answer */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentPreflightResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
             404: {
                 headers: {
                     [name: string]: unknown;

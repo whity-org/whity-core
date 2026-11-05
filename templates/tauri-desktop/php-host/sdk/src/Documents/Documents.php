@@ -33,4 +33,15 @@ interface Documents
      * @throws DocumentNotIssuedException when nothing was issued, with why
      */
     public function issue(IssueRequest $request): IssueResult;
+
+    /**
+     * Would this issue, and if not, why (SDK 1.66)? Runs the same checks as
+     * {@see issue()}, including `document.issuing` listeners with `check_only: true`
+     * in the payload, and writes nothing. A real issue still checks everything again.
+     *
+     * @throws DocumentNotIssuedException with {@see DocumentNotIssuedException::NO_ACTOR}
+     *         when there is nobody to ask for. Anything else that would refuse the
+     *         issue is in the result.
+     */
+    public function preflight(IssueRequest $request): PreflightResult;
 }
