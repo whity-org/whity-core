@@ -6,16 +6,13 @@ import { Button } from '@whity/ui/button';
 import { Alert, AlertDescription } from '@whity/ui/alert';
 import { Input } from '@/components/ui/input';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@whity/ui/alert-dialog';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { useTranslation, type TranslateFn } from '@whity/features/i18n';
 import { IconCheck } from '@tabler/icons-react';
 import QRCode from 'react-qr-code';
@@ -23,6 +20,7 @@ import QRCode from 'react-qr-code';
 interface TwoFactorStatus {
   enabled: boolean;
   backup_codes_available: number;
+  password_available: boolean;
 }
 
 /**
@@ -70,9 +68,7 @@ function wizardErrorText(t: TranslateFn, error: WizardError): string {
 type SettingsError =
   | { kind: 'none' }
   | { kind: 'backend'; text: string }
-  | { kind: 'status' }
-  | { kind: 'disable' }
-  | { kind: 'regenerate' };
+  | { kind: 'status' };
 
 /** Resolve a {@link SettingsError} to the sentence to show. */
 function settingsErrorText(t: TranslateFn, error: SettingsError): string {
@@ -83,10 +79,6 @@ function settingsErrorText(t: TranslateFn, error: SettingsError): string {
       return error.text;
     case 'status':
       return t('twoFactorSettings.error.status', 'Failed to fetch 2FA status');
-    case 'disable':
-      return t('twoFactorSettings.error.disable', 'Failed to disable 2FA');
-    case 'regenerate':
-      return t('twoFactorSettings.error.regenerate', 'Failed to regenerate backup codes');
   }
 }
 
@@ -298,6 +290,165 @@ export const TwoFactorSetupWizard: React.FC<TwoFactorSetupWizardProps> = ({ onCo
   );
 };
 
+/** What the person typed to prove it is them. */
+type TwoFactorProof = { code: string } | { password: string };
+
+/** Why the server refused a proof, or `failed` for anything else that went wrong. */
+type ProofRefusal = 'required' | 'invalid' | 'throttled' | 'failed';
+
+/** Read the server's refusal into the words the dialog shows. */
+async function proofRefusalOf(response: Response): Promise<ProofRefusal> {
+  const body = await response.json().catch(() => ({}));
+  switch (body?.details?.reason) {
+    case 'proof_required':
+      return 'required';
+    case 'proof_invalid':
+      return 'invalid';
+    case 'throttled':
+      return 'throttled';
+    default:
+      return 'failed';
+  }
+}
+
+interface TwoFactorProofDialogProps {
+  title: string;
+  /** Names what will happen, so nobody confirms this without knowing. */
+  consequence: string;
+  submitLabel: string;
+  pendingLabel: string;
+  /** Said when the request failed for a reason other than the proof. */
+  failureText: string;
+  destructive: boolean;
+  /** Offer the password as well as a code. False for accounts that have none. */
+  passwordAvailable: boolean;
+  /** Send the proof; resolves to null when the change went through. */
+  onSubmit: (proof: TwoFactorProof) => Promise<ProofRefusal | null>;
+  onCancel: () => void;
+}
+
+/**
+ * Asks for fresh proof before a change to the second factor. The server refuses
+ * these changes without it; this is where the person gives it.
+ */
+const TwoFactorProofDialog: React.FC<TwoFactorProofDialogProps> = ({
+  title,
+  consequence,
+  submitLabel,
+  pendingLabel,
+  failureText,
+  destructive,
+  passwordAvailable,
+  onSubmit,
+  onCancel,
+}) => {
+  const t = useTranslation('auth');
+  const [mode, setMode] = useState<'code' | 'password'>('code');
+  const [value, setValue] = useState<string>('');
+  const [pending, setPending] = useState<boolean>(false);
+  const [refusal, setRefusal] = useState<ProofRefusal | null>(null);
+
+  const switchMode = (next: 'code' | 'password') => {
+    setMode(next);
+    setValue('');
+    setRefusal(null);
+  };
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setPending(true);
+    setRefusal(null);
+    const outcome = await onSubmit(mode === 'code' ? { code: value.trim() } : { password: value });
+    // On success the parent closes this dialog, so only a refusal has more to do.
+    if (outcome !== null) {
+      setRefusal(outcome);
+      setValue('');
+      setPending(false);
+    }
+  };
+
+  const refusalText = (() => {
+    switch (refusal) {
+      case null:
+        return '';
+      case 'required':
+        return t('twoFactorSettings.proof.error.required', 'Enter a code or your password to continue.');
+      case 'invalid':
+        return mode === 'code'
+          ? t(
+              'twoFactorSettings.proof.error.invalidCode',
+              'That code is not correct. A code works only once, so if you just used this one, wait for the next.'
+            )
+          : t('twoFactorSettings.proof.error.invalidPassword', 'That password is not correct.');
+      case 'throttled':
+        return t('twoFactorSettings.proof.error.throttled', 'Too many wrong tries. Wait a while and try again.');
+      case 'failed':
+        return failureText;
+    }
+  })();
+
+  const fieldLabel =
+    mode === 'code'
+      ? t('twoFactorSettings.proof.code.label', 'Authenticator code or backup code')
+      : t('twoFactorSettings.proof.password.label', 'Your password');
+
+  return (
+    <Dialog open={true} onOpenChange={(open) => !open && onCancel()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{consequence}</DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label htmlFor="two-factor-proof" className="block text-sm font-medium mb-2">
+              {fieldLabel}
+            </label>
+            <Input
+              id="two-factor-proof"
+              key={mode}
+              type={mode === 'code' ? 'text' : 'password'}
+              autoComplete={mode === 'code' ? 'one-time-code' : 'current-password'}
+              autoFocus
+              dir="ltr"
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+            />
+            {passwordAvailable && (
+              <button
+                type="button"
+                className="mt-2 text-sm text-primary underline-offset-4 hover:underline"
+                onClick={() => switchMode(mode === 'code' ? 'password' : 'code')}
+              >
+                {mode === 'code'
+                  ? t('twoFactorSettings.proof.usePassword', 'Use my password instead')
+                  : t('twoFactorSettings.proof.useCode', 'Use a code instead')}
+              </button>
+            )}
+          </div>
+          {refusalText && (
+            <Alert variant="destructive">
+              <AlertDescription>{refusalText}</AlertDescription>
+            </Alert>
+          )}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onCancel} disabled={pending}>
+              {t('twoFactorSettings.confirm.cancel', 'Cancel')}
+            </Button>
+            <Button
+              type="submit"
+              variant={destructive ? 'destructive' : 'default'}
+              disabled={pending || value.trim() === ''}
+            >
+              {pending ? pendingLabel : submitLabel}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
 export const TwoFactorSettings: React.FC = () => {
   const { apiClient } = useAuth();
   const t = useTranslation('auth');
@@ -307,9 +458,8 @@ export const TwoFactorSettings: React.FC = () => {
   const [showWizard, setShowWizard] = useState<boolean>(false);
   const [error, setError] = useState<SettingsError>({ kind: 'none' });
   const [statusMessage, setStatusMessage] = useState<string>('');
-  const [actionLoading, setActionLoading] = useState<boolean>(false);
-  const [disableConfirmOpen, setDisableConfirmOpen] = useState<boolean>(false);
-  const [regenerateConfirmOpen, setRegenerateConfirmOpen] = useState<boolean>(false);
+  const [passwordAvailable, setPasswordAvailable] = useState<boolean>(false);
+  const [proofFor, setProofFor] = useState<'disable' | 'regenerate' | null>(null);
 
   const fetchStatus = useCallback(async () => {
     setLoading(true);
@@ -331,6 +481,7 @@ export const TwoFactorSettings: React.FC = () => {
       const data: TwoFactorStatus = await response.json();
       setEnabled(data.enabled);
       setBackupCodesAvailable(data.backup_codes_available);
+      setPasswordAvailable(data.password_available);
     } catch {
       setError({ kind: 'status' });
     } finally {
@@ -338,56 +489,45 @@ export const TwoFactorSettings: React.FC = () => {
     }
   }, [apiClient]);
 
-  const handleDisable = async () => {
-    setDisableConfirmOpen(false);
-    setActionLoading(true);
+  const sendProof = (path: string, proof: TwoFactorProof) =>
+    apiClient(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(proof),
+    });
+
+  const handleDisable = async (proof: TwoFactorProof): Promise<ProofRefusal | null> => {
     setError({ kind: 'none' });
     setStatusMessage('');
 
     try {
-      const response = await apiClient('/api/v1/auth/2fa/disable', {
-        method: 'POST',
-      });
+      const response = await sendProof('/api/v1/auth/2fa/disable', proof);
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        setError(
-          errorData.message ? { kind: 'backend', text: errorData.message } : { kind: 'disable' }
-        );
-        setActionLoading(false);
-        return;
+        return await proofRefusalOf(response);
       }
 
+      setProofFor(null);
       setEnabled(false);
       setBackupCodesAvailable(0);
       setStatusMessage(
         t('twoFactorSettings.disable.success', 'Two-factor authentication has been disabled.')
       );
+      return null;
     } catch {
-      setError({ kind: 'disable' });
-    } finally {
-      setActionLoading(false);
+      return 'failed';
     }
   };
 
-  const handleRegenerateCodes = async () => {
-    setRegenerateConfirmOpen(false);
-    setActionLoading(true);
+  const handleRegenerateCodes = async (proof: TwoFactorProof): Promise<ProofRefusal | null> => {
     setError({ kind: 'none' });
     setStatusMessage('');
 
     try {
-      const response = await apiClient('/api/v1/auth/2fa/regenerate-codes', {
-        method: 'POST',
-      });
+      const response = await sendProof('/api/v1/auth/2fa/regenerate-codes', proof);
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        setError(
-          errorData.message ? { kind: 'backend', text: errorData.message } : { kind: 'regenerate' }
-        );
-        setActionLoading(false);
-        return;
+        return await proofRefusalOf(response);
       }
 
       const data = await response.json();
@@ -402,14 +542,14 @@ export const TwoFactorSettings: React.FC = () => {
       element.setAttribute('download', 'whity-backup-codes.txt');
       element.click();
 
+      setProofFor(null);
       setBackupCodesAvailable(data.backup_codes.length);
       setStatusMessage(
         t('twoFactorSettings.regenerate.success', 'Backup codes regenerated and downloaded.')
       );
+      return null;
     } catch {
-      setError({ kind: 'regenerate' });
-    } finally {
-      setActionLoading(false);
+      return 'failed';
     }
   };
 
@@ -526,76 +666,55 @@ export const TwoFactorSettings: React.FC = () => {
           <>
             <Button
               variant="secondary"
-              onClick={() => setRegenerateConfirmOpen(true)}
-              disabled={actionLoading}
+              onClick={() => setProofFor('regenerate')}
               className="w-full"
             >
-              {actionLoading
-                ? t('twoFactorSettings.regenerate.pending', 'Regenerating...')
-                : t('twoFactorSettings.regenerate', 'Regenerate Backup Codes')}
+              {t('twoFactorSettings.regenerate', 'Regenerate Backup Codes')}
             </Button>
             <Button
               variant="destructive"
-              onClick={() => setDisableConfirmOpen(true)}
-              disabled={actionLoading}
+              onClick={() => setProofFor('disable')}
               className="w-full"
             >
-              {actionLoading
-                ? t('twoFactorSettings.disable.pending', 'Disabling...')
-                : t('twoFactorSettings.disable', 'Disable 2FA')}
+              {t('twoFactorSettings.disable', 'Disable 2FA')}
             </Button>
           </>
         )}
       </div>
 
-      {/* Disable 2FA confirmation dialog */}
-      <AlertDialog open={disableConfirmOpen} onOpenChange={setDisableConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {t('twoFactorSettings.disable.confirm.title', 'Disable Two-Factor Authentication?')}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {t(
-                'twoFactorSettings.disable.confirm.body',
-                'You will need to enable 2FA again to restore this protection. This cannot be undone immediately.'
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t('twoFactorSettings.confirm.cancel', 'Cancel')}</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/80"
-              onClick={handleDisable}
-            >
-              {t('twoFactorSettings.disable', 'Disable 2FA')}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {proofFor === 'disable' && (
+        <TwoFactorProofDialog
+          title={t('twoFactorSettings.disable.confirm.title', 'Disable Two-Factor Authentication?')}
+          consequence={t(
+            'twoFactorSettings.disable.proof.body',
+            'Anyone who has your password will be able to sign in without a code, and your backup codes stop working. Confirm it is you to continue.'
+          )}
+          submitLabel={t('twoFactorSettings.disable', 'Disable 2FA')}
+          pendingLabel={t('twoFactorSettings.disable.pending', 'Disabling...')}
+          failureText={t('twoFactorSettings.error.disable', 'Failed to disable 2FA')}
+          destructive
+          passwordAvailable={passwordAvailable}
+          onSubmit={handleDisable}
+          onCancel={() => setProofFor(null)}
+        />
+      )}
 
-      {/* Regenerate backup codes confirmation dialog */}
-      <AlertDialog open={regenerateConfirmOpen} onOpenChange={setRegenerateConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {t('twoFactorSettings.regenerate.confirm.title', 'Regenerate Backup Codes?')}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {t(
-                'twoFactorSettings.regenerate.confirm.body',
-                'This will invalidate your current backup codes. Make sure to download the new ones.'
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t('twoFactorSettings.confirm.cancel', 'Cancel')}</AlertDialogCancel>
-            <AlertDialogAction onClick={handleRegenerateCodes}>
-              {t('twoFactorSettings.regenerate.confirm.submit', 'Regenerate Codes')}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {proofFor === 'regenerate' && (
+        <TwoFactorProofDialog
+          title={t('twoFactorSettings.regenerate.confirm.title', 'Regenerate Backup Codes?')}
+          consequence={t(
+            'twoFactorSettings.regenerate.proof.body',
+            'Your current backup codes stop working and new ones download to this device. Confirm it is you to continue.'
+          )}
+          submitLabel={t('twoFactorSettings.regenerate.confirm.submit', 'Regenerate Codes')}
+          pendingLabel={t('twoFactorSettings.regenerate.pending', 'Regenerating...')}
+          failureText={t('twoFactorSettings.error.regenerate', 'Failed to regenerate backup codes')}
+          destructive={false}
+          passwordAvailable={passwordAvailable}
+          onSubmit={handleRegenerateCodes}
+          onCancel={() => setProofFor(null)}
+        />
+      )}
 
       {showWizard && (
         <TwoFactorSetupWizard

@@ -1729,7 +1729,16 @@ $router->register('GET',    '/api/me/sessions',      [$sessionsHandler, 'list'],
 $router->register('DELETE', '/api/me/sessions/{id}', [$sessionsHandler, 'revoke'], null);
 $router->register('DELETE', '/api/me/sessions',      [$sessionsHandler, 'revokeOthers'], null);
 
-$twoFactorHandler = new TwoFactorHandler($db->getPdo(), $totpService, $backupCodesService, $tokenValidator, $auditLogger);
+// Wrong proofs on disable and regenerate count on their own, with the login
+// limits: a stolen session guessing here must not lock the owner out of signing in.
+$twoFactorProofThrottle = new LoginThrottleService(
+    new DatabaseSharedStore($db->getPdo()),
+    (int) ($_ENV['LOGIN_THROTTLE_USER_THRESHOLD']  ?? getenv('LOGIN_THROTTLE_USER_THRESHOLD')  ?: LoginThrottleService::DEFAULT_USER_THRESHOLD),
+    (int) ($_ENV['LOGIN_THROTTLE_IP_THRESHOLD']    ?? getenv('LOGIN_THROTTLE_IP_THRESHOLD')    ?: LoginThrottleService::DEFAULT_IP_THRESHOLD),
+    (int) ($_ENV['LOGIN_THROTTLE_WINDOW_SECONDS']  ?? getenv('LOGIN_THROTTLE_WINDOW_SECONDS')  ?: LoginThrottleService::DEFAULT_WINDOW_SECONDS),
+    'two_factor_proof',
+);
+$twoFactorHandler = new TwoFactorHandler($db->getPdo(), $totpService, $backupCodesService, $tokenValidator, $auditLogger, $twoFactorProofThrottle);
 $router->register('POST', '/api/auth/2fa/setup', [$twoFactorHandler, 'setup'], null);
 $router->register('POST', '/api/auth/2fa/confirm', [$twoFactorHandler, 'confirm'], null);
 $router->register('POST', '/api/auth/2fa/disable', [$twoFactorHandler, 'disable'], null);

@@ -501,12 +501,16 @@ final class CoreApiSchemas
             'requiredRole' => null,
             'requiredPermission' => null,
             'schema' => [
-                'summary' => 'Disable 2FA — clears the stored secret and invalidates all backup codes',
+                'summary' => 'Disable 2FA — needs a current code, backup code or password; clears the stored secret and invalidates all backup codes',
                 'tags' => ['auth'],
+                'request' => 'TwoFaProofRequest',
                 'responses' => [
                     200 => self::jsonResponse('2FA disabled', 'SimpleMessageResponse'),
+                    400 => self::errorResponse('2FA is not enabled'),
                     401 => self::errorResponse('Missing or invalid access token'),
+                    403 => self::errorResponse('Proof is missing or wrong; details.reason is proof_required or proof_invalid'),
                     404 => self::errorResponse('User/profile not found'),
+                    429 => self::errorResponse('Too many wrong proofs; details.reason is throttled'),
                     500 => self::errorResponse('Internal error'),
                 ],
             ],
@@ -519,13 +523,16 @@ final class CoreApiSchemas
             'requiredRole' => null,
             'requiredPermission' => null,
             'schema' => [
-                'summary' => 'Invalidate existing backup codes and generate 15 new ones',
+                'summary' => 'Invalidate existing backup codes and generate 15 new ones — needs a current code, backup code or password',
                 'tags' => ['auth'],
+                'request' => 'TwoFaProofRequest',
                 'responses' => [
                     200 => self::jsonResponse('15 new plaintext backup codes; old codes are invalidated', 'TwoFaRegenerateCodesResponse'),
                     400 => self::errorResponse('2FA is not enabled'),
                     401 => self::errorResponse('Missing or invalid access token'),
+                    403 => self::errorResponse('Proof is missing or wrong; details.reason is proof_required or proof_invalid'),
                     404 => self::errorResponse('User/profile not found'),
+                    429 => self::errorResponse('Too many wrong proofs; details.reason is throttled'),
                     500 => self::errorResponse('Internal error'),
                 ],
             ],
@@ -4459,6 +4466,13 @@ final class CoreApiSchemas
                 'message' => self::str(),
             ], ['backup_codes', 'message']),
 
+            // POST /api/auth/2fa/disable and /regenerate-codes — request body
+            // (TwoFactorHandler::refuseWithoutProof). One of the two is needed.
+            'TwoFaProofRequest' => self::object([
+                'code' => self::str(),
+                'password' => self::str(),
+            ], []),
+
             // POST /api/auth/2fa/regenerate-codes — 200 response
             'TwoFaRegenerateCodesResponse' => self::object([
                 'backup_codes' => ['type' => 'array', 'items' => self::str()],
@@ -4469,7 +4483,8 @@ final class CoreApiSchemas
             'TwoFaStatusResponse' => self::object([
                 'enabled' => self::bool(),
                 'backup_codes_available' => self::int(),
-            ], ['enabled', 'backup_codes_available']),
+                'password_available' => self::bool(),
+            ], ['enabled', 'backup_codes_available', 'password_available']),
 
             // ── SSO / federated identity (WC-e6287, WC-f3b17bd2; ADR 0009) ────
             // A tenant's configured OIDC provider. `client_secret` is WRITE-ONLY:

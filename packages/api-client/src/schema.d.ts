@@ -606,7 +606,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Disable 2FA — clears the stored secret and invalidates all backup codes */
+        /** Disable 2FA — needs a current code, backup code or password; clears the stored secret and invalidates all backup codes */
         post: operations["post_api_v1_auth_2fa_disable"];
         delete?: never;
         options?: never;
@@ -623,7 +623,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Invalidate existing backup codes and generate 15 new ones */
+        /** Invalidate existing backup codes and generate 15 new ones — needs a current code, backup code or password */
         post: operations["post_api_v1_auth_2fa_regenerate_codes"];
         delete?: never;
         options?: never;
@@ -12427,6 +12427,10 @@ export interface components {
             code: string;
             temp_token?: string;
         };
+        TwoFaProofRequest: {
+            code?: string;
+            password?: string;
+        };
         TwoFaRegenerateCodesResponse: {
             backup_codes: string[];
             message: string;
@@ -12438,6 +12442,7 @@ export interface components {
         TwoFaStatusResponse: {
             enabled: boolean;
             backup_codes_available: number;
+            password_available: boolean;
         };
         TwoFactorPolicy: {
             id: number;
@@ -15832,7 +15837,11 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TwoFaProofRequest"];
+            };
+        };
         responses: {
             /** @description 2FA disabled */
             200: {
@@ -15843,8 +15852,26 @@ export interface operations {
                     "application/json": components["schemas"]["SimpleMessageResponse"];
                 };
             };
+            /** @description 2FA is not enabled */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Missing or invalid access token */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Proof is missing or wrong; details.reason is proof_required or proof_invalid */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -15870,6 +15897,15 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            /** @description Too many wrong proofs; details.reason is throttled */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Internal error */
             500: {
                 headers: {
@@ -15888,7 +15924,11 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TwoFaProofRequest"];
+            };
+        };
         responses: {
             /** @description 15 new plaintext backup codes; old codes are invalidated */
             200: {
@@ -15917,6 +15957,15 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            /** @description Proof is missing or wrong; details.reason is proof_required or proof_invalid */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description User/profile not found */
             404: {
                 headers: {
@@ -15928,6 +15977,15 @@ export interface operations {
             };
             /** @description Method not allowed */
             405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too many wrong proofs; details.reason is throttled */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };

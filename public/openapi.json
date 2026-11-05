@@ -3820,10 +3820,20 @@
         "/api/v1/auth/2fa/disable": {
             "post": {
                 "operationId": "post_api_v1_auth_2fa_disable",
-                "summary": "Disable 2FA \u2014 clears the stored secret and invalidates all backup codes",
+                "summary": "Disable 2FA \u2014 needs a current code, backup code or password; clears the stored secret and invalidates all backup codes",
                 "tags": [
                     "auth"
                 ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/TwoFaProofRequest"
+                            }
+                        }
+                    }
+                },
                 "responses": {
                     "200": {
                         "description": "2FA disabled",
@@ -3835,8 +3845,28 @@
                             }
                         }
                     },
+                    "400": {
+                        "description": "2FA is not enabled",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
                     "401": {
                         "description": "Missing or invalid access token",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Proof is missing or wrong; details.reason is proof_required or proof_invalid",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -3865,6 +3895,16 @@
                             }
                         }
                     },
+                    "429": {
+                        "description": "Too many wrong proofs; details.reason is throttled",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
                     "500": {
                         "description": "Internal error",
                         "content": {
@@ -3881,10 +3921,20 @@
         "/api/v1/auth/2fa/regenerate-codes": {
             "post": {
                 "operationId": "post_api_v1_auth_2fa_regenerate_codes",
-                "summary": "Invalidate existing backup codes and generate 15 new ones",
+                "summary": "Invalidate existing backup codes and generate 15 new ones \u2014 needs a current code, backup code or password",
                 "tags": [
                     "auth"
                 ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/TwoFaProofRequest"
+                            }
+                        }
+                    }
+                },
                 "responses": {
                     "200": {
                         "description": "15 new plaintext backup codes; old codes are invalidated",
@@ -3916,6 +3966,16 @@
                             }
                         }
                     },
+                    "403": {
+                        "description": "Proof is missing or wrong; details.reason is proof_required or proof_invalid",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
                     "404": {
                         "description": "User/profile not found",
                         "content": {
@@ -3928,6 +3988,16 @@
                     },
                     "405": {
                         "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many wrong proofs; details.reason is throttled",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -68686,6 +68756,17 @@
                     "code"
                 ]
             },
+            "TwoFaProofRequest": {
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "type": "string"
+                    },
+                    "password": {
+                        "type": "string"
+                    }
+                }
+            },
             "TwoFaRegenerateCodesResponse": {
                 "type": "object",
                 "properties": {
@@ -68727,11 +68808,15 @@
                     },
                     "backup_codes_available": {
                         "type": "integer"
+                    },
+                    "password_available": {
+                        "type": "boolean"
                     }
                 },
                 "required": [
                     "enabled",
-                    "backup_codes_available"
+                    "backup_codes_available",
+                    "password_available"
                 ]
             },
             "TwoFactorPolicy": {

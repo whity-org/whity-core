@@ -33,12 +33,17 @@ final class LoginThrottleService
      * LOGIN_THROTTLE_* env), matching the HTTP RATE_LIMIT_* rules. Each is clamped
      * to at least 1 so a stray 0/negative can never silently disable the
      * brute-force protection.
+     *
+     * $scope names the counters. Two services with different scopes count
+     * separately over one store, so wrong answers on a signed-in route cannot
+     * lock the same person, or everyone behind their IP, out of signing in.
      */
     public function __construct(
         private readonly SharedStoreInterface $store,
         int $userThreshold = self::DEFAULT_USER_THRESHOLD,
         int $ipThreshold = self::DEFAULT_IP_THRESHOLD,
         int $windowSeconds = self::DEFAULT_WINDOW_SECONDS,
+        private readonly string $scope = 'login',
     ) {
         $this->userThreshold = max(1, $userThreshold);
         $this->ipThreshold   = max(1, $ipThreshold);
@@ -51,11 +56,11 @@ final class LoginThrottleService
      */
     public function isThrottled(?int $userId, ?string $ip): bool
     {
-        if ($userId !== null && $this->store->count("login:fail:user:{$userId}") >= $this->userThreshold) {
+        if ($userId !== null && $this->store->count("{$this->scope}:fail:user:{$userId}") >= $this->userThreshold) {
             return true;
         }
 
-        if ($ip !== null && $this->store->count("login:fail:ip:{$ip}") >= $this->ipThreshold) {
+        if ($ip !== null && $this->store->count("{$this->scope}:fail:ip:{$ip}") >= $this->ipThreshold) {
             return true;
         }
 
@@ -68,11 +73,11 @@ final class LoginThrottleService
     public function recordFailure(?int $userId, ?string $ip): void
     {
         if ($userId !== null) {
-            $this->store->increment("login:fail:user:{$userId}", $this->windowSeconds);
+            $this->store->increment("{$this->scope}:fail:user:{$userId}", $this->windowSeconds);
         }
 
         if ($ip !== null) {
-            $this->store->increment("login:fail:ip:{$ip}", $this->windowSeconds);
+            $this->store->increment("{$this->scope}:fail:ip:{$ip}", $this->windowSeconds);
         }
     }
 
@@ -82,6 +87,6 @@ final class LoginThrottleService
      */
     public function clearUser(int $userId): void
     {
-        $this->store->delete("login:fail:user:{$userId}");
+        $this->store->delete("{$this->scope}:fail:user:{$userId}");
     }
 }

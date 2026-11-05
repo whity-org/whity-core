@@ -156,11 +156,11 @@ test.describe('Two-Factor Authentication — Settings UI (admin)', () => {
     // Arrange: enable 2FA via the API so the regenerate control is available.
     expect(baseURL).toBeTruthy();
     const api = await createAuthedApi(baseURL as string, ADMIN);
-    await enableTwoFactor(api, computeTotp);
+    const { backupCodes } = await enableTwoFactor(api, computeTotp);
     await api.dispose();
 
-    // The regenerate action is gated behind an AlertDialog — confirm it; also
-    // accept the automatic backup-code download.
+    // Regenerating asks for proof first, and refuses a wrong code; also accept
+    // the automatic backup-code download.
     const downloadPromise = page
       .waitForEvent('download', { timeout: 5_000 })
       .catch(() => null);
@@ -169,8 +169,12 @@ test.describe('Two-Factor Authentication — Settings UI (admin)', () => {
     await settings.goto();
     await expect(settings.statusChip('Enabled')).toBeVisible();
     await settings.regenerateButton.click();
-    // Confirm the AlertDialog that replaced window.confirm.
-    await page.getByRole('alertdialog').getByRole('button', { name: 'Regenerate Codes' }).click();
+    const proof = page.getByRole('dialog');
+    await proof.getByLabel('Authenticator code or backup code').fill('000000');
+    await proof.getByRole('button', { name: 'Regenerate Codes' }).click();
+    await expect(proof.getByText(/That code is not correct/)).toBeVisible();
+    await proof.getByLabel('Authenticator code or backup code').fill(backupCodes[0]);
+    await proof.getByRole('button', { name: 'Regenerate Codes' }).click();
 
     // After regeneration the panel reports a fresh set of 15 codes available.
     await expect(page.getByText(/backup codes available/)).toBeVisible();
@@ -186,12 +190,20 @@ test.describe('Two-Factor Authentication — Settings UI (admin)', () => {
     const api = await createAuthedApi(baseURL as string, ADMIN);
     await enableTwoFactor(api, computeTotp);
 
+    // The session alone is not enough: the API refuses without proof.
+    const refused = await api.post('/api/v1/auth/2fa/disable', { data: {} });
+    expect(refused.status()).toBe(403);
+    expect((await getTwoFactorStatus(api)).enabled).toBe(true);
+
     const settings = new SettingsPage(page);
     await settings.goto();
     await expect(settings.statusChip('Enabled')).toBeVisible();
     await settings.disableButton.click();
-    // Confirm the AlertDialog that replaced window.confirm.
-    await page.getByRole('alertdialog').getByRole('button', { name: 'Disable 2FA' }).click();
+    const proof = page.getByRole('dialog');
+    await expect(proof.getByText(/sign in without a code/)).toBeVisible();
+    await proof.getByRole('button', { name: 'Use my password instead' }).click();
+    await proof.getByLabel('Your password').fill(ADMIN.password);
+    await proof.getByRole('button', { name: 'Disable 2FA' }).click();
     await expect(settings.statusChip('Not Enabled')).toBeVisible();
 
     // Independent confirmation: the account is back to plain login (no 202).
