@@ -261,7 +261,7 @@ final class DocumentPublishingApiHandlerRealEngineTest extends TestCase
 
         $check = $this->check(self::OWNER, $id);
         self::assertSame(200, $check->getStatusCode(), $check->getBody());
-        $blockers = $this->data($check);
+        $blockers = $this->blockerList($check);
         self::assertCount(1, $blockers);
         self::assertSame('too-large', $blockers[0]['kind']);
         self::assertSame(4096, $blockers[0]['max']);
@@ -283,7 +283,7 @@ final class DocumentPublishingApiHandlerRealEngineTest extends TestCase
 
         // One byte under the measured size still blocks; at it, publishing goes through.
         $this->settings->setTenant(self::TENANT, SettingsRegistry::DOCUMENTS_FLOW_MAX_BYTES, (string) ($bytes - 1));
-        self::assertSame('too-large', $this->data($this->check(self::OWNER, $id))[0]['kind'] ?? null);
+        self::assertSame('too-large', $this->blockerList($this->check(self::OWNER, $id))[0]['kind'] ?? null);
         $this->settings->setTenant(self::TENANT, SettingsRegistry::DOCUMENTS_FLOW_MAX_BYTES, (string) $bytes);
         self::assertSame([], $this->data($this->check(self::OWNER, $id)));
         self::assertSame(201, $this->publish(self::OWNER, $id, '"2"')->getStatusCode());
@@ -642,6 +642,13 @@ final class DocumentPublishingApiHandlerRealEngineTest extends TestCase
             ->execute([self::TENANT, 'Letters', $title, $userId, '2026-10-20 09:00:00']);
 
         return (int) $this->pdo->lastInsertId();
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function blockerList(Response $res): array
+    {
+        /** @var list<array<string, mixed>> */
+        return array_values($this->data($res));
     }
 
     private function check(int $userId, int $id, int $tenant = self::TENANT): Response
