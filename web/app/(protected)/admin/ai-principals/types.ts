@@ -63,3 +63,17 @@ export interface OwnMcpToken {
   name: string;
   last_used_at: string | null;
 }
+
+/**
+ * One row of `GET /api/v1/mcp/tokens` (McpTokenService::listForUser): the
+ * caller's own connections, snake_case, open to anyone signed in.
+ */
+export interface OwnMcpTokenRow {
+  jti: string;
+  name: string;
+  principal_kind: string;
+  scope: string[];
+  expires_at: string | null;
+  created_at: string | null;
+  last_used_at: string | null;
+}
