@@ -199,6 +199,11 @@ final class TenantOwnedTables
         'home_card_hidden' => '200_add_home_card_hidden.php',
         // WHIT-838: a plugin's secrets, per workspace (migration 187).
         'plugin_secrets' => '187_create_plugin_secrets.php',
+
+        // WHIT-906: keys that open a plugin's public form. Every query binds tenant_id
+        // except PublicFormKeyRepository::findLive(), the anonymous lookup that
+        // resolves the tenant from a 256-bit key.
+        'public_form_keys' => '217_create_public_form_keys.php',
         // WHIT-815: the workspace's agent definitions (migration 180).
         'agents' => '180_create_agents.php',
         // WHIT-816: a person's use of a workspace agent, with their grant (migration 181).

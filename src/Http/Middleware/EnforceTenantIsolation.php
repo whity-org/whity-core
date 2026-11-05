@@ -330,6 +330,10 @@ class EnforceTenantIsolation
         '#^/api/v1/public/forms/[^/]+/uploads$#',
         '#^/api/v1/public/forms/[^/]+/submissions$#',
 
+        // What the page of a plugin's public form needs to show its bot check
+        // (WHIT-906). The key in the path is the only thing it answers to.
+        '#^/api/v1/public/plugin-forms/[^/]+$#',
+
         // Per-device licensing: redeeming an activation code. The person doing
         // it may be an end user or a student with NO account, so there is no
         // session to carry a tenant — the code itself resolves which tenant,

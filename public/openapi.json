@@ -37670,6 +37670,394 @@
                 ]
             }
         },
+        "/api/v1/public-form-keys": {
+            "get": {
+                "operationId": "get_api_v1_public_form_keys",
+                "summary": "This workspace's public form keys",
+                "tags": [
+                    "plugins"
+                ],
+                "description": "Revoked keys included, newest first. `meta.forms` is what a key can be issued for. A key can't be read back: this returns its name and first characters.",
+                "responses": {
+                    "200": {
+                        "description": "The keys",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PublicFormKeyListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "operationId": "post_api_v1_public_form_keys",
+                "summary": "Issue a key that opens a plugin's public form for this workspace",
+                "tags": [
+                    "plugins"
+                ],
+                "description": "The answer is the only time the key can be read.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PublicFormKeyCreateRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The new key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PublicFormKeyIssuedResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "No plugin has this form, or a field failed validation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/public-form-keys/{id}": {
+            "patch": {
+                "operationId": "patch_api_v1_public_form_keys_id",
+                "summary": "Change a key's name or allowed sites",
+                "tags": [
+                    "plugins"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PublicFormKeyUpdateRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The changed key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PublicFormKeyResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Key not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The key has been revoked",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A field failed validation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/public-form-keys/{id}/revoke": {
+            "post": {
+                "operationId": "post_api_v1_public_form_keys_id_revoke",
+                "summary": "Revoke a key, at once and for good",
+                "tags": [
+                    "plugins"
+                ],
+                "description": "Revoking twice changes nothing.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Revoked"
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Key not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/public/forms/{slug}": {
             "get": {
                 "operationId": "get_api_v1_public_forms_slug",
@@ -38067,6 +38455,98 @@
                     },
                     "500": {
                         "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/public/plugin-forms/{key}": {
+            "get": {
+                "operationId": "get_api_v1_public_plugin_forms_key",
+                "summary": "What the page of a plugin's public form needs (PUBLIC, rate-limited)",
+                "tags": [
+                    "plugins"
+                ],
+                "description": "The provider and site key for the form's bot check, neither of which is secret. Answers only to a live key, with the same 404 for anything else. An Origin that is sent must be on the key's list or the instance's.",
+                "parameters": [
+                    {
+                        "name": "key",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Whether the form is accepting, and its bot check",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PublicFormConfigResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "This site may not use this key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No live key at this address",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many attempts from this address",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "Temporarily unavailable",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -40926,6 +41406,188 @@
                         }
                     }
                 }
+            }
+        },
+        "/api/v1/settings/public-forms/bot-check": {
+            "get": {
+                "operationId": "get_api_v1_settings_public_forms_bot_check",
+                "summary": "The instance's bot check for public forms",
+                "tags": [
+                    "settings"
+                ],
+                "description": "System tenant only. The secret is never returned: `has_secret` says whether one is stored.",
+                "responses": {
+                    "200": {
+                        "description": "The settings",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PublicFormBotSettingsResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "put": {
+                "operationId": "put_api_v1_settings_public_forms_bot_check",
+                "summary": "Change the instance's bot check for public forms",
+                "tags": [
+                    "settings"
+                ],
+                "description": "System tenant only. A field left out stays as it is. With no provider, every public form is refused unless `allow_without_bot_check` is true. The secret is write-only and encrypted: null or empty clears it.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PublicFormBotSettingsUpdateRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The settings",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PublicFormBotSettingsResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A field failed validation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
             }
         },
         "/api/v1/settings/tabs": {
@@ -65067,6 +65729,106 @@
                     "data"
                 ]
             },
+            "PublicFormBotSettingsResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "provider": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "providers": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "site_key": {
+                                "type": "string"
+                            },
+                            "has_secret": {
+                                "type": "boolean"
+                            },
+                            "allow_without_bot_check": {
+                                "type": "boolean"
+                            },
+                            "ready": {
+                                "type": "boolean"
+                            }
+                        },
+                        "required": [
+                            "provider",
+                            "providers",
+                            "site_key",
+                            "has_secret",
+                            "allow_without_bot_check",
+                            "ready"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "PublicFormBotSettingsUpdateRequest": {
+                "type": "object",
+                "properties": {
+                    "provider": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "site_key": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "secret": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "allow_without_bot_check": {
+                        "type": "boolean"
+                    }
+                }
+            },
+            "PublicFormConfigResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "accepting": {
+                                "type": "boolean"
+                            },
+                            "bot_check": {
+                                "type": "object",
+                                "properties": {
+                                    "provider": {
+                                        "type": "string",
+                                        "nullable": true
+                                    },
+                                    "site_key": {
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "provider",
+                                    "site_key"
+                                ],
+                                "nullable": true
+                            }
+                        },
+                        "required": [
+                            "accepting",
+                            "bot_check"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
             "PublicFormField": {
                 "type": "object",
                 "properties": {
@@ -65151,6 +65913,199 @@
                     "is_required",
                     "position"
                 ]
+            },
+            "PublicFormKey": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "plugin": {
+                        "type": "string"
+                    },
+                    "form": {
+                        "type": "string"
+                    },
+                    "label": {
+                        "type": "string"
+                    },
+                    "key_hint": {
+                        "type": "string"
+                    },
+                    "allowed_origins": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "created_at": {
+                        "type": "string"
+                    },
+                    "revoked_at": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "id",
+                    "plugin",
+                    "form",
+                    "label",
+                    "key_hint",
+                    "allowed_origins",
+                    "created_at",
+                    "revoked_at"
+                ]
+            },
+            "PublicFormKeyCreateRequest": {
+                "type": "object",
+                "properties": {
+                    "plugin": {
+                        "type": "string"
+                    },
+                    "form": {
+                        "type": "string"
+                    },
+                    "label": {
+                        "type": "string"
+                    },
+                    "allowed_origins": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "required": [
+                    "plugin",
+                    "form",
+                    "label"
+                ]
+            },
+            "PublicFormKeyIssuedResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "id": {
+                                "type": "integer"
+                            },
+                            "plugin": {
+                                "type": "string"
+                            },
+                            "form": {
+                                "type": "string"
+                            },
+                            "label": {
+                                "type": "string"
+                            },
+                            "key_hint": {
+                                "type": "string"
+                            },
+                            "allowed_origins": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "created_at": {
+                                "type": "string"
+                            },
+                            "revoked_at": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "key": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "id",
+                            "plugin",
+                            "form",
+                            "label",
+                            "key_hint",
+                            "allowed_origins",
+                            "created_at",
+                            "revoked_at",
+                            "key"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "PublicFormKeyListResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/PublicFormKey"
+                        }
+                    },
+                    "meta": {
+                        "type": "object",
+                        "properties": {
+                            "forms": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "plugin": {
+                                            "type": "string"
+                                        },
+                                        "form": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "plugin",
+                                        "form"
+                                    ]
+                                }
+                            },
+                            "bot_check_ready": {
+                                "type": "boolean"
+                            }
+                        },
+                        "required": [
+                            "forms",
+                            "bot_check_ready"
+                        ]
+                    }
+                },
+                "required": [
+                    "data",
+                    "meta"
+                ]
+            },
+            "PublicFormKeyResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/PublicFormKey"
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "PublicFormKeyUpdateRequest": {
+                "type": "object",
+                "properties": {
+                    "label": {
+                        "type": "string"
+                    },
+                    "allowed_origins": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                }
             },
             "PublicFormResponse": {
                 "type": "object",

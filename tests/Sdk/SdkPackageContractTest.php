@@ -242,9 +242,11 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsOneEightForInteractiveBlocks(): void
     {
         $this->assertSame(
-            '1.66.0',
+            '1.67.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.66 ADDS DOCUMENT PREFLIGHT: Documents::preflight and PluginDocumentStore::preflight say whether a '
+            'SDK 1.67 ADDS PUBLIC FORMS: a route declared public => form takes anonymous browser submissions, with the '
+            . 'tenant from a key and the checks run by the host; Http\\PublicForm carries the result (WHIT-906). Purely additive. '
+            . 'SDK 1.66 ADDS DOCUMENT PREFLIGHT: Documents::preflight and PluginDocumentStore::preflight say whether a '
             . 'document would issue and every reason it would not, writing nothing; document.issuing listeners get '
             . 'check_only and answer with checks (WHIT-892). Purely additive. '
             . 'SDK 1.65 ADDS DOCUMENT NUMBERS: DocumentNumberingRule says when a document is numbered and what the '

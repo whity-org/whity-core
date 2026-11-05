@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.66).
+ * SDK identity (v1.67).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -968,13 +968,19 @@ namespace Whity\Sdk;
  * {@see Documents\PreflightResult}. `document.issuing` listeners get `check_only` and
  * can answer with `checks` (WHIT-892). Only the host implements these interfaces.
  *
+ * 1.67 (PUBLIC FORMS: a route declared `'public' => 'form'` on POST
+ * `/api/<slug>/forms/<name>/{key}` takes anonymous browser submissions. The host
+ * resolves the tenant from the key and runs the limits, Origin check and bot check
+ * before the handler, which reads the result from {@see Http\PublicForm}. On an
+ * older host the route is not public (WHIT-906).
+ *
  * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.66.0';
+    public const VERSION = '1.67.0';
 
     /**
      * Static identity only — never instantiated.

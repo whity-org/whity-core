@@ -1768,6 +1768,98 @@ final class CoreApiSchemas
             ],
             [
                 'method' => 'GET',
+                'path' => '/api/public/plugin-forms/{key}',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'What the page of a plugin\'s public form needs (PUBLIC, rate-limited)',
+                    'description' => 'The provider and site key for the form\'s bot check, neither of which is secret. '
+                        . 'Answers only to a live key, with the same 404 for anything else. An Origin that is '
+                        . 'sent must be on the key\'s list or the instance\'s.',
+                    'tags' => ['plugins'],
+                    'mcp' => ['expose' => false],
+                    'responses' => [
+                        200 => self::jsonResponse('Whether the form is accepting, and its bot check', 'PublicFormConfigResponse'),
+                        403 => self::errorResponse('This site may not use this key'),
+                        404 => self::errorResponse('No live key at this address'),
+                        429 => self::errorResponse('Too many attempts from this address'),
+                        503 => self::errorResponse('Temporarily unavailable'),
+                    ],
+                ],
+            ],
+            self::permissionRoute('GET', '/api/public-form-keys', 'public_form_keys:manage', [
+                'summary' => 'This workspace\'s public form keys',
+                'description' => 'Revoked keys included, newest first. `meta.forms` is what a key can be issued for. '
+                    . 'A key can\'t be read back: this returns its name and first characters.',
+                'tags' => ['plugins'],
+                // Never a tool: its answer carries a key or its input a secret.
+                'mcp' => ['expose' => false],
+                'responses' => [
+                    200 => self::jsonResponse('The keys', 'PublicFormKeyListResponse'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/public-form-keys', 'public_form_keys:manage', [
+                'summary' => 'Issue a key that opens a plugin\'s public form for this workspace',
+                'description' => 'The answer is the only time the key can be read.',
+                'tags' => ['plugins'],
+                // Never a tool: its answer carries a key or its input a secret.
+                'mcp' => ['expose' => false],
+                'request' => 'PublicFormKeyCreateRequest',
+                'responses' => [
+                    201 => self::jsonResponse('The new key', 'PublicFormKeyIssuedResponse'),
+                    422 => self::errorResponse('No plugin has this form, or a field failed validation'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('PATCH', '/api/public-form-keys/{id:\d+}', 'public_form_keys:manage', [
+                'summary' => 'Change a key\'s name or allowed sites',
+                'tags' => ['plugins'],
+                // Never a tool: its answer carries a key or its input a secret.
+                'mcp' => ['expose' => false],
+                'request' => 'PublicFormKeyUpdateRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The changed key', 'PublicFormKeyResponse'),
+                    404 => self::errorResponse('Key not found'),
+                    409 => self::errorResponse('The key has been revoked'),
+                    422 => self::errorResponse('A field failed validation'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/public-form-keys/{id:\d+}/revoke', 'public_form_keys:manage', [
+                'summary' => 'Revoke a key, at once and for good',
+                'description' => 'Revoking twice changes nothing.',
+                'tags' => ['plugins'],
+                // Never a tool: its answer carries a key or its input a secret.
+                'mcp' => ['expose' => false],
+                'responses' => [
+                    204 => ['description' => 'Revoked'],
+                    404 => self::errorResponse('Key not found'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/settings/public-forms/bot-check', 'settings:manage', [
+                'summary' => 'The instance\'s bot check for public forms',
+                'description' => 'System tenant only. The secret is never returned: `has_secret` says whether one is stored.',
+                'tags' => ['settings'],
+                // Never a tool: its answer carries a key or its input a secret.
+                'mcp' => ['expose' => false],
+                'responses' => [
+                    200 => self::jsonResponse('The settings', 'PublicFormBotSettingsResponse'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('PUT', '/api/settings/public-forms/bot-check', 'settings:manage', [
+                'summary' => 'Change the instance\'s bot check for public forms',
+                'description' => 'System tenant only. A field left out stays as it is. With no provider, every public '
+                    . 'form is refused unless `allow_without_bot_check` is true. The secret is write-only and '
+                    . 'encrypted: null or empty clears it.',
+                'tags' => ['settings'],
+                // Never a tool: its answer carries a key or its input a secret.
+                'mcp' => ['expose' => false],
+                'request' => 'PublicFormBotSettingsUpdateRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The settings', 'PublicFormBotSettingsResponse'),
+                    422 => self::errorResponse('A field failed validation'),
+                ] + self::authErrors(),
+            ]),
+            [
+                'method' => 'GET',
                 'path' => '/api/public/forms/{slug}',
                 'requiredRole' => null,
                 'requiredPermission' => null,
@@ -7759,6 +7851,66 @@ final class CoreApiSchemas
                 'title' => self::localizedText() + ['nullable' => true],
                 'description' => self::localizedText() + ['nullable' => true],
             ], ['key', 'field_keys']),
+            'PublicFormKey' => self::object([
+                'id' => self::int(),
+                'plugin' => self::str(),
+                'form' => self::str(),
+                'label' => self::str(),
+                'key_hint' => self::str(),
+                'allowed_origins' => ['type' => 'array', 'items' => ['type' => 'string']],
+                'created_at' => self::str(),
+                'revoked_at' => self::str(true),
+            ], ['id', 'plugin', 'form', 'label', 'key_hint', 'allowed_origins', 'created_at', 'revoked_at']),
+            'PublicFormKeyResponse' => self::dataEnvelope(SchemaBuilder::ref('PublicFormKey')),
+            'PublicFormKeyIssuedResponse' => self::dataEnvelope(self::object([
+                'id' => self::int(),
+                'plugin' => self::str(),
+                'form' => self::str(),
+                'label' => self::str(),
+                'key_hint' => self::str(),
+                'allowed_origins' => ['type' => 'array', 'items' => ['type' => 'string']],
+                'created_at' => self::str(),
+                'revoked_at' => self::str(true),
+                'key' => self::str(),
+            ], ['id', 'plugin', 'form', 'label', 'key_hint', 'allowed_origins', 'created_at', 'revoked_at', 'key'])),
+            'PublicFormKeyListResponse' => self::object([
+                'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('PublicFormKey')],
+                'meta' => self::object([
+                    'forms' => ['type' => 'array', 'items' => self::object(['plugin' => self::str(), 'form' => self::str()], ['plugin', 'form'])],
+                    'bot_check_ready' => ['type' => 'boolean'],
+                ], ['forms', 'bot_check_ready']),
+            ], ['data', 'meta']),
+            'PublicFormKeyCreateRequest' => self::object([
+                'plugin' => self::str(),
+                'form' => self::str(),
+                'label' => self::str(),
+                'allowed_origins' => ['type' => 'array', 'items' => ['type' => 'string']],
+            ], ['plugin', 'form', 'label']),
+            'PublicFormKeyUpdateRequest' => self::object([
+                'label' => self::str(),
+                'allowed_origins' => ['type' => 'array', 'items' => ['type' => 'string']],
+            ], []),
+            'PublicFormConfigResponse' => self::dataEnvelope(self::object([
+                'accepting' => ['type' => 'boolean'],
+                'bot_check' => self::object([
+                    'provider' => self::str(true),
+                    'site_key' => self::str(),
+                ], ['provider', 'site_key']) + ['nullable' => true],
+            ], ['accepting', 'bot_check'])),
+            'PublicFormBotSettingsResponse' => self::dataEnvelope(self::object([
+                'provider' => self::str(true),
+                'providers' => ['type' => 'array', 'items' => ['type' => 'string']],
+                'site_key' => self::str(),
+                'has_secret' => ['type' => 'boolean'],
+                'allow_without_bot_check' => ['type' => 'boolean'],
+                'ready' => ['type' => 'boolean'],
+            ], ['provider', 'providers', 'site_key', 'has_secret', 'allow_without_bot_check', 'ready'])),
+            'PublicFormBotSettingsUpdateRequest' => self::object([
+                'provider' => self::str(true),
+                'site_key' => self::str(true),
+                'secret' => self::str(true),
+                'allow_without_bot_check' => ['type' => 'boolean'],
+            ], []),
             'FormSubmissionReview' => self::object([
                 'id' => self::int(),
                 'submission_id' => self::int(),

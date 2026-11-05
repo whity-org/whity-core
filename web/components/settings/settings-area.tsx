@@ -40,6 +40,7 @@ const GROUP_OF: Readonly<Record<string, GroupId>> = {
   security: 'security',
   sso: 'security',
   signup: 'security',
+  'public-forms': 'security',
   email: 'email',
   'email-domains': 'email',
   storage: 'data',

@@ -8,6 +8,7 @@ Welcome to the Whity Core documentation.
 - **[Whity CLI](Whity-CLI.md)** — Install and update a self-hosted Whity with one command
 - **[Architecture](Architecture.md)** — How a request flows through the worker, the plugin loader and the tenant context
 - **[Plugin Development](Plugin-Development.md)** — Build plugins
+- **[Public forms for plugins](Plugin-Public-Forms.md)** — Take anonymous form submissions with no proxy
 
 ## System documentation
 
