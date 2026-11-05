@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Whity\Storage;
 
+use Psr\Log\LoggerInterface;
 use Whity\Core\Settings\SettingsRegistry;
 use Whity\Core\Settings\SettingsService;
 use Whity\Storage\S3\S3Config;
@@ -96,6 +97,44 @@ final class StorageDriverFactory
         );
 
         return new S3StorageDriver($config, new StreamObjectHttpTransport());
+    }
+
+    /**
+     * The BOOT path (#1622): {@see fromSettings()}, but a configuration that
+     * cannot be built falls back to the local driver instead of throwing.
+     *
+     * The HTTP entry point builds the platform driver while every worker boots.
+     * A throw there killed each worker before it served a request, so the
+     * settings API — the one surface that could correct the value — was down
+     * with everything else, and only SQL on the database host recovered it.
+     * Here the failure is logged at CRITICAL with the reason, the instance
+     * comes up on local disk, and the admin can fix the setting.
+     *
+     * This accepts the split-backend hazard the class docblock describes, for
+     * as long as the setting stays broken, in exchange for a reachable
+     * instance; the critical log is what makes it visible. Paths where a
+     * silent backend switch would do damage instead of degrading (the upload
+     * sweep, which deletes rows) keep calling {@see fromSettings()} and fail.
+     *
+     * @param array<string, mixed> $env Environment map (bootstrap config + the S3 secret).
+     */
+    public static function fromSettingsOrLocal(
+        SettingsService $settings,
+        array $env,
+        string $defaultLocalRoot,
+        LoggerInterface $logger,
+    ): StorageDriverInterface {
+        try {
+            return self::fromSettings($settings, $env, $defaultLocalRoot);
+        } catch (StorageException $e) {
+            $logger->critical(
+                'Storage: the configured storage driver could not be built; falling back to LOCAL storage '
+                . 'until the storage.* settings are corrected in the admin. Reason: {reason}',
+                ['reason' => $e->getMessage(), 'fallback_root' => $defaultLocalRoot]
+            );
+
+            return new LocalStorageDriver($defaultLocalRoot);
+        }
     }
 
     /**

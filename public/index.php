@@ -3054,7 +3054,11 @@ $router->register('GET', '/api/subscription',                  [$subscriptionHan
 // split-backend hazard StorageDriverFactory's own docblock warns about. One
 // driver, built before anything that needs it.
 $storageRoot = getenv('STORAGE_ROOT') ?: (__DIR__ . '/../storage');
-$defaultStorageDriver = \Whity\Storage\StorageDriverFactory::fromSettings($settingsService, $_ENV, $storageRoot);
+// #1622: a storage configuration that cannot be built (an endpoint with no
+// scheme, s3 selected before the secret is in the environment) is logged at
+// CRITICAL and falls back to local disk instead of killing every worker — so
+// the settings API stays up to correct it.
+$defaultStorageDriver = \Whity\Storage\StorageDriverFactory::fromSettingsOrLocal($settingsService, $_ENV, $storageRoot, $logger);
 $storageResolver = new \Whity\Storage\TenantStorageResolver(
     $defaultStorageDriver,
     new \Whity\Storage\TenantStorageConfigRepository($db->getPdo()),
