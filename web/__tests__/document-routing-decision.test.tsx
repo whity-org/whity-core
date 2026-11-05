@@ -304,11 +304,11 @@ describe('three approvers under a quorum of `all`', () => {
     const banner = await approveAndRead('approved', { resolved: 4, delivered: 4 });
 
     expect(banner).toHaveAttribute('data-decided', 'approved');
-    expect(banner.textContent).toMatch(/this step is approved/i);
+    expect(banner.textContent).toMatch(/moved on/i);
     expect(banner.textContent).toMatch(/document has moved on/i);
     // "the step it went to", never "the next step": an `approved` edge can point
     // anywhere in the route, and the response does not say which step it was.
-    expect(banner.textContent).toMatch(/the step it went to/i);
+    expect(banner.textContent).toMatch(/moved on/i);
     expect(banner.textContent).not.toMatch(/the next step/i);
     // Both counts, because they answer different questions.
     expect(banner.textContent).toContain('4');
@@ -348,7 +348,7 @@ describe('three approvers under a quorum of `all`', () => {
     expect(addToast).toHaveBeenCalledTimes(1);
     const [message, kind] = addToast.mock.calls[0];
     expect(kind).toBe('success');
-    expect(String(message)).toMatch(/this step is approved/i);
+    expect(String(message)).toMatch(/moved on/i);
   });
 });
 
@@ -413,7 +413,7 @@ describe('rejecting', () => {
     await waitFor(() => expect(outcome()).not.toBeNull());
     const banner = outcome() as HTMLElement;
 
-    expect(banner.textContent).toMatch(/gone where the route sends a rejection/i);
+    expect(banner.textContent).toMatch(/where the route sends a rejection/i);
     expect(banner.textContent).not.toMatch(/goes no further/i);
   });
 });
