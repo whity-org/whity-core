@@ -60,6 +60,7 @@ describe('a refused list', () => {
     expect(await screen.findByText('You don’t have access to agents')).toBeInTheDocument();
     expect(screen.queryByText('The agents could not be loaded.')).toBeNull();
     expect(screen.queryByRole('button', { name: 'New agent' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
   });
 
   it('billing: no access and no "No invoices yet"', async () => {

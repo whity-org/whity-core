@@ -84,7 +84,8 @@ test.describe('Regular user (non-admin)', () => {
     // Try again and not an empty list (design 2.9, the access-denied state).
     await expect(page.getByText('You don’t have access to the people in this workspace')).toBeVisible();
     await expect(page.getByText('Failed to fetch users')).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible();
+    // Nothing to retry: the server answered, and the answer was no.
+    await expect(page.getByRole('button', { name: 'Try again' })).toHaveCount(0);
   });
 
   test('settings page is accessible and shows the user role', async ({ userPage, page }) => {
