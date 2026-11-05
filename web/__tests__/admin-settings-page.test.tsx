@@ -413,6 +413,39 @@ describe('AdminSettingsPage — plugin-declared settings (#713 item 1)', () => {
   });
 });
 
+describe('AdminSettingsPage — trusted plugin stores', () => {
+  const STORE_REGISTRY = [
+    ...REGISTRY,
+    { key: 'plugins.store_allowed_hosts', type: 'string', default: '' },
+  ];
+
+  it('offers the field, in plain words, to the platform operator and saves what they type', async () => {
+    setTenant(0);
+    grant('settings:read', 'settings:write', 'settings:manage');
+    routeGet(['site_name'], true, STORE_REGISTRY, { ...GLOBAL, 'plugins.store_allowed_hosts': '' });
+    render(<AdminSettingsPage />);
+
+    const section = await screen.findByTestId('settings-section-plugin-store');
+    // Not the raw key, and not under "Other settings".
+    expect(within(section).getByLabelText('Trusted plugin stores')).toBeInTheDocument();
+    expect(screen.queryByTestId('settings-section-other')).not.toBeInTheDocument();
+
+    fireEvent.change(within(section).getByLabelText('Trusted plugin stores'), {
+      target: { value: 'store.example.com' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /save platform defaults/i }));
+
+    await waitFor(() =>
+      expect(mockApiPatch).toHaveBeenCalledWith(
+        '/api/v1/settings/global',
+        expect.objectContaining({
+          body: { settings: { 'plugins.store_allowed_hosts': 'store.example.com' } },
+        })
+      )
+    );
+  });
+});
+
 describe('AdminSettingsPage — overridden vs inherited indicator', () => {
   it('marks overridden keys distinctly from inherited ones', async () => {
     grant('settings:read', 'settings:write');

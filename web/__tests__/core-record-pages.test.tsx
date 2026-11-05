@@ -223,6 +223,25 @@ describe('/admin/tenants/[id] — the workspace record', () => {
     expect(JSON.parse(patch![1].body)).toEqual({ name: 'Acme Widgets', slug: 'acme' });
   });
 
+  it('lets a workspace with no slug be renamed without inventing one', async () => {
+    params = { id: '7' };
+    grant(TENANTS_WRITE);
+    mockTenantBackend({ list: rawResponse(tenantPage([{ ...TENANT, slug: null }])) });
+    const user = userEvent.setup();
+
+    render(<TenantRecordPage />);
+    await screen.findByTestId('tenant-record');
+
+    await user.clear(screen.getByTestId('tenant-record-name'));
+    await user.type(screen.getByTestId('tenant-record-name'), 'Acme Widgets');
+    await user.click(screen.getByTestId('tenant-record-save'));
+
+    await waitFor(() => expect(rawApiClient.mock.calls.some((call) => call[1]?.method === 'PATCH')).toBe(true));
+    expect(screen.queryByTestId('tenant-record-slug-error')).not.toBeInTheDocument();
+    const patch = rawApiClient.mock.calls.find((call) => call[1]?.method === 'PATCH');
+    expect(JSON.parse(patch![1].body)).toEqual({ name: 'Acme Widgets' });
+  });
+
   it('refuses a slug the backend would accept but no URL should carry', async () => {
     params = { id: '7' };
     grant(TENANTS_WRITE);
