@@ -78,6 +78,42 @@ final class SessionsRealEngineTest extends TestCase
         self::assertTrue($sessions[0]['current']);
     }
 
+    /** WHIT-905: a refresh retires the access token it replaces. */
+    public function testRefreshRevokesTheAccessTokenItReplaces(): void
+    {
+        $this->seedProfile('a@example.com');
+        [$oldAccess, $refresh] = $this->login('a@example.com');
+        self::assertNotNull($this->validator()->validateAccessTokenFromBearer($oldAccess));
+
+        $refreshRes = $this->authHandler()->handleRefresh(
+            new Request('POST', '/api/auth/refresh', ['Authorization' => 'Bearer ' . $refresh, 'X-Auth-Mode' => 'token'])
+        );
+        self::assertSame(200, $refreshRes->getStatusCode(), $refreshRes->getBody());
+        $newAccess = (string) json_decode($refreshRes->getBody(), true)['access_token'];
+
+        self::assertNull($this->validator()->validateAccessTokenFromBearer($oldAccess), 'The replaced access token must stop working.');
+        self::assertNotNull($this->validator()->validateAccessTokenFromBearer($newAccess), 'The new access token must work.');
+    }
+
+    /** WHIT-905: after a refresh, signing out leaves no access token alive. */
+    public function testSigningOutAfterARefreshEndsEveryAccessToken(): void
+    {
+        $this->seedProfile('a@example.com');
+        [$oldAccess, $refresh] = $this->login('a@example.com');
+        $refreshRes = $this->authHandler()->handleRefresh(
+            new Request('POST', '/api/auth/refresh', ['Authorization' => 'Bearer ' . $refresh, 'X-Auth-Mode' => 'token'])
+        );
+        $newAccess = (string) json_decode($refreshRes->getBody(), true)['access_token'];
+
+        $logout = $this->authHandler()->handleLogout(
+            new Request('POST', '/api/auth/logout', ['Authorization' => 'Bearer ' . $newAccess, 'X-Auth-Mode' => 'token'])
+        );
+        self::assertSame(200, $logout->getStatusCode());
+
+        self::assertNull($this->validator()->validateAccessTokenFromBearer($oldAccess));
+        self::assertNull($this->validator()->validateAccessTokenFromBearer($newAccess));
+    }
+
     public function testRevokingASessionRejectsItsLiveAccessToken(): void
     {
         $this->seedProfile('a@example.com');

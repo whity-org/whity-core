@@ -75,6 +75,10 @@ final class SessionService
      * access token (so $matchJti is the current access_jti). Both jtis are
      * 128-bit-random platform-wide unique, so this never rotates the wrong row.
      *
+     * The access token being replaced is revoked too (WHIT-905). Otherwise it kept
+     * working until it expired, so signing out, which revokes only the tokens it
+     * is handed, left an older access token alive for up to 15 minutes.
+     *
      * @param string $matchJti  The caller's CURRENT access or refresh jti.
      * @param string $expiresAt 'Y-m-d H:i:s' of the new refresh token's expiry.
      */
@@ -84,6 +88,14 @@ final class SessionService
         string $newRefreshJti,
         string $expiresAt,
     ): bool {
+        // @tenant-guard-ignore: matched by the caller's own current jti (access OR refresh), unique platform-wide.
+        $previous = $this->db->prepare(
+            'SELECT access_jti FROM sessions
+              WHERE (refresh_jti = :match OR access_jti = :match) AND revoked_at IS NULL'
+        );
+        $previous->execute([':match' => $matchJti]);
+        $replacedAccessJti = $previous->fetchColumn();
+
         // @tenant-guard-ignore: matched by the caller's own current jti (access OR refresh) — each is a platform-wide UNIQUE handle, so it cannot touch another tenant's session row.
         $stmt = $this->db->prepare(
             'UPDATE sessions
@@ -97,8 +109,16 @@ final class SessionService
             ':expires_at'  => $expiresAt,
             ':match'       => $matchJti,
         ]);
+        $rotated = $stmt->rowCount() > 0;
 
-        return $stmt->rowCount() > 0;
+        if ($rotated && is_string($replacedAccessJti) && $replacedAccessJti !== '' && $replacedAccessJti !== $newAccessJti) {
+            // Kept until well past any access token's 15-minute life, then swept.
+            $this->db->prepare(
+                'INSERT INTO revoked_tokens (jti, expires_at) VALUES (?, ?) ON CONFLICT (jti) DO NOTHING'
+            )->execute([$replacedAccessJti, date('Y-m-d H:i:s', time() + 3600)]);
+        }
+
+        return $rotated;
     }
 
     /**
