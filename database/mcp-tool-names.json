@@ -267,9 +267,6 @@
     "en": "List permission delegations in your workspace",
     "ar": "عرض التفويضات"
   },
-  "get_api_deployments_status": {
-    "ar": "عرض حالة التثبيت الحالية"
-  },
   "get_api_document_background_issuing": {
     "en": "See which plugins can issue documents on their own",
     "ar": "عرض الإضافات التي تصدر مستندات من تلقاء نفسها"
@@ -983,13 +980,6 @@
   "post_api_delegations": {
     "en": "Delegate some of your permissions to someone",
     "ar": "تفويض بعض صلاحياتك لشخص آخر"
-  },
-  "post_api_deployments_apply": {
-    "en": "Install a new Whity deployment",
-    "ar": "تثبيت إصدار جديد من المنصة"
-  },
-  "post_api_deployments_rollback": {
-    "ar": "التراجع عن آخر تثبيت للمنصة"
   },
   "post_api_document_collections": {
     "en": "Create a document collection of your own",

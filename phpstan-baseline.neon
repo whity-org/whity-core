@@ -36,26 +36,6 @@ parameters:
 			path: src/Api/AdminApiHandler.php
 
 		-
-			message: "#^Parameter \\#1 \\$tenantId of method Whity\\\\Core\\\\Deployment\\\\DeploymentManager\\:\\:apply\\(\\) expects int, int\\|null given\\.$#"
-			count: 1
-			path: src/Api/DeploymentApiHandler.php
-
-		-
-			message: "#^Parameter \\#1 \\$tenantId of method Whity\\\\Core\\\\Deployment\\\\DeploymentManager\\:\\:getStatus\\(\\) expects int, int\\|null given\\.$#"
-			count: 1
-			path: src/Api/DeploymentApiHandler.php
-
-		-
-			message: "#^Parameter \\#1 \\$tenantId of method Whity\\\\Core\\\\Deployment\\\\DeploymentManager\\:\\:rollback\\(\\) expects int, int\\|null given\\.$#"
-			count: 1
-			path: src/Api/DeploymentApiHandler.php
-
-		-
-			message: "#^Parameter \\#1 \\$tenantId of method Whity\\\\Core\\\\Deployment\\\\DeploymentManager\\:\\:rollbackMigration\\(\\) expects int, int\\|null given\\.$#"
-			count: 1
-			path: src/Api/DeploymentApiHandler.php
-
-		-
 			message: "#^Argument of an invalid type array\\<int, string\\>\\|false supplied for foreach, only iterables are supported\\.$#"
 			count: 1
 			path: src/Api/MigrationsApiHandler.php
@@ -346,66 +326,6 @@ parameters:
 			message: "#^Method Whity\\\\Console\\\\GenerateOpenApiSchemaCommand\\:\\:execute\\(\\) has parameter \\$argv with no value type specified in iterable type array\\.$#"
 			count: 1
 			path: src/Console/GenerateOpenApiSchemaCommand.php
-
-		-
-			message: "#^Argument of an invalid type array\\<int, string\\>\\|false supplied for foreach, only iterables are supported\\.$#"
-			count: 2
-			path: src/Core/Deployment/DeploymentManager.php
-
-		-
-			message: "#^Method Whity\\\\Core\\\\Deployment\\\\DeploymentManager\\:\\:getStatus\\(\\) return type has no value type specified in iterable type array\\.$#"
-			count: 1
-			path: src/Core/Deployment/DeploymentManager.php
-
-		-
-			message: "#^Method class@anonymous/src/Core/Deployment/DeploymentManager\\.php\\:214\\:\\:__construct\\(\\) has parameter \\$pdo with no type specified\\.$#"
-			count: 1
-			path: src/Core/Deployment/DeploymentManager.php
-
-		-
-			message: "#^Method class@anonymous/src/Core/Deployment/DeploymentManager\\.php\\:214\\:\\:exec\\(\\) has no return type specified\\.$#"
-			count: 1
-			path: src/Core/Deployment/DeploymentManager.php
-
-		-
-			message: "#^Method class@anonymous/src/Core/Deployment/DeploymentManager\\.php\\:214\\:\\:exec\\(\\) has parameter \\$sql with no type specified\\.$#"
-			count: 1
-			path: src/Core/Deployment/DeploymentManager.php
-
-		-
-			message: "#^Method class@anonymous/src/Core/Deployment/DeploymentManager\\.php\\:214\\:\\:getPdo\\(\\) has no return type specified\\.$#"
-			count: 1
-			path: src/Core/Deployment/DeploymentManager.php
-
-		-
-			message: "#^Method class@anonymous/src/Core/Deployment/DeploymentManager\\.php\\:214\\:\\:query\\(\\) has no return type specified\\.$#"
-			count: 1
-			path: src/Core/Deployment/DeploymentManager.php
-
-		-
-			message: "#^Method class@anonymous/src/Core/Deployment/DeploymentManager\\.php\\:214\\:\\:query\\(\\) has parameter \\$params with no type specified\\.$#"
-			count: 1
-			path: src/Core/Deployment/DeploymentManager.php
-
-		-
-			message: "#^Method class@anonymous/src/Core/Deployment/DeploymentManager\\.php\\:214\\:\\:query\\(\\) has parameter \\$sql with no type specified\\.$#"
-			count: 1
-			path: src/Core/Deployment/DeploymentManager.php
-
-		-
-			message: "#^Parameter \\#1 \\$array of function array_diff expects array, array\\<int, string\\>\\|false given\\.$#"
-			count: 1
-			path: src/Core/Deployment/DeploymentManager.php
-
-		-
-			message: "#^Parameter \\#1 \\$array of function sort expects TArray of array\\<string\\>, array\\<int, string\\>\\|false given\\.$#"
-			count: 1
-			path: src/Core/Deployment/DeploymentManager.php
-
-		-
-			message: "#^Property class@anonymous/src/Core/Deployment/DeploymentManager\\.php\\:214\\:\\:\\$pdo has no type specified\\.$#"
-			count: 1
-			path: src/Core/Deployment/DeploymentManager.php
 
 		-
 			message: "#^Method Whity\\\\Core\\\\Hooks\\\\HookManager\\:\\:dispatch\\(\\) has parameter \\$data with no value type specified in iterable type array\\.$#"
@@ -828,13 +748,8 @@ parameters:
 			path: tests/Integration/AuthFlowTest.php
 
 		-
-			message: "#^Cannot call method fetchAll\\(\\) on PDOStatement\\|false\\.$#"
-			count: 1
-			path: tests/Integration/CrossTenantRejectionRealEngineTest.php
-
-		-
 			message: "#^Cannot call method fetchColumn\\(\\) on PDOStatement\\|false\\.$#"
-			count: 48
+			count: 44
 			path: tests/Integration/CrossTenantRejectionRealEngineTest.php
 
 		-
@@ -1191,36 +1106,6 @@ parameters:
 			message: "#^Anonymous function should return PDO but returns PDO\\|null\\.$#"
 			count: 1
 			path: tests/Unit/Core/Database/DatabaseConnectionPoolTest.php
-
-		-
-			message: "#^Method Tests\\\\Unit\\\\Core\\\\Deployment\\\\DeploymentManagerTest\\:\\:removeDirectory\\(\\) has no return type specified\\.$#"
-			count: 1
-			path: tests/Unit/Core/Deployment/DeploymentManagerTest.php
-
-		-
-			message: "#^Method Tests\\\\Unit\\\\Core\\\\Deployment\\\\DeploymentManagerTest\\:\\:removeDirectory\\(\\) has parameter \\$dir with no type specified\\.$#"
-			count: 1
-			path: tests/Unit/Core/Deployment/DeploymentManagerTest.php
-
-		-
-			message: "#^Parameter \\#1 \\$array of function array_diff expects array, array\\<int, string\\>\\|false given\\.$#"
-			count: 1
-			path: tests/Unit/Core/Deployment/DeploymentManagerTest.php
-
-		-
-			message: "#^Property Tests\\\\Unit\\\\Core\\\\Deployment\\\\DeploymentManagerTest\\:\\:\\$db has no type specified\\.$#"
-			count: 1
-			path: tests/Unit/Core/Deployment/DeploymentManagerTest.php
-
-		-
-			message: "#^Property Tests\\\\Unit\\\\Core\\\\Deployment\\\\DeploymentManagerTest\\:\\:\\$manager has no type specified\\.$#"
-			count: 1
-			path: tests/Unit/Core/Deployment/DeploymentManagerTest.php
-
-		-
-			message: "#^Property Tests\\\\Unit\\\\Core\\\\Deployment\\\\DeploymentManagerTest\\:\\:\\$storagePath has no type specified\\.$#"
-			count: 1
-			path: tests/Unit/Core/Deployment/DeploymentManagerTest.php
 
 		-
 			message: "#^Method class@anonymous/tests/Unit/Core/Tenant/TenantContextTest\\.php\\:470\\:\\:log\\(\\) has parameter \\$message with no type specified\\.$#"

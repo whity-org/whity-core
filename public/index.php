@@ -288,7 +288,6 @@ use Whity\Core\Mail\MailerFactory;
 use Whity\Api\RolesApiHandler;
 use Whity\Api\TenantsApiHandler;
 use Whity\Api\PermissionsApiHandler;
-use Whity\Api\DeploymentApiHandler;
 use Whity\Api\PluginsApiHandler;
 use Whity\Api\MigrationsApiHandler;
 use Whity\Api\AdminApiHandler;
@@ -320,7 +319,6 @@ use Whity\Core\RBAC\CorePermissions;
 use Whity\Core\Hooks\HookManager;
 use Whity\Core\Audit\AuditContext;
 use Whity\Core\Audit\AuditLogger;
-use Whity\Core\Deployment\DeploymentManager;
 use Whity\Core\Log\ErrorLogLogger;
 use Whity\Core\Tenant\TenantContext;
 use Whity\Auth\TotpService;
@@ -1493,7 +1491,6 @@ $pluginLoader = new PluginLoader(
 );
 
 // 9b. Initialize deployment manager
-$deploymentManager = new DeploymentManager($db->getPdo(), __DIR__ . '/../storage/deployments');
 
 // 10. Register authentication handler
 // Inject the shared $totpService (built at step 3b) so the login-path 2FA validation uses the
@@ -2312,11 +2309,6 @@ $router->register('GET', '/api/platform/version/latest', [$platformVersionHandle
 // exposes only route shapes (method/path/schema), never any tenant data.
 $openApiHandler = new OpenApiHandler($router, $pluginLoader);
 $router->registerUnversioned('GET', '/api/openapi.json', [$openApiHandler, 'handle']);
-
-$deploymentHandler = new DeploymentApiHandler($deploymentManager);
-$router->register('POST', '/api/deployments/apply', [$deploymentHandler, 'apply'], 'admin');
-$router->register('POST', '/api/deployments/rollback', [$deploymentHandler, 'rollback'], 'admin');
-$router->register('GET', '/api/deployments/status', [$deploymentHandler, 'status'], 'admin');
 
 // Plugins admin API (WC-9/PR #88, WC-10/PR #104). Pass the live $pluginLoader so
 // list/enable/disable use the WC-9 lifecycle at runtime. WC-218: each route is

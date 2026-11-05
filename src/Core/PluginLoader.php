@@ -2424,8 +2424,7 @@ class PluginLoader
     /**
      * Recursively remove a directory or single file.
      *
-     * Mirrors the pattern from DeploymentManager::removeRecursive(). Silently
-     * returns when the path does not exist.
+     * Silently returns when the path does not exist.
      *
      * @param string $path Absolute path to remove.
      */
