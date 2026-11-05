@@ -58,6 +58,19 @@ describe('parseWireDate', () => {
 })
 
 describe('formatDate / formatDateTime', () => {
+  it('reads a bare date in UTC, so it stays on its own day in a zone behind UTC', () => {
+    const format = jest.spyOn(Date.prototype, 'toLocaleDateString')
+    try {
+      expect(formatDate('2026-11-20', 'en-GB')).toBe('20 Nov 2026')
+      expect(format.mock.calls[0][1]).toMatchObject({ timeZone: 'UTC' })
+      format.mockClear()
+      formatDate('2026-11-20 23:30:00', 'en-GB')
+      expect(format.mock.calls[0][1]).not.toHaveProperty('timeZone')
+    } finally {
+      format.mockRestore()
+    }
+  })
+
   it('formats in the locale it is given, not the runtime default', () => {
     expect(formatDate('2026-08-25 14:02:11', 'en-GB')).toBe('25 Aug 2026')
     expect(formatDate('2026-08-25 14:02:11', 'en-US')).toBe('25 Aug 2026')

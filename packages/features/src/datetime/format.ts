@@ -105,8 +105,10 @@ function shortStyleLocale(locale: DateLocale): string {
  */
 export function formatDate(value: string | null | undefined, locale: DateLocale): string | null {
   const parsed = parseWireDate(value)
+  // A bare date names a day rather than an instant, so it stays that day in every zone.
+  const options = /^\d{4}-\d{2}-\d{2}$/.test((value ?? '').trim()) ? { ...SHORT_DATE, timeZone: 'UTC' } : SHORT_DATE
 
-  return parsed === null ? null : parsed.toLocaleDateString(shortStyleLocale(locale), SHORT_DATE)
+  return parsed === null ? null : parsed.toLocaleDateString(shortStyleLocale(locale), options)
 }
 
 /**

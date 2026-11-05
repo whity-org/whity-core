@@ -17,7 +17,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { Button } from '@whity/ui/button';
 import { Stepper } from '@whity/ui/stepper';
-import { answerDate } from '@whity/features/forms';
+import { useDateDisplay } from '@whity/features/datetime';
 import { useTranslation } from '@whity/features/i18n';
 import {
   FormField,
@@ -347,6 +347,7 @@ function ReviewAnswer({
   references?: Partial<Record<string, ReferenceOption[]>>;
 }) {
   const t = useTranslation('forms');
+  const { date } = useDateDisplay();
   const nothing = <span className="text-muted-foreground">{t('review.noAnswer', 'No answer')}</span>;
 
   if (field.field_type === 'checkbox') {
@@ -354,7 +355,7 @@ function ReviewAnswer({
   }
   if (value === undefined || value === '' || (Array.isArray(value) && value.length === 0)) return nothing;
   if (field.field_type === 'date' && typeof value === 'string' && value.trim() !== '') {
-    return <>{answerDate(value, preferArabic ? 'ar' : 'en')}</>;
+    return <>{date(value) ?? '—'}</>;
   }
   // The answer is an opaque reference, and the question itself shows the file's name.
   if (field.field_type === 'file') {
@@ -380,7 +381,7 @@ function ReviewAnswer({
                 const cell = row[column.key];
                 const label = localized(column.label, preferArabic) || column.key;
 
-                const shown = column.type === 'date' && typeof cell === 'string' ? answerDate(cell, preferArabic ? 'ar' : 'en') : String(cell);
+                const shown = column.type === 'date' && typeof cell === 'string' ? (date(cell) ?? '—') : String(cell);
 
                 return `${label}: ${cell === true ? t('field.yes', 'Yes') : shown}`;
               })

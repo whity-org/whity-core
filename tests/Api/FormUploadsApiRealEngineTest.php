@@ -552,7 +552,9 @@ final class FormUploadsApiRealEngineTest extends TestCase
         [$submissionId] = $this->sentPaper();
         $formId = $this->publishedFormWithFileField();
         $this->upload($formId, self::PAPER);
-        $unclaimed = (int) $this->pdo->query('SELECT MAX(id) FROM form_uploads')->fetchColumn();
+        $newest = $this->pdo->query('SELECT MAX(id) FROM form_uploads');
+        self::assertNotFalse($newest);
+        $unclaimed = (int) $newest->fetchColumn();
 
         self::assertSame(404, $this->downloadForOffice($submissionId, $unclaimed)->getStatusCode());
     }

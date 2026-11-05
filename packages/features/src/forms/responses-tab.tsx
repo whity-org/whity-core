@@ -11,7 +11,7 @@ import { useDateDisplay } from "../datetime"
 import { useTranslation } from "../i18n"
 import { useCurrentLanguage } from "./language"
 import { createFormsApi } from "./api"
-import { answerDate, pickText } from "./text"
+import { pickText } from "./text"
 import { ResponsesSummaryCards } from "./responses-summary"
 import type { FieldDraft, FormsScreenEnv, ResponsesSummary, SubmissionDetail, SubmissionFile, SubmissionRow } from "./types"
 
@@ -35,10 +35,10 @@ export function routingVariant(state: string | undefined): "success" | "secondar
 }
 
 /** An answer as one line of words. */
-export function answerText(field: Pick<FieldDraft, "field_type" | "options" | "validation">, value: unknown, language: string | null, yes: string, no: string): string {
+export function answerText(field: Pick<FieldDraft, "field_type" | "options" | "validation">, value: unknown, language: string | null, yes: string, no: string, date: (value: string) => string): string {
   if (value === null || value === undefined || value === "") return ""
   if (typeof value === "boolean") return value ? yes : no
-  if (field.field_type === "date" && typeof value === "string") return answerDate(value, language)
+  if (field.field_type === "date" && typeof value === "string") return date(value)
   const optionLabel = (raw: unknown): string => {
     const match = field.options.find((o) => o.value === String(raw))
     return match ? pickText(match.label, language) || String(raw) : String(raw)
@@ -142,7 +142,7 @@ export function ResponsesTab({ env, formId }: { env: FormsScreenEnv; formId: num
 export function ResponseDialog({ env, submissionId, mine = false, onClose }: { env: FormsScreenEnv; submissionId: number; mine?: boolean; onClose: () => void }) {
   const t = useTranslation("forms")
   const { currentLanguage } = useCurrentLanguage()
-  const { dateTime } = useDateDisplay()
+  const { date, dateTime } = useDateDisplay()
   const routingLabel = useRoutingLabel()
   const api = useMemo(() => createFormsApi(env.transport), [env.transport])
   const [detail, setDetail] = useState<SubmissionDetail | null>(null)
@@ -192,7 +192,7 @@ export function ResponseDialog({ env, submissionId, mine = false, onClose }: { e
                   {field.field_type === "file" && answers[field.field_key] ? (
                     <AttachedFiles base={filesBase} files={(detail.files ?? []).filter((file) => file.field_key === field.field_key)} />
                   ) : (
-                    answerText(field, answers[field.field_key], currentLanguage, t("responses.yes", "Yes"), t("responses.no", "No")) ||
+                    answerText(field, answers[field.field_key], currentLanguage, t("responses.yes", "Yes"), t("responses.no", "No"), (value) => date(value) ?? "—") ||
                     t("responses.noAnswer", "No answer")
                   )}
                 </dd>
