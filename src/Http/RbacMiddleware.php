@@ -65,7 +65,8 @@ class RbacMiddleware
         Request $request,
         callable $next,
         ?string $requiredRole = null,
-        ?string $requiredPermission = null
+        ?string $requiredPermission = null,
+        ?callable $recordAccess = null
     ): Response {
         // Fail-open: routes with no role/permission requirement are unprotected.
         if ($requiredRole === null && $requiredPermission === null) {
@@ -129,7 +130,10 @@ class RbacMiddleware
 
         // Enforce the required permission against the authoritative store.
         if ($requiredPermission !== null) {
-            if (!$this->roleChecker->hasPermissionForProfile($profileId, $requiredPermission, $tenantId)) {
+            // A route may pass a caller whose access comes from the record rather than
+            // a role (Router::allowRecordAccess). The answer for anyone else is unchanged.
+            if (!$this->roleChecker->hasPermissionForProfile($profileId, $requiredPermission, $tenantId)
+                && ($recordAccess === null || $recordAccess($profileId, $tenantId) !== true)) {
                 return $this->forbidden($requiredPermission);
             }
         }

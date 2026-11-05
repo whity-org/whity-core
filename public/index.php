@@ -3644,6 +3644,8 @@ $router->register('POST', '/api/documents',                                     
 $router->register('GET',  '/api/documents/{id:\d+}',                                   [$documentsHandler, 'show'],            null, null, CorePermissions::DOCUMENTS_READ);
 $router->register('GET',  '/api/documents/{id:\d+}/content',                           [$documentsHandler, 'content'],         null, null, CorePermissions::DOCUMENTS_READ);
 $router->register('GET',  '/api/documents/{id:\d+}/artifacts/{artifactId:\d+}/content', [$documentsHandler, 'artifactContent'], null, null, CorePermissions::DOCUMENTS_READ);
+// WHIT-902: a person a route reached can open that document with no documents:read.
+\Whity\Core\Document\RecipientDocumentAccess::allowOn($router, $routeRecipientRepository);
 $router->register('POST', '/api/documents/{id:\d+}/render',                            [$documentsHandler, 'rerender'],        null, null, CorePermissions::DOCUMENTS_ISSUE);
 
 // #1036: the document's verification code.
