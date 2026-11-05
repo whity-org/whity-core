@@ -133,8 +133,18 @@ export interface FormDraftRow {
   updated_at: string
 }
 
+/** A file somebody attached. Download it from the submission's `files/{id}` address. */
+export interface SubmissionFile {
+  id: number
+  field_key: string
+  content_type: string
+  byte_size: number
+  filename: string | null
+}
+
 export interface SubmissionDetail extends SubmissionRow {
   fields: FieldDraft[]
+  files?: SubmissionFile[]
   form_version_now: number | null
 }
 

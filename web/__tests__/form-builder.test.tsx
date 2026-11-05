@@ -3,6 +3,8 @@
  * The fixture is an intake form for Example Bakery, with invented questions.
  */
 
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
@@ -16,12 +18,14 @@ import {
   questionIndexIn,
   duplicateField,
   groupBySection,
+  KIND_ORDER,
   moveField,
   newField,
   relabel,
   removeField,
 } from '../../packages/features/src/forms/builder-model';
-import type { FieldDraft } from '../../packages/features/src/forms/types';
+import { fieldBody } from '../../packages/features/src/forms/api';
+import type { FieldDraft, FieldKind, FieldValidation } from '../../packages/features/src/forms/types';
 
 function draft(key: string, overrides: Partial<FieldDraft> = {}): FieldDraft {
   return {
@@ -42,6 +46,52 @@ function draft(key: string, overrides: Partial<FieldDraft> = {}): FieldDraft {
 }
 
 describe('builder model', () => {
+  const vectors = JSON.parse(
+    readFileSync(join(__dirname, '../../tests/Unit/Core/Form/question-body-vectors.json'), 'utf8')
+  ) as Record<string, Record<string, unknown>>;
+
+  /** A new question as an author finishes it: every wording filled in. */
+  function written(kind: FieldKind): FieldDraft {
+    const field = newField(kind, [], null);
+    const validation = field.validation as FieldValidation;
+    return {
+      ...field,
+      label: { en: 'Question', ar: 'سؤال' },
+      options: field.options.map((o) => ({ ...o, label: { en: 'Choice', ar: 'خيار' } })),
+      validation: Array.isArray(field.validation) || validation.columns === undefined
+        ? field.validation
+        : { ...validation, columns: validation.columns.map((c) => ({ ...c, label: { en: 'Column', ar: 'عمود' } })) },
+    };
+  }
+
+  it('holds every kind to the vectors the server runs', () => {
+    expect(Object.keys(vectors).sort()).toEqual([...KIND_ORDER].sort());
+  });
+
+  it.each([...KIND_ORDER])('sends a new %s question as the server keeps it, and sees no change when it comes back', (kind) => {
+    const sent = fieldBody(written(kind));
+    expect(sent).toEqual(vectors[kind]);
+    const back = { ...(vectors[kind] as unknown as FieldDraft), id: 3, help_text_i18n: [] as [], extra: 'server' };
+    expect(snapshot(fieldBody(back))).toBe(snapshot(sent));
+  });
+
+  it.each([...KIND_ORDER])('forgets what a %s question no longer uses', (kind) => {
+    const was: FieldDraft = {
+      ...written(kind),
+      label: { en: ' Question ', ar: 'سؤال ' },
+      help_text_i18n: { en: '  ' },
+      options: [{ value: 'kept', label: { en: 'Kept' } }],
+      validation: { ...(written(kind).validation as FieldValidation), pattern: ' ', minRows: 2 },
+    };
+    const body = fieldBody(was) as { label: unknown; help_text: unknown; options: unknown[]; validation: Record<string, unknown> };
+    expect(body.label).toEqual({ en: 'Question', ar: 'سؤال' });
+    expect(body.help_text).toBeNull();
+    expect(body.validation.pattern).toBeUndefined();
+    if (kind !== 'select' && kind !== 'multiselect') expect(body.options).toEqual([]);
+    if (kind !== 'repeating') expect(body.validation.columns).toBeUndefined();
+    if (kind !== 'repeating') expect(body.validation.minRows).toBeUndefined();
+  });
+
   it('gives a new question its own key and renames it from its wording until it is saved', () => {
     const fields = [draft('supplier')];
     const added = newField('text', fields, null);
@@ -151,6 +201,12 @@ const FORM = {
   public_closes_at: null,
   sections: [],
 };
+
+/** Selects the one saved question and gives back its English wording box. */
+async function screenLabel() {
+  await userEvent.click(await screen.findByText(/Supplier name/));
+  return screen.findByLabelText(/English/, { selector: '#q-label-en' });
+}
 
 function fakeEnv(calls: Array<{ method: string; path: string; body?: unknown }>, form: Record<string, unknown> = FORM): FormsScreenEnv {
   return {
@@ -291,6 +347,42 @@ describe('FormBuilderScreen', () => {
     await userEvent.type(await screen.findByLabelText(/English/, { selector: '#q-label-en' }), 'Delivery day');
     await waitFor(() => expect(calls.some((c) => c.method === 'PUT')).toBe(true), { timeout: 6000 });
   }, 12000);
+
+  it('saves a table of rows once, however differently the server words it back', async () => {
+    const calls: Array<{ method: string; path: string; body?: unknown }> = [];
+    const env = fakeEnv(calls);
+    const request = env.transport.request.bind(env.transport);
+    env.transport.request = (async (method: string, path: string, body?: unknown) => {
+      const reply = await request(method, path, body);
+      if (method !== 'PUT') return reply;
+      // Whatever a server adds to what it was sent is not somebody's edit.
+      const rows = (body as { fields: FieldDraft[] }).fields.map((f) => ({ ...f, id: 5, help_text_i18n: {}, label: { en: 'Worded by the server' }, validation: { ...f.validation, added: true } }));
+      return { status: 200, body: { data: rows } };
+    }) as typeof env.transport.request;
+    render(<FormBuilderScreen env={env} formId={7} canManage />);
+    await screen.findByText(/Supplier name/);
+    await userEvent.type(await screenLabel(), '!');
+    await waitFor(() => expect(calls.filter((c) => c.method === 'PUT')).toHaveLength(1), { timeout: 6000 });
+    await new Promise((resolve) => setTimeout(resolve, 3500));
+    expect(calls.filter((c) => c.method === 'PUT')).toHaveLength(1);
+  }, 15000);
+
+  it('tries a refused save once, and again only after the next edit', async () => {
+    const calls: Array<{ method: string; path: string; body?: unknown }> = [];
+    const env = fakeEnv(calls);
+    const request = env.transport.request.bind(env.transport);
+    env.transport.request = (async (method: string, path: string, body?: unknown) => {
+      const reply = await request(method, path, body);
+      return method === 'PUT' ? { status: 422, body: { error: 'Refused' } } : reply;
+    }) as typeof env.transport.request;
+    render(<FormBuilderScreen env={env} formId={7} canManage />);
+    await screen.findByText(/Supplier name/);
+    await userEvent.type(await screenLabel(), '!');
+    await waitFor(() => expect(calls.filter((c) => c.method === 'PUT')).toHaveLength(1), { timeout: 6000 });
+    await new Promise((resolve) => setTimeout(resolve, 3500));
+    expect(calls.filter((c) => c.method === 'PUT')).toHaveLength(1);
+    expect(env.notify).toHaveBeenCalledTimes(1);
+  }, 15000);
 
   it('collapses a section to its bar and opens it again', async () => {
     const withSections = { ...FORM, sections: [{ key: 's1', title: { en: 'Part one' }, description: {} }] };

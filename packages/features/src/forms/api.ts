@@ -1,5 +1,7 @@
 import type {
   FieldDraft,
+  FieldOption,
+  FieldValidation,
   FieldVocabulary,
   FormRow,
   FormSectionDef,
@@ -110,21 +112,76 @@ export function createFormsApi(transport: Transport) {
 
 export type FormsApi = ReturnType<typeof createFormsApi>
 
-/** The body the fields endpoint takes for one question. */
+/** Kinds whose choices the author writes, in a question or in a table's column. */
+const OPTION_KINDS: readonly string[] = ["select", "multiselect"]
+
+function cleanText(map: LocalizedMap | [] | undefined): LocalizedMap {
+  if (map === undefined || Array.isArray(map)) return {}
+  const clean: LocalizedMap = {}
+  for (const language of ["en", "ar"] as const) {
+    const text = map[language]?.trim()
+    if (text) clean[language] = text
+  }
+  return clean
+}
+
+function cleanOptions(kind: string, options: readonly FieldOption[] | undefined): FieldOption[] {
+  // Only a kind with written choices keeps them. Switching a choice question to text
+  // leaves its choices on the draft, so they can come back if it is switched again.
+  if (!OPTION_KINDS.includes(kind)) return []
+  return (options ?? []).map((option) => ({ value: option.value.trim(), label: cleanText(option.label) }))
+}
+
+function cleanNumber(value: unknown): unknown {
+  return typeof value === "string" && value.trim() !== "" && !Number.isNaN(Number(value)) ? Number(value) : value
+}
+
+function cleanValidation(kind: string, raw: FieldValidation | []): FieldValidation {
+  const source: FieldValidation = Array.isArray(raw) ? {} : raw
+  const clean: Record<string, unknown> = {}
+  for (const rule of ["min", "max", "maxLength"] as const) {
+    if (source[rule] !== undefined && source[rule] !== null) clean[rule] = cleanNumber(source[rule])
+  }
+  const pattern = source.pattern?.trim()
+  if (pattern) clean.pattern = pattern
+  if (source.maxFiles !== undefined && source.maxFiles !== null) clean.maxFiles = source.maxFiles
+  if (source.ou_type) clean.ou_type = source.ou_type
+  if (kind === "repeating") {
+    clean.columns = (source.columns ?? []).map((column) => ({
+      key: column.key,
+      type: column.type,
+      label: cleanText(column.label),
+      required: column.required === true,
+      options: cleanOptions(column.type, column.options),
+    }))
+    if (source.minRows !== undefined && source.minRows !== null) clean.minRows = source.minRows
+    if (source.maxRows !== undefined && source.maxRows !== null) clean.maxRows = source.maxRows
+  }
+  return clean as FieldValidation
+}
+
+/**
+ * The body the fields endpoint takes for one question, in the form the server stores.
+ *
+ * The builder compares these to see what changed, so a question typed here and the same
+ * question read back must come out identical, for every kind. Text is trimmed and empty
+ * languages dropped, choices belong only to kinds that have them, and a table's columns
+ * always state `required` and `options`. `question-body-vectors.json` holds the server
+ * and this function to one answer.
+ */
 export function fieldBody(field: FieldDraft): Record<string, unknown> {
-  const validation = Array.isArray(field.validation) ? {} : field.validation
-  const help = Array.isArray(field.help_text_i18n) ? {} : field.help_text_i18n
+  const help = cleanText(field.help_text_i18n)
   return {
     field_key: field.field_key,
     field_type: field.field_type,
-    label: field.label,
-    help_text: Object.values(help).some((v) => v) ? help : null,
-    is_required: field.is_required,
-    options: field.options,
-    validation,
-    prefill_source: field.prefill_source,
-    section_key: field.section_key,
-    visible_when: field.visible_when,
-    audience: field.audience,
+    label: cleanText(field.label),
+    help_text: Object.keys(help).length > 0 ? help : null,
+    is_required: field.is_required === true,
+    options: cleanOptions(field.field_type, field.options),
+    validation: cleanValidation(field.field_type, field.validation),
+    prefill_source: field.prefill_source ?? null,
+    section_key: field.section_key ?? null,
+    visible_when: field.visible_when ?? null,
+    audience: field.audience ?? "applicant",
   }
 }

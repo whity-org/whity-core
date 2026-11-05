@@ -48,9 +48,15 @@ function setUp(rows: unknown[], drafts: unknown[] = [], withdrawStatus = 200, wi
             status: 200,
             body: {
               data: {
-                ...row({ data: { supplier: 'Example Mill' } }),
+                ...row({ data: { supplier: 'Example Mill', delivery: '2026-11-20', licence: true } }),
                 form_version_now: 1,
-                fields: [{ field_key: 'supplier', field_type: 'text', label: { en: 'Supplier' }, options: [], validation: [] }],
+                fields: [
+                  { field_key: 'supplier', field_type: 'text', label: { en: 'Supplier' }, options: [], validation: [] },
+                  { field_key: 'delivery', field_type: 'date', label: { en: 'Delivery day' }, options: [], validation: [] },
+                  { field_key: 'licence', field_type: 'file', label: { en: 'Licence' }, options: [], validation: [] },
+                  { field_key: 'customs', field_type: 'text', label: { en: 'Customs number' }, options: [], validation: [], visible_when: { field: 'imports', equals: true } },
+                ],
+                files: [{ id: 31, field_key: 'licence', content_type: 'application/pdf', byte_size: 9, filename: 'licence.pdf' }],
               },
             },
           };
@@ -120,6 +126,10 @@ describe('My submissions', () => {
     await userEvent.click(await screen.findByText('SUP-0005'));
 
     expect(await screen.findByText('Example Mill')).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Download licence.pdf' }).getAttribute('href')).toBe('/api/v1/me/form-submissions/5/files/31');
+    expect(screen.getByText('20 Nov 2026')).toBeTruthy();
+    // A question its rule hid wasn't asked, so it isn't reported as unanswered.
+    expect(screen.queryByText('Customs number')).toBeNull();
     expect(calls).toContainEqual(['GET', '/api/v1/me/form-submissions/5']);
     expect(calls.some(([, path]) => path.startsWith('/api/v1/form-submissions/'))).toBe(false);
   });

@@ -174,6 +174,8 @@ final class FormUploadsApiRealEngineTest extends TestCase
             $this->fields,
             $submissionRepository,
             $issuer,
+            $this->uploadRows,
+            $this->storage,
         );
         $this->public = new PublicFormsApiHandler(
             $this->forms,
@@ -463,6 +465,138 @@ final class FormUploadsApiRealEngineTest extends TestCase
      * policy at all, and that the refusal is a 422 with a sentence rather than a
      * parser error or an ini failure.
      */
+    /**
+     * A sent paper and the submission it is on.
+     *
+     * @return array{0: int, 1: int}
+     */
+    private function sentPaper(int $tenantId = self::TENANT, string $paper = self::PAPER): array
+    {
+        $formId = $this->publishedFormWithFileField(null, $tenantId);
+        $reference = $this->upload($formId, $paper, $tenantId);
+        $response = $this->submit($formId, ['title' => 'On sandstone', 'paper' => $reference], $tenantId);
+        self::assertSame(201, $response->getStatusCode(), (string) $response->getBody());
+        $submissionId = (int) self::data($response)['id'];
+        $uploadId = $this->uploadRows->forSubmission($tenantId, $submissionId)[0]['id'];
+
+        return [$submissionId, $uploadId];
+    }
+
+    private function downloadMine(int $submissionId, int $fileId, int $profileId = self::APPLICANT): Response
+    {
+        $request = new Request('GET', '/x');
+        $request->user = (object) ['profile_id' => $profileId];
+
+        return $this->submissions->myFileContent($request, ['id' => (string) $submissionId, 'fileId' => (string) $fileId]);
+    }
+
+    private function downloadForOffice(int $submissionId, int $fileId): Response
+    {
+        return $this->submissions->fileContent(new Request('GET', '/x'), ['id' => (string) $submissionId, 'fileId' => (string) $fileId]);
+    }
+
+    public function testTheSenderDownloadsWhatTheyAttachedAsAnAttachment(): void
+    {
+        [$submissionId, $fileId] = $this->sentPaper();
+
+        $response = $this->downloadMine($submissionId, $fileId);
+
+        self::assertSame(200, $response->getStatusCode(), (string) $response->getBody());
+        self::assertSame(self::PAPER, (string) $response->getBody());
+        $headers = array_change_key_case($response->getHeaders());
+        self::assertSame('application/pdf', $headers['content-type']);
+        self::assertStringStartsWith('attachment; filename="paper.pdf"', $headers['content-disposition']);
+        self::assertSame('nosniff', $headers['x-content-type-options']);
+        self::assertSame('private, no-store', $headers['cache-control']);
+    }
+
+    public function testSomebodyWhoCanReadResponsesDownloadsIt(): void
+    {
+        [$submissionId, $fileId] = $this->sentPaper();
+
+        $response = $this->downloadForOffice($submissionId, $fileId);
+
+        self::assertSame(200, $response->getStatusCode(), (string) $response->getBody());
+        self::assertSame(self::PAPER, (string) $response->getBody());
+    }
+
+    public function testAnotherMembersPaperIsTheSameAsNoneAtAll(): void
+    {
+        [$submissionId, $fileId] = $this->sentPaper();
+
+        self::assertSame(404, $this->downloadMine($submissionId, $fileId, self::SECOND_MEMBER)->getStatusCode());
+        self::assertSame(404, $this->downloadMine($submissionId, $fileId + 1000)->getStatusCode());
+    }
+
+    public function testAnotherWorkspaceCannotReachItByEitherRoute(): void
+    {
+        [$submissionId, $fileId] = $this->sentPaper();
+
+        $this->enterTenant(self::OTHER_TENANT);
+
+        self::assertSame(404, $this->downloadForOffice($submissionId, $fileId)->getStatusCode());
+        self::assertSame(404, $this->downloadMine($submissionId, $fileId)->getStatusCode());
+    }
+
+    public function testAFileIdIsNotACapabilityThroughAnotherSubmission(): void
+    {
+        [$first] = $this->sentPaper();
+        [, $otherFile] = $this->sentPaper();
+
+        self::assertSame(404, $this->downloadForOffice($first, $otherFile)->getStatusCode());
+        self::assertSame(404, $this->downloadMine($first, $otherFile)->getStatusCode());
+    }
+
+    public function testAnUploadNobodySubmittedCannotBeDownloaded(): void
+    {
+        [$submissionId] = $this->sentPaper();
+        $formId = $this->publishedFormWithFileField();
+        $this->upload($formId, self::PAPER);
+        $newest = $this->pdo->query('SELECT MAX(id) FROM form_uploads');
+        self::assertNotFalse($newest);
+        $unclaimed = (int) $newest->fetchColumn();
+
+        self::assertSame(404, $this->downloadForOffice($submissionId, $unclaimed)->getStatusCode());
+    }
+
+    public function testAFileOnAStaffQuestionIsTheOfficesAndNotTheSenders(): void
+    {
+        $formId = $this->publishedFormWithFileField();
+        $this->fields->create(self::TENANT, $formId, 'office_copy', FieldType::FILE, ['en' => 'Office copy'], null, false, [], [], null, null, null, null, FormFieldRepository::AUDIENCE_STAFF);
+        $reference = $this->upload($formId, self::PAPER);
+        $submissionId = (new FormSubmissionRepository($this->pdo))->create(self::TENANT, $formId, 1, self::APPLICANT, null, ['office_copy' => $reference]);
+        $this->uploadRows->claim(self::TENANT, $formId, $reference, self::APPLICANT, $submissionId);
+        $fileId = $this->uploadRows->forSubmission(self::TENANT, $submissionId)[0]['id'];
+
+        self::assertSame(200, $this->downloadForOffice($submissionId, $fileId)->getStatusCode());
+        self::assertSame(404, $this->downloadMine($submissionId, $fileId)->getStatusCode());
+    }
+
+    public function testThePagesListTheFilesWithoutSayingWhereTheyAreStored(): void
+    {
+        [$submissionId, $fileId] = $this->sentPaper();
+        $request = new Request('GET', '/x');
+        $request->user = (object) ['profile_id' => self::APPLICANT];
+
+        $mine = $this->submissions->showMine($request, ['id' => (string) $submissionId]);
+        $office = $this->submissions->show(new Request('GET', '/x'), ['id' => (string) $submissionId]);
+
+        self::assertStringNotContainsString('form-uploads', (string) $mine->getBody());
+        foreach ([$mine, $office] as $response) {
+            $file = self::data($response)['files'][0];
+            self::assertSame(['id' => $fileId, 'field_key' => 'paper', 'content_type' => 'application/pdf', 'byte_size' => strlen(self::PAPER), 'filename' => 'paper.pdf'], $file);
+        }
+    }
+
+    public function testBytesThatCannotBeReadAreUnavailableRatherThanMissing(): void
+    {
+        [$submissionId, $fileId] = $this->sentPaper();
+        $key = $this->uploadRows->forSubmission(self::TENANT, $submissionId)[0]['storage_key'];
+        $this->storage->delete($key);
+
+        self::assertSame(503, $this->downloadForOffice($submissionId, $fileId)->getStatusCode());
+    }
+
     public function testAnOversizedUploadIsRefusedByTheEndpoint(): void
     {
         $slug = $this->openPublicLink($this->publishedFormWithFileField());

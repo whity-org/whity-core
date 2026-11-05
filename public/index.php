@@ -4033,7 +4033,9 @@ $formSubmissionsHandler = new \Whity\Api\FormSubmissionsApiHandler(
     $formRepository,
     $formFieldRepository,
     $formSubmissionRepository,
-    $submissionIssuer
+    $submissionIssuer,
+    $formUploadRepository,
+    $storageDriver
 );
 $formSubmissionReviewsHandler = new \Whity\Api\FormSubmissionReviewsApiHandler(
     $formFieldRepository,
@@ -4044,6 +4046,7 @@ $formSubmissionReviewsHandler = new \Whity\Api\FormSubmissionReviewsApiHandler(
 $router->register('POST', '/api/forms/{id:\d+}/submissions', [$formSubmissionsHandler, 'submit'], null, null, CorePermissions::FORMS_SUBMIT);
 $router->register('GET', '/api/form-submissions', [$formSubmissionsHandler, 'list'], null, null, CorePermissions::FORMS_READ);
 $router->register('GET', '/api/form-submissions/{id:\d+}', [$formSubmissionsHandler, 'show'], null, null, CorePermissions::FORMS_READ);
+$router->register('GET', '/api/form-submissions/{id:\d+}/files/{fileId:\d+}', [$formSubmissionsHandler, 'fileContent'], null, null, CorePermissions::FORMS_READ);
 // The office's record on a submission (migration 194). Somebody who can read a
 // submission can read what became of it; recording takes `forms:review`.
 $router->register('GET', '/api/form-submissions/{id:\d+}/review', [$formSubmissionReviewsHandler, 'show'], null, null, CorePermissions::FORMS_READ);
@@ -4064,6 +4067,7 @@ $router->register('POST', '/api/form-submissions/{id:\d+}/review', [$formSubmiss
 // opened to them holds none.
 $router->register('GET', '/api/me/form-submissions', [$formSubmissionsHandler, 'listMine'], null);
 $router->register('GET', '/api/me/form-submissions/{id:\d+}', [$formSubmissionsHandler, 'showMine'], null);
+$router->register('GET', '/api/me/form-submissions/{id:\d+}/files/{fileId:\d+}', [$formSubmissionsHandler, 'myFileContent'], null);
 $formSubmissionWithdrawalHandler = new \Whity\Api\FormSubmissionWithdrawalApiHandler(
     $db->getPdo(),
     $formSubmissionRepository,

@@ -1,0 +1,3 @@
+- **A new table question no longer saves itself forever.** The form builder compares what it holds with what the server last accepted, so a question the server stores slightly differently stops looking changed, and Preview becomes available again.
+- **A refused save is tried once.** It waits for your next edit instead of repeating the same message every few seconds.
+- **Reading a form is clearer.** Date answers read as 20 Nov 2026 on the review step and on a response, a question hidden by its rule no longer says "No answer", the rule on a question shows the choice in your language, and the Add question menu no longer overlaps at narrower widths.

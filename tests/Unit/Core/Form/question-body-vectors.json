@@ -1,0 +1,223 @@
+{
+  "text": {
+    "field_key": "question",
+    "field_type": "text",
+    "label": {
+      "en": "Question",
+      "ar": "سؤال"
+    },
+    "help_text": null,
+    "is_required": false,
+    "options": [],
+    "validation": {},
+    "prefill_source": null,
+    "section_key": null,
+    "visible_when": null,
+    "audience": "applicant"
+  },
+  "textarea": {
+    "field_key": "question",
+    "field_type": "textarea",
+    "label": {
+      "en": "Question",
+      "ar": "سؤال"
+    },
+    "help_text": null,
+    "is_required": false,
+    "options": [],
+    "validation": {},
+    "prefill_source": null,
+    "section_key": null,
+    "visible_when": null,
+    "audience": "applicant"
+  },
+  "number": {
+    "field_key": "question",
+    "field_type": "number",
+    "label": {
+      "en": "Question",
+      "ar": "سؤال"
+    },
+    "help_text": null,
+    "is_required": false,
+    "options": [],
+    "validation": {},
+    "prefill_source": null,
+    "section_key": null,
+    "visible_when": null,
+    "audience": "applicant"
+  },
+  "date": {
+    "field_key": "question",
+    "field_type": "date",
+    "label": {
+      "en": "Question",
+      "ar": "سؤال"
+    },
+    "help_text": null,
+    "is_required": false,
+    "options": [],
+    "validation": {},
+    "prefill_source": null,
+    "section_key": null,
+    "visible_when": null,
+    "audience": "applicant"
+  },
+  "checkbox": {
+    "field_key": "question",
+    "field_type": "checkbox",
+    "label": {
+      "en": "Question",
+      "ar": "سؤال"
+    },
+    "help_text": null,
+    "is_required": false,
+    "options": [],
+    "validation": {},
+    "prefill_source": null,
+    "section_key": null,
+    "visible_when": null,
+    "audience": "applicant"
+  },
+  "file": {
+    "field_key": "question",
+    "field_type": "file",
+    "label": {
+      "en": "Question",
+      "ar": "سؤال"
+    },
+    "help_text": null,
+    "is_required": false,
+    "options": [],
+    "validation": {},
+    "prefill_source": null,
+    "section_key": null,
+    "visible_when": null,
+    "audience": "applicant"
+  },
+  "profile_ref": {
+    "field_key": "question",
+    "field_type": "profile_ref",
+    "label": {
+      "en": "Question",
+      "ar": "سؤال"
+    },
+    "help_text": null,
+    "is_required": false,
+    "options": [],
+    "validation": {},
+    "prefill_source": null,
+    "section_key": null,
+    "visible_when": null,
+    "audience": "applicant"
+  },
+  "ou_ref": {
+    "field_key": "question",
+    "field_type": "ou_ref",
+    "label": {
+      "en": "Question",
+      "ar": "سؤال"
+    },
+    "help_text": null,
+    "is_required": false,
+    "options": [],
+    "validation": {},
+    "prefill_source": null,
+    "section_key": null,
+    "visible_when": null,
+    "audience": "applicant"
+  },
+  "signature": {
+    "field_key": "question",
+    "field_type": "signature",
+    "label": {
+      "en": "Question",
+      "ar": "سؤال"
+    },
+    "help_text": null,
+    "is_required": false,
+    "options": [],
+    "validation": {},
+    "prefill_source": null,
+    "section_key": null,
+    "visible_when": null,
+    "audience": "applicant"
+  },
+  "select": {
+    "field_key": "question",
+    "field_type": "select",
+    "label": {
+      "en": "Question",
+      "ar": "سؤال"
+    },
+    "help_text": null,
+    "is_required": false,
+    "options": [
+      {
+        "value": "choice",
+        "label": {
+          "en": "Choice",
+          "ar": "خيار"
+        }
+      }
+    ],
+    "validation": {},
+    "prefill_source": null,
+    "section_key": null,
+    "visible_when": null,
+    "audience": "applicant"
+  },
+  "multiselect": {
+    "field_key": "question",
+    "field_type": "multiselect",
+    "label": {
+      "en": "Question",
+      "ar": "سؤال"
+    },
+    "help_text": null,
+    "is_required": false,
+    "options": [
+      {
+        "value": "choice",
+        "label": {
+          "en": "Choice",
+          "ar": "خيار"
+        }
+      }
+    ],
+    "validation": {},
+    "prefill_source": null,
+    "section_key": null,
+    "visible_when": null,
+    "audience": "applicant"
+  },
+  "repeating": {
+    "field_key": "question",
+    "field_type": "repeating",
+    "label": {
+      "en": "Question",
+      "ar": "سؤال"
+    },
+    "help_text": null,
+    "is_required": false,
+    "options": [],
+    "validation": {
+      "columns": [
+        {
+          "key": "column_1",
+          "type": "text",
+          "label": {
+            "en": "Column",
+            "ar": "عمود"
+          },
+          "required": false,
+          "options": []
+        }
+      ]
+    },
+    "prefill_source": null,
+    "section_key": null,
+    "visible_when": null,
+    "audience": "applicant"
+  }
+}
