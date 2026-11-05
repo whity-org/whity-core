@@ -10,6 +10,8 @@ interface RevokeAiPrincipalModalProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   principal: AiPrincipal;
+  /** The caller's own connection: the route anyone signed in may use, not the admin one. */
+  own?: boolean;
   onSuccess: () => void;
 }
 
@@ -17,6 +19,7 @@ export function RevokeAiPrincipalModal({
   isOpen,
   onOpenChange,
   principal,
+  own = false,
   onSuccess,
 }: RevokeAiPrincipalModalProps) {
   const { apiClient } = useAuth();
@@ -26,7 +29,7 @@ export function RevokeAiPrincipalModal({
   const handleRevoke = async () => {
     try {
       const response = await apiClient(
-        `/api/v1/admin/mcp/tokens/${principal.jti}`,
+        `/api/v1/${own ? '' : 'admin/'}mcp/tokens/${principal.jti}`,
         { method: 'DELETE' }
       );
 
