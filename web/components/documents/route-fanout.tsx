@@ -45,6 +45,7 @@
  * rows has recreated the problem the rule exists to avoid.
  */
 
+import { humanizeCode } from '@/lib/plain-words';
 import { useMemo, useState } from 'react';
 import { IconCheck } from '@tabler/icons-react';
 import { Badge } from '@whity/ui/badge';
@@ -143,12 +144,20 @@ export function describeStepRule(
       ? null
       : (roleNames.get(roleId) ?? t('routing.role.byId', 'A role', { id: roleId }));
 
+  // Kinds that name no single role read as a sentence, never as their code.
+  if (step.rule_kind === 'explicit') {
+    return t('routing.rule.kind.explicit', 'Specific people, chosen by name');
+  }
+  if (step.rule_kind === 'group') {
+    return t('routing.rule.kind.group', 'Everyone in a user group');
+  }
+
   if (roleName === null) {
     // A kind this client does not know how to describe. Its OWN key is the
     // honest answer — it is what the author picked and what the engine will
     // resolve — rather than a generic "custom rule", which would hide which
-    // rule a route actually names.
-    return step.rule_kind;
+    // rule a route actually names. Shown as words, not as the stored code.
+    return humanizeCode(step.rule_kind);
   }
 
   if (step.rule_kind === 'role_below_actor') {

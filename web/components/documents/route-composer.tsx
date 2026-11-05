@@ -146,6 +146,7 @@ import {
 } from '@whity/ui/audience-people-picker';
 import { IconArrowDown, IconArrowUp, IconPlus, IconTrash } from '@tabler/icons-react';
 import { useTranslation } from '@whity/features/i18n';
+import { reachText } from './route-act-panel';
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/lib/toast-context';
 import type { DraftStep, IssueRouteResponse, RoutingRule } from './routing-wire';
@@ -595,8 +596,8 @@ export function RouteComposer({
             )
           : t(
               'routing.compose.issued',
-              'Route created. Its first step resolved to {resolved} people and reached {delivered}.',
-              { resolved, delivered }
+              'Route created. The first step reached {people}.',
+              { people: reachText(t, resolved, delivered) }
             ),
         resolved === 0 ? 'error' : 'success'
       );
@@ -728,7 +729,7 @@ export function RouteComposer({
         <AlertDescription>
           {t(
             'routing.compose.preview.contract',
-            'Each step names a RULE, not people. Who it reaches is worked out when the document is sent — and for every step after the first, relative to whoever forwards it. You will be told how many people the first step reached as soon as the route is created.'
+            'Each step says who it is for, such as a role, not particular people. Who that is gets worked out when the document is sent. You will be told how many people the first step reached as soon as the route is created.'
           )}
         </AlertDescription>
       </Alert>

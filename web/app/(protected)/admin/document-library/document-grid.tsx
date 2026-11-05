@@ -1,6 +1,7 @@
 'use client';
 
 import { useTranslation } from '@whity/features/i18n';
+import { formNameFrom } from '@/lib/documents/template-name';
 import { useDateDisplay } from '@whity/features/datetime';
 import { Badge } from '@whity/ui/badge';
 import { Button } from '@whity/ui/button';
@@ -139,7 +140,7 @@ export function DocumentGrid({
                   <DocumentTitle row={row} lines={2} />
                 </div>
                 <p dir="auto" className="truncate text-xs text-muted-foreground">
-                  {row.template_name}
+                  {(formNameFrom(row.template_name) !== null ? t('organizer.template.fromForm', 'Form: {name}', { name: formNameFrom(row.template_name) ?? '' }) : row.template_name)}
                   {(row.withdrawn_at ?? null) !== null && (
                     <Badge variant="destructive" className="ms-2">
                       {t('organizer.table.withdrawn', 'Withdrawn')}

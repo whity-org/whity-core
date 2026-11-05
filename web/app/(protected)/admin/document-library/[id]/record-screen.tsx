@@ -85,6 +85,7 @@ import {
 } from '@whity/features/record';
 import type { RecordFactsFn, RecordSectionSpec } from '@whity/features/record';
 import { useTranslation } from '@whity/features/i18n';
+import { formNameFrom } from '@/lib/documents/template-name';
 import { Tabs, TabsList, TabsTrigger } from '@whity/ui/tabs';
 import { Alert, AlertDescription, AlertTitle } from '@whity/ui/alert';
 import { Button } from '@whity/ui/button';
@@ -293,6 +294,9 @@ export function DocumentRecordScreen({ documentId, onBack }: DocumentRecordScree
   const t = useTranslation('documents');
   const dates = useDateDisplay();
   const [trailPage, setTrailPage] = useState(FIRST_PAGE);
+  // Bumped when the Routing tab changes who holds the document, so the Awaiting
+  // tile and the names beside it are read again.
+  const [routingVersion, setRoutingVersion] = useState(0);
   // The address names the tab (`?tab=routing`), so a link and the old
   // circulation address land on it. The tab body only renders once the record
   // has loaded, so reading it here cannot disagree with the server render.
@@ -419,7 +423,7 @@ export function DocumentRecordScreen({ documentId, onBack }: DocumentRecordScree
       const body = (await response.json()) as { data?: RouteRecipient[] };
       return body.data ?? [];
     },
-    [documentId, recipientsVisible],
+    [documentId, recipientsVisible, routingVersion],
     t('record.error.recipients', 'Failed to load who has this document')
   );
 
@@ -460,7 +464,7 @@ export function DocumentRecordScreen({ documentId, onBack }: DocumentRecordScree
         unitsAvailable: unitsResult.complete,
       };
     },
-    [documentId],
+    [documentId, routingVersion],
     t('record.error.directory', 'Failed to load names')
   );
 
@@ -535,7 +539,7 @@ export function DocumentRecordScreen({ documentId, onBack }: DocumentRecordScree
 
   const fields: DocumentRecordFields = {
     title: record.title,
-    templateName: record.template_name,
+    templateName: (formNameFrom(record.template_name) !== null ? t('organizer.template.fromForm', 'Form: {name}', { name: formNameFrom(record.template_name) ?? '' }) : record.template_name),
     createdAt: record.created_at,
     versionCount: record.artifacts.length,
     raisedBy:
@@ -682,7 +686,7 @@ export function DocumentRecordScreen({ documentId, onBack }: DocumentRecordScree
       documentId={record.id}
       documentTitle={record.title}
       withdrawn={withdrawn}
-      onChanged={() => undefined}
+      onChanged={() => setRoutingVersion((v) => v + 1)}
     />
   );
   const routingSection: RecordSectionSpec = {
