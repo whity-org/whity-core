@@ -3075,6 +3075,7 @@ class PluginLoader
                     label: $slot->label,
                     recordType: $slot->recordType,
                     kinds: $slot->kinds,
+                    numbering: $slot->numbering,
                 );
             }
             $slotRegistry->register($owner, $slots);

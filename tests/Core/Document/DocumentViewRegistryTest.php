@@ -718,9 +718,9 @@ final class DocumentViewRegistryTest extends TestCase
         );
 
         self::assertSame(
-            // Everything except the two the REQUEST supplies, which
-            // withRequestScope exists to replace rather than to preserve.
-            array_values(array_diff($declared, ['restrictToCreator', 'search'])),
+            // Everything except what the REQUEST supplies, which withRequestScope
+            // and withIssueFilters exist to replace rather than to preserve.
+            array_values(array_diff($declared, ['restrictToCreator', 'search', 'recordType', 'recordId', 'sourceId', 'slot'])),
             array_keys(self::viewSlots(DocumentCriteria::unfiltered())),
             'DocumentCriteria gained or lost a view slot; viewSlots() must list every one, in order'
         );

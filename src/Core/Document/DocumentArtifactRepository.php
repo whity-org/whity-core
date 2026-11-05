@@ -49,14 +49,14 @@ final class DocumentArtifactRepository
      * so the two halves of the immutability guarantee fail independently.
      *
      * @param array{document_id: int, storage_key: string, content_type: string,
-     *              byte_size: int, checksum_sha256: string, rendered_by?: ?int} $rec
+     *              byte_size: int, checksum_sha256: string, rendered_by?: ?int, pages?: ?int} $rec
      */
     public function create(int $tenantId, array $rec): int
     {
         $stmt = $this->db->prepare(
             'INSERT INTO document_artifacts
-                 (tenant_id, document_id, storage_key, content_type, byte_size, checksum_sha256, rendered_by, rendered_at)
-             VALUES (:tenant_id, :document_id, :storage_key, :content_type, :byte_size, :checksum_sha256, :rendered_by, NOW())'
+                 (tenant_id, document_id, storage_key, content_type, byte_size, checksum_sha256, rendered_by, pages, rendered_at)
+             VALUES (:tenant_id, :document_id, :storage_key, :content_type, :byte_size, :checksum_sha256, :rendered_by, :pages, NOW())'
         );
         $stmt->execute([
             ':tenant_id'       => $tenantId,
@@ -66,6 +66,7 @@ final class DocumentArtifactRepository
             ':byte_size'       => $rec['byte_size'],
             ':checksum_sha256' => $rec['checksum_sha256'],
             ':rendered_by'     => $rec['rendered_by'] ?? null,
+            ':pages'           => $rec['pages'] ?? null,
         ]);
 
         return (int) $this->db->lastInsertId();
@@ -84,7 +85,7 @@ final class DocumentArtifactRepository
     public function listForDocument(int $documentId, int $tenantId): array
     {
         $stmt = $this->db->prepare(
-            'SELECT id, tenant_id, document_id, storage_key, content_type, byte_size, checksum_sha256, rendered_by, rendered_at
+            'SELECT id, tenant_id, document_id, storage_key, content_type, byte_size, checksum_sha256, rendered_by, pages, rendered_at
              FROM document_artifacts
              WHERE tenant_id = :tenant_id AND document_id = :document_id
              ORDER BY id DESC'
@@ -109,7 +110,7 @@ final class DocumentArtifactRepository
     public function findLatestForDocument(int $documentId, int $tenantId): ?array
     {
         $stmt = $this->db->prepare(
-            'SELECT id, tenant_id, document_id, storage_key, content_type, byte_size, checksum_sha256, rendered_by, rendered_at
+            'SELECT id, tenant_id, document_id, storage_key, content_type, byte_size, checksum_sha256, rendered_by, pages, rendered_at
              FROM document_artifacts
              WHERE tenant_id = :tenant_id AND document_id = :document_id
              ORDER BY id DESC LIMIT 1'
@@ -132,7 +133,7 @@ final class DocumentArtifactRepository
     public function findById(int $id, int $documentId, int $tenantId): ?array
     {
         $stmt = $this->db->prepare(
-            'SELECT id, tenant_id, document_id, storage_key, content_type, byte_size, checksum_sha256, rendered_by, rendered_at
+            'SELECT id, tenant_id, document_id, storage_key, content_type, byte_size, checksum_sha256, rendered_by, pages, rendered_at
              FROM document_artifacts
              WHERE id = :id AND document_id = :document_id AND tenant_id = :tenant_id'
         );
@@ -158,6 +159,9 @@ final class DocumentArtifactRepository
             'checksum_sha256' => (string) $row['checksum_sha256'],
             'rendered_by'     => $row['rendered_by'] !== null ? (int) $row['rendered_by'] : null,
             'rendered_at'     => (string) $row['rendered_at'],
+            // How many pages the render service reported; null on an artifact
+            // stored before this was kept (migration 216).
+            'pages'           => isset($row['pages']) ? (int) $row['pages'] : null,
         ];
     }
 }

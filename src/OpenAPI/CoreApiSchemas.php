@@ -5463,6 +5463,7 @@ final class CoreApiSchemas
                 'checksum_sha256' => self::str(),
                 'rendered_by' => self::int(true),
                 'rendered_at' => self::str(),
+                'pages' => self::int(true) + ['description' => 'How many pages these bytes have, to compare with a paper copy. Null on an artifact stored before this was kept.'],
                 'content_url' => self::str(),
             ], ['id', 'document_id', 'content_type', 'byte_size', 'checksum_sha256', 'rendered_at', 'content_url']),
             'Document' => self::object([
@@ -5472,6 +5473,16 @@ final class CoreApiSchemas
                 'document_source_id' => self::int(true),
                 'document_source_version' => self::int(true),
                 'origin_key' => self::str(true),
+                'number' => self::str(true) + ['description' => 'What people quote it by, such as INV-2026-0142. Stored when handed out and never recomputed. Null with no numbering rule, before final approval on a final-approval rule, and on a document issued before numbers existed.'],
+                'number_assigned_at' => self::str(true) + ['description' => 'When the number was handed out, in UTC'],
+                'record_type' => self::str(true) + ['description' => 'The type of the business record it was issued from'],
+                'record_id' => self::str(true) + ['description' => 'The id of that record'],
+                'slot' => self::str(true) + ['description' => 'The template slot it was issued through'],
+                'state' => [
+                    'type' => 'string',
+                    'enum' => ['draft', 'in_review', 'issued', 'superseded', 'withdrawn'],
+                    'description' => 'Where it is, derived from the routing trail and never stored. `in_review`: a route has an open item. `draft`: its newest route ended rejected, or it waits for final approval to be numbered. `withdrawn`: taken back; the record stays. `issued`: everything else. Absent where a route did not read it.',
+                ],
                 'template_name' => self::str(),
                 'title' => self::str(),
                 'origin_ou_id' => self::int(true),
@@ -6540,6 +6551,7 @@ final class CoreApiSchemas
             // `blocks` is the WhityDocument contract's Block[], stored verbatim.
             // List rows omit it; GET /{id} and saves return it.
             'DocumentSource' => self::object([
+                'numbering' => SchemaBuilder::ref('DocumentNumbering') + ['nullable' => true, 'description' => 'How documents from this template are numbered, when it has its own rule'],
                 'id' => self::int(),
                 'tenant_id' => self::int(),
                 'kind' => ['type' => 'string', 'enum' => ['template', 'letter', 'report', 'note', 'wiki', 'label']],
@@ -6568,6 +6580,7 @@ final class CoreApiSchemas
                 'updated_at' => self::str(),
             ], ['id', 'tenant_id', 'kind', 'title', 'lang', 'default_view', 'full_width', 'draft_version', 'scope', 'created_at', 'updated_at']),
             'DocumentSourceAudienceRequest' => self::object([
+                'numbering' => SchemaBuilder::ref('DocumentNumbering') + ['nullable' => true, 'description' => 'How documents from this template are numbered; it wins over a slot\'s rule. Needs documents:publish.'],
                 'scope' => ['type' => 'string', 'enum' => ['personal', 'tenant', 'global', 'system']] + ['description' => 'Who can see the document: `personal` (only its creator), `tenant`, `global` or `system`. Anything but personal needs documents:publish.'],
                 'required_permission' => self::str(true) + ['description' => 'A permission a reader must also hold to see a shared document; null for none. Needs documents:publish.'],
                 'owner_ou_id' => self::int(true) + ['description' => 'The organizational unit the document is filed under; null files it tenant-wide. Needs documents:publish.'],
@@ -6968,6 +6981,7 @@ final class CoreApiSchemas
                 'recordType' => self::str() + ['description' => 'The field record type the slot\'s documents are for; a bound template must have the same one'],
                 'kinds' => ['type' => 'array', 'items' => ['type' => 'string', 'enum' => ['template', 'label']], 'description' => 'Which document kinds can fill it'],
                 'starter' => self::str(true) + ['description' => 'The plugin\'s starter for the slot, once starters are seeded (WHIT-687)'],
+                'numbering' => SchemaBuilder::ref('DocumentNumbering') + ['nullable' => true, 'description' => 'How the slot\'s documents are numbered, unless the bound template has its own rule'],
                 'binding' => self::object([
                     'template_id' => self::int(),
                     'title' => self::str(true) + ['description' => 'Null when the template is gone or hidden from the caller'],
@@ -6978,6 +6992,10 @@ final class CoreApiSchemas
                     ], ['code', 'message']) + ['nullable' => true, 'description' => 'Why the bound template can\'t be issued from now; null when it fits'],
                 ], ['template_id', 'title', 'published_version', 'problem']) + ['nullable' => true, 'description' => 'The template bound to the slot, or null'],
             ], ['key', 'plugin', 'label', 'labelAr', 'recordType', 'kinds', 'starter', 'binding']),
+            'DocumentNumbering' => self::object([
+                'pattern' => self::str() + ['description' => 'Literal text with `{YYYY}`, `{YY}`, `{MM}`, and `{SEQ}` or `{SEQ:n}` exactly once, such as `INV-{YYYY}-{SEQ:4}`. A pattern with `{YYYY}` restarts each year.'],
+                'assign' => ['type' => 'string', 'enum' => ['on_issue', 'on_final_approval'], 'description' => 'When a number is handed out. Defaults to on_issue.'],
+            ], ['pattern']),
             'DocumentTemplateSlotListResponse' => self::object([
                 'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('DocumentTemplateSlot')],
             ], ['data']),
@@ -11690,7 +11708,10 @@ final class CoreApiSchemas
                         'Anchor unit for the unit-scoped folders. Defaults to the caller\'s own unit.'
                     ),
                     self::queryParam('collection_id', 'integer', 'Required by the "collection" view'),
-                    self::queryParam('q', 'string', 'Case-insensitive substring of the document title'),
+                    self::queryParam('q', 'string', 'Case-insensitive substring of the document title or number'),
+                    self::queryParam('record', 'string', 'Only documents issued from this record, as `<type>:<id>`. A malformed value is a 400.'),
+                    self::queryParam('source_id', 'integer', 'Only documents issued from this template. A malformed value is a 400.'),
+                    self::queryParam('slot', 'string', 'Only documents issued through this slot, as `<plugin>.<slot>`'),
                     self::queryParam(
                         'sort',
                         'string',
@@ -13289,16 +13310,17 @@ final class CoreApiSchemas
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('PATCH', '/api/document-sources/{id:\d+}', 'documents:write', [
-                'summary' => 'Change who can see an editor document',
+                'summary' => 'Change who can see an editor document, or how its documents are numbered',
                 'description' =>
                     'Its scope, the permission a reader needs and the unit it is filed at (A31). Not part of '
                     . 'the draft: it changes without a publish. Making a document shared needs documents:publish; '
-                    . 'a value sent back unchanged is not a change.',
+                    . 'a value sent back unchanged is not a change. `numbering` also needs documents:publish, and '
+                    . 'applies to documents issued from now on; null uses the slot\'s rule or none.',
                 'tags' => ['documents'],
                 'request' => 'DocumentSourceAudienceRequest',
                 'responses' => [
                     200 => self::jsonResponse('The document', 'DocumentSourceResponse'),
-                    403 => self::errorResponse('Sharing a document requires documents:publish'),
+                    403 => self::errorResponse('Sharing a document or changing its numbering requires documents:publish'),
                     404 => self::errorResponse('Document not found or not visible to the caller'),
                     422 => self::errorResponse('Validation failed'),
                 ] + self::authErrors(),

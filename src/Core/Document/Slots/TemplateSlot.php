@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Whity\Core\Document\Slots;
 
+use Whity\Sdk\Documents\DocumentNumberingRule;
+
 /**
  * A template slot (DOCUMENT-AUTOMATION.md 3.2, WHIT-742): a named place a
  * plugin needs a document template, such as "the invoice" or "the order
@@ -28,6 +30,8 @@ final class TemplateSlot
         public readonly string $recordType,
         public readonly array $kinds = ['template'],
         public readonly ?string $starter = null,
+        // How its documents are numbered, unless the bound template says otherwise (WHIT-684).
+        public readonly ?DocumentNumberingRule $numbering = null,
     ) {
     }
 
@@ -53,6 +57,7 @@ final class TemplateSlot
                 label: $label,
                 recordType: $plugin . '.' . (string) $slot['record'],
                 kinds: $kinds,
+                numbering: isset($slot['numbering']) ? DocumentNumberingRule::fromArray($slot['numbering']) : null,
             );
         }
 
@@ -87,7 +92,7 @@ final class TemplateSlot
         return null;
     }
 
-    /** @return array{key: string, plugin: string, label: string, labelAr: string, recordType: string, kinds: list<string>, starter: string|null} */
+    /** @return array{key: string, plugin: string, label: string, labelAr: string, recordType: string, kinds: list<string>, starter: string|null, numbering: array{pattern: string, assign: string}|null} */
     public function toArray(): array
     {
         return [
@@ -98,6 +103,7 @@ final class TemplateSlot
             'recordType' => $this->recordType,
             'kinds' => $this->kinds,
             'starter' => $this->starter,
+            'numbering' => $this->numbering?->toArray(),
         ];
     }
 }

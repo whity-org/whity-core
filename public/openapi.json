@@ -11206,11 +11206,11 @@
             },
             "patch": {
                 "operationId": "patch_api_v1_document_sources_id",
-                "summary": "Change who can see an editor document",
+                "summary": "Change who can see an editor document, or how its documents are numbered",
                 "tags": [
                     "documents"
                 ],
-                "description": "Its scope, the permission a reader needs and the unit it is filed at (A31). Not part of the draft: it changes without a publish. Making a document shared needs documents:publish; a value sent back unchanged is not a change.",
+                "description": "Its scope, the permission a reader needs and the unit it is filed at (A31). Not part of the draft: it changes without a publish. Making a document shared needs documents:publish; a value sent back unchanged is not a change. `numbering` also needs documents:publish, and applies to documents issued from now on; null uses the slot's rule or none.",
                 "parameters": [
                     {
                         "name": "id",
@@ -11263,7 +11263,7 @@
                         }
                     },
                     "403": {
-                        "description": "Sharing a document requires documents:publish",
+                        "description": "Sharing a document or changing its numbering requires documents:publish",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -15501,7 +15501,34 @@
                         "name": "q",
                         "in": "query",
                         "required": false,
-                        "description": "Case-insensitive substring of the document title",
+                        "description": "Case-insensitive substring of the document title or number",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "record",
+                        "in": "query",
+                        "required": false,
+                        "description": "Only documents issued from this record, as `<type>:<id>`. A malformed value is a 400.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "source_id",
+                        "in": "query",
+                        "required": false,
+                        "description": "Only documents issued from this template. A malformed value is a 400.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "slot",
+                        "in": "query",
+                        "required": false,
+                        "description": "Only documents issued through this slot, as `<plugin>.<slot>`",
                         "schema": {
                             "type": "string"
                         }
@@ -53472,6 +53499,42 @@
                         "type": "string",
                         "nullable": true
                     },
+                    "number": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "What people quote it by, such as INV-2026-0142. Stored when handed out and never recomputed. Null with no numbering rule, before final approval on a final-approval rule, and on a document issued before numbers existed."
+                    },
+                    "number_assigned_at": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "When the number was handed out, in UTC"
+                    },
+                    "record_type": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "The type of the business record it was issued from"
+                    },
+                    "record_id": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "The id of that record"
+                    },
+                    "slot": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "The template slot it was issued through"
+                    },
+                    "state": {
+                        "type": "string",
+                        "enum": [
+                            "draft",
+                            "in_review",
+                            "issued",
+                            "superseded",
+                            "withdrawn"
+                        ],
+                        "description": "Where it is, derived from the routing trail and never stored. `in_review`: a route has an open item. `draft`: its newest route ended rejected, or it waits for final approval to be numbered. `withdrawn`: taken back; the record stays. `issued`: everything else. Absent where a route did not read it."
+                    },
                     "template_name": {
                         "type": "string"
                     },
@@ -53604,6 +53667,11 @@
                     },
                     "rendered_at": {
                         "type": "string"
+                    },
+                    "pages": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "How many pages these bytes have, to compare with a paper copy. Null on an artifact stored before this was kept."
                     },
                     "content_url": {
                         "type": "string"
@@ -54552,6 +54620,26 @@
                     "name"
                 ]
             },
+            "DocumentNumbering": {
+                "type": "object",
+                "properties": {
+                    "pattern": {
+                        "type": "string",
+                        "description": "Literal text with `{YYYY}`, `{YY}`, `{MM}`, and `{SEQ}` or `{SEQ:n}` exactly once, such as `INV-{YYYY}-{SEQ:4}`. A pattern with `{YYYY}` restarts each year."
+                    },
+                    "assign": {
+                        "type": "string",
+                        "enum": [
+                            "on_issue",
+                            "on_final_approval"
+                        ],
+                        "description": "When a number is handed out. Defaults to on_issue."
+                    }
+                },
+                "required": [
+                    "pattern"
+                ]
+            },
             "DocumentOwnField": {
                 "type": "object",
                 "properties": {
@@ -55070,6 +55158,11 @@
             "DocumentSource": {
                 "type": "object",
                 "properties": {
+                    "numbering": {
+                        "$ref": "#/components/schemas/DocumentNumbering",
+                        "nullable": true,
+                        "description": "How documents from this template are numbered, when it has its own rule"
+                    },
                     "id": {
                         "type": "integer"
                     },
@@ -55223,6 +55316,11 @@
             "DocumentSourceAudienceRequest": {
                 "type": "object",
                 "properties": {
+                    "numbering": {
+                        "$ref": "#/components/schemas/DocumentNumbering",
+                        "nullable": true,
+                        "description": "How documents from this template are numbered; it wins over a slot's rule. Needs documents:publish."
+                    },
                     "scope": {
                         "type": "string",
                         "enum": [
@@ -56058,6 +56156,11 @@
                         "type": "string",
                         "nullable": true,
                         "description": "The plugin's starter for the slot, once starters are seeded (WHIT-687)"
+                    },
+                    "numbering": {
+                        "$ref": "#/components/schemas/DocumentNumbering",
+                        "nullable": true,
+                        "description": "How the slot's documents are numbered, unless the bound template has its own rule"
                     },
                     "binding": {
                         "type": "object",

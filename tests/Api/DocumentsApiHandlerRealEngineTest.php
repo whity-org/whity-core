@@ -612,7 +612,255 @@ final class DocumentsApiHandlerRealEngineTest extends TestCase
         self::assertCount(1, $this->artifactRepo->listForDocument($documentId, self::TENANT));
     }
 
+    // ── numbers, records, state and pages (WHIT-684) ─────────────────────────
+
+    public function testADocumentOnAnIssueRuleIsNumberedStoredAndPrinted(): void
+    {
+        $template = $this->numberedTemplate('INV-{YYYY}-{SEQ:4}');
+
+        $id = $this->issueFrom(self::OWNER, $template, 'Invoice');
+
+        $number = 'INV-' . gmdate('Y') . '-0001';
+        $shown = self::data($this->call('show', self::OWNER, ['id' => (string) $id]));
+        self::assertSame($number, $shown['number']);
+        self::assertSame('issued', $shown['state']);
+        self::assertNotNull($shown['number_assigned_at']);
+
+        $printed = EditorTemplateFixture::texts($this->fakeRender->flowCalls[array_key_last($this->fakeRender->flowCalls)]);
+        self::assertContains($number, $printed, 'issued_document.number must reach the PDF');
+
+        // A correction prints the same number, and the counter doesn't move.
+        self::assertSame(201, $this->call('rerender', self::OWNER, ['id' => (string) $id])->getStatusCode());
+        self::assertContains($number, EditorTemplateFixture::texts($this->fakeRender->flowCalls[array_key_last($this->fakeRender->flowCalls)]));
+        self::assertSame($number, self::data($this->call('show', self::OWNER, ['id' => (string) $id]))['number']);
+
+        // The next document gets the next one.
+        $next = $this->issueFrom(self::OWNER, $template, 'Invoice two');
+        self::assertSame('INV-' . gmdate('Y') . '-0002', self::data($this->call('show', self::OWNER, ['id' => (string) $next]))['number']);
+    }
+
+    public function testACallerCannotNameTheirOwnNumber(): void
+    {
+        $template = $this->numberedTemplate('INV-{YYYY}-{SEQ:4}');
+        TenantContext::reset();
+        TenantContext::setTenantId(self::TENANT);
+        $req = new Request('POST', '/api/documents', [], (string) json_encode([
+            'document_source_id' => $template,
+            'values' => ['issued_document.number' => 'FORGED-1'],
+        ]));
+        $req->user = (object) ['profile_id' => self::OWNER, 'active_tenant_id' => self::TENANT];
+
+        self::assertSame(422, $this->handler->create($req)->getStatusCode());
+    }
+
+    public function testAnOriginKeyReplayKeepsTheOneNumber(): void
+    {
+        $template = $this->numberedTemplate('INV-{YYYY}-{SEQ:4}');
+        $issue = function () use ($template): array {
+            TenantContext::reset();
+            TenantContext::setTenantId(self::TENANT);
+            $req = new Request('POST', '/api/documents', [], (string) json_encode(['document_source_id' => $template, 'origin_key' => 'order:1:invoice']));
+            $req->user = (object) ['profile_id' => self::OWNER, 'active_tenant_id' => self::TENANT];
+
+            return self::data($this->handler->create($req));
+        };
+
+        $first = $issue();
+        $replay = $issue();
+
+        self::assertSame($first['id'], $replay['id']);
+        self::assertSame($first['number'], $replay['number']);
+        self::assertSame('INV-' . gmdate('Y') . '-0001', $replay['number']);
+    }
+
+    public function testAFinalApprovalRuleLeavesADraftWithNoNumber(): void
+    {
+        $template = $this->numberedTemplate('MIN-{YYYY}-{SEQ:3}', 'on_final_approval');
+
+        $id = $this->issueFrom(self::OWNER, $template, 'Minutes');
+
+        $shown = self::data($this->call('show', self::OWNER, ['id' => (string) $id]));
+        self::assertNull($shown['number']);
+        self::assertSame('draft', $shown['state']);
+    }
+
+    public function testAnOlderDocumentKeepsWorkingWithNoNumberOrRecord(): void
+    {
+        $id = $this->issue(self::OWNER, 'Letter');
+        // As migration 216 leaves a row issued before it: nothing was backfilled.
+        $this->pdo->exec('UPDATE document_artifacts SET pages = NULL WHERE document_id = ' . $id);
+
+        $shown = self::data($this->call('show', self::OWNER, ['id' => (string) $id]));
+
+        self::assertNull($shown['number']);
+        self::assertNull($shown['record_type']);
+        self::assertNull($shown['record_id']);
+        self::assertNull($shown['slot']);
+        self::assertSame('issued', $shown['state']);
+        self::assertNull($shown['artifacts'][0]['pages']);
+    }
+
+    public function testPagesAreKeptOnTheArtifactAndReturned(): void
+    {
+        $this->fakeRender->flowPageCount = 7;
+
+        $id = $this->issue(self::OWNER, 'Long report');
+
+        self::assertSame(7, self::data($this->call('show', self::OWNER, ['id' => (string) $id]))['artifacts'][0]['pages']);
+    }
+
+    public function testQFindsADocumentByItsNumber(): void
+    {
+        $numbered = $this->issueFrom(self::OWNER, $this->numberedTemplate('KL-CRT-{SEQ:4}'), 'Handover');
+        $this->issue(self::OWNER, 'Something else');
+
+        self::assertSame([$numbered], $this->listedIds(['q' => 'kl-crt-0001']));
+        self::assertSame([$numbered], $this->listedIds(['q' => 'Handover']), 'the title still matches');
+    }
+
+    public function testDocumentsFilterByRecordSourceAndSlot(): void
+    {
+        $sourceA = $this->editor->published(self::TENANT, self::OWNER, 'A');
+        $sourceB = $this->editor->published(self::TENANT, self::OWNER, 'B');
+        $a = $this->issueFrom(self::OWNER, $sourceA, 'From A');
+        $b = $this->issueFrom(self::OWNER, $sourceB, 'From B');
+        $this->pdo->exec("UPDATE documents SET record_type = 'Bakery.order', record_id = '131', slot = 'Bakery.receipt' WHERE id = {$a}");
+        $this->pdo->exec("UPDATE documents SET record_type = 'Bakery.order', record_id = '132' WHERE id = {$b}");
+
+        self::assertSame([$a], $this->listedIds(['record' => 'Bakery.order:131']));
+        self::assertSame([$b], $this->listedIds(['record' => 'Bakery.order:132']));
+        self::assertSame([], $this->listedIds(['record' => 'Bakery.invoice:131']));
+        self::assertSame([$a], $this->listedIds(['source_id' => (string) $sourceA]));
+        self::assertSame([$a], $this->listedIds(['slot' => 'Bakery.receipt']));
+        self::assertSame([], $this->listedIds(['slot' => 'Bakery.other']));
+        self::assertSame([$a], $this->listedIds(['record' => 'Bakery.order:131', 'slot' => 'Bakery.receipt', 'source_id' => (string) $sourceA]));
+    }
+
+    public function testAMalformedFilterIsRefusedRatherThanIgnored(): void
+    {
+        $this->issue(self::OWNER, 'Letter');
+
+        self::assertSame(400, $this->listWith(['record' => 'no-colon'])->getStatusCode());
+        self::assertSame(400, $this->listWith(['source_id' => 'abc'])->getStatusCode());
+    }
+
+    public function testNoFilterOrSearchReachesAnotherTenant(): void
+    {
+        $source = $this->numberedTemplate('SECRET-{SEQ:4}');
+        $id = $this->issueFrom(self::OWNER, $source, 'Theirs');
+        $this->pdo->exec("UPDATE documents SET record_type = 'Bakery.order', record_id = '131', slot = 'Bakery.receipt' WHERE id = {$id}");
+
+        foreach ([
+            ['record' => 'Bakery.order:131'],
+            ['source_id' => (string) $source],
+            ['slot' => 'Bakery.receipt'],
+            ['q' => 'SECRET-0001'],
+        ] as $query) {
+            $res = $this->listWith($query, self::OTHER_TENANT_ADMIN, self::OTHER_TENANT);
+            self::assertSame([], self::decode($res)['data'], 'must not cross tenants: ' . (string) json_encode($query));
+        }
+        // And the same queries do find it at home, so the empties above mean something.
+        self::assertSame([$id], $this->listedIds(['record' => 'Bakery.order:131']));
+    }
+
+    public function testAFilterDoesNotWidenWhatACallerMaySee(): void
+    {
+        $id = $this->issue(self::OWNER, 'Private');
+        $this->pdo->exec("UPDATE documents SET record_type = 'Bakery.order', record_id = '131' WHERE id = {$id}");
+
+        self::assertSame([], self::decode($this->listWith(['record' => 'Bakery.order:131'], self::VIEWER))['data']);
+    }
+
+    public function testTheNumberingRuleNeedsPublishAndAValidPattern(): void
+    {
+        $template = $this->editor->published(self::TENANT, self::OWNER, 'Rule');
+        $patch = function (int $actor, mixed $numbering) use ($template): Response {
+            TenantContext::reset();
+            TenantContext::setTenantId(self::TENANT);
+            $req = new Request('PATCH', '/api/document-sources/' . $template, [], (string) json_encode(['numbering' => $numbering]));
+            $req->user = (object) ['profile_id' => $actor, 'active_tenant_id' => self::TENANT];
+
+            return $this->editor->sources->updateAudience($req, ['id' => (string) $template]);
+        };
+
+        self::assertSame(422, $patch(self::OWNER, ['pattern' => 'NO-SEQUENCE'])->getStatusCode());
+        self::assertSame(422, $patch(self::OWNER, ['pattern' => 'A-{SEQ}', 'assign' => 'someday'])->getStatusCode());
+        self::assertSame(422, $patch(self::OWNER, ['pattern' => 'A-{YEAR}-{SEQ}'])->getStatusCode());
+
+        $saved = $patch(self::OWNER, ['pattern' => 'A-{SEQ}']);
+        self::assertSame(200, $saved->getStatusCode());
+        // assertEquals: PostgreSQL's JSONB keeps its own key order.
+        self::assertEquals(['pattern' => 'A-{SEQ}', 'assign' => 'on_issue'], self::data($saved)['numbering']);
+
+        self::assertNull(self::data($patch(self::OWNER, null))['numbering']);
+    }
+
+    public function testANumberHandedOutAtFinalApprovalIsPrintedOnANewArtifact(): void
+    {
+        $template = $this->numberedTemplate('MIN-{SEQ:3}', 'on_final_approval');
+        $id = $this->issueFrom(self::OWNER, $template, 'Minutes');
+        (new \Whity\Core\Document\Numbering\DocumentNumbering($this->pdo))->assign(self::TENANT, $id);
+
+        $actor = new \Whity\Core\Document\Issuing\ActingAs(self::TENANT, self::OWNER, static fn (string $permission): bool => true);
+        $document = $this->documentRepo->findById($id, self::TENANT);
+        $source = $this->editor->sourceRepo->findById($template, self::TENANT);
+        self::assertNotNull($document);
+        self::assertNotNull($source);
+
+        $outcome = $this->editor->issuing->reprintNumbered($actor, $source, $document);
+
+        self::assertTrue($outcome['stored'] ?? false);
+        self::assertCount(2, $this->artifactRepo->listForDocument($id, self::TENANT), 'the earlier PDF stays');
+        self::assertContains('MIN-001', EditorTemplateFixture::texts($this->fakeRender->flowCalls[array_key_last($this->fakeRender->flowCalls)]));
+
+        // A template that doesn't print the number has nothing to change, and spends no render.
+        $plain = $this->editor->published(self::TENANT, self::OWNER, 'Plain');
+        $this->editor->sourceRepo->updateNumbering($plain, self::TENANT, ['pattern' => 'P-{SEQ}', 'assign' => 'on_final_approval']);
+        $plainId = $this->issueFrom(self::OWNER, $plain, 'Plain one');
+        $before = count($this->fakeRender->flowCalls);
+        $plainDoc = $this->documentRepo->findById($plainId, self::TENANT);
+        $plainSource = $this->editor->sourceRepo->findById($plain, self::TENANT);
+        self::assertNotNull($plainDoc);
+        self::assertNotNull($plainSource);
+        self::assertNull($this->editor->issuing->reprintNumbered($actor, $plainSource, $plainDoc));
+        self::assertCount($before, $this->fakeRender->flowCalls);
+    }
+
     // ── helpers ──────────────────────────────────────────────────────────────
+
+    /** A published template that prints its number, with its own numbering rule. */
+    private function numberedTemplate(string $pattern, string $assign = 'on_issue'): int
+    {
+        $id = $this->editor->published(self::TENANT, self::OWNER, 'Numbered ' . bin2hex(random_bytes(3)), [
+            $this->editor->para($this->editor->field('issued_document.number')),
+        ]);
+        $this->editor->sourceRepo->updateNumbering($id, self::TENANT, ['pattern' => $pattern, 'assign' => $assign]);
+
+        return $id;
+    }
+
+    /** @param array<string, string> $query */
+    private function listWith(array $query, int $actor = self::OWNER, int $tenant = self::TENANT): Response
+    {
+        TenantContext::reset();
+        TenantContext::setTenantId($tenant);
+        $req = new Request('GET', '/api/documents?' . http_build_query($query), [], '');
+        $req->user = (object) ['profile_id' => $actor, 'active_tenant_id' => $tenant];
+
+        return $this->handler->list($req);
+    }
+
+    /**
+     * @param array<string, string> $query
+     * @return list<int>
+     */
+    private function listedIds(array $query): array
+    {
+        $res = $this->listWith($query);
+        self::assertSame(200, $res->getStatusCode(), $res->getBody());
+
+        return array_map(static fn (array $row): int => (int) $row['id'], self::decode($res)['data']);
+    }
 
     /** Issue a document the way production does, from its own template. */
     private function issue(int $actorId, string $title): int

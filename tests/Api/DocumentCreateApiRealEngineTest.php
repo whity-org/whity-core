@@ -1055,6 +1055,30 @@ final class DocumentCreateApiRealEngineTest extends TestCase
         self::assertSame($templateId, self::data($res)['document_source_id']);
     }
 
+    public function testASlotNumbersItsDocumentsAndTheRecordAndSlotAreStored(): void
+    {
+        $this->slots->register('Courier', [
+            new TemplateSlot('Courier.receipt', 'Courier', ['en' => 'Receipt', 'ar' => 'إيصال'], 'document', numbering: new \Whity\Sdk\Documents\DocumentNumberingRule('RCP-{SEQ:4}')),
+        ]);
+        $templateId = $this->editor->published(self::TENANT, self::RAISER, 'Receipt', [$this->editor->para('Receipt')], ['record_type' => 'document', 'scope' => 'tenant']);
+        $this->bindSlot($templateId);
+        $about = $this->seedDocument(self::RAISER, 'About');
+
+        $issued = $this->create(self::RAISER, ['slot' => 'Courier.receipt', 'record' => 'document:' . $about, 'render' => false]);
+        self::assertSame(201, $issued->getStatusCode(), $issued->getBody());
+        $data = self::decode($issued)['data'];
+        self::assertSame('RCP-0001', $data['number']);
+        self::assertSame('document', $data['record_type']);
+        self::assertSame((string) $about, $data['record_id']);
+        self::assertSame('Courier.receipt', $data['slot']);
+        self::assertSame('issued', $data['state']);
+
+        // The template's own rule wins over the slot's.
+        $this->editor->sourceRepo->updateNumbering($templateId, self::TENANT, ['pattern' => 'OWN-{SEQ:2}', 'assign' => 'on_issue']);
+        $own = $this->create(self::RAISER, ['slot' => 'Courier.receipt', 'record' => 'document:' . $about, 'render' => false]);
+        self::assertSame('OWN-01', self::decode($own)['data']['number']);
+    }
+
     public function testASlotThatCantBeIssuedFromSaysWhyAndWritesNothing(): void
     {
         $about = $this->seedDocument(self::RAISER, 'Order 4812');

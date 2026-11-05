@@ -157,8 +157,12 @@ final class TemplateIssuing
                 title: $title,
                 recordLabel: $resolved['label'],
                 render: is_bool($requested) ? $requested : null,
-                record: $record !== null ? $record[0] . ':' . $record[1] : null,
+                // Only a record the template read, with the actor's permissions: a typeless
+                // template checks nothing, and an unchecked claim isn't a record to keep.
+                record: $type !== null && $record !== null ? $record[0] . ':' . $record[1] : null,
                 originKey: $originKey,
+                slot: $input->slot,
+                numbering: $input->slot !== null ? $this->slots?->find($tenantId, $input->slot)?->numbering : null,
             ), $actor);
         } catch (HookVetoException $e) {
             // A `document.issuing` listener refused it; nothing was written.
@@ -312,6 +316,11 @@ final class TemplateIssuing
         $conflicts = [];
         foreach ($values as $path => $value) {
             $path = (string) $path;
+            // Core hands the number out; nobody names their own.
+            if ($path === DocumentIssuing::NUMBER_FIELD) {
+                $conflicts[] = $path;
+                continue;
+            }
             if (!isset($declared[$path])) {
                 if (count($unknown) < self::FIELDS_REPORTED) {
                     $unknown[] = $path;

@@ -8,6 +8,7 @@ use PDO;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\SchemaFromMigrations;
 use Whity\Core\Audience\ExplicitRuleResolver;
+use Whity\Core\Document\DocumentRepository;
 use Whity\Core\Document\Routing\DocumentRouter;
 use Whity\Core\Document\Routing\RouteAction;
 use Whity\Core\Document\Routing\RouteEdgeRepository;
@@ -84,6 +85,7 @@ final class DocumentRouterVerdictRealEngineTest extends TestCase
     private RouteRecipientRepository $recipients;
     private RouteEdgeRepository $edges;
     private SettingsService $settings;
+    private RoutingRuleRegistry $rules;
 
     protected function setUp(): void
     {
@@ -111,6 +113,7 @@ final class DocumentRouterVerdictRealEngineTest extends TestCase
             ))
         );
 
+        $this->rules = $rules;
         $this->router = new DocumentRouter(
             $this->pdo,
             new RouteRepository($this->pdo),
@@ -122,6 +125,129 @@ final class DocumentRouterVerdictRealEngineTest extends TestCase
             $this->settings,
             null
         );
+    }
+
+    // -- numbers on final approval, state from the trail (WHIT-684) ----------
+
+    public function testFinalApprovalHandsOutTheNumberOnceAndTheStateFollowsTheTrail(): void
+    {
+        $documentId = $this->seedAwaitingNumber();
+        self::assertSame('draft', $this->documentRow($documentId)['state']);
+
+        $route = $this->issueGate($documentId, 'Approval');
+        $doc = $this->documentRow($documentId);
+        self::assertSame('in_review', $doc['state']);
+        self::assertNull($doc['number']);
+
+        // Approved at the gate, but the route goes on to a second step: not final yet.
+        $this->router->act(self::TENANT, self::HEAD_A, $route, RouteAction::ACKNOWLEDGED, null, RouteVerdict::APPROVED);
+        $doc = $this->documentRow($documentId);
+        self::assertNull($doc['number'], 'a number must wait for the last step');
+        self::assertSame('in_review', $doc['state']);
+
+        $this->router->act(self::TENANT, self::TECH_A, $route, RouteAction::ACKNOWLEDGED, null);
+        $doc = $this->documentRow($documentId);
+        self::assertSame('MIN-' . gmdate('Y') . '-001', $doc['number']);
+        self::assertSame('issued', $doc['state']);
+
+        // A note afterwards replays nothing.
+        $this->router->act(self::TENANT, self::TECH_A, $route, RouteAction::NOTED, 'Filed');
+        self::assertSame($doc['number'], $this->documentRow($documentId)['number']);
+        $counters = $this->pdo->query('SELECT SUM(value) FROM sequence_counters WHERE tenant_id = 1');
+        self::assertNotFalse($counters);
+        self::assertSame(1, (int) $counters->fetchColumn());
+    }
+
+    public function testARejectionHandsOutNoNumberAndLeavesADraft(): void
+    {
+        $documentId = $this->seedAwaitingNumber();
+        $route = $this->issueGate($documentId, 'Approval');
+
+        $this->router->act(self::TENANT, self::HEAD_A, $route, RouteAction::ACKNOWLEDGED, null, RouteVerdict::REJECTED);
+
+        $doc = $this->documentRow($documentId);
+        self::assertNull($doc['number']);
+        self::assertSame('draft', $doc['state']);
+    }
+
+    public function testADocumentWithNoRuleThatWasRejectedIsADraftAndOneApprovedIsIssued(): void
+    {
+        $rejected = $this->seedDocument();
+        $this->router->act(self::TENANT, self::HEAD_A, $this->issueGate($rejected, 'One'), RouteAction::ACKNOWLEDGED, null, RouteVerdict::REJECTED);
+        self::assertSame('draft', $this->documentRow($rejected)['state']);
+
+        // Circulated with no decision at all: nothing about it is held back.
+        $circulated = $this->seedDocument();
+        $route = $this->router->issue(self::TENANT, self::DEAN, ['id' => $circulated], 'FYI', [[
+            'rule_kind' => RoutingRuleRegistry::KIND_EXPLICIT,
+            'rule_config' => ['profile_ids' => [self::HEAD_A]],
+        ]])['route'];
+        self::assertSame('in_review', $this->documentRow($circulated)['state']);
+        $this->router->act(self::TENANT, self::HEAD_A, $route, RouteAction::ACKNOWLEDGED, null);
+        self::assertSame('issued', $this->documentRow($circulated)['state']);
+    }
+
+    public function testStateIsWithdrawnWhateverTheTrailSays(): void
+    {
+        $documentId = $this->seedDocument();
+        $this->issueGate($documentId, 'Open');
+        $this->pdo->exec('UPDATE documents SET withdrawn_at = ' . $this->now() . ' WHERE id = ' . $documentId);
+
+        self::assertSame('withdrawn', $this->documentRow($documentId)['state']);
+    }
+
+    public function testTheNumberedEventFiresOnceWithTheNumber(): void
+    {
+        $hooks = new \Whity\Core\Hooks\HookManager();
+        /** @var \ArrayObject<int, array<string, mixed>> $fired */
+        $fired = new \ArrayObject();
+        $hooks->listen(\Whity\Sdk\Hooks\Events::DOCUMENT_NUMBERED, static function (array $event) use ($fired): array {
+            $fired->append($event);
+
+            return $event;
+        });
+        $router = new DocumentRouter(
+            $this->pdo,
+            new RouteRepository($this->pdo),
+            $this->steps,
+            $this->events,
+            $this->recipients,
+            $this->edges,
+            $this->rules,
+            $this->settings,
+            $hooks,
+        );
+        $documentId = $this->seedAwaitingNumber();
+        $route = $this->issueGate($documentId, 'Approval');
+
+        $router->act(self::TENANT, self::HEAD_A, $route, RouteAction::ACKNOWLEDGED, null, RouteVerdict::APPROVED);
+        self::assertSame(0, $fired->count());
+        $router->act(self::TENANT, self::TECH_A, $route, RouteAction::ACKNOWLEDGED, null);
+        $router->act(self::TENANT, self::TECH_A, $route, RouteAction::NOTED, 'Filed');
+
+        self::assertSame(1, $fired->count());
+        $event = $fired->offsetGet(0);
+        self::assertNotNull($event);
+        self::assertSame('MIN-' . gmdate('Y') . '-001', $event['number']);
+        self::assertSame($documentId, $event['id']);
+        self::assertSame(self::TECH_A, $event['actor_profile_id']);
+    }
+
+    /** @return array<string, mixed> */
+    private function documentRow(int $documentId): array
+    {
+        $row = (new DocumentRepository($this->pdo))->findById($documentId, self::TENANT);
+        self::assertNotNull($row);
+
+        return $row;
+    }
+
+    private function seedAwaitingNumber(): int
+    {
+        $documentId = $this->seedDocument();
+        $this->pdo->exec("UPDATE documents SET number_pattern = 'MIN-{YYYY}-{SEQ:3}' WHERE id = " . $documentId);
+
+        return $documentId;
     }
 
     // -- 1. rejection routes differently ------------------------------------

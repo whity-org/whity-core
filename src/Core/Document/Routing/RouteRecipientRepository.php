@@ -598,6 +598,19 @@ final class RouteRecipientRepository
         return $stmt->fetchColumn() !== false;
     }
 
+    /** Whether anyone still has an open item on this route. */
+    public function hasOpenOnRoute(int $tenantId, int $routeId): bool
+    {
+        $stmt = $this->db->prepare(
+            'SELECT 1 FROM document_route_recipients
+              WHERE tenant_id = :tenant_id AND route_id = :route_id AND closed_by_event_id IS NULL
+              LIMIT 1'
+        );
+        $stmt->execute([':tenant_id' => $tenantId, ':route_id' => $routeId]);
+
+        return $stmt->fetchColumn() !== false;
+    }
+
     /**
      * Whether a person already has an OPEN item at a step. See {@see create()}.
      */

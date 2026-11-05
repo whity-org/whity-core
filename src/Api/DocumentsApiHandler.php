@@ -407,6 +407,24 @@ final class DocumentsApiHandler
             self::stringParam($query, 'q')
         );
 
+        // What it was issued from (WHIT-684). Refused rather than ignored when
+        // malformed: a filter that silently didn't apply lists the wrong documents.
+        $recordParam = self::stringParam($query, 'record');
+        $record = $recordParam !== null ? TemplateIssuing::parseRecord($recordParam) : null;
+        if ($recordParam !== null && $record === null) {
+            return Response::error("'record' must be \"<type>:<id>\", such as Bakery.order:131", 400);
+        }
+        $sourceParam = self::stringParam($query, 'source_id');
+        if ($sourceParam !== null && (!ctype_digit($sourceParam) || (int) $sourceParam <= 0)) {
+            return Response::error("'source_id' must be the id of a template", 400);
+        }
+        $criteria = $criteria->withIssueFilters(
+            $record[0] ?? null,
+            $record[1] ?? null,
+            $sourceParam !== null ? (int) $sourceParam : null,
+            self::stringParam($query, 'slot'),
+        );
+
         // Parsed AFTER the view resolves so a bad `sort` on an unanchorable
         // folder still reports the folder's reason: the caller's first problem
         // is the one worth telling them about, and 422-then-400 would have them
