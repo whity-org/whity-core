@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Whity\Api;
 
+use Whity\Core\Form\FieldType;
 use Whity\Core\Form\FormFieldRepository;
 use Whity\Core\Form\FormRejectedException;
 use Whity\Core\Form\FormRepository;
@@ -200,6 +201,56 @@ final class FormSubmissionsApiHandler
             ]);
         } catch (\Exception $e) {
             error_log('[FormSubmissionsApiHandler] show failed: ' . $e->getMessage());
+
+            return Response::error('Failed to fetch the submission', 500);
+        }
+    }
+
+    /**
+     * GET /api/v1/me/form-submissions/{id} — one of the caller's own submissions.
+     *
+     * No permission, like {@see listMine()}: the route decides whose. Somebody else's is
+     * the same 404 as one that doesn't exist. Only the questions they were asked, and
+     * only their answers to those: what the office recorded has its own permission, and
+     * the applicant has no route to it. A file answer says one was attached, because its
+     * storage key means nothing to a reader and shouldn't leave the system.
+     *
+     * @param array<string, string> $params
+     */
+    public function showMine(Request $request, array $params): Response
+    {
+        try {
+            $tenantId = TenantContext::getTenantId();
+            $profileId = self::actorProfileId($request);
+            if ($tenantId === null || $profileId === null) {
+                return Response::error('Submission not found', 404);
+            }
+
+            $submission = $this->submissions->find($tenantId, (int) ($params['id'] ?? 0), $profileId);
+            if ($submission === null) {
+                return Response::error('Submission not found', 404);
+            }
+
+            $formId = (int) $submission['form_id'];
+            $form = $this->forms->find($tenantId, $formId);
+            $fields = FormFieldRepository::applicantFields($this->fields->listForForm($tenantId, $formId));
+            $asked = array_flip(array_map(static fn (array $field): string => (string) $field['field_key'], $fields));
+            $data = array_intersect_key(is_array($submission['data'] ?? null) ? $submission['data'] : [], $asked);
+            foreach ($fields as $field) {
+                $key = (string) $field['field_key'];
+                if ($field['field_type'] === FieldType::FILE && isset($data[$key])) {
+                    $data[$key] = true;
+                }
+            }
+
+            return Response::json([
+                'data' => ['data' => (object) $data] + $submission + [
+                    'fields' => $fields,
+                    'form_version_now' => $form === null ? null : (int) $form['version'],
+                ],
+            ]);
+        } catch (\Exception $e) {
+            error_log('[FormSubmissionsApiHandler] showMine failed: ' . $e->getMessage());
 
             return Response::error('Failed to fetch the submission', 500);
         }

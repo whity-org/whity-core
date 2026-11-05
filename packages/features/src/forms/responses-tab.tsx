@@ -20,11 +20,18 @@ export function useRoutingLabel() {
   const t = useTranslation("forms")
   return (row: Pick<SubmissionRow, "state" | "current_step">): string => {
     if (row.state === "completed") return t("responses.routing.done", "Finished")
+    if (row.state === "withdrawn") return t("responses.routing.withdrawn", "Withdrawn")
     if (row.state === "in progress") {
       return row.current_step ? t("responses.routing.with", "With {step}", { step: row.current_step }) : t("responses.routing.inProgress", "In progress")
     }
     return t("responses.routing.none", "Not sent anywhere")
   }
+}
+
+/** The badge for where a response is: withdrawn reads as over, not as waiting. */
+export function routingVariant(state: string | undefined): "success" | "secondary" | "outline" {
+  if (state === "completed") return "success"
+  return state === "withdrawn" ? "secondary" : "outline"
 }
 
 /** An answer as one line of words. */
@@ -122,7 +129,7 @@ export function ResponsesTab({ env, formId }: { env: FormsScreenEnv; formId: num
           { id: "person", header: t("responses.col.person", "From"), cell: (row) => row.submitted_by_name ?? t("responses.visitor", "A visitor") },
           { id: "reference", header: headers[0], cell: (row) => <span className="font-mono">{row.reference ?? `#${row.id}`}</span> },
           { id: "submitted", header: headers[1], cell: (row) => dateTime(row.submitted_at) ?? "" },
-          { id: "routing", header: headers[2], cell: (row) => <Badge variant={row.state === "completed" ? "success" : "outline"}>{routingLabel(row)}</Badge> },
+          { id: "routing", header: headers[2], cell: (row) => <Badge variant={routingVariant(row.state)}>{routingLabel(row)}</Badge> },
         ]}
       />
       {openId !== null && <ResponseDialog env={env} submissionId={openId} onClose={() => setOpenId(null)} />}
@@ -131,7 +138,7 @@ export function ResponsesTab({ env, formId }: { env: FormsScreenEnv; formId: num
 }
 
 /** One response as a record: the questions, and what was answered. */
-export function ResponseDialog({ env, submissionId, onClose }: { env: FormsScreenEnv; submissionId: number; onClose: () => void }) {
+export function ResponseDialog({ env, submissionId, mine = false, onClose }: { env: FormsScreenEnv; submissionId: number; mine?: boolean; onClose: () => void }) {
   const t = useTranslation("forms")
   const { currentLanguage } = useCurrentLanguage()
   const { dateTime } = useDateDisplay()
@@ -142,10 +149,12 @@ export function ResponseDialog({ env, submissionId, onClose }: { env: FormsScree
 
   const load = useCallback(async () => {
     setError(null)
-    const result = await api.getSubmission(submissionId, t("responses.error.one", "This response could not be loaded."))
+    const failed = t("responses.error.one", "This response could not be loaded.")
+    // Somebody reading their own holds no `forms:read`, so it has its own address.
+    const result = mine ? await api.getMySubmission(submissionId, failed) : await api.getSubmission(submissionId, failed)
     if (result.ok) setDetail(result.data)
     else setError(result.message)
-  }, [api, submissionId, t])
+  }, [api, mine, submissionId, t])
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the fetch on mount is the effect
@@ -175,8 +184,10 @@ export function ResponseDialog({ env, submissionId, onClose }: { env: FormsScree
               <div key={field.field_key} className="space-y-0.5">
                 <dt className="text-sm font-medium">{pickText(field.label, currentLanguage) || field.field_key}</dt>
                 <dd className="text-sm text-muted-foreground">
-                  {answerText(field, answers[field.field_key], currentLanguage, t("responses.yes", "Yes"), t("responses.no", "No")) ||
-                    t("responses.noAnswer", "No answer")}
+                  {field.field_type === "file" && answers[field.field_key]
+                    ? t("responses.attached", "Attached")
+                    : answerText(field, answers[field.field_key], currentLanguage, t("responses.yes", "Yes"), t("responses.no", "No")) ||
+                      t("responses.noAnswer", "No answer")}
                 </dd>
               </div>
             ))}

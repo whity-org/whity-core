@@ -21,6 +21,8 @@ export function useProblemText(fields: readonly FieldDraft[]): (problem: Problem
     switch (problem.code) {
       case "noWording":
         return t("builder.problem.noWording", "{which} has no wording yet.", { which })
+      case "blankChoice":
+        return t("builder.problem.blankChoice", "{which} has a choice with no text.", { which })
       case "noChoices":
         return t("builder.problem.noChoices", "{which} needs at least one choice with text.", { which })
       case "noColumns":

@@ -12,6 +12,7 @@ import type { FormsScreenEnv } from '@whity/features/forms';
 import {
   reorder,
   problemsOf,
+  snapshot,
   questionIndexIn,
   duplicateField,
   groupBySection,
@@ -72,6 +73,25 @@ describe('builder model', () => {
     const copy = duplicateField(fields, 0);
     expect(copy[1].id).toBeUndefined();
     expect(copy[1].field_key).toBe('imports_copy');
+  });
+
+  it('compares objects by their contents, because the server returns labels in another order', () => {
+    const typed = [{ field_key: 'kind', label: { en: 'Kind', ar: 'نوع' }, options: [{ value: 'a', label: { en: 'A', ar: 'أ' } }] }];
+    const stored = [{ options: [{ label: { ar: 'أ', en: 'A' }, value: 'a' }], label: { ar: 'نوع', en: 'Kind' }, field_key: 'kind' }];
+    expect(snapshot(typed)).toBe(snapshot(stored));
+  });
+
+  it('still sees a changed answer and a changed order', () => {
+    expect(snapshot({ label: { en: 'Kind' } })).not.toBe(snapshot({ label: { en: 'Sort' } }));
+    expect(snapshot([{ field_key: 'a' }, { field_key: 'b' }])).not.toBe(snapshot([{ field_key: 'b' }, { field_key: 'a' }]));
+  });
+
+  it('holds a save while a new choice has no wording', () => {
+    const fields = [draft('kind', {
+      field_type: 'select',
+      options: [{ value: 'a', label: { en: 'Flour' } }, { value: 'b', label: {} }],
+    })];
+    expect(problemsOf(fields, { en: 'Form' }, ['en']).map((p) => [p.code, p.blocking])).toEqual([['blankChoice', true]]);
   });
 
   it('drops a dragged question into the place and section of the one it lands on', () => {

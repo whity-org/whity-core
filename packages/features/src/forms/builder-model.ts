@@ -138,9 +138,27 @@ export function reorder(fields: readonly FieldDraft[], from: number, to: number)
   return next
 }
 
-/** What a changed form would save: stable text, for comparing against what was loaded. */
+function sortedKeys(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(sortedKeys)
+  if (value === null || typeof value !== "object") return value
+  const source = value as Record<string, unknown>
+  return Object.fromEntries(
+    Object.keys(source)
+      .sort()
+      .map((key) => [key, sortedKeys(source[key])])
+  )
+}
+
+/**
+ * What a changed form would save: stable text, for comparing against what was loaded.
+ *
+ * Objects compare by their keys and values, never their order: the server stores labels
+ * as JSONB, which reorders keys, so `{ en, ar }` comes back as `{ ar, en }`. Comparing
+ * those as different kept the builder saving the same form forever. A list's order does
+ * mean something, so it stays.
+ */
 export function snapshot(value: unknown): string {
-  return JSON.stringify(value)
+  return JSON.stringify(sortedKeys(value))
 }
 
 /** Questions shown with a bar per section: unsectioned first, then each section in order. */
@@ -157,7 +175,7 @@ export function groupBySection<T extends { section_key: string | null }>(
   return groups.filter((g, i) => i > 0 || g.items.length > 0)
 }
 
-export type ProblemCode = "noName" | "noWording" | "noChoices" | "noColumns" | "missingLanguage"
+export type ProblemCode = "noName" | "noWording" | "noChoices" | "blankChoice" | "noColumns" | "missingLanguage"
 
 export interface Problem {
   code: ProblemCode
@@ -180,6 +198,9 @@ export function problemsOf(fields: readonly FieldDraft[], name: LocalizedMap, la
     if (!anyText(field.label)) problems.push({ code: "noWording", index, blocking: true })
     if (CHOICE_KINDS.includes(field.field_type) && !field.options.some((o) => anyText(o.label))) {
       problems.push({ code: "noChoices", index, blocking: true })
+    } else if (CHOICE_KINDS.includes(field.field_type) && field.options.some((o) => !anyText(o.label))) {
+      // The server refuses a choice with no wording, so a save waits until it is written.
+      problems.push({ code: "blankChoice", index, blocking: true })
     }
     if (field.field_type === "repeating") {
       const columns = Array.isArray(field.validation) ? [] : (field.validation.columns ?? [])

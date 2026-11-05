@@ -3,6 +3,7 @@ import type {
   FieldVocabulary,
   FormRow,
   FormSectionDef,
+  FormDraftRow,
   FormsResult,
   ResponsesSummary,
   LocalizedMap,
@@ -94,6 +95,14 @@ export function createFormsApi(transport: Transport) {
       ),
     listMySubmissions: (fallback: string) =>
       call(transport, "GET", "/api/v1/me/form-submissions?limit=200", undefined, fallback, (b) => data<SubmissionRow[]>(b)),
+    getMySubmission: (id: number, fallback: string) =>
+      call(transport, "GET", `/api/v1/me/form-submissions/${id}`, undefined, fallback, (b) => data<SubmissionDetail>(b)),
+    withdrawMySubmission: (id: number, fallback: string) =>
+      call(transport, "POST", `/api/v1/me/form-submissions/${id}/withdraw`, {}, fallback, (b) => data<SubmissionRow>(b)),
+    listMyDrafts: (fallback: string) =>
+      call(transport, "GET", "/api/v1/me/form-drafts", undefined, fallback, (b) => data<FormDraftRow[]>(b)),
+    deleteMyDraft: (formId: number, fallback: string) =>
+      call(transport, "DELETE", `/api/v1/me/forms/${formId}/draft`, undefined, fallback, () => true),
     getSubmission: (id: number, fallback: string) =>
       call(transport, "GET", `/api/v1/form-submissions/${id}`, undefined, fallback, (b) => data<SubmissionDetail>(b)),
   }

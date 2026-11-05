@@ -197,7 +197,8 @@ final class SubmissionIssuer
             $document = $this->documents->raise(
                 $tenantId,
                 $actorProfileId,
-                ['name' => 'form:' . (string) ($form['form_key'] ?? '')],
+                // Shown in the library and on the record, so it is the form's name, not its key.
+                ['name' => $title],
                 $title,
                 // `variable_data` stays null. It is the render subsystem's
                 // key/value list for a label sheet, not a general side-channel,

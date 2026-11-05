@@ -31,6 +31,38 @@ final class ResponsesCsv
     private const BOM = "\xEF\xBB\xBF";
 
     /**
+     * The file's own words. English and Arabic are what the export offers.
+     */
+    private const WORDS = [
+        'en' => [
+            'reference' => 'Reference',
+            'submitted_at' => 'Submitted at (UTC)',
+            'submitted_by' => 'Submitted by',
+            'routing' => 'Where it is',
+            'not routed' => 'Not sent anywhere',
+            'in progress' => 'In progress',
+            'completed' => 'Finished',
+            'withdrawn' => 'Withdrawn',
+            'yes' => 'Yes',
+            'no' => 'No',
+            'attached' => '%d attached',
+        ],
+        'ar' => [
+            'reference' => 'الرقم المرجعي',
+            'submitted_at' => 'تاريخ الإرسال (UTC)',
+            'submitted_by' => 'المرسل',
+            'routing' => 'أين وصل',
+            'not routed' => 'لم يُرسل إلى أي جهة',
+            'in progress' => 'قيد المعالجة',
+            'completed' => 'مكتمل',
+            'withdrawn' => 'مسحوب',
+            'yes' => 'نعم',
+            'no' => 'لا',
+            'attached' => 'مرفقات: %d',
+        ],
+    ];
+
+    /**
      * Static helper only — never instantiated.
      */
     private function __construct()
@@ -69,7 +101,7 @@ final class ResponsesCsv
             throw new \RuntimeException('Could not open a temporary stream for the export');
         }
 
-        $header = ['Reference', 'Submitted at', 'Submitted by', 'Routing'];
+        $header = [self::word('reference', $language), self::word('submitted_at', $language), self::word('submitted_by', $language), self::word('routing', $language)];
         foreach ($fields as $field) {
             $header[] = self::labelOf($field, $language);
         }
@@ -81,9 +113,9 @@ final class ResponsesCsv
 
             $line = [
                 self::safeText((string) ($row['reference'] ?? '')),
-                (string) ($row['submitted_at'] ?? ''),
+                self::timestamp((string) ($row['submitted_at'] ?? '')),
                 self::safeText((string) ($row['submitted_by_name'] ?? '')),
-                self::safeText((string) ($row['state'] ?? '')),
+                self::safeText(self::word((string) ($row['state'] ?? ''), $language)),
             ];
             foreach ($fields as $field) {
                 $line[] = self::cell($field, $answers[(string) $field['field_key']] ?? null, $language);
@@ -96,6 +128,29 @@ final class ResponsesCsv
         fclose($stream);
 
         return self::BOM . $csv;
+    }
+
+    private static function word(string $key, string $language): string
+    {
+        return self::WORDS[$language][$key] ?? self::WORDS['en'][$key] ?? $key;
+    }
+
+    /**
+     * A date a spreadsheet and a person can both read. The column heading says UTC.
+     */
+    private static function timestamp(string $value): string
+    {
+        if ($value === '') {
+            return '';
+        }
+
+        try {
+            return (new \DateTimeImmutable($value, new \DateTimeZone('UTC')))
+                ->setTimezone(new \DateTimeZone('UTC'))
+                ->format('Y-m-d H:i');
+        } catch (\Exception) {
+            return $value;
+        }
     }
 
     /**
@@ -146,7 +201,7 @@ final class ResponsesCsv
             return (string) $answer;
         }
         if (is_bool($answer)) {
-            return $answer ? 'Yes' : 'No';
+            return self::word($answer ? 'yes' : 'no', $language);
         }
 
         $type = (string) ($field['field_type'] ?? '');
@@ -154,10 +209,10 @@ final class ResponsesCsv
         if ($type === FieldType::FILE) {
             $count = is_array($answer) ? count($answer) : 1;
 
-            return $count . ' attached';
+            return sprintf(self::word('attached', $language), $count);
         }
         if ($type === FieldType::SIGNATURE && is_array($answer)) {
-            return self::safeText(trim((string) ($answer['name'] ?? '') . ' ' . (string) ($answer['signed_at'] ?? '')));
+            return self::safeText(trim((string) ($answer['name'] ?? '') . ' ' . self::timestamp((string) ($answer['signed_at'] ?? ''))));
         }
         if ($type === FieldType::REPEATING && is_array($answer)) {
             return self::safeText(implode(' | ', array_map(
