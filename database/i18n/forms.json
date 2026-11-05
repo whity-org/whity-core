@@ -308,6 +308,7 @@
         "responses.empty.title": "No responses yet",
         "responses.error": "The responses could not be loaded.",
         "responses.error.one": "This response could not be loaded.",
+        "responses.export": "Export responses",
         "responses.loading": "Loading responses",
         "responses.no": "No",
         "responses.noAnswer": "No answer",
@@ -330,6 +331,14 @@
         "step.label": "Steps of this form",
         "step.of": "Step {number} of {total}",
         "step.review": "Review",
-        "step.untitled": "Part {number}"
+        "step.untitled": "Part {number}",
+        "summary.other": "Other",
+        "summary.perWeek": "Responses a week",
+        "summary.routing": "Where they are",
+        "summary.routing.completed": "Finished",
+        "summary.routing.inProgress": "In progress",
+        "summary.routing.notRouted": "Not sent anywhere",
+        "summary.routing.withdrawn": "Withdrawn",
+        "summary.total": "Responses"
     }
 }

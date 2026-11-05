@@ -12,7 +12,8 @@ import { useTranslation } from "../i18n"
 import { useCurrentLanguage } from "./language"
 import { createFormsApi } from "./api"
 import { pickText } from "./text"
-import type { FieldDraft, FormsScreenEnv, SubmissionDetail, SubmissionRow } from "./types"
+import { ResponsesSummaryCards } from "./responses-summary"
+import type { FieldDraft, FormsScreenEnv, ResponsesSummary, SubmissionDetail, SubmissionRow } from "./types"
 
 /** Where a response is in its routing, in plain words. */
 export function useRoutingLabel() {
@@ -58,15 +59,19 @@ export function answerText(field: Pick<FieldDraft, "field_type" | "options" | "v
 /** The Responses tab: every response to this form, and each one's answers. */
 export function ResponsesTab({ env, formId }: { env: FormsScreenEnv; formId: number }) {
   const t = useTranslation("forms")
+  const { currentLanguage } = useCurrentLanguage()
   const { dateTime } = useDateDisplay()
   const routingLabel = useRoutingLabel()
   const api = useMemo(() => createFormsApi(env.transport), [env.transport])
   const [rows, setRows] = useState<SubmissionRow[] | null>(null)
   const [failure, setFailure] = useState<{ denied: boolean; message: string } | null>(null)
   const [openId, setOpenId] = useState<number | null>(null)
+  const [summary, setSummary] = useState<ResponsesSummary | null>(null)
 
   const load = useCallback(async () => {
     setFailure(null)
+    // The summary is a bonus: a server without it leaves the table as it was.
+    void api.getSummary(formId, "").then((result) => setSummary(result.ok ? result.data : null))
     const result = await api.listSubmissions(formId, t("responses.error", "The responses could not be loaded."))
     if (result.ok) setRows(result.data)
     else setFailure({ denied: result.status === 403, message: result.message })
@@ -99,7 +104,15 @@ export function ResponsesTab({ env, formId }: { env: FormsScreenEnv; formId: num
   }
 
   return (
-    <>
+    <div className="space-y-6">
+      <div className="flex justify-end">
+        <Button asChild variant="outline">
+          <a href={`/api/v1/forms/${formId}/responses/export?language=${currentLanguage === "ar" ? "ar" : "en"}`} download>
+            {t("responses.export", "Export responses")}
+          </a>
+        </Button>
+      </div>
+      {summary !== null && summary.total > 0 && <ResponsesSummaryCards summary={summary} />}
       <DataTable<SubmissionRow>
         aria-label={t("responses.title", "Responses")}
         data={rows}
@@ -113,7 +126,7 @@ export function ResponsesTab({ env, formId }: { env: FormsScreenEnv; formId: num
         ]}
       />
       {openId !== null && <ResponseDialog env={env} submissionId={openId} onClose={() => setOpenId(null)} />}
-    </>
+    </div>
   )
 }
 

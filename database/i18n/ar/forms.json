@@ -309,6 +309,7 @@
         "responses.empty.title": "لا توجد ردود بعد",
         "responses.error": "تعذّر تحميل الردود.",
         "responses.error.one": "تعذّر تحميل هذا الرد.",
+        "responses.export": "تصدير الردود",
         "responses.loading": "جارٍ تحميل الردود",
         "responses.no": "لا",
         "responses.noAnswer": "لا توجد إجابة",
@@ -331,6 +332,14 @@
         "step.label": "خطوات هذا النموذج",
         "step.of": "الخطوة {number} من {total}",
         "step.review": "مراجعة",
-        "step.untitled": "الجزء {number}"
+        "step.untitled": "الجزء {number}",
+        "summary.other": "أخرى",
+        "summary.perWeek": "الردود في الأسبوع",
+        "summary.routing": "أين وصلت",
+        "summary.routing.completed": "انتهت",
+        "summary.routing.inProgress": "قيد المعالجة",
+        "summary.routing.notRouted": "لم تُرسل إلى جهة",
+        "summary.routing.withdrawn": "مسحوبة",
+        "summary.total": "الردود"
     }
 }
