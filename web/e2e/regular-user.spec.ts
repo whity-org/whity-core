@@ -80,8 +80,10 @@ test.describe('Regular user (non-admin)', () => {
     await page.goto('/admin/users');
     await page.waitForURL('**/admin/users');
     await expect(page.getByRole('heading', { name: 'Users' })).toBeVisible();
-    // The failure is shown in the failed area, with Try again, not as a toast.
-    await expect(page.getByText('Failed to fetch users').first()).toBeVisible();
+    // A refused request (403) is "no access" in plain words, not a failure with
+    // Try again and not an empty list (design 2.9, the access-denied state).
+    await expect(page.getByText('You don’t have access to the people in this workspace')).toBeVisible();
+    await expect(page.getByText('Failed to fetch users')).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible();
   });
 

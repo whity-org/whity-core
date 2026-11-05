@@ -287,6 +287,20 @@ export function fieldMeta(t: TranslateFn): Record<string, FieldMeta> {
         'Master switch for federated sign-in. When off, every configured identity provider is disabled instance-wide.'
       ),
     },
+    'auth.self_2fa_recovery_enabled': {
+      label: t('settings.meta.auth.self_2fa_recovery_enabled.label', 'Self-service two-step recovery'),
+      help: t(
+        'settings.meta.auth.self_2fa_recovery_enabled.help',
+        'Let people who lost their two-step device ask to get back in themselves. Requests still go through the approval gate.'
+      ),
+    },
+    'auth.sso_self_provision_workspace': {
+      label: t('settings.meta.auth.sso_self_provision_workspace.label', 'Workspace on first single sign-on'),
+      help: t(
+        'settings.meta.auth.sso_self_provision_workspace.help',
+        'Give a person who signs in through an operator identity provider, and belongs to no workspace, a new workspace of their own.'
+      ),
+    },
     'storage.driver': {
       label: t('settings.meta.storage.driver.label', 'Storage driver'),
       help: t(

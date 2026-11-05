@@ -141,7 +141,7 @@ export default function PluginStorePage() {
           title={t('pluginStore.disabled.title', 'Plugin store disabled')}
           description={t(
             'pluginStore.disabled.description',
-            'Installing from a store is turned off on this instance. An operator can turn it on in Feature flags and add a trusted store in the global settings.',
+            'Installing from a store is turned off on this instance. It needs the plugin marketplace switched on in Feature flags and at least one trusted store in the global settings.',
           )}
         />
       ) : (

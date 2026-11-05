@@ -14,6 +14,7 @@ import { Badge } from '@whity/ui/badge';
 import { Button } from '@whity/ui/button';
 import { IconFilePlus } from '@tabler/icons-react';
 import { useTranslation } from '@whity/features/i18n';
+import { formNameFrom } from '@/lib/documents/template-name';
 import { useDateDisplay } from '@whity/features/datetime';
 import { useRouter } from 'next/navigation';
 import { useCapabilities } from '@/hooks/useCapabilities';
@@ -578,7 +579,7 @@ export default function DocumentLibraryPage() {
             <div className="min-w-0">
               <DocumentTitle row={row} />
               <span dir="auto" className="block truncate text-sm text-muted-foreground">
-                {row.template_name}
+                {(formNameFrom(row.template_name) !== null ? t('organizer.template.fromForm', 'Form: {name}', { name: formNameFrom(row.template_name) ?? '' }) : row.template_name)}
                 {(row.withdrawn_at ?? null) !== null && (
                   <Badge variant="destructive" className="ms-2" data-testid="library-withdrawn">
                     {t('organizer.table.withdrawn', 'Withdrawn')}
@@ -649,7 +650,7 @@ export default function DocumentLibraryPage() {
         title={t('organizer.title', 'Documents')}
         description={t(
           'organizer.description',
-          'Every folder here is a query over what documents record — nothing stores where a document lives. Collections are your own.'
+          'Every folder here is a saved search over your documents. Collections are your own; adding a document to one does not move it.'
         )}
         action={
           // Gated on `documents:issue`, the capability the create route
