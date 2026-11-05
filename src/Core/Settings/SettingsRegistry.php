@@ -581,6 +581,10 @@ final class SettingsRegistry
     //             endpoint cannot be asked "does this document exist".
     //   stage   — adds the current routing verb and its date, and tells a
     //             withdrawn or superseded code apart from an unrecognised one.
+    //   described — adds what kind of document it is (the template's public
+    //             name, never its title), its revision letter and page count,
+    //             and which revision replaced a revised one (#1627). Never a
+    //             price, a name, a subject or the document's number.
     //
     // Tenant-overridable because #1036 is explicit that this is a tenant's
     // decision: some institutions want a holder to see where a document sits,
@@ -927,7 +931,7 @@ final class SettingsRegistry
         // DEFAULT sits: `minimal` is the middle value and stays the default,
         // because it is what shipped and adding a quieter level must not change
         // what any existing tenant discloses.
-        self::DOCUMENTS_QR_PUBLIC_DETAIL => ['undated', 'minimal', 'stage'],
+        self::DOCUMENTS_QR_PUBLIC_DETAIL => ['undated', 'minimal', 'stage', 'described'],
         // 'internal' stores errors in this deployment's own database (no extra
         // infrastructure); 'sentry' ships them to any Sentry-PROTOCOL backend —
         // hosted Sentry, or a self-hosted GlitchTip/Bugsink — via the encrypted

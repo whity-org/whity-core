@@ -53,6 +53,12 @@ type Verification = {
   issued_on?: string | null;
   stage?: string;
   stage_on?: string | null;
+  /** The `described` level (#1627): the template's public name, never its title. */
+  kind?: string;
+  revision?: string;
+  pages?: number;
+  /** A refused code whose document was revised, at `described` only. */
+  replaced_by?: { revision: string; issued_on: string | null };
 };
 
 /**
@@ -238,6 +244,14 @@ export default function VerifyDocumentPage({ params }: { params: Promise<{ token
                 /* Latin-alphanumeric; bidi reordering would scramble it. */
                 monospaceLtr
               />
+              {/* The `described` level (#1627): enough to compare with the paper. */}
+              <Fact label={t('verify.field.kind', 'Document')} value={phase.data.kind} />
+              <Fact label={t('verify.field.revision', 'Revision')} value={phase.data.revision} monospaceLtr />
+              <Fact
+                label={t('verify.field.pages', 'Pages')}
+                value={phase.data.pages !== undefined ? String(phase.data.pages) : undefined}
+                monospaceLtr
+              />
               {phase.data.stage !== undefined && (
                 <Fact
                   label={t('verify.field.stage', 'Current stage')}
@@ -255,6 +269,30 @@ export default function VerifyDocumentPage({ params }: { params: Promise<{ token
             <dl className="space-y-3 text-sm">
               <Fact label={t('verify.field.withdrawnOn', 'Withdrawn on')} value={phase.data.revoked_on} />
             </dl>
+          )}
+
+          {/* Shown only at `described` (#1627). */}
+          {phase.kind === 'ready' && !phase.data.verified && phase.data.replaced_by && (
+            <div className="space-y-3" data-testid="verify-replaced-by">
+              <p className="text-sm" dir="auto">
+                {t(
+                  'verify.replacedByBody',
+                  'Revision {revision} replaced it. Ask the organisation for that one.',
+                  { revision: phase.data.replaced_by.revision }
+                )}
+              </p>
+              <dl className="space-y-3 text-sm">
+                <Fact
+                  label={t('verify.field.replacedBy', 'Replaced by revision')}
+                  value={phase.data.replaced_by.revision}
+                  monospaceLtr
+                />
+                {/* @date-display-ignore: the public verification surface, governed by
+                    `documents.qr_public_detail` and not by `ui.hide_dates`, as above; the
+                    server has already reduced the value to a date. */}
+                <Fact label={t('verify.field.replacedOn', 'Replaced on')} value={phase.data.replaced_by.issued_on} />
+              </dl>
+            </div>
           )}
 
           {recordId !== null &&

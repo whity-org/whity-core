@@ -6721,6 +6721,7 @@ final class CoreApiSchemas
             // List rows omit it; GET /{id} and saves return it.
             'DocumentSource' => self::object([
                 'numbering' => SchemaBuilder::ref('DocumentNumbering') + ['nullable' => true, 'description' => 'How documents from this template are numbered, when it has its own rule'],
+                'public_name' => self::str(true) + ['description' => 'What kind of document this makes, in words for strangers: the kind the public check shows at the `described` level. Null shows no kind.'],
                 'id' => self::int(),
                 'tenant_id' => self::int(),
                 'kind' => ['type' => 'string', 'enum' => ['template', 'letter', 'report', 'note', 'wiki', 'label']],
@@ -6749,6 +6750,7 @@ final class CoreApiSchemas
                 'updated_at' => self::str(),
             ], ['id', 'tenant_id', 'kind', 'title', 'lang', 'default_view', 'full_width', 'draft_version', 'scope', 'created_at', 'updated_at']),
             'DocumentSourceAudienceRequest' => self::object([
+                'public_name' => self::str(true) + ['description' => 'What kind of document this makes, for the public check (\'Handover certificate\'), at most 120 characters; null or empty for none. Never a customer\'s name. Needs documents:publish.'],
                 'numbering' => SchemaBuilder::ref('DocumentNumbering') + ['nullable' => true, 'description' => 'How documents from this template are numbered; it wins over a slot\'s rule. Needs documents:publish.'],
                 'scope' => ['type' => 'string', 'enum' => ['personal', 'tenant', 'global', 'system']] + ['description' => 'Who can see the document: `personal` (only its creator), `tenant`, `global` or `system`. Anything but personal needs documents:publish.'],
                 'required_permission' => self::str(true) + ['description' => 'A permission a reader must also hold to see a shared document; null for none. Needs documents:publish.'],
@@ -13127,7 +13129,9 @@ final class CoreApiSchemas
                         . '`documents.qr_public_detail` to `stage`, which adds the current routing verb '
                         . 'and distinguishes a revoked code from an unrecognised one, or LOWER it to '
                         . '`undated`, which withholds `issued_on` and leaves everything else as '
-                        . '`minimal`. It never returns a '
+                        . '`minimal`. `described` adds to `stage` the kind (the template\'s public name), '
+                        . 'the revision letter, the page count, and on a revised document\'s code which '
+                        . 'revision replaced it. It never returns a price, the document number, a '
                         . 'document id, a title, any content, any recipient, or any name of a person or '
                         . 'unit — a signed-in reader who wants the record calls '
                         . 'GET /api/documents/by-verification/{token}, where RBAC decides unchanged.',
@@ -13175,13 +13179,34 @@ final class CoreApiSchemas
                                             ],
                                             'stage' => [
                                                 'type' => 'string',
-                                                'description' => 'Only at the `stage` disclosure level',
+                                                'description' => 'Only at the `stage` and `described` disclosure levels',
                                                 'enum' => ['issued', 'forwarded', 'acknowledged', 'returned', 'noted'],
                                             ],
                                             'stage_on' => [
                                                 'type' => 'string',
                                                 'nullable' => true,
                                                 'description' => 'Date only, and only at the `stage` level',
+                                            ],
+                                            'kind' => [
+                                                'type' => 'string',
+                                                'description' => 'Only at `described`, and only when the template has a public name: what kind of document it is. Never its title.',
+                                            ],
+                                            'revision' => [
+                                                'type' => 'string',
+                                                'description' => 'Only at `described`: the revision letter, A for the first',
+                                            ],
+                                            'pages' => [
+                                                'type' => 'integer',
+                                                'description' => 'Only at `described`, and only when the render service reported it',
+                                            ],
+                                            'replaced_by' => [
+                                                'type' => 'object',
+                                                'description' => 'Only at `described`, on a refused code whose document was revised',
+                                                'properties' => [
+                                                    'revision' => ['type' => 'string'],
+                                                    'issued_on' => ['type' => 'string', 'nullable' => true],
+                                                ],
+                                                'required' => ['revision', 'issued_on'],
                                             ],
                                         ],
                                         'required' => ['verified'],

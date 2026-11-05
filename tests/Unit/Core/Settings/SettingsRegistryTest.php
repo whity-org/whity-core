@@ -231,7 +231,7 @@ final class SettingsRegistryTest extends TestCase
         // quieter level must not change what an existing tenant discloses.
         self::assertNull(SettingsRegistry::validate('documents.qr_public_detail', 'undated'));
         self::assertSame(
-            ['undated', 'minimal', 'stage'],
+            ['undated', 'minimal', 'stage', 'described'],
             SettingsRegistry::optionsFor('documents.qr_public_detail')
         );
         // 18: 16 on develop (#1014's quorum was the sixteenth) plus these two.

@@ -86,6 +86,7 @@ export async function patchTemplate(
     required_permission?: string | null;
     owner_ou_id?: number | null;
     numbering?: DocumentNumberingRule | null;
+    public_name?: string | null;
   },
   fallback: string
 ): Promise<string | null> {
