@@ -8843,13 +8843,17 @@ export interface components {
         };
         DocumentPublishBlocker: {
             /** @enum {string} */
-            kind: "open-suggestions" | "missing-plugin" | "block-without-print-view" | "unknown-field" | "theme-unavailable";
+            kind: "open-suggestions" | "missing-plugin" | "block-without-print-view" | "unknown-field" | "theme-unavailable" | "too-large";
             count?: number;
             plugin?: string;
             blockId?: string;
             path?: string;
             /** @description With theme-unavailable: the theme the document names that the workspace doesn't have */
             ref?: string;
+            /** @description With too-large: what printing the template sends Whity Render, in bytes, before any record's values */
+            bytes?: number;
+            /** @description With too-large: the render size ceiling (documents.flow_max_bytes), in bytes */
+            max?: number;
         };
         DocumentPublishCheckResponse: {
             data: components["schemas"]["DocumentPublishBlocker"][];

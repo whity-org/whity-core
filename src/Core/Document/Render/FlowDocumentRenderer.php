@@ -105,14 +105,10 @@ final class FlowDocumentRenderer
      */
     public function renderLabels(int $tenantId, array $payload): RenderedDocument
     {
-        $encoded = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-        if ($encoded === false) {
-            throw DocumentRenderRejectedException::because('Labels could not be encoded for rendering: ' . json_last_error_msg());
-        }
-        $maxBytes = $this->ceiling($this->settings->effective($tenantId), SettingsRegistry::DOCUMENTS_FLOW_MAX_BYTES);
-        if (strlen($encoded) > $maxBytes) {
+        $size = self::size($this->settings, $tenantId, $payload, 'Labels');
+        if ($size['bytes'] > $size['max']) {
             throw DocumentRenderRejectedException::because(
-                'The labels exceed the maximum render size (' . strlen($encoded) . " bytes, max {$maxBytes})"
+                "The labels exceed the maximum render size ({$size['bytes']} bytes, max {$size['max']})"
             );
         }
 
@@ -161,23 +157,46 @@ final class FlowDocumentRenderer
             );
         }
 
-        // Measured on the ENCODED payload, not estimated from the tree: figures
-        // are `data:` URIs and a single embedded scan can be most of a
-        // document's weight, so anything short of encoding it would be guessing
-        // at the number the limit is actually about.
+        $size = self::size($this->settings, $tenantId, $payload);
+        if ($size['bytes'] > $size['max']) {
+            throw DocumentRenderRejectedException::because(
+                "Document exceeds the maximum render size ({$size['bytes']} bytes, max {$size['max']})"
+            );
+        }
+    }
+
+    /**
+     * A payload's render size against this tenant's size ceiling
+     * (`documents.flow_max_bytes`), without rendering or refusing anything.
+     *
+     * The one measure of "too large to print": the render paths above refuse
+     * on it, and publishing a template asks it of the payload printing would
+     * send (#1435), so the two can't disagree about what fits. Static, and
+     * needing only the settings, because a publish check must answer even on
+     * an instance whose render service isn't configured yet.
+     *
+     * Measured on the ENCODED payload, not estimated from the tree: figures
+     * are `data:` URIs and a single embedded scan can be most of a document's
+     * weight, so anything short of encoding it would be guessing at the number
+     * the limit is actually about.
+     *
+     * @param array<string, mixed> $payload
+     * @return array{bytes: int, max: int}
+     *
+     * @throws DocumentRenderRejectedException The payload can't be encoded at all.
+     */
+    public static function size(SettingsService $settings, int $tenantId, array $payload, string $what = 'Document'): array
+    {
         $encoded = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         if ($encoded === false) {
             throw DocumentRenderRejectedException::because(
-                'Document could not be encoded for rendering: ' . json_last_error_msg()
+                $what . ' could not be encoded for rendering: ' . json_last_error_msg()
             );
         }
+        $effective = $settings->effective($tenantId);
+        $key = SettingsRegistry::DOCUMENTS_FLOW_MAX_BYTES;
 
-        $maxBytes = $this->ceiling($effective, SettingsRegistry::DOCUMENTS_FLOW_MAX_BYTES);
-        if (strlen($encoded) > $maxBytes) {
-            throw DocumentRenderRejectedException::because(
-                'Document exceeds the maximum render size (' . strlen($encoded) . " bytes, max {$maxBytes})"
-            );
-        }
+        return ['bytes' => strlen($encoded), 'max' => (int) ($effective[$key] ?? SettingsRegistry::defaultFor($key))];
     }
 
     /**
