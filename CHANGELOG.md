@@ -209,8 +209,9 @@ uses tag-based releases (see the `v*` tags in the repository).
   Before this, the API checked a token's signature but not its type. A temporary
   token from the password step could skip two-step sign-in, and refresh, device and
   AI app tokens acted with the person's full permissions, past an app's scope and
-  after it was disconnected. A signed-out session's access token now also stops
-  working at once, not when it expires. Update if you run an earlier version
+  after it was disconnected. The access token a person signs out with now also
+  stops working at once, not when it expires; an older one from before a refresh
+  still runs out on its own, within 15 minutes. Update if you run an earlier version
   (WHIT-903).
 
 ## [0.2.24] - 2026-11-03
