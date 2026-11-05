@@ -5765,6 +5765,67 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/public-form-keys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * This workspace's public form keys
+         * @description Revoked keys included, newest first. `meta.forms` is what a key can be issued for. A key can't be read back: this returns its name and first characters.
+         */
+        get: operations["get_api_v1_public_form_keys"];
+        put?: never;
+        /**
+         * Issue a key that opens a plugin's public form for this workspace
+         * @description The answer is the only time the key can be read.
+         */
+        post: operations["post_api_v1_public_form_keys"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public-form-keys/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Change a key's name or allowed sites */
+        patch: operations["patch_api_v1_public_form_keys_id"];
+        trace?: never;
+    };
+    "/api/v1/public-form-keys/{id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revoke a key, at once and for good
+         * @description Revoking twice changes nothing.
+         */
+        post: operations["post_api_v1_public_form_keys_id_revoke"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/public/forms/{slug}": {
         parameters: {
             query?: never;
@@ -5839,6 +5900,26 @@ export interface paths {
          * @description UNAUTHENTICATED BY DESIGN. The person typing the code may be an end user or a student with no account and no session, so they are authorised by POSSESSION: the code's own entropy and check characters, the pre-auth IP rate limiter, and the fact that every fact used to resolve the activation comes from the code rather than the caller. Nothing the caller sends is trusted, including any tenant they name. Send `serial_number` — the number printed on the unit — when the code is not already bound to one; never an internal id, which a person cannot know and which would let a caller enumerate rows by number. ERRORS NEVER DISTINGUISH AN UNKNOWN CODE FROM A MISTYPED ONE, because doing so would let an anonymous caller learn which well-formed codes exist.
          */
         post: operations["post_api_v1_public_licensing_redeem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/plugin-forms/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What the page of a plugin's public form needs (PUBLIC, rate-limited)
+         * @description The provider and site key for the form's bot check, neither of which is secret. Answers only to a live key, with the same 404 for anything else. An Origin that is sent must be on the key's list or the instance's.
+         */
+        get: operations["get_api_v1_public_plugin_forms_key"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -6180,6 +6261,30 @@ export interface paths {
         head?: never;
         /** Update the current user's language preference */
         patch: operations["patch_api_v1_settings_language"];
+        trace?: never;
+    };
+    "/api/v1/settings/public-forms/bot-check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The instance's bot check for public forms
+         * @description System tenant only. The secret is never returned: `has_secret` says whether one is stored.
+         */
+        get: operations["get_api_v1_settings_public_forms_bot_check"];
+        /**
+         * Change the instance's bot check for public forms
+         * @description System tenant only. A field left out stays as it is. With no provider, every public form is refused unless `allow_without_bot_check` is true. The secret is write-only and encrypted: null or empty clears it.
+         */
+        put: operations["put_api_v1_settings_public_forms_bot_check"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/settings/tabs": {
@@ -11525,6 +11630,31 @@ export interface components {
         PromotionResponse: {
             data: components["schemas"]["Promotion"];
         };
+        PublicFormBotSettingsResponse: {
+            data: {
+                provider: string | null;
+                providers: string[];
+                site_key: string;
+                has_secret: boolean;
+                allow_without_bot_check: boolean;
+                ready: boolean;
+            };
+        };
+        PublicFormBotSettingsUpdateRequest: {
+            provider?: string | null;
+            site_key?: string | null;
+            secret?: string | null;
+            allow_without_bot_check?: boolean;
+        };
+        PublicFormConfigResponse: {
+            data: {
+                accepting: boolean;
+                bot_check: {
+                    provider: string | null;
+                    site_key: string;
+                } | null;
+            };
+        };
         PublicFormField: {
             field_key: string;
             /** @enum {string} */
@@ -11549,6 +11679,52 @@ export interface components {
             position: number;
             visible_when?: components["schemas"]["FormFieldCondition"];
             multi_valued?: boolean;
+        };
+        PublicFormKey: {
+            id: number;
+            plugin: string;
+            form: string;
+            label: string;
+            key_hint: string;
+            allowed_origins: string[];
+            created_at: string;
+            revoked_at: string | null;
+        };
+        PublicFormKeyCreateRequest: {
+            plugin: string;
+            form: string;
+            label: string;
+            allowed_origins?: string[];
+        };
+        PublicFormKeyIssuedResponse: {
+            data: {
+                id: number;
+                plugin: string;
+                form: string;
+                label: string;
+                key_hint: string;
+                allowed_origins: string[];
+                created_at: string;
+                revoked_at: string | null;
+                key: string;
+            };
+        };
+        PublicFormKeyListResponse: {
+            data: components["schemas"]["PublicFormKey"][];
+            meta: {
+                forms: {
+                    plugin: string;
+                    form: string;
+                }[];
+                bot_check_ready: boolean;
+            };
+        };
+        PublicFormKeyResponse: {
+            data: components["schemas"]["PublicFormKey"];
+        };
+        PublicFormKeyUpdateRequest: {
+            label?: string;
+            allowed_origins?: string[];
         };
         PublicFormResponse: {
             data: {
@@ -42896,6 +43072,321 @@ export interface operations {
             };
         };
     };
+    get_api_v1_public_form_keys: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The keys */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicFormKeyListResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_public_form_keys: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublicFormKeyCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description The new key */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicFormKeyIssuedResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No plugin has this form, or a field failed validation */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    patch_api_v1_public_form_keys_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublicFormKeyUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description The changed key */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicFormKeyResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Key not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The key has been revoked */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A field failed validation */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_public_form_keys_id_revoke: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Revoked */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Key not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     get_api_v1_public_forms_slug: {
         parameters: {
             query?: never;
@@ -43216,6 +43707,82 @@ export interface operations {
             };
             /** @description Internal server error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_public_plugin_forms_key: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Whether the form is accepting, and its bot check */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicFormConfigResponse"];
+                };
+            };
+            /** @description This site may not use this key */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No live key at this address */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too many attempts from this address */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Temporarily unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -45418,6 +45985,158 @@ export interface operations {
             };
             /** @description Language selection is disabled on this instance (i18n.enabled is off) */
             503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_settings_public_forms_bot_check: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The settings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicFormBotSettingsResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    put_api_v1_settings_public_forms_bot_check: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublicFormBotSettingsUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description The settings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicFormBotSettingsResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A field failed validation */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };

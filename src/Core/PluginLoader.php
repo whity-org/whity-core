@@ -3187,16 +3187,26 @@ class PluginLoader
             /** @var array<string, mixed> $declared */
             $declared = $route;
             $wantsPublic = array_key_exists('public', $declared) && $declared['public'] !== false;
+            // A public FORM (WHIT-906): `'public' => 'form'`, the only other value.
+            $wantsPublicForm = $wantsPublic && $declared['public'] === 'form';
             if ($wantsPublic) {
-                $refusal = $declared['public'] === true
-                    ? \Whity\Core\Plugin\PluginPublicRoutes::refusal(
+                $refusal = match (true) {
+                    $declared['public'] === true => \Whity\Core\Plugin\PluginPublicRoutes::refusal(
                         $plugin->getName(),
                         (string) $method,
                         (string) $path,
                         $requiredPermission,
                         $requiredRole,
-                    )
-                    : "'public' must be the boolean true";
+                    ),
+                    $wantsPublicForm => \Whity\Core\Plugin\PluginPublicRoutes::formRefusal(
+                        $plugin->getName(),
+                        (string) $method,
+                        (string) $path,
+                        $requiredPermission,
+                        $requiredRole,
+                    ),
+                    default => "'public' must be the boolean true or 'form'",
+                };
                 if ($refusal !== null) {
                     $this->logWarning(
                         "Plugin {$pluginKey} route {$method} {$path} asks to be public: {$refusal}; "
@@ -3211,7 +3221,7 @@ class PluginLoader
                 // OpenAPI declaration through to the router/generator.
                 $schema = isset($route['schema']) && is_array($route['schema']) ? $route['schema'] : null;
 
-                $wrappedHandler = $this->wrapHandler($pluginKey, $handler, $wantsPublic);
+                $wrappedHandler = $this->wrapHandler($pluginKey, $handler, $wantsPublic, $wantsPublicForm);
                 $accepted = $this->router->register(
                     $method,
                     $path,
@@ -3241,9 +3251,15 @@ class PluginLoader
                     // it: a core pattern route registered earlier (first match
                     // wins) could otherwise capture the literal path.
                     $served = $this->router->versionedPath((string) $path);
-                    $resolved = $this->router->match(new \Whity\Core\Request('POST', $served, [], ''));
+                    // A form's path has a parameter, so it is probed with a real value.
+                    $probe = str_replace('{key}', str_repeat('0', 64), $served);
+                    $resolved = $this->router->match(new \Whity\Core\Request('POST', $probe, [], ''));
                     if ($resolved !== null && ($resolved['namespacePrefix'] ?? null) === $namespacePrefix) {
-                        \Whity\Core\Plugin\PluginPublicRoutes::add($namespacePrefix, 'POST', $served);
+                        if ($wantsPublicForm) {
+                            \Whity\Core\Plugin\PluginPublicRoutes::addForm($namespacePrefix, $plugin->getName(), (string) $resolved['path'], (string) $path);
+                        } else {
+                            \Whity\Core\Plugin\PluginPublicRoutes::add($namespacePrefix, 'POST', $served);
+                        }
                     } else {
                         $this->logWarning(
                             "Plugin {$pluginKey} route POST {$path} asks to be public, but another route answers "
@@ -4839,9 +4855,15 @@ class PluginLoader
      * @param callable $handler The raw plugin route handler.
      * @return callable(Request, array<string, string>): Response
      */
-    private function wrapHandler(string $pluginKey, callable $handler, bool $public = false): callable
+    private function wrapHandler(string $pluginKey, callable $handler, bool $public = false, bool $publicForm = false): callable
     {
-        return function (Request $request, array $params = []) use ($pluginKey, $handler, $public): Response {
+        return function (Request $request, array $params = []) use ($pluginKey, $handler, $public, $publicForm): Response {
+            // A public form's handler never runs on a request the gate didn't pass,
+            // however that request got here (WHIT-906).
+            if ($publicForm && \Whity\Sdk\Http\PublicForm::from($request) === null) {
+                return Response::error('Not Found', 404);
+            }
+
             $lifecycle = $this->lifecycles[$pluginKey] ?? null;
 
             if ($lifecycle !== null && $lifecycle->isFailed()) {

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Whity\Core\Plugin;
 
 use Whity\Core\Router;
+use Whity\Sdk\Http\PublicForm;
 use Whity\Sdk\PluginNamespace;
 
 /**
@@ -42,6 +43,12 @@ use Whity\Sdk\PluginNamespace;
  * the raw body before acting on anything in it. That is the same rule core's
  * own webhooks follow.
  *
+ * A PUBLIC FORM (WHIT-906) is the second kind: `'public' => 'form'` on POST
+ * `/api/<slug>/forms/<name>/{key}`, for an anonymous browser rather than a signed
+ * server. {@see self::formRefusal()} decides the shape, and admission needs one
+ * more thing than a webhook's: {@see \Whity\Http\Middleware\PublicFormGate} must
+ * already have passed the request. If the gate isn't running, the route is closed.
+ *
  * PER PROCESS. Every FrankenPHP worker loads plugins at boot and fills its own
  * copy; a disabled, reloaded or uninstalled plugin's routes are removed with
  * its other routes.
@@ -55,6 +62,9 @@ final class PluginPublicRoutes
 
     /** @var array<string, string> "METHOD path" => owner (the plugin's namespace prefix) */
     private static array $owners = [];
+
+    /** @var array<string, array{owner: string, plugin: string, form: string}> served path => the form route */
+    private static array $forms = [];
 
     /**
      * Why a declared public route is refused, or null when it is acceptable.
@@ -84,6 +94,81 @@ final class PluginPublicRoutes
         return null;
     }
 
+    /**
+     * Why a declared public FORM route is refused, or null when it is acceptable.
+     */
+    public static function formRefusal(
+        string $pluginName,
+        string $method,
+        string $path,
+        mixed $requiredPermission,
+        mixed $requiredRole,
+    ): ?string {
+        if (strtoupper($method) !== self::METHOD) {
+            return 'a public form route must be POST';
+        }
+        $slug = PluginNamespace::slug($pluginName);
+        if ($slug === null) {
+            return 'the plugin name yields no namespace slug';
+        }
+        $shape = '#^/api/' . preg_quote($slug, '#') . '/forms/' . self::NAME_PATTERN . '/\{key\}$#D';
+        if (preg_match($shape, $path) !== 1) {
+            return "a public form route must be exactly /api/{$slug}/forms/<name>/{key}, <name> matching " . self::NAME_PATTERN;
+        }
+        if ($requiredPermission !== null || $requiredRole !== null) {
+            return 'a public form route cannot also require a permission or a role';
+        }
+        return null;
+    }
+
+    /** Record a served form route (the router's /api/v1/... pattern). */
+    public static function addForm(string $owner, string $pluginName, string $servedPath, string $declaredPath): void
+    {
+        $segments = explode('/', $declaredPath);
+        self::$forms[$servedPath] = [
+            'owner' => $owner,
+            'plugin' => (string) PluginNamespace::slug($pluginName),
+            'form' => $segments[count($segments) - 2],
+        ];
+    }
+
+    /**
+     * The form route a request is for, or null. It has to be this plugin's own
+     * route that the router resolves, and the key comes from the path alone.
+     *
+     * @return array{owner: string, plugin: string, form: string, key: string}|null
+     */
+    public static function formFor(\Whity\Sdk\Http\Request $request, ?Router $router): ?array
+    {
+        if (self::$forms === [] || $router === null || !str_contains($request->getPath(), '/forms/')) {
+            return null;
+        }
+        // A preflight asks about the POST, so the POST is what gets matched.
+        $route = $router->match(new \Whity\Core\Request(self::METHOD, $request->getPath(), [], ''));
+        $form = $route === null ? null : (self::$forms[$route['path']] ?? null);
+        if ($route === null || $form === null || ($route['namespacePrefix'] ?? null) !== $form['owner']) {
+            return null;
+        }
+
+        return $form + ['key' => (string) ($route['params']['key'] ?? '')];
+    }
+
+    /**
+     * The form routes that can be issued a key, for the admin screen.
+     *
+     * @return list<array{plugin: string, form: string}>
+     */
+    public static function forms(): array
+    {
+        $out = [];
+        foreach (self::$forms as $form) {
+            $out[] = ['plugin' => $form['plugin'], 'form' => $form['form']];
+        }
+        usort($out, static fn (array $a, array $b): int => [$a['plugin'], $a['form']] <=> [$b['plugin'], $b['form']]);
+
+        return $out;
+    }
+
     /** Record a served route (the router's /api/v1/... path) as public. */
     public static function add(string $owner, string $method, string $servedPath): void
     {
@@ -94,12 +179,14 @@ final class PluginPublicRoutes
     public static function removeOwner(string $owner): void
     {
         self::$owners = array_filter(self::$owners, static fn (string $o): bool => $o !== $owner);
+        self::$forms = array_filter(self::$forms, static fn (array $f): bool => $f['owner'] !== $owner);
     }
 
     /** Whether this exact method and served path were registered as public. */
     public static function allows(string $method, string $path): bool
     {
-        return isset(self::$owners[strtoupper($method) . ' ' . $path]);
+        return isset(self::$owners[strtoupper($method) . ' ' . $path])
+            || (strtoupper($method) === self::METHOD && isset(self::$forms[$path]));
     }
 
     /**
@@ -114,6 +201,13 @@ final class PluginPublicRoutes
         if (!$request instanceof \Whity\Core\Request) {
             return false;
         }
+        // A public form: only once the gate has passed it.
+        if ($request->hasAttribute(PublicForm::ATTRIBUTE)
+            && strtoupper($request->getMethod()) === self::METHOD
+            && self::formFor($request, $router) !== null
+        ) {
+            return true;
+        }
         $key = strtoupper($request->getMethod()) . ' ' . $path;
         $owner = self::$owners[$key] ?? null;
         if ($owner === null || $router === null) {
@@ -127,5 +221,6 @@ final class PluginPublicRoutes
     public static function reset(): void
     {
         self::$owners = [];
+        self::$forms = [];
     }
 }

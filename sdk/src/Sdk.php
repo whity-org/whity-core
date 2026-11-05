@@ -968,6 +968,12 @@ namespace Whity\Sdk;
  * {@see Documents\PreflightResult}. `document.issuing` listeners get `check_only` and
  * can answer with `checks` (WHIT-892). Only the host implements these interfaces.
  *
+ * 1.67 (PUBLIC FORMS: a route declared `'public' => 'form'` on POST
+ * `/api/<slug>/forms/<name>/{key}` takes anonymous browser submissions. The host
+ * resolves the tenant from the key and runs the limits, Origin check and bot check
+ * before the handler, which reads the result from {@see Http\PublicForm}. On an
+ * older host the route is not public (WHIT-906).
+ *
  * Purely additive.)
  *
  * 1.68 (DOCUMENT REVISIONS: {@see Hooks\Events::DOCUMENT_REVISED} says a revision replaced

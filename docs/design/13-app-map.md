@@ -6,7 +6,7 @@ The screens of whity-core's web app as they exist in `web/app`, grouped as the s
 
 Sidebar groups: (top) Dashboard · Inbox · Approvals — People — AI — Documents — Platform — Settings. The tenant switcher sits under the logo; the user and account menu at the foot. The system tenant (id 0) sees Platform; tenants see their own items. Plugin items arrive from `GET /api/navigation`.
 
-**Settings (owner decision D1, 31 Oct 2026).** Settings is one item at the foot of the sidebar. It opens a settings area with its own grouped sub-nav: Workspace (General, Branding) · Sign-in and security (Security, SSO, Sign-up) · Email (Email, Email domains) · Data (Storage, Tags, Languages, Translations) · Advanced (Feature flags, Error tracking). Every page keeps its route and permission. The personal account (U04) stays in the user menu, not the sidebar. The area has no card yet (design ask WHIT-826, `DESIGN-ASKS.md`).
+**Settings (owner decision D1, 31 Oct 2026).** Settings is one item at the foot of the sidebar. It opens a settings area with its own grouped sub-nav: Workspace (General, Branding) · Sign-in and security (Security, SSO, Sign-up, Public forms) · Email (Email, Email domains) · Data (Storage, Tags, Languages, Translations) · Advanced (Feature flags, Error tracking). Every page keeps its route and permission. The personal account (U04) stays in the user menu, not the sidebar. The area has no card yet (design ask WHIT-826, `DESIGN-ASKS.md`).
 
 ## Screens
 
@@ -49,6 +49,7 @@ Sidebar groups: (top) Dashboard · Inbox · Approvals — People — AI — Docu
 | A50 | Branding | `/admin/settings/branding` | `TplSettingsGeneral`, `TplAdminBranding` | section 25; settings sub-nav |
 | A51 | Email · email domains | `/admin/settings/email`, `/email-domains` | `TplSettingsEmailDomains`; email in `TplPlatformSettings` | section 25 |
 | A52 | Security · SSO · sign-up | `/admin/settings/security`, `/sso`, `/signup` | `TplSettingsSecurity`, `TplSettingsSSO` | section 25 |
+| A52b | Public forms | `/admin/settings/public-forms` | none yet (ask WHIT-906) | section 25 |
 | A53 | Storage · feature flags · error tracking | `/admin/settings/storage`, `/feature-flags`, `/error-tracking` | `TplPlatformSettings` | section 25 |
 | **Account** | | | | |
 | U01 | Sign in · register · verify email | `/login`, `/register`, `/verify-email` | `TplAuthSignIn` | |

@@ -1424,6 +1424,22 @@ $postAuthRateLimiter = new RateLimitMiddleware(
 
 // Pre-auth IP limiter runs FIRST so a flood is shed before body/CSRF/tenant work.
 $kernel->use($preAuthRateLimiter);
+// A plugin's public form (WHIT-906): before anything that reads a credential, so
+// CSRF and the rest see the anonymous request this gate leaves behind.
+$publicFormKeyRepository = new \Whity\Core\Plugin\PublicForm\PublicFormKeyRepository($db->getPdo());
+$publicFormGlobals = new \Whity\Core\Settings\GlobalSettingsRepository($db->getPdo());
+$publicFormBotCheck = new \Whity\Core\Plugin\PublicForm\BotCheck(
+    $publicFormGlobals,
+    \Whity\Core\Security\EncryptedSecretStore::fromEnv($_ENV),
+    new \Whity\Core\Http\HttpFetcher(),
+);
+$publicFormGate = new \Whity\Http\Middleware\PublicFormGate(
+    $router,
+    $publicFormKeyRepository,
+    new DatabaseSharedStore($db->getPdo()),
+    $publicFormBotCheck,
+);
+$kernel->use($publicFormGate);
 $kernel->use(new RequestBodyValidator());
 $kernel->use(new CsrfGuard());
 $kernel->use($tenantIsolationMiddleware);
@@ -4152,6 +4168,18 @@ $publicFormsHandler = new \Whity\Api\PublicFormsApiHandler(
     // a reason for a second storage path.
     $formUploadStore
 );
+$publicFormKeysHandler = new \Whity\Api\PublicFormKeysApiHandler(
+    $publicFormKeyRepository,
+    $publicFormBotCheck,
+    new DatabaseSharedStore($db->getPdo()),
+    $auditLogger ?? null,
+);
+$router->register('GET', '/api/public-form-keys', [$publicFormKeysHandler, 'index'], null, null, CorePermissions::PUBLIC_FORM_KEYS_MANAGE);
+$router->register('POST', '/api/public-form-keys', [$publicFormKeysHandler, 'issue'], null, null, CorePermissions::PUBLIC_FORM_KEYS_MANAGE);
+$router->register('PATCH', '/api/public-form-keys/{id:\d+}', [$publicFormKeysHandler, 'update'], null, null, CorePermissions::PUBLIC_FORM_KEYS_MANAGE);
+$router->register('POST', '/api/public-form-keys/{id:\d+}/revoke', [$publicFormKeysHandler, 'revoke'], null, null, CorePermissions::PUBLIC_FORM_KEYS_MANAGE);
+$router->register('GET', '/api/public/plugin-forms/{key}', [$publicFormKeysHandler, 'config'], null);
+
 $router->register('GET', '/api/public/forms/{slug}', [$publicFormsHandler, 'render'], null);
 // AN ANONYMOUS UPLOAD (migration 134). `file` fields used to be stripped from
 // the public surface on the grounds that every upload route was gated, so a
@@ -4714,6 +4742,14 @@ $mailSettingsHandler = new \Whity\Api\MailSettingsApiHandler(
 $router->register('GET', '/api/settings/mail/status',        [$mailSettingsHandler, 'status'],      null, null, CorePermissions::SETTINGS_MANAGE);
 $router->register('PUT', '/api/settings/mail/smtp-password', [$mailSettingsHandler, 'setPassword'], null, null, CorePermissions::SETTINGS_MANAGE);
 $router->register('PUT', '/api/settings/mail/oauth-credentials', [$mailSettingsHandler, 'setOAuthCredentials'], null, null, CorePermissions::SETTINGS_MANAGE);
+$publicFormBotSettingsHandler = new \Whity\Api\PublicFormBotSettingsApiHandler(
+    $publicFormGlobals,
+    $publicFormBotCheck,
+    $roleChecker,
+    $auditLogger ?? null,
+);
+$router->register('GET', '/api/settings/public-forms/bot-check', [$publicFormBotSettingsHandler, 'show'], null, null, CorePermissions::SETTINGS_MANAGE);
+$router->register('PUT', '/api/settings/public-forms/bot-check', [$publicFormBotSettingsHandler, 'update'], null, null, CorePermissions::SETTINGS_MANAGE);
 $router->register('POST', '/api/settings/mail/test',         [$mailSettingsHandler, 'test'],        null, null, CorePermissions::SETTINGS_MANAGE);
 
 // 13c. Register the Tenant Branding API (WC-233). Public GET /api/v1/branding
@@ -5450,7 +5486,7 @@ if ($isWorker) {
         // are gated behind development/DEBUG. Decision is computed once per
         // iteration and captured by the request closure below.
         $logLifecycle = WorkerRuntime::shouldLogLifecycle($_ENV);
-        $keepRunning = \frankenphp_handle_request(static function () use ($kernel, $hookManager, $pluginLoader, $db, $logLifecycle, $securityHeaders, $errorTracker, $tenantManifestHost, $documentFieldRegistry) {
+        $keepRunning = \frankenphp_handle_request(static function () use ($kernel, $hookManager, $pluginLoader, $db, $logLifecycle, $securityHeaders, $errorTracker, $tenantManifestHost, $documentFieldRegistry, $publicFormGate) {
             try {
                 // Dispatch request start hook
                 if ($logLifecycle) {
@@ -5475,7 +5511,14 @@ if ($isWorker) {
                 $request = Request::fromGlobals();
 
                 // Resolve CORS headers once per request from the allowlist (WC-53).
-                $corsHeaders = Cors::headers($request->getHeader('Origin'));
+                // A plugin's public form sets its own (WHIT-906): they never allow credentials.
+                $corsHeaders = $publicFormGate->ownsCors($request) ? [] : Cors::headers($request->getHeader('Origin'));
+
+                $publicFormPreflight = $publicFormGate->preflight($request);
+                if ($publicFormPreflight !== null) {
+                    $publicFormPreflight->withHeaders($securityHeaders)->send();
+                    return;
+                }
 
                 // Handle OPTIONS preflight requests for CORS
                 if ($request->getMethod() === 'OPTIONS') {
@@ -5609,7 +5652,14 @@ if ($isWorker) {
         $request = Request::fromGlobals();
 
         // Resolve CORS headers once per request from the allowlist (WC-53).
-        $corsHeaders = Cors::headers($request->getHeader('Origin'));
+        // A plugin's public form sets its own (WHIT-906): they never allow credentials.
+        $corsHeaders = $publicFormGate->ownsCors($request) ? [] : Cors::headers($request->getHeader('Origin'));
+
+        $publicFormPreflight = $publicFormGate->preflight($request);
+        if ($publicFormPreflight !== null) {
+            $publicFormPreflight->withHeaders($securityHeaders)->send();
+            exit;
+        }
 
         // Handle OPTIONS preflight requests for CORS
         if ($request->getMethod() === 'OPTIONS') {
