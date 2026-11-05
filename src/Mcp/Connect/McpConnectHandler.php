@@ -20,8 +20,10 @@ use Whity\Mcp\Tools\ToolsListHandler;
  *   POST /api/mcp/connect/preview  — the tools an app holding a given scope would
  *                                    see, for the caller, before any token exists
  *
- * Both are gated on mcp:tokens:manage at the route, like token issuance: the
- * wizard ends by issuing one.
+ * Neither has a route permission, like token issuance, where the wizard ends: a
+ * person connects their own AI app (#1623). The info is the workspace's settings
+ * and the permission catalogue, and the preview runs the tools/list filter for the
+ * caller, so it shows only what they could already do.
  *
  * The presets are built here, not in the UI, because they are lists of
  * permission names and only the server knows which exist. A preset is a starting
@@ -57,7 +59,7 @@ final class McpConnectHandler
     /** @param array<string, mixed> $params */
     public function info(Request $request, array $params = []): Response
     {
-        $identity = $this->identity();
+        $identity = $this->identity($request);
         if ($identity === null) {
             return Response::error('Unauthenticated', 401);
         }
@@ -94,7 +96,7 @@ final class McpConnectHandler
     /** @param array<string, mixed> $params */
     public function preview(Request $request, array $params = []): Response
     {
-        $identity = $this->identity();
+        $identity = $this->identity($request);
         if ($identity === null) {
             return Response::error('Unauthenticated', 401);
         }
@@ -147,9 +149,14 @@ final class McpConnectHandler
      *
      * @return array{0: int, 1: int}|null
      */
-    private function identity(): ?array
+    private function identity(Request $request): ?array
     {
         $claims = $this->tokenValidator->validateAccessToken();
+        if ($claims === null) {
+            $header = $request->getHeader('Authorization') ?? '';
+            $token  = stripos($header, 'Bearer ') === 0 ? trim(substr($header, 7)) : '';
+            $claims = $token !== '' ? $this->tokenValidator->validateAccessTokenFromBearer($token) : null;
+        }
         if ($claims === null) {
             return null;
         }

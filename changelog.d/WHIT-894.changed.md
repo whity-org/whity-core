@@ -1,0 +1,1 @@
+People can create and revoke their own AI connections without an admin. The permission `mcp:tokens:manage` now only covers seeing and revoking everyone's connections. These routes also accept a bearer access token, for native apps and headless frontends (#1623).
