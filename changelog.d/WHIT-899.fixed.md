@@ -1,1 +1,0 @@
-- **A paused agent is marked as paused before you start using it**, and Agents and Connected AI apps no longer share a menu icon (WHIT-899).

@@ -6,6 +6,213 @@ uses tag-based releases (see the `v*` tags in the repository).
 
 ## [Unreleased]
 
+## [0.2.25] - 2026-11-05
+
+### Added
+
+- **Documents have a number, the record they came from, and a state.** A template or a
+  plugin's slot can number its documents (`INV-{YYYY}-{SEQ:4}`), when issued or on final
+  approval. The number prints, and `q` finds it. The API also returns the record a document
+  was issued from, filterable with `?record=`, `?source_id=` and `?slot=`, a state derived
+  from the routing trail (`draft`, `in_review`, `issued`, `superseded`, `withdrawn`), and the
+  page count of each PDF. Older documents keep working with no number or record (WHIT-684,
+  #1624, SDK 1.65).
+- **Install and update a self-hosted Whity with one command.** The new `whity` command (`npm install -g @whity/cli`) sets up the Docker stack with generated secrets, and `whity update` backs up the database, proves the backup restores, moves all three images to the new version, runs migrations and checks the result. If an update fails, it stops and prints the exact commands to go back. It works in Windows PowerShell as well as on Linux and macOS, and its guide is in English and Arabic (WHIT-840).
+- **Each release now ships its production compose file** as the `whity-compose.yml` asset. It runs the background workers and keeps uploaded files in a volume, so they survive an update (WHIT-840).
+- **Forms can ask for a table of rows or a signature.** A table question takes
+  rows under columns you define, up to 200 rows. A signature question takes a
+  typed full name and records the time on the server, so it can't be backdated
+  (WHIT-855).
+- **A form can be opened to the workspace's members.** An author with `forms:manage`
+  turns this on for one form, and active members can then fill in that form with
+  no permission of their own. It's off on every form, so nobody gains anything
+  when you upgrade (WHIT-859).
+- **A new home page.** Dashboard now opens on Waiting for you: documents from your inbox and agent proposals in one list, oldest first, with Approve and Decline in place. Agents today and, for operators, platform numbers sit beside it. /admin lands here too (WHIT-860).
+- **Inbox and Approvals in plain words.** Inbox rows open when clicked, states read Your decision, To review or Done in your language, and a failed load offers Try again. Approvals shows skeleton rows while loading, and permission codes appear only with Show technical details (WHIT-860).
+- **The sidebar keeps only the current group open.** Opening another group folds the rest (WHIT-860).
+- **Responses show a summary and can be exported.** The Responses tab opens with how many came back, how many a week, where they are in their routing, and one card for each choice question with its most common answers. Export responses downloads them as a spreadsheet file. Free text and files are never summarised (WHIT-861).
+- **A new form builder.** Forms are now built on a canvas that looks like the form: add, move, copy and delete questions, set choices, conditions ("Only if …"), who answers, sections, the button text and the reference number, in English and Arabic side by side. The Forms list, the forms you can fill in and My submissions follow the same design, and the public form now carries the workspace's logo and colour with a small "Built on Whity" credit (WHIT-861).
+- **Choice questions use Whity selects.** Single-choice, person and unit questions on the fill-in pages no longer use the browser's own dropdown (WHIT-861).
+- The people API now returns what the design 2.9 screens show: last active, two-step state and display name on users, with filters by role, unit, two-step and status; people count and built-in on roles; each permission's area and actions; member count on units; a group's current size and where it is used; names and an end date on delegations; the sender on inbox items; and paging and the reason on approval queues.
+- You can change the role of several people at once, require two-step of one person or several, and undo revoking a delegation shortly after. Delegations can have an end date.
+- The Approval gating menu item now shows for anyone holding one of its three permissions, not for a role named admin.
+- The agent pages now show who each agent works for, how much it does on its own, when it was last active and whether it is paused, with Pause and Resume. An agent's page shows what it did today and what it may read.
+- People who manage agents see everyone's agent activity, with a filter by agent.
+- What AI can do lists each action by its plain name in English and Arabic, with its area and what happens if it goes wrong. A change that can't be undone now reads as a proposal.
+- The preset gallery says what each preset does and what it needs, and Connected AI apps says what each app may do.
+- An agent can be paused and resumed. A paused agent is refused on every call, however it signed in, and its waiting proposals can be declined but can't run until it is resumed.
+- Agents now report who they work for, what they did and proposed today, what is waiting and when they were last active, and how much they do on their own.
+- People who manage agents get a workspace-wide activity list, with a filter by agent.
+- Every action AI can take now has a plain name in English and Arabic, an area, and how long Undo lasts, and says what agents can really do with it: a write that can't be undone reads as a proposal.
+- An agent can keep documents for reference. The list never widens what it may read, which stays within each person's own access. Core's presets say what they do and what they need.
+- Added the security design for Verified plugins, with what the code does today, the threat model, the options and the decisions for the owner.
+- **Apps can add a card to the home page (SDK 1.62).** A plugin declares one `homeCard`: a route of its own under one permission gives a number, a few lines and at most one chart, in the person's scope. A workspace plugin's card counts one record type. People hide a card and bring it back with `GET /api/me/home-cards` and `PUT /api/me/home-cards/{key}/hidden`, per person and per workspace (WHIT-872).
+- **The home page is complete.** It greets you by name and reads one merged list of what is waiting. App cards appear under From your apps, each with Hide from home and a Show link at the foot. Your recent documents lists your drafts and what you sent this week, and Finish setting up shows owners and admins what still blocks real work, until it's done (WHIT-872).
+- **One list of what is waiting for you.** `GET /api/me/waiting` merges every inbox source and your agent proposals, oldest first, with the real totals. A source that fails is named and the rest is still served (WHIT-872).
+- **The audit log says what happened in words.** Entries from `GET /api/v1/audit-logs` carry the actor and target by name and a sentence in the reader's language. New filters for an agent and an area, `GET /api/v1/audit-logs/facets` for what they can offer, and `GET /api/v1/audit-logs/export` for a CSV that is tenant-scoped, needs `audit:read`, is safe to open in a spreadsheet, and refuses more than 50000 rows rather than cutting them.
+- **Workspaces carry their plan and status** in `GET /api/v1/tenants`.
+- **Remind for two-step sign-in:** `POST /api/v1/2fa-policies/remind`, once a day per person. Rules say who they cover by name, and the status list gives names and when each person was last reminded.
+- **Change plan:** `POST /api/v1/billing/change-plan` moves the subscription the workspace already holds. A dearer plan is charged now by the billing service; a cheaper one starts at renewal.
+- **A server error gives a reference to quote**, in the JSON body and the `X-Error-Reference` header, and in the server's log.
+- **A maintenance window can be announced** with the `maintenance.active` and `maintenance.until` settings, which `GET /api/v1/status` reports. It is a signal: the API keeps answering.
+- **An invitation names who invited you and as which role** in its preview.
+- **Amounts in words.** JOD money fields on a record offer their amount in words in English and Arabic, and an invoice's detail includes its total in words. It follows section 16 of the design, which still asks for an Arabic-speaking accountant's review, so don't treat it as meeting an invoicing rule yet.
+- **A document can be withdrawn.** Withdraw this document keeps the record and its history, stops its printed codes confirming it, closes anything waiting on it and records who did it in the audit log. It needs the new `documents:withdraw` permission, which roles that can issue documents receive on upgrade. A workspace that shows document stages on its QR page tells the holder the document was withdrawn; at the default level the page gives its usual answer, that the code can't be confirmed (WHIT-874).
+- **Route templates show how often they've been used**, and forms return the name of the route they use, so the builder can show Routed to (WHIT-874).
+- **Responses show people's names, and forms can be previewed and deleted.** A
+  response names who sent it, the forms list shows how many responses each has, an
+  author can preview a draft, and a form nobody has answered can be deleted (WHIT-876).
+- **Responses can be summarised and exported.** A form has a summary of its answers
+  and a CSV download for people who can read its responses. Exports are audited, stay
+  in the workspace, and can't run as a formula when opened in a spreadsheet (WHIT-877).
+- **Members can find forms opened to them.** Once a workspace opens a form to its
+  members, they get Forms and My submissions in the sidebar. Nobody else's sidebar
+  changes, and neither entry grants anything (WHIT-878).
+- **People can withdraw what they sent.** Until somebody has decided on it, a person
+  can take back their own form submission, and the document it produced goes with it.
+  The record and answers are kept, and staff can no longer record a review (WHIT-880).
+- A workspace can install a declarative plugin from the store into itself. It is data that Whity draws, so none of the publisher's code runs, and it installs turned off with a Turn on switch.
+- **Form drafts are kept on the server.** Somebody filling in a form can leave and
+  come back on another device. File and staff answers are not kept, and a draft is
+  removed when the form is sent (WHIT-882).
+- Core can now check a signed statement that a plugin version passed review, using public keys pinned in code, and apply a signed list of withdrawn plugins. No key is pinned yet, so nothing can become Verified.
+- **Plugins get their own file storage and document tracking (SDK 1.63).** A plugin
+  keeps files per workspace through `PluginFiles`, in the platform's storage layer,
+  and a generic upload and download controller can be wired into its routes. It
+  issues documents through `PluginDocuments`, which records each document as the
+  plugin's, and reads back the QR verification code and scan tracking for those
+  documents only (WHIT-886).
+- **Plugins can declare and customize agents (SDK 1.64).** A plugin implements
+  `PluginAgentsInterface` to declare agents under its own name: a persona in English
+  and Arabic, its toolsets, where a person's grant starts, and the feature flags the
+  host offers. A workspace starts an agent from one as its own copy, and a later
+  declaration never changes an agent already made. A plugin cannot declare an agent
+  under another plugin's or core's name, cannot start a write at Allowed, and cannot
+  switch on a feature the host does not expose (WHIT-893).
+- **Anyone can connect an AI app to their own account from the web app.** Connected AI apps is now in everyone's menu and shows the apps connected to your account, with the connect wizard, Renew and Disconnect. People who manage AI connections get a second tab with everyone's. When AI apps are off, the wizard now says who can turn them on: only whoever runs the server, or an organization administrator under Settings (WHIT-899).
+- **Withdraw a form submission from My submissions, and open what you sent.** A person can now take back a submission nobody has acted on, after a dialog saying it can't be undone, and read their own answers without needing permission to read everyone's.
+- **Outgoing email can sign in with OAuth2 as well as a password.** Choose OAuth
+  in the Email settings and enter a Google or Microsoft client ID, client secret
+  and refresh token. Whity fetches and refreshes the access token itself, and the
+  screen says in plain words when the account needs reconnecting. Secrets are
+  encrypted at rest and never shown again, and installs using a password carry on
+  unchanged (WHIT-901).
+- **Download a file attached to a form.** The person who sent it, and anyone who can read the responses, can now open it from the response. It always arrives as a download, only within its own workspace.
+
+### Changed
+
+- **Users and Roles to the new design.** Users has People and Invitations tabs, a Person column with avatars, Invite people as the main button, whole-row click, Deactivate with Undo and a question before revoking an invitation. A person's page has Overview, Access and History tabs, a save bar that names what changed with the old value, and Delete asks first. A role's page has Overview, Access, People and History tabs and the same save bar. History reads in words and permissions show in plain words; codes appear only with Show technical details (WHIT-860).
+- **Delegations, Relations, Units, Registrations and approvals in plain words.** Delegations name who and where instead of Role #3, and ask before revoking. Family relations search and sort on the server, ask before removing a relation, and show access denied in both views. A unit's drawer has Members, Roles here and Details tabs and only shows actions the person may use. Sign-up rejections ask first, password and two-step approvals ask for the email to be typed, and requests show when they were made (WHIT-860).
+- **The signed-in form page's button says Send.** It no longer says Submit (WHIT-861).
+- **The form builder is easier to build long forms in.** The page has one panel with the questions on the left and the selected question's settings on the right, a breadcrumb and a "Changed" line under the title, and no stray scrollbar by the tabs. Add question shows every kind at once and puts the cursor in the new question's wording. Questions can be dragged, or moved with Alt and the arrow keys (WHIT-861).
+- **The form builder says what is missing.** Saving or publishing with a question that has no wording, no choices or no columns lists each one by name and takes you to it. A server refusal about a question does the same. Publish asks first, saying what it opens and what is still missing, such as a language left empty. Forms with more than eight questions get a Jump to a question list, and on narrow screens the question settings open in a side sheet (WHIT-861).
+- **Long forms are easier to work in.** A draft form saves itself when you pause typing, and says when it last did; an open form still saves from the bar, because its questions are live as soon as they are saved. Each section can be folded to its bar, with Collapse sections and Expand sections for all of them. The Set and Empty badges beside English and Arabic text are translated (WHIT-861).
+- **One language selector for the form builder, and clearer question settings.** Choose English, Arabic or Both once and every bilingual field in the settings follows, one input under another with the language named on each. A form can be written in one language: switch the other off in Settings and its fields and warnings go away (text already written stays; this is kept in the browser, not on the server). The question settings are grouped under headings: The question, Choices (each in its own box), What can be answered, Who answers, When it is asked, Where it sits (WHIT-861).
+- **Your account page is in tabs, and settings pickers use the design system's select.** Profile, Sign-in and security, Sessions and devices, and Preferences (text size, Show technical details, language) each open from their own tab, and a link keeps you on the tab you were on. In workspace settings, the time zone, language, sign-in provider, default role and fixed-choice pickers are no longer the browser's own menus. Licensed devices now appear in the settings menu for people who may view them.
+- **Workspaces, plan prices and promotions are easier to read and harder to get wrong.** Searching workspaces now searches all of them on the server. Deleting one asks you to type its name. Plan prices and fixed-amount promotions are typed as amounts (JOD 49.000, not 49000), and retiring a price offers Undo for ten seconds.
+- **The audit log and error inbox lead with plain words.** People, ids, IP addresses, detail blobs, error classes and file locations appear only when Show technical details is on. The system statistics cards use the design system's colours, and the language creation dialog's direction picker is no longer the browser's own menu.
+- **Billing says what it can't do.** Someone who can see the workspace's invoices but not pay them is told so and who to ask. A failed invoice load offers Try again, a row opens the invoice, and the column that said "Outstanding" now says "Still to pay".
+- **Tags are one page, and Translations leads with coverage.** Tag groups and their tags are on a single Tags page: each group with its tags in a line, and a drawer to rename the group and add, rename or remove its tags (old tag-group links still work). On Translations, each language shows its coverage as a tile, wording filters apply as you type, "Only untranslated" is a switch, and keys and Add Key appear only with Show technical details.
+- **Fewer raw codes and old wording on workspace screens.** The audit log says what happened in words (the code appears with Show technical details), General settings no longer quotes a permission code, a workspace's billing enforcement is explained in words, the email-domain role reads as a name, and affiliate amounts show as amounts (JOD 12.500), not minor units. Statistics and Tenants use sentence case.
+- **Dates read as "25 Aug 2026, 14:02" everywhere, and two controls reach the 40px size.** Dates now write the month as a word (so 3/11 can't be misread), times are 24-hour, and digits stay Western digits in Arabic. Sortable table headers and the top search box are 40px tall.
+- **Sign-in and system pages follow design 2.9.** Sign-in puts single sign-on first (including Whity ID as "Continue with Whity ID"), asks for the two-step code in six boxes you can paste into, and the new-password page ticks the password rules as you type. Pages that don't exist and unexpected errors now say what happened and what to do next, with a reference to copy.
+- **A document's page has tabs, and routing lives inside it.** Open a document and
+  you get Document, Routing, History and Verification, with Download PDF and Print
+  as buttons. The old circulation address and the inbox link now open the Routing
+  tab. Notes and wiki, templates and routes got the new table, wording and a
+  one-sentence description of each route; the route editor draws top to bottom
+  and can be renamed (WHIT-864).
+- The plugin store has Store and Installed tabs, a page for each plugin, and an install dialog. Installed plugins are a table with a row menu, and operator tools (upload, reload) sit in a menu only for people who can use them.
+- Users has Role, Unit, Two-step and status filters, the Unit, Two-step and Last active columns, and a bulk bar to change role or require two-step. A person's page lets you edit their name and require two-step.
+- A role's Access tab is a grid of areas by See, Create, Change, Delete and Approve, and the roles list shows how many people hold each role and which roles are built in.
+- User groups show how many people are in each now and where it is used, and units show their member count.
+- Delegations show who gave them, can have an end date, and revoke at once with Undo.
+- The inbox shows who an item came from and whether you approved or rejected it. Approval requests page and show why the person asked.
+- Confirming a two-step recovery now takes a button press, with an optional reason, instead of happening when the link opens.
+- Previewing a form and deleting a form now have plain names in English and Arabic on What AI can do.
+- Plugins: `plugins:install` now installs from a store, apart from `plugins:upload`. Uninstalling keeps a plugin and its data for 30 days, with Reinstall. Updates are by hand, and one asking for new access waits for approval. The store shows price, usage and what a plugin adds, every third-party plugin is marked Not verified, and Plugins is one sidebar item.
+- **Dashboard is in everyone's sidebar, and server statistics are for operators.** The Dashboard link now opens the home page for every member. Server statistics move to a new System link under Platform, shown only in the system workspace. **Workspace owners no longer see them:** `GET /api/admin/stats` answers only in the system workspace, and `stats:read` no longer follows `users:read` (WHIT-872).
+- **The audit log reads as sentences.** It groups by day, names people and agents, filters by who, agent, area and when, and exports a CSV. Codes, ids and addresses appear only with Show technical details on.
+- **Tenants show their plan and status,** and two-step rules say who they cover by name, with a Remind button for anyone who has not set it up.
+- **Change plan on Billing.** A person who can pay compares the other plans and moves to one, after a dialog that says when the change takes effect.
+- **A maintenance window shows** as a notice at the top of the app and on the status page. It stops nobody working. Set it from Feature flags, with an optional time you expect to be back.
+- **An invitation says who invited you and as which role,** and a server error page shows the reference to quote.
+- **The Email domains page and tab follow `email_domains:manage`** instead of a role named admin, so a renamed administrative role still sees them.
+- **People on documents appear by name for everyone who can read the document.** The library, a document's page and notes and wiki pages no longer need `users:read` to name who raised or handled something, and no longer show "Account #". Only names are shared, never email addresses, and only for people on what you can already see (WHIT-874).
+- **Tenants is only in the system tenant's sidebar.** Workspace admins no longer see
+  Tenants or its Create Tenant button, which only ever ended in a refusal for them.
+  They reach their workspace's record from Settings General instead (WHIT-879).
+- **People can connect their own AI apps without an admin.** Anyone signed in can
+  create, revoke and adjust their own connections, and each one can still do no
+  more than they can. `mcp:tokens:manage` now only covers seeing and revoking
+  everyone's. These routes also accept a bearer access token, for native apps and
+  headless frontends (#1623).
+
+### Fixed
+
+- **Home platform numbers load, for operators only.** The Platform card on the home page read the wrong part of the statistics response and always showed an error; it now shows the numbers, and only to people in the system workspace (WHIT-860).
+- **Plainer Roles, Groups, Units, Users and Delegations.** Empty lists say what the place is for instead of No data available, plugin role names such as hello_viewer read as Hello viewer, the units page says units, the delegation dialog lists permissions in words with codes behind Show technical details, and the tab strips no longer show a stray scroll arrow. /admin/approval-gating opens the sign-ups tab instead of a 404 (WHIT-860).
+- **Plans can be created from the screen, and a refused page says so.** Plans and pricing has a New plan button (it only existed in the API). Plans and pricing, Promotions and the error inbox now say "You don't have access" when the server refuses the request, instead of showing "No unresolved errors" or "Failed to load" beside "No promotions yet". A failed load offers Try again.
+- **Pages you can't open now say so in plain words.** Agents, Users, Workspaces, What AI can do, Documents, Billing, Plugins, Settings, Translations, Notifications, the error inbox and System statistics show "You don't have access to …" when the server refuses the request, instead of "Failed to load" with Try again, an empty list, or a permission code. The permission appears only with Show technical details. The audit log hides its filters and Export when you can't open it. The Tenants list and System statistics are the system tenant's: a workspace admin is told they have no access (their own workspace record is still reached from Settings).
+- **Arabic is complete for the workspace screens, and fewer raw codes show.** Notification delivery, Billing (plans, payment history), Licensed devices, plan tiers and the sidebar items for forms, billing, user groups, route templates, meetings and convening bodies now have Arabic. A route step that names specific people says so instead of "explicit", the connect-an-AI-app warning no longer quotes a server setting (it appears with Show technical details), role names read as words in the statistics, and two feature flags have plain names.
+- **Trusted plugin stores can be set from Settings.** The global settings now have a "Plugin store" section with a "Trusted plugin stores" field (comma-separated addresses, in plain words and Arabic), so the plugin store page no longer sends the operator to a field that did not exist. Nothing about validation changed: installing still accepts only secure public stores, and only the platform operator sees the field. A workspace admin is now told to ask whoever runs the platform, and no longer reads that a plugin "runs for every workspace". A workspace with no slug can be renamed without typing one, "Back" on a workspace admin's own record says "Back to settings", and permission names on the delegation dialog are shown in the person's language.
+- **Document routing and issuing read better.** Sending a document to someone now
+  shows their name and updates the Awaiting count straight away. Issuing a document
+  starts with empty fields (examples are hints, not values), form-raised documents
+  show the form's name instead of its code, a template's editor says Templates,
+  and the routing messages and library description are in plain words (WHIT-864).
+- **The route editor now follows dark mode, and a few A3 screens read properly.**
+  Stage cards are no longer white on a dark canvas, the editor has a breadcrumb and
+  a start marker, template visibility is in plain words, and the date picker and the
+  "no unit" folder message are translated (WHIT-864).
+- A date picked in the shared date field now reaches the form, on the day picked. Delegations saved with no end date, birth dates were lost and promotion end dates did not save. Delegations already saved with no end date keep none, and need revoking and granting again to get one.
+- The colour and time fields built on the same input now report what was picked as well.
+- Dropdowns are the 40px the design calls for, not 28px, and the language selects, table filters, toast Undo and sidebar group headings are no longer below the small control size.
+- Saving a person's role updates their Access tab straight away, and plugin roles read as words everywhere on a person's page and in delegations.
+- The delegate dialog groups permissions by area with a search box, and says "Whole workspace" and "unit" instead of "Tenant-wide" and "OU".
+- The bulk dialog no longer flashes "the 0 selected" as it closes, and says "this person" when one person is selected.
+- Plugin roles read as words in the Invite dialog and the other people dialogs, and in a route's stages, so you see "Hello viewer" rather than `hello_viewer`.
+- **People are no longer signed out at random when a screen loads.** After the
+  15-minute access token expired, a screen's parallel requests each renewed the
+  session, and the extras were refused and signed the person out. The browser now
+  renews once, across tabs too. A throttled or failing refresh no longer signs
+  anyone out either (WHIT-868).
+- **The sidebar no longer leads workspace admins to pages that refuse them.** Plans
+  and pricing, Promotions and Errors now show only for the system tenant, and
+  Approval Gating opens on a tab the workspace can use. Email, Storage, Languages
+  and Feature flags moved to the Platform group (WHIT-875).
+- **Operators in the system workspace stay signed in.** Refreshing a session in the system tenant (tenant 0) was refused, so operators were signed out every 15 minutes. The refresh endpoint now accepts the system tenant, and still refuses a missing or negative tenant claim (#1601).
+- **A paused agent is marked as paused before you start using it**, and Agents and Connected AI apps no longer share a menu icon (WHIT-899).
+- **The form builder stops saving once a form is saved.** It kept saving every few seconds with the save bar stuck and Preview disabled, because labels came back with their languages in a different order. It also waits for a new choice to have wording.
+- **Unsent form answers are kept on the server.** People can carry on from another device, see when the draft was last saved, and find drafts on My submissions and the forms list.
+- **A withdrawn submission says Withdrawn.** It used to read as "Not sent anywhere" on My submissions and the Responses tab.
+- **The form page and forms list stop asking for what a member can't read.** Opening a form no longer produces refused requests in the background.
+- **Response exports read properly in Arabic and English.** Headings and routing words follow the export language, and dates are readable and marked as UTC.
+- **New documents from a form show the form's name.** They showed its internal key in the library and on the record.
+- **People can open a document routed to them.** A member with the default role saw the
+  item in their inbox, but opening it said "This document could not be loaded". A recipient of
+  a route can now read that document and its PDFs and act on it, with no new role. Everyone
+  else gets the same answer as before, and agents reach exactly what they did (WHIT-902).
+- **A new table question no longer saves itself forever.** The form builder compares what it holds with what the server last accepted, so a question the server stores slightly differently stops looking changed, and Preview becomes available again.
+- **A refused save is tried once.** It waits for your next edit instead of repeating the same message every few seconds.
+- **Reading a form is clearer.** Date answers read as 20 Nov 2026 on the review step and on a response, a question hidden by its rule no longer says "No answer", the rule on a question shows the choice in your language, and the Add question menu no longer overlaps at narrower widths.
+
+### Security
+
+- Turning off two-step sign-in or regenerating backup codes now asks for a current code, a backup code or your password, on the server as well as on the page. Before, a borrowed or stolen session could do either with one click. Accounts that sign in through an identity provider use a code. Scripts calling these two routes must now send `code` or `password`.
+- Only the system tenant can install, upload, turn on or off, remove or reload plugins. A plugin runs for every workspace on the deployment, and a workspace administrator could previously upload and run one. Workspaces still see the list, without the deployment's errors and file names.
+- **A development dependency is updated for a Symfony path advisory.**
+  `symfony/filesystem` moves to v8.1.11 for GHSA-6prc-h956-hxjq. It is a
+  development tool here and isn't in the production image. Composer now resolves
+  dependencies for PHP 8.4.27, the version the image runs (WHIT-895).
+- **Only a signed-in session's access token now counts as a sign-in on the API.**
+  Before this, the API checked a token's signature but not its type. A temporary
+  token from the password step could skip two-step sign-in, and refresh, device and
+  AI app tokens acted with the person's full permissions, past an app's scope and
+  after it was disconnected. A signed-out session's access token now also stops
+  working at once, not when it expires. Update if you run an earlier version
+  (WHIT-903).
+
 ## [0.2.24] - 2026-11-03
 
 ### Added

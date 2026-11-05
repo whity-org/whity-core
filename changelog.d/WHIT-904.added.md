@@ -1,1 +1,0 @@
-- **Download a file attached to a form.** The person who sent it, and anyone who can read the responses, can now open it from the response. It always arrives as a download, only within its own workspace.

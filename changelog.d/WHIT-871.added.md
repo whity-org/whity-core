@@ -1,1 +1,0 @@
-- Added the security design for Verified plugins, with what the code does today, the threat model, the options and the decisions for the owner.

@@ -1,3 +1,0 @@
-- The people API now returns what the design 2.9 screens show: last active, two-step state and display name on users, with filters by role, unit, two-step and status; people count and built-in on roles; each permission's area and actions; member count on units; a group's current size and where it is used; names and an end date on delegations; the sender on inbox items; and paging and the reason on approval queues.
-- You can change the role of several people at once, require two-step of one person or several, and undo revoking a delegation shortly after. Delegations can have an end date.
-- The Approval gating menu item now shows for anyone holding one of its three permissions, not for a role named admin.
