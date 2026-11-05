@@ -281,6 +281,44 @@ final class DocumentsApiHandler
     }
 
     /**
+     * POST /api/documents/{id}/revisions — a new document that replaces this one, from
+     * the record as it is now (#1625). The body is `{reason, template?, record?}`.
+     *
+     * @param array<string, string> $params
+     */
+    public function revise(Request $request, array $params): Response
+    {
+        $resolved = $this->resolveVisibleDocument($request, $params);
+        if ($resolved instanceof Response) {
+            return $resolved;
+        }
+        [$tenantId, $callerId, $document] = $resolved;
+        $body = JsonBody::parsed($request);
+
+        try {
+            $issued = $this->templateIssuing()->revise(
+                new ActingAs($tenantId, $callerId, $this->permissionResolver($callerId, $tenantId)),
+                $document,
+                $body['reason'] ?? null,
+                $body['template'] ?? null,
+                $body['record'] ?? null,
+            );
+        } catch (DocumentIssueRefused $e) {
+            return Response::error($e->clientMessage, $e->status, $e->details);
+        } catch (\Throwable $e) {
+            error_log('[DocumentsApiHandler] revising the document failed: ' . $e->getMessage());
+
+            return Response::error('The revision could not be created', 503);
+        }
+
+        return Response::json([
+            'data' => DocumentPresenter::document($issued['document'], $issued['artifacts']),
+            'render' => $issued['render'],
+            'diff' => $issued['diff'],
+        ], 201);
+    }
+
+    /**
      * POST /api/documents/preflight — would this issue, and if not, why? The body is
      * an issue's. Nothing is written and no number is allocated. Always 200 with the
      * answer, since "no, because" is what was asked for.
@@ -640,6 +678,9 @@ final class DocumentsApiHandler
 
         if (($document['withdrawn_at'] ?? null) !== null) {
             return Response::error('This document has been withdrawn, so it cannot be corrected', 409);
+        }
+        if (($document['superseded_by'] ?? null) !== null) {
+            return Response::error('A later revision replaced this document, so correct that one', 409);
         }
 
         $effective = $this->settings->effective($tenantId);

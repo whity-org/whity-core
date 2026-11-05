@@ -45,6 +45,7 @@ use Whity\Core\i18n\ServerLabels;
  *   preflight.why.render_unavailable = PDFs can't be made on this instance
  *   preflight.why.persist_unavailable = PDFs can't be stored on this instance
  *   fields.issuedDocument.number = This document's number
+ *   fields.issuedDocument.revision = This document's revision
  *   fields.month.january = January
  *   fields.month.february = February
  *   fields.month.march = March

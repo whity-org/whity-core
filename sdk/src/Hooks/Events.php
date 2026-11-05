@@ -122,6 +122,13 @@ final class Events
     public const DOCUMENT_NUMBERED = 'document.numbered';
     public const DOCUMENT_NUMBERED_ASYNC = 'document.numbered.async';
 
+    /**
+     * SDK 1.68: a revision replaced a document. Payload: `id`, `supersedes_id`, `reason`,
+     * `actor`, `number`, `revision`. It also fires `document.issued` for the new document.
+     */
+    public const DOCUMENT_REVISED = 'document.revised';
+    public const DOCUMENT_REVISED_ASYNC = 'document.revised.async';
+
     // ---- platform ----
     public const NAVIGATION_REGISTER = 'navigation.register';
     public const PERMISSION_REGISTERED = 'permission.registered';

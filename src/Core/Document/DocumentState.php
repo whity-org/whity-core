@@ -14,8 +14,7 @@ use Whity\Core\Document\Routing\RouteVerdict;
  * In order, the first that holds:
  *
  *   withdrawn   `withdrawn_at` is set (migration 201). The record stays readable.
- *   superseded  A later revision replaced it. Named here for the API's vocabulary;
- *               nothing reaches it until revisions exist (#1625).
+ *   superseded  Another document says it replaces this one (`supersedes_id`).
  *   in_review   A route has an open item: `closed_by_event_id IS NULL`.
  *   draft       Nobody has the document and it isn't out yet: its newest route
  *               ended rejected, or it waits for a final approval to be numbered.
@@ -44,16 +43,29 @@ final class DocumentState
     {
     }
 
+    /** A revision as people say it: 1 is A, 26 is Z, 27 is AA. */
+    public static function revisionLetter(int $revision): string
+    {
+        $letters = '';
+        for ($n = max($revision, 1); $n > 0; $n = (int) (($n - 1) / 26)) {
+            $letters = chr(65 + ($n - 1) % 26) . $letters;
+        }
+
+        return $letters;
+    }
+
     /**
      * @param bool        $withdrawn     `withdrawn_at` is set.
+     * @param bool        $superseded    A later revision replaced it.
      * @param bool        $routingOpen   A route on it has an open item.
      * @param string|null $latestVerdict The newest verdict on its newest route.
      * @param bool        $awaitsNumber  It has a numbering rule and no number yet.
      */
-    public static function derive(bool $withdrawn, bool $routingOpen, ?string $latestVerdict, bool $awaitsNumber): string
+    public static function derive(bool $withdrawn, bool $superseded, bool $routingOpen, ?string $latestVerdict, bool $awaitsNumber): string
     {
         return match (true) {
             $withdrawn => self::WITHDRAWN,
+            $superseded => self::SUPERSEDED,
             $routingOpen => self::IN_REVIEW,
             $latestVerdict === RouteVerdict::REJECTED, $awaitsNumber => self::DRAFT,
             default => self::ISSUED,

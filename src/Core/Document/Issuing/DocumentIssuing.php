@@ -9,6 +9,7 @@ use Throwable;
 use Whity\Core\Document\DocumentArtifactRepository;
 use Whity\Core\Document\DocumentIssuer;
 use Whity\Core\Document\DocumentRepository;
+use Whity\Core\Document\DocumentState;
 use Whity\Core\Document\DocumentSourceVersionRepository;
 use Whity\Core\Document\Print\SourceDocumentPrinter;
 use Whity\Core\Document\Print\WhityDocumentPrinter;
@@ -68,6 +69,9 @@ final class DocumentIssuing
     /** The field a template prints a document's number with. */
     public const NUMBER_FIELD = 'issued_document.number';
 
+    /** The field a template prints a document's revision letter with. */
+    public const REVISION_FIELD = 'issued_document.revision';
+
     /** The limits one rendered document spends. */
     public const RENDER_METERS = [
         EntitlementRegistry::DOCUMENTS_RENDER_PER_DAY,
@@ -99,6 +103,16 @@ final class DocumentIssuing
         return ($source['published_version'] ?? null) !== null
             ? $this->versions->find((int) $source['id'], $tenantId, (int) $source['published_version'])
             : null;
+    }
+
+    /**
+     * The version a document printed, for a revision that keeps its template as it was.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function version(int $tenantId, int $sourceId, int $version): ?array
+    {
+        return $this->versions->find($sourceId, $tenantId, $version);
     }
 
     /**
@@ -177,7 +191,9 @@ final class DocumentIssuing
         $event = self::issuingEvent($request, $actor);
         $this->veto(Events::DOCUMENT_ISSUING, $event);
 
-        $numbering = self::rule($source, $request->numbering);
+        // A revision keeps its original's number and rule; it never starts a series.
+        $replaced = $request->revisionOf;
+        $numbering = $replaced === null ? self::rule($source, $request->numbering) : null;
         $record = TemplateIssuing::parseRecord($request->record);
 
         try {
@@ -189,8 +205,13 @@ final class DocumentIssuing
                     'source_id' => (int) $source['id'],
                     'source_version' => (int) $version['version'],
                     'origin_key' => $originKey,
-                    'number_pattern' => $numbering?->pattern,
+                    'number_pattern' => $replaced !== null ? ($replaced['number_pattern'] ?? null) : $numbering?->pattern,
                     'number_now' => $numbering?->assign === DocumentNumberingRule::ON_ISSUE,
+                    'number' => $replaced['number'] ?? null,
+                    'number_assigned_at' => $replaced['number_assigned_at'] ?? null,
+                    'supersedes_id' => $replaced['id'] ?? null,
+                    'revision' => $replaced !== null ? (int) ($replaced['revision'] ?? 1) + 1 : 1,
+                    'revision_reason' => $request->revisionReason,
                     'record_type' => $record[0] ?? null,
                     'record_id' => $record[1] ?? null,
                     'slot' => $request->slot,
@@ -200,6 +221,14 @@ final class DocumentIssuing
                 [array_map(static fn (?string $v): string => $v ?? '', $values)],
             );
         } catch (PDOException $e) {
+            // Two people revising one document: the unique index let one through.
+            if ($replaced !== null) {
+                $current = $this->documents?->findById((int) $replaced['id'], $tenantId);
+                if (($current['superseded_by'] ?? null) !== null) {
+                    throw new DocumentRevisionConflictException((int) $current['superseded_by']);
+                }
+                throw $e;
+            }
             // Two requests with the same origin key at once: the unique index
             // let one through, and the other answers with that one's document.
             $existing = $originKey !== null ? $this->documents?->findByOriginKey($originKey, $tenantId) : null;
@@ -211,6 +240,17 @@ final class DocumentIssuing
         }
         $event = ['id' => (int) $document['id'], 'number' => $document['number'] ?? null] + $event;
         $this->announce(Events::DOCUMENT_ISSUED, $event);
+        if ($replaced !== null) {
+            $this->announce(Events::DOCUMENT_REVISED, [
+                'id' => (int) $document['id'],
+                'tenant_id' => $tenantId,
+                'supersedes_id' => (int) $replaced['id'],
+                'number' => $document['number'] ?? null,
+                'revision' => DocumentState::revisionLetter((int) $document['revision']),
+                'reason' => $request->revisionReason,
+                'actor' => $callerId,
+            ]);
+        }
 
         // The verification code is minted now, with the record, whether or not
         // a PDF follows: the record page shows it, and a later render (or a
@@ -530,6 +570,7 @@ final class DocumentIssuing
         // Stored on the record, and read from it for every print: an issue, a
         // correction and a reprint after final approval all show the same one.
         $values[self::NUMBER_FIELD] = isset($document['number']) ? (string) $document['number'] : null;
+        $values[self::REVISION_FIELD] = DocumentState::revisionLetter((int) ($document['revision'] ?? 1));
 
         $printer = $this->printer($actor, $source, $values);
         $payload = $this->print->payload(

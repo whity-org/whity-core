@@ -2582,6 +2582,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/documents/{id}/revisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Issue a revision that replaces this document, from its record as it is now
+         * @description A new document with the same number and the next revision letter, linked by `supersedes_id`. The fields are read again from the record; a template's own fields carry over. The original's state becomes `superseded` and its verification codes stop verifying. `diff` says what changed. Refused for a document with no record (`no_record`), a withdrawn one (`withdrawn`), one already replaced (`already_revised`) and one still in review (`in_review`).
+         */
+        post: operations["post_api_v1_documents_id_revisions"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/documents/{id}/routes": {
         parameters: {
             query?: never;
@@ -8346,8 +8366,20 @@ export interface components {
             record_id?: string | null;
             /** @description The template slot it was issued through */
             slot?: string | null;
+            /** @description Its revision letter. The number stays the same across revisions: INV-2026-0142 rev B. */
+            revision?: string;
+            /** @description Why this revision was issued */
+            revision_reason?: string | null;
+            /** @description The document this revision replaces */
+            supersedes_id?: number | null;
+            /** @description The revision that replaced this document */
+            superseded_by?: number | null;
+            /** @description That revision's letter */
+            superseded_by_revision?: string | null;
+            /** @description When it was replaced */
+            superseded_on?: string | null;
             /**
-             * @description Where it is, derived from the routing trail and never stored. `in_review`: a route has an open item. `draft`: its newest route ended rejected, or it waits for final approval to be numbered. `withdrawn`: taken back; the record stays. `issued`: everything else. Absent where a route did not read it.
+             * @description Where it is, derived from the routing trail and never stored. `in_review`: a route has an open item. `draft`: its newest route ended rejected, or it waits for final approval to be numbered. `superseded`: a later revision replaced it. `withdrawn`: taken back; the record stays. `issued`: everything else. Absent where a route did not read it.
              * @enum {string}
              */
             state?: "draft" | "in_review" | "issued" | "superseded" | "withdrawn";
@@ -8724,6 +8756,39 @@ export interface components {
         };
         DocumentResponse: {
             data: components["schemas"]["Document"];
+        };
+        DocumentRevisionRequest: {
+            /** @description Why it is being replaced, at most 1000 characters */
+            reason: string;
+            /**
+             * @description The version it printed (default), or the template's latest published version
+             * @enum {string}
+             */
+            template?: "pinned" | "latest";
+            /** @description If sent, it must be the record the document was issued from, as `type:id` */
+            record?: string;
+        };
+        DocumentRevisionResponse: {
+            data: components["schemas"]["Document"];
+            /** @description Whether a PDF was stored, as on POST /api/documents */
+            render: Record<string, never>;
+            diff: {
+                /** @description Field path => value, new in this revision */
+                added: {
+                    [key: string]: string;
+                };
+                /** @description Field path => value, gone from this revision */
+                removed: {
+                    [key: string]: string;
+                };
+                /** @description Field path => what it said and says now */
+                changed: {
+                    [key: string]: {
+                        from: string;
+                        to: string;
+                    };
+                };
+            };
         };
         DocumentRoute: {
             id: number;
@@ -26349,6 +26414,113 @@ export interface operations {
                 };
             };
             /** @description Rendering or persistence is disabled, or the render service is unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_documents_id_revisions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DocumentRevisionRequest"];
+            };
+        };
+        responses: {
+            /** @description The new revision, whether it was rendered, and what changed */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentRevisionResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No such document or template, or the caller can't see it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `withdrawn`, `already_revised`, `in_review`, `vetoed`, `version_gone`, `template_unpublished` or `record_type_changed` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `no_record`, `no_source`, a missing or too long reason, or required fields with no value */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The revision could not be created */
             503: {
                 headers: {
                     [name: string]: unknown;
