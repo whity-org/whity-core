@@ -87,6 +87,23 @@ interface StorageDriverInterface
      */
     public function move(string $source, string $destination): void;
 
+    /**
+     * Every key that starts with $prefix, in ascending order.
+     *
+     * The prefix is a directory-like string such as `tenants/42/reports/`; the
+     * match is recursive, so keys in sub-directories are returned too. The
+     * keys are returned exactly as they were written, so a caller can pass one
+     * straight to {@see get()}. An absent prefix is an empty list, not an error.
+     *
+     * Added in SDK 1.63 (WHIT-886) for the plugin file store, which must list
+     * its own files without knowing them in advance.
+     *
+     * @return list<string>
+     *
+     * @throws StorageException On unexpected driver errors.
+     */
+    public function list(string $prefix): array;
+
     // ------------------------------------------------------------------
     // Metadata
     // ------------------------------------------------------------------

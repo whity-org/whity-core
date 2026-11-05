@@ -83,6 +83,11 @@ final class TenantRoutingStorageDriver implements StorageDriverInterface
         return $this->driverForKey($key)->lastModified($key);
     }
 
+    public function list(string $prefix): array
+    {
+        return $this->driverForKey($prefix)->list($prefix);
+    }
+
     public function temporaryUrl(string $key, int $expiresInSeconds = 3600): string
     {
         return $this->driverForKey($key)->temporaryUrl($key, $expiresInSeconds);

@@ -1234,11 +1234,23 @@ class AuthHandler
             'user' => [
                 'id'        => $profileId,
                 'email'     => $email,
+                // WHIT-872: the home greets a person by name.
+                'display_name' => $this->profileDisplayName($profileId),
                 'role'      => $role,
                 'tenant_id' => $activeTenantId,
             ],
             'memberships' => $memberships,
         ], 200);
+    }
+
+    private function profileDisplayName(int $profileId): ?string
+    {
+        // @tenant-guard-ignore: profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
+        $stmt = $this->db->prepare('SELECT display_name FROM profiles WHERE id = ?');
+        $stmt->execute([$profileId]);
+        $name = $stmt->fetchColumn();
+
+        return is_string($name) && trim($name) !== '' ? $name : null;
     }
 
     /**
@@ -1983,10 +1995,12 @@ class AuthHandler
         // 0 would mint a session with profile_id=0/active_tenant_id=0 — i.e.
         // SYSTEM-TENANT authority — a privilege escalation. Use is_int (never
         // is_numeric): a numeric string must not be silently coerced here.
+        // active_tenant_id 0 is the real system tenant and is accepted (>= 0).
         $profileId      = $claims['profile_id'] ?? null;
         $activeTenantId = $claims['active_tenant_id'] ?? null;
+        // active_tenant_id 0 is the system tenant (WHIT-1601): valid, so >= 0.
         if (!is_int($profileId) || $profileId <= 0
-            || !is_int($activeTenantId) || $activeTenantId <= 0
+            || !is_int($activeTenantId) || $activeTenantId < 0
         ) {
             return Response::error('Unauthorized', 401);
         }

@@ -12,9 +12,20 @@ export type McpToolVisibility = 'always-on' | 'discoverable' | 'off';
 /** What an AI agent may do with the tool on its own (design §5.11). */
 export type McpAgentPolicy = 'allow' | 'propose' | 'suggest-only' | 'refuse';
 
+/** The most an agent can ever do with it, whatever a person grants (the server's `agentAccess`). */
+export type McpAgentAccess = 'can' | 'proposes' | 'suggests' | 'never';
+
 export interface McpTool {
   /** Tool name, as an MCP client sees it. */
   name: string;
+  /** What it's called, in plain words; `plainNameAr` is null when it has no Arabic. */
+  plainName: string;
+  plainNameAr: string | null;
+  area: { id: string; title: string; titleAr: string | null };
+  agentAccess: McpAgentAccess;
+  readOnly: boolean;
+  /** How long an agent's run of it can be undone; null when it can't. */
+  undoWindowSeconds: number | null;
   description: string;
   /** Required permission slug, or null. */
   requiredPermission: string | null;

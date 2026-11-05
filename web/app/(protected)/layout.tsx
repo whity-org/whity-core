@@ -4,6 +4,7 @@ import { AuthGate } from '@/components/auth-gate';
 import { Sidebar } from '@/components/sidebar';
 import { TopBar } from '@/components/shell/top-bar';
 import { AppCommandPalette } from '@/components/shell/app-command-palette';
+import { MaintenanceNotice } from '@/components/shell/maintenance-notice';
 
 /**
  * The standard app shell: sidebar + a padded, max-width content column.
@@ -36,6 +37,7 @@ export default function ProtectedLayout({
         <main className="flex-1 overflow-auto">
           {/* WHIT-147: the top bar holds search (⌘K); the palette mounts once per shell. */}
           <TopBar />
+          <MaintenanceNotice />
           <div className="p-6 md:p-8 max-w-7xl">{children}</div>
         </main>
         <AppCommandPalette />

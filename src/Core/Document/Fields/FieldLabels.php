@@ -35,6 +35,8 @@ use Whity\Core\i18n\ServerLabels;
  *   fields.month.october = October
  *   fields.month.november = November
  *   fields.month.december = December
+ *   fields.inWords.en = {field} in words (English)
+ *   fields.inWords.ar = {field} in words (Arabic)
  *   fields.yes = Yes
  *   fields.no = No
  */

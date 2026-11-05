@@ -43,9 +43,9 @@ const t = (_key: string, fallback?: string, vars?: Record<string, string | numbe
 };
 
 const CATALOGUE: Permission[] = [
-  { id: 1, name: 'users:read', description: 'Read users' },
-  { id: 2, name: 'users:write', description: 'Write users' },
-  { id: 3, name: 'roles:read', description: 'Read roles' },
+  { id: 1, name: 'users:read', description: 'Read users', area: 'users', areaLabel: 'Users', areaGroup: 'people', actions: ['see'] },
+  { id: 2, name: 'users:write', description: 'Write users', area: 'users', areaLabel: 'Users', areaGroup: 'people', actions: ['create', 'change'] },
+  { id: 3, name: 'roles:read', description: 'Read roles', area: 'roles', areaLabel: 'Roles', areaGroup: 'people', actions: ['see'] },
 ];
 
 /** The role as the server describes it, before any per-region verdict. */
@@ -114,21 +114,14 @@ describe('the permissions region — hidden, read-only, editable', () => {
 
     await openTab('Access');
     await screen.findByTestId('perm-grid');
-    expect(screen.getByTestId('perm-grid-group-users')).toBeInTheDocument();
-    // Editable is the only state that needs the catalogue, and the only state
-    // that fetches it.
     expect(adapter.listPermissions).toHaveBeenCalled();
 
-    const usersGroup = screen.getByTestId('perm-grid-group-users');
-    const usersRead = within(usersGroup)
-      .getByText('users:read')
-      .closest('label')
-      ?.querySelector('input[type="checkbox"]');
-    expect(usersRead).toBeChecked();
-    expect(usersRead).not.toBeDisabled();
+    const usersSee = screen.getByRole('checkbox', { name: 'Users: See' });
+    expect(usersSee).toBeChecked();
+    expect(usersSee).not.toBeDisabled();
   });
 
-  it('READ-ONLY: the ROLE’s own grants, no controls, and a reason — plus the detail', async () => {
+  it('READ-ONLY: the ROLE’s own grants ticked, nothing to change, and a reason — plus the detail', async () => {
     const adapter = renderFor({
       ...ROLE,
       permissions: [CATALOGUE[0]],
@@ -148,12 +141,11 @@ describe('the permissions region — hidden, read-only, editable', () => {
         "(changing this requires the 'roles:manage' permission)"
     );
 
-    // The role's OWN grants, never the installation's catalogue — feeding the
-    // catalogue to a read-only view renders every permission on the deployment
-    // as though the role held it.
-    expect(screen.getByText('users:read')).toBeInTheDocument();
-    expect(screen.queryByText('users:write')).not.toBeInTheDocument();
-    expect(adapter.listPermissions).not.toHaveBeenCalled();
+    // The whole grid with the role's ticks, and nothing that can change them.
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Users: See: allowed' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Users: Change: not allowed' })).toBeInTheDocument();
+    expect(adapter.listPermissions).toHaveBeenCalled();
 
     // The details region is still editable beside it — that is the whole point.
     await openTab('Overview');
@@ -301,8 +293,7 @@ describe('a save carries only the regions this caller may write', () => {
 
     await openTab('Access');
     await screen.findByTestId('perm-grid');
-    const usersGroup = screen.getByTestId('perm-grid-group-users');
-    await user.click(within(usersGroup).getByText('users:write'));
+    await user.click(screen.getByRole('checkbox', { name: 'Users: Change' }));
     await user.click(screen.getByRole('button', { name: 'Save changes' }));
 
     await waitFor(() => expect(updateRole).toHaveBeenCalled());

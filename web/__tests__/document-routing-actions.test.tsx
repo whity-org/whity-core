@@ -227,7 +227,7 @@ describe('RouteFanout', () => {
     expect(screen.getByText(/this route reached nobody/i)).toBeInTheDocument();
   });
 
-  it('falls back to the profile id rather than inventing a name', () => {
+  it('says someone has left rather than showing an id or inventing a name', () => {
     render(
       <RouteFanout
         route={ROUTE}
@@ -238,7 +238,7 @@ describe('RouteFanout', () => {
       />
     );
 
-    expect(screen.getAllByText('Account #42').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('A former member').length).toBeGreaterThan(0);
   });
 });
 

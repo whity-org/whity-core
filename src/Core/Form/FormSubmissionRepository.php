@@ -36,7 +36,7 @@ use PDO;
 final class FormSubmissionRepository
 {
     private const COLUMNS = 's.id, s.tenant_id, s.form_id, s.form_version, s.submitted_by_profile_id,
-                             s.document_id, s.data, s.reference, s.submitted_at, s.created_at,
+                             s.document_id, s.data, s.reference, s.submitted_at, s.created_at, s.withdrawn_at,
                              p.display_name AS submitted_by_name';
 
     public function __construct(private readonly PDO $db)
@@ -62,6 +62,7 @@ final class FormSubmissionRepository
      */
     private const ROUTE_STATE = ",
                        CASE
+                         WHEN s.withdrawn_at IS NOT NULL THEN 'withdrawn'
                          WHEN s.document_id IS NULL THEN 'not routed'
                          WHEN NOT EXISTS (
                            SELECT 1 FROM document_routes dr
@@ -227,6 +228,46 @@ final class FormSubmissionRepository
     }
 
     /**
+     * Take back the author's own submission, unless somebody has already decided on it.
+     *
+     * One statement, so a review or the last approval can't land between the check and
+     * the write. False means nothing changed; the row says why.
+     */
+    public function markWithdrawn(int $tenantId, int $id, int $profileId): bool
+    {
+        $stmt = $this->db->prepare(
+            'UPDATE form_submissions
+                SET withdrawn_at = NOW(), withdrawn_by_profile_id = :withdrawn_by
+              WHERE tenant_id = :tenant_id AND id = :id
+                AND submitted_by_profile_id = :profile_id
+                AND withdrawn_at IS NULL
+                AND NOT EXISTS (
+                    SELECT 1 FROM form_submission_reviews r
+                     WHERE r.submission_id = form_submissions.id AND r.tenant_id = form_submissions.tenant_id
+                )
+                AND NOT (
+                    EXISTS (
+                        SELECT 1 FROM document_routes dr
+                         WHERE dr.document_id = form_submissions.document_id AND dr.tenant_id = form_submissions.tenant_id
+                    )
+                    AND NOT EXISTS (
+                        SELECT 1 FROM document_route_recipients rc
+                         WHERE rc.document_id = form_submissions.document_id AND rc.tenant_id = form_submissions.tenant_id
+                           AND rc.closed_by_event_id IS NULL
+                    )
+                )'
+        );
+        $stmt->execute([
+            ':withdrawn_by' => $profileId,
+            ':tenant_id' => $tenantId,
+            ':id' => $id,
+            ':profile_id' => $profileId,
+        ]);
+
+        return $stmt->rowCount() === 1;
+    }
+
+    /**
      * How many submissions a form has received.
      *
      * Asked by the builder so an author about to change a published form can see
@@ -326,6 +367,7 @@ final class FormSubmissionRepository
             // published schema declares an object.
             'data' => $data === [] ? new \stdClass() : $data,
             'submitted_at' => (string) $row['submitted_at'],
+            'withdrawn_at' => $row['withdrawn_at'] ?? null,
             'created_at' => (string) $row['created_at'],
         ];
 

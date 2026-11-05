@@ -95,6 +95,46 @@ final class UserGroupRepository
     }
 
     /**
+     * Where each of these groups is used: the route templates with a step naming it.
+     *
+     * Steps are read and filtered here because the group id sits inside `rule_config`,
+     * which is JSON on PostgreSQL and text on SQLite. A tenant's group steps are few.
+     *
+     * Route templates are the only thing that can name a group today. A route on an
+     * issued document keeps the recipients it resolved, so it does not depend on the
+     * group any more; forms and document templates have no way to reference one.
+     *
+     * @param array<int, int> $groupIds
+     * @return array<int, list<array{id: int, name: string}>> Group id => templates, by name.
+     */
+    public function routeTemplatesUsing(int $tenantId, array $groupIds): array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT s.rule_config, t.id, t.name
+               FROM document_route_template_steps s
+               JOIN document_route_templates t ON t.id = s.template_id AND t.tenant_id = s.tenant_id
+              WHERE s.tenant_id = :tenant_id AND s.rule_kind = 'group'
+              ORDER BY t.name ASC, t.id ASC"
+        );
+        $stmt->execute([':tenant_id' => $tenantId]);
+
+        $wanted = array_flip($groupIds);
+        $seen = [];
+        $usage = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $config = json_decode((string) $row['rule_config'], true);
+            $groupId = is_array($config) && isset($config['group_id']) ? (int) $config['group_id'] : 0;
+            if (!isset($wanted[$groupId]) || isset($seen[$groupId . ':' . $row['id']])) {
+                continue;
+            }
+            $seen[$groupId . ':' . $row['id']] = true;
+            $usage[$groupId][] = ['id' => (int) $row['id'], 'name' => (string) $row['name']];
+        }
+
+        return $usage;
+    }
+
+    /**
      * A page of this tenant's groups.
      *
      * Ordered by whatever {@see listSpec()} allowed the caller to ask for,

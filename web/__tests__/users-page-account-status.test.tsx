@@ -145,8 +145,9 @@ describe('UsersPage account status (WC-user-status)', () => {
       expect(screen.getByText('alice')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('Active')).toBeInTheDocument();
-    expect(screen.getByText('Deactivated')).toBeInTheDocument();
+    const table = screen.getByRole('table');
+    expect(within(table).getByText('Active')).toBeInTheDocument();
+    expect(within(table).getByText('Deactivated')).toBeInTheDocument();
   });
 
   it('offers "Deactivate" for an active user and calls PATCH with accountStatus: inactive', async () => {

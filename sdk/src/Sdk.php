@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.61).
+ * SDK identity (v1.64).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -925,13 +925,39 @@ namespace Whity\Sdk;
  * write at Allowed; {@see Manifest\PluginManifest::agentPresets()} reads them
  * (WHIT-818).
  *
+ * Purely additive.) ->
+ * 1.62 (HOME CARDS: the optional {@see PluginHomeCardInterface} and `homeCard` in
+ * `plugin.json` add one card to the home page. It reads a GET route the plugin
+ * registered under the same permission, or counts a record type in a workspace
+ * plugin; {@see Manifest\HomeCardValidator} checks it and
+ * {@see Manifest\PluginManifest::homeCard()} reads it (WHIT-872).
+ *
+ * Purely additive.) ->
+ * 1.63 (PLUGIN FILES AND DOCUMENT TRACKING: the host services {@see Storage\PluginFiles}
+ * and {@see Documents\PluginDocuments} give a plugin its own files, kept per plugin
+ * and per workspace in the platform's storage layer, and its own documents, issued
+ * through {@see Documents} and recorded as the plugin's, with a QR verification code
+ * and the scan tracking for those documents only. {@see Storage\PluginFileController}
+ * is a generic upload and download endpoint a plugin wires into its own routes.
+ * {@see Storage\PluginFileStore::list()} is new and the storage driver gains a
+ * `list()` (WHIT-886).
+ *
+ * Purely additive.)
+ * 1.64 (PLUGIN AGENTS: the optional {@see PluginAgentsInterface} lets a plugin
+ * declare or customize agents under its own toolset root: a persona in English
+ * and Arabic, toolsets, where a person's grant starts, and the host feature
+ * flags it turns on ({@see Manifest\AgentFeatures}). Checked by
+ * {@see Manifest\AgentDeclarationValidator}, which refuses another plugin's or
+ * core's agent, a write at Allowed, and an unknown feature. Re-declaring a key
+ * with a higher version customizes it.
+ *
  * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.61.0';
+    public const VERSION = '1.64.0';
 
     /**
      * Static identity only — never instantiated.

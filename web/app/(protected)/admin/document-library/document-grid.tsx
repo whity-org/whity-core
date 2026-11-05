@@ -2,6 +2,7 @@
 
 import { useTranslation } from '@whity/features/i18n';
 import { useDateDisplay } from '@whity/features/datetime';
+import { Badge } from '@whity/ui/badge';
 import { Button } from '@whity/ui/button';
 import { EmptyState } from '@whity/ui/empty-state';
 import { Skeleton } from '@whity/ui/skeleton';
@@ -139,6 +140,11 @@ export function DocumentGrid({
                 </div>
                 <p dir="auto" className="truncate text-xs text-muted-foreground">
                   {row.template_name}
+                  {(row.withdrawn_at ?? null) !== null && (
+                    <Badge variant="destructive" className="ms-2">
+                      {t('organizer.table.withdrawn', 'Withdrawn')}
+                    </Badge>
+                  )}
                 </p>
               </div>
               <StarButton row={row} busy={handlers.busy} onToggleStar={handlers.onToggleStar} />

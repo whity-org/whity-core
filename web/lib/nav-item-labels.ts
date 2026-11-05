@@ -44,6 +44,7 @@ export function useNavItemLabels(): Record<string, string> {
       'platform-email': t('sidebar.item.platformEmail', 'Email'),
       'platform-storage': t('sidebar.item.platformStorage', 'Storage'),
       'platform-feature-flags': t('sidebar.item.platformFeatureFlags', 'Feature flags'),
+      'member-forms': t('sidebar.item.memberForms', 'Forms'),
       translations: t('sidebar.item.translations', 'Translations'),
       settings: t('sidebar.item.settings', 'Settings'),
     }),

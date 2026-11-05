@@ -63,11 +63,11 @@ const EDITABLE_SECTIONS = {
 };
 
 const CATALOGUE: Permission[] = [
-  { id: 1, name: 'users:read', description: 'Read users' },
-  { id: 2, name: 'users:write', description: 'Write users' },
-  { id: 3, name: 'roles:read', description: 'Read roles' },
-  { id: 4, name: 'roles:write', description: 'Write roles' },
-  { id: 5, name: 'ous:read', description: 'Read OUs' },
+  { id: 1, name: 'users:read', description: 'Read users', area: 'users', areaLabel: 'Users', areaGroup: 'people', actions: ['see'] },
+  { id: 2, name: 'users:write', description: 'Write users', area: 'users', areaLabel: 'Users', areaGroup: 'people', actions: ['create', 'change'] },
+  { id: 3, name: 'roles:read', description: 'Read roles', area: 'roles', areaLabel: 'Roles', areaGroup: 'people', actions: ['see'] },
+  { id: 4, name: 'roles:write', description: 'Write roles', area: 'roles', areaLabel: 'Roles', areaGroup: 'people', actions: ['create', 'change'] },
+  { id: 5, name: 'ous:read', description: 'Read OUs', area: 'units', areaLabel: 'Organisational units', areaGroup: 'people', actions: ['see'] },
 ];
 
 const TENANT_ROLE: RoleWithPermissions = {
@@ -158,28 +158,19 @@ describe('RoleRecordScreen — the record and its form', () => {
     expect(adapter.getRole).toHaveBeenCalledTimes(1);
   });
 
-  it('shows the whole permission catalogue grouped by resource, with the role\'s own set ticked', async () => {
+  it('shows areas by action, with the role\'s own set ticked', async () => {
     renderRecord();
 
     await openTab('Access');
     await screen.findByTestId('perm-grid');
-    // One section per resource prefix, all present at once.
-    expect(screen.getByTestId('perm-grid-group-users')).toBeInTheDocument();
-    expect(screen.getByTestId('perm-grid-group-roles')).toBeInTheDocument();
-    expect(screen.getByTestId('perm-grid-group-ous')).toBeInTheDocument();
+    expect(screen.getByTestId('perm-grid-area-users')).toBeInTheDocument();
+    expect(screen.getByTestId('perm-grid-area-roles')).toBeInTheDocument();
+    expect(screen.getByTestId('perm-grid-area-units')).toBeInTheDocument();
 
-    const usersGroup = screen.getByTestId('perm-grid-group-users');
-    const usersRead = within(usersGroup)
-      .getByText('users:read')
-      .closest('label')
-      ?.querySelector('input[type="checkbox"]');
-    const usersWrite = within(usersGroup)
-      .getByText('users:write')
-      .closest('label')
-      ?.querySelector('input[type="checkbox"]');
-
-    expect(usersRead).toBeChecked();
-    expect(usersWrite).not.toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Users: See' })).toBeChecked();
+    // One permission fills two cells, so both follow it.
+    expect(screen.getByRole('checkbox', { name: 'Users: Create' })).not.toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Users: Change' })).not.toBeChecked();
   });
 
   /**
@@ -208,8 +199,8 @@ describe('RoleRecordScreen — the record and its form', () => {
     await screen.findByTestId('perm-grid');
     await user.type(screen.getByTestId('perm-grid-search'), 'ous');
 
-    expect(screen.getByTestId('perm-grid-group-ous')).toBeInTheDocument();
-    expect(screen.queryByTestId('perm-grid-group-users')).not.toBeInTheDocument();
+    expect(screen.getByTestId('perm-grid-area-units')).toBeInTheDocument();
+    expect(screen.queryByTestId('perm-grid-area-users')).not.toBeInTheDocument();
   });
 
   it('saves name, description and the permission set through the adapter', async () => {
@@ -223,9 +214,7 @@ describe('RoleRecordScreen — the record and its form', () => {
     await user.type(nameInput, 'Support Tier 2');
 
     await openTab('Access');
-    const usersGroup = screen.getByTestId('perm-grid-group-users');
-    const usersWrite = within(usersGroup).getByText('users:write');
-    await user.click(usersWrite);
+    await user.click(screen.getByRole('checkbox', { name: 'Users: Change' }));
 
     await user.click(screen.getByRole('button', { name: 'Save changes' }));
 
@@ -468,19 +457,19 @@ describe('RoleRecordScreen — read-only is a state, not a disabled form', () =>
   });
 
   /**
-   * A read-only page shows the ROLE'S permissions, never the installation's
-   * whole catalogue — otherwise a viewer reads "this role can do everything".
+   * A read-only page shows the whole grid with this role's ticks, so a viewer sees
+   * what it cannot do as well as what it can, and can change neither.
    */
-  it('shows only the role\'s own permissions when read-only', async () => {
+  it('ticks only the role\'s own permissions when read-only, and nothing can change', async () => {
     renderRecord({ adapter: fakeAdapter({ getRole: jest.fn().mockResolvedValue(GLOBAL_ROLE) }) });
 
     await openTab('Access');
     await screen.findByTestId('perm-grid');
-    expect(screen.getByText('users:read')).toBeInTheDocument();
-    expect(screen.getByText('roles:read')).toBeInTheDocument();
-    // In the catalogue, not on the role.
-    expect(screen.queryByText('users:write')).not.toBeInTheDocument();
-    expect(screen.queryByText('ous:read')).not.toBeInTheDocument();
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Users: See: allowed' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Roles: See: allowed' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Users: Change: not allowed' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Organisational units: See: not allowed' })).toBeInTheDocument();
   });
 });
 

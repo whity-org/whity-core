@@ -51,6 +51,9 @@ use Whity\Mcp\Prompts\Prompt;
 use Whity\Mcp\Prompts\PromptRegistry;
 use Whity\Mcp\Tools\AuthoredToolRegistry;
 use Whity\Sdk\PluginAgentPresetsInterface;
+use Whity\Sdk\PluginAgentsInterface;
+use Whity\Sdk\PluginHomeCardInterface;
+use Whity\Sdk\Manifest\HomeCardValidator;
 use Whity\Sdk\PluginDocumentsInterface;
 use Whity\Sdk\PluginFrontendInterface;
 use Whity\Sdk\PluginInterface;
@@ -254,7 +257,7 @@ class PluginLoader
      * is that screen not in my navigation?" has no other place to look, and
      * until now the answer existed only in a container log.
      *
-     * @var array<string, array{plugin: PluginInterface, namespacePrefix: string, hooks: array<array{event: string, callback: callable}>, frontendFeatures: list<array<string, mixed>>, droppedFrontendFeatures: list<array{plugin: string, featureId: string|null, reason: string}>, themeOverrideRoute: array{plugin: string, path: string, requiredPermission: ?string, handler: callable}|null}>
+     * @var array<string, array{plugin: PluginInterface, namespacePrefix: string, hooks: array<array{event: string, callback: callable}>, frontendFeatures: list<array<string, mixed>>, droppedFrontendFeatures: list<array{plugin: string, featureId: string|null, reason: string}>, themeOverrideRoute: array{plugin: string, path: string, requiredPermission: ?string, handler: callable}|null, homeCard: array<string, mixed>|null}>
      */
     private array $registeredPlugins = [];
 
@@ -1834,6 +1837,7 @@ class PluginLoader
             'frontendFeatures' => [],
             'droppedFrontendFeatures' => [],
             'themeOverrideRoute' => null,
+            'homeCard' => null,
         ];
         // Mark administratively disabled so reEnablePlugin() re-registers its
         // capabilities from this retained instance.
@@ -1995,6 +1999,7 @@ class PluginLoader
             $this->registeredPlugins[$pluginKey]['frontendFeatures'] = $registered['frontendFeatures'];
             $this->registeredPlugins[$pluginKey]['droppedFrontendFeatures'] = $registered['droppedFrontendFeatures'];
             $this->registeredPlugins[$pluginKey]['themeOverrideRoute'] = $registered['themeOverrideRoute'];
+            $this->registeredPlugins[$pluginKey]['homeCard'] = $registered['homeCard'];
             unset($this->administrativelyDisabled[$pluginKey]);
         }
 
@@ -3008,6 +3013,7 @@ class PluginLoader
             'frontendFeatures' => $registered['frontendFeatures'],
             'droppedFrontendFeatures' => $registered['droppedFrontendFeatures'],
             'themeOverrideRoute' => $registered['themeOverrideRoute'],
+            'homeCard' => $registered['homeCard'],
         ];
 
         // The plugin is now fully registered and ready to serve.
@@ -3089,7 +3095,7 @@ class PluginLoader
      * @param PluginInterface $plugin The plugin instance to register.
      * @param string $namespacePrefix The plugin namespace prefix.
      * @param string $pluginKey Stable identity (original FQCN) for bookkeeping.
-     * @return array{hooks: array<array{event: string, callback: callable}>, frontendFeatures: list<array<string, mixed>>, droppedFrontendFeatures: list<array{plugin: string, featureId: string|null, reason: string}>, themeOverrideRoute: array{plugin: string, path: string, requiredPermission: ?string, handler: callable}|null}
+     * @return array{hooks: array<array{event: string, callback: callable}>, frontendFeatures: list<array<string, mixed>>, droppedFrontendFeatures: list<array{plugin: string, featureId: string|null, reason: string}>, themeOverrideRoute: array{plugin: string, path: string, requiredPermission: ?string, handler: callable}|null, homeCard: array<string, mixed>|null}
      */
     private function registerCapabilities(
         PluginInterface $plugin,
@@ -3482,6 +3488,22 @@ class PluginLoader
             }
         }
 
+        // 2a-quater-ter. Plugin agents (SDK 1.64, WHIT-893). Same shape: optional,
+        //     and a bad declaration is dropped with a logged reason while the
+        //     plugin keeps loading. They join the plugin's presets, so a workspace
+        //     starts an agent from one as a copy. Scope is the plugin's own root:
+        //     another plugin's or core's agent, a write at Allowed, and an unknown
+        //     feature are refused.
+        if ($plugin instanceof PluginAgentsInterface && $this->agentPresetRegistry !== null && $this->permissionRegistry !== null) {
+            try {
+                foreach ($this->agentPresetRegistry->registerPluginAgents($pluginKey, $plugin->getAgents(), $this->permissionRegistry->exists(...)) as $reason) {
+                    $this->logWarning("[Plugin:{$pluginKey}] getAgents(): {$reason}.");
+                }
+            } catch (Throwable $e) {
+                $this->handlePluginThrowable($pluginKey, $e, 'getAgents');
+            }
+        }
+
         // 2a-quinquies. Register declared SETTINGS (#713 item 1). Same shape as
         //     every declaration above: an OPTIONAL interface, so a plugin that
         //     needs no configuration implements nothing and is skipped, and the
@@ -3606,12 +3628,64 @@ class PluginLoader
             $registeredGetHandlers
         );
 
+        // 6. The plugin's optional home card (SDK 1.62, WHIT-872), same philosophy.
+        $homeCard = $this->collectHomeCard($plugin, $pluginKey, $registeredGetRoutes);
+
         return [
             'hooks' => $registeredHooks,
             'frontendFeatures' => $collected['features'],
             'droppedFrontendFeatures' => $collected['dropped'],
             'themeOverrideRoute' => $themeOverrideRoute,
+            'homeCard' => $homeCard,
         ];
+    }
+
+    /**
+     * Collect and validate a plugin's optional home card (SDK 1.62, WHIT-872).
+     *
+     * Fail-closed like {@see collectThemeOverrideRoute()}: a throwing declaration, a
+     * bad shape, or a source that isn't a GET route THIS plugin registered under the
+     * card's own permission is dropped with a logged warning, and the plugin keeps
+     * loading. The permission must match so the person who is offered the card can
+     * read what it shows, and a `record` card is for workspace plugins, which don't
+     * come through here.
+     *
+     * @param array<string, string|null> $registeredGetRoutes GET path => requiredPermission, ACTUALLY registered for this plugin.
+     * @return array<string, mixed>|null
+     */
+    private function collectHomeCard(PluginInterface $plugin, string $pluginKey, array $registeredGetRoutes): ?array
+    {
+        if (!$plugin instanceof PluginHomeCardInterface) {
+            return null;
+        }
+
+        try {
+            $card = $plugin->getHomeCard();
+        } catch (Throwable $e) {
+            $this->handlePluginThrowable($pluginKey, $e, 'home card declaration');
+            return null;
+        }
+        if ($card === null) {
+            return null;
+        }
+
+        $errors = HomeCardValidator::errors($card);
+        if ($errors !== []) {
+            $this->logWarning("Plugin {$pluginKey} declares an invalid home card; ignored: " . implode('; ', $errors));
+            return null;
+        }
+
+        $source = $card['source'] ?? null;
+        if (!is_string($source) || !array_key_exists($source, $registeredGetRoutes)) {
+            $this->logWarning("Plugin {$pluginKey} declares a home card whose source is not a GET route it registered; ignored (fail-closed).");
+            return null;
+        }
+        if ($registeredGetRoutes[$source] !== $card['permission']) {
+            $this->logWarning("Plugin {$pluginKey} declares a home card whose source is gated on another permission; ignored (fail-closed).");
+            return null;
+        }
+
+        return ['plugin' => $plugin->getName()] + $card;
     }
 
     /**
@@ -4633,6 +4707,35 @@ class PluginLoader
         }
 
         return $features;
+    }
+
+    /**
+     * Every active plugin's validated home card (SDK 1.62, WHIT-872), in load order.
+     * A plugin that is disabled or failed contributes none, so its card goes on the
+     * next request and comes back when it does.
+     *
+     * @return list<array{plugin: string, permission: string, source: string, label: array{en: string, ar: string}, caption?: array{en: string, ar: string}, screen?: string, icon?: string}>
+     */
+    public function getHomeCards(): array
+    {
+        $cards = [];
+        foreach ($this->registeredPlugins as $pluginKey => $info) {
+            if (isset($this->administrativelyDisabled[$pluginKey])) {
+                continue;
+            }
+
+            $lifecycle = $this->lifecycles[$pluginKey] ?? null;
+            if ($lifecycle === null || !$lifecycle->isActive()) {
+                continue;
+            }
+
+            if ($info['homeCard'] !== null) {
+                $cards[] = $info['homeCard'];
+            }
+        }
+
+        /** @var list<array{plugin: string, permission: string, source: string, label: array{en: string, ar: string}, caption?: array{en: string, ar: string}, screen?: string, icon?: string}> */
+        return $cards;
     }
 
     /**

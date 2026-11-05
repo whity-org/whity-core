@@ -82,6 +82,23 @@ function redirectToBilling(): void {
   window.location.replace(BILLING_PATH);
 }
 
+/**
+ * The reference the server gave its last 5xx. The 500 page has no response to read
+ * and Next.js only gives server errors a digest, so a crash in the browser after a
+ * failed call would otherwise have nothing to quote to support.
+ */
+let lastErrorReference: string | null = null;
+
+function noteErrorReference(response: Response): void {
+  if (response.status >= 500) {
+    lastErrorReference = response.headers?.get?.('X-Error-Reference') ?? lastErrorReference;
+  }
+}
+
+export function latestErrorReference(): string | null {
+  return lastErrorReference;
+}
+
 export async function apiClient(
   url: string,
   options?: ApiClientOptions
@@ -124,6 +141,7 @@ export async function apiClient(
 
   // Make the initial request
   const response = await fetch(fullUrl, requestInit);
+  noteErrorReference(response);
 
   // The payment wall. Handled BEFORE the 401 branch below because it is not an
   // authentication problem and refreshing a token cannot resolve it — the

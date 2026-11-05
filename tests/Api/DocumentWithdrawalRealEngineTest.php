@@ -131,7 +131,7 @@ final class DocumentWithdrawalRealEngineTest extends TestCase
         $this->withdraw($id, self::OFFICER);
 
         $stmt = $this->pdo->prepare(
-            "SELECT tenant_id, actor_user_id, target_id FROM audit_log
+            "SELECT tenant_id, actor_user_id, target_id, metadata FROM audit_log
               WHERE action = 'documents.document.withdrawn' AND target_id = :id"
         );
         $stmt->execute([':id' => $id]);
@@ -140,6 +140,7 @@ final class DocumentWithdrawalRealEngineTest extends TestCase
         self::assertIsArray($row, 'an audit row was written');
         self::assertSame(self::TENANT, (int) $row['tenant_id']);
         self::assertSame(self::OFFICER, (int) $row['actor_user_id']);
+        self::assertSame(0, json_decode((string) $row['metadata'], true)['qr_withdrawn'], 'the logger keeps the count');
     }
 
     public function testASecondWithdrawalIsRefusedAndChangesNothing(): void
@@ -159,7 +160,7 @@ final class DocumentWithdrawalRealEngineTest extends TestCase
         $source = (string) file_get_contents(dirname(__DIR__, 2) . '/public/index.php');
         $line = '';
         foreach (explode("\n", $source) as $candidate) {
-            if (str_contains($candidate, "/withdraw'") && str_contains($candidate, "register('POST'")) {
+            if (str_contains($candidate, '$documentWithdrawalHandler') && str_contains($candidate, "register('POST'")) {
                 $line = $candidate;
             }
         }
@@ -339,6 +340,10 @@ final class DocumentWithdrawalRealEngineTest extends TestCase
         self::assertTrue($last['withdrawal']);
         self::assertSame(self::OFFICER, $last['actor_profile_id']);
         self::assertFalse($trail[0]['withdrawal']);
+
+        $recipients = $this->json($this->routingHandler()->recipients($this->request(self::OWNER), ['id' => (string) $id]))['data'];
+        self::assertFalse($recipients[0]['open']);
+        self::assertTrue($recipients[0]['closed_by_withdrawal'], 'nobody acted on it');
     }
 
     public function testAWithdrawnDocumentCannotBeRouted(): void

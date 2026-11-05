@@ -275,6 +275,13 @@ final class PublicFormsApiRealEngineTest extends TestCase
         self::assertContains('A12', $references);
     }
 
+    public function testAnAnonymousSubmissionTouchesNoDraft(): void
+    {
+        $slug = $this->openLink($this->publishedForm());
+
+        self::assertSame(201, $this->submit($slug, ['full_name' => 'Layla Haddad'])->getStatusCode());
+    }
+
     public function testAPublicSubmissionLeavesOutAQuestionItsConditionHid(): void
     {
         $formId = $this->publishedForm();

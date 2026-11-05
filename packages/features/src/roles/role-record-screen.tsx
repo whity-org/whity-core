@@ -33,8 +33,8 @@
  *   roles.record.name.label = Role name
  *   roles.record.name.placeholder = e.g., Editor
  *   roles.record.notManageable = This role can't be modified by your tenant — global base roles are managed by the system tenant.
- *   roles.record.permissions.subtitle = Grouped by the resource each permission acts on.
- *   roles.record.permissions.title = Permissions
+ *   roles.record.permissions.intro = Each person with this role can do what is ticked.
+ *   roles.record.permissions.heading = What this role can do
  *   roles.record.details.readOnly.permission = You don't have permission to change roles, so these details are read-only.
  *   roles.record.permissions.readOnly.permission = You may see what this role grants, but not change it.
  *   roles.record.readOnly.systemRole = This is a global base role. Only the system tenant can change it.
@@ -84,7 +84,7 @@ import {
 import { useDateDisplay } from '../datetime';
 import type { RecordFactsFn, RecordResource, RecordSectionSpec } from '../record';
 import { identityTranslate } from '../nav/types';
-import { PermissionsGrid } from './permissions-grid';
+import { PermissionAreaGrid } from './permission-area-grid';
 import type {
   Permission,
   RoleAssignment,
@@ -273,7 +273,7 @@ export function RoleRecordScreen({
     async () => {
       const role = await adapter.getRole(roleId);
       const catalogue =
-        role.sections?.permissions?.state === 'editable' ? await adapter.listPermissions() : [];
+        role.sections?.permissions !== undefined ? await adapter.listPermissions() : [];
       return { role, catalogue };
     },
     [roleId],
@@ -582,10 +582,10 @@ export function RoleRecordScreen({
 
   const permissionsSection: RecordSectionSpec = {
     key: 'permissions',
-    title: t('roles.record.permissions.title', 'Permissions'),
+    title: t('roles.record.permissions.heading', 'What this role can do'),
     description: t(
-      'roles.record.permissions.subtitle',
-      'Grouped by the resource each permission acts on.'
+      'roles.record.permissions.intro',
+      'Each person with this role can do what is ticked.'
     ),
     access: permissionsAccess,
     // THE ACUTE CASE, in its final form. This grid used to be 53+ checkboxes in
@@ -595,20 +595,20 @@ export function RoleRecordScreen({
     // own gate: who may READ what a role grants and who may CHANGE it are
     // different questions, and the modal had nowhere to put the difference.
     editor: (
-      <PermissionsGrid
+      <PermissionAreaGrid
         permissions={catalogue}
         selectedIds={form.permissionIds}
+        savedIds={(current.permissions ?? []).map((p) => p.id)}
         onChange={(permissionIds) => setDraft({ ...form, permissionIds })}
         t={t}
       />
     ),
-    // The ROLE'S OWN permissions, never the installation's whole catalogue —
-    // feeding the catalogue to a read-only view renders every permission on the
-    // deployment as though the role had it. It is also all this branch HAS: the
-    // catalogue is not fetched unless the region is editable.
+    // The whole grid with this role's ticks and nothing to change, so a reader sees
+    // what it cannot do as well as what it can. `permissions:read` gates this region
+    // and the catalogue alike, so anyone seeing the region may read the catalogue.
     readOnly: (
-      <PermissionsGrid
-        permissions={current.permissions ?? []}
+      <PermissionAreaGrid
+        permissions={catalogue.length > 0 ? catalogue : (current.permissions ?? [])}
         selectedIds={form.permissionIds}
         onChange={() => undefined}
         t={t}

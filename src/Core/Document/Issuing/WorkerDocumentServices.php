@@ -103,6 +103,32 @@ final class WorkerDocumentServices
         \Whity\register_service(TemplateIssuing::class, $issuing);
         \Whity\register_service(Documents::class, new SdkDocuments($issuing, $roleChecker, $jobPlugin, $slots));
 
+        // SDK 1.63 (WHIT-886): a plugin's job reaches the same plugin files and
+        // plugin documents as its routes do. Both are built on first use, so a
+        // worker that runs no plugin file job needs no storage key.
+        \Whity\register_service(\Whity\Sdk\Storage\PluginFiles::class, new \Whity\Core\Plugin\HostPluginFiles(
+            static fn (): \Whity\Storage\TenantStorageResolver => new \Whity\Storage\TenantStorageResolver(
+                \Whity\Storage\StorageDriverFactory::fromSettings($settings, $env, $storageRoot),
+                new \Whity\Storage\TenantStorageConfigRepository($pdo),
+                new \Whity\Core\Entitlement\EntitlementService(new \Whity\Core\Entitlement\TenantEntitlementRepository($pdo)),
+                \Whity\Core\Security\EncryptedSecretStore::fromEnv($env),
+            ),
+        ));
+        $pluginDocumentUrls = \Whity\Core\Http\FrontendUrls::fromEnv();
+        \Whity\register_service(\Whity\Sdk\Documents\PluginDocuments::class, new \Whity\Core\Plugin\HostPluginDocuments(
+            $pdo,
+            static fn (): Documents => \Whity\app(Documents::class),
+            new \Whity\Core\Document\Qr\DocumentQrService(
+                $pdo,
+                new \Whity\Core\Document\Qr\DocumentQrTokenRepository($pdo),
+                new \Whity\Core\Document\Qr\DocumentQrScanRepository($pdo),
+                $pluginDocumentUrls->base(),
+                $pluginDocumentUrls->link(\Whity\Core\Http\FrontendUrls::DOCUMENT_VERIFY)
+            ),
+            new \Whity\Core\Document\Qr\DocumentQrScanRepository($pdo),
+            $settings,
+        ));
+
         return ['slots' => $slots, 'fields' => $fields];
     }
 }
