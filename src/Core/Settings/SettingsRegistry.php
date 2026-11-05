@@ -173,6 +173,13 @@ final class SettingsRegistry
     public const MAIL_SMTP_PORT = 'mail.smtp.port';
     public const MAIL_SMTP_ENCRYPTION = 'mail.smtp.encryption';
     public const MAIL_SMTP_USERNAME = 'mail.smtp.username';
+    // WHIT-901: how SMTP signs in, 'password' or 'oauth2'. The default keeps every
+    // existing install on its password. The client secret and refresh token, like
+    // the password, are not registry settings: see Mail\OAuth\SmtpOAuthStore.
+    public const MAIL_SMTP_AUTH_MODE = 'mail.smtp.auth_mode';
+    public const MAIL_OAUTH_PROVIDER = 'mail.oauth.provider';
+    public const MAIL_OAUTH_CLIENT_ID = 'mail.oauth.client_id';
+    public const MAIL_OAUTH_MICROSOFT_TENANT = 'mail.oauth.microsoft_tenant';
     public const MAIL_FROM_ADDRESS = 'mail.from_address';
     public const MAIL_FROM_NAME = 'mail.from_name';
     public const MAIL_EVENT_WELCOME = 'mail.events.welcome_enabled';
@@ -755,6 +762,10 @@ final class SettingsRegistry
         self::MAIL_SMTP_PORT,
         self::MAIL_SMTP_ENCRYPTION,
         self::MAIL_SMTP_USERNAME,
+        self::MAIL_SMTP_AUTH_MODE,
+        self::MAIL_OAUTH_PROVIDER,
+        self::MAIL_OAUTH_CLIENT_ID,
+        self::MAIL_OAUTH_MICROSOFT_TENANT,
         self::MAIL_FROM_ADDRESS,
         self::MAIL_FROM_NAME,
         self::MAIL_EVENT_WELCOME,
@@ -892,6 +903,8 @@ final class SettingsRegistry
     private const ENUM_OPTIONS = [
         self::MAIL_TRANSPORT => ['none', 'log', 'smtp'],
         self::MAIL_SMTP_ENCRYPTION => ['none', 'tls', 'ssl'],
+        self::MAIL_SMTP_AUTH_MODE => ['password', 'oauth2'],
+        self::MAIL_OAUTH_PROVIDER => ['google', 'microsoft'],
         // Payment-wall strictness the wall applies to a LAPSED tenant. 'warn' is
         // the safe global default (never blocks); the operator raises it globally
         // or per-tenant. Kept in sync with SubscriptionService enforcement modes.
@@ -977,6 +990,10 @@ final class SettingsRegistry
         self::MAIL_SMTP_PORT => '587',
         self::MAIL_SMTP_ENCRYPTION => 'tls',
         self::MAIL_SMTP_USERNAME => '',
+        self::MAIL_SMTP_AUTH_MODE => 'password',
+        self::MAIL_OAUTH_PROVIDER => 'google',
+        self::MAIL_OAUTH_CLIENT_ID => '',
+        self::MAIL_OAUTH_MICROSOFT_TENANT => 'common',
         self::MAIL_FROM_ADDRESS => '',
         self::MAIL_FROM_NAME => '',
         // Notification toggles default ON: once a transport is configured, the
@@ -1401,7 +1418,12 @@ final class SettingsRegistry
             self::STORAGE_S3_ACCESS_KEY,
             self::STORAGE_S3_PUBLIC_BASE_URL => null, // free-form strings (validated at driver build)
             self::MAIL_TRANSPORT,
-            self::MAIL_SMTP_ENCRYPTION => self::validateEnum($key, $value),
+            self::MAIL_SMTP_ENCRYPTION,
+            self::MAIL_SMTP_AUTH_MODE,
+            self::MAIL_OAUTH_PROVIDER => self::validateEnum($key, $value),
+            self::MAIL_OAUTH_MICROSOFT_TENANT => \Whity\Core\Mail\OAuth\SmtpOAuthProvider::isValidMicrosoftTenant($value)
+                ? null
+                : self::MAIL_OAUTH_MICROSOFT_TENANT . ' must be a directory ID, or common, organizations or consumers.',
             self::MAIL_SMTP_PORT => self::validatePort($value),
             self::MAIL_FROM_ADDRESS => self::validateFromAddress($value),
             self::MAIL_EVENT_WELCOME,
@@ -1434,6 +1456,7 @@ final class SettingsRegistry
             self::DOCUMENTS_BACKGROUND_ISSUING => BackgroundIssuing::validate($value),
             self::MAIL_SMTP_HOST,
             self::MAIL_SMTP_USERNAME,
+            self::MAIL_OAUTH_CLIENT_ID,
             self::MAIL_FROM_NAME,
             self::MAIL_FOOTER_TEXT,
             self::PLUGINS_STORE_ALLOWED_HOSTS => null, // free-form strings

@@ -4,7 +4,12 @@ declare(strict_types=1);
 
 namespace Whity\Core\Mail;
 
+use Closure;
 use Psr\Log\LoggerInterface;
+use Whity\Core\Http\HttpClient;
+use Whity\Core\Http\HttpFetcher;
+use Whity\Core\Mail\OAuth\SmtpOAuthStore;
+use Whity\Core\Mail\OAuth\SmtpOAuthTokenManager;
 use Whity\Core\Security\EncryptedSecretStore;
 use Whity\Core\Settings\GlobalSettingsRepository;
 use Whity\Core\Settings\SettingsRegistry;
@@ -37,6 +42,11 @@ final class MailerFactory
      */
     public const SMTP_PASSWORD_SETTING_KEY = 'mail.smtp.password_encrypted';
 
+    public const AUTH_MODE_PASSWORD = 'password';
+    public const AUTH_MODE_OAUTH2 = 'oauth2';
+
+    private const TOKEN_REQUEST_TIMEOUT_SECONDS = 10;
+
     /**
      * @param array<string, mixed> $env Environment map (e.g. $_ENV).
      */
@@ -65,12 +75,21 @@ final class MailerFactory
      * warning): a half-configured server must not crash boot nor throw on every
      * send. A password that fails to decrypt is treated as "no password" (warned),
      * so a key-rotation mishap can't wedge the worker.
+     *
+     * `mail.smtp.auth_mode` = 'oauth2' signs in with XOAUTH2 instead (WHIT-901). An
+     * unfinished OAuth2 connection does NOT degrade to a no-op: the send throws, so
+     * the queue keeps the message and the operator sees why.
+     *
+     * @param HttpClient|null $http Test seam for the token endpoint.
+     * @param (Closure(SmtpConfig): SmtpConnection)|null $connector Test seam for SMTP.
      */
     public static function fromSettings(
         SettingsService $settings,
         GlobalSettingsRepository $globals,
         EncryptedSecretStore $secrets,
         LoggerInterface $logger,
+        ?HttpClient $http = null,
+        ?Closure $connector = null,
     ): Mailer {
         // Reading the settings hits the database. A failure here (transient DB
         // outage, a migration lagging behind a deploy) must NOT propagate — email
@@ -109,7 +128,10 @@ final class MailerFactory
         }
 
         $username = trim((string) ($global[SettingsRegistry::MAIL_SMTP_USERNAME] ?? ''));
-        $password = self::decryptPassword($globals, $secrets, $logger);
+        $authMode = (string) ($global[SettingsRegistry::MAIL_SMTP_AUTH_MODE] ?? self::AUTH_MODE_PASSWORD);
+        $password = $authMode === self::AUTH_MODE_OAUTH2
+            ? null
+            : self::decryptPassword($globals, $secrets, $logger);
 
         $config = new SmtpConfig(
             host: $host,
@@ -121,7 +143,30 @@ final class MailerFactory
             password: $password,
         );
 
-        return new SmtpMailer($config);
+        if ($authMode === self::AUTH_MODE_OAUTH2) {
+            return new OAuth2SmtpMailer(
+                $config,
+                self::oauthTokens($settings, $globals, $secrets, $logger, $http),
+                $connector,
+            );
+        }
+
+        return new SmtpMailer($config, $connector);
+    }
+
+    public static function oauthTokens(
+        SettingsService $settings,
+        GlobalSettingsRepository $globals,
+        EncryptedSecretStore $secrets,
+        LoggerInterface $logger,
+        ?HttpClient $http = null,
+    ): SmtpOAuthTokenManager {
+        return new SmtpOAuthTokenManager(
+            $settings,
+            new SmtpOAuthStore($globals, $secrets),
+            $http ?? new HttpFetcher(self::TOKEN_REQUEST_TIMEOUT_SECONDS),
+            $logger,
+        );
     }
 
     /**

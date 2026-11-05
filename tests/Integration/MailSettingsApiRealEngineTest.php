@@ -10,6 +10,8 @@ use Psr\Log\NullLogger;
 use Tests\Support\SchemaFromMigrations;
 use Whity\Api\MailSettingsApiHandler;
 use Whity\Auth\RoleChecker;
+use Whity\Core\Audit\AuditLoggerInterface;
+use Whity\Core\Mail\OAuth\SmtpOAuthStore;
 use Whity\Core\Mail\MailerFactory;
 use Whity\Core\RBAC\PermissionRegistry;
 use Whity\Core\Request;
@@ -44,6 +46,8 @@ final class MailSettingsApiRealEngineTest extends TestCase
     private PDO $pdo;
     private GlobalSettingsRepository $globals;
     private MailSettingsApiHandler $handler;
+    /** @var AuditLoggerInterface&object{entries: list<array{string, array<string, mixed>}>} */
+    private AuditLoggerInterface $audit;
 
     protected function setUp(): void
     {
@@ -92,6 +96,125 @@ final class MailSettingsApiRealEngineTest extends TestCase
         $data = $this->decode($response)['data'];
         self::assertSame('none', $data['transport']);
         self::assertFalse($data['has_smtp_password']);
+    }
+
+    // ==================== oauth-credentials (WHIT-901) ====================
+
+    public function testOAuthCredentialsRejectACallerWithoutManage(): void
+    {
+        TenantContext::setTenantId(self::SYSTEM_TENANT);
+        $response = $this->handler->setOAuthCredentials(
+            $this->req('PUT', '/api/settings/mail/oauth-credentials', ['refresh_token' => 'x'], self::USER_NONE, self::SYSTEM_TENANT)
+        );
+
+        self::assertSame(403, $response->getStatusCode());
+        self::assertNull($this->globals->get(SmtpOAuthStore::REFRESH_TOKEN_KEY));
+    }
+
+    public function testATenantAdminCannotReachOAuthCredentialsOrTheirStatus(): void
+    {
+        // A workspace administrator holding settings:manage is still not the operator.
+        TenantContext::setTenantId(self::TENANT_A);
+
+        $write = $this->handler->setOAuthCredentials(
+            $this->req('PUT', '/api/settings/mail/oauth-credentials', ['refresh_token' => 'x'], self::USER_FULL, self::TENANT_A)
+        );
+        $read = $this->handler->status(
+            $this->req('GET', '/api/settings/mail/status', null, self::USER_FULL, self::TENANT_A)
+        );
+
+        self::assertSame(403, $write->getStatusCode());
+        self::assertSame(403, $read->getStatusCode());
+        self::assertNull($this->globals->get(SmtpOAuthStore::REFRESH_TOKEN_KEY));
+    }
+
+    public function testOAuthCredentialsAreEncryptedWriteOnlyAndAuditedByNameOnly(): void
+    {
+        TenantContext::setTenantId(self::SYSTEM_TENANT);
+        $response = $this->handler->setOAuthCredentials($this->req(
+            'PUT',
+            '/api/settings/mail/oauth-credentials',
+            ['client_secret' => 'the-client-secret', 'refresh_token' => 'the-refresh-token'],
+            self::USER_FULL,
+            self::SYSTEM_TENANT,
+        ));
+        self::assertSame(204, $response->getStatusCode(), $response->getBody());
+
+        $secret = (string) $this->globals->get(SmtpOAuthStore::CLIENT_SECRET_KEY);
+        $refresh = (string) $this->globals->get(SmtpOAuthStore::REFRESH_TOKEN_KEY);
+        self::assertStringNotContainsString('the-client-secret', $secret);
+        self::assertStringNotContainsString('the-refresh-token', $refresh);
+        $store = new EncryptedSecretStore(['v1' => self::KEY], 'v1');
+        self::assertSame('the-client-secret', $store->decrypt($secret));
+        self::assertSame('the-refresh-token', $store->decrypt($refresh));
+
+        $status = $this->handler->status(
+            $this->req('GET', '/api/settings/mail/status', null, self::USER_FULL, self::SYSTEM_TENANT)
+        );
+        $body = $status->getBody();
+        self::assertStringNotContainsString('the-client-secret', $body);
+        self::assertStringNotContainsString('the-refresh-token', $body);
+        $oauth = $this->decode($status)['data']['oauth'];
+        self::assertTrue($oauth['has_client_secret']);
+        self::assertTrue($oauth['has_refresh_token']);
+        self::assertSame('password', $this->decode($status)['data']['auth_mode']);
+
+        self::assertCount(1, $this->audit->entries);
+        [$action, $options] = $this->audit->entries[0];
+        self::assertSame('settings.mail_oauth_credentials_changed', $action);
+        self::assertSame(['changed' => 'client secret set, refresh token set'], $options['metadata']);
+    }
+
+    public function testAFieldLeftOutStaysAndNullClearsAndCachedTokenGoes(): void
+    {
+        TenantContext::setTenantId(self::SYSTEM_TENANT);
+        $put = fn(array $body) => $this->handler->setOAuthCredentials(
+            $this->req('PUT', '/api/settings/mail/oauth-credentials', $body, self::USER_FULL, self::SYSTEM_TENANT)
+        );
+
+        $put(['client_secret' => 'one', 'refresh_token' => 'two']);
+        $this->globals->set(SmtpOAuthStore::ACCESS_TOKEN_KEY, 'cached');
+        $keptSecret = $this->globals->get(SmtpOAuthStore::CLIENT_SECRET_KEY);
+
+        self::assertSame(204, $put(['refresh_token' => null])->getStatusCode());
+
+        self::assertSame($keptSecret, $this->globals->get(SmtpOAuthStore::CLIENT_SECRET_KEY));
+        self::assertNull($this->globals->get(SmtpOAuthStore::REFRESH_TOKEN_KEY));
+        self::assertNull($this->globals->get(SmtpOAuthStore::ACCESS_TOKEN_KEY), 'A token from the old credentials goes too');
+    }
+
+    public function testBadOAuthCredentialsAreRefusedWithoutEchoingThem(): void
+    {
+        TenantContext::setTenantId(self::SYSTEM_TENANT);
+        $put = fn(array $body) => $this->handler->setOAuthCredentials(
+            $this->req('PUT', '/api/settings/mail/oauth-credentials', $body, self::USER_FULL, self::SYSTEM_TENANT)
+        );
+
+        self::assertSame(400, $put([])->getStatusCode());
+        self::assertSame(422, $put(['refresh_token' => 123])->getStatusCode());
+        self::assertSame(422, $put(['client_secret' => str_repeat('x', 8193)])->getStatusCode());
+
+        $response = $put(['refresh_token' => "bad-token-value\r\nInjected: yes"]);
+        self::assertSame(422, $response->getStatusCode());
+        self::assertStringNotContainsString('bad-token-value', $response->getBody());
+        self::assertNull($this->globals->get(SmtpOAuthStore::REFRESH_TOKEN_KEY));
+    }
+
+    public function testATestSendInOAuthModeReportsTheStateInPlainWords(): void
+    {
+        TenantContext::setTenantId(self::SYSTEM_TENANT);
+        $settings = new SettingsService($this->globals, new TenantSettingsRepository($this->pdo));
+        $settings->setGlobal('mail.transport', 'smtp');
+        $settings->setGlobal('mail.smtp.host', 'smtp.gmail.com');
+        $settings->setGlobal('mail.from_address', 'mail@example-bakery.test');
+        $settings->setGlobal('mail.smtp.auth_mode', 'oauth2');
+
+        $response = $this->handler->test(
+            $this->req('POST', '/api/settings/mail/test', ['to' => 'friend@example-bakery.test'], self::USER_FULL, self::SYSTEM_TENANT)
+        );
+
+        self::assertSame(502, $response->getStatusCode());
+        self::assertStringContainsString('finish connecting the mail account', $response->getBody());
     }
 
     // ==================== smtp-password ====================
@@ -195,6 +318,15 @@ final class MailSettingsApiRealEngineTest extends TestCase
             new EncryptedSecretStore(['v1' => self::KEY], 'v1'),
             $roleChecker,
             new NullLogger(),
+            $this->audit = new class () implements AuditLoggerInterface {
+                /** @var list<array{string, array<string, mixed>}> */
+                public array $entries = [];
+
+                public function record(string $action, array $options = []): void
+                {
+                    $this->entries[] = [$action, $options];
+                }
+            },
         );
     }
 

@@ -118,6 +118,7 @@ final class AuditSentences
      *   audit.sentence.security_2fa_policy_deleted = {actor} removed a two-step rule
      *   audit.sentence.security_2fa_policy_reminded = {actor} reminded {target} to set up two-step sign-in
      *   audit.sentence.security_2fa_policy_updated = {actor} changed a two-step rule
+     *   audit.sentence.settings_mail_oauth_credentials_changed = {actor} changed the OAuth sign-in for outgoing email
      *   audit.sentence.taxonomy_tag_deleted = {actor} deleted a tag
      *   audit.sentence.taxonomy_tag_group_deleted = {actor} deleted a tag group
      *   audit.sentence.tenant_created = {actor} created workspace {target}
@@ -217,6 +218,7 @@ final class AuditSentences
         'security.2fa_policy.deleted' => '{actor} removed a two-step rule',
         'security.2fa_policy.reminded' => '{actor} reminded {target} to set up two-step sign-in',
         'security.2fa_policy.updated' => '{actor} changed a two-step rule',
+        'settings.mail_oauth_credentials_changed' => '{actor} changed the OAuth sign-in for outgoing email',
         'taxonomy.tag.deleted' => '{actor} deleted a tag',
         'taxonomy.tag_group.deleted' => '{actor} deleted a tag group',
         'tenant.created' => '{actor} created workspace {target}',

@@ -34,7 +34,8 @@ final class SettingsRegistryTest extends TestCase
              'storage.driver', 'storage.s3.endpoint', 'storage.s3.region', 'storage.s3.bucket',
              'storage.s3.access_key', 'storage.s3.path_style', 'storage.s3.public_base_url',
              'mail.transport', 'mail.smtp.host', 'mail.smtp.port', 'mail.smtp.encryption',
-             'mail.smtp.username', 'mail.from_address', 'mail.from_name',
+             'mail.smtp.username', 'mail.smtp.auth_mode', 'mail.oauth.provider', 'mail.oauth.client_id',
+             'mail.oauth.microsoft_tenant', 'mail.from_address', 'mail.from_name',
              'mail.events.welcome_enabled', 'mail.events.approval_enabled',
              'mail.events.invitation_enabled', 'mail.events.verification_enabled',
              'mail.events.deletion_enabled', 'mail.events.password_reset_enabled',
@@ -432,7 +433,8 @@ final class SettingsRegistryTest extends TestCase
         // 93 since WHIT-788: three billing.seller_* out, five company.* in.
         // 94 since WHIT-742 slice 3: documents.background_issuing.
         // 96 since WHIT-873: maintenance.active and maintenance.until.
-        self::assertCount(96, $describe);
+        // 100 since WHIT-901: mail.smtp.auth_mode and three mail.oauth.* keys.
+        self::assertCount(100, $describe);
         self::assertSame(
             ['key' => 'site_name', 'type' => 'string', 'default' => 'Whity'],
             $describe[0]
@@ -444,7 +446,8 @@ final class SettingsRegistryTest extends TestCase
     public function testMailKeysAreGlobalOnly(): void
     {
         foreach (['mail.transport', 'mail.smtp.host', 'mail.smtp.port', 'mail.smtp.encryption',
-                  'mail.smtp.username', 'mail.from_address', 'mail.from_name',
+                  'mail.smtp.username', 'mail.smtp.auth_mode', 'mail.oauth.provider', 'mail.oauth.client_id',
+             'mail.oauth.microsoft_tenant', 'mail.from_address', 'mail.from_name',
                   'mail.events.welcome_enabled', 'mail.events.approval_enabled',
                   'mail.events.invitation_enabled', 'mail.events.verification_enabled',
                   'mail.events.deletion_enabled', 'mail.events.password_reset_enabled',

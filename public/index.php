@@ -4687,10 +4687,12 @@ $mailSettingsHandler = new \Whity\Api\MailSettingsApiHandler(
     $globalSettingsRepository,
     $secretStore,
     $roleChecker,
-    $logger
+    $logger,
+    $auditLogger
 );
 $router->register('GET', '/api/settings/mail/status',        [$mailSettingsHandler, 'status'],      null, null, CorePermissions::SETTINGS_MANAGE);
 $router->register('PUT', '/api/settings/mail/smtp-password', [$mailSettingsHandler, 'setPassword'], null, null, CorePermissions::SETTINGS_MANAGE);
+$router->register('PUT', '/api/settings/mail/oauth-credentials', [$mailSettingsHandler, 'setOAuthCredentials'], null, null, CorePermissions::SETTINGS_MANAGE);
 $router->register('POST', '/api/settings/mail/test',         [$mailSettingsHandler, 'test'],        null, null, CorePermissions::SETTINGS_MANAGE);
 
 // 13c. Register the Tenant Branding API (WC-233). Public GET /api/v1/branding

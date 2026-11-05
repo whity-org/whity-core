@@ -40,7 +40,7 @@ final class HttpFetcher implements HttpClient
         return $this->decode($this->fetch('GET', $url, null));
     }
 
-    public function postForm(string $url, array $params): ?array
+    public function postForm(string $url, #[\SensitiveParameter] array $params): ?array
     {
         return $this->decode($this->fetch('POST', $url, http_build_query($params)));
     }
@@ -182,7 +182,7 @@ final class HttpFetcher implements HttpClient
         return array_values(array_unique($ips));
     }
 
-    private function fetch(string $method, string $url, ?string $body): ?string
+    private function fetch(string $method, string $url, #[\SensitiveParameter] ?string $body): ?string
     {
         if (!self::isPubliclyRoutableUrl($url)) {
             // A blocked URL is a configuration/security problem, not a transient
