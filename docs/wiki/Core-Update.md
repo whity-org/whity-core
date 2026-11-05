@@ -181,6 +181,9 @@ For a compose-based deployment (the per-product deployment anatomy in
 3. **Run migrations** (also applies any new migrations from installed
    plugins): `php public/index.php migrate run` — in compose,
    `docker exec <app>_frankenphp php public/index.php migrate run`.
+   This also loads the release's new labels in every language, and leaves
+   strings edited in `/admin/translations` alone. A running app reads labels
+   when it starts, so restart it if it's already on the new version.
 
 4. **Regenerate the deployment's OpenAPI spec** (core route changes AND
    installed plugins): `php public/index.php generate:openapi`.
