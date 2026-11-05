@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useMemo } from 'react';
+import { use, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { DocumentEditorScreen } from '@whity/features/document-editor';
 import { useTranslation } from '@whity/features/i18n';
@@ -34,7 +34,27 @@ export default function DocumentSourcePage({
   const router = useRouter();
   const t = useTranslation('documents');
   const { hasPermission } = useCapabilities();
-  const { user } = useAuth();
+  const { user, apiClient } = useAuth();
+  // Where Back goes and what the path says depends on what the document is: a
+  // template belongs to Templates, a note or wiki page to Notes and wiki.
+  const [kind, setKind] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    void (async () => {
+      try {
+        const response = await apiClient(`/api/v1/document-sources/${id}`);
+        if (!response.ok) return;
+        const body = (await response.json()) as { data?: { kind?: string } };
+        if (live) setKind(body.data?.kind ?? null);
+      } catch {
+        // the path just keeps its default
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, [apiClient, id]);
+  const isTemplate = kind === 'template' || kind === 'label' || kind === 'letter' || kind === 'report';
   // Your own cards say "You"; the id matches the actor the server sends.
   const me = useMemo(() => (user ? { kind: 'person' as const, id: String(user.id), name: user.email } : undefined), [user]);
 
@@ -51,8 +71,14 @@ export default function DocumentSourcePage({
       canSuggest={hasPermission(DOCUMENTS_SUGGEST)}
       canComment={hasPermission(DOCUMENTS_COMMENT)}
       me={me}
-      onBack={() => (issuing ? router.push('/admin/document-library') : router.push('/admin/document-sources'))}
-      path={issuing ? t('blockEditor.issue.path', 'New document') : t('blockEditor.list.title', 'Notes and wiki')}
+      onBack={() => (issuing ? router.push('/admin/document-library') : router.push(isTemplate ? '/admin/document-templates' : '/admin/document-sources'))}
+      path={
+        issuing
+          ? t('blockEditor.issue.path', 'New document')
+          : isTemplate
+            ? t('blockEditor.path.templates', 'Templates')
+            : t('blockEditor.list.title', 'Notes and wiki')
+      }
       issue={
         issuing
           ? {

@@ -138,6 +138,23 @@ import {
  * note can never be edited down, and every future reader of that trail pays for
  * it) rather than a tenant-tunable capacity, so it will not drift per install.
  */
+/**
+ * How many people a step reached: "1 person", "4 people", or "3 of the 4 people it
+ * is for" when some of them could not be reached.
+ */
+export function reachText(
+  t: (key: string, fallback?: string, vars?: Record<string, string | number>) => string,
+  resolved: number,
+  delivered: number
+): string {
+  if (resolved === delivered || resolved < delivered) {
+    return delivered === 1
+      ? t('routing.people.one', '1 person')
+      : t('routing.people.other', '{count} people', { count: delivered });
+  }
+  return t('routing.people.partial', '{delivered} of the {resolved} people it is for', { delivered, resolved });
+}
+
 export const MAX_NOTE_LENGTH = 4000;
 
 /** One button's availability, and why it is what it is. */
@@ -391,8 +408,8 @@ export function RouteActPanel({
             // BEHIND this one; only an approval with no edge falls through to the
             // next authoring ordinal. The response says how many people were
             // reached, not which step reached them, so this says exactly that.
-            'Approved. This step is approved and the document has moved on: the step it went to resolved to {resolved} people and reached {delivered}.',
-            { resolved: o.resolved, delivered: o.delivered }
+            'Approved. The document has moved on and reached {people}.',
+            { people: reachText(t, o.resolved, o.delivered) }
           )
         : t(
             'routing.act.decision.approved.ends',
@@ -403,8 +420,8 @@ export function RouteActPanel({
     return o.delivered > 0
       ? t(
           'routing.act.decision.rejected.moved',
-          'Rejected. This step can no longer be approved, and the document has gone where the route sends a rejection: that step resolved to {resolved} people and reached {delivered}.',
-          { resolved: o.resolved, delivered: o.delivered }
+          'Rejected. The document went where the route sends a rejection and reached {people}.',
+          { people: reachText(t, o.resolved, o.delivered) }
         )
       : t(
           'routing.act.decision.rejected.ends',
@@ -491,8 +508,8 @@ export function RouteActPanel({
         addToast(
           t(
             'routing.act.forwarded.ok',
-            'Recorded. The next step resolved to {resolved} people and reached {delivered}.',
-            { resolved: counts.resolved ?? 0, delivered: counts.delivered ?? 0 }
+            'Recorded. The next step reached {people}.',
+            { people: reachText(t, counts.resolved ?? 0, counts.delivered ?? 0) }
           ),
           'success'
         );
