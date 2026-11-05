@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { TechnicalDetails } from '@whity/ui/display-preferences';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/lib/toast-context';
@@ -29,6 +28,7 @@ import {
 } from '@whity/ui/select';
 import { IconAlertCircle, IconCircleCheck, IconPlugConnected } from '@tabler/icons-react';
 import { Stepper } from '@whity/ui/stepper';
+import { TechnicalDetails } from '@whity/ui/display-preferences';
 import { useFormattingLocale, useTranslation } from '@whity/features/i18n';
 import { titleCase } from '@whity/features/roles';
 import {
@@ -504,15 +504,18 @@ function Preflight({ info, infoError }: { info: McpConnectInfo | null; infoError
       <Alert variant="warning">
         <IconAlertCircle />
         <AlertTitle>{t('aiPrincipals.connect.preflight.serverOffTitle', 'AI apps are turned off on this server')}</AlertTitle>
-        <AlertDescription>
-          {t(
-            'aiPrincipals.connect.preflight.serverOff',
-            'Whoever runs this server needs to turn AI apps on and restart it. Until then no app can connect.'
-          )}
+        <AlertDescription className="space-y-2">
+          <span className="block">
+            {t(
+              'aiPrincipals.connect.preflight.serverOff',
+              'Only the person who runs this Whity server can turn AI apps on. Changing a setting in Whity will not do it. Until they do, no app can connect, so ask them.'
+            )}
+          </span>
           <TechnicalDetails>
-            <code className="mt-1 block text-sm" dir="ltr">
-              MCP_ENABLED=true
-            </code>
+            <span className="block text-xs">
+              {t('aiPrincipals.connect.preflight.serverOffCode', 'For whoever runs the server: set')}{' '}
+              <code dir="ltr" className="font-mono">MCP_ENABLED=true</code> {t('aiPrincipals.connect.preflight.serverOffRestart', 'and restart it.')}
+            </span>
           </TechnicalDetails>
         </AlertDescription>
       </Alert>
@@ -524,7 +527,7 @@ function Preflight({ info, infoError }: { info: McpConnectInfo | null; infoError
         <IconAlertCircle />
         <AlertTitle>{t('aiPrincipals.connect.preflight.tenantOffTitle', 'AI apps are turned off for this organization')}</AlertTitle>
         <AlertDescription>
-          {t('aiPrincipals.connect.preflight.tenantOff', 'Turn on the Model Context Protocol endpoint under Settings, Integrations, then come back. If it is already on, the plan for this organization does not include AI apps.')}{' '}
+          {t('aiPrincipals.connect.preflight.tenantOff', 'An administrator of your organization can turn on the MCP endpoint under Settings, Integrations. If it is already on, the plan for this organization does not include AI apps.')}{' '}
           <Link href="/admin/settings" className="underline">
             {t('aiPrincipals.connect.preflight.openSettings', 'Open settings')}
           </Link>
