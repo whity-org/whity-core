@@ -11,9 +11,9 @@ import { useDateDisplay } from "../datetime"
 import { useTranslation } from "../i18n"
 import { useCurrentLanguage } from "./language"
 import { createFormsApi } from "./api"
-import { pickText } from "./text"
+import { answerDate, pickText } from "./text"
 import { ResponsesSummaryCards } from "./responses-summary"
-import type { FieldDraft, FormsScreenEnv, ResponsesSummary, SubmissionDetail, SubmissionRow } from "./types"
+import type { FieldDraft, FormsScreenEnv, ResponsesSummary, SubmissionDetail, SubmissionFile, SubmissionRow } from "./types"
 
 /** Where a response is in its routing, in plain words. */
 export function useRoutingLabel() {
@@ -38,6 +38,7 @@ export function routingVariant(state: string | undefined): "success" | "secondar
 export function answerText(field: Pick<FieldDraft, "field_type" | "options" | "validation">, value: unknown, language: string | null, yes: string, no: string): string {
   if (value === null || value === undefined || value === "") return ""
   if (typeof value === "boolean") return value ? yes : no
+  if (field.field_type === "date" && typeof value === "string") return answerDate(value, language)
   const optionLabel = (raw: unknown): string => {
     const match = field.options.find((o) => o.value === String(raw))
     return match ? pickText(match.label, language) || String(raw) : String(raw)
@@ -162,6 +163,10 @@ export function ResponseDialog({ env, submissionId, mine = false, onClose }: { e
   }, [load])
 
   const answers = detail === null || Array.isArray(detail.data) ? {} : detail.data
+  const filesBase = `/api/v1${mine ? "/me" : ""}/form-submissions/${submissionId}/files`
+  // A question with a rule and no answer wasn't asked: the server keeps no answer to a
+  // hidden question, so "No answer" would blame the person for something they never saw.
+  const asked = (detail?.fields ?? []).filter((field) => field.visible_when === null || field.visible_when === undefined || !isBlank(answers[field.field_key]))
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -180,14 +185,16 @@ export function ResponseDialog({ env, submissionId, mine = false, onClose }: { e
           <p className="text-sm text-muted-foreground">{t("responses.loading", "Loading responses")}</p>
         ) : (
           <dl className="space-y-4">
-            {detail.fields.map((field) => (
+            {asked.map((field) => (
               <div key={field.field_key} className="space-y-0.5">
                 <dt className="text-sm font-medium">{pickText(field.label, currentLanguage) || field.field_key}</dt>
                 <dd className="text-sm text-muted-foreground">
-                  {field.field_type === "file" && answers[field.field_key]
-                    ? t("responses.attached", "Attached")
-                    : answerText(field, answers[field.field_key], currentLanguage, t("responses.yes", "Yes"), t("responses.no", "No")) ||
-                      t("responses.noAnswer", "No answer")}
+                  {field.field_type === "file" && answers[field.field_key] ? (
+                    <AttachedFiles base={filesBase} files={(detail.files ?? []).filter((file) => file.field_key === field.field_key)} />
+                  ) : (
+                    answerText(field, answers[field.field_key], currentLanguage, t("responses.yes", "Yes"), t("responses.no", "No")) ||
+                    t("responses.noAnswer", "No answer")
+                  )}
                 </dd>
               </div>
             ))}
@@ -200,5 +207,26 @@ export function ResponseDialog({ env, submissionId, mine = false, onClose }: { e
         </div>
       </DialogContent>
     </Dialog>
+  )
+}
+
+function isBlank(answer: unknown): boolean {
+  return answer === null || answer === undefined || answer === "" || (Array.isArray(answer) && answer.length === 0)
+}
+
+/** The files answering one question. A submission older than the list still says one came. */
+function AttachedFiles({ base, files }: { base: string; files: SubmissionFile[] }) {
+  const t = useTranslation("forms")
+  if (files.length === 0) return <>{t("responses.attached", "Attached")}</>
+  return (
+    <span className="flex flex-col items-start gap-2 pt-1">
+      {files.map((file) => (
+        <Button key={file.id} asChild variant="outline" className="h-auto min-h-10 max-w-full whitespace-normal break-all text-start">
+          <a href={`${base}/${file.id}`} download>
+            {t("responses.downloadFile", "Download {name}", { name: file.filename ?? t("responses.attachedFile", "attached file") })}
+          </a>
+        </Button>
+      ))}
+    </span>
   )
 }

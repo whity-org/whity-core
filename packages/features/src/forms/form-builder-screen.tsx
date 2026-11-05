@@ -41,6 +41,8 @@ import type { FieldDraft, FieldKind, FormRow, FormSectionDef, FormsScreenEnv } f
 interface Loaded {
   form: FormRow
   fields: FieldDraft[]
+  /** What the server last accepted, as it was sent. Whatever it does to that afterwards isn't a change. */
+  savedBodies: string
   settings: FormSettings
   kinds: FieldKind[]
 }
@@ -131,7 +133,7 @@ function FormBuilder({ env, formId, canManage }: { env: FormsScreenEnv; formId: 
     const drafts = draftsOf(rows)
     const form = formResult.data
     const next = settingsOf(form, form.sections as unknown as Array<{ key: string | null; title?: unknown; description?: unknown }>)
-    setLoaded({ form, fields: drafts, settings: next, kinds })
+    setLoaded({ form, fields: drafts, savedBodies: snapshot(drafts.map(fieldBody)), settings: next, kinds })
     setFields(drafts)
     setSettings(next)
     setSelected(null)
@@ -142,9 +144,14 @@ function FormBuilder({ env, formId, canManage }: { env: FormsScreenEnv; formId: 
     void load()
   }, [load])
 
-  const fieldsChanged = loaded !== null && snapshot(fields.map(fieldBody)) !== snapshot(loaded.fields.map(fieldBody))
+  const bodies = snapshot(fields.map(fieldBody))
+  const fieldsChanged = loaded !== null && bodies !== loaded.savedBodies
   const settingsChanged = loaded !== null && settings !== null && snapshot(settings) !== snapshot(loaded.settings)
   const dirty = fieldsChanged || settingsChanged
+  // A save the server refused waits for the next edit. Sending it again every few
+  // seconds would only repeat the same message.
+  const attempt = `${bodies}|${snapshot(settings)}`
+  const [refused, setRefused] = useState<string | null>(null)
 
   const [showProblems, setShowProblems] = useState(false)
   const [savedAt, setSavedAt] = useState<Date | null>(null)
@@ -193,6 +200,7 @@ function FormBuilder({ env, formId, canManage }: { env: FormsScreenEnv; formId: 
     let form = loaded.form
     let savedSettings = loaded.settings
     let savedFields = loaded.fields
+    let savedBodies = loaded.savedBodies
     let nextFields = fields
 
     if (settingsChanged) {
@@ -211,6 +219,7 @@ function FormBuilder({ env, formId, canManage }: { env: FormsScreenEnv; formId: 
       )
       if (!result.ok) {
         setSaving(false)
+        setRefused(attempt)
         env.notify(result.message, "error")
         return false
       }
@@ -219,9 +228,11 @@ function FormBuilder({ env, formId, canManage }: { env: FormsScreenEnv; formId: 
     }
 
     if (fieldsChanged || nextFields !== fields) {
-      const result = await api.replaceFields(form.id, nextFields.map(fieldBody), failed)
+      const sent = nextFields.map(fieldBody)
+      const result = await api.replaceFields(form.id, sent, failed)
       if (!result.ok) {
         setSaving(false)
+        setRefused(attempt)
         const at = questionIndexIn(result.message)
         if (at !== null) jump(at)
         env.notify(
@@ -233,11 +244,12 @@ function FormBuilder({ env, formId, canManage }: { env: FormsScreenEnv; formId: 
         return false
       }
       savedFields = draftsOf(result.data)
+      savedBodies = snapshot(sent)
       nextFields = savedFields
     }
 
     setSaving(false)
-    setLoaded({ ...loaded, form, fields: savedFields, settings: savedSettings })
+    setLoaded({ ...loaded, form, fields: savedFields, savedBodies, settings: savedSettings })
     // Not `setFields(fields)`: that is the list as it was when the save began, and
     // whatever was typed since would be thrown away. Saved questions only gain
     // their ids, so their keys are locked from here on.
@@ -253,11 +265,11 @@ function FormBuilder({ env, formId, canManage }: { env: FormsScreenEnv; formId: 
     if (quiet) setSavedAt(new Date())
     else env.notify(t("builder.save.done", "Your changes were saved."), "success")
     return true
-  }, [api, blocking, env, fields, fieldsChanged, jump, loaded, problemText, settings, settingsChanged, t])
+  }, [api, attempt, blocking, env, fields, fieldsChanged, jump, loaded, problemText, settings, settingsChanged, t])
 
   // A draft is not live, so it saves itself a moment after you pause. An open form
   // does not: its questions are in front of people the moment they are saved.
-  const autosaveReady = canManage && loaded !== null && loaded.form.status === "draft" && dirty && !saving && blocking.length === 0
+  const autosaveReady = canManage && loaded !== null && loaded.form.status === "draft" && dirty && !saving && blocking.length === 0 && attempt !== refused
   useEffect(() => {
     if (!autosaveReady) return
     const id = window.setTimeout(() => void save(true), 2500)

@@ -11,10 +11,12 @@ use Whity\Api\FormSubmissionsApiHandler;
 use Whity\Core\Form\FormFieldRepository;
 use Whity\Core\Form\FormRepository;
 use Whity\Core\Form\FormSubmissionRepository;
+use Whity\Core\Form\FormUploadRepository;
 use Whity\Core\Form\SubmissionIssuer;
 use Whity\Core\Request;
 use Whity\Core\Response;
 use Whity\Core\Tenant\TenantContext;
+use Whity\Storage\LocalStorageDriver;
 
 /**
  * Somebody reading what they sent holds no `forms:read`, so the route decides whose.
@@ -53,6 +55,8 @@ final class MyFormSubmissionApiRealEngineTest extends TestCase
             $fields,
             $this->submissions,
             (new \ReflectionClass(SubmissionIssuer::class))->newInstanceWithoutConstructor(),
+            new FormUploadRepository($this->pdo),
+            new LocalStorageDriver(sys_get_temp_dir()),
         );
         TenantContext::setTenantId(self::TENANT);
     }

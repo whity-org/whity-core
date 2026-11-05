@@ -17,6 +17,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { Button } from '@whity/ui/button';
 import { Stepper } from '@whity/ui/stepper';
+import { answerDate } from '@whity/features/forms';
 import { useTranslation } from '@whity/features/i18n';
 import {
   FormField,
@@ -352,6 +353,9 @@ function ReviewAnswer({
     return <>{value === true ? t('field.yes', 'Yes') : t('review.no', 'No')}</>;
   }
   if (value === undefined || value === '' || (Array.isArray(value) && value.length === 0)) return nothing;
+  if (field.field_type === 'date' && typeof value === 'string' && value.trim() !== '') {
+    return <>{answerDate(value, preferArabic ? 'ar' : 'en')}</>;
+  }
   // The answer is an opaque reference, and the question itself shows the file's name.
   if (field.field_type === 'file') {
     return Array.isArray(value)
@@ -376,7 +380,9 @@ function ReviewAnswer({
                 const cell = row[column.key];
                 const label = localized(column.label, preferArabic) || column.key;
 
-                return `${label}: ${cell === true ? t('field.yes', 'Yes') : String(cell)}`;
+                const shown = column.type === 'date' && typeof cell === 'string' ? answerDate(cell, preferArabic ? 'ar' : 'en') : String(cell);
+
+                return `${label}: ${cell === true ? t('field.yes', 'Yes') : shown}`;
               })
               .join(' · ')}
           </li>

@@ -2003,6 +2003,17 @@ final class CoreApiSchemas
                     404 => self::errorResponse('Submission not found'),
                 ] + self::authErrors(),
             ]),
+            self::permissionRoute('GET', '/api/form-submissions/{id:\d+}/files/{fileId:\d+}', 'forms:read', [
+                'summary' => 'Download a file attached to a submission',
+                'description' => 'Always sent as an attachment with `nosniff`. Only a file attached to this '
+                    . 'submission, in this workspace, and named by one of its answers.',
+                'tags' => ['forms'],
+                'responses' => [
+                    200 => ['description' => 'The file, as an attachment', 'content' => ['application/octet-stream' => ['schema' => ['type' => 'string', 'format' => 'binary']]]],
+                    404 => self::errorResponse('File not found'),
+                    503 => self::errorResponse('The file could not be read from storage'),
+                ] + self::authErrors(),
+            ]),
             self::permissionRoute('GET', '/api/form-submissions/{id:\d+}/review', 'forms:read', [
                 'summary' => 'What the office recorded about a submission',
                 'description' => 'The current review, every earlier one, and the staff fields they answer. '
@@ -2063,6 +2074,23 @@ final class CoreApiSchemas
                     'responses' => [
                         200 => self::jsonResponse('The submission and its fields', 'FormSubmissionDetailResponse'),
                         404 => self::errorResponse('Not one of the caller\'s submissions'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'GET',
+                'path' => '/api/me/form-submissions/{id:\d+}/files/{fileId:\d+}',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Download a file the caller attached to their own submission',
+                    'description' => 'Only the caller\'s own: anybody else\'s is a 404. Always sent as an '
+                        . 'attachment with `nosniff`.',
+                    'tags' => ['forms'],
+                    'responses' => [
+                        200 => ['description' => 'The file, as an attachment', 'content' => ['application/octet-stream' => ['schema' => ['type' => 'string', 'format' => 'binary']]]],
+                        404 => self::errorResponse('Not a file on one of the caller\'s submissions'),
+                        503 => self::errorResponse('The file could not be read from storage'),
                     ] + self::authErrors(),
                 ],
             ],
@@ -8065,6 +8093,13 @@ final class CoreApiSchemas
                     SchemaBuilder::ref('FormSubmission'),
                     self::object([
                         'fields' => ['type' => 'array', 'items' => SchemaBuilder::ref('FormField')],
+                        'files' => ['type' => 'array', 'items' => self::object([
+                            'id' => self::int(),
+                            'field_key' => self::str(),
+                            'content_type' => self::str(),
+                            'byte_size' => self::int(),
+                            'filename' => self::str(true),
+                        ], ['id', 'field_key', 'content_type', 'byte_size', 'filename'])],
                         'form_version_now' => self::int(true),
                     ], []),
                 ],
