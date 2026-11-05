@@ -7,6 +7,7 @@ import { AuthShell } from '@/components/auth-shell';
 import { PasswordChecklist } from '@/components/password-checklist';
 import { Button } from '@whity/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@whity/ui/textarea';
 import { Alert, AlertDescription } from '@whity/ui/alert';
 import { useTranslation } from '@whity/features/i18n';
 
@@ -31,6 +32,7 @@ function ResetPasswordInner() {
   const t = useTranslation('auth');
 
   const [status, setStatus] = useState<Status>(token ? 'form' : 'no-token');
+  const [reason, setReason] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -62,7 +64,7 @@ function ResetPasswordInner() {
           // CSRF defense (WC-160): required on state-changing POSTs.
           'X-Requested-With': 'XMLHttpRequest',
         },
-        body: JSON.stringify({ token, password }),
+        body: JSON.stringify({ token, password, ...(reason.trim() !== '' ? { reason: reason.trim() } : {}) }),
         credentials: 'include',
       });
 
@@ -146,6 +148,22 @@ function ResetPasswordInner() {
             />
           </div>
           <PasswordChecklist password={password} confirm={confirmPassword} />
+          <div className="space-y-2">
+            <label htmlFor="reason" className="text-sm font-medium">
+              {t('resetPassword.reason.label', 'Why are you resetting it? (optional)')}
+            </label>
+            <Textarea
+              id="reason"
+              rows={2}
+              maxLength={500}
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              disabled={submitting}
+            />
+            <p className="text-sm text-muted-foreground">
+              {t('resetPassword.reason.hint', 'If your workspace needs an administrator to approve this, they see what you write here.')}
+            </p>
+          </div>
           <Button type="submit" className="w-full" disabled={submitting}>
             {submitting
               ? t('resetPassword.submit.pending', 'Resetting…')

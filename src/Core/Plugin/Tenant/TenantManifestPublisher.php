@@ -118,6 +118,33 @@ final class TenantManifestPublisher
     }
 
     /**
+     * Publish a plugin from a store, turned off (S.12: nothing is Verified yet).
+     *
+     * In one transaction, so there's no moment when it's on: publish() alone
+     * makes a new plugin live.
+     *
+     * @param array<mixed> $manifest The decoded manifest.
+     * @return array{version_id: int, plugin: string, version: string, hash: string}
+     * @throws InvalidManifestException When it doesn't validate or isn't allowed.
+     */
+    public function publishTurnedOff(int $tenantId, array $manifest, ?int $publishedBy): array
+    {
+        $this->db->beginTransaction();
+        try {
+            $result = $this->publish($tenantId, $manifest, $publishedBy, null, null, 'Installed from a store');
+            $this->repository->setEnabled($tenantId, $result['plugin'], false);
+            $this->db->commit();
+        } catch (Throwable $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $e;
+        }
+
+        return $result;
+    }
+
+    /**
      * Validate a manifest and check it is one this workspace may publish. The
      * validate route and publish share it.
      *

@@ -118,7 +118,7 @@ describe('PendingRegistrationsPage — list and actions', () => {
     expect(screen.getByText('Acme Inc')).toBeInTheDocument();
     expect(screen.getByText(/owner@acme\.test/)).toBeInTheDocument();
     expect(global.fetch).toHaveBeenCalledWith(
-      '/api/v1/registrations/pending',
+      '/api/v1/registrations/pending?page=1&per_page=25',
       expect.objectContaining({ credentials: 'include' })
     );
   });

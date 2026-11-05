@@ -58,11 +58,13 @@ final class ScheduleRunCommand implements CliCommand
         ?SharedStoreInterface $store = null,
         ?JobRepository $jobs = null,
         ?LoggerInterface $logger = null,
-        ?\Closure $sleeper = null
+        ?\Closure $sleeper = null,
+        private ?\Whity\Core\Plugin\PluginRecords $pluginRecords = null
     ) {
         $this->logger = $logger ?? new NullLogger();
         if ($schedules === null || $queue === null || $store === null || $jobs === null) {
             $pdo = Database::connect()->getPdo();
+            $this->pluginRecords ??= new \Whity\Core\Plugin\PluginRecords($pdo);
             $schedules ??= new ScheduledJobRepository($pdo);
             $queue ??= new QueueService(new JobRepository($pdo));
             $store ??= new DatabaseSharedStore($pdo);
@@ -153,6 +155,15 @@ final class ScheduleRunCommand implements CliCommand
 
         // Built-in retention GC for the durable queue's retained completed jobs.
         $pruned = $this->jobs->pruneCompleted($retentionSeconds);
+
+        // S.7: uninstalled plugins whose 30 days are over. Once an hour is plenty,
+        // and the queue worker does it because that's where plugin code is loaded.
+        if ($this->pluginRecords !== null && $this->pluginRecords->dueRemovals() !== []) {
+            $this->queue->dispatch(\Whity\Core\Queue\Jobs\PurgeRemovedPluginsJob::NAME, [], [
+                'tenant_id' => 0,
+                'idempotency_key' => 'plugins-purge-' . gmdate('YmdH'),
+            ]);
+        }
 
         $this->logger->info('[schedule:run] tick complete', [
             'bucket'     => $bucket,

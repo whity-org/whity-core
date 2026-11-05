@@ -7,6 +7,7 @@ namespace Whity\Http;
 use Whity\Sdk\Http\Request;
 use Whity\Sdk\Http\Response;
 use Whity\Core\Audit\AuditContext;
+use Whity\Core\Observability\ErrorReference;
 use Whity\Core\Router;
 use Whity\Core\Tenant\TenantContext;
 
@@ -199,7 +200,7 @@ class HttpKernel
             }
 
             // Execute the complete pipeline
-            return $pipeline($request);
+            return ErrorReference::attach($pipeline($request), $request);
         } finally {
             // Clean up request state after request completes
             $this->resetRequestState();

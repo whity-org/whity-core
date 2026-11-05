@@ -375,6 +375,133 @@
                 ]
             }
         },
+        "/api/v1/2fa-policies/remind": {
+            "post": {
+                "operationId": "post_api_v1_2fa_policies_remind",
+                "summary": "Remind one person to set up two-step sign-in",
+                "tags": [
+                    "security"
+                ],
+                "description": "Only somebody a rule in this workspace covers and who has not set it up, and once a day per person.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/TwoFactorRemindRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Reminder sent",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TwoFactorRemindResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No rule in this workspace covers that person",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "That person has already set it up",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "profile_id is required",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Already reminded today",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/2fa-policies/status": {
             "get": {
                 "operationId": "get_api_v1_2fa_policies_status",
@@ -3049,6 +3176,24 @@
                         }
                     },
                     {
+                        "name": "agent",
+                        "in": "query",
+                        "required": false,
+                        "description": "Filter by agent principal, as listed by /api/audit-logs/facets",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "area",
+                        "in": "query",
+                        "required": false,
+                        "description": "Filter by area, as listed by /api/audit-logs/facets. An unknown area matches nothing.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
                         "name": "target_type",
                         "in": "query",
                         "required": false,
@@ -3172,6 +3317,253 @@
                 ]
             }
         },
+        "/api/v1/audit-logs/export": {
+            "get": {
+                "operationId": "get_api_v1_audit_logs_export",
+                "summary": "The matching audit entries as a CSV",
+                "tags": [
+                    "audit-logs"
+                ],
+                "description": "The same rows, tenant scope and filters as GET /api/audit-logs, newest first. A cell a spreadsheet would run as a formula starts with an apostrophe. `technical=1` adds event codes, ids and IP addresses. More than 50000 rows is refused with 422 rather than cut short; choose a shorter period.",
+                "parameters": [
+                    {
+                        "name": "actor",
+                        "in": "query",
+                        "required": false,
+                        "description": "Filter by actor user id",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "agent",
+                        "in": "query",
+                        "required": false,
+                        "description": "Filter by agent principal",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "area",
+                        "in": "query",
+                        "required": false,
+                        "description": "Filter by area",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "action",
+                        "in": "query",
+                        "required": false,
+                        "description": "Exact action match",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "target_type",
+                        "in": "query",
+                        "required": false,
+                        "description": "Filter by target type",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "target_id",
+                        "in": "query",
+                        "required": false,
+                        "description": "Filter by target id",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "required": false,
+                        "description": "Inclusive ISO-8601 lower bound",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "required": false,
+                        "description": "Inclusive ISO-8601 upper bound",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "technical",
+                        "in": "query",
+                        "required": false,
+                        "description": "1 adds event codes, ids and IP addresses",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The CSV, UTF-8 with a byte order mark",
+                        "content": {
+                            "text/csv": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Too many entries to export at once",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/audit-logs/facets": {
+            "get": {
+                "operationId": "get_api_v1_audit_logs_facets",
+                "summary": "Who, which agents and which areas the audit filters can offer, by name",
+                "tags": [
+                    "audit-logs"
+                ],
+                "description": "Only people and agents in rows the caller could already read. The system tenant reads every workspace, so it sees all of them.",
+                "responses": {
+                    "200": {
+                        "description": "The filter options",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuditLogFacetsResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/auth/2fa-recovery/confirm": {
             "post": {
                 "operationId": "post_api_v1_auth_2fa_recovery_confirm",
@@ -3184,7 +3576,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/TokenOnlyRequest"
+                                "$ref": "#/components/schemas/TwoFactorRecoveryConfirmRequest"
                             }
                         }
                     }
@@ -4263,6 +4655,133 @@
                         }
                     }
                 }
+            }
+        },
+        "/api/v1/billing/change-plan": {
+            "post": {
+                "operationId": "post_api_v1_billing_change_plan",
+                "summary": "Move this workspace's subscription to another plan",
+                "tags": [
+                    "billing"
+                ],
+                "description": "A second checkout would open a second subscription, so a tier change moves the one this deployment already holds. A dearer plan is charged now for the rest of the period; a cheaper one starts at renewal with nothing refunded. Either way the amount is the billing service's, so none is quoted here. `idempotency_key` is one per confirmed change, and makes a retry after a timeout safe.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/BillingChangePlanRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The change was accepted",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BillingChangePlanResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "This deployment does not sell subscriptions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Already on that plan, or no active subscription to change",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Unknown plan, an add-on, or a bad idempotency key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "The billing service refused or could not be reached",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
             }
         },
         "/api/v1/billing/checkout": {
@@ -7432,7 +7951,7 @@
                         "name": "includeRevoked",
                         "in": "query",
                         "required": false,
-                        "description": "Include revoked delegations",
+                        "description": "Include delegations that have ended, whether revoked or past their end date",
                         "schema": {
                             "type": "boolean"
                         }
@@ -7681,6 +8200,102 @@
                     },
                     "405": {
                         "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/delegations/{id}/restore": {
+            "post": {
+                "operationId": "post_api_v1_delegations_id_restore",
+                "summary": "Undo a revoke: only by the person who revoked it, soon after",
+                "tags": [
+                    "delegations"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Restore confirmation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MutationResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Delegation not found, or not revoked",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "It can no longer be undone: too late, past its end date, or the grantor no longer holds the permission",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -20774,6 +21389,189 @@
                 ]
             }
         },
+        "/api/v1/forms/{id}/responses/export": {
+            "get": {
+                "operationId": "get_api_v1_forms_id_responses_export",
+                "summary": "Download a form's responses as a CSV file",
+                "tags": [
+                    "forms"
+                ],
+                "description": "At most 20,000 rows, and `X-Whity-Rows-Truncated` says if it stopped there. A text cell that a spreadsheet would run as a formula is made safe with a leading `'`. Staff answers are left out, and a file answer says how many are attached rather than giving the storage key. `?language=ar` chooses the wording. Each export is audited.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "language",
+                        "in": "query",
+                        "required": false,
+                        "description": "en or ar; the wording of labels and choices.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The CSV file",
+                        "content": {
+                            "text/csv": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Form not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/forms/{id}/responses/summary": {
+            "get": {
+                "operationId": "get_api_v1_forms_id_responses_summary",
+                "summary": "What a form's responses add up to",
+                "tags": [
+                    "forms"
+                ],
+                "description": "A count per choice for each choice question, responses per week for the last 12 weeks, and where responses are in their routing. Text and file questions are not summarised, and staff answers appear nowhere. Reads at most 20,000 responses; `truncated` says so.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The summary",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/FormResponsesSummaryResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Form not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/forms/{id}/submissions": {
             "post": {
                 "operationId": "post_api_v1_forms_id_submissions",
@@ -25778,6 +26576,77 @@
                 }
             }
         },
+        "/api/v1/me/form-drafts": {
+            "get": {
+                "operationId": "get_api_v1_me_form_drafts",
+                "summary": "The caller's unsent answers, on forms still open to them",
+                "tags": [
+                    "forms"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The drafts",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/FormDraftListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/me/form-submissions": {
             "get": {
                 "operationId": "get_api_v1_me_form_submissions",
@@ -25930,6 +26799,271 @@
                     },
                     "405": {
                         "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/me/forms/{id}/draft": {
+            "delete": {
+                "operationId": "delete_api_v1_me_forms_id_draft",
+                "summary": "Throw away the caller's draft",
+                "tags": [
+                    "forms"
+                ],
+                "description": "Idempotent, and works on a form that has since closed.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Deleted"
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "get": {
+                "operationId": "get_api_v1_me_forms_id_draft",
+                "summary": "The caller's draft of a form, or null",
+                "tags": [
+                    "forms"
+                ],
+                "description": "Nobody else can read a draft. The same 404 for a form that does not exist, is not open, or that the caller may not fill in.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The draft, or null",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/FormDraftResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not available to this caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "put": {
+                "operationId": "put_api_v1_me_forms_id_draft",
+                "summary": "Save the caller's unsent answers",
+                "tags": [
+                    "forms"
+                ],
+                "description": "Not validated, because half-finished answers are what a draft is. Staff questions, file answers and unknown keys are dropped. Sending the form deletes the draft.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/FormDraftSaveRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The saved draft",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/FormDraftResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not available to this caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Malformed, or larger than 256 KB",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -26219,6 +27353,189 @@
                     },
                     "429": {
                         "description": "Too many uploads",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/me/home-cards": {
+            "get": {
+                "operationId": "get_api_v1_me_home_cards",
+                "summary": "The cards installed apps add to the caller's home, in install order",
+                "tags": [
+                    "home"
+                ],
+                "description": "Only cards whose permission the caller holds in this workspace. Hidden ones are listed too, so a client can offer Show. A card names its data route in `source`; that route applies its own permission and the caller's scope.",
+                "responses": {
+                    "200": {
+                        "description": "The cards",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HomeCardListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/me/home-cards/{key}/hidden": {
+            "put": {
+                "operationId": "put_api_v1_me_home_cards_key_hidden",
+                "summary": "Hide a home card or show it again, for the caller in this workspace",
+                "tags": [
+                    "home"
+                ],
+                "parameters": [
+                    {
+                        "name": "key",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/HomeCardHiddenRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The card and its new state",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HomeCardHiddenResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No card by that name that the caller may see",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "hidden is missing or not true or false",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -27170,6 +28487,154 @@
                         }
                     }
                 }
+            }
+        },
+        "/api/v1/me/recent-documents": {
+            "get": {
+                "operationId": "get_api_v1_me_recent_documents",
+                "summary": "The caller's drafts and the documents they sent this week, newest first, at most five",
+                "tags": [
+                    "home"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The rows",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RecentDocumentListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/me/setup-steps": {
+            "get": {
+                "operationId": "get_api_v1_me_setup_steps",
+                "summary": "What still blocks real work in this workspace: branding, team, an agent, the tax number and a plan",
+                "tags": [
+                    "home"
+                ],
+                "description": "A step that does not apply is left out, such as a plan on an install with no plans. The system tenant has none.",
+                "responses": {
+                    "200": {
+                        "description": "The steps and how many are done",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SetupStepsResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
             }
         },
         "/api/v1/me/waiting": {
@@ -33815,6 +35280,82 @@
                 ]
             }
         },
+        "/api/v1/plugins/removed": {
+            "get": {
+                "operationId": "get_api_v1_plugins_removed",
+                "summary": "Plugins kept for 30 days after uninstalling (empty outside the system tenant)",
+                "tags": [
+                    "platform-ops"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Kept plugins",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PluginRemovedResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/plugins/store/allowed": {
             "get": {
                 "operationId": "get_api_v1_plugins_store_allowed",
@@ -33991,6 +35532,82 @@
                     },
                     "502": {
                         "description": "The store catalogue could not be fetched",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/plugins/updates": {
+            "get": {
+                "operationId": "get_api_v1_plugins_updates",
+                "summary": "Newer store versions of installed plugins (empty outside the system tenant)",
+                "tags": [
+                    "platform-ops"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Available updates",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PluginUpdatesResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -34232,7 +35849,7 @@
         "/api/v1/plugins/{id}/uninstall": {
             "post": {
                 "operationId": "post_api_v1_plugins_id_uninstall",
-                "summary": "Uninstall a plugin (disable, roll back migrations, remove files)",
+                "summary": "Uninstall a plugin: turned off and kept 30 days, or removed at once with now",
                 "tags": [
                     "platform-ops"
                 ],
@@ -34531,6 +36148,400 @@
                     },
                     "500": {
                         "description": "Internal error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/plugins/{name}/reinstall": {
+            "post": {
+                "operationId": "post_api_v1_plugins_name_reinstall",
+                "summary": "Restore an uninstalled plugin within its 30 days",
+                "tags": [
+                    "platform-ops"
+                ],
+                "parameters": [
+                    {
+                        "name": "name",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Reinstalled",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PluginActionResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Not the platform operator",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/plugins/{name}/update": {
+            "post": {
+                "operationId": "post_api_v1_plugins_name_update",
+                "summary": "Fetch the latest version; applies if it asks for no new access, otherwise waits for approval",
+                "tags": [
+                    "platform-ops"
+                ],
+                "parameters": [
+                    {
+                        "name": "name",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PluginUpdateRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Updated or waiting",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PluginUpdateResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid package",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Not the platform operator",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Up to date or uninstalled",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Incompatible or not newer",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Store unavailable",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/plugins/{name}/update/approve": {
+            "post": {
+                "operationId": "post_api_v1_plugins_name_update_approve",
+                "summary": "Accept the new access a waiting update asks for and apply it",
+                "tags": [
+                    "platform-ops"
+                ],
+                "parameters": [
+                    {
+                        "name": "name",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Updated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PluginUpdateResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Not the platform operator",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Nothing waiting",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/plugins/{name}/update/reject": {
+            "post": {
+                "operationId": "post_api_v1_plugins_name_update_reject",
+                "summary": "Drop a waiting update and stay on this version",
+                "tags": [
+                    "platform-ops"
+                ],
+                "parameters": [
+                    {
+                        "name": "name",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Rejected",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PluginUpdateResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Not the platform operator",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Nothing waiting",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -43973,6 +45984,103 @@
                 ]
             }
         },
+        "/api/v1/user-groups/usage": {
+            "get": {
+                "operationId": "get_api_v1_user_groups_usage",
+                "summary": "How many people each group holds now, and where it is used",
+                "tags": [
+                    "user-groups"
+                ],
+                "parameters": [
+                    {
+                        "name": "ids",
+                        "in": "query",
+                        "required": false,
+                        "description": "Group ids, comma-separated, at most 100: the rows on screen. A group of another workspace is left out.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "One entry per group found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UserGroupUsageResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "`ids` missing, malformed or too many",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/user-groups/{id}": {
             "delete": {
                 "operationId": "delete_api_v1_user_groups_id",
@@ -44393,7 +46501,7 @@
                         "name": "sort",
                         "in": "query",
                         "required": false,
-                        "description": "Sort key: `name`, `email`, `role`, `status`, `created` (default), plus `tenant` for a system-tenant caller. `name` and `email` order identically \u2014 the name IS the email's local part. An unrecognised key is not an error: it falls back to the default, because a client asking for a column it cannot see should get a list rather than a 400.",
+                        "description": "Sort key: `name`, `email`, `role`, `status`, `created` (default), `lastActive`, plus `tenant` for a system-tenant caller. An unrecognised key is not an error: it falls back to the default, because a client asking for a column it cannot see should get a list rather than a 400.",
                         "schema": {
                             "type": "string"
                         }
@@ -44411,7 +46519,43 @@
                         "name": "q",
                         "in": "query",
                         "required": false,
-                        "description": "Case-insensitive substring match on email or role name. It narrows `pagination.total` too, so the envelope always describes the filtered list.",
+                        "description": "Case-insensitive substring match on display name, email or role name. It narrows `pagination.total` too, so the envelope always describes the filtered list.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "role_id",
+                        "in": "query",
+                        "required": false,
+                        "description": "Only people whose primary role is one of these ids, comma-separated.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "ou_id",
+                        "in": "query",
+                        "required": false,
+                        "description": "Only people in one of these organizational units, comma-separated.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "two_step",
+                        "in": "query",
+                        "required": false,
+                        "description": "`on` or `off`: whether the person has two-step turned on.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "account_status",
+                        "in": "query",
+                        "required": false,
+                        "description": "`active` or `inactive`. Both are listed when omitted.",
                         "schema": {
                             "type": "string"
                         }
@@ -44460,6 +46604,16 @@
                     },
                     "405": {
                         "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A malformed filter",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -44574,6 +46728,228 @@
                     },
                     "422": {
                         "description": "Email longer than 255 characters",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/users/bulk/require-two-step": {
+            "post": {
+                "operationId": "post_api_v1_users_bulk_require_two_step",
+                "summary": "Require two-step of several people, through a policy naming each of them",
+                "tags": [
+                    "users"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UsersBulkTwoStepRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Who now has a policy and who already had one",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UsersBulkResultResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A malformed request, or a target that was not found; `details.refused` lists them",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/users/bulk/role": {
+            "post": {
+                "operationId": "post_api_v1_users_bulk_role",
+                "summary": "Change the primary role of several people at once, all or nothing",
+                "tags": [
+                    "users"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UsersBulkRoleRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Who changed and who already held the role",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UsersBulkResultResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The role has permissions the caller does not hold",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "The role is not available in a target's workspace",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "This would leave a workspace with nobody able to manage people",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A malformed request, or a target that cannot be changed; `details.refused` gives the reason for each",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -45304,6 +47680,206 @@
                 ]
             }
         },
+        "/api/v1/users/{id}/two-step-requirement": {
+            "delete": {
+                "operationId": "delete_api_v1_users_id_two_step_requirement",
+                "summary": "Remove the policy naming one person. A workspace or unit policy still applies.",
+                "tags": [
+                    "users"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The person no longer has a policy naming them",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UserTwoStepClearedResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "User not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "put": {
+                "operationId": "put_api_v1_users_id_two_step_requirement",
+                "summary": "Require two-step of one person",
+                "tags": [
+                    "users"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UserTwoStepRequirementRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Whether a policy was added",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UsersBulkResultResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A malformed request, or the person was not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/workspace-plugins": {
             "get": {
                 "operationId": "get_api_v1_workspace_plugins",
@@ -45587,6 +48163,132 @@
                     },
                     "500": {
                         "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/workspace-plugins/install-from-store": {
+            "post": {
+                "operationId": "post_api_v1_workspace_plugins_install_from_store",
+                "summary": "Install a declarative plugin from a trusted store into this workspace, turned off",
+                "tags": [
+                    "platform-ops"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/InstallFromStoreRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Installed, turned off",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WorkspacePluginInstallResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "No workspace, or the store is not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Already in this workspace",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Not allowed in a workspace",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "Store unavailable",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -46163,6 +48865,178 @@
                         }
                     }
                 }
+            }
+        },
+        "/api/v1/workspace-plugins/{plugin}/disable": {
+            "post": {
+                "operationId": "post_api_v1_workspace_plugins_plugin_disable",
+                "summary": "Turn off this workspace's plugin",
+                "tags": [
+                    "platform-ops"
+                ],
+                "parameters": [
+                    {
+                        "name": "plugin",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Turned off",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WorkspacePluginSwitchResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/workspace-plugins/{plugin}/enable": {
+            "post": {
+                "operationId": "post_api_v1_workspace_plugins_plugin_enable",
+                "summary": "Turn on this workspace's plugin",
+                "tags": [
+                    "platform-ops"
+                ],
+                "parameters": [
+                    {
+                        "name": "plugin",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Turned on",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WorkspacePluginSwitchResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
             }
         },
         "/api/v1/workspace-plugins/{plugin}/versions": {
@@ -48295,6 +51169,65 @@
                     "createdAt": {
                         "type": "string",
                         "nullable": true
+                    },
+                    "actor": {
+                        "type": "object",
+                        "properties": {
+                            "kind": {
+                                "type": "string",
+                                "enum": [
+                                    "person",
+                                    "agent",
+                                    "system"
+                                ]
+                            },
+                            "name": {
+                                "type": "string"
+                            },
+                            "agent": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "forPerson": {
+                                "type": "string",
+                                "nullable": true
+                            }
+                        },
+                        "required": [
+                            "kind",
+                            "name",
+                            "agent",
+                            "forPerson"
+                        ]
+                    },
+                    "target": {
+                        "type": "object",
+                        "nullable": true,
+                        "properties": {
+                            "type": {
+                                "type": "string"
+                            },
+                            "name": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "type",
+                            "name"
+                        ]
+                    },
+                    "sentence": {
+                        "type": "string"
+                    },
+                    "sentenceTemplate": {
+                        "type": "string"
+                    },
+                    "area": {
+                        "type": "string"
+                    },
+                    "how": {
+                        "type": "string",
+                        "nullable": true
                     }
                 },
                 "required": [
@@ -48306,7 +51239,85 @@
                     "targetId",
                     "metadata",
                     "ipAddress",
-                    "createdAt"
+                    "createdAt",
+                    "actor",
+                    "target",
+                    "sentence",
+                    "sentenceTemplate",
+                    "area",
+                    "how"
+                ]
+            },
+            "AuditLogFacetsResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "people": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "id": {
+                                            "type": "integer"
+                                        },
+                                        "name": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "id",
+                                        "name"
+                                    ]
+                                }
+                            },
+                            "agents": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "id": {
+                                            "type": "string"
+                                        },
+                                        "name": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "id",
+                                        "name"
+                                    ]
+                                }
+                            },
+                            "areas": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "id": {
+                                            "type": "string"
+                                        },
+                                        "name": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "id",
+                                        "name"
+                                    ]
+                                }
+                            }
+                        },
+                        "required": [
+                            "people",
+                            "agents",
+                            "areas"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
                 ]
             },
             "AuditLogListResponse": {
@@ -48543,6 +51554,54 @@
                         },
                         "required": [
                             "has_access"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "BillingChangePlanRequest": {
+                "type": "object",
+                "properties": {
+                    "plan_key": {
+                        "type": "string",
+                        "description": "The plan to move to, from the list of plans this workspace can buy."
+                    },
+                    "billing_period": {
+                        "type": "string",
+                        "description": "month or year. Leave it out to keep the plan's only price."
+                    },
+                    "idempotency_key": {
+                        "type": "string",
+                        "description": "8 to 64 characters, new for each confirmed change and the same on a retry of it."
+                    }
+                },
+                "required": [
+                    "plan_key",
+                    "idempotency_key"
+                ]
+            },
+            "BillingChangePlanResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "plan_key": {
+                                "type": "string"
+                            },
+                            "takes_effect": {
+                                "type": "string",
+                                "enum": [
+                                    "now",
+                                    "renewal"
+                                ]
+                            }
+                        },
+                        "required": [
+                            "plan_key",
+                            "takes_effect"
                         ]
                     }
                 },
@@ -49631,6 +52690,34 @@
                     "revokedAt": {
                         "type": "string",
                         "nullable": true
+                    },
+                    "expiresAt": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "active",
+                            "expired",
+                            "revoked"
+                        ]
+                    },
+                    "grantorName": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "granteeName": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "ouName": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "permissionDescription": {
+                        "type": "string",
+                        "nullable": true
                     }
                 },
                 "required": [
@@ -49642,7 +52729,9 @@
                     "permission",
                     "ouId",
                     "grantedAt",
-                    "revokedAt"
+                    "revokedAt",
+                    "expiresAt",
+                    "status"
                 ]
             },
             "DelegationCreateRequest": {
@@ -49672,6 +52761,11 @@
                         "type": "integer",
                         "nullable": true,
                         "description": "Limit the delegation to this organizational unit and the units below it. Null or omitted applies tenant-wide."
+                    },
+                    "expiresAt": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "When it ends, an ISO-8601 moment in the future. Null or omitted is no end date."
                     }
                 },
                 "required": [
@@ -49700,6 +52794,10 @@
                             },
                             "ouId": {
                                 "type": "integer",
+                                "nullable": true
+                            },
+                            "expiresAt": {
+                                "type": "string",
                                 "nullable": true
                             },
                             "permissions": {
@@ -51526,6 +54624,9 @@
                         "type": "boolean"
                     },
                     "closed_by_delivery": {
+                        "type": "boolean"
+                    },
+                    "closed_by_withdrawal": {
                         "type": "boolean"
                     },
                     "created_at": {
@@ -54169,6 +57270,103 @@
                     "data"
                 ]
             },
+            "FormDraft": {
+                "type": "object",
+                "properties": {
+                    "form_id": {
+                        "type": "integer"
+                    },
+                    "data": {
+                        "type": "object",
+                        "additionalProperties": true
+                    },
+                    "step": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "updated_at": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "form_id",
+                    "data",
+                    "updated_at"
+                ]
+            },
+            "FormDraftListResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "form_id": {
+                                    "type": "integer"
+                                },
+                                "form_name": {
+                                    "type": "object",
+                                    "x-whity-localized-text": true,
+                                    "properties": {
+                                        "ar": {
+                                            "type": "string"
+                                        },
+                                        "en": {
+                                            "type": "string"
+                                        }
+                                    }
+                                },
+                                "step": {
+                                    "type": "integer",
+                                    "nullable": true
+                                },
+                                "updated_at": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "form_id",
+                                "form_name",
+                                "updated_at"
+                            ]
+                        }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "FormDraftResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/FormDraft",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "FormDraftSaveRequest": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "additionalProperties": true,
+                        "description": "The answers so far, keyed by field key."
+                    },
+                    "step": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "Which step the person is on."
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
             "FormField": {
                 "type": "object",
                 "properties": {
@@ -54756,6 +57954,136 @@
                 "properties": {
                     "data": {
                         "$ref": "#/components/schemas/Form"
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "FormResponsesSummaryResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "total": {
+                                "type": "integer"
+                            },
+                            "truncated": {
+                                "type": "boolean"
+                            },
+                            "per_week": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "week": {
+                                            "type": "string"
+                                        },
+                                        "count": {
+                                            "type": "integer"
+                                        }
+                                    },
+                                    "required": [
+                                        "week",
+                                        "count"
+                                    ]
+                                }
+                            },
+                            "routing": {
+                                "type": "object",
+                                "properties": {
+                                    "not_routed": {
+                                        "type": "integer"
+                                    },
+                                    "in_progress": {
+                                        "type": "integer"
+                                    },
+                                    "completed": {
+                                        "type": "integer"
+                                    }
+                                },
+                                "required": [
+                                    "not_routed",
+                                    "in_progress",
+                                    "completed"
+                                ]
+                            },
+                            "questions": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_key": {
+                                            "type": "string"
+                                        },
+                                        "field_type": {
+                                            "type": "string"
+                                        },
+                                        "label": {
+                                            "type": "object",
+                                            "x-whity-localized-text": true,
+                                            "properties": {
+                                                "ar": {
+                                                    "type": "string"
+                                                },
+                                                "en": {
+                                                    "type": "string"
+                                                }
+                                            }
+                                        },
+                                        "answered": {
+                                            "type": "integer"
+                                        },
+                                        "options": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "value": {
+                                                        "type": "string"
+                                                    },
+                                                    "label": {
+                                                        "type": "object",
+                                                        "x-whity-localized-text": true,
+                                                        "properties": {
+                                                            "ar": {
+                                                                "type": "string"
+                                                            },
+                                                            "en": {
+                                                                "type": "string"
+                                                            }
+                                                        },
+                                                        "nullable": true
+                                                    },
+                                                    "count": {
+                                                        "type": "integer"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "value",
+                                                    "count"
+                                                ]
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "field_key",
+                                        "field_type",
+                                        "label",
+                                        "answered",
+                                        "options"
+                                    ]
+                                }
+                            }
+                        },
+                        "required": [
+                            "total",
+                            "truncated",
+                            "per_week",
+                            "routing",
+                            "questions"
+                        ]
                     }
                 },
                 "required": [
@@ -55567,6 +58895,101 @@
                     }
                 }
             },
+            "HomeCard": {
+                "type": "object",
+                "properties": {
+                    "key": {
+                        "type": "string"
+                    },
+                    "label": {
+                        "type": "string"
+                    },
+                    "labelAr": {
+                        "type": "string"
+                    },
+                    "caption": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "captionAr": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "icon": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "href": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "source": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "value": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "hidden": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "key",
+                    "label",
+                    "labelAr",
+                    "hidden"
+                ]
+            },
+            "HomeCardHiddenRequest": {
+                "type": "object",
+                "properties": {
+                    "hidden": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "hidden"
+                ]
+            },
+            "HomeCardHiddenResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "key": {
+                                "type": "string"
+                            },
+                            "hidden": {
+                                "type": "boolean"
+                            }
+                        },
+                        "required": [
+                            "key",
+                            "hidden"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "HomeCardListResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/HomeCard"
+                        }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
             "IdentityProvider": {
                 "type": "object",
                 "properties": {
@@ -55766,6 +59189,28 @@
                     "resource_id": {
                         "type": "string",
                         "nullable": true
+                    },
+                    "sender": {
+                        "type": "object",
+                        "nullable": true,
+                        "properties": {
+                            "kind": {
+                                "type": "string",
+                                "enum": [
+                                    "person",
+                                    "public"
+                                ]
+                            },
+                            "profile_id": {
+                                "type": "integer"
+                            },
+                            "name": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "kind"
+                        ]
                     },
                     "meta": {
                         "type": "object",
@@ -56052,12 +59497,22 @@
                             },
                             "requires_password": {
                                 "type": "boolean"
+                            },
+                            "inviter_name": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "role_name": {
+                                "type": "string",
+                                "nullable": true
                             }
                         },
                         "required": [
                             "email",
                             "tenant_name",
-                            "requires_password"
+                            "requires_password",
+                            "inviter_name",
+                            "role_name"
                         ]
                     }
                 },
@@ -56179,6 +59634,23 @@
                         "items": {
                             "$ref": "#/components/schemas/PaymentTransaction"
                         }
+                    },
+                    "total_in_words": {
+                        "type": "object",
+                        "properties": {
+                            "en": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "ar": {
+                                "type": "string",
+                                "nullable": true
+                            }
+                        },
+                        "required": [
+                            "en",
+                            "ar"
+                        ]
                     }
                 }
             },
@@ -56936,6 +60408,10 @@
                             },
                             "email": {
                                 "type": "string"
+                            },
+                            "display_name": {
+                                "type": "string",
+                                "nullable": true
                             },
                             "role": {
                                 "type": "string"
@@ -58552,6 +62028,9 @@
                     "ou_type_label": {
                         "type": "string",
                         "nullable": true
+                    },
+                    "member_count": {
+                        "type": "integer"
                     }
                 },
                 "required": [
@@ -58564,7 +62043,8 @@
                     "created_at",
                     "ou_type_id",
                     "ou_type_key",
-                    "ou_type_label"
+                    "ou_type_label",
+                    "member_count"
                 ]
             },
             "OuCreateRequest": {
@@ -59056,6 +62536,11 @@
                     },
                     "password": {
                         "type": "string"
+                    },
+                    "reason": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Optional. Why you are asking, shown to the approver when approval is required. At most 500 characters."
                     }
                 },
                 "required": [
@@ -59238,6 +62723,10 @@
                     "display_name": {
                         "type": "string"
                     },
+                    "reason": {
+                        "type": "string",
+                        "nullable": true
+                    },
                     "created_at": {
                         "type": "string"
                     }
@@ -59258,10 +62747,14 @@
                         "items": {
                             "$ref": "#/components/schemas/PendingPasswordResetItem"
                         }
+                    },
+                    "pagination": {
+                        "$ref": "#/components/schemas/Pagination"
                     }
                 },
                 "required": [
-                    "data"
+                    "data",
+                    "pagination"
                 ]
             },
             "PendingSelectionResponse": {
@@ -59317,6 +62810,10 @@
                     "display_name": {
                         "type": "string"
                     },
+                    "reason": {
+                        "type": "string",
+                        "nullable": true
+                    },
                     "created_at": {
                         "type": "string"
                     }
@@ -59337,10 +62834,14 @@
                         "items": {
                             "$ref": "#/components/schemas/PendingTwoFactorRecoveryItem"
                         }
+                    },
+                    "pagination": {
+                        "$ref": "#/components/schemas/Pagination"
                     }
                 },
                 "required": [
-                    "data"
+                    "data",
+                    "pagination"
                 ]
             },
             "Permission": {
@@ -59378,12 +62879,45 @@
                     },
                     "source": {
                         "type": "string"
+                    },
+                    "area": {
+                        "type": "string"
+                    },
+                    "areaLabel": {
+                        "type": "string"
+                    },
+                    "areaGroup": {
+                        "type": "string",
+                        "enum": [
+                            "people",
+                            "documents",
+                            "ai",
+                            "workspace",
+                            "apps"
+                        ]
+                    },
+                    "actions": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "enum": [
+                                "see",
+                                "create",
+                                "change",
+                                "delete",
+                                "approve"
+                            ]
+                        }
                     }
                 },
                 "required": [
                     "id",
                     "name",
-                    "description"
+                    "description",
+                    "area",
+                    "areaLabel",
+                    "areaGroup",
+                    "actions"
                 ]
             },
             "PermissionCatalogueResponse": {
@@ -60097,6 +63631,29 @@
                     "php_version"
                 ]
             },
+            "PluginActionResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "message": {
+                                "type": "string"
+                            },
+                            "state": {
+                                "type": "string",
+                                "nullable": true
+                            }
+                        },
+                        "required": [
+                            "message"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
             "PluginEntry": {
                 "type": "object",
                 "properties": {
@@ -60124,6 +63681,75 @@
                     },
                     "permissions_count": {
                         "type": "integer"
+                    },
+                    "trust": {
+                        "type": "string",
+                        "enum": [
+                            "unverified"
+                        ]
+                    },
+                    "install": {
+                        "type": "object",
+                        "properties": {
+                            "source": {
+                                "type": "string"
+                            },
+                            "store_host": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "installed_by": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "installed_at": {
+                                "type": "string"
+                            },
+                            "permissions": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "outside_domains": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "update_waiting": {
+                                "type": "object",
+                                "properties": {
+                                    "version": {
+                                        "type": "string"
+                                    },
+                                    "new_permissions": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "new_domains": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        }
+                                    }
+                                },
+                                "required": [
+                                    "version",
+                                    "new_permissions",
+                                    "new_domains"
+                                ],
+                                "nullable": true
+                            }
+                        },
+                        "required": [
+                            "source",
+                            "installed_at",
+                            "permissions",
+                            "outside_domains"
+                        ]
                     }
                 },
                 "required": [
@@ -60163,6 +63789,144 @@
                     },
                     "meta": {
                         "$ref": "#/components/schemas/PluginListMeta"
+                    }
+                },
+                "required": [
+                    "data",
+                    "meta"
+                ]
+            },
+            "PluginRemovedResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "name": {
+                                    "type": "string"
+                                },
+                                "version": {
+                                    "type": "string",
+                                    "nullable": true
+                                },
+                                "removed_by": {
+                                    "type": "string",
+                                    "nullable": true
+                                },
+                                "removed_at": {
+                                    "type": "string"
+                                },
+                                "purge_after": {
+                                    "type": "string"
+                                },
+                                "purge_failed": {
+                                    "type": "boolean"
+                                }
+                            },
+                            "required": [
+                                "name",
+                                "removed_at",
+                                "purge_after",
+                                "purge_failed"
+                            ]
+                        }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "PluginUpdateRequest": {
+                "type": "object",
+                "properties": {
+                    "token": {
+                        "type": "string",
+                        "description": "The store access token, when the store requires one to download."
+                    }
+                }
+            },
+            "PluginUpdateResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "status": {
+                                "type": "string",
+                                "enum": [
+                                    "updated",
+                                    "waiting_approval",
+                                    "rejected"
+                                ]
+                            },
+                            "version": {
+                                "type": "string"
+                            },
+                            "state": {
+                                "type": "string"
+                            },
+                            "new_permissions": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "new_domains": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "worker_restart_required": {
+                                "type": "boolean"
+                            }
+                        },
+                        "required": [
+                            "status"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "PluginUpdatesResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "plugin": {
+                                    "type": "string"
+                                },
+                                "installed_version": {
+                                    "type": "string"
+                                },
+                                "latest_version": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "plugin",
+                                "installed_version",
+                                "latest_version"
+                            ]
+                        }
+                    },
+                    "meta": {
+                        "type": "object",
+                        "properties": {
+                            "stores_unreachable": {
+                                "type": "integer"
+                            }
+                        },
+                        "required": [
+                            "stores_unreachable"
+                        ]
                     }
                 },
                 "required": [
@@ -60623,6 +64387,9 @@
                     "plan_key": {
                         "type": "string"
                     },
+                    "is_current": {
+                        "type": "boolean"
+                    },
                     "name": {
                         "type": "string"
                     },
@@ -60670,6 +64437,61 @@
                         "type": "array",
                         "items": {
                             "$ref": "#/components/schemas/PurchasablePlan"
+                        }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "RecentDocument": {
+                "type": "object",
+                "properties": {
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "document",
+                            "draft"
+                        ]
+                    },
+                    "id": {
+                        "type": "integer"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "with",
+                            "issued",
+                            "draft"
+                        ]
+                    },
+                    "waitingWith": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "at": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "kind",
+                    "id",
+                    "title",
+                    "status",
+                    "waitingWith",
+                    "at"
+                ]
+            },
+            "RecentDocumentListResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/RecentDocument"
                         }
                     }
                 },
@@ -61217,6 +65039,12 @@
                     },
                     "permissionCount": {
                         "type": "integer"
+                    },
+                    "peopleCount": {
+                        "type": "integer"
+                    },
+                    "builtIn": {
+                        "type": "boolean"
                     },
                     "manageable": {
                         "type": "boolean"
@@ -62255,6 +66083,55 @@
                     "data"
                 ]
             },
+            "SetupStepsResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "steps": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "key": {
+                                            "type": "string",
+                                            "enum": [
+                                                "branding",
+                                                "team",
+                                                "agent",
+                                                "tax",
+                                                "plan"
+                                            ]
+                                        },
+                                        "done": {
+                                            "type": "boolean"
+                                        }
+                                    },
+                                    "required": [
+                                        "key",
+                                        "done"
+                                    ]
+                                }
+                            },
+                            "done": {
+                                "type": "integer"
+                            },
+                            "total": {
+                                "type": "integer"
+                            }
+                        },
+                        "required": [
+                            "steps",
+                            "done",
+                            "total"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
             "SimpleMessageResponse": {
                 "type": "object",
                 "properties": {
@@ -62451,11 +66328,19 @@
                                 "items": {
                                     "type": "string"
                                 }
+                            },
+                            "can_install": {
+                                "type": "boolean"
+                            },
+                            "can_install_declarative": {
+                                "type": "boolean"
                             }
                         },
                         "required": [
                             "enabled",
-                            "hosts"
+                            "hosts",
+                            "can_install",
+                            "can_install_declarative"
                         ]
                     }
                 },
@@ -62487,11 +66372,120 @@
                     "latest_version": {
                         "type": "string",
                         "nullable": true
+                    },
+                    "trust": {
+                        "type": "string",
+                        "enum": [
+                            "unverified"
+                        ]
+                    },
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "declarative",
+                            "code"
+                        ]
+                    },
+                    "price": {
+                        "type": "object",
+                        "properties": {
+                            "amount": {
+                                "type": "string"
+                            },
+                            "currency": {
+                                "type": "string"
+                            },
+                            "interval": {
+                                "type": "string",
+                                "nullable": true
+                            }
+                        },
+                        "required": [
+                            "amount",
+                            "currency"
+                        ],
+                        "nullable": true
+                    },
+                    "used_by": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "adds": {
+                        "type": "object",
+                        "properties": {
+                            "screens": {
+                                "type": "integer"
+                            },
+                            "document_blocks": {
+                                "type": "integer"
+                            },
+                            "agent_tools": {
+                                "type": "integer"
+                            },
+                            "fields": {
+                                "type": "integer"
+                            }
+                        },
+                        "required": [
+                            "screens",
+                            "document_blocks",
+                            "agent_tools",
+                            "fields"
+                        ]
+                    },
+                    "permissions": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "outside_domains": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "languages": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "support_url": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "changelog": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "version": {
+                                    "type": "string"
+                                },
+                                "date": {
+                                    "type": "string",
+                                    "nullable": true
+                                },
+                                "notes": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "version",
+                                "notes"
+                            ]
+                        }
                     }
                 },
                 "required": [
                     "slug",
-                    "name"
+                    "name",
+                    "trust"
                 ]
             },
             "StoreCatalogueResponse": {
@@ -62861,6 +66855,44 @@
                     "createdAt": {
                         "type": "string",
                         "nullable": true
+                    },
+                    "plan": {
+                        "type": "object",
+                        "nullable": true,
+                        "properties": {
+                            "key": {
+                                "type": "string"
+                            },
+                            "name": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "key",
+                            "name"
+                        ]
+                    },
+                    "status": {
+                        "type": "object",
+                        "properties": {
+                            "state": {
+                                "type": "string",
+                                "enum": [
+                                    "active",
+                                    "trial",
+                                    "overdue",
+                                    "suspended"
+                                ]
+                            },
+                            "daysLeft": {
+                                "type": "integer",
+                                "nullable": true
+                            }
+                        },
+                        "required": [
+                            "state",
+                            "daysLeft"
+                        ]
                     }
                 },
                 "required": [
@@ -62868,7 +66900,9 @@
                     "name",
                     "slug",
                     "userCount",
-                    "createdAt"
+                    "createdAt",
+                    "plan",
+                    "status"
                 ]
             },
             "TenantCreateRequest": {
@@ -64231,6 +68265,10 @@
                     "grace_period_days": {
                         "type": "integer"
                     },
+                    "scope_name": {
+                        "type": "string",
+                        "nullable": true
+                    },
                     "created_by": {
                         "type": "integer",
                         "nullable": true
@@ -64306,6 +68344,9 @@
                     "profile_id": {
                         "type": "integer"
                     },
+                    "name": {
+                        "type": "string"
+                    },
                     "email": {
                         "type": "string"
                     },
@@ -64315,13 +68356,19 @@
                     "enforcement_deadline": {
                         "type": "integer",
                         "nullable": true
+                    },
+                    "last_reminded_at": {
+                        "type": "string",
+                        "nullable": true
                     }
                 },
                 "required": [
                     "profile_id",
+                    "name",
                     "email",
                     "enrolled",
-                    "enforcement_deadline"
+                    "enforcement_deadline",
+                    "last_reminded_at"
                 ]
             },
             "TwoFactorPolicyStatusResponse": {
@@ -64349,6 +68396,22 @@
                     "grace_period_days"
                 ]
             },
+            "TwoFactorRecoveryConfirmRequest": {
+                "type": "object",
+                "properties": {
+                    "token": {
+                        "type": "string"
+                    },
+                    "reason": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Optional. Why you are asking, shown to the approver. At most 500 characters."
+                    }
+                },
+                "required": [
+                    "token"
+                ]
+            },
             "TwoFactorRecoveryConfirmResponse": {
                 "type": "object",
                 "properties": {
@@ -64368,6 +68431,41 @@
                         "required": [
                             "status",
                             "message"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "TwoFactorRemindRequest": {
+                "type": "object",
+                "properties": {
+                    "profile_id": {
+                        "type": "integer",
+                        "description": "The person to remind, from the two-step status list."
+                    }
+                },
+                "required": [
+                    "profile_id"
+                ]
+            },
+            "TwoFactorRemindResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "profile_id": {
+                                "type": "integer"
+                            },
+                            "last_reminded_at": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "profile_id",
+                            "last_reminded_at"
                         ]
                     }
                 },
@@ -64742,11 +68840,18 @@
                     "name": {
                         "type": "string"
                     },
+                    "displayName": {
+                        "type": "string"
+                    },
                     "email": {
                         "type": "string"
                     },
                     "role": {
                         "type": "string"
+                    },
+                    "roleId": {
+                        "type": "integer",
+                        "nullable": true
                     },
                     "tenantId": {
                         "type": "integer"
@@ -64755,9 +68860,36 @@
                         "type": "integer",
                         "nullable": true
                     },
+                    "ouName": {
+                        "type": "string",
+                        "nullable": true
+                    },
                     "createdAt": {
                         "type": "string",
                         "nullable": true
+                    },
+                    "lastActiveAt": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "twoStep": {
+                        "type": "object",
+                        "properties": {
+                            "enabled": {
+                                "type": "boolean"
+                            },
+                            "required": {
+                                "type": "boolean"
+                            },
+                            "requiredDirectly": {
+                                "type": "boolean"
+                            }
+                        },
+                        "required": [
+                            "enabled",
+                            "required",
+                            "requiredDirectly"
+                        ]
                     },
                     "status": {
                         "type": "string"
@@ -65065,6 +69197,53 @@
                     }
                 }
             },
+            "UserGroupUsageResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "id": {
+                                    "type": "integer"
+                                },
+                                "now": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "description": "People in it now, resolved for the caller as a preview is. Null when its rule cannot be resolved at the moment."
+                                },
+                                "route_templates": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "id": {
+                                                "type": "integer"
+                                            },
+                                            "name": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        "required": [
+                                            "id",
+                                            "name"
+                                        ]
+                                    }
+                                }
+                            },
+                            "required": [
+                                "id",
+                                "now",
+                                "route_templates"
+                            ]
+                        }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
             "UserListResponse": {
                 "type": "object",
                 "properties": {
@@ -65094,9 +69273,53 @@
                     "data"
                 ]
             },
+            "UserTwoStepClearedResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "profile_id": {
+                                "type": "integer"
+                            },
+                            "tenant_id": {
+                                "type": "integer"
+                            },
+                            "requiredDirectly": {
+                                "type": "boolean"
+                            }
+                        },
+                        "required": [
+                            "profile_id",
+                            "tenant_id",
+                            "requiredDirectly"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "UserTwoStepRequirementRequest": {
+                "type": "object",
+                "properties": {
+                    "tenant_id": {
+                        "type": "integer",
+                        "description": "Required for a system-tenant caller."
+                    },
+                    "grace_period_days": {
+                        "type": "integer",
+                        "description": "Days before it is enforced. Default 0: from their next sign-in."
+                    }
+                }
+            },
             "UserUpdateRequest": {
                 "type": "object",
                 "properties": {
+                    "displayName": {
+                        "type": "string",
+                        "description": "The name shown for this person. Refused with 409 when they also belong to another workspace, unless the caller is the system tenant."
+                    },
                     "email": {
                         "type": "string",
                         "format": "email",
@@ -65153,6 +69376,108 @@
                         "description": "Required to set `password` on an account that signs in through an identity provider; otherwise that is refused."
                     }
                 }
+            },
+            "UsersBulkPair": {
+                "type": "object",
+                "properties": {
+                    "profile_id": {
+                        "type": "integer"
+                    },
+                    "tenant_id": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "profile_id",
+                    "tenant_id"
+                ]
+            },
+            "UsersBulkResultResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "changed": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/UsersBulkPair"
+                                }
+                            },
+                            "unchanged": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/UsersBulkPair"
+                                }
+                            }
+                        },
+                        "required": [
+                            "changed",
+                            "unchanged"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "UsersBulkRoleRequest": {
+                "type": "object",
+                "properties": {
+                    "role_id": {
+                        "type": "integer",
+                        "description": "The new role, by id. It must be available in every target's workspace, and hold nothing the caller does not."
+                    },
+                    "targets": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/UsersBulkTarget"
+                        },
+                        "minItems": 1,
+                        "maxItems": 200,
+                        "description": "The people to change. If any of them cannot be changed, nobody is."
+                    }
+                },
+                "required": [
+                    "role_id",
+                    "targets"
+                ]
+            },
+            "UsersBulkTarget": {
+                "type": "object",
+                "properties": {
+                    "profile_id": {
+                        "type": "integer"
+                    },
+                    "tenant_id": {
+                        "type": "integer",
+                        "description": "Which workspace. Required for a system-tenant caller, since one person can be in several; anyone else's targets are in their own workspace."
+                    }
+                },
+                "required": [
+                    "profile_id"
+                ]
+            },
+            "UsersBulkTwoStepRequest": {
+                "type": "object",
+                "properties": {
+                    "targets": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/UsersBulkTarget"
+                        },
+                        "minItems": 1,
+                        "maxItems": 200,
+                        "description": "The people who must use two-step. If any of them is not found, nobody changes."
+                    },
+                    "grace_period_days": {
+                        "type": "integer",
+                        "description": "Days before it is enforced. Default 0: from their next sign-in."
+                    }
+                },
+                "required": [
+                    "targets"
+                ]
             },
             "WaitingListResponse": {
                 "type": "object",
@@ -65290,6 +69615,37 @@
                     "automations_enabled"
                 ]
             },
+            "WorkspacePluginInstallResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "plugin": {
+                                "type": "string"
+                            },
+                            "slug": {
+                                "type": "string"
+                            },
+                            "version": {
+                                "type": "string"
+                            },
+                            "enabled": {
+                                "type": "boolean"
+                            }
+                        },
+                        "required": [
+                            "plugin",
+                            "slug",
+                            "version",
+                            "enabled"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
             "WorkspacePluginListResponse": {
                 "type": "object",
                 "properties": {
@@ -65315,6 +69671,29 @@
                 },
                 "required": [
                     "manifest"
+                ]
+            },
+            "WorkspacePluginSwitchResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "plugin": {
+                                "type": "string"
+                            },
+                            "enabled": {
+                                "type": "boolean"
+                            }
+                        },
+                        "required": [
+                            "plugin",
+                            "enabled"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
                 ]
             },
             "WorkspacePluginVersion": {

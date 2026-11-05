@@ -99,7 +99,7 @@ describe('/admin/stats — platform versions', () => {
     render(<AdminStats />);
 
     await waitFor(() => {
-      expect(screen.getByText('Core Version')).toBeInTheDocument();
+      expect(screen.getByText('Core version')).toBeInTheDocument();
     });
     expect(screen.getByText('0.2.4')).toBeInTheDocument();
     expect(screen.getByText('Plugin SDK')).toBeInTheDocument();
@@ -126,11 +126,11 @@ describe('/admin/stats — platform versions', () => {
     await waitFor(() => {
       expect(screen.getByText('8.3.10')).toBeInTheDocument();
     });
-    expect(screen.getByText('PHP Version')).toBeInTheDocument();
-    expect(screen.getByText('Memory Usage')).toBeInTheDocument();
+    expect(screen.getByText('PHP version')).toBeInTheDocument();
+    expect(screen.getByText('Memory usage')).toBeInTheDocument();
 
     // The version rows are simply not there.
-    expect(screen.queryByText('Core Version')).not.toBeInTheDocument();
+    expect(screen.queryByText('Core version')).not.toBeInTheDocument();
     expect(screen.queryByText('Plugin SDK')).not.toBeInTheDocument();
 
     // And nothing anywhere reports a problem: no error alert, no toast surface,
@@ -146,7 +146,7 @@ describe('/admin/stats — platform versions', () => {
     await waitFor(() => {
       expect(screen.getByText('8.3.10')).toBeInTheDocument();
     });
-    expect(screen.queryByText('Core Version')).not.toBeInTheDocument();
+    expect(screen.queryByText('Core version')).not.toBeInTheDocument();
     expect(screen.queryByText('Plugin SDK')).not.toBeInTheDocument();
     expect(screen.queryByTestId('stats-fetch-error')).not.toBeInTheDocument();
     expect(consoleError).not.toHaveBeenCalled();
@@ -163,7 +163,7 @@ describe('/admin/stats — platform versions', () => {
     // ...and does not take the version readout down with it. The two requests
     // are independent in both directions, which is the point of not folding
     // them into one payload.
-    expect(screen.getByText('Core Version')).toBeInTheDocument();
+    expect(screen.getByText('Core version')).toBeInTheDocument();
     expect(screen.getByText('0.2.4')).toBeInTheDocument();
   });
 });

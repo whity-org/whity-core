@@ -13,7 +13,7 @@ import { Badge } from '@whity/ui/badge';
 import { Stepper } from '@whity/ui/stepper';
 import { TechnicalDetails } from '@whity/ui/display-preferences';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@whity/ui/dialog';
-import { IconKey } from '@tabler/icons-react';
+import { IconAlertTriangle, IconKey } from '@tabler/icons-react';
 
 type CataloguePlugin = components['schemas']['StoreCataloguePlugin'];
 type PluginEntry = components['schemas']['PluginEntry'];
@@ -43,6 +43,8 @@ export function InstallPluginDialog({ plugin, storeUrl, onOpenChange }: InstallP
   const [installing, setInstalling] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [installed, setInstalled] = useState<PluginEntry | null>(null);
+  const [installedSlug, setInstalledSlug] = useState<string | null>(null);
+  const declarative = plugin?.kind === 'declarative';
   const [turningOn, setTurningOn] = useState(false);
   const [turnedOn, setTurnedOn] = useState(false);
 
@@ -52,6 +54,7 @@ export function InstallPluginDialog({ plugin, storeUrl, onOpenChange }: InstallP
       setToken('');
       setError(null);
       setInstalled(null);
+      setInstalledSlug(null);
       setTurnedOn(false);
     }
     onOpenChange(open);
@@ -92,6 +95,21 @@ export function InstallPluginDialog({ plugin, storeUrl, onOpenChange }: InstallP
     setInstalling(true);
     setError(null);
     try {
+      if (declarative) {
+        const { data, error: installError } = await api.POST('/api/v1/workspace-plugins/install-from-store', {
+          body: { store_url: storeUrl, slug: plugin.slug, version: plugin.latest_version, token: token || undefined },
+        });
+        if (installError) {
+          setError(
+            installError.error ||
+              t('pluginStore.error.install', 'Failed to install "{name}".', { name: plugin.name }),
+          );
+          return;
+        }
+        setInstalledSlug(data?.data.slug ?? null);
+        setStep(1);
+        return;
+      }
       const { data, error: installError } = await api.POST('/api/v1/plugins/install-from-store', {
         body: { store_url: storeUrl, slug: plugin.slug, version: plugin.latest_version, token: token || undefined },
       });
@@ -111,12 +129,12 @@ export function InstallPluginDialog({ plugin, storeUrl, onOpenChange }: InstallP
   };
 
   const turnOn = async () => {
-    if (!installed) return;
+    if (!installed && !installedSlug) return;
     setTurningOn(true);
     try {
-      const { error: enableError } = await api.POST('/api/v1/plugins/{name}/enable', {
-        params: { path: { name: installed.id } },
-      });
+      const { error: enableError } = installedSlug
+        ? await api.POST('/api/v1/workspace-plugins/{plugin}/enable', { params: { path: { plugin: installedSlug } } })
+        : await api.POST('/api/v1/plugins/{name}/enable', { params: { path: { name: installed?.id ?? '' } } });
       if (enableError) {
         addToast(enableError.error || t('plugins.error.enable', 'Failed to enable plugin'), 'error');
         return;
@@ -164,23 +182,59 @@ export function InstallPluginDialog({ plugin, storeUrl, onOpenChange }: InstallP
             {step === 0 ? (
               <div className="space-y-4 text-sm">
                 <ul className="list-disc space-y-1.5 ps-5 text-muted-foreground">
-                  <li>
-                    {t(
-                      'pluginInstall.access.isolated',
-                      'It runs in an isolated frame, apart from the rest of your workspace.',
-                    )}
-                  </li>
-                  <li>
-                    {t(
-                      'pluginInstall.access.off',
-                      'It is installed turned off. You decide when to turn it on.',
-                    )}
-                  </li>
+                  {declarative ? (
+                    <>
+                      <li>
+                        {t(
+                          'pluginInstall.access.declarative',
+                          'It goes into this workspace only. Whity draws its screens, and none of the publisher\'s code runs. Whity has not reviewed it.',
+                        )}
+                      </li>
+                      <li>
+                        {t('pluginInstall.access.declarativeOff', 'It is installed turned off, and you decide when to turn it on.')}
+                      </li>
+                    </>
+                  ) : (
+                    <>
+                      <li>
+                        {t(
+                          'pluginInstall.access.server',
+                          'Once turned on, it runs on this server for every workspace, with full access to the data here. Whity has not reviewed it. Only install it if you trust who made it.',
+                        )}
+                      </li>
+                      <li>
+                        {t(
+                          'pluginInstall.access.turnedOff',
+                          'It is installed turned off, and you decide when to turn it on. A small part of it does run once now, to read its name and version.',
+                        )}
+                      </li>
+                    </>
+                  )}
+                  {(plugin.permissions ?? []).length > 0 ? (
+                    <li>
+                      {t('pluginInstall.access.permissions', 'Permissions it asks for: {count}', {
+                        count: (plugin.permissions ?? []).length,
+                      })}
+                    </li>
+                  ) : null}
                 </ul>
+                {(plugin.outside_domains ?? []).map((domain) => (
+                  <p key={domain} className="flex items-start gap-2 rounded-md border border-warning/30 bg-warning-tint p-3 text-warning-text">
+                    <IconAlertTriangle className="mt-0.5 size-4 shrink-0" />
+                    {t('pluginInstall.access.domain', 'The store says it sends data to {domain}', { domain })}
+                  </p>
+                ))}
                 <TechnicalDetails>
                   <p className="font-mono text-xs text-muted-foreground">
                     {plugin.slug} v{plugin.latest_version ?? '-'} · {storeUrl}
                   </p>
+                  {(plugin.permissions ?? []).length > 0 ? (
+                    <ul className="mt-1 space-y-0.5 font-mono text-xs text-muted-foreground">
+                      {(plugin.permissions ?? []).map((slug) => (
+                        <li key={slug}>{slug}</li>
+                      ))}
+                    </ul>
+                  ) : null}
                 </TechnicalDetails>
 
                 <div className="space-y-1.5">
@@ -247,7 +301,7 @@ export function InstallPluginDialog({ plugin, storeUrl, onOpenChange }: InstallP
                       {t('pluginInstall.goInstalled', 'Go to Installed')}
                     </Link>
                   </Button>
-                  {!turnedOn && installed && hasPermission(PLUGINS_ENABLE) ? (
+                  {!turnedOn && (installed || installedSlug) && hasPermission(PLUGINS_ENABLE) ? (
                     <Button onClick={turnOn} loading={turningOn} disabled={turningOn}>
                       {t('pluginInstall.turnOn', 'Turn on')}
                     </Button>

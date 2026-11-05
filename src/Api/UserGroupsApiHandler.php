@@ -111,6 +111,9 @@ final class UserGroupsApiHandler
     /** Matches the `name VARCHAR(160)` column, so the validator and the column agree. */
     private const MAX_NAME_LENGTH = 160;
 
+    /** One page of the largest size. Each id resolves a rule, so this stays bounded. */
+    private const USAGE_MAX_IDS = 100;
+
     public function __construct(
         private readonly PDO $db,
         private readonly UserGroupRepository $groups,
@@ -178,6 +181,66 @@ final class UserGroupsApiHandler
             'data' => array_map(UserGroupPresenter::group(...), $rows),
             'pagination' => $query->meta($total),
         ]);
+    }
+
+    /**
+     * GET /api/user-groups/usage?ids=1,2,3 — the Now and Used in columns for a page.
+     *
+     * Separate from the list on purpose: {@see UserGroupPresenter} explains why a
+     * count is never a field on a group. It is asked for here, for the rows on screen
+     * and at most {@see self::USAGE_MAX_IDS} of them. `now` is resolved for the caller,
+     * as a preview is, and `null` when the rule cannot be resolved at the moment (say,
+     * its plugin is off). A group of another tenant is simply absent.
+     */
+    public function usage(Request $request): Response
+    {
+        $ctx = $this->context($request);
+        if ($ctx instanceof Response) {
+            return $ctx;
+        }
+        [$tenantId, $callerId] = $ctx;
+
+        parse_str((string) parse_url($request->getPath(), PHP_URL_QUERY), $query);
+        $raw = $query['ids'] ?? ($_GET['ids'] ?? '');
+        if (!is_string($raw) || $raw === '') {
+            return Response::error('ids is required', 422);
+        }
+        $ids = explode(',', $raw);
+        if (count($ids) > self::USAGE_MAX_IDS) {
+            return Response::error('At most ' . self::USAGE_MAX_IDS . ' ids at once', 422);
+        }
+        foreach ($ids as $id) {
+            if (!ctype_digit($id)) {
+                return Response::error('ids must be a comma-separated list of ids', 422);
+            }
+        }
+        $ids = array_values(array_unique(array_map('intval', $ids)));
+
+        $templates = $this->groups->routeTemplatesUsing($tenantId, $ids);
+        $actorOuId = PrimaryMembershipOu::forProfile($this->db, $tenantId, $callerId);
+
+        $data = [];
+        foreach ($ids as $id) {
+            $group = $this->groups->findById($id, $tenantId);
+            if ($group === null) {
+                continue;
+            }
+            try {
+                $now = $this->resolver->preview(
+                    $tenantId,
+                    (string) $group['rule_kind'],
+                    is_array($group['rule_config']) ? $group['rule_config'] : [],
+                    $callerId,
+                    $actorOuId,
+                    1,
+                )->total;
+            } catch (GroupRejectedException) {
+                $now = null;
+            }
+            $data[] = ['id' => $id, 'now' => $now, 'route_templates' => $templates[$id] ?? []];
+        }
+
+        return Response::json(['data' => $data]);
     }
 
     /**

@@ -73,6 +73,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/2fa-policies/remind": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Remind one person to set up two-step sign-in
+         * @description Only somebody a rule in this workspace covers and who has not set it up, and once a day per person.
+         */
+        post: operations["post_api_v1_2fa_policies_remind"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/2fa-policies/status": {
         parameters: {
             query?: never;
@@ -486,6 +506,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/audit-logs/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The matching audit entries as a CSV
+         * @description The same rows, tenant scope and filters as GET /api/audit-logs, newest first. A cell a spreadsheet would run as a formula starts with an apostrophe. `technical=1` adds event codes, ids and IP addresses. More than 50000 rows is refused with 422 rather than cut short; choose a shorter period.
+         */
+        get: operations["get_api_v1_audit_logs_export"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/audit-logs/facets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Who, which agents and which areas the audit filters can offer, by name
+         * @description Only people and agents in rows the caller could already read. The system tenant reads every workspace, so it sees all of them.
+         */
+        get: operations["get_api_v1_audit_logs_facets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/2fa-recovery/confirm": {
         parameters: {
             query?: never;
@@ -719,6 +779,26 @@ export interface paths {
         put?: never;
         /** Switch the active tenant for an already-logged-in profile */
         post: operations["post_api_v1_auth_switch_tenant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/billing/change-plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Move this workspace's subscription to another plan
+         * @description A second checkout would open a second subscription, so a tier change moves the one this deployment already holds. A dearer plan is charged now for the rest of the period; a cheaper one starts at renewal with nothing refunded. Either way the amount is the billing service's, so none is quoted here. `idempotency_key` is one per confirmed change, and makes a retry after a timeout safe.
+         */
+        post: operations["post_api_v1_billing_change_plan"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1221,6 +1301,23 @@ export interface paths {
         post?: never;
         /** Revoke a delegation (non-destructive: sets revokedAt) */
         delete: operations["delete_api_v1_delegations_id"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/delegations/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Undo a revoke: only by the person who revoked it, soon after */
+        post: operations["post_api_v1_delegations_id_restore"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -3040,6 +3137,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/forms/{id}/responses/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download a form's responses as a CSV file
+         * @description At most 20,000 rows, and `X-Whity-Rows-Truncated` says if it stopped there. A text cell that a spreadsheet would run as a formula is made safe with a leading `'`. Staff answers are left out, and a file answer says how many are attached rather than giving the storage key. `?language=ar` chooses the wording. Each export is audited.
+         */
+        get: operations["get_api_v1_forms_id_responses_export"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/forms/{id}/responses/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What a form's responses add up to
+         * @description A count per choice for each choice question, responses per week for the last 12 weeks, and where responses are in their routing. Text and file questions are not summarised, and staff answers appear nowhere. Reads at most 20,000 responses; `truncated` says so.
+         */
+        get: operations["get_api_v1_forms_id_responses_summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/forms/{id}/submissions": {
         parameters: {
             query?: never;
@@ -3789,6 +3926,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/form-drafts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The caller's unsent answers, on forms still open to them */
+        get: operations["get_api_v1_me_form_drafts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/form-submissions": {
         parameters: {
             query?: never;
@@ -3824,6 +3978,34 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/forms/{id}/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The caller's draft of a form, or null
+         * @description Nobody else can read a draft. The same 404 for a form that does not exist, is not open, or that the caller may not fill in.
+         */
+        get: operations["get_api_v1_me_forms_id_draft"];
+        /**
+         * Save the caller's unsent answers
+         * @description Not validated, because half-finished answers are what a draft is. Staff questions, file answers and unknown keys are dropped. Sending the form deletes the draft.
+         */
+        put: operations["put_api_v1_me_forms_id_draft"];
+        post?: never;
+        /**
+         * Throw away the caller's draft
+         * @description Idempotent, and works on a form that has since closed.
+         */
+        delete: operations["delete_api_v1_me_forms_id_draft"];
         options?: never;
         head?: never;
         patch?: never;
@@ -3883,6 +4065,43 @@ export interface paths {
          * @description The ordinary form upload, with its limits and single-use reference, once the caller may fill in this form. MULTIPART, one part named `file`.
          */
         post: operations["post_api_v1_me_forms_id_uploads"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/home-cards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The cards installed apps add to the caller's home, in install order
+         * @description Only cards whose permission the caller holds in this workspace. Hidden ones are listed too, so a client can offer Show. A card names its data route in `source`; that route applies its own permission and the caller's scope.
+         */
+        get: operations["get_api_v1_me_home_cards"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/home-cards/{key}/hidden": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Hide a home card or show it again, for the caller in this workspace */
+        put: operations["put_api_v1_me_home_cards_key_hidden"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -4054,6 +4273,43 @@ export interface paths {
         put?: never;
         /** Resolve which of a batch of requests the caller is permitted to make */
         post: operations["post_api_v1_me_permitted_actions"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/recent-documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The caller's drafts and the documents they sent this week, newest first, at most five */
+        get: operations["get_api_v1_me_recent_documents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/setup-steps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What still blocks real work in this workspace: branding, team, an agent, the tax number and a plan
+         * @description A step that does not apply is left out, such as a plan on an install with no plans. The system tenant has none.
+         */
+        get: operations["get_api_v1_me_setup_steps"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -5067,6 +5323,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/plugins/removed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Plugins kept for 30 days after uninstalling (empty outside the system tenant) */
+        get: operations["get_api_v1_plugins_removed"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/plugins/store/allowed": {
         parameters: {
             query?: never;
@@ -5099,6 +5372,23 @@ export interface paths {
          * @description Server-side proxy to a store's public catalogue for the admin UI. Query: `store_url` (a bare https origin that MUST be on the allowlist) and optional `q` (case-insensitive substring over slug/name/description/author/tags). The browser never contacts the store directly.
          */
         get: operations["get_api_v1_plugins_store_catalog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/plugins/updates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Newer store versions of installed plugins (empty outside the system tenant) */
+        get: operations["get_api_v1_plugins_updates"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5150,7 +5440,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Uninstall a plugin (disable, roll back migrations, remove files) */
+        /** Uninstall a plugin: turned off and kept 30 days, or removed at once with now */
         post: operations["post_api_v1_plugins_id_uninstall"];
         delete?: never;
         options?: never;
@@ -5186,6 +5476,74 @@ export interface paths {
         put?: never;
         /** Enable a plugin by name (applies pending migrations) */
         post: operations["post_api_v1_plugins_name_enable"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/plugins/{name}/reinstall": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restore an uninstalled plugin within its 30 days */
+        post: operations["post_api_v1_plugins_name_reinstall"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/plugins/{name}/update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Fetch the latest version; applies if it asks for no new access, otherwise waits for approval */
+        post: operations["post_api_v1_plugins_name_update"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/plugins/{name}/update/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Accept the new access a waiting update asks for and apply it */
+        post: operations["post_api_v1_plugins_name_update_approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/plugins/{name}/update/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Drop a waiting update and stay on this version */
+        post: operations["post_api_v1_plugins_name_update_reject"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6405,6 +6763,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/user-groups/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** How many people each group holds now, and where it is used */
+        get: operations["get_api_v1_user_groups_usage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/user-groups/{id}": {
         parameters: {
             query?: never;
@@ -6453,6 +6828,40 @@ export interface paths {
         put?: never;
         /** Create a user */
         post: operations["post_api_v1_users"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users/bulk/require-two-step": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Require two-step of several people, through a policy naming each of them */
+        post: operations["post_api_v1_users_bulk_require_two_step"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users/bulk/role": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Change the primary role of several people at once, all or nothing */
+        post: operations["post_api_v1_users_bulk_role"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6530,6 +6939,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/users/{id}/two-step-requirement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Require two-step of one person */
+        put: operations["put_api_v1_users_id_two_step_requirement"];
+        post?: never;
+        /** Remove the policy naming one person. A workspace or unit policy still applies. */
+        delete: operations["delete_api_v1_users_id_two_step_requirement"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workspace-plugins": {
         parameters: {
             query?: never;
@@ -6568,6 +6995,23 @@ export interface paths {
          * @description Compares it with the live version and counts the records each change touches: safe, data (records need attention) or destructive (values stop being served). Publishes nothing.
          */
         post: operations["post_api_v1_workspace_plugins_impact"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspace-plugins/install-from-store": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Install a declarative plugin from a trusted store into this workspace, turned off */
+        post: operations["post_api_v1_workspace_plugins_install_from_store"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6668,6 +7112,40 @@ export interface paths {
          */
         put: operations["put_api_v1_workspace_plugins_plugin_automations"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspace-plugins/{plugin}/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Turn off this workspace's plugin */
+        post: operations["post_api_v1_workspace_plugins_plugin_disable"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspace-plugins/{plugin}/enable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Turn on this workspace's plugin */
+        post: operations["post_api_v1_workspace_plugins_plugin_enable"];
         delete?: never;
         options?: never;
         head?: never;
@@ -7222,6 +7700,37 @@ export interface components {
             metadata: Record<string, never>;
             ipAddress: string | null;
             createdAt: string | null;
+            actor: {
+                /** @enum {string} */
+                kind: "person" | "agent" | "system";
+                name: string;
+                agent: string | null;
+                forPerson: string | null;
+            };
+            target: {
+                type: string;
+                name: string;
+            } | null;
+            sentence: string;
+            sentenceTemplate: string;
+            area: string;
+            how: string | null;
+        };
+        AuditLogFacetsResponse: {
+            data: {
+                people: {
+                    id: number;
+                    name: string;
+                }[];
+                agents: {
+                    id: string;
+                    name: string;
+                }[];
+                areas: {
+                    id: string;
+                    name: string;
+                }[];
+            };
         };
         AuditLogListResponse: {
             data: components["schemas"]["AuditLogEntry"][];
@@ -7293,6 +7802,21 @@ export interface components {
                 access_until?: string | null;
                 cancel_at_period_end?: boolean;
                 checkout_status?: string | null;
+            };
+        };
+        BillingChangePlanRequest: {
+            /** @description The plan to move to, from the list of plans this workspace can buy. */
+            plan_key: string;
+            /** @description month or year. Leave it out to keep the plan's only price. */
+            billing_period?: string;
+            /** @description 8 to 64 characters, new for each confirmed change and the same on a retry of it. */
+            idempotency_key: string;
+        };
+        BillingChangePlanResponse: {
+            data: {
+                plan_key: string;
+                /** @enum {string} */
+                takes_effect: "now" | "renewal";
             };
         };
         BillingQuantityRequest: {
@@ -7565,6 +8089,13 @@ export interface components {
             ouId: number | null;
             grantedAt: string | null;
             revokedAt: string | null;
+            expiresAt: string | null;
+            /** @enum {string} */
+            status: "active" | "expired" | "revoked";
+            grantorName?: string | null;
+            granteeName?: string | null;
+            ouName?: string | null;
+            permissionDescription?: string | null;
         };
         DelegationCreateRequest: {
             /**
@@ -7578,6 +8109,8 @@ export interface components {
             permissions: string[];
             /** @description Limit the delegation to this organizational unit and the units below it. Null or omitted applies tenant-wide. */
             ouId?: number | null;
+            /** @description When it ends, an ISO-8601 moment in the future. Null or omitted is no end date. */
+            expiresAt?: string | null;
         };
         DelegationCreateResponse: {
             data: {
@@ -7585,6 +8118,7 @@ export interface components {
                 granteeType?: string;
                 granteeId?: number;
                 ouId?: number | null;
+                expiresAt?: string | null;
                 permissions?: string[];
                 count: number;
             };
@@ -8091,6 +8625,7 @@ export interface components {
             closed_by_event_id?: number | null;
             open: boolean;
             closed_by_delivery: boolean;
+            closed_by_withdrawal?: boolean;
             created_at: string;
         };
         DocumentRouteRecipientListResponse: {
@@ -8908,6 +9443,36 @@ export interface components {
                 submission_count?: number;
             };
         };
+        FormDraft: {
+            form_id: number;
+            data: {
+                [key: string]: unknown;
+            };
+            step?: number | null;
+            updated_at: string;
+        };
+        FormDraftListResponse: {
+            data: {
+                form_id: number;
+                form_name: {
+                    ar?: string;
+                    en?: string;
+                };
+                step?: number | null;
+                updated_at: string;
+            }[];
+        };
+        FormDraftResponse: {
+            data: components["schemas"]["FormDraft"];
+        };
+        FormDraftSaveRequest: {
+            /** @description The answers so far, keyed by field key. */
+            data: {
+                [key: string]: unknown;
+            };
+            /** @description Which step the person is on. */
+            step?: number | null;
+        };
         FormField: {
             id: number;
             tenant_id: number;
@@ -9088,6 +9653,38 @@ export interface components {
         };
         FormResponse: {
             data: components["schemas"]["Form"];
+        };
+        FormResponsesSummaryResponse: {
+            data: {
+                total: number;
+                truncated: boolean;
+                per_week: {
+                    week: string;
+                    count: number;
+                }[];
+                routing: {
+                    not_routed: number;
+                    in_progress: number;
+                    completed: number;
+                };
+                questions: {
+                    field_key: string;
+                    field_type: string;
+                    label: {
+                        ar?: string;
+                        en?: string;
+                    };
+                    answered: number;
+                    options: {
+                        value: string;
+                        label?: {
+                            ar?: string;
+                            en?: string;
+                        } | null;
+                        count: number;
+                    }[];
+                }[];
+            };
         };
         FormSection: {
             key: string | null;
@@ -9303,6 +9900,30 @@ export interface components {
         HelloGreetingResponse: {
             data: components["schemas"]["HelloGreeting"];
         };
+        HomeCard: {
+            key: string;
+            label: string;
+            labelAr: string;
+            caption?: string | null;
+            captionAr?: string | null;
+            icon?: string | null;
+            href?: string | null;
+            source?: string | null;
+            value?: number | null;
+            hidden: boolean;
+        };
+        HomeCardHiddenRequest: {
+            hidden: boolean;
+        };
+        HomeCardHiddenResponse: {
+            data: {
+                key: string;
+                hidden: boolean;
+            };
+        };
+        HomeCardListResponse: {
+            data: components["schemas"]["HomeCard"][];
+        };
         IdentityProvider: {
             id: number;
             tenant_id: number;
@@ -9360,6 +9981,12 @@ export interface components {
             status?: string | null;
             resource_type?: string | null;
             resource_id?: string | null;
+            sender?: {
+                /** @enum {string} */
+                kind: "person" | "public";
+                profile_id?: number;
+                name?: string;
+            } | null;
             meta?: {
                 [key: string]: unknown;
             };
@@ -9445,6 +10072,8 @@ export interface components {
                 email: string;
                 tenant_name: string;
                 requires_password: boolean;
+                inviter_name: string | null;
+                role_name: string | null;
             };
         };
         InvitationRevokedResponse: {
@@ -9478,6 +10107,10 @@ export interface components {
         InvoiceDetail: {
             lines?: components["schemas"]["InvoiceLine"][];
             payments?: components["schemas"]["PaymentTransaction"][];
+            total_in_words?: {
+                en: string | null;
+                ar: string | null;
+            };
         };
         InvoiceLine: {
             id: number;
@@ -9693,6 +10326,7 @@ export interface components {
             user: {
                 id: number;
                 email: string;
+                display_name?: string | null;
                 role: string;
             };
             access_token?: string;
@@ -10102,6 +10736,7 @@ export interface components {
             ou_type_id: number | null;
             ou_type_key: string | null;
             ou_type_label: string | null;
+            member_count: number;
         };
         OuCreateRequest: {
             /** @description Name of the organizational unit. */
@@ -10221,6 +10856,8 @@ export interface components {
         PasswordResetConfirmRequest: {
             token: string;
             password: string;
+            /** @description Optional. Why you are asking, shown to the approver when approval is required. At most 500 characters. */
+            reason?: string | null;
         };
         PasswordResetConfirmResponse: {
             data: {
@@ -10271,10 +10908,12 @@ export interface components {
             profile_id: number;
             email: string;
             display_name: string;
+            reason?: string | null;
             created_at: string;
         };
         PendingPasswordResetListResponse: {
             data: components["schemas"]["PendingPasswordResetItem"][];
+            pagination: components["schemas"]["Pagination"];
         };
         PendingSelectionResponse: {
             data: {
@@ -10290,10 +10929,12 @@ export interface components {
             profile_id: number;
             email: string;
             display_name: string;
+            reason?: string | null;
             created_at: string;
         };
         PendingTwoFactorRecoveryListResponse: {
             data: components["schemas"]["PendingTwoFactorRecoveryItem"][];
+            pagination: components["schemas"]["Pagination"];
         };
         Permission: {
             id: number;
@@ -10305,6 +10946,11 @@ export interface components {
             name: string;
             description: string | null;
             source?: string;
+            area: string;
+            areaLabel: string;
+            /** @enum {string} */
+            areaGroup: "people" | "documents" | "ai" | "workspace" | "apps";
+            actions: ("see" | "create" | "change" | "delete" | "approve")[];
         };
         PermissionCatalogueResponse: {
             data: components["schemas"]["PermissionCatalogueEntry"][];
@@ -10489,6 +11135,12 @@ export interface components {
             sdk_version: string;
             php_version: string;
         };
+        PluginActionResponse: {
+            data: {
+                message: string;
+                state?: string | null;
+            };
+        };
         PluginEntry: {
             id: string;
             name: string;
@@ -10498,6 +11150,21 @@ export interface components {
             version?: string;
             routes_count?: number;
             permissions_count?: number;
+            /** @enum {string} */
+            trust?: "unverified";
+            install?: {
+                source: string;
+                store_host?: string | null;
+                installed_by?: string | null;
+                installed_at: string;
+                permissions: string[];
+                outside_domains: string[];
+                update_waiting?: {
+                    version: string;
+                    new_permissions: string[];
+                    new_domains: string[];
+                } | null;
+            };
         };
         PluginListMeta: {
             worker_local: boolean;
@@ -10507,6 +11174,41 @@ export interface components {
         PluginListResponse: {
             data: components["schemas"]["PluginEntry"][];
             meta: components["schemas"]["PluginListMeta"];
+        };
+        PluginRemovedResponse: {
+            data: {
+                name: string;
+                version?: string | null;
+                removed_by?: string | null;
+                removed_at: string;
+                purge_after: string;
+                purge_failed: boolean;
+            }[];
+        };
+        PluginUpdateRequest: {
+            /** @description The store access token, when the store requires one to download. */
+            token?: string;
+        };
+        PluginUpdateResponse: {
+            data: {
+                /** @enum {string} */
+                status: "updated" | "waiting_approval" | "rejected";
+                version?: string;
+                state?: string;
+                new_permissions?: string[];
+                new_domains?: string[];
+                worker_restart_required?: boolean;
+            };
+        };
+        PluginUpdatesResponse: {
+            data: {
+                plugin: string;
+                installed_version: string;
+                latest_version: string;
+            }[];
+            meta: {
+                stores_unreachable: number;
+            };
         };
         PluginUploadResponse: {
             data: components["schemas"]["PluginEntry"];
@@ -10631,6 +11333,7 @@ export interface components {
         };
         PurchasablePlan: {
             plan_key: string;
+            is_current?: boolean;
             name: string;
             description?: string | null;
             unit_amount: number;
@@ -10643,6 +11346,19 @@ export interface components {
         };
         PurchasablePlanListResponse: {
             data: components["schemas"]["PurchasablePlan"][];
+        };
+        RecentDocument: {
+            /** @enum {string} */
+            kind: "document" | "draft";
+            id: number;
+            title: string;
+            /** @enum {string} */
+            status: "with" | "issued" | "draft";
+            waitingWith: string | null;
+            at: string;
+        };
+        RecentDocumentListResponse: {
+            data: components["schemas"]["RecentDocument"][];
         };
         RecordSectionDenial: {
             /** @enum {string} */
@@ -10793,6 +11509,8 @@ export interface components {
             parent_id: number | null;
             created_at: string | null;
             permissionCount: number;
+            peopleCount?: number;
+            builtIn?: boolean;
             manageable: boolean;
             global: boolean;
         };
@@ -11054,6 +11772,17 @@ export interface components {
         SettingsValueMapResponse: {
             data: components["schemas"]["SettingsValueMap"];
         };
+        SetupStepsResponse: {
+            data: {
+                steps: {
+                    /** @enum {string} */
+                    key: "branding" | "team" | "agent" | "tax" | "plan";
+                    done: boolean;
+                }[];
+                done: number;
+                total: number;
+            };
+        };
         SimpleMessageResponse: {
             message: string;
         };
@@ -11105,6 +11834,8 @@ export interface components {
             data: {
                 enabled: boolean;
                 hosts: string[];
+                can_install: boolean;
+                can_install_declarative: boolean;
             };
         };
         StoreCataloguePlugin: {
@@ -11114,6 +11845,32 @@ export interface components {
             author?: string;
             tags?: string[];
             latest_version?: string | null;
+            /** @enum {string} */
+            trust: "unverified";
+            /** @enum {string} */
+            kind?: "declarative" | "code";
+            price?: {
+                amount: string;
+                currency: string;
+                interval?: string | null;
+            } | null;
+            used_by?: number | null;
+            updated_at?: string | null;
+            adds?: {
+                screens: number;
+                document_blocks: number;
+                agent_tools: number;
+                fields: number;
+            };
+            permissions?: string[];
+            outside_domains?: string[];
+            languages?: string[];
+            support_url?: string | null;
+            changelog?: {
+                version: string;
+                date?: string | null;
+                notes: string;
+            }[];
         };
         StoreCatalogueResponse: {
             data: components["schemas"]["StoreCataloguePlugin"][];
@@ -11207,6 +11964,15 @@ export interface components {
             slug: string | null;
             userCount: number;
             createdAt: string | null;
+            plan: {
+                key: string;
+                name: string;
+            } | null;
+            status: {
+                /** @enum {string} */
+                state: "active" | "trial" | "overdue" | "suspended";
+                daysLeft: number | null;
+            };
         };
         TenantCreateRequest: {
             /** @description Display name of the new tenant (workspace). */
@@ -11560,6 +12326,7 @@ export interface components {
             scope_type: "tenant" | "ou" | "user";
             scope_id: number | null;
             grace_period_days: number;
+            scope_name?: string | null;
             created_by?: number | null;
             created_at: string;
             updated_at: string;
@@ -11578,9 +12345,11 @@ export interface components {
         };
         TwoFactorPolicyStatusEntry: {
             profile_id: number;
+            name: string;
             email: string;
             enrolled: boolean;
             enforcement_deadline: number | null;
+            last_reminded_at: string | null;
         };
         TwoFactorPolicyStatusResponse: {
             data: components["schemas"]["TwoFactorPolicyStatusEntry"][];
@@ -11588,11 +12357,26 @@ export interface components {
         TwoFactorPolicyUpdateRequest: {
             grace_period_days: number;
         };
+        TwoFactorRecoveryConfirmRequest: {
+            token: string;
+            /** @description Optional. Why you are asking, shown to the approver. At most 500 characters. */
+            reason?: string | null;
+        };
         TwoFactorRecoveryConfirmResponse: {
             data: {
                 /** @enum {string} */
                 status: "pending";
                 message: string;
+            };
+        };
+        TwoFactorRemindRequest: {
+            /** @description The person to remind, from the two-step status list. */
+            profile_id: number;
+        };
+        TwoFactorRemindResponse: {
+            data: {
+                profile_id: number;
+                last_reminded_at: string;
             };
         };
         UiKitDemoChartRow: {
@@ -11686,11 +12470,20 @@ export interface components {
         User: {
             id: number;
             name: string;
+            displayName?: string;
             email: string;
             role: string;
+            roleId?: number | null;
             tenantId: number;
             ou_id?: number | null;
+            ouName?: string | null;
             createdAt: string | null;
+            lastActiveAt?: string | null;
+            twoStep?: {
+                enabled: boolean;
+                required: boolean;
+                requiredDirectly: boolean;
+            };
             status?: string;
             /** @enum {string} */
             accountStatus?: "active" | "inactive";
@@ -11780,6 +12573,17 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        UserGroupUsageResponse: {
+            data: {
+                id: number;
+                /** @description People in it now, resolved for the caller as a preview is. Null when its rule cannot be resolved at the moment. */
+                now: number | null;
+                route_templates: {
+                    id: number;
+                    name: string;
+                }[];
+            }[];
+        };
         UserListResponse: {
             data: components["schemas"]["User"][];
             pagination: components["schemas"]["Pagination"];
@@ -11787,7 +12591,22 @@ export interface components {
         UserResponse: {
             data: components["schemas"]["User"];
         };
+        UserTwoStepClearedResponse: {
+            data: {
+                profile_id: number;
+                tenant_id: number;
+                requiredDirectly: boolean;
+            };
+        };
+        UserTwoStepRequirementRequest: {
+            /** @description Required for a system-tenant caller. */
+            tenant_id?: number;
+            /** @description Days before it is enforced. Default 0: from their next sign-in. */
+            grace_period_days?: number;
+        };
         UserUpdateRequest: {
+            /** @description The name shown for this person. Refused with 409 when they also belong to another workspace, unless the caller is the system tenant. */
+            displayName?: string;
             /**
              * Format: email
              * @description New sign-in email address.
@@ -11811,6 +12630,33 @@ export interface components {
             accountStatus?: "active" | "inactive";
             /** @description Required to set `password` on an account that signs in through an identity provider; otherwise that is refused. */
             allowLocalPasswordOnIdpAccount?: boolean;
+        };
+        UsersBulkPair: {
+            profile_id: number;
+            tenant_id: number;
+        };
+        UsersBulkResultResponse: {
+            data: {
+                changed: components["schemas"]["UsersBulkPair"][];
+                unchanged: components["schemas"]["UsersBulkPair"][];
+            };
+        };
+        UsersBulkRoleRequest: {
+            /** @description The new role, by id. It must be available in every target's workspace, and hold nothing the caller does not. */
+            role_id: number;
+            /** @description The people to change. If any of them cannot be changed, nobody is. */
+            targets: components["schemas"]["UsersBulkTarget"][];
+        };
+        UsersBulkTarget: {
+            profile_id: number;
+            /** @description Which workspace. Required for a system-tenant caller, since one person can be in several; anyone else's targets are in their own workspace. */
+            tenant_id?: number;
+        };
+        UsersBulkTwoStepRequest: {
+            /** @description The people who must use two-step. If any of them is not found, nobody changes. */
+            targets: components["schemas"]["UsersBulkTarget"][];
+            /** @description Days before it is enforced. Default 0: from their next sign-in. */
+            grace_period_days?: number;
         };
         WaitingListResponse: {
             data: components["schemas"]["WaitingRow"][];
@@ -11851,6 +12697,14 @@ export interface components {
             automations_enabled: boolean;
             updated_at?: string;
         };
+        WorkspacePluginInstallResponse: {
+            data: {
+                plugin: string;
+                slug: string;
+                version: string;
+                enabled: boolean;
+            };
+        };
         WorkspacePluginListResponse: {
             data: components["schemas"]["WorkspacePlugin"][];
         };
@@ -11858,6 +12712,12 @@ export interface components {
             /** @description The plugin.json object (format whity.plugin/1). See sdk/resources/plugin-manifest.schema.json. */
             manifest: {
                 [key: string]: unknown;
+            };
+        };
+        WorkspacePluginSwitchResponse: {
+            data: {
+                plugin: string;
+                enabled: boolean;
             };
         };
         WorkspacePluginVersion: {
@@ -12194,6 +13054,111 @@ export interface operations {
             };
             /** @description Validation failed */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_2fa_policies_remind: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TwoFactorRemindRequest"];
+            };
+        };
+        responses: {
+            /** @description Reminder sent */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TwoFactorRemindResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No rule in this workspace covers that person */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description That person has already set it up */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description profile_id is required */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Already reminded today */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -14282,6 +15247,10 @@ export interface operations {
                 action?: string;
                 /** @description Filter by actor user id */
                 actor?: number;
+                /** @description Filter by agent principal, as listed by /api/audit-logs/facets */
+                agent?: string;
+                /** @description Filter by area, as listed by /api/audit-logs/facets. An unknown area matches nothing. */
+                area?: string;
                 /** @description Filter by target type */
                 target_type?: string;
                 /** @description Filter by target id — the history of ONE record. Normally paired with target_type; alone it matches that id across every target type. */
@@ -14357,6 +15326,164 @@ export interface operations {
             };
         };
     };
+    get_api_v1_audit_logs_export: {
+        parameters: {
+            query?: {
+                /** @description Filter by actor user id */
+                actor?: number;
+                /** @description Filter by agent principal */
+                agent?: string;
+                /** @description Filter by area */
+                area?: string;
+                /** @description Exact action match */
+                action?: string;
+                /** @description Filter by target type */
+                target_type?: string;
+                /** @description Filter by target id */
+                target_id?: number;
+                /** @description Inclusive ISO-8601 lower bound */
+                from?: string;
+                /** @description Inclusive ISO-8601 upper bound */
+                to?: string;
+                /** @description 1 adds event codes, ids and IP addresses */
+                technical?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The CSV, UTF-8 with a byte order mark */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too many entries to export at once */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_audit_logs_facets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The filter options */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditLogFacetsResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     post_api_v1_auth_2fa_recovery_confirm: {
         parameters: {
             query?: never;
@@ -14366,7 +15493,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["TokenOnlyRequest"];
+                "application/json": components["schemas"]["TwoFactorRecoveryConfirmRequest"];
             };
         };
         responses: {
@@ -15315,6 +16442,111 @@ export interface operations {
             };
             /** @description Internal server error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_billing_change_plan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BillingChangePlanRequest"];
+            };
+        };
+        responses: {
+            /** @description The change was accepted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BillingChangePlanResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description This deployment does not sell subscriptions */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Already on that plan, or no active subscription to change */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unknown plan, an add-on, or a bad idempotency key */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The billing service refused or could not be reached */
+            502: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -17746,7 +18978,7 @@ export interface operations {
                 granteeId?: number;
                 /** @description Filter by grantor user id */
                 grantorUserId?: number;
-                /** @description Include revoked delegations */
+                /** @description Include delegations that have ended, whether revoked or past their end date */
                 includeRevoked?: boolean;
             };
             header?: never;
@@ -17956,6 +19188,82 @@ export interface operations {
             };
             /** @description Method not allowed */
             405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_delegations_id_restore: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Restore confirmation */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Delegation not found, or not revoked */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description It can no longer be undone: too late, past its end date, or the grantor no longer holds the permission */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -28088,6 +29396,143 @@ export interface operations {
             };
         };
     };
+    get_api_v1_forms_id_responses_export: {
+        parameters: {
+            query?: {
+                /** @description en or ar; the wording of labels and choices. */
+                language?: string;
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The CSV file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Form not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_forms_id_responses_summary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The summary */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormResponsesSummaryResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Form not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     post_api_v1_forms_id_submissions: {
         parameters: {
             query?: never;
@@ -32175,6 +33620,71 @@ export interface operations {
             };
         };
     };
+    get_api_v1_me_form_drafts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The drafts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormDraftListResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     get_api_v1_me_form_submissions: {
         parameters: {
             query?: {
@@ -32264,6 +33774,227 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["MemberFormListResponse"];
                 };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_me_forms_id_draft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The draft, or null */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormDraftResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not available to this caller */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    put_api_v1_me_forms_id_draft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FormDraftSaveRequest"];
+            };
+        };
+        responses: {
+            /** @description The saved draft */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormDraftResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not available to this caller */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Malformed, or larger than 256 KB */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    delete_api_v1_me_forms_id_draft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Missing or invalid authentication */
             401: {
@@ -32533,6 +34264,160 @@ export interface operations {
             };
             /** @description Too many uploads */
             429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_me_home_cards: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The cards */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HomeCardListResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    put_api_v1_me_home_cards_key_hidden: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HomeCardHiddenRequest"];
+            };
+        };
+        responses: {
+            /** @description The card and its new state */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HomeCardHiddenResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No card by that name that the caller may see */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description hidden is missing or not true or false */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -33326,6 +35211,136 @@ export interface operations {
             };
             /** @description Missing 'checks' list, or more than 200 checks */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_me_recent_documents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The rows */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecentDocumentListResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_me_setup_steps: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The steps and how many are done */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetupStepsResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -38591,6 +40606,71 @@ export interface operations {
             };
         };
     };
+    get_api_v1_plugins_removed: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Kept plugins */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginRemovedResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     get_api_v1_plugins_store_allowed: {
         parameters: {
             query?: never;
@@ -38733,6 +40813,71 @@ export interface operations {
             };
             /** @description The store catalogue could not be fetched */
             502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_plugins_updates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Available updates */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginUpdatesResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -39165,6 +41310,314 @@ export interface operations {
                 };
             };
             /** @description Internal error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_plugins_name_reinstall: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Reinstalled */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginActionResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not the platform operator */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_plugins_name_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PluginUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Updated or waiting */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginUpdateResponse"];
+                };
+            };
+            /** @description Invalid package */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not the platform operator */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Up to date or uninstalled */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Incompatible or not newer */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Store unavailable */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_plugins_name_update_approve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginUpdateResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not the platform operator */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Nothing waiting */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_plugins_name_update_reject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Rejected */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginUpdateResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not the platform operator */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Nothing waiting */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -46633,6 +49086,83 @@ export interface operations {
             };
         };
     };
+    get_api_v1_user_groups_usage: {
+        parameters: {
+            query?: {
+                /** @description Group ids, comma-separated, at most 100: the rows on screen. A group of another workspace is left out. */
+                ids?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One entry per group found */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserGroupUsageResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `ids` missing, malformed or too many */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     get_api_v1_user_groups_id: {
         parameters: {
             query?: never;
@@ -46948,12 +49478,20 @@ export interface operations {
                 page?: number;
                 /** @description Page size (default 25, max 100). A client that needs every user must follow the `pagination` envelope to the last page; one request only ever describes page one. */
                 per_page?: number;
-                /** @description Sort key: `name`, `email`, `role`, `status`, `created` (default), plus `tenant` for a system-tenant caller. `name` and `email` order identically — the name IS the email's local part. An unrecognised key is not an error: it falls back to the default, because a client asking for a column it cannot see should get a list rather than a 400. */
+                /** @description Sort key: `name`, `email`, `role`, `status`, `created` (default), `lastActive`, plus `tenant` for a system-tenant caller. An unrecognised key is not an error: it falls back to the default, because a client asking for a column it cannot see should get a list rather than a 400. */
                 sort?: string;
                 /** @description Sort direction, `asc` or `desc`. Anything else is read as `asc`. */
                 dir?: string;
-                /** @description Case-insensitive substring match on email or role name. It narrows `pagination.total` too, so the envelope always describes the filtered list. */
+                /** @description Case-insensitive substring match on display name, email or role name. It narrows `pagination.total` too, so the envelope always describes the filtered list. */
                 q?: string;
+                /** @description Only people whose primary role is one of these ids, comma-separated. */
+                role_id?: string;
+                /** @description Only people in one of these organizational units, comma-separated. */
+                ou_id?: string;
+                /** @description `on` or `off`: whether the person has two-step turned on. */
+                two_step?: string;
+                /** @description `active` or `inactive`. Both are listed when omitted. */
+                account_status?: string;
             };
             header?: never;
             path?: never;
@@ -46999,6 +49537,15 @@ export interface operations {
             };
             /** @description Method not allowed */
             405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A malformed filter */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -47094,6 +49641,189 @@ export interface operations {
                 };
             };
             /** @description Email longer than 255 characters */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_users_bulk_require_two_step: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UsersBulkTwoStepRequest"];
+            };
+        };
+        responses: {
+            /** @description Who now has a policy and who already had one */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsersBulkResultResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A malformed request, or a target that was not found; `details.refused` lists them */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_users_bulk_role: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UsersBulkRoleRequest"];
+            };
+        };
+        responses: {
+            /** @description Who changed and who already held the role */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsersBulkResultResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The role has permissions the caller does not hold */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The role is not available in a target's workspace */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description This would leave a workspace with nobody able to manage people */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A malformed request, or a target that cannot be changed; `details.refused` gives the reason for each */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -47663,6 +50393,162 @@ export interface operations {
             };
         };
     };
+    put_api_v1_users_id_two_step_requirement: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserTwoStepRequirementRequest"];
+            };
+        };
+        responses: {
+            /** @description Whether a policy was added */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsersBulkResultResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A malformed request, or the person was not found */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    delete_api_v1_users_id_two_step_requirement: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The person no longer has a policy naming them */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserTwoStepClearedResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description User not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     get_api_v1_workspace_plugins: {
         parameters: {
             query?: never;
@@ -47902,6 +50788,111 @@ export interface operations {
             };
             /** @description Internal server error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_workspace_plugins_install_from_store: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InstallFromStoreRequest"];
+            };
+        };
+        responses: {
+            /** @description Installed, turned off */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspacePluginInstallResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No workspace, or the store is not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Already in this workspace */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed in a workspace */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Store unavailable */
+            502: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -48300,6 +51291,140 @@ export interface operations {
             };
             /** @description enabled must be true or false */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_workspace_plugins_plugin_disable: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Turned off */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspacePluginSwitchResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_workspace_plugins_plugin_enable: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Turned on */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspacePluginSwitchResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
                 headers: {
                     [name: string]: unknown;
                 };

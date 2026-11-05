@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { toDecimalString } from '@whity/ui/money/currency';
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/lib/toast-context';
 import { useFetch } from '@/hooks/useFetch';
@@ -190,7 +191,7 @@ export function AffiliatePayouts({
               onClick={() => assemble(b.currency)}
             >
               {t('payout.assemble', 'Pay {amount} {currency}', {
-                amount: b.amount_minor,
+                amount: toDecimalString(b.amount_minor, b.currency),
                 currency: b.currency,
               })}
             </Button>
@@ -231,13 +232,13 @@ export function AffiliatePayouts({
               {payouts.map((p) => (
                 <tr key={p.id} className="border-b last:border-0">
                   <td className="py-1 pe-3 tabular-nums">
-                    {p.total_minor} {p.currency}
+                    {p.currency} {toDecimalString(p.total_minor, p.currency)}
                     <span className="text-xs text-muted-foreground ms-1">
                       {t('payout.lines', '({count} commissions)', { count: p.commission_count })}
                     </span>
                   </td>
                   <td className="py-1 pe-3 tabular-nums">
-                    {p.withholding_minor} {p.currency}
+                    {p.currency} {toDecimalString(p.withholding_minor, p.currency)}
                     {/* STATED EVEN AT ZERO. A withholding of nothing is a
                         decision that was made, not a blank. */}
                     <span className="text-xs text-muted-foreground ms-1">
@@ -245,7 +246,7 @@ export function AffiliatePayouts({
                     </span>
                   </td>
                   <td className="py-1 pe-3 tabular-nums font-medium">
-                    {p.net_minor} {p.currency}
+                    {p.currency} {toDecimalString(p.net_minor, p.currency)}
                   </td>
                   <td className="py-1 pe-3">
                     {p.status === 'paid' ? (
@@ -295,7 +296,7 @@ export function AffiliatePayouts({
                 t(
                   'payout.record.description',
                   'Confirm that {amount} {currency} has been transferred. This cannot be undone — the reference is the only record of which payment settled this payout.',
-                  { amount: settling.net_minor, currency: settling.currency }
+                  { amount: toDecimalString(settling.net_minor, settling.currency), currency: settling.currency }
                 )}
             </DialogDescription>
           </DialogHeader>

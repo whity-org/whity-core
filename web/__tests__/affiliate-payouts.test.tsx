@@ -107,9 +107,9 @@ describe('the three amounts', () => {
     // Anchored at the START of each cell — the separation between the figure
     // and its annotation is CSS margin, so it is not in the text. Anchoring is
     // what makes a swapped pair fail: "9500…" cannot satisfy /^500 JOD/.
-    expect(cells[0]).toMatch(/^10000 JOD/);
-    expect(cells[1]).toMatch(/^500 JOD/);
-    expect(cells[2]).toBe('9500 JOD');
+    expect(cells[0]).toMatch(/^JOD 10\.000/);
+    expect(cells[1]).toMatch(/^JOD 0\.500/);
+    expect(cells[2]).toBe('JOD 9.500');
   });
 
   it('states the rate the payout was assembled at', async () => {
@@ -160,8 +160,8 @@ describe('assembling', () => {
       { currency: 'USD', amount_minor: 500 },
     ]);
 
-    expect(await screen.findByRole('button', { name: 'Pay 9000 JOD' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Pay 500 USD' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Pay 9.000 JOD' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Pay 5.00 USD' })).toBeInTheDocument();
   });
 
   it('asks the server for that currency only', async () => {
@@ -169,7 +169,7 @@ describe('assembling', () => {
     const user = userEvent.setup();
 
     mount([{ currency: 'JOD', amount_minor: 9000 }]);
-    await user.click(await screen.findByRole('button', { name: 'Pay 9000 JOD' }));
+    await user.click(await screen.findByRole('button', { name: 'Pay 9.000 JOD' }));
 
     await waitFor(() => {
       const post = apiClient.mock.calls.find(
@@ -191,7 +191,7 @@ describe('assembling', () => {
 
     mount([{ currency: 'JOD', amount_minor: -2000 }]);
 
-    expect(await screen.findByRole('button', { name: 'Pay -2000 JOD' })).toBeDisabled();
+    expect(await screen.findByRole('button', { name: 'Pay -2.000 JOD' })).toBeDisabled();
     expect(screen.getByText(/carries forward/)).toBeInTheDocument();
   });
 
@@ -211,7 +211,7 @@ describe('assembling', () => {
     });
 
     mount([{ currency: 'JOD', amount_minor: 9000 }]);
-    await user.click(await screen.findByRole('button', { name: 'Pay 9000 JOD' }));
+    await user.click(await screen.findByRole('button', { name: 'Pay 9.000 JOD' }));
 
     await waitFor(() => {
       expect(addToast).toHaveBeenCalledWith(expect.stringContaining('carries forward'), 'error');
@@ -232,7 +232,7 @@ describe('recording a transfer', () => {
     mount();
     await user.click(await screen.findByRole('button', { name: 'Record payment' }));
 
-    expect(await screen.findByText(/9500 JOD has been transferred/)).toBeInTheDocument();
+    expect(await screen.findByText(/9\.500 JOD has been transferred/)).toBeInTheDocument();
   });
 
   it('cannot be confirmed without a reference', async () => {

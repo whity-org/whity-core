@@ -5,15 +5,19 @@ import { Button } from '@whity/ui/button';
 import { Icon } from '@whity/ui/icon';
 import { SystemState } from '@whity/ui/system-state';
 import { useTranslation } from '@whity/features/i18n';
+import { latestErrorReference } from '@/lib/api-client';
 
 /**
  * The 500 page: nothing the person did caused it, nothing was lost, one thing
  * to do next, and a reference they can copy for support. The reference is the
- * error digest Next.js assigns; without one the copy button is left out.
+ * error digest Next.js assigns or, for a crash in the browser, the one the server
+ * gave its last failed call. With neither the copy button is left out: a value only
+ * this browser knows would find nothing in the server's log.
  */
-export function SystemErrorState({ digest, onRetry }: { digest?: string; onRetry: () => void }) {
+export function SystemErrorState({ digest: givenDigest, onRetry }: { digest?: string; onRetry: () => void }) {
   const t = useTranslation('common');
   const [copied, setCopied] = useState(false);
+  const digest = givenDigest ?? latestErrorReference() ?? undefined;
 
   const copy = async () => {
     if (!digest) return;

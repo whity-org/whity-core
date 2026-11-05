@@ -26,6 +26,9 @@ export const RELATIONS_MANAGE = 'relations:manage';
  */
 export const USERS_READ = 'users:read';
 export const USERS_WRITE = 'users:write';
+export const SECURITY_MANAGE = 'security:manage';
+export const ROLES_READ = 'roles:read';
+export const OUS_READ = 'ous:read';
 export const USERS_DELETE = 'users:delete';
 
 /** Permissions for role management. */
@@ -37,6 +40,7 @@ export const OUS_WRITE = 'ous:write';
 export const OUS_DELETE = 'ous:delete';
 
 /** Permissions for tenant management. */
+export const TENANTS_READ = 'tenants:read';
 export const TENANTS_WRITE = 'tenants:write';
 export const TENANTS_DELETE = 'tenants:delete';
 
@@ -188,6 +192,9 @@ export const DOCUMENTS_RENDER = 'documents:render';
  * that held render, so nobody who could issue before loses it.
  */
 export const DOCUMENTS_ISSUE = 'documents:issue';
+
+/** Taking an issued document back (S5). It keeps the record and cannot be undone. */
+export const DOCUMENTS_WITHDRAW = 'documents:withdraw';
 
 /**
  * Document ROUTE TEMPLATES (#1027) — the reusable, branching flow designs the

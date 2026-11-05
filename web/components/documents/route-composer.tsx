@@ -941,8 +941,8 @@ export function RouteComposer({
                         'routing.compose.step.groupDynamic',
                         'A group is a rule, not a saved list of people. Who it reaches is worked out again every time the document moves, so this is what it means right now — not a set that has been fixed in place.'
                       )}
-                      unnamedMemberLabel={(profileId) =>
-                        t('routing.compose.step.groupUnnamed', 'Account #{id}', { id: profileId })
+                      unnamedMemberLabel={() =>
+                        t('routing.compose.step.groupUnnamed', 'Someone in this workspace')
                       }
                       previewRetryLabel={t('routing.compose.step.groupRetry', 'Try again')}
                       unknownGroupLabel={(groupId) =>
@@ -997,8 +997,8 @@ export function RouteComposer({
                       removeLabel={(name) =>
                         t('routing.compose.step.peopleRemove', 'Remove {name}', { name })
                       }
-                      unknownPersonLabel={(profileId) =>
-                        t('routing.compose.step.peopleUnknown', 'Account #{id}', { id: profileId })
+                      unknownPersonLabel={() =>
+                        t('routing.compose.step.peopleUnknown', 'Someone in this workspace')
                       }
                     />
                   </div>

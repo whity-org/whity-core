@@ -4,23 +4,21 @@ import { Suspense, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api/client';
-import type { components } from '@/lib/api/schema';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { useTranslation } from '@whity/features/i18n';
 import { PluginsTabs } from '@/components/plugins/plugins-tabs';
 import { InstallPluginDialog } from '@/components/plugins/install-plugin-dialog';
-import { PermissionButton } from '@/components/rbac/permission-button';
+import { InstallButton, type CataloguePlugin, usePluginAddsLabels, usePriceLabel, useUsageLabel } from '@/components/plugins/plugin-facts';
 import { Badge } from '@whity/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@whity/ui/card';
 import { AccessDeniedPanel, AreaError, EmptyFirstTime } from '@whity/ui/page-states';
 import { Skeleton } from '@whity/ui/skeleton';
 import { TechnicalDetails } from '@whity/ui/display-preferences';
-import { IconArrowLeft, IconDownload, IconPuzzle } from '@tabler/icons-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@whity/ui/tabs';
+import { useDateDisplay } from '@whity/features/datetime';
+import { IconAlertTriangle, IconArrowLeft, IconPuzzle } from '@tabler/icons-react';
 
 const PLUGINS_READ = 'plugins:read';
-const PLUGINS_UPLOAD = 'plugins:upload';
-
-type CataloguePlugin = components['schemas']['StoreCataloguePlugin'];
 
 function PluginDetail() {
   const t = useTranslation('admin');
@@ -29,6 +27,12 @@ function PluginDetail() {
   const slug = decodeURIComponent(params.plugin);
   const { hasPermission, loading: isCapabilitiesLoading } = useCapabilities();
   const hasAccess = hasPermission(PLUGINS_READ);
+  const addsLabels = usePluginAddsLabels();
+  const priceLabel = usePriceLabel();
+  const usageLabel = useUsageLabel();
+  const dates = useDateDisplay();
+  const [canInstall, setCanInstall] = useState(false);
+  const [canInstallDeclarative, setCanInstallDeclarative] = useState(false);
 
   const [storeUrl, setStoreUrl] = useState(searchParams.get('store') ?? '');
   const [plugin, setPlugin] = useState<CataloguePlugin | null>(null);
@@ -41,9 +45,11 @@ function PluginDetail() {
     setError(null);
     try {
       let store = storeUrl;
+      const { data: allowed } = await api.GET('/api/v1/plugins/store/allowed');
+      setCanInstall(allowed?.data.can_install ?? false);
+      setCanInstallDeclarative(allowed?.data.can_install_declarative ?? false);
       if (!store) {
-        const { data } = await api.GET('/api/v1/plugins/store/allowed');
-        const host = data?.data.hosts[0];
+        const host = allowed?.data.hosts[0];
         if (!host) {
           setPlugin(null);
           return;
@@ -123,20 +129,36 @@ function PluginDetail() {
             <div className="min-w-0 flex-1 space-y-1">
               <h2 className="text-2xl font-semibold text-foreground">{plugin.name}</h2>
               {plugin.author ? <p className="text-sm text-muted-foreground">{plugin.author}</p> : null}
+              <Badge variant="outline">{t('pluginStore.notVerified', 'Not verified')}</Badge>
               {plugin.description ? <p className="text-sm text-foreground">{plugin.description}</p> : null}
+              {usageLabel(plugin) ? <p className="text-sm text-muted-foreground">{usageLabel(plugin)}</p> : null}
+              {addsLabels(plugin).length > 0 ? (
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {addsLabels(plugin).map((label) => (
+                    <Badge key={label} variant="secondary">
+                      {label}
+                    </Badge>
+                  ))}
+                </div>
+              ) : null}
             </div>
-            <PermissionButton permission={PLUGINS_UPLOAD} disabled={!plugin.latest_version} onClick={() => setInstallOpen(true)} className="gap-2">
-              <IconDownload />
-              {t('pluginStore.action.install', 'Install')}
-            </PermissionButton>
+            <div className="flex flex-col items-end gap-1">
+              <InstallButton canInstall={plugin.kind === 'declarative' ? canInstallDeclarative : canInstall} disabled={!plugin.latest_version} onClick={() => setInstallOpen(true)} />
+              {priceLabel(plugin) ? <p className="text-sm text-muted-foreground">{priceLabel(plugin)}</p> : null}
+            </div>
           </header>
 
           <div className="grid gap-6 md:grid-cols-[1fr_20rem]">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">{t('pluginDetail.overview', 'Overview')}</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm">
+            <Tabs defaultValue="overview">
+              <TabsList variant="line">
+                <TabsTrigger value="overview">{t('pluginDetail.overview', 'Overview')}</TabsTrigger>
+                <TabsTrigger value="permissions">
+                  {t('pluginDetail.permissions', 'Permissions ({count})', { count: (plugin.permissions ?? []).length })}
+                </TabsTrigger>
+                <TabsTrigger value="changelog">{t('pluginDetail.changelog', 'Changelog')}</TabsTrigger>
+                <TabsTrigger value="support">{t('pluginDetail.support', 'Support')}</TabsTrigger>
+              </TabsList>
+              <TabsContent value="overview" className="space-y-3 pt-4 text-sm">
                 <p className="text-muted-foreground">
                   {plugin.description || t('pluginDetail.noDescription', 'The publisher has not added a description.')}
                 </p>
@@ -149,8 +171,47 @@ function PluginDetail() {
                     ))}
                   </div>
                 ) : null}
-              </CardContent>
-            </Card>
+              </TabsContent>
+              <TabsContent value="permissions" className="space-y-2 pt-4 text-sm">
+                <p className="text-muted-foreground">
+                  {t(
+                    'pluginDetail.permissionsNote',
+                    'What the store lists. Once turned on, a plugin runs on the server, so this is what it asks for, not a limit on what it can do.',
+                  )}
+                </p>
+                {(plugin.permissions ?? []).length > 0 ? (
+                  <ul className="space-y-1 font-mono text-xs">
+                    {(plugin.permissions ?? []).map((slug) => (
+                      <li key={slug}>{slug}</li>
+                    ))}
+                  </ul>
+                ) : null}
+              </TabsContent>
+              <TabsContent value="changelog" className="space-y-3 pt-4 text-sm">
+                {(plugin.changelog ?? []).length === 0 ? (
+                  <p className="text-muted-foreground">{t('pluginDetail.noChangelog', 'The publisher has not added a changelog.')}</p>
+                ) : (
+                  (plugin.changelog ?? []).map((entry) => (
+                    <div key={entry.version}>
+                      <p className="font-medium">
+                        {entry.version}
+                        {entry.date && dates.date(entry.date) ? ` · ${dates.date(entry.date)}` : ''}
+                      </p>
+                      <p className="text-muted-foreground">{entry.notes}</p>
+                    </div>
+                  ))
+                )}
+              </TabsContent>
+              <TabsContent value="support" className="pt-4 text-sm">
+                {plugin.support_url ? (
+                  <a href={plugin.support_url} target="_blank" rel="noopener noreferrer" className="break-all text-primary underline">
+                    {plugin.support_url}
+                  </a>
+                ) : (
+                  <p className="text-muted-foreground">{t('pluginDetail.noSupport', 'The publisher has not added a support link.')}</p>
+                )}
+              </TabsContent>
+            </Tabs>
 
             <Card>
               <CardHeader>
@@ -173,9 +234,38 @@ function PluginDetail() {
                   <div>
                     <dt className="text-muted-foreground">{t('pluginDetail.runs', 'How it runs')}</dt>
                     <dd className="font-medium">
-                      {t('pluginDetail.runsFrame', 'In an isolated frame, installed turned off')}
+                      {plugin.kind === 'declarative'
+                        ? t(
+                            'pluginDetail.runsDeclarative',
+                            'In this workspace only, drawn by Whity. None of the publisher\'s code runs. Whity has not reviewed it.',
+                          )
+                        : t(
+                            'pluginDetail.runsServer',
+                            'On this server, for every workspace, once it is turned on. Whity has not reviewed it.',
+                          )}
                     </dd>
                   </div>
+                  {plugin.updated_at && dates.date(plugin.updated_at) ? (
+                    <div>
+                      <dt className="text-muted-foreground">{t('pluginDetail.updated', 'Last update')}</dt>
+                      <dd className="font-medium">{dates.date(plugin.updated_at)}</dd>
+                    </div>
+                  ) : null}
+                  {(plugin.languages ?? []).length > 0 ? (
+                    <div>
+                      <dt className="text-muted-foreground">{t('pluginDetail.languages', 'Languages')}</dt>
+                      <dd className="font-medium">{(plugin.languages ?? []).join(', ')}</dd>
+                    </div>
+                  ) : null}
+                  {(plugin.outside_domains ?? []).length > 0 ? (
+                    <div className="rounded-md border border-warning/30 bg-warning-tint p-3 text-warning-text">
+                      <dt className="flex items-center gap-1.5 font-medium">
+                        <IconAlertTriangle className="size-4 shrink-0" />
+                        {t('pluginDetail.outside', 'Sends data outside')}
+                      </dt>
+                      <dd className="mt-1 break-all">{(plugin.outside_domains ?? []).join(', ')}</dd>
+                    </div>
+                  ) : null}
                   <TechnicalDetails>
                     <div>
                       <dt className="text-muted-foreground">{t('pluginDetail.source', 'Store')}</dt>

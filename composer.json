@@ -39,7 +39,7 @@
     ]
   },
   "scripts-descriptions": {
-    "phpstan": "Static analysis over the same paths, at the same memory limit, as CI (#934)."
+    "phpstan": "Static analysis over the same paths as CI (#934). CI raises the memory limit to 2G."
   },
   "autoload": {
     "classmap": [
