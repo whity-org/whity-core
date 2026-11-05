@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { TechnicalDetails } from '@whity/ui/display-preferences';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/lib/toast-context';
@@ -506,8 +507,13 @@ function Preflight({ info, infoError }: { info: McpConnectInfo | null; infoError
         <AlertDescription>
           {t(
             'aiPrincipals.connect.preflight.serverOff',
-            'Whoever runs this server needs to set MCP_ENABLED=true and restart it. Until then no app can connect.'
+            'Whoever runs this server needs to turn AI apps on and restart it. Until then no app can connect.'
           )}
+          <TechnicalDetails>
+            <code className="mt-1 block text-sm" dir="ltr">
+              MCP_ENABLED=true
+            </code>
+          </TechnicalDetails>
         </AlertDescription>
       </Alert>
     );
