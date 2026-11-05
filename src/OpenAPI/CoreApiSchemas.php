@@ -2051,6 +2051,22 @@ final class CoreApiSchemas
                 ],
             ],
             [
+                'method' => 'GET',
+                'path' => '/api/me/form-submissions/{id:\d+}',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'One of the caller\'s own submissions, with the questions they were asked',
+                    'description' => 'Only the caller\'s own: anybody else\'s is a 404. Staff questions and '
+                        . 'any answers to them are left out, because they have their own permission.',
+                    'tags' => ['forms'],
+                    'responses' => [
+                        200 => self::jsonResponse('The submission and its fields', 'FormSubmissionDetailResponse'),
+                        404 => self::errorResponse('Not one of the caller\'s submissions'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
                 'method' => 'POST',
                 'path' => '/api/me/form-submissions/{id:\d+}/withdraw',
                 'requiredRole' => null,

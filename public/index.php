@@ -4033,6 +4033,7 @@ $router->register('POST', '/api/form-submissions/{id:\d+}/review', [$formSubmiss
 // "being a recipient IS the authorization"), and a member who filled in a form
 // opened to them holds none.
 $router->register('GET', '/api/me/form-submissions', [$formSubmissionsHandler, 'listMine'], null);
+$router->register('GET', '/api/me/form-submissions/{id:\d+}', [$formSubmissionsHandler, 'showMine'], null);
 $formSubmissionWithdrawalHandler = new \Whity\Api\FormSubmissionWithdrawalApiHandler(
     $db->getPdo(),
     $formSubmissionRepository,

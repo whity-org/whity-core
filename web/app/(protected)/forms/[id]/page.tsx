@@ -18,12 +18,16 @@
  * meant to be filled" look identical once the box is empty.
  */
 
-import { use, useEffect, useState } from 'react';
+import { use, useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
+import { Icon } from '@whity/ui/icon';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
 import { Button } from '@whity/ui/button';
 import { useDirection } from '@/lib/direction-context';
 import { apiClient } from '@/lib/api-client';
+import { useCapabilities } from '@/hooks/useCapabilities';
 import { useTranslation } from '@whity/features/i18n';
+import { useDateDisplay } from '@whity/features/datetime';
 import {
   localized,
   type Answer,
@@ -33,6 +37,7 @@ import {
 } from '@/components/forms/form-fields';
 import { FormFill, type FillableField, type FormSectionSpec } from '@/components/forms/form-fill';
 import { useRefusalMessage, type RefusalBody } from '@/components/forms/form-refusals';
+import { useFormDraft } from '@/components/forms/use-form-draft';
 
 interface RenderedForm {
   form: {
@@ -52,31 +57,26 @@ interface RenderedForm {
   accepts_submissions: boolean;
 }
 
-/** Per-form, per-browser. Never sent anywhere. */
-function draftKey(id: string): string {
-  return `whity:form-draft:${id}`;
-}
-
-function readDraft(id: string): Record<string, Answer> {
-  try {
-    const raw = window.localStorage.getItem(draftKey(id));
-    if (raw === null) return {};
-    const parsed: unknown = JSON.parse(raw);
-
-    return parsed !== null && typeof parsed === 'object' ? (parsed as Record<string, Answer>) : {};
-  } catch {
-    // Private windows, cleared site data and browsers set to block storage all
-    // land here. A draft is a convenience; losing it must never cost the form.
-    return {};
-  }
-}
-
 export default function FillFormPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { dir } = useDirection();
   const preferArabic = dir === 'rtl';
   const t = useTranslation('forms');
   const refusalMessage = useRefusalMessage();
+  const { hasPermission, loading: capabilitiesLoading } = useCapabilities();
+  const { time } = useDateDisplay();
+  const draft = useFormDraft(id);
+  // Fail-closed while loading, so nothing is asked until this is known. Latched, because
+  // a later refresh of the permissions mustn't refetch the form and reseed the answers.
+  const [capabilitiesKnown, setCapabilitiesKnown] = useState(false);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- a latch on outside state
+    if (!capabilitiesLoading) setCapabilitiesKnown(true);
+  }, [capabilitiesLoading]);
+  const mayListUnits = hasPermission('ous:read');
+  // What the workspace already knows, which Start over goes back to.
+  const prefilled = useRef<Record<string, Answer>>({});
+  const stepRef = useRef(0);
 
   const [rendered, setRendered] = useState<RenderedForm | null>(null);
   // Which failure, not its wording: the words are chosen when they are drawn, so a
@@ -88,6 +88,9 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
   const [reference, setReference] = useState<string | null>(null);
   const [units, setUnits] = useState<ReferenceOption[]>([]);
   const [restored, setRestored] = useState(false);
+  const [startStep, setStartStep] = useState(0);
+  // Bumped by Start over, so the steps begin again too.
+  const [attempt, setAttempt] = useState(0);
   // Where this person fills it in: `/forms` with `forms:submit`, or `/me/forms` when
   // the form was opened to members and they hold nothing else.
   const [apiBase, setApiBase] = useState('/api/v1/forms');
@@ -96,7 +99,9 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
   // field, because whether this reader may see a list of the tenant's units is a
   // question about the reader, not about the field — and the public page
   // deliberately never asks it.
+  const asksForUnit = rendered?.fields.some((field) => field.field_type === 'ou_ref') ?? false;
   useEffect(() => {
+    if (!asksForUnit || !mayListUnits) return;
     let cancelled = false;
 
     apiClient('/api/v1/ous', { headers: { Accept: 'application/json' } })
@@ -123,20 +128,26 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [asksForUnit, mayListUnits]);
 
   useEffect(() => {
+    if (!capabilitiesKnown) return;
     let cancelled = false;
+    const mayFillAnyForm = hasPermission('forms:submit');
 
     const renderAt = (base: string) =>
       apiClient(`${base}/${encodeURIComponent(id)}/render`, { headers: { Accept: 'application/json' } });
 
-    renderAt('/api/v1/forms')
+    // Without `forms:submit` the first address would only refuse them. The fallback
+    // stays for somebody whose permission changed after this page learned it.
+    renderAt(mayFillAnyForm ? '/api/v1/forms' : '/api/v1/me/forms')
       .then(async (first) => {
         let response = first;
-        if (first.status === 403) {
+        if (mayFillAnyForm && first.status === 403) {
           response = await renderAt('/api/v1/me/forms');
-          if (!cancelled && response.ok) setApiBase('/api/v1/me/forms');
+        }
+        if (!cancelled && response.ok && (!mayFillAnyForm || first.status === 403)) {
+          setApiBase('/api/v1/me/forms');
         }
         const body = (await response.json().catch(() => ({}))) as { data?: RenderedForm; error?: string };
         if (cancelled) return;
@@ -147,7 +158,6 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
 
           return;
         }
-        setRendered(body.data);
 
         // Seed from the server's resolved prefill. Only strings are seeded: a
         // prefill that arrived as some other shape is a mismatch between the
@@ -157,11 +167,16 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
         for (const [key, value] of Object.entries(body.data.prefill ?? {})) {
           if (typeof value === 'string' && value !== '') seed[key] = value;
         }
+        prefilled.current = seed;
         // Prefill first, then whatever was already typed — a draft is a
         // later statement of intent than a default, so it wins.
-        const draft = readDraft(id);
-        setAnswers({ ...seed, ...draft });
-        setRestored(Object.keys(draft).length > 0);
+        const saved = body.data.accepts_submissions ? await draft.load() : null;
+        if (cancelled) return;
+        setAnswers({ ...seed, ...(saved?.answers ?? {}) });
+        setRestored(saved !== null);
+        stepRef.current = saved?.step ?? 0;
+        setStartStep(stepRef.current);
+        setRendered(body.data);
       })
       .catch(() => {
         if (!cancelled) setLoadError('loadFailed');
@@ -173,32 +188,39 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
     return () => {
       cancelled = true;
     };
-  }, [id]);
+    // `draft` and `hasPermission` change identity freely. Only the form, and learning the
+    // permissions, are reasons to load it again.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, capabilitiesKnown]);
 
-  // Keep the draft current. File answers are deliberately EXCLUDED: an upload
-  // reference is single-use, so restoring one would hand the server a reference
-  // it has already spent and refuse the submission for a reason nobody can see.
-  useEffect(() => {
-    if (rendered === null || submitted) return;
-
+  // Keep the draft current, but only once they have changed something: opening a form
+  // isn't starting one. File answers are deliberately EXCLUDED: an upload reference is
+  // single-use, so restoring one would hand the server a reference it has already spent
+  // and refuse the submission for a reason nobody can see.
+  function keepDraft(next: Record<string, Answer>, step: number) {
     const fileKeys = new Set(
-      rendered.fields.filter((f) => f.field_type === 'file').map((f) => f.field_key)
+      (rendered?.fields ?? []).filter((f) => f.field_type === 'file').map((f) => f.field_key)
     );
-    const keep = Object.fromEntries(Object.entries(answers).filter(([key]) => !fileKeys.has(key)));
+    draft.schedule(Object.fromEntries(Object.entries(next).filter(([key]) => !fileKeys.has(key))), step);
+  }
 
-    try {
-      window.localStorage.setItem(draftKey(id), JSON.stringify(keep));
-    } catch {
-      // Storage unavailable or full — the form still works.
-    }
-  }, [answers, id, rendered, submitted]);
+  function changeAnswers(next: Record<string, Answer>) {
+    setAnswers(next);
+    keepDraft(next, stepRef.current);
+  }
 
-  function discardDraft() {
-    try {
-      window.localStorage.removeItem(draftKey(id));
-    } catch {
-      // nothing to do
-    }
+  function changeStep(step: number) {
+    stepRef.current = step;
+    keepDraft(answers, step);
+  }
+
+  function startOver() {
+    void draft.discard();
+    setAnswers(prefilled.current);
+    setRestored(false);
+    stepRef.current = 0;
+    setStartStep(0);
+    setAttempt((current) => current + 1);
   }
 
   function labelOf(fieldKey: string): string {
@@ -245,6 +267,9 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
 
   /** Resolves with a refusal, or null once the server has the answers. */
   async function submitAnswers(toSend: Record<string, Answer>): Promise<RefusalBody | null> {
+    // No save may land after this and bring the draft back. The server drops the draft
+    // as it takes the answers.
+    await draft.pause();
     const response = await apiClient(`${apiBase}/${encodeURIComponent(id)}/submissions`, {
       method: 'POST',
       headers: {
@@ -260,12 +285,14 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
       body: JSON.stringify({ data: toSend }),
     });
     const body = (await response.json().catch(() => ({}))) as RefusalBody & { data?: { reference?: string | null } };
-    if (!response.ok) return body;
+    if (!response.ok) {
+      draft.resume();
+
+      return body;
+    }
 
     setReference(body.data?.reference ?? null);
-    // Only once the server has it. Clearing on the attempt would lose the
-    // answers precisely when the attempt failed.
-    discardDraft();
+    draft.forget();
     setSubmitted(true);
 
     return null;
@@ -310,6 +337,11 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
           {reference !== null && (
             <p className="text-sm font-medium">{t('fill.reference', 'Your reference: {reference}', { reference })}</p>
           )}
+          <div className="pt-2">
+            <Button asChild variant="outline">
+              <Link href="/admin/x/my-form-submissions">{t('fill.viewSubmissions', 'View your submissions')}</Link>
+            </Button>
+          </div>
         </CardHeader>
       </Card>
     );
@@ -333,19 +365,15 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
               {restored && (
                 <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-card p-3 text-sm shadow-2xs">
                   <span className="text-muted-foreground">
-                    {t('fill.draftRestored', 'Your unsent answers were restored from this browser.')}
+                    {t('fill.draftRestored', 'You started this earlier. Your answers are back, so you can carry on.')}
                   </span>
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
-                    onClick={() => {
-                      discardDraft();
-                      setAnswers({});
-                      setRestored(false);
-                    }}
+                    onClick={startOver}
                   >
-                    {t('fill.startAgain', 'Start again')}
+                    {t('fill.startOver', 'Start over')}
                   </Button>
                 </div>
               )}
@@ -361,15 +389,28 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
               )}
 
               <FormFill
+                key={attempt}
                 fields={rendered.fields}
                 sections={rendered.sections ?? []}
                 answers={answers}
-                onAnswersChange={setAnswers}
+                onAnswersChange={changeAnswers}
                 preferArabic={preferArabic}
                 references={{ ou_ref: units }}
                 upload={uploadAttachment}
                 submitLabel={submitLabel}
                 submit={submitAnswers}
+                initialStep={startStep}
+                onStepChange={changeStep}
+                footer={
+                  draft.failed ? (
+                    t('fill.draftFailed', 'Your draft could not be saved. You can still send the form.')
+                  ) : draft.savedAt !== null ? (
+                    <span className="inline-flex items-center gap-1.5">
+                      <Icon name="check" size={16} />
+                      {t('fill.draftSaved', 'Draft saved at {time}', { time: time(draft.savedAt) ?? '' })}
+                    </span>
+                  ) : undefined
+                }
               />
             </div>
           )}

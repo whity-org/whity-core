@@ -74,6 +74,9 @@ export function FormFill({
   upload,
   submitLabel,
   submit,
+  initialStep = 0,
+  onStepChange,
+  footer,
 }: {
   fields: FillableField[];
   sections: FormSectionSpec[];
@@ -85,12 +88,17 @@ export function FormFill({
   submitLabel: string;
   /** Sends the answers. Resolves with a refusal, or null once the server has them. */
   submit: (answers: Record<string, Answer>) => Promise<RefusalBody | null>;
+  /** The step to open on, when somebody is carrying on from a draft. */
+  initialStep?: number;
+  onStepChange?: (step: number) => void;
+  /** Beside the buttons: "Draft saved at 10:42". */
+  footer?: React.ReactNode;
 }) {
   const t = useTranslation('forms');
   const refusalMessage = useRefusalMessage();
   const top = useRef<HTMLDivElement>(null);
 
-  const [stepIndex, setStepIndex] = useState(0);
+  const [stepIndex, setStepIndex] = useState(initialStep);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -139,6 +147,7 @@ export function FormFill({
 
   function goTo(index: number) {
     setStepIndex(index);
+    onStepChange?.(index);
     setFormError(null);
     top.current?.scrollIntoView?.({ block: 'start' });
   }
@@ -306,7 +315,8 @@ export function FormFill({
         </p>
       )}
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
+        {footer !== undefined && <div className="me-auto text-sm text-muted-foreground">{footer}</div>}
         {stepped && current > 0 && (
           <Button type="button" variant="outline" onClick={() => goTo(current - 1)}>
             {t('step.back', 'Back')}

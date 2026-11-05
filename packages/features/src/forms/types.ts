@@ -124,6 +124,15 @@ export interface SubmissionRow {
   form_name?: LocalizedMap | null
 }
 
+/** `GET /api/v1/me/form-drafts`: what somebody started and has not sent. */
+export interface FormDraftRow {
+  form_id: number
+  form_name: LocalizedMap | null
+  /** The step they were on, counted from 0. */
+  step: number | null
+  updated_at: string
+}
+
 export interface SubmissionDetail extends SubmissionRow {
   fields: FieldDraft[]
   form_version_now: number | null

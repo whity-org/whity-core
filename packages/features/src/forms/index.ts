@@ -1,6 +1,6 @@
 export { FormsListScreen } from "./forms-list-screen"
 export { FormBuilderScreen } from "./form-builder-screen"
-export { FormsCatalogScreen, draftStorageKey } from "./forms-catalog-screen"
+export { FormsCatalogScreen } from "./forms-catalog-screen"
 export { MySubmissionsScreen } from "./my-submissions-screen"
 export { createFormsApi } from "./api"
 export type { FormsScreenEnv, NotifyType } from "./types"

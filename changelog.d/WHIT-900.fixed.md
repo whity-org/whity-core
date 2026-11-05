@@ -1,0 +1,6 @@
+- **The form builder stops saving once a form is saved.** It kept saving every few seconds with the save bar stuck and Preview disabled, because labels came back with their languages in a different order. It also waits for a new choice to have wording.
+- **Unsent form answers are kept on the server.** People can carry on from another device, see when the draft was last saved, and find drafts on My submissions and the forms list.
+- **A withdrawn submission says Withdrawn.** It used to read as "Not sent anywhere" on My submissions and the Responses tab.
+- **The form page and forms list stop asking for what a member can't read.** Opening a form no longer produces refused requests in the background.
+- **Response exports read properly in Arabic and English.** Headings and routing words follow the export language, and dates are readable and marked as UTC.
+- **New documents from a form show the form's name.** They showed its internal key in the library and on the record.

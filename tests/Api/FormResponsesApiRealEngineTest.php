@@ -179,7 +179,7 @@ final class FormResponsesApiRealEngineTest extends TestCase
         $rows = $this->exportRows();
 
         self::assertSame(
-            ['Reference', 'Submitted at', 'Submitted by', 'Routing', 'Supplier', 'Kind', 'Kinds', 'Imports', 'Crates', 'Paper'],
+            ['Reference', 'Submitted at (UTC)', 'Submitted by', 'Where it is', 'Supplier', 'Kind', 'Kinds', 'Imports', 'Crates', 'Paper'],
             $rows[0],
         );
         self::assertSame(['Example Mill', 'Flour', 'Flour, Milk', 'Yes'], array_slice($rows[1], 4, 4));
@@ -276,6 +276,27 @@ final class FormResponsesApiRealEngineTest extends TestCase
         self::assertSame(1, $summary['routing']['withdrawn']);
         $kind = array_column($summary['questions'], null, 'field_key')['kind'];
         self::assertSame(['flour' => 1], array_column($kind['options'], 'count', 'value'));
+    }
+
+    public function testAnArabicExportIsInArabicAllTheWay(): void
+    {
+        $this->respond(['supplier' => 'a', 'imports' => true]);
+
+        $rows = $this->exportRows('?language=ar');
+
+        self::assertSame(['الرقم المرجعي', 'تاريخ الإرسال (UTC)', 'المرسل', 'أين وصل'], array_slice($rows[0], 0, 4));
+        self::assertSame('لم يُرسل إلى أي جهة', $rows[1][3]);
+        self::assertContains('نعم', $rows[1]);
+    }
+
+    public function testAnExportedDateIsReadableAndNoRowSaysNotRouted(): void
+    {
+        $this->respond(['supplier' => 'a']);
+
+        $rows = $this->exportRows();
+
+        self::assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/', $rows[1][1]);
+        self::assertSame('Not sent anywhere', $rows[1][3]);
     }
 
     public function testResponsesPerWeekIncludesQuietWeeks(): void

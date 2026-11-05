@@ -1,0 +1,1 @@
+- **Withdraw a form submission from My submissions, and open what you sent.** A person can now take back a submission nobody has acted on, after a dialog saying it can't be undone, and read their own answers without needing permission to read everyone's.
