@@ -16,7 +16,7 @@
 
 import type { RecordSectionVerdicts } from '@whity/features/record';
 
-import type { DocumentArtifact } from '../types';
+import type { DocumentArtifact, DocumentState } from '../types';
 
 /**
  * One issued document as `GET /api/v1/documents/{id}` returns it.
@@ -47,6 +47,9 @@ export interface DocumentRecord {
   created_at: string;
   /** Set when the document was withdrawn. The record stays readable. */
   withdrawn_at?: string | null;
+  /** What people quote it by. Null with no numbering rule, or until final approval. */
+  number?: string | null;
+  state?: DocumentState;
   withdrawn_by?: number | null;
   content_url: string | null;
   artifacts: DocumentArtifact[];

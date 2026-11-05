@@ -3,13 +3,12 @@
 import { useTranslation } from '@whity/features/i18n';
 import { formNameFrom } from '@/lib/documents/template-name';
 import { useDateDisplay } from '@whity/features/datetime';
-import { Badge } from '@whity/ui/badge';
 import { Button } from '@whity/ui/button';
 import { EmptyState } from '@whity/ui/empty-state';
 import { Skeleton } from '@whity/ui/skeleton';
 import { IconFileText } from '@tabler/icons-react';
 import { Pagination } from '@/components/ui/pagination';
-import { DocumentActions, DocumentTitle, StarButton, type DocumentItemHandlers } from './document-item';
+import { DocumentActions, DocumentNumber, DocumentStateBadge, DocumentTitle, StarButton, type DocumentItemHandlers } from './document-item';
 import type { LibraryEmptyState } from './library-empty-state';
 import type { DocumentRow, Pagination as PaginationMeta } from './types';
 
@@ -140,12 +139,14 @@ export function DocumentGrid({
                   <DocumentTitle row={row} lines={2} />
                 </div>
                 <p dir="auto" className="truncate text-xs text-muted-foreground">
+                  {row.number ? (
+                    <>
+                      <DocumentNumber number={row.number} />
+                      {' · '}
+                    </>
+                  ) : null}
                   {(formNameFrom(row.template_name) !== null ? t('organizer.template.fromForm', 'Form: {name}', { name: formNameFrom(row.template_name) ?? '' }) : row.template_name)}
-                  {(row.withdrawn_at ?? null) !== null && (
-                    <Badge variant="destructive" className="ms-2">
-                      {t('organizer.table.withdrawn', 'Withdrawn')}
-                    </Badge>
-                  )}
+                  <DocumentStateBadge row={row} />
                 </p>
               </div>
               <StarButton row={row} busy={handlers.busy} onToggleStar={handlers.onToggleStar} />

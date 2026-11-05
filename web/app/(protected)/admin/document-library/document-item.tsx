@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useTranslation } from '@whity/features/i18n';
+import { Badge } from '@whity/ui/badge';
 import { Button } from '@whity/ui/button';
 import {
   DropdownMenu,
@@ -171,6 +172,59 @@ export function DocumentTitle({ row, lines = 1 }: { row: DocumentRow; lines?: 1 
       {row.title}
     </Link>
   );
+}
+
+/**
+ * The number people quote a document by. A code, so it stays left to right and in
+ * the code font whatever the interface language is. Nothing at all with no number.
+ */
+export function DocumentNumber({ number }: { number?: string | null }) {
+  if (number === undefined || number === null || number === '') return null;
+
+  return (
+    <span dir="ltr" className="font-mono" data-testid="library-number">
+      {number}
+    </span>
+  );
+}
+
+/**
+ * Where a document is, for the states worth a reader's attention. `issued` is what
+ * almost every document is, so a list says nothing for it. Older servers send no
+ * state; withdrawn still shows from `withdrawn_at`.
+ */
+export function DocumentStateBadge({ row }: { row: DocumentRow }) {
+  const t = useTranslation('documents');
+  const state = row.state ?? ((row.withdrawn_at ?? null) !== null ? 'withdrawn' : 'issued');
+
+  switch (state) {
+    case 'withdrawn':
+      return (
+        <Badge variant="destructive" className="ms-2" data-testid="library-withdrawn">
+          {t('organizer.table.withdrawn', 'Withdrawn')}
+        </Badge>
+      );
+    case 'draft':
+      return (
+        <Badge variant="outline" className="ms-2" data-testid="library-state-draft">
+          {t('organizer.state.draft', 'Draft')}
+        </Badge>
+      );
+    case 'in_review':
+      return (
+        <Badge variant="info" className="ms-2" data-testid="library-state-in-review">
+          {t('organizer.state.inReview', 'In review')}
+        </Badge>
+      );
+    case 'superseded':
+      return (
+        <Badge variant="warning" className="ms-2" data-testid="library-state-superseded">
+          {t('organizer.state.superseded', 'Replaced')}
+        </Badge>
+      );
+    default:
+      return null;
+  }
 }
 
 /**

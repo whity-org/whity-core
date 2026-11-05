@@ -10,7 +10,6 @@ import { useFetch } from '@/hooks/useFetch';
 import { fetchAllPages } from '@/lib/api/fetch-all-pages';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
-import { Badge } from '@whity/ui/badge';
 import { Button } from '@whity/ui/button';
 import { IconFilePlus } from '@tabler/icons-react';
 import { useTranslation } from '@whity/features/i18n';
@@ -27,12 +26,10 @@ import {
 import { ViewRail, viewLabel, viewDescription } from './view-rail';
 import { LibraryToolbar } from './library-toolbar';
 import { DocumentGrid } from './document-grid';
-import {
-  DocumentActions,
+import { DocumentNumber, DocumentStateBadge, DocumentActions,
   DocumentTitle,
   StarButton,
-  type DocumentItemHandlers,
-} from './document-item';
+  type DocumentItemHandlers, } from './document-item';
 import {
   CreateCollectionDialog,
   DeleteCollectionDialog,
@@ -579,12 +576,14 @@ export default function DocumentLibraryPage() {
             <div className="min-w-0">
               <DocumentTitle row={row} />
               <span dir="auto" className="block truncate text-sm text-muted-foreground">
+                {row.number ? (
+                  <>
+                    <DocumentNumber number={row.number} />
+                    {' · '}
+                  </>
+                ) : null}
                 {(formNameFrom(row.template_name) !== null ? t('organizer.template.fromForm', 'Form: {name}', { name: formNameFrom(row.template_name) ?? '' }) : row.template_name)}
-                {(row.withdrawn_at ?? null) !== null && (
-                  <Badge variant="destructive" className="ms-2" data-testid="library-withdrawn">
-                    {t('organizer.table.withdrawn', 'Withdrawn')}
-                  </Badge>
-                )}
+                <DocumentStateBadge row={row} />
               </span>
             </div>
           </div>

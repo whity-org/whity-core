@@ -26,6 +26,7 @@ import { DOCUMENTS_ISSUE, DOCUMENTS_PUBLISH, DOCUMENTS_WRITE } from '@/lib/capab
 import { issueHref } from '@/lib/documents/issue';
 import { fetchAllPages } from '@/lib/api/fetch-all-pages';
 import { createDocumentSource } from '@/lib/documents/sources';
+import { NumberingDialog } from './numbering-dialog';
 import { ScopeDialog } from './scope-dialog';
 import { DeleteDialog } from './delete-dialog';
 import { CopyDialog } from './copy-dialog';
@@ -119,6 +120,7 @@ export default function DocumentTemplatesPage() {
 
   const [copying, setCopying] = useState<TemplateRow | null>(null);
   const [scoping, setScoping] = useState<TemplateRow | null>(null);
+  const [numbering, setNumbering] = useState<TemplateRow | null>(null);
   const [deleting, setDeleting] = useState<TemplateRow | null>(null);
   const [creating, setCreating] = useState(false);
   const [starting, setStarting] = useState(false);
@@ -249,6 +251,11 @@ export default function DocumentTemplatesPage() {
         <DropdownMenuItem onClick={() => setScoping(row)} disabled={!canPublish}>
           {t('documentTemplates.rowActions.audience', 'Who can see it…')}
         </DropdownMenuItem>
+        {row.kind === 'template' && (
+          <DropdownMenuItem onClick={() => setNumbering(row)} disabled={!canPublish}>
+            {t('documentTemplates.rowActions.numbering', 'Numbering…')}
+          </DropdownMenuItem>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => setDeleting(row)} disabled={!canWrite} variant="destructive">
           {t('documentTemplates.rowActions.delete', 'Delete…')}
@@ -367,6 +374,20 @@ export default function DocumentTemplatesPage() {
           onClose={() => setScoping(null)}
           onSaved={() => {
             setScoping(null);
+            templates.refetch();
+          }}
+        />
+      )}
+
+      {numbering !== null && (
+        <NumberingDialog
+          row={numbering}
+          name={nameOf(numbering)}
+          apiClient={apiClient}
+          addToast={addToast}
+          onClose={() => setNumbering(null)}
+          onSaved={() => {
+            setNumbering(null);
             templates.refetch();
           }}
         />

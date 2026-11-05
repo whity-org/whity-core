@@ -272,6 +272,32 @@ describe('the record is built from the URL alone', () => {
     expect(screen.getByTestId('document-record-stat-unit')).toHaveTextContent('Registry');
   });
 
+  it('shows the number, the state and the pages when the document has them', async () => {
+    params = { id: '5' };
+    serve({
+      record: {
+        number: 'INV-2026-0142',
+        state: 'in_review',
+        artifacts: [{ id: 1, document_id: 42, content_type: 'application/pdf', byte_size: 10, checksum_sha256: 'x', rendered_at: '2026-11-05 10:00:00', pages: 2, content_url: '/api/v1/documents/42/artifacts/1/content' }],
+      },
+    });
+    render(<DocumentRecordPage />);
+
+    expect(await screen.findByText('⁦INV-2026-0142⁩')).toBeInTheDocument();
+    expect(screen.getByText('In review')).toBeInTheDocument();
+    expect(screen.getByText('Pages')).toBeInTheDocument();
+  });
+
+  it('says nothing about a number an older document never had', async () => {
+    params = { id: '5' };
+    serve({});
+    render(<DocumentRecordPage />);
+
+    await screen.findAllByText('PO 4471');
+    expect(screen.queryByText('Number')).not.toBeInTheDocument();
+    expect(screen.queryByText('Pages')).not.toBeInTheDocument();
+  });
+
   it('never fetches for a non-numeric segment', async () => {
     params = { id: 'not-a-number' };
     serve({});

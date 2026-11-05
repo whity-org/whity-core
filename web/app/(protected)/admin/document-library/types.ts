@@ -97,8 +97,13 @@ export interface DocumentArtifact {
   byte_size: number;
   checksum_sha256: string;
   rendered_at: string;
+  /** How many pages these bytes have. Null on one stored before this was kept. */
+  pages?: number | null;
   content_url: string;
 }
+
+/** Where a document is, derived by the server from the routing trail (WHIT-684). */
+export type DocumentState = 'draft' | 'in_review' | 'issued' | 'superseded' | 'withdrawn';
 
 export interface DocumentRow {
   id: number;
@@ -109,6 +114,9 @@ export interface DocumentRow {
   created_at: string;
   /** Null unless the document was withdrawn. It stays in the library either way. */
   withdrawn_at?: string | null;
+  /** What people quote it by. Null with no numbering rule, or until final approval. */
+  number?: string | null;
+  state?: DocumentState;
   content_url: string | null;
   artifacts: DocumentArtifact[];
   /**

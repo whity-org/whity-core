@@ -716,7 +716,7 @@ it('offers no search, sort or layout switch to a caller who cannot read the fold
   expect(screen.queryByLabelText('Sort by')).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Grid' })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'List' })).not.toBeInTheDocument();
-  expect(screen.queryByLabelText('Search titles')).not.toBeInTheDocument();
+  expect(screen.queryByLabelText('Search titles and numbers')).not.toBeInTheDocument();
 });
 
 /**
