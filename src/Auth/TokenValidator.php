@@ -176,6 +176,22 @@ class TokenValidator
     }
 
     /**
+     * Whether an access token's session still stands: its jti isn't revoked and
+     * its epoch is current. The HTTP gate asks this for every request, because a
+     * signature alone says nothing about a sign-out or a password change.
+     *
+     * @param array<string, mixed> $claims Claims of a token already parsed as type `access`.
+     */
+    public function isAccessTokenLive(array $claims): bool
+    {
+        $jti = $claims['jti'] ?? null;
+
+        return is_string($jti) && $jti !== ''
+            && !$this->isTokenRevoked($jti)
+            && $this->isTokenEpochCurrent($claims);
+    }
+
+    /**
      * Validate a refresh token passed as a Bearer string or body field.
      *
      * Used by handleRefresh() in token mode (WC-ddcd16ad).

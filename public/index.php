@@ -1349,6 +1349,8 @@ $tenantIsolationMiddleware = new EnforceTenantIsolation(
     new \Whity\Auth\ActiveTenantMembershipGuard($db->getPdo()),
     // Admits a plugin's declared webhook only when its own route would run (WHIT-671).
     $router,
+    // A signed-out or superseded session's access token stops working at once.
+    (new TokenValidator($jwtParser, $db->getPdo()))->isAccessTokenLive(...),
 );
 
 // 8. Initialize HTTP kernel and register middleware
