@@ -3262,36 +3262,6 @@ final class CoreApiSchemas
                     ],
                 ],
             ],
-            // Deployment management — admin role required
-            self::adminRoute('POST', '/api/deployments/apply', [
-                'summary' => 'Apply a deployment artefact',
-                'tags' => ['platform-ops'],
-                'request' => 'DeploymentApplyRequest',
-                'responses' => [
-                    201 => self::jsonResponse('Deployment applied', 'SimpleMessageResponse'),
-                    400 => self::errorResponse('Validation failed'),
-                    403 => self::errorResponse('Insufficient permissions'),
-                    500 => self::errorResponse('Internal error'),
-                ],
-            ]),
-            self::adminRoute('POST', '/api/deployments/rollback', [
-                'summary' => 'Roll back the last deployment',
-                'tags' => ['platform-ops'],
-                'responses' => [
-                    200 => self::jsonResponse('Rollback complete', 'SimpleMessageResponse'),
-                    403 => self::errorResponse('Insufficient permissions'),
-                    500 => self::errorResponse('Internal error'),
-                ],
-            ]),
-            self::adminRoute('GET', '/api/deployments/status', [
-                'summary' => 'Get the current deployment status',
-                'tags' => ['platform-ops'],
-                'responses' => [
-                    200 => self::jsonResponse('Current deployment status', 'DeploymentStatusResponse'),
-                    403 => self::errorResponse('Insufficient permissions'),
-                    500 => self::errorResponse('Internal error'),
-                ],
-            ]),
             self::adminRoute('GET', '/api/migrations', [
                 'summary' => 'List database migrations and their execution state',
                 'tags' => ['platform-ops'],
@@ -9236,19 +9206,8 @@ final class CoreApiSchemas
             // as an open object rather than pinned field-by-field.
             'OpenApiDocumentResponse' => ['type' => 'object', 'additionalProperties' => true],
 
-            // Shared bare { message } response (deployment and plugin handlers)
+            // Shared bare { message } response (plugin handlers)
             'SimpleMessageResponse' => self::object(['message' => self::str()], ['message']),
-
-            // POST /api/deployments/apply request body
-            'DeploymentApplyRequest' => self::object([
-                'version' => self::str(),
-                'source_path' => self::str(),
-            ], ['version', 'source_path']),
-
-            // GET /api/deployments/status — free-form data object
-            'DeploymentStatusResponse' => self::object([
-                'data' => ['type' => 'object', 'additionalProperties' => true],
-            ], ['data']),
 
             // GET /api/migrations
             'MigrationEntry' => self::object([

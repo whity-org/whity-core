@@ -26,7 +26,6 @@ use Whity\Api\PermissionsApiHandler;
 use Whity\Api\PluginsApiHandler;
 use Whity\Api\MigrationsApiHandler;
 use Whity\Api\OusApiHandler;
-use Whity\Core\Deployment\DeploymentManager;
 
 /**
  * Base Command class for CLI commands

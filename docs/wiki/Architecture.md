@@ -211,7 +211,7 @@ Both the role-hierarchy walk and the OU parent-chain walk are protected by visit
 
 ### RbacMiddleware route enforcement
 
-`RbacMiddleware` (`src/Http/RbacMiddleware.php`) enforces the route's `requiredRole` and/or `requiredPermission`. A `403` for a missing permission echoes the offending permission under a `required` key. Routes with neither requirement are unprotected (fail-open). The core platform routes registered in `public/index.php` use the legacy role string `'admin'` as their `requiredRole` (e.g. all `/api/users`, `/api/roles`, `/api/tenants`, `/api/ous`, `/api/plugins`, `/api/deployments`, `/api/migrations`, `/api/admin/stats` endpoints).
+`RbacMiddleware` (`src/Http/RbacMiddleware.php`) enforces the route's `requiredRole` and/or `requiredPermission`. A `403` for a missing permission echoes the offending permission under a `required` key. Routes with neither requirement are unprotected (fail-open). The core platform routes registered in `public/index.php` use the legacy role string `'admin'` as their `requiredRole` (e.g. all `/api/users`, `/api/roles`, `/api/tenants`, `/api/ous`, `/api/plugins`, `/api/migrations`, `/api/admin/stats` endpoints).
 
 ### Roles API
 
