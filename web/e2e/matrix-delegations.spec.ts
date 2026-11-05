@@ -133,7 +133,20 @@ test.describe('Delegations (role matrix)', () => {
       .locator('input[type="checkbox"]')
       .check();
 
+    // An end date, picked for real: next month, so it is never in the past. A
+    // picked date that did not reach the server saved a delegation that never ends.
+    await dialog.getByLabel('Until (optional)').click();
+    await page.getByRole('button', { name: 'Next month' }).click();
+    await page.getByRole('button', { name: '15', exact: true }).click();
+
+    const created = page.waitForResponse(
+      (res) =>
+        res.url().endsWith('/api/v1/delegations') &&
+        res.request().method() === 'POST'
+    );
     await dialog.getByRole('button', { name: 'Create Delegation' }).click();
+    const sent = (await created).request().postDataJSON() as { expiresAt: string | null };
+    expect(sent.expiresAt).not.toBeNull();
     await expect(
       toastWithText(page, 'Delegation created successfully')
     ).toBeVisible();
@@ -145,6 +158,7 @@ test.describe('Delegations (role matrix)', () => {
     await expect(row).toBeVisible();
     await expect(row).toContainText('Relations read');
     await expect(row).toContainText('Active');
+    await expect(row).not.toContainText('No end date');
 
     // Revoke happens at once, and the toast offers Undo (tier 1).
     await row.getByRole('button', { name: 'Revoke' }).click();
