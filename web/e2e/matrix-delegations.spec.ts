@@ -145,8 +145,9 @@ test.describe('Delegations (role matrix)', () => {
         res.request().method() === 'POST'
     );
     await dialog.getByRole('button', { name: 'Create Delegation' }).click();
-    const sent = (await created).request().postDataJSON() as { expiresAt: string | null };
-    expect(sent.expiresAt).not.toBeNull();
+    const saved = await created;
+    expect(saved.status()).toBe(201);
+    expect(await saved.text()).toMatch(/"expiresAt":"\d{4}-/);
     await expect(
       toastWithText(page, 'Delegation created successfully')
     ).toBeVisible();
