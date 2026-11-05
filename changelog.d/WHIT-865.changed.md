@@ -1,1 +1,0 @@
-- The plugin store has Store and Installed tabs, a page for each plugin, and an install dialog. Installed plugins are a table with a row menu, and operator tools (upload, reload) sit in a menu only for people who can use them.
