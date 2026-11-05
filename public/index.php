@@ -3639,7 +3639,9 @@ $documentVerificationHandler = new \Whity\Api\DocumentVerificationApiHandler(
     $documentRepository,
     $routeEventRepository,
     $settingsService,
-    new DatabaseSharedStore($db->getPdo())
+    new DatabaseSharedStore($db->getPdo()),
+    $documentSourceRepository,
+    $documentArtifactRepository,
 );
 
 // `/api/documents/views` is registered BEFORE the `{id:\d+}` routes and cannot

@@ -2331,7 +2331,7 @@ export interface paths {
         };
         /**
          * Verify a document from the QR code printed on it (public, rate-limited)
-         * @description PUBLIC and unauthenticated by design: the caller is somebody holding a printed sheet, and the paper is the whole of their relationship with this system. Always 200. An unknown token, a malformed one, a withdrawn one and a superseded one produce the SAME body at the default disclosure level, so this endpoint cannot be asked whether a document exists. A tenant may raise `documents.qr_public_detail` to `stage`, which adds the current routing verb and distinguishes a revoked code from an unrecognised one, or LOWER it to `undated`, which withholds `issued_on` and leaves everything else as `minimal`. It never returns a document id, a title, any content, any recipient, or any name of a person or unit — a signed-in reader who wants the record calls GET /api/documents/by-verification/{token}, where RBAC decides unchanged.
+         * @description PUBLIC and unauthenticated by design: the caller is somebody holding a printed sheet, and the paper is the whole of their relationship with this system. Always 200. An unknown token, a malformed one, a withdrawn one and a superseded one produce the SAME body at the default disclosure level, so this endpoint cannot be asked whether a document exists. A tenant may raise `documents.qr_public_detail` to `stage`, which adds the current routing verb and distinguishes a revoked code from an unrecognised one, or LOWER it to `undated`, which withholds `issued_on` and leaves everything else as `minimal`. `described` adds to `stage` the kind (the template's public name), the revision letter, the page count, and on a revised document's code which revision replaced it. It never returns a price, the document number, a document id, a title, any content, any recipient, or any name of a person or unit — a signed-in reader who wants the record calls GET /api/documents/by-verification/{token}, where RBAC decides unchanged.
          */
         get: operations["get_api_v1_document_verifications_token"];
         put?: never;
@@ -9006,6 +9006,8 @@ export interface components {
         DocumentSource: {
             /** @description How documents from this template are numbered, when it has its own rule */
             numbering?: components["schemas"]["DocumentNumbering"];
+            /** @description What kind of document this makes, in words for strangers: the kind the public check shows at the `described` level. Null shows no kind. */
+            public_name?: string | null;
             id: number;
             tenant_id: number;
             /** @enum {string} */
@@ -9049,6 +9051,8 @@ export interface components {
             updated_at: string;
         };
         DocumentSourceAudienceRequest: {
+            /** @description What kind of document this makes, for the public check ('Handover certificate'), at most 120 characters; null or empty for none. Never a customer's name. Needs documents:publish. */
+            public_name?: string | null;
             /** @description How documents from this template are numbered; it wins over a slot's rule. Needs documents:publish. */
             numbering?: components["schemas"]["DocumentNumbering"];
             /**
@@ -25320,12 +25324,23 @@ export interface operations {
                             /** @description The issue DATE (YYYY-MM-DD), not a timestamp. ABSENT at the `undated` disclosure level — absent rather than null, because null would be a statement about the document and this is a statement about the page. */
                             issued_on?: string | null;
                             /**
-                             * @description Only at the `stage` disclosure level
+                             * @description Only at the `stage` and `described` disclosure levels
                              * @enum {string}
                              */
                             stage?: "issued" | "forwarded" | "acknowledged" | "returned" | "noted";
                             /** @description Date only, and only at the `stage` level */
                             stage_on?: string | null;
+                            /** @description Only at `described`, and only when the template has a public name: what kind of document it is. Never its title. */
+                            kind?: string;
+                            /** @description Only at `described`: the revision letter, A for the first */
+                            revision?: string;
+                            /** @description Only at `described`, and only when the render service reported it */
+                            pages?: number;
+                            /** @description Only at `described`, on a refused code whose document was revised */
+                            replaced_by?: {
+                                revision: string;
+                                issued_on: string | null;
+                            };
                         };
                     };
                 };

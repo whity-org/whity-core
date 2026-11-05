@@ -23,7 +23,7 @@ use Whity\Core\Db\DbBool;
  */
 final class DocumentSourceRepository
 {
-    private const COLUMNS = 'id, tenant_id, kind, title, lang, default_view, full_width, page, record_type, blocks, own_fields, theme, numbering,
+    private const COLUMNS = 'id, tenant_id, kind, title, lang, default_view, full_width, page, record_type, blocks, own_fields, theme, numbering, public_name,
         draft_version, published_version, scope, required_permission, created_by, owner_ou_id, updated_by,
         starter_key, legacy_template_id, created_at, updated_at';
 
@@ -292,6 +292,28 @@ final class DocumentSourceRepository
         ]);
     }
 
+    /**
+     * What kind of document a template makes, in words for strangers (#1627), or
+     * null for none. Shown on the public check at the `described` level only.
+     */
+    public function updatePublicName(int $id, int $tenantId, ?string $publicName): void
+    {
+        $stmt = $this->db->prepare(
+            'UPDATE document_sources SET public_name = :public_name, updated_at = NOW() WHERE id = :id AND tenant_id = :tenant_id'
+        );
+        $stmt->execute([':public_name' => $publicName, ':id' => $id, ':tenant_id' => $tenantId]);
+    }
+
+    /** A template's public name, read in its own tenant only (#1627). */
+    public function publicName(int $id, int $tenantId): ?string
+    {
+        $stmt = $this->db->prepare('SELECT public_name FROM document_sources WHERE id = :id AND tenant_id = :tenant_id');
+        $stmt->execute([':id' => $id, ':tenant_id' => $tenantId]);
+        $name = $stmt->fetchColumn();
+
+        return is_string($name) && trim($name) !== '' ? $name : null;
+    }
+
     public function delete(int $id, int $tenantId): void
     {
         $stmt = $this->db->prepare('DELETE FROM document_sources WHERE id = :id AND tenant_id = :tenant_id');
@@ -321,6 +343,8 @@ final class DocumentSourceRepository
             'own_fields'          => is_array($ownFields) ? array_values($ownFields) : [],
             'theme'               => is_array($theme) ? $theme : null,
             'numbering'           => is_array($numbering) ? $numbering : null,
+            // What kind of document this makes, for strangers on the public check (#1627).
+            'public_name'         => isset($row['public_name']) && $row['public_name'] !== '' ? (string) $row['public_name'] : null,
             'draft_version'       => (int) $row['draft_version'],
             'published_version'   => $row['published_version'] !== null ? (int) $row['published_version'] : null,
             'scope'               => (string) $row['scope'],
