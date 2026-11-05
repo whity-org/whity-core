@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useState } from "react";
+import { humanizeCode } from "@/lib/plain-words";
 import { AdminHeader } from "@/components/admin/admin-header";
 import {
   Card,
@@ -326,7 +327,7 @@ export default function AdminStats() {
                     <div key={role.name} className="space-y-1">
                       <div className="flex items-center justify-between text-sm">
                         <span className="font-medium capitalize">
-                          {role.name}
+                          {humanizeCode(role.name)}
                         </span>
                         <span className="text-muted-foreground">
                           {t("stats.roles.userCount", "{count} users", {
