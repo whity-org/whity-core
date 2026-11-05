@@ -3263,6 +3263,22 @@ final class CoreApiSchemas
                     404 => self::errorResponse('Not found'),
                 ],
             ]),
+            self::permissionRoute('GET', '/api/plugins/trust-status', 'plugins:read', [
+                'summary' => 'Whether Verified can work here, and how fresh the signed revocation list is',
+                'tags' => ['platform-ops'],
+                'responses' => [
+                    200 => self::jsonResponse('Trust status', 'PluginTrustStatusResponse'),
+                ],
+            ]),
+            self::permissionRoute('POST', '/api/plugins/revocations', 'plugins:install', [
+                'summary' => 'Apply a signed revocation list (how an offline install keeps up)',
+                'tags' => ['platform-ops'],
+                'responses' => [
+                    200 => self::jsonResponse('Applied', 'PluginTrustStatusResponse'),
+                    403 => self::errorResponse('Not the platform operator'),
+                    422 => self::errorResponse('Refused'),
+                ],
+            ]),
             self::permissionRoute('GET', '/api/plugins/updates', 'plugins:read', [
                 'summary' => 'Newer store versions of installed plugins (empty outside the system tenant)',
                 'tags' => ['platform-ops'],
@@ -9007,6 +9023,15 @@ final class CoreApiSchemas
             'WorkspacePluginSwitchResponse' => self::object([
                 'data' => self::object(['plugin' => self::str(), 'enabled' => self::bool()], ['plugin', 'enabled']),
             ], ['data']),
+            'PluginTrustStatusResponse' => self::object([
+                'data' => self::object([
+                    'keys' => self::int(),
+                    'sequence' => ['type' => 'integer', 'nullable' => true],
+                    'issued_at' => ['type' => 'integer', 'nullable' => true],
+                    'expires_at' => ['type' => 'integer', 'nullable' => true],
+                    'stale' => self::bool(),
+                ], ['keys', 'stale']),
+            ], ['data']),
             'PluginRemovedResponse' => self::object([
                 'data' => ['type' => 'array', 'items' => self::object([
                     'name' => self::str(),
@@ -14322,10 +14347,11 @@ final class CoreApiSchemas
                 'plugin' => self::str() + ['description' => 'The plugin\'s name'],
                 'version_id' => self::int() + ['description' => 'The live version\'s id'],
                 'version' => self::str() + ['description' => 'The live version'],
+                'trust' => ['type' => 'string', 'enum' => ['verified', 'unverified'], 'description' => 'Verified only with a mark from a signature checked against a key pinned in core'],
                 'enabled' => self::bool() + ['description' => 'Whether the plugin is switched on'],
                 'automations_enabled' => self::bool() + ['description' => 'Whether its automations are switched on'],
                 'updated_at' => self::str(),
-            ], ['slug', 'plugin', 'version_id', 'version', 'enabled', 'automations_enabled']),
+            ], ['slug', 'plugin', 'version_id', 'version', 'trust', 'enabled', 'automations_enabled']),
             'WorkspacePluginListResponse' => self::listEnvelope('WorkspacePlugin'),
             'WorkspacePluginManifestRequest' => self::object(['manifest' => $manifest], ['manifest']),
             'PublishWorkspacePluginRequest' => self::object([

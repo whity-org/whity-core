@@ -2154,12 +2154,15 @@ $manifestTestRunner = new \Whity\Core\Plugin\Tenant\ManifestTestRunner(
     $tenantRecordRepository,
     new \Whity\Core\Plugin\Tenant\RecordWriter($db->getPdo(), $tenantRecordRepository, $roleChecker)
 );
+// Verified marks: public keys pinned in code, nothing here can sign.
+$pluginTrust = new \Whity\Core\Plugin\Trust\PluginTrust($db->getPdo(), \Whity\Core\Plugin\Trust\TrustedKeys::pinned(), $auditLogger);
 $tenantPluginVersionsHandler = new \Whity\Api\TenantPluginVersionsApiHandler(
     $tenantPluginRepository,
     $tenantManifestPublisher,
     $manifestImpact,
     $manifestTestRunner,
-    $auditLogger
+    $auditLogger,
+    $pluginTrust
 );
 $router->register('GET', '/api/workspace-plugins', [$tenantPluginVersionsHandler, 'list'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_READ);
 $router->register('POST', '/api/workspace-plugins', [$tenantPluginVersionsHandler, 'publish'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_PUBLISH);
@@ -2320,11 +2323,15 @@ $installFromStoreHandler = new \Whity\Api\InstallFromStoreApiHandler(
     null,
     new \Whity\Core\Plugin\PluginRecords($db->getPdo()),
     $tenantManifestPublisher,
-    $tenantPluginRepository
+    $tenantPluginRepository,
+    $pluginTrust
 );
 $router->register('POST', '/api/plugins/install-from-store', [$installFromStoreHandler, 'install'], null, null, CorePermissions::PLUGINS_INSTALL);
 // Decision 2: a workspace installs declarative plugins into itself. Data, not code.
 $router->register('POST', '/api/workspace-plugins/install-from-store', [$installFromStoreHandler, 'installDeclarative'], null, null, CorePermissions::PLUGINS_INSTALL);
+// Verified: how fresh the signed revocation list is, and importing one.
+$router->register('GET', '/api/plugins/trust-status', [$installFromStoreHandler, 'trustStatus'], null, null, CorePermissions::PLUGINS_READ);
+$router->register('POST', '/api/plugins/revocations', [$installFromStoreHandler, 'importRevocations'], null, null, CorePermissions::PLUGINS_INSTALL);
 // S.6: updates, always asked for by a person; new access waits for approval.
 $router->register('GET', '/api/plugins/updates', [$installFromStoreHandler, 'availableUpdates'], null, null, CorePermissions::PLUGINS_READ);
 $router->register('POST', '/api/plugins/{name}/update', [$installFromStoreHandler, 'update'], null, null, CorePermissions::PLUGINS_INSTALL);

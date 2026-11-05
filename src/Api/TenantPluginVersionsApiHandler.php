@@ -53,13 +53,19 @@ final class TenantPluginVersionsApiHandler
         private readonly ManifestImpact $impact,
         private readonly ManifestTestRunner $tests,
         private readonly ?AuditLogger $audit = null,
+        private readonly ?\Whity\Core\Plugin\Trust\PluginTrust $trust = null,
     ) {
     }
 
     public function list(Request $request): Response
     {
         return $this->guarded(fn (int $tenantId): Response => Response::json(['data' => array_map(
-            static fn (array $p): array => ['slug' => PluginNamespace::slug($p['plugin'])] + $p,
+            function (array $p): array {
+                $verified = $this->trust?->isVerified($p['plugin'], $p['version'], $p['hash']) ?? false;
+                unset($p['hash']);
+
+                return ['slug' => PluginNamespace::slug($p['plugin']), 'trust' => $verified ? 'verified' : 'unverified'] + $p;
+            },
             $this->plugins->plugins($tenantId),
         )]));
     }
@@ -86,7 +92,17 @@ final class TenantPluginVersionsApiHandler
     {
         return $this->guarded(function (int $tenantId) use ($request, $params, $enabled): Response {
             $plugin = $this->plugins->pluginKey($tenantId, (string) ($params['plugin'] ?? ''));
-            if ($plugin === null || !$this->plugins->setEnabled($tenantId, $plugin, $enabled)) {
+            if ($plugin === null) {
+                return self::notFound();
+            }
+            if ($enabled && $this->trust !== null) {
+                foreach ($this->plugins->plugins($tenantId) as $row) {
+                    if ($row['plugin'] === $plugin && $this->trust->isKilled($plugin, $row['version'])) {
+                        return Response::error('This version was withdrawn for a security reason.', 409);
+                    }
+                }
+            }
+            if (!$this->plugins->setEnabled($tenantId, $plugin, $enabled)) {
                 return self::notFound();
             }
             $this->audit?->record($enabled ? 'tenant_plugin.enabled' : 'tenant_plugin.disabled', [
