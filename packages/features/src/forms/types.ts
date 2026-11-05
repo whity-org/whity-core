@@ -144,3 +144,15 @@ export interface FormsScreenEnv {
   notify: (message: string, type: NotifyType, action?: { label: string; onClick: () => void }) => void
   navigate: (path: string) => void
 }
+
+/** `GET /api/v1/forms/{id}/responses/summary`: counts only, never free text. */
+export interface ResponsesSummary {
+  total: number
+  per_week: Array<{ week: string; count: number }>
+  routing: { not_routed: number; in_progress: number; completed: number; withdrawn?: number }
+  questions: Array<{
+    field_key: string
+    label: LocalizedMap
+    options: Array<{ value: string; label: LocalizedMap | null; count: number }>
+  }>
+}

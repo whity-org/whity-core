@@ -3963,6 +3963,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/form-submissions/{id}/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Withdraw one of the caller's own submissions
+         * @description Keeps the row and its answers, and withdraws the document it produced in the same transaction. Somebody else's submission is a 404. Refused with a 409 once a review is recorded or the route has finished (`details.reason` `already_decided`), or if already withdrawn (`already_withdrawn`). There is no undo.
+         */
+        post: operations["post_api_v1_me_form_submissions_id_withdraw"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/forms": {
         parameters: {
             query?: never;
@@ -9698,6 +9718,7 @@ export interface components {
                     not_routed: number;
                     in_progress: number;
                     completed: number;
+                    withdrawn: number;
                 };
                 questions: {
                     field_key: string;
@@ -9754,6 +9775,7 @@ export interface components {
                 [key: string]: unknown;
             };
             submitted_at: string;
+            withdrawn_at?: string | null;
             created_at?: string;
             form_key?: string;
             form_name?: {
@@ -9804,6 +9826,9 @@ export interface components {
             meta?: {
                 ignored_keys?: string[];
             };
+        };
+        FormSubmissionWithdrawnResponse: {
+            data: components["schemas"]["FormSubmission"];
         };
         FormUpdateRequest: {
             /** @description New name as `{"en": ..., "ar": ...}`; a plain string is read as English. */
@@ -33777,6 +33802,82 @@ export interface operations {
             };
             /** @description Method not allowed */
             405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_me_form_submissions_id_withdraw: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The withdrawn submission */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormSubmissionWithdrawnResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not one of the caller's submissions */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Already decided or already withdrawn */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

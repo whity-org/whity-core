@@ -95,10 +95,9 @@ final class DocumentSlotValidator
             $label($slot['label'] ?? null, "{$path}.label", 200, true, $errors);
 
             if (array_key_exists('numbering', $slot)) {
-                try {
-                    DocumentNumberingRule::fromArray($slot['numbering']);
-                } catch (\InvalidArgumentException $e) {
-                    $errors[] = "{$path}: " . $e->getMessage();
+                $problem = DocumentNumberingRule::problem($slot['numbering']);
+                if ($problem !== null) {
+                    $errors[] = "{$path}: {$problem}";
                 }
             }
 

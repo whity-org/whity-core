@@ -126,9 +126,8 @@ final class CorePermissions
     public const SETTINGS_WRITE = 'settings:write';
     public const SETTINGS_MANAGE = 'settings:manage';
 
-    // MCP token management (WC-149b2fc9). Gates the mint and revoke operations
-    // for MCP credentials so an admin can control which users are allowed to
-    // authenticate AI clients to the MCP endpoint.
+    // MCP token administration (WC-149b2fc9): seeing and revoking everyone's AI
+    // connections in the workspace. A person's own tokens need no permission (#1623).
     public const MCP_TOKENS_MANAGE = 'mcp:tokens:manage';
 
     // Workspace agents (WHIT-815). Creates, edits and archives the workspace's

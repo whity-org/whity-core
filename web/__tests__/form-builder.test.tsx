@@ -7,6 +7,7 @@ import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { FormBuilderScreen, FormsListScreen } from '@whity/features/forms';
+import { ResponsesTab } from '../../packages/features/src/forms/responses-tab';
 import type { FormsScreenEnv } from '@whity/features/forms';
 import {
   reorder,
@@ -299,5 +300,40 @@ describe('FormBuilderScreen', () => {
     await userEvent.click(screen.getByText(/Supplier name/));
     expect(document.getElementById('q-label-ar')).toBeNull();
     expect(document.getElementById('q-label-en')).not.toBeNull();
+  });
+});
+
+describe('ResponsesTab', () => {
+  it('shows the counts and an export link above the table', async () => {
+    const env: FormsScreenEnv = {
+      transport: {
+        async request(_method: string, path: string) {
+          if (path.endsWith('/responses/summary')) {
+            return {
+              status: 200,
+              body: {
+                data: {
+                  total: 3,
+                  per_week: [{ week: '2026-10-26', count: 3 }],
+                  routing: { not_routed: 1, in_progress: 2, completed: 0 },
+                  questions: [{ field_key: 'role', label: { en: 'Role' }, options: [{ value: 'a', label: { en: 'Baker' }, count: 2 }] }],
+                },
+              },
+            };
+          }
+          if (path.startsWith('/api/v1/form-submissions')) {
+            return { status: 200, body: { data: [{ id: 1, form_id: 7, form_version: 1, submitted_by_profile_id: 2, submitted_by_name: 'Lina Saad', document_id: null, reference: 'S-1', data: {}, submitted_at: '2026-11-01 10:00:00' }] } };
+          }
+          return { status: 404, body: null };
+        },
+      },
+      notify: jest.fn(),
+      navigate: jest.fn(),
+    };
+    render(<ResponsesTab env={env} formId={7} />);
+    expect(await screen.findByText('Baker')).toBeInTheDocument();
+    expect(screen.getByText('Where they are')).toBeInTheDocument();
+    expect(screen.getByText('Lina Saad')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Export responses' })).toHaveAttribute('href', '/api/v1/forms/7/responses/export?language=en');
   });
 });

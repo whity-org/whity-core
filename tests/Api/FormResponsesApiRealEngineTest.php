@@ -264,6 +264,20 @@ final class FormResponsesApiRealEngineTest extends TestCase
         self::assertStringContainsString('Kind', $first);
     }
 
+    public function testAWithdrawnResponseIsCountedAsThatAndLeavesTheAnswers(): void
+    {
+        $this->respond(['supplier' => 'a', 'kind' => 'flour']);
+        $this->respond(['supplier' => 'b', 'kind' => 'milk']);
+        $this->pdo->exec('UPDATE form_submissions SET withdrawn_at = NOW() WHERE id = (SELECT MAX(id) FROM form_submissions)');
+
+        $summary = $this->summary();
+
+        self::assertSame(2, $summary['total']);
+        self::assertSame(1, $summary['routing']['withdrawn']);
+        $kind = array_column($summary['questions'], null, 'field_key')['kind'];
+        self::assertSame(['flour' => 1], array_column($kind['options'], 'count', 'value'));
+    }
+
     public function testResponsesPerWeekIncludesQuietWeeks(): void
     {
         $this->respond(['supplier' => 'a']);

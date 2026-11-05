@@ -2050,6 +2050,25 @@ final class CoreApiSchemas
                     ] + self::authErrors(),
                 ],
             ],
+            [
+                'method' => 'POST',
+                'path' => '/api/me/form-submissions/{id:\d+}/withdraw',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Withdraw one of the caller\'s own submissions',
+                    'description' => 'Keeps the row and its answers, and withdraws the document it produced in '
+                        . 'the same transaction. Somebody else\'s submission is a 404. Refused with a 409 once '
+                        . 'a review is recorded or the route has finished (`details.reason` '
+                        . '`already_decided`), or if already withdrawn (`already_withdrawn`). There is no undo.',
+                    'tags' => ['forms'],
+                    'responses' => [
+                        200 => self::jsonResponse('The withdrawn submission', 'FormSubmissionWithdrawnResponse'),
+                        404 => self::errorResponse('Not one of the caller\'s submissions'),
+                        409 => self::errorResponse('Already decided or already withdrawn'),
+                    ] + self::authErrors(),
+                ],
+            ],
         ];
     }
 
@@ -7927,7 +7946,8 @@ final class CoreApiSchemas
                     'not_routed' => self::int(),
                     'in_progress' => self::int(),
                     'completed' => self::int(),
-                ], ['not_routed', 'in_progress', 'completed']),
+                    'withdrawn' => self::int(),
+                ], ['not_routed', 'in_progress', 'completed', 'withdrawn']),
                 'questions' => ['type' => 'array', 'items' => self::object([
                     'field_key' => self::str(),
                     'field_type' => self::str(),
@@ -7999,6 +8019,8 @@ final class CoreApiSchemas
                 'document_id' => self::int(true),
                 'data' => ['type' => 'object', 'additionalProperties' => true],
                 'submitted_at' => self::str(),
+                // Null until its author takes it back. The row and answers stay.
+                'withdrawn_at' => self::str(true),
                 'created_at' => self::str(),
                 // Present only on the reads that join `forms`. Absent means "not
                 // fetched by this read", never "empty".
@@ -8015,6 +8037,7 @@ final class CoreApiSchemas
                     ], []),
                 ],
             ]),
+            'FormSubmissionWithdrawnResponse' => self::object(['data' => SchemaBuilder::ref('FormSubmission')], ['data']),
             'FormSubmissionCreateResponse' => self::object([
                 'data' => SchemaBuilder::ref('FormSubmission'),
                 'meta' => self::object([

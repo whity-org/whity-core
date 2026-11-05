@@ -3561,6 +3561,14 @@ $documentsHandler = new \Whity\Api\DocumentsApiHandler(
     \Whity\app(\Whity\Core\Document\Issuing\TemplateIssuing::class),
     $roleChecker,
 ));
+$documentWithdrawal = new \Whity\Core\Document\DocumentWithdrawal(
+    $db->getPdo(),
+    $documentRepository,
+    $documentQrTokenRepository,
+    $routeRecipientRepository,
+    $routeEventRepository,
+    $auditLogger
+);
 // SDK 1.63 (WHIT-886): plugin files, through the storage resolver built above
 // for the tenant storage routes, and plugin documents, which wrap Documents and
 // use the QR service built earlier.
@@ -3578,14 +3586,7 @@ $documentWithdrawalHandler = new \Whity\Api\DocumentWithdrawalApiHandler(
     $documentRepository,
     $documentVisibilityPolicy,
     $roleChecker,
-    new \Whity\Core\Document\DocumentWithdrawal(
-        $db->getPdo(),
-        $documentRepository,
-        $documentQrTokenRepository,
-        $routeRecipientRepository,
-        $routeEventRepository,
-        $auditLogger
-    )
+    $documentWithdrawal
 );
 $router->register('POST', '/api/documents/{id:\d+}/withdraw', [$documentWithdrawalHandler, 'withdraw'], null, null, CorePermissions::DOCUMENTS_WITHDRAW);
 $documentQrHandler = new \Whity\Api\DocumentQrApiHandler(
@@ -4041,6 +4042,14 @@ $router->register('POST', '/api/form-submissions/{id:\d+}/review', [$formSubmiss
 // "being a recipient IS the authorization"), and a member who filled in a form
 // opened to them holds none.
 $router->register('GET', '/api/me/form-submissions', [$formSubmissionsHandler, 'listMine'], null);
+$formSubmissionWithdrawalHandler = new \Whity\Api\FormSubmissionWithdrawalApiHandler(
+    $db->getPdo(),
+    $formSubmissionRepository,
+    $documentRepository,
+    $documentWithdrawal,
+    $auditLogger
+);
+$router->register('POST', '/api/me/form-submissions/{id:\d+}/withdraw', [$formSubmissionWithdrawalHandler, 'withdraw'], null);
 
 // A FORM OPENED TO THE WORKSPACE'S MEMBERS (migration 198). No permission, like the
 // inbox: being an active member, on a form somebody with `forms:manage` opened, is the
@@ -4869,8 +4878,10 @@ $router->register('POST', '/api/relations', [$relationsHandler, 'create'], null,
 $router->register('DELETE', '/api/relations/{id:\d+}', [$relationsHandler, 'delete'], null, null, CorePermissions::RELATIONS_MANAGE);
 
 // WC-2686308f: MCP token management endpoints (issue / list / revoke).
-// WC-149b2fc9: create and revoke are gated by mcp:tokens:manage so an admin
-// controls who may mint AI credentials. List is read-only and ungated.
+// #1623: a person manages their own AI connections, so these have no route
+// permission: each handler acts only on the caller's own tokens, and a token never
+// does more than its owner. mcp:tokens:manage is for the admin routes below, which
+// reach everyone's. Undeclared on purpose, which keeps them off the agent surface.
 $mcpTokenService = new McpTokenService($db->getPdo(), $jwtParser);
 // WHIT-832: the grant screen needs the operations an agent could be offered,
 // with their gates; derived once per worker from the same catalogue as tools/list.
@@ -4885,11 +4896,11 @@ $mcpTokenHandler = new McpTokenHandler(
     },
     $auditLogger,
 );
-$router->register('POST',   '/api/mcp/tokens',       [$mcpTokenHandler, 'create'], null, null, CorePermissions::MCP_TOKENS_MANAGE);
+$router->register('POST',   '/api/mcp/tokens',       [$mcpTokenHandler, 'create']);
 $router->register('GET',    '/api/mcp/tokens',       [$mcpTokenHandler, 'list']);
-$router->register('DELETE', '/api/mcp/tokens/{jti}', [$mcpTokenHandler, 'revoke'], null, null, CorePermissions::MCP_TOKENS_MANAGE);
+$router->register('DELETE', '/api/mcp/tokens/{jti}', [$mcpTokenHandler, 'revoke']);
 $router->register('GET',    '/api/mcp/tokens/{jti}/grant', [$mcpTokenHandler, 'grant']);
-$router->register('PATCH',  '/api/mcp/tokens/{jti}/grant', [$mcpTokenHandler, 'updateGrant'], null, null, CorePermissions::MCP_TOKENS_MANAGE);
+$router->register('PATCH',  '/api/mcp/tokens/{jti}/grant', [$mcpTokenHandler, 'updateGrant']);
 
 // WC-0208ce4d: AI-principal admin endpoints (tenant-scoped, admin surface).
 // Gated by mcp:tokens:manage so only admins who hold the credential-management
@@ -5306,8 +5317,9 @@ $router->registerUnversioned('GET',  '/mcp/agents/{agent:[a-z0-9][a-z0-9-]*}', [
 $router->registerUnversioned('POST', '/mcp/{split:[a-z0-9][a-z0-9_.-]*}', [$mcpTransportHandler, 'handlePost']);
 $router->registerUnversioned('GET',  '/mcp/{split:[a-z0-9][a-z0-9_.-]*}', [$mcpTransportHandler, 'handleGet']);
 
-// WHIT-697: the "Connect an AI app" wizard. Gated like token issuance, which
-// is where the wizard ends. The preview runs the tools/list filter itself.
+// WHIT-697: the "Connect an AI app" wizard. No route permission, like token
+// issuance, where the wizard ends (#1623). The preview runs the tools/list filter
+// itself, so it shows only what the caller could already do.
 $mcpConnectHandler = new McpConnectHandler(
     $tokenValidator,
     $mcpToolsListHandler,
@@ -5316,8 +5328,8 @@ $mcpConnectHandler = new McpConnectHandler(
     $mcpServerEnabled,
     McpConnectHandler::endpointFor((string) ($_ENV['APP_URL'] ?? getenv('APP_URL') ?: '')),
 );
-$router->register('GET',  '/api/mcp/connect',         [$mcpConnectHandler, 'info'],    null, null, CorePermissions::MCP_TOKENS_MANAGE);
-$router->register('POST', '/api/mcp/connect/preview', [$mcpConnectHandler, 'preview'], null, null, CorePermissions::MCP_TOKENS_MANAGE);
+$router->register('GET',  '/api/mcp/connect',         [$mcpConnectHandler, 'info']);
+$router->register('POST', '/api/mcp/connect/preview', [$mcpConnectHandler, 'preview']);
 
 // Load plugins AFTER every core route (WC-169): the Router refuses duplicate
 // method+path registrations (first wins), so core routes can never be

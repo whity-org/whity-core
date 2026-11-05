@@ -192,6 +192,17 @@ final class FormStaffFieldsApiRealEngineTest extends TestCase
         return $decoded['data'];
     }
 
+    public function testAWithdrawnSubmissionTakesNoReview(): void
+    {
+        $id = $this->submit(['supplier' => 'a']);
+        (new FormSubmissionRepository($this->pdo))->markWithdrawn(self::TENANT, $id, self::APPLICANT);
+
+        $response = $this->record($id, ['decision' => 'yes']);
+
+        self::assertSame(409, $response->getStatusCode(), (string) $response->getBody());
+        self::assertSame([], (new FormSubmissionReviewRepository($this->pdo))->listForSubmission(self::TENANT, $id));
+    }
+
     public function testTheSignedInRenderDoesNotShowAStaffField(): void
     {
         $rendered = $this->renderer->render(self::TENANT, self::APPLICANT, $this->forms->find(self::TENANT, $this->formId) ?? []);

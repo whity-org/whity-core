@@ -8,6 +8,8 @@ use Whity\Core\Container\HostWiredService;
 use Whity\Core\RBAC\CorePermissions;
 use Whity\Mcp\Tools\CoreToolsets;
 use Whity\Mcp\Tools\ToolSurface;
+use Whity\Sdk\Manifest\AgentDeclarationValidator;
+use Whity\Sdk\Manifest\AgentFeatures;
 use Whity\Sdk\Manifest\AgentPresetValidator;
 use Whity\Sdk\Manifest\PluginManifest;
 
@@ -118,6 +120,47 @@ final class AgentPresetRegistry implements HostWiredService
                 array_push($refused, ...$errors);
                 continue;
             }
+            $kept[$normal['key']] = $normal;
+        }
+        $this->plugins[$pluginKey] = $kept;
+
+        return $refused;
+    }
+
+    /**
+     * A code plugin's agents, declared under PluginAgentsInterface (SDK 1.64,
+     * WHIT-893). They join the plugin's presets, so a workspace starts an agent
+     * from one exactly as from a preset: a copy, never a live link. A
+     * declaration under the same key with a higher version replaces the earlier
+     * one for new agents; agents already created keep what they were given.
+     *
+     * Returns why any was refused. A refused declaration is dropped and the
+     * plugin keeps loading.
+     *
+     * @param list<mixed>            $declared        what getAgents() returned
+     * @param callable(string): bool $permissionExists
+     * @return list<string>
+     */
+    public function registerPluginAgents(string $pluginKey, array $declared, callable $permissionExists): array
+    {
+        $root = CoreToolsets::pluginToolsetIdForClass($pluginKey);
+        [$accepted, $refused] = AgentDeclarationValidator::check($declared, $root, $permissionExists);
+
+        $kept = $this->plugins[$pluginKey] ?? [];
+        foreach ($accepted as $agent) {
+            $features = $agent['features'] ?? [];
+            unset($agent['features']);
+            $key = is_string($agent['key'] ?? null) ? $agent['key'] : '';
+            unset($agent['key']);
+            [$normal, $errors] = self::normalize($root, $key, $agent, $permissionExists);
+            if ($normal === null) {
+                array_push($refused, ...$errors);
+                continue;
+            }
+            $normal['features'] = array_filter(
+                array_intersect_key((array) $features, array_flip(AgentFeatures::ALL)),
+                'is_bool',
+            );
             $kept[$normal['key']] = $normal;
         }
         $this->plugins[$pluginKey] = $kept;
