@@ -297,6 +297,85 @@ final class McpTokenHandlerTest extends TestCase
         self::assertSame(404, $revokeResponse->getStatusCode(), 'Cross-profile revoke must return 404');
     }
 
+    // ── Bearer sign-in (#1623) ──────────────────────────────────────────────
+
+    public function testABearerAccessTokenManagesThePersonsOwnTokens(): void
+    {
+        $bearer = ['Authorization' => 'Bearer ' . $this->mintAccessToken(), 'Content-Type' => 'application/json'];
+
+        $created = $this->handler->create(new Request('POST', '/api/mcp/tokens', $bearer, '{"name":"cli","scope":["tools:call"]}'));
+        self::assertSame(201, $created->getStatusCode());
+        $jti = (string) json_decode($created->getBody(), true)['jti'];
+
+        $listed = json_decode($this->handler->list(new Request('GET', '/api/mcp/tokens', $bearer, ''))->getBody(), true);
+        self::assertSame([$jti], array_column($listed['tokens'], 'jti'));
+
+        $revoked = $this->handler->revoke(new Request('DELETE', "/api/mcp/tokens/{$jti}", $bearer, ''), ['jti' => $jti]);
+        self::assertSame(204, $revoked->getStatusCode());
+    }
+
+    public function testABearerCannotRevokeAnotherPersonsToken(): void
+    {
+        $service = new McpTokenService($this->pdo, $this->jwtParser);
+        $claims  = $this->jwtParser->parse($service->issue(self::PROFILE_A, self::TENANT_ID, 'theirs', ['tools:call']));
+        self::assertIsArray($claims);
+        $jti     = (string) $claims['jti'];
+
+        $bearer  = ['Authorization' => 'Bearer ' . $this->mintAccessToken(self::PROFILE_B)];
+        $revoked = $this->handler->revoke(new Request('DELETE', "/api/mcp/tokens/{$jti}", $bearer, ''), ['jti' => $jti]);
+
+        self::assertSame(404, $revoked->getStatusCode());
+        self::assertNotNull($service->findActive($jti, self::PROFILE_A, self::TENANT_ID));
+    }
+
+    /** An AI client's own credential must never be able to mint itself another. */
+    public function testAnMcpTokenIsNotASignIn(): void
+    {
+        $mcpToken = (new McpTokenService($this->pdo, $this->jwtParser))->issue(self::PROFILE_A, self::TENANT_ID, 'client', ['tools:call']);
+        $headers  = ['Authorization' => "Bearer {$mcpToken}", 'Content-Type' => 'application/json'];
+
+        $response = $this->handler->create(new Request('POST', '/api/mcp/tokens', $headers, '{"name":"more","scope":["tools:call"]}'));
+
+        self::assertSame(401, $response->getStatusCode());
+    }
+
+    public function testAMalformedBearerIsUnauthenticated(): void
+    {
+        foreach (['Bearer ', 'Bearer not-a-token', 'Basic abc'] as $header) {
+            $response = $this->handler->list(new Request('GET', '/api/mcp/tokens', ['Authorization' => $header], ''));
+            self::assertSame(401, $response->getStatusCode(), $header);
+        }
+    }
+
+    /**
+     * A person's own token routes carry no permission, and the routes that reach
+     * everyone's tokens keep theirs. Read from the file that registers them.
+     */
+    public function testOnlyTheAdminRoutesKeepTheAdminPermission(): void
+    {
+        $index = (string) file_get_contents(dirname(__DIR__, 3) . '/public/index.php');
+        $line  = static function (string $method, string $path) use ($index): string {
+            $found = preg_match('#^\$router->register\(\s*\'' . $method . '\',\s*\'' . preg_quote($path, '#') . '\'.*$#m', $index, $m);
+            self::assertSame(1, $found, "{$method} {$path} is not registered");
+            return $m[0];
+        };
+
+        foreach ([
+            ['POST', '/api/mcp/tokens'],
+            ['GET', '/api/mcp/tokens'],
+            ['DELETE', '/api/mcp/tokens/{jti}'],
+            ['GET', '/api/mcp/tokens/{jti}/grant'],
+            ['PATCH', '/api/mcp/tokens/{jti}/grant'],
+            ['GET', '/api/mcp/connect'],
+            ['POST', '/api/mcp/connect/preview'],
+        ] as [$method, $path]) {
+            self::assertStringNotContainsString('MCP_TOKENS_MANAGE', $line($method, $path), "{$method} {$path}");
+        }
+        foreach ([['GET', '/api/admin/mcp/tokens'], ['DELETE', '/api/admin/mcp/tokens/{jti}']] as [$method, $path]) {
+            self::assertStringContainsString('MCP_TOKENS_MANAGE', $line($method, $path), "{$method} {$path}");
+        }
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     /**
