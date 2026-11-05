@@ -15,6 +15,7 @@ use Whity\Core\Store\SharedStoreInterface;
 use Whity\Core\Tenant\TenantContext;
 use Whity\Http\Cors;
 use Whity\Sdk\Http\PublicForm;
+use Whity\Sdk\Http\PublicRead;
 use Whity\Sdk\Http\Request;
 use Whity\Sdk\Http\Response;
 
@@ -55,6 +56,16 @@ use Whity\Sdk\Http\Response;
  * post-auth limiter and the payment wall treat the request as the tenant's: a form
  * spends the tenant's request budget, and a lapsed tenant's form answers 402.
  *
+ * A PUBLIC READ (WHIT-704), `'public' => 'read'` on GET, goes through the same steps
+ * minus the ones that only make sense for a body: 1, a per-IP limit, 4 (the same
+ * keys), 5, and the ceiling per read and tenant. No bot check: a read changes
+ * nothing, and a page fetching it can't be asked to solve one each time. Origin is
+ * checked only when the caller sends one. A browser sends none for a link opened
+ * directly, and without the CORS headers only an allowed origin gets, no page on
+ * another site can read the answer anyway. Reads are OFF until the operator sets
+ * `PLUGIN_PUBLIC_READS=on`: until then this gate leaves them alone, so the tenant
+ * middleware asks for a sign-in and the handler wrapper refuses even a signed-in one.
+ *
  * Runs after the pre-auth limiter and before anything that reads a credential.
  * Holds no request state, so it is safe in a FrankenPHP worker.
  */
@@ -71,6 +82,12 @@ final class PublicFormGate
     /** Per form and tenant across every address, an hour. Core's public forms use the same. */
     public const FORM_MAX = 300;
 
+    /** Per IP, per read, an hour (WHIT-704). A page may fetch a read on every view. */
+    public const READ_ROUTE_IP_MAX = 600;
+
+    /** Per read and tenant across every address, an hour (WHIT-704). */
+    public const READ_ROUTE_MAX = 6000;
+
     /** A form with no files. Well above any real one, and far below the API's 1 MiB. */
     public const MAX_BODY_BYTES = 65536;
 
@@ -85,11 +102,25 @@ final class PublicFormGate
         private readonly SharedStoreInterface $store,
         private readonly BotCheck $botCheck,
         private readonly ?\Closure $instanceOrigins = null,
+        private readonly bool $readsEnabled = false,
     ) {
+    }
+
+    /**
+     * Whether the operator switched plugins' public reads on (WHIT-704). Off unless set.
+     *
+     * @param array<string, mixed> $env
+     */
+    public static function readsEnabledFromEnv(array $env): bool
+    {
+        return in_array(strtolower(trim((string) ($env['PLUGIN_PUBLIC_READS'] ?? ''))), ['on', 'true', '1', 'yes'], true);
     }
 
     public function handle(Request $request, callable $next): Response
     {
+        if (strtoupper($request->getMethod()) === PluginPublicRoutes::READ_METHOD) {
+            return $this->handleRead($request, $next);
+        }
         if (strtoupper($request->getMethod()) !== PluginPublicRoutes::METHOD) {
             return $next($request);
         }
@@ -175,6 +206,63 @@ final class PublicFormGate
     }
 
     /**
+     * A plugin's public read (WHIT-704). See the class comment for the steps.
+     */
+    private function handleRead(Request $request, callable $next): Response
+    {
+        if (!$this->readsEnabled) {
+            return $next($request);
+        }
+        $read = PluginPublicRoutes::readFor($request, $this->router);
+        if ($read === null) {
+            return $next($request);
+        }
+
+        $request = self::anonymous($request);
+        $ip = ClientIp::fromRequest($request);
+
+        if (($limited = $this->charge('pluginread:ip:' . $read['plugin'] . ':' . $read['form'] . ':' . ($ip ?? 'unknown'), self::READ_ROUTE_IP_MAX)) !== null) {
+            return $limited;
+        }
+
+        try {
+            $row = $this->keys->findLive($read['key']);
+            if ($row === null || $row['plugin'] !== $read['plugin'] || $row['form_name'] !== $read['form']) {
+                return Response::error('This link is not valid, or is no longer open', 404);
+            }
+
+            $origin = $request->getHeader('Origin');
+            $cors = [];
+            if ($origin !== null) {
+                if (!PublicFormOrigins::allows($origin, $row['allowed_origins'], $this->instanceOrigins())) {
+                    return Response::error('This link cannot be read from this site', 403);
+                }
+                $cors = self::corsFor(strtolower(trim($origin)));
+            }
+
+            $tenantId = (int) $row['tenant_id'];
+            if (($limited = $this->charge('pluginread:read:' . $tenantId . ':' . $read['plugin'] . ':' . $read['form'], self::READ_ROUTE_MAX)) !== null) {
+                return $limited->withHeaders($cors);
+            }
+        } catch (\Throwable $e) {
+            error_log('[PublicFormGate] the read check failed: ' . $e->getMessage());
+
+            return Response::error('This link is temporarily unavailable', 503);
+        }
+
+        TenantContext::setTenantId($tenantId);
+        $request->setAttribute(PublicRead::ATTRIBUTE, new PublicRead($tenantId, $read['plugin'], $read['form'], $origin === null ? '' : strtolower(trim($origin))));
+
+        $response = $next($request);
+
+        if (!headers_sent()) {
+            header_remove('Set-Cookie');
+        }
+
+        return self::withoutCookies($response)->withHeaders($cors);
+    }
+
+    /**
      * Answer a browser's preflight for a form route, or null when the request isn't one.
      *
      * Always a 204, so it can't be asked which keys are real. Only a live key with
@@ -221,6 +309,7 @@ final class PublicFormGate
     public function ownsCors(Request $request): bool
     {
         return PluginPublicRoutes::formFor($request, $this->router) !== null
+            || ($this->readsEnabled && PluginPublicRoutes::readFor($request, $this->router) !== null)
             || preg_match('#^/api/v1/public/plugin-forms/[^/]+$#D', $request->getPath()) === 1;
     }
 

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.68).
+ * SDK identity (v1.69).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -980,12 +980,21 @@ namespace Whity\Sdk;
  * a document (WHIT-888).
  *
  * Purely additive.)
+ *
+ * 1.69 (PUBLIC READS: a route declared `'public' => 'read'` on GET
+ * `/api/<slug>/public/<name>/{key}` answers anybody holding the link. The host
+ * resolves the tenant from the same kind of key a public form uses, runs its limits
+ * and Origin check before the handler, which reads the result from
+ * {@see Http\PublicRead}, and serves it only when the operator has switched public
+ * reads on. On an older host the route is not public (WHIT-704).
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.68.0';
+    public const VERSION = '1.69.0';
 
     /**
      * Static identity only — never instantiated.

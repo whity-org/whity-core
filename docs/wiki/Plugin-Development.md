@@ -1546,6 +1546,12 @@ Declare `'public' => 'form'` on POST `/api/<your slug>/forms/<name>/{key}`. The 
 
 See [Public forms for plugins](Plugin-Public-Forms.md).
 
+## Step 12d — Answer a public GET (SDK 1.69)
+
+Declare `'public' => 'read'` on GET `/api/<your slug>/public/<name>/{key}` for something anybody holding a link may see. It uses the same keys and the same tenant rule as a public form, the host runs its limits and the Origin check first, and your handler reads the workspace from `Whity\Sdk\Http\PublicRead::from($request)`. The operator must switch these on with `PLUGIN_PUBLIC_READS=on`; until then the route stays private.
+
+See [Public reads](Plugin-Public-Forms.md#public-reads-sdk-169).
+
 ## Step 13 — Declare it in `plugin.json` instead (SDK 1.47)
 
 Everything a plugin only *declares* can live in a JSON file instead of PHP methods: its identity and requirements, permissions, roles, `blocks` screens, owned tables, data types and limits. Put `plugin.json` next to an empty class:
