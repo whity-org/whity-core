@@ -86,9 +86,12 @@ export default function MyAgentsPage() {
         )}
       </div>
       {agent.assignment === null ? (
-        <Button variant="outline" disabled={busyId !== null} loading={busyId === agent.id} onClick={() => void act(agent, 'POST')}>
-          {t('myAgents.start', 'Start using')}
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {agent.paused && <Badge variant="outline">{t('agents.status.paused', 'Paused')}</Badge>}
+          <Button variant="outline" disabled={busyId !== null} loading={busyId === agent.id} onClick={() => void act(agent, 'POST')}>
+            {t('myAgents.start', 'Start using')}
+          </Button>
+        </div>
       ) : (
         <div className="flex flex-wrap items-center gap-2">
           {agent.paused ? (

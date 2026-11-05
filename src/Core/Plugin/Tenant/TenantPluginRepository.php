@@ -141,12 +141,12 @@ final class TenantPluginRepository
      * The workspace's plugins, switched on or not, with their live version
      * (WHIT-764).
      *
-     * @return list<array{plugin: string, version_id: int, version: string, enabled: bool, automations_enabled: bool, updated_at: string}>
+     * @return list<array{plugin: string, version_id: int, version: string, hash: string, enabled: bool, automations_enabled: bool, updated_at: string}>
      */
     public function plugins(int $tenantId): array
     {
         $stmt = $this->db->prepare(
-            'SELECT tp.plugin_key, tp.active_version_id, v.version, tp.enabled, tp.automations_enabled, tp.updated_at
+            'SELECT tp.plugin_key, tp.active_version_id, v.version, v.hash, tp.enabled, tp.automations_enabled, tp.updated_at
                FROM tenant_plugins tp
                JOIN plugin_manifest_versions v ON v.id = tp.active_version_id AND v.tenant_id = tp.tenant_id
               WHERE tp.tenant_id = :tenant_id
@@ -159,6 +159,7 @@ final class TenantPluginRepository
                 'plugin' => (string) $row['plugin_key'],
                 'version_id' => (int) $row['active_version_id'],
                 'version' => (string) $row['version'],
+                'hash' => trim((string) $row['hash']),
                 'enabled' => DbBool::of($row['enabled']),
                 'automations_enabled' => DbBool::of($row['automations_enabled']),
                 'updated_at' => (string) $row['updated_at'],

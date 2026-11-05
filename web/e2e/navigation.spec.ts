@@ -53,12 +53,11 @@ test.describe('Sidebar navigation (admin)', () => {
     await expect(page.getByRole('button', { name: /New unit|Add the first unit/ }).first()).toBeVisible();
   });
 
-  test('Tenants is not in a workspace admin\'s sidebar, and still opens by URL', async ({ adminPage, page }) => {
+  test("Tenants is not in a workspace admin's sidebar, and the URL says they have no access", async ({ adminPage, page }) => {
     await page.goto('/admin/tenants');
     await expect(adminPage.shell.navLink('Tenants')).toHaveCount(0);
-    await expect(page.getByRole('heading', { name: 'Tenants' })).toBeVisible();
-    await expect(page.getByRole('table')).toBeVisible();
-    await expect(page.getByRole('columnheader', { name: 'Slug' })).toBeVisible();
+    await expect(page.getByText('You don’t have access to workspaces')).toBeVisible();
+    await expect(page.getByRole('table')).toHaveCount(0);
   });
 
   test('Settings General leads a workspace admin to their workspace record', async ({ adminPage, page }) => {

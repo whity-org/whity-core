@@ -8,7 +8,7 @@ import { Input } from "@whity/ui/input"
 import { Switch } from "@whity/ui/switch"
 
 import { useTranslation } from "../i18n"
-import { LanguageBar, useFormLanguages } from "./form-languages"
+import { useFormLanguages } from "./form-languages"
 import type { FormRow, FormSectionDef, LocalizedMap } from "./types"
 
 /** The parts of a form the Settings tab edits, held together so one save bar covers them. */
@@ -79,7 +79,6 @@ export function FormSettingsTab({
               </label>
             </div>
           ))}
-          <LanguageBar />
         </CardContent>
       </Card>
 

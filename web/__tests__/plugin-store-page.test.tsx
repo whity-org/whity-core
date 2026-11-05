@@ -45,6 +45,11 @@ jest.mock('@/hooks/useCapabilities', () => ({
   useCapabilities: () => mockCapabilities,
 }));
 
+let mockTenantId = 0;
+jest.mock('@/lib/auth-context', () => ({
+  useAuth: () => ({ user: { tenant_id: mockTenantId } }),
+}));
+
 import PluginStorePage from '@/app/(protected)/admin/plugins/store/page';
 
 const CATALOG = [
@@ -78,13 +83,30 @@ test('shows Access Denied without plugins:read', () => {
   hasPermission.mockImplementation((p: string) => p !== 'plugins:read');
   routeGet();
   render(<PluginStorePage />);
-  expect(screen.getByText('You cannot browse the plugin store')).toBeInTheDocument();
+  expect(screen.getByText('You don’t have access to the plugin store')).toBeInTheDocument();
 });
 
 test('shows the disabled state when no stores are configured', async () => {
   routeGet(allowedResponse(false, []));
   render(<PluginStorePage />);
   expect(await screen.findByText(/Plugin store disabled/i)).toBeInTheDocument();
+});
+
+test('tells the operator where trusted stores are added', async () => {
+  mockTenantId = 0;
+  routeGet(allowedResponse(false, []));
+  render(<PluginStorePage />);
+  expect(await screen.findByText(/under Plugin store in the global settings/i)).toBeInTheDocument();
+});
+
+test('tells a workspace admin to ask whoever runs the platform, not to edit global settings', async () => {
+  mockTenantId = 7;
+  routeGet(allowedResponse(false, []));
+  render(<PluginStorePage />);
+  expect(await screen.findByText(/Ask the person who runs the platform/i)).toBeInTheDocument();
+  expect(screen.queryByText(/global settings/i)).toBeNull();
+  expect(screen.queryByText(/runs for every workspace/i)).toBeNull();
+  mockTenantId = 0;
 });
 
 test('lists the store plugins as soon as the store is known', async () => {

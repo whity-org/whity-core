@@ -606,7 +606,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Disable 2FA — clears the stored secret and invalidates all backup codes */
+        /** Disable 2FA — needs a current code, backup code or password; clears the stored secret and invalidates all backup codes */
         post: operations["post_api_v1_auth_2fa_disable"];
         delete?: never;
         options?: never;
@@ -623,7 +623,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Invalidate existing backup codes and generate 15 new ones */
+        /** Invalidate existing backup codes and generate 15 new ones — needs a current code, backup code or password */
         post: operations["post_api_v1_auth_2fa_regenerate_codes"];
         delete?: never;
         options?: never;
@@ -2901,6 +2901,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/form-submissions/{id}/files/{fileId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download a file attached to a submission
+         * @description Always sent as an attachment with `nosniff`. Only a file attached to this submission, in this workspace, and named by one of its answers.
+         */
+        get: operations["get_api_v1_form_submissions_id_files_fileid"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/form-submissions/{id}/review": {
         parameters: {
             query?: never;
@@ -3977,6 +3997,66 @@ export interface paths {
         get: operations["get_api_v1_me_form_submissions"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/form-submissions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * One of the caller's own submissions, with the questions they were asked
+         * @description Only the caller's own: anybody else's is a 404. Staff questions and any answers to them are left out, because they have their own permission.
+         */
+        get: operations["get_api_v1_me_form_submissions_id"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/form-submissions/{id}/files/{fileId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download a file the caller attached to their own submission
+         * @description Only the caller's own: anybody else's is a 404. Always sent as an attachment with `nosniff`.
+         */
+        get: operations["get_api_v1_me_form_submissions_id_files_fileid"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/form-submissions/{id}/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Withdraw one of the caller's own submissions
+         * @description Keeps the row and its answers, and withdraws the document it produced in the same transaction. Somebody else's submission is a 404. Refused with a 409 once a review is recorded or the route has finished (`details.reason` `already_decided`), or if already withdrawn (`already_withdrawn`). There is no undo.
+         */
+        post: operations["post_api_v1_me_form_submissions_id_withdraw"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5360,6 +5440,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/plugins/revocations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Apply a signed revocation list (how an offline install keeps up) */
+        post: operations["post_api_v1_plugins_revocations"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/plugins/store/allowed": {
         parameters: {
             query?: never;
@@ -5392,6 +5489,23 @@ export interface paths {
          * @description Server-side proxy to a store's public catalogue for the admin UI. Query: `store_url` (a bare https origin that MUST be on the allowlist) and optional `q` (case-insensitive substring over slug/name/description/author/tags). The browser never contacts the store directly.
          */
         get: operations["get_api_v1_plugins_store_catalog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/plugins/trust-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Whether Verified can work here, and how fresh the signed revocation list is */
+        get: operations["get_api_v1_plugins_trust_status"];
         put?: never;
         post?: never;
         delete?: never;
@@ -9740,6 +9854,7 @@ export interface components {
                     not_routed: number;
                     in_progress: number;
                     completed: number;
+                    withdrawn: number;
                 };
                 questions: {
                     field_key: string;
@@ -9796,6 +9911,7 @@ export interface components {
                 [key: string]: unknown;
             };
             submitted_at: string;
+            withdrawn_at?: string | null;
             created_at?: string;
             form_key?: string;
             form_name?: {
@@ -9819,6 +9935,13 @@ export interface components {
         FormSubmissionDetailResponse: {
             data: components["schemas"]["FormSubmission"] & {
                 fields?: components["schemas"]["FormField"][];
+                files?: {
+                    id: number;
+                    field_key: string;
+                    content_type: string;
+                    byte_size: number;
+                    filename: string | null;
+                }[];
                 form_version_now?: number | null;
             };
         };
@@ -9846,6 +9969,9 @@ export interface components {
             meta?: {
                 ignored_keys?: string[];
             };
+        };
+        FormSubmissionWithdrawnResponse: {
+            data: components["schemas"]["FormSubmission"];
         };
         FormUpdateRequest: {
             /** @description New name as `{"en": ..., "ar": ...}`; a plain string is read as English. */
@@ -11259,6 +11385,15 @@ export interface components {
                 purge_failed: boolean;
             }[];
         };
+        PluginTrustStatusResponse: {
+            data: {
+                keys: number;
+                sequence?: number | null;
+                issued_at?: number | null;
+                expires_at?: number | null;
+                stale: boolean;
+            };
+        };
         PluginUpdateRequest: {
             /** @description The store access token, when the store requires one to download. */
             token?: string;
@@ -12381,6 +12516,10 @@ export interface components {
             code: string;
             temp_token?: string;
         };
+        TwoFaProofRequest: {
+            code?: string;
+            password?: string;
+        };
         TwoFaRegenerateCodesResponse: {
             backup_codes: string[];
             message: string;
@@ -12392,6 +12531,7 @@ export interface components {
         TwoFaStatusResponse: {
             enabled: boolean;
             backup_codes_available: number;
+            password_available: boolean;
         };
         TwoFactorPolicy: {
             id: number;
@@ -12765,6 +12905,11 @@ export interface components {
             version_id: number;
             /** @description The live version */
             version: string;
+            /**
+             * @description Verified only with a mark from a signature checked against a key pinned in core
+             * @enum {string}
+             */
+            trust: "verified" | "unverified";
             /** @description Whether the plugin is switched on */
             enabled: boolean;
             /** @description Whether its automations are switched on */
@@ -15781,7 +15926,11 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TwoFaProofRequest"];
+            };
+        };
         responses: {
             /** @description 2FA disabled */
             200: {
@@ -15792,8 +15941,26 @@ export interface operations {
                     "application/json": components["schemas"]["SimpleMessageResponse"];
                 };
             };
+            /** @description 2FA is not enabled */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Missing or invalid access token */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Proof is missing or wrong; details.reason is proof_required or proof_invalid */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -15819,6 +15986,15 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            /** @description Too many wrong proofs; details.reason is throttled */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Internal error */
             500: {
                 headers: {
@@ -15837,7 +16013,11 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TwoFaProofRequest"];
+            };
+        };
         responses: {
             /** @description 15 new plaintext backup codes; old codes are invalidated */
             200: {
@@ -15866,6 +16046,15 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            /** @description Proof is missing or wrong; details.reason is proof_required or proof_invalid */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description User/profile not found */
             404: {
                 headers: {
@@ -15877,6 +16066,15 @@ export interface operations {
             };
             /** @description Method not allowed */
             405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too many wrong proofs; details.reason is throttled */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -27945,6 +28143,83 @@ export interface operations {
             };
         };
     };
+    get_api_v1_form_submissions_id_files_fileid: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+                fileId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file, as an attachment */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description File not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The file could not be read from storage */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     get_api_v1_form_submissions_id_review: {
         parameters: {
             query?: never;
@@ -33897,6 +34172,226 @@ export interface operations {
             };
             /** @description Method not allowed */
             405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_me_form_submissions_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The submission and its fields */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormSubmissionDetailResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not one of the caller's submissions */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_me_form_submissions_id_files_fileid: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+                fileId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file, as an attachment */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not a file on one of the caller's submissions */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The file could not be read from storage */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_me_form_submissions_id_withdraw: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The withdrawn submission */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormSubmissionWithdrawnResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not one of the caller's submissions */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Already decided or already withdrawn */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -40829,6 +41324,80 @@ export interface operations {
             };
         };
     };
+    post_api_v1_plugins_revocations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Applied */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginTrustStatusResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not the platform operator */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     get_api_v1_plugins_store_allowed: {
         parameters: {
             query?: never;
@@ -40971,6 +41540,71 @@ export interface operations {
             };
             /** @description The store catalogue could not be fetched */
             502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_plugins_trust_status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Trust status */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginTrustStatusResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };

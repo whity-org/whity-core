@@ -318,7 +318,7 @@ describe('CreateDelegationModal OU scope picker', () => {
     expect(scopeTrigger()).toBeDisabled();
     // The fallback the form still offers is BROADER than an OU scope, so the
     // alert has to say so rather than leave an empty-looking dropdown.
-    expect(screen.getByText(/grants more than an OU scope would/i)).toBeInTheDocument();
+    expect(screen.getByText(/grants more than one unit would/i)).toBeInTheDocument();
     // The dialog itself stays usable — a tenant-wide delegation is still a
     // complete, deliberate choice.
     expect(screen.getByRole('button', { name: /create delegation/i })).toBeEnabled();

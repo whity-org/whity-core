@@ -12,13 +12,15 @@ import { useTranslation } from "../i18n"
 import { useCurrentLanguage } from "./language"
 import { createFormsApi } from "./api"
 import { pickText } from "./text"
-import type { FieldDraft, FormsScreenEnv, SubmissionDetail, SubmissionRow } from "./types"
+import { ResponsesSummaryCards } from "./responses-summary"
+import type { FieldDraft, FormsScreenEnv, ResponsesSummary, SubmissionDetail, SubmissionFile, SubmissionRow } from "./types"
 
 /** Where a response is in its routing, in plain words. */
 export function useRoutingLabel() {
   const t = useTranslation("forms")
   return (row: Pick<SubmissionRow, "state" | "current_step">): string => {
     if (row.state === "completed") return t("responses.routing.done", "Finished")
+    if (row.state === "withdrawn") return t("responses.routing.withdrawn", "Withdrawn")
     if (row.state === "in progress") {
       return row.current_step ? t("responses.routing.with", "With {step}", { step: row.current_step }) : t("responses.routing.inProgress", "In progress")
     }
@@ -26,10 +28,17 @@ export function useRoutingLabel() {
   }
 }
 
+/** The badge for where a response is: withdrawn reads as over, not as waiting. */
+export function routingVariant(state: string | undefined): "success" | "secondary" | "outline" {
+  if (state === "completed") return "success"
+  return state === "withdrawn" ? "secondary" : "outline"
+}
+
 /** An answer as one line of words. */
-export function answerText(field: Pick<FieldDraft, "field_type" | "options" | "validation">, value: unknown, language: string | null, yes: string, no: string): string {
+export function answerText(field: Pick<FieldDraft, "field_type" | "options" | "validation">, value: unknown, language: string | null, yes: string, no: string, date: (value: string) => string): string {
   if (value === null || value === undefined || value === "") return ""
   if (typeof value === "boolean") return value ? yes : no
+  if (field.field_type === "date" && typeof value === "string") return date(value)
   const optionLabel = (raw: unknown): string => {
     const match = field.options.find((o) => o.value === String(raw))
     return match ? pickText(match.label, language) || String(raw) : String(raw)
@@ -58,15 +67,19 @@ export function answerText(field: Pick<FieldDraft, "field_type" | "options" | "v
 /** The Responses tab: every response to this form, and each one's answers. */
 export function ResponsesTab({ env, formId }: { env: FormsScreenEnv; formId: number }) {
   const t = useTranslation("forms")
+  const { currentLanguage } = useCurrentLanguage()
   const { dateTime } = useDateDisplay()
   const routingLabel = useRoutingLabel()
   const api = useMemo(() => createFormsApi(env.transport), [env.transport])
   const [rows, setRows] = useState<SubmissionRow[] | null>(null)
   const [failure, setFailure] = useState<{ denied: boolean; message: string } | null>(null)
   const [openId, setOpenId] = useState<number | null>(null)
+  const [summary, setSummary] = useState<ResponsesSummary | null>(null)
 
   const load = useCallback(async () => {
     setFailure(null)
+    // The summary is a bonus: a server without it leaves the table as it was.
+    void api.getSummary(formId, "").then((result) => setSummary(result.ok ? result.data : null))
     const result = await api.listSubmissions(formId, t("responses.error", "The responses could not be loaded."))
     if (result.ok) setRows(result.data)
     else setFailure({ denied: result.status === 403, message: result.message })
@@ -99,7 +112,15 @@ export function ResponsesTab({ env, formId }: { env: FormsScreenEnv; formId: num
   }
 
   return (
-    <>
+    <div className="space-y-6">
+      <div className="flex justify-end">
+        <Button asChild variant="outline">
+          <a href={`/api/v1/forms/${formId}/responses/export?language=${currentLanguage === "ar" ? "ar" : "en"}`} download>
+            {t("responses.export", "Export responses")}
+          </a>
+        </Button>
+      </div>
+      {summary !== null && summary.total > 0 && <ResponsesSummaryCards summary={summary} />}
       <DataTable<SubmissionRow>
         aria-label={t("responses.title", "Responses")}
         data={rows}
@@ -109,19 +130,19 @@ export function ResponsesTab({ env, formId }: { env: FormsScreenEnv; formId: num
           { id: "person", header: t("responses.col.person", "From"), cell: (row) => row.submitted_by_name ?? t("responses.visitor", "A visitor") },
           { id: "reference", header: headers[0], cell: (row) => <span className="font-mono">{row.reference ?? `#${row.id}`}</span> },
           { id: "submitted", header: headers[1], cell: (row) => dateTime(row.submitted_at) ?? "" },
-          { id: "routing", header: headers[2], cell: (row) => <Badge variant={row.state === "completed" ? "success" : "outline"}>{routingLabel(row)}</Badge> },
+          { id: "routing", header: headers[2], cell: (row) => <Badge variant={routingVariant(row.state)}>{routingLabel(row)}</Badge> },
         ]}
       />
       {openId !== null && <ResponseDialog env={env} submissionId={openId} onClose={() => setOpenId(null)} />}
-    </>
+    </div>
   )
 }
 
 /** One response as a record: the questions, and what was answered. */
-export function ResponseDialog({ env, submissionId, onClose }: { env: FormsScreenEnv; submissionId: number; onClose: () => void }) {
+export function ResponseDialog({ env, submissionId, mine = false, onClose }: { env: FormsScreenEnv; submissionId: number; mine?: boolean; onClose: () => void }) {
   const t = useTranslation("forms")
   const { currentLanguage } = useCurrentLanguage()
-  const { dateTime } = useDateDisplay()
+  const { date, dateTime } = useDateDisplay()
   const routingLabel = useRoutingLabel()
   const api = useMemo(() => createFormsApi(env.transport), [env.transport])
   const [detail, setDetail] = useState<SubmissionDetail | null>(null)
@@ -129,10 +150,12 @@ export function ResponseDialog({ env, submissionId, onClose }: { env: FormsScree
 
   const load = useCallback(async () => {
     setError(null)
-    const result = await api.getSubmission(submissionId, t("responses.error.one", "This response could not be loaded."))
+    const failed = t("responses.error.one", "This response could not be loaded.")
+    // Somebody reading their own holds no `forms:read`, so it has its own address.
+    const result = mine ? await api.getMySubmission(submissionId, failed) : await api.getSubmission(submissionId, failed)
     if (result.ok) setDetail(result.data)
     else setError(result.message)
-  }, [api, submissionId, t])
+  }, [api, mine, submissionId, t])
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the fetch on mount is the effect
@@ -140,6 +163,10 @@ export function ResponseDialog({ env, submissionId, onClose }: { env: FormsScree
   }, [load])
 
   const answers = detail === null || Array.isArray(detail.data) ? {} : detail.data
+  const filesBase = `/api/v1${mine ? "/me" : ""}/form-submissions/${submissionId}/files`
+  // A question with a rule and no answer wasn't asked: the server keeps no answer to a
+  // hidden question, so "No answer" would blame the person for something they never saw.
+  const asked = (detail?.fields ?? []).filter((field) => field.visible_when === null || field.visible_when === undefined || !isBlank(answers[field.field_key]))
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -158,12 +185,16 @@ export function ResponseDialog({ env, submissionId, onClose }: { env: FormsScree
           <p className="text-sm text-muted-foreground">{t("responses.loading", "Loading responses")}</p>
         ) : (
           <dl className="space-y-4">
-            {detail.fields.map((field) => (
+            {asked.map((field) => (
               <div key={field.field_key} className="space-y-0.5">
                 <dt className="text-sm font-medium">{pickText(field.label, currentLanguage) || field.field_key}</dt>
                 <dd className="text-sm text-muted-foreground">
-                  {answerText(field, answers[field.field_key], currentLanguage, t("responses.yes", "Yes"), t("responses.no", "No")) ||
-                    t("responses.noAnswer", "No answer")}
+                  {field.field_type === "file" && answers[field.field_key] ? (
+                    <AttachedFiles base={filesBase} files={(detail.files ?? []).filter((file) => file.field_key === field.field_key)} />
+                  ) : (
+                    answerText(field, answers[field.field_key], currentLanguage, t("responses.yes", "Yes"), t("responses.no", "No"), (value) => date(value) ?? "—") ||
+                    t("responses.noAnswer", "No answer")
+                  )}
                 </dd>
               </div>
             ))}
@@ -176,5 +207,26 @@ export function ResponseDialog({ env, submissionId, onClose }: { env: FormsScree
         </div>
       </DialogContent>
     </Dialog>
+  )
+}
+
+function isBlank(answer: unknown): boolean {
+  return answer === null || answer === undefined || answer === "" || (Array.isArray(answer) && answer.length === 0)
+}
+
+/** The files answering one question. A submission older than the list still says one came. */
+function AttachedFiles({ base, files }: { base: string; files: SubmissionFile[] }) {
+  const t = useTranslation("forms")
+  if (files.length === 0) return <>{t("responses.attached", "Attached")}</>
+  return (
+    <span className="flex flex-col items-start gap-2 pt-1">
+      {files.map((file) => (
+        <Button key={file.id} asChild variant="outline" className="h-auto min-h-10 max-w-full whitespace-normal break-all text-start">
+          <a href={`${base}/${file.id}`} download>
+            {t("responses.downloadFile", "Download {name}", { name: file.filename ?? t("responses.attachedFile", "attached file") })}
+          </a>
+        </Button>
+      ))}
+    </span>
   )
 }

@@ -1,5 +1,0 @@
-- An agent can be paused and resumed. A paused agent is refused on every call, however it signed in, and its waiting proposals can be declined but can't run until it is resumed.
-- Agents now report who they work for, what they did and proposed today, what is waiting and when they were last active, and how much they do on their own.
-- People who manage agents get a workspace-wide activity list, with a filter by agent.
-- Every action AI can take now has a plain name in English and Arabic, an area, and how long Undo lasts, and says what agents can really do with it: a write that can't be undone reads as a proposal.
-- An agent can keep documents for reference. The list never widens what it may read, which stays within each person's own access. Core's presets say what they do and what they need.

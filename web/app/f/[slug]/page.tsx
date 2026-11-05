@@ -189,7 +189,10 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
       </div>
       <footer className="mt-10 flex w-full max-w-2xl flex-wrap items-center justify-between gap-3">
         <BuiltOnWhity label={t('fill.builtOn', 'Built on Whity')} />
-        <LanguageSwitcher variant="dropdown" />
+        <LanguageSwitcher
+          variant="dropdown"
+          className="h-10 cursor-pointer rounded-control border border-input bg-card px-2.5 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
+        />
       </footer>
     </main>
   );

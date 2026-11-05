@@ -532,4 +532,70 @@ class RbacMiddlewareTest extends TestCase
         $this->assertSame(200, $response->getStatusCode());
         $this->assertSame('Success', $response->getBody());
     }
+
+    public function testRecordAccessPassesACallerWhoLacksThePermission(): void
+    {
+        $roleChecker = $this->createMock(RoleChecker::class);
+        $roleChecker->method('hasPermissionForProfile')->willReturn(false);
+        $middleware = new RbacMiddleware($this->mockJwtParser, $roleChecker);
+        $request = new Request('GET', '/x', ['Authorization' => 'Bearer t'], '');
+        $request->setAttribute(Request::ATTR_JWT_CLAIMS, ['profile_id' => 7]);
+        $seen = [];
+
+        $response = $middleware->handle(
+            $request,
+            static fn (Request $r): Response => Response::json(['user' => ((array) $r->user)['profile_id'] ?? null]),
+            null,
+            'things:read',
+            static function (int $profile, int $tenant) use (&$seen): bool {
+                $seen = [$profile, $tenant];
+
+                return true;
+            },
+        );
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertSame([7, self::TENANT], $seen);
+        self::assertStringContainsString('"user":7', $response->getBody(), 'the handler still gets the caller');
+    }
+
+    public function testRecordAccessThatSaysNoLeavesTheRefusalAsItWas(): void
+    {
+        $roleChecker = $this->createMock(RoleChecker::class);
+        $roleChecker->method('hasPermissionForProfile')->willReturn(false);
+        $middleware = new RbacMiddleware($this->mockJwtParser, $roleChecker);
+        $request = new Request('GET', '/x', ['Authorization' => 'Bearer t'], '');
+        $request->setAttribute(Request::ATTR_JWT_CLAIMS, ['profile_id' => 7]);
+
+        $response = $middleware->handle(
+            $request,
+            static fn (Request $r): Response => Response::json([]),
+            null,
+            'things:read',
+            static fn (int $profile, int $tenant): bool => false,
+        );
+
+        self::assertSame(403, $response->getStatusCode());
+    }
+
+    public function testRecordAccessIsNotAskedWhenThePermissionIsHeld(): void
+    {
+        $roleChecker = $this->createMock(RoleChecker::class);
+        $roleChecker->method('hasPermissionForProfile')->willReturn(true);
+        $middleware = new RbacMiddleware($this->mockJwtParser, $roleChecker);
+        $request = new Request('GET', '/x', ['Authorization' => 'Bearer t'], '');
+        $request->setAttribute(Request::ATTR_JWT_CLAIMS, ['profile_id' => 7]);
+
+        $response = $middleware->handle(
+            $request,
+            static fn (Request $r): Response => Response::json([]),
+            null,
+            'things:read',
+            static function (int $profile, int $tenant): bool {
+                self::fail('a permission holder needs no record check');
+            },
+        );
+
+        self::assertSame(200, $response->getStatusCode());
+    }
 }

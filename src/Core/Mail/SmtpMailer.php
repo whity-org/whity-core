@@ -11,7 +11,7 @@ use Closure;
  * (the container has no composer/mail SDK) speaking the SMTP submission dialogue
  * over an injectable {@see SmtpConnection}:
  *
- *   greeting(220) → EHLO → [STARTTLS(220) → EHLO] → [AUTH LOGIN(235)]
+ *   greeting(220) → EHLO → [STARTTLS(220) → EHLO] → [AUTH LOGIN or XOAUTH2 (235)]
  *   → MAIL FROM(250) → RCPT TO(250/251) → DATA(354) → body + <CRLF>.<CRLF> (250) → QUIT
  *
  * The connection is abstracted so the protocol is unit-tested with a scripted
@@ -55,7 +55,9 @@ final class SmtpMailer implements Mailer
                 $this->ehlo($conn);               // re-EHLO over the encrypted channel
             }
 
-            if ($this->config->hasAuth()) {
+            if ($this->config->usesXoauth2()) {
+                $this->authXoauth2($conn, $fromEmail);
+            } elseif ($this->config->hasAuth()) {
                 $this->authLogin($conn);
             }
 
@@ -93,6 +95,40 @@ final class SmtpMailer implements Mailer
     }
 
     /**
+     * AUTH XOAUTH2 (WHIT-901). The initial response is
+     * base64("user=<mailbox>^Aauth=Bearer <token>^A^A"). On a refused token the
+     * server sends a 334 challenge holding its error, which the client answers with
+     * an empty line to get the final failure code.
+     *
+     * @throws SmtpAuthRejectedException When the server refuses the token.
+     */
+    private function authXoauth2(SmtpConnection $conn, string $fromEmail): void
+    {
+        $user = $this->config->hasAuth() ? (string) $this->config->username : $fromEmail;
+        if (strpbrk($user, "\r\n\x01") !== false) {
+            throw new MailException('invalid SMTP username: contains a line break');
+        }
+
+        $conn->write('AUTH XOAUTH2 ' . base64_encode(
+            'user=' . $user . "\x01auth=Bearer " . $this->config->accessToken . "\x01\x01"
+        ) . "\r\n");
+
+        $code = $this->readReplyCode($conn);
+        if ($code === 334) {
+            $conn->write("\r\n");
+            $code = $this->readReplyCode($conn);
+        }
+        if ($code === 235) {
+            return;
+        }
+        // Only the code is kept. The server's words can echo account detail.
+        if (in_array($code, self::XOAUTH2_REJECTED_CODES, true)) {
+            throw new SmtpAuthRejectedException(sprintf('SMTP refused the XOAUTH2 token (%d)', $code));
+        }
+        throw new MailException(sprintf('unexpected SMTP reply %d (expected 235)', $code));
+    }
+
+    /**
      * Write a command line (CRLF-terminated) and assert the reply's status code is
      * one of $accepted.
      */
@@ -109,6 +145,9 @@ final class SmtpMailer implements Mailer
      */
     private const MAX_REPLY_LINES = 100;
 
+    /** Replies meaning "this token is no good", as opposed to an unsupported command. */
+    private const XOAUTH2_REJECTED_CODES = [454, 530, 534, 535];
+
     /**
      * Read a (possibly multi-line) SMTP reply and assert its 3-digit status code
      * is one of $accepted. Multi-line replies use "code-" continuation and a final
@@ -116,7 +155,19 @@ final class SmtpMailer implements Mailer
      */
     private function expect(SmtpConnection $conn, int ...$accepted): void
     {
-        $code = null;
+        $code = $this->readReplyCode($conn);
+
+        if (!in_array($code, $accepted, true)) {
+            throw new MailException(sprintf('unexpected SMTP reply %d (expected %s)', $code, implode('/', $accepted)));
+        }
+    }
+
+    /**
+     * Read a (possibly multi-line) SMTP reply and return its status code.
+     */
+    private function readReplyCode(SmtpConnection $conn): int
+    {
+        $code = 0;
         $lines = 0;
         do {
             if (++$lines > self::MAX_REPLY_LINES) {
@@ -127,9 +178,7 @@ final class SmtpMailer implements Mailer
             $continues = isset($line[3]) && $line[3] === '-';
         } while ($continues);
 
-        if (!in_array($code, $accepted, true)) {
-            throw new MailException(sprintf('unexpected SMTP reply %d (expected %s)', $code, implode('/', $accepted)));
-        }
+        return $code;
     }
 
     /**

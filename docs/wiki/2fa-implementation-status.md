@@ -30,8 +30,8 @@ All 5 endpoints fully functional:
 - POST `/api/auth/2fa/setup` - Generate secret + QR code
 - POST `/api/auth/2fa/confirm` - Verify TOTP code, save secret
 - GET `/api/auth/2fa/status` - Check 2FA status and backup code count
-- POST `/api/auth/2fa/regenerate-codes` - Generate new backup codes
-- POST `/api/auth/2fa/disable` - Disable 2FA
+- POST `/api/auth/2fa/regenerate-codes` - Generate new backup codes. Needs the same proof as disable
+- POST `/api/auth/2fa/disable` - Disable 2FA. Needs `code` (authenticator or backup) or `password` in the body
 
 ### Frontend
 - Settings page with 2FA section

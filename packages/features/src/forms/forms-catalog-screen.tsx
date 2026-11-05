@@ -14,24 +14,12 @@ import { createFormsApi } from "./api"
 import { pickText } from "./text"
 import type { FormRow, FormsScreenEnv } from "./types"
 
-/** The key a form's unsent answers are kept under in this browser. */
-export function draftStorageKey(formId: number | string): string {
-  return `whity:form-draft:${formId}`
-}
-
-function hasLocalDraft(formId: number): boolean {
-  try {
-    const raw = window.localStorage.getItem(draftStorageKey(formId))
-    if (raw === null) return false
-    const parsed: unknown = JSON.parse(raw)
-    return parsed !== null && typeof parsed === "object" && Object.keys(parsed as object).length > 0
-  } catch {
-    return false
-  }
-}
-
-/** The forms a person can fill in, as cards. Unsent drafts in this browser come first. */
-export function FormsCatalogScreen({ env }: { env: FormsScreenEnv }) {
+/**
+ * The forms a person can fill in, as cards. What they started and did not send comes
+ * first, wherever they started it. `canReadForms` is `forms:read`: without it the
+ * tenant's list would only refuse them, so they go straight to the forms opened to them.
+ */
+export function FormsCatalogScreen({ env, canReadForms = true }: { env: FormsScreenEnv; canReadForms?: boolean }) {
   const t = useTranslation("forms")
   const { currentLanguage } = useCurrentLanguage()
   const api = useMemo(() => createFormsApi(env.transport), [env.transport])
@@ -42,9 +30,9 @@ export function FormsCatalogScreen({ env }: { env: FormsScreenEnv }) {
   const load = useCallback(async () => {
     setFailure(null)
     const failed = t("catalog.error", "The forms could not be loaded.")
-    let result = await api.listForms(failed)
+    let result = canReadForms ? await api.listForms(failed) : await api.listMyForms(failed)
     // A member who may fill forms in but not read them all sees the forms opened to them.
-    if (!result.ok && result.status === 403) {
+    if (canReadForms && !result.ok && result.status === 403) {
       const mine = await api.listMyForms(failed)
       if (mine.ok) result = mine
     }
@@ -54,8 +42,10 @@ export function FormsCatalogScreen({ env }: { env: FormsScreenEnv }) {
     }
     const open = result.data.filter((form) => form.status === "published")
     setForms(open)
-    setDrafts(new Set(open.filter((form) => hasLocalDraft(form.id)).map((form) => form.id)))
-  }, [api, t])
+    // A bonus, like the summary: without it the forms are still all there.
+    const mine = await api.listMyDrafts("")
+    setDrafts(new Set(mine.ok ? mine.data.map((draft) => draft.form_id) : []))
+  }, [api, canReadForms, t])
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the fetch on mount is the effect

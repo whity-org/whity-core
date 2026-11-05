@@ -286,12 +286,16 @@ class TwoFactorFlowTest extends TestCase
     public function testDisableDisables2fa(): void
     {
         $this->createAccessToken();
-        $mockPdo = $this->createMockPdo(['two_factor_enabled' => true]);
+        $mockPdo = $this->createMockPdo([
+            'two_factor_enabled' => true,
+            'auth_method' => 'local',
+            'password_hash' => password_hash('the password', PASSWORD_BCRYPT),
+        ]);
         $tokenValidator = new TokenValidator($this->jwtParser, $mockPdo);
         $backupCodesService = $this->createMock(BackupCodesService::class);
         $handler = new TwoFactorHandler($mockPdo, $this->totpService, $backupCodesService, $tokenValidator);
 
-        $request = new Request('POST', '/api/auth/2fa/disable');
+        $request = new Request('POST', '/api/auth/2fa/disable', [], '{"password":"the password"}');
         $response = $handler->disable($request);
 
         $this->assertSame(200, $response->getStatusCode());
@@ -305,7 +309,12 @@ class TwoFactorFlowTest extends TestCase
     public function testRegenerateCodesInvalidatesOldCodes(): void
     {
         $this->createAccessToken();
-        $mockPdo = $this->createMockPdo(['two_factor_enabled' => true, 'two_factor_backup_codes_version' => 1]);
+        $mockPdo = $this->createMockPdo([
+            'two_factor_enabled' => true,
+            'two_factor_backup_codes_version' => 1,
+            'auth_method' => 'local',
+            'password_hash' => password_hash('the password', PASSWORD_BCRYPT),
+        ]);
         $tokenValidator = new TokenValidator($this->jwtParser, $mockPdo);
         $backupCodesService = $this->createMock(BackupCodesService::class);
         $handler = new TwoFactorHandler($mockPdo, $this->totpService, $backupCodesService, $tokenValidator);
@@ -316,7 +325,7 @@ class TwoFactorFlowTest extends TestCase
             ->willReturnCallback(fn($c) => 'hashed_' . $c);
         $backupCodesService->method('invalidateOldCodes');
 
-        $request = new Request('POST', '/api/auth/2fa/regenerate-codes');
+        $request = new Request('POST', '/api/auth/2fa/regenerate-codes', [], '{"password":"the password"}');
         $response = $handler->regenerateCodes($request);
 
         $this->assertSame(200, $response->getStatusCode());

@@ -6,6 +6,10 @@ namespace Whity\Api;
 
 use Psr\Log\LoggerInterface;
 use Whity\Auth\RoleChecker;
+use Whity\Core\Audit\AuditLoggerInterface;
+use Whity\Core\Http\HttpClient;
+use Whity\Core\Mail\OAuth\SmtpOAuthStore;
+use Whity\Core\Mail\OAuth\SmtpOAuthTokenManager;
 use Whity\Core\Mail\MailException;
 use Whity\Core\Mail\MailerFactory;
 use Whity\Core\Mail\NullMailer;
@@ -30,6 +34,9 @@ use Whity\Http\JsonBody;
  *  - PUT  /api/v1/settings/mail/smtp-password (settings:manage, system tenant) —
  *        set (encrypt-at-rest) or clear the SMTP password. Body `{ "password": ... }`;
  *        null/empty clears it.
+ *  - PUT  /api/v1/settings/mail/oauth-credentials (settings:manage, system tenant) —
+ *        set or clear the OAuth2 client secret and refresh token (WHIT-901). Same
+ *        rules as the password: encrypted at rest, write-only, 204 on success.
  *  - POST /api/v1/settings/mail/test          (settings:manage, system tenant) —
  *        send a one-off test message to a given address using the CURRENTLY
  *        configured transport, so the operator can verify SMTP end-to-end.
@@ -45,12 +52,17 @@ use Whity\Http\JsonBody;
  */
 final class MailSettingsApiHandler
 {
+    /** Well above any real provider token, and a bound on what gets encrypted. */
+    private const MAX_OAUTH_SECRET_BYTES = 8192;
+
     public function __construct(
         private readonly SettingsService $settings,
         private readonly GlobalSettingsRepository $globals,
         private readonly EncryptedSecretStore $secrets,
         private readonly RoleChecker $roleChecker,
         private readonly LoggerInterface $logger,
+        private readonly ?AuditLoggerInterface $audit = null,
+        private readonly ?HttpClient $tokenHttp = null,
     ) {
     }
 
@@ -71,6 +83,11 @@ final class MailSettingsApiHandler
                 'data' => [
                     'transport' => $global[SettingsRegistry::MAIL_TRANSPORT] ?? 'none',
                     'has_smtp_password' => $this->hasStoredPassword(),
+                    'auth_mode' => $global[SettingsRegistry::MAIL_SMTP_AUTH_MODE] ?? MailerFactory::AUTH_MODE_PASSWORD,
+                    'oauth' => $this->oauthTokens()->describe(
+                        trim((string) ($global[SettingsRegistry::MAIL_SMTP_HOST] ?? '')),
+                        (string) ($global[SettingsRegistry::MAIL_SMTP_ENCRYPTION] ?? 'tls'),
+                    ),
                 ],
             ], 200);
         } catch (\Throwable $e) {
@@ -125,6 +142,76 @@ final class MailSettingsApiHandler
     }
 
     /**
+     * PUT /api/v1/settings/mail/oauth-credentials — set or clear the OAuth2 secrets.
+     *
+     * Body: `{ "client_secret": "<secret>" | null, "refresh_token": "<token>" | null }`.
+     * A field left out stays as it is, and null or empty clears it. Values are never
+     * echoed, logged or audited: the audit entry names which fields changed. The
+     * provider and client ID are ordinary settings on PATCH /settings/global.
+     */
+    public function setOAuthCredentials(Request $request): Response
+    {
+        $auth = $this->authorize($request);
+        if ($auth instanceof Response) {
+            return $auth;
+        }
+
+        $body = JsonBody::parsed($request);
+        $changes = [];
+        $errors = [];
+        foreach (['client_secret', 'refresh_token'] as $field) {
+            if (!array_key_exists($field, $body)) {
+                continue;
+            }
+            $value = $body[$field];
+            if ($value !== null && (!is_string($value) || strlen($value) > self::MAX_OAUTH_SECRET_BYTES
+                || preg_match('/[\x00-\x1F\x7F]/', $value) === 1)
+            ) {
+                $errors[$field] = $field . ' must be a single line of text or null.';
+                continue;
+            }
+            $changes[$field] = is_string($value) ? trim($value) : '';
+        }
+        if ($errors !== []) {
+            return Response::error('Validation failed', 422, $errors);
+        }
+        if ($changes === []) {
+            return Response::error('Request body must include "client_secret" or "refresh_token" (null to clear)', 400);
+        }
+
+        try {
+            $store = new SmtpOAuthStore($this->globals, $this->secrets);
+            $summary = [];
+            foreach ($changes as $field => $value) {
+                $summary[] = ($field === 'client_secret' ? 'client secret ' : 'refresh token ')
+                    . ($value === '' ? 'cleared' : 'set');
+                match (true) {
+                    $field === 'client_secret' && $value === '' => $store->clearClientSecret(),
+                    $field === 'client_secret' => $store->setClientSecret($value),
+                    $value === '' => $store->clearRefreshToken(),
+                    default => $store->setRefreshToken($value),
+                };
+            }
+            $store->forgetDerivedState();
+
+            $this->audit?->record('settings.mail_oauth_credentials_changed', [
+                'tenant_id' => $auth['tenantId'],
+                'actor_user_id' => $auth['userId'],
+                // Under one plain key: the audit writer rightly drops any key with
+                // "secret" or "token" in its name, which would leave this empty.
+                'metadata' => ['changed' => implode(', ', $summary)],
+            ]);
+
+            return Response::json([], 204);
+        } catch (\Throwable $e) {
+            // The class alone: the message of a crypto or database failure is not
+            // guaranteed free of what was being written.
+            $this->logger->error('[MailSettingsApiHandler] setOAuthCredentials failed: ' . $e::class);
+            return Response::error('Failed to store the OAuth credentials', 500);
+        }
+    }
+
+    /**
      * POST /api/v1/settings/mail/test — send a test message via the current transport.
      *
      * Body: `{ "to": "<email>" }`. Builds the mailer from the CURRENT settings and
@@ -145,7 +232,18 @@ final class MailSettingsApiHandler
             return Response::error('Validation failed', 422, ['to' => 'to must be a valid email address.']);
         }
 
-        $mailer = MailerFactory::fromSettings($this->settings, $this->globals, $this->secrets, $this->logger);
+        // A person pressing "send test" may have just fixed something on the
+        // provider's side, so it asks the provider again rather than waiting out
+        // the pause on a recorded failure.
+        $this->oauthTokens()->clearFailure();
+
+        $mailer = MailerFactory::fromSettings(
+            $this->settings,
+            $this->globals,
+            $this->secrets,
+            $this->logger,
+            $this->tokenHttp,
+        );
 
         // A NullMailer means email is disabled or the SMTP config is incomplete —
         // "sending" would silently no-op, which is a misleading test result.
@@ -177,6 +275,11 @@ final class MailSettingsApiHandler
             $this->logger->error('[MailSettingsApiHandler] test send error: ' . $e->getMessage());
             return Response::error('Test email failed', 502);
         }
+    }
+
+    private function oauthTokens(): SmtpOAuthTokenManager
+    {
+        return MailerFactory::oauthTokens($this->settings, $this->globals, $this->secrets, $this->logger, $this->tokenHttp);
     }
 
     /**

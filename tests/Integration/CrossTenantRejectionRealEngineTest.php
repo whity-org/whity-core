@@ -421,7 +421,7 @@ final class CrossTenantRejectionRealEngineTest extends TestCase
         $this->authCookieFor(20, self::TENANT_B);
         TenantContext::setTenantId(self::TENANT_A);
 
-        $response = $this->twoFactorHandler()->disable($this->req('POST', '/api/auth/2fa/disable'));
+        $response = $this->twoFactorHandler()->disable($this->req('POST', '/api/auth/2fa/disable', $this->passwordProofFor(102)));
 
         // Post-cutover: the handler reaches profile 102 (global profiles table).
         // The cross-tenant guard is in the middleware, not here. The disable
@@ -445,7 +445,7 @@ final class CrossTenantRejectionRealEngineTest extends TestCase
         $this->authCookieFor(20, self::TENANT_B);
         TenantContext::setTenantId(self::TENANT_A);
 
-        $this->twoFactorHandler()->regenerateCodes($this->req('POST', '/api/auth/2fa/regenerate-codes'));
+        $this->twoFactorHandler()->regenerateCodes($this->req('POST', '/api/auth/2fa/regenerate-codes', $this->passwordProofFor(102)));
 
         // Post-cutover: the handler reaches profile 102 via the global profiles
         // table and bumps the backup_codes_version. The middleware (not tested
@@ -502,7 +502,7 @@ final class CrossTenantRejectionRealEngineTest extends TestCase
         $this->authCookieFor(10, self::TENANT_A);
         TenantContext::setTenantId(self::TENANT_A);
 
-        $response = $this->twoFactorHandler()->disable($this->req('POST', '/api/auth/2fa/disable'));
+        $response = $this->twoFactorHandler()->disable($this->req('POST', '/api/auth/2fa/disable', $this->passwordProofFor(101)));
 
         $this->assertSame(200, $response->getStatusCode(), "Tenant A's own 2FA disable must succeed");
         $this->assertSame(
@@ -1996,6 +1996,20 @@ final class CrossTenantRejectionRealEngineTest extends TestCase
      * Real {@see TwoFactorHandler} wired to the in-memory engine with a real
      * TokenValidator/TotpService/BackupCodesService (WC-191).
      */
+    /**
+     * Give a fixture profile a real password and return the proof the disable and
+     * regenerate routes need.
+     *
+     * @return array{password: string}
+     */
+    private function passwordProofFor(int $profileId): array
+    {
+        $this->pdo->prepare('UPDATE profiles SET password_hash = ? WHERE id = ?')
+            ->execute([password_hash('the password', PASSWORD_BCRYPT), $profileId]);
+
+        return ['password' => 'the password'];
+    }
+
     private function twoFactorHandler(): TwoFactorHandler
     {
         $jwtParser = new JwtParser(self::JWT_SECRET);

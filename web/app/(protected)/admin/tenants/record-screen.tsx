@@ -167,6 +167,8 @@ export interface TenantRecordScreenProps {
   callerTenantId: number | null;
   onNotify: (message: string, tone: 'success' | 'error' | 'info' | 'warning') => void;
   onBack: () => void;
+  /** Where Back goes, in words. Defaults to the workspaces list. */
+  backLabel?: string;
 }
 
 export function TenantRecordScreen({
@@ -175,6 +177,7 @@ export function TenantRecordScreen({
   callerTenantId,
   onNotify,
   onBack,
+  backLabel,
 }: TenantRecordScreenProps) {
   const t = useTranslation('admin');
 
@@ -285,7 +288,7 @@ export function TenantRecordScreen({
     pristine !== null &&
     (form.name !== pristine.name || form.slug !== pristine.slug);
 
-  const back = { label: t('tenants.record.back', 'Back to workspaces'), onBack };
+  const back = { label: backLabel ?? t('tenants.record.back', 'Back to workspaces'), onBack };
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -297,7 +300,10 @@ export function TenantRecordScreen({
       onNotify(t('tenants.record.name.required', 'A name is required.'), 'error');
       return;
     }
-    if (!SLUG_PATTERN.test(slug)) {
+    // A workspace created without a slug can still be renamed: an empty slug that
+    // was already empty is left alone rather than rejected.
+    const leaveSlug = slug === '' && (pristine?.slug ?? '') === '';
+    if (!leaveSlug && !SLUG_PATTERN.test(slug)) {
       setSlugError(
         t(
           'tenants.record.slug.invalid',
@@ -312,7 +318,7 @@ export function TenantRecordScreen({
       setIsSaving(true);
       const response = await apiClient(`/api/v1/tenants/${current.id}`, {
         method: 'PATCH',
-        body: JSON.stringify({ name, slug }),
+        body: JSON.stringify(leaveSlug ? { name } : { name, slug }),
       });
       if (response.status === 409) {
         onNotify(

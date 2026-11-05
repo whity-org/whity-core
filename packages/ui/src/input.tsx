@@ -94,6 +94,14 @@ function formatBytes(bytes: number): string {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`
 }
 
+/** The picked day as YYYY-MM-DD, as the person sees it. toISOString() would give UTC's day. */
+function toDateValue(date: Date): string {
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const day = String(date.getDate()).padStart(2, "0")
+
+  return `${String(date.getFullYear()).padStart(4, "0")}-${month}-${day}`
+}
+
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
   (
     {
@@ -225,9 +233,50 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
     const isSearch = type === "search"
     const isSlider = type === "range" || type === "slider"
 
+    /*
+      HOW A PICKER REPORTS A CHOICE.
+
+      The pickers are not inputs, so a choice reaches the caller's onChange as a
+      real change event from a hidden input, which also carries `name` for a
+      plain form post. React compares the input's value with the last one it saw,
+      through its own wrapper around `.value`. So the value has to be written with
+      the browser's setter ONLY: writing `.value` first tells React about it, the
+      event then looks like no change, and the choice is dropped with no error.
+    */
+    const reportPickerValue = (val: string) => {
+      const input = internalRef.current
+      if (!input) return
+      Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set?.call(
+        input,
+        val
+      )
+      input.dispatchEvent(new Event("input", { bubbles: true }))
+    }
+
+    /*
+      Follows the caller's value, so choosing the same day again after a form
+      reset still counts as a change.
+
+      Only a date keeps its own type. Time and colour pickers report forms a typed
+      input would blank ("03:30 PM"), and a range input would clamp to its limits.
+    */
+    const pickerInput = (backingType: "date" | "text") => (
+      <input
+        ref={internalRef}
+        type={backingType}
+        hidden
+        name={props.name}
+        {...(props.value !== undefined
+          ? { value: String(props.value), onChange: props.onChange ?? (() => undefined) }
+          : { defaultValue: props.defaultValue, onChange: props.onChange })}
+      />
+    )
+
     const renderInputControl = () => {
       if (isSlider) {
         return (
+          <>
+          {pickerInput("text")}
           <Slider
             disabled={disabled}
             className={className}
@@ -237,80 +286,38 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
             defaultValue={props.defaultValue !== undefined ? [Number(props.defaultValue)] : [0]}
             value={props.value !== undefined ? [Number(props.value)] : undefined}
             onValueChange={(vals) => {
-              const val = String(vals[0])
-              if (internalRef.current) {
-                internalRef.current.value = val
-                const nativeSetter = Object.getOwnPropertyDescriptor(
-                  window.HTMLInputElement.prototype,
-                  "value"
-                )?.set
-                nativeSetter?.call(internalRef.current, val)
-                internalRef.current.dispatchEvent(new Event("input", { bubbles: true }))
-                internalRef.current.dispatchEvent(new Event("change", { bubbles: true }))
-              }
+              reportPickerValue(String(vals[0]))
             }}
           />
+          </>
         )
       }
 
       if (isColor) {
         return (
+          <>
+          {pickerInput("text")}
           <ColorPicker
+            id={inputId}
             disabled={disabled}
             className={className}
             placeholder={props.placeholder}
             defaultValue={props.defaultValue as string}
             value={props.value as string}
             onChange={(c) => {
-              if (internalRef.current) {
-                const val = c || ""
-                internalRef.current.value = val
-                const nativeSetter = Object.getOwnPropertyDescriptor(
-                  window.HTMLInputElement.prototype,
-                  "value"
-                )?.set
-                nativeSetter?.call(internalRef.current, val)
-                internalRef.current.dispatchEvent(new Event("input", { bubbles: true }))
-                internalRef.current.dispatchEvent(new Event("change", { bubbles: true }))
-              }
+              reportPickerValue(c || "")
             }}
           />
+          </>
         )
       }
 
       if (isDate) {
         return (
           <>
-            {/*
-              THE ELEMENT THE EVENT COMES FROM.
-
-              The picker below reports a choice by writing to `internalRef` and
-              dispatching a native event, which is how React's `onChange`
-              receives it. Every other branch of this component renders the
-              native input further down — these picker branches return early and
-              never reached it, so `internalRef.current` was null, the whole
-              dispatch body was skipped, and a chosen date never left the picker.
-              The caller saw an empty value and a "required" error on a field
-              they had just filled in.
-
-              Uncontrolled on purpose: the dispatch sets `.value` through the
-              native setter, and a React-controlled value would be reasserted
-              over it on the next render.
-
-              `type="date"` with the `hidden` ATTRIBUTE, not `type="hidden"`:
-              React only tracks value changes for text-like inputs, and
-              `hidden` is not one of them — the event would be dispatched onto
-              an element React never listens to, and the same silent nothing
-              would happen for a different reason.
-            */}
-            <input
-              ref={internalRef}
-              type="date"
-              hidden
-              name={props.name}
-              onChange={props.onChange}
-            />
+          {pickerInput("date")}
           <DatePicker
+            id={inputId}
             disabled={disabled}
             className={className}
             placeholder={props.placeholder ?? datePickerLabels?.placeholder}
@@ -322,17 +329,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
             defaultValue={props.defaultValue as string}
             value={props.value as string}
             onChange={(d) => {
-              if (internalRef.current) {
-                const val = d ? d.toISOString().split("T")[0] : ""
-                internalRef.current.value = val
-                const nativeSetter = Object.getOwnPropertyDescriptor(
-                  window.HTMLInputElement.prototype,
-                  "value"
-                )?.set
-                nativeSetter?.call(internalRef.current, val)
-                internalRef.current.dispatchEvent(new Event("input", { bubbles: true }))
-                internalRef.current.dispatchEvent(new Event("change", { bubbles: true }))
-              }
+              reportPickerValue(d ? toDateValue(d) : "")
             }}
           />
           </>
@@ -341,26 +338,20 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
 
       if (isTime) {
         return (
+          <>
+          {pickerInput("text")}
           <TimePicker
+            id={inputId}
             disabled={disabled}
             className={className}
             placeholder={props.placeholder}
             defaultValue={props.defaultValue as string}
             value={props.value as string}
             onChange={(t) => {
-              if (internalRef.current) {
-                const val = t || ""
-                internalRef.current.value = val
-                const nativeSetter = Object.getOwnPropertyDescriptor(
-                  window.HTMLInputElement.prototype,
-                  "value"
-                )?.set
-                nativeSetter?.call(internalRef.current, val)
-                internalRef.current.dispatchEvent(new Event("input", { bubbles: true }))
-                internalRef.current.dispatchEvent(new Event("change", { bubbles: true }))
-              }
+              reportPickerValue(t || "")
             }}
           />
+          </>
         )
       }
 

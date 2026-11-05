@@ -160,7 +160,7 @@ final class DocumentWithdrawalRealEngineTest extends TestCase
         $source = (string) file_get_contents(dirname(__DIR__, 2) . '/public/index.php');
         $line = '';
         foreach (explode("\n", $source) as $candidate) {
-            if (str_contains($candidate, "/withdraw'") && str_contains($candidate, "register('POST'")) {
+            if (str_contains($candidate, '$documentWithdrawalHandler') && str_contains($candidate, "register('POST'")) {
                 $line = $candidate;
             }
         }

@@ -1,12 +1,14 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { LoadProblem } from '@/components/load-problem';
+import { throwUnlessOk } from '@/lib/forbidden';
 import { useRouter } from 'next/navigation';
 import { Avatar } from '@whity/ui/avatar';
 import { Button } from '@whity/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@whity/ui/dropdown-menu';
 import { Icon } from '@whity/ui/icon';
-import { AreaError, EmptyFiltered, EmptyFirstTime, LoadingRows } from '@whity/ui/page-states';
+import { EmptyFiltered, EmptyFirstTime, LoadingRows } from '@whity/ui/page-states';
 import { SearchField } from '@whity/ui/search-field';
 import { ToggleGroup } from '@whity/ui/toggle-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@whity/ui/select';
@@ -46,7 +48,7 @@ export default function AgentsPage() {
 
   const agents = useFetch<WorkspaceAgent[]>(async () => {
     const response = await apiClient('/api/v1/agents?archived=1');
-    if (!response.ok) throw new Error(t('agents.error.load', 'The agents could not be loaded.'));
+    throwUnlessOk(response, t('agents.error.load', 'The agents could not be loaded.'));
     return ((await response.json()) as { data: WorkspaceAgent[] }).data;
   }, [apiClient]);
 
@@ -154,16 +156,18 @@ export default function AgentsPage() {
         title={t('agents.title', 'Agents')}
         description={t('agents.description', 'Agents work for the person using them, never with more access than that person has. They ask first for anything you choose.')}
         action={
-          <Button onClick={() => setChoosing(true)}>
-            <Icon name="plus" size={16} />
-            {t('agents.new.action', 'New agent')}
-          </Button>
+          agents.forbidden ? undefined : (
+            <Button onClick={() => setChoosing(true)}>
+              <Icon name="plus" size={16} />
+              {t('agents.new.action', 'New agent')}
+            </Button>
+          )
         }
       />
       <AgentsTabs active="everyone" counts={{ everyone: agents.loading ? undefined : list.filter((a) => a.status === 'active').length }} />
 
       {agents.error !== null ? (
-        <AreaError message={agents.error} retryLabel={t('agents.retry', 'Try again')} onRetry={agents.refetch} />
+        <LoadProblem forbidden={agents.forbidden} message={agents.error} onRetry={agents.refetch} area={t('agents.area', 'agents')} />
       ) : agents.loading ? (
         <LoadingRows
           headers={[t('agents.table.agent', 'Agent'), t('agents.table.worksFor', 'Works for'), t('agents.table.onItsOwn', 'On its own'), t('agents.table.status', 'Status')]}

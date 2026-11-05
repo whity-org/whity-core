@@ -95,6 +95,9 @@ final class FormSubmissionReviewsApiHandler
             if ($submission === null) {
                 return Response::error('Submission not found', 404);
             }
+            if (($submission['withdrawn_at'] ?? null) !== null) {
+                return Response::error('This submission has been withdrawn', 409, ['reason' => 'submission_withdrawn']);
+            }
 
             $staffFields = FormFieldRepository::staffFields(
                 $this->fields->listForForm($tenantId, (int) $submission['form_id'])

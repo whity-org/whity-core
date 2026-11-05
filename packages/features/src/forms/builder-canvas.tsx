@@ -13,7 +13,7 @@ import { groupBySection } from "./builder-model"
 import { ChoiceSelect } from "./choice-select"
 import { useKindLabel } from "./kind-labels"
 import { pickText } from "./text"
-import type { FieldDraft, FieldKind, FormSectionDef } from "./types"
+import type { FieldCondition, FieldDraft, FieldKind, FormSectionDef } from "./types"
 
 /** What an answer will look like, drawn quietly so the author sees the shape. */
 function AnswerPreview({ field }: { field: FieldDraft }) {
@@ -104,12 +104,12 @@ export function AddQuestion({ kinds, onAdd, disabled }: { kinds: readonly FieldK
           ref={(node) => node?.scrollIntoView({ block: "nearest" })}
           role="group"
           aria-label={t("builder.addQuestion.kinds", "Kind of question")}
-          className="grid grid-cols-2 gap-2 rounded-card border border-border bg-card p-2 sm:grid-cols-3">
+          className="grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-2 rounded-card border border-border bg-card p-2">
           {kinds.map((kind) => (
             <Button
               key={kind}
               variant="ghost"
-              className="justify-start"
+              className="h-auto min-h-10 justify-start whitespace-normal text-start"
               onClick={() => {
                 setOpen(false)
                 onAdd(kind)
@@ -164,6 +164,16 @@ export function BuilderCanvas({
   const kindLabel = useKindLabel()
   const groups = groupBySection(fields, sections.map((s) => s.key))
   const labelOf = (key: string) => pickText(fields.find((f) => f.field_key === key)?.label, currentLanguage) || key
+  // A rule stores the choice's value, which is written once. The reader gets its words.
+  const answerWords = (rule: FieldCondition): string => {
+    const controller = fields.find((f) => f.field_key === rule.field)
+    const words = (raw: string | number | boolean): string => {
+      if (controller?.field_type === "checkbox") return raw === true || raw === "true" ? t("responses.yes", "Yes") : t("responses.no", "No")
+      const option = controller?.options.find((o) => o.value === String(raw))
+      return (option && pickText(option.label, currentLanguage)) || String(raw)
+    }
+    return rule.equals !== undefined ? words(rule.equals) : (rule.in ?? []).map(words).join(", ")
+  }
   // A form with no questions still needs somewhere to add the first one.
   const shown = groups.length === 0 ? [{ key: null as string | null, items: [] }] : groups
 
@@ -282,7 +292,7 @@ export function BuilderCanvas({
                       <Badge variant="info">
                         {t("builder.pill.onlyIfQuestion", "Only if “{question}” is {answer}", {
                           question: labelOf(field.visible_when.field),
-                          answer: String(field.visible_when.equals ?? (field.visible_when.in ?? []).join(", ")),
+                          answer: answerWords(field.visible_when),
                         })}
                       </Badge>
                     )}

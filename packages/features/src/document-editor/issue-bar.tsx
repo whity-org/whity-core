@@ -81,22 +81,6 @@ export function IssueBar({
           </div>
         )}
 
-        {fields.map((field) => (
-          <label key={field.key} className="flex items-center gap-2 text-[0.8125rem]">
-            <span className="text-muted-foreground" dir="auto">
-              {field.label || field.key}
-            </span>
-            <input
-              id={`issue-field-${field.key}`}
-              dir="auto"
-              value={values[field.key] ?? ''}
-              placeholder={field.sample ?? ''}
-              onChange={(e) => onValue(field.key, e.target.value)}
-              className="h-7 w-44 min-w-0 rounded-md border border-input bg-card px-2.5 text-xs font-medium text-foreground outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
-            />
-          </label>
-        ))}
-
         <span className="min-w-0 flex-1" />
 
         {onEditCopy && (
@@ -108,6 +92,33 @@ export function IssueBar({
           {t('blockEditor.issue.submit', 'Issue')}
         </Button>
       </div>
+
+      {/* The template's own fields, empty until somebody types: an example is a
+          hint ("e.g. PO-0057"), never a value, so a document can't be issued with
+          a sample's numbers by looking filled in. Scrolls inside itself so a long
+          list doesn't push the document off the screen. */}
+      {fields.length > 0 && (
+        <div
+          className="grid max-h-40 grid-cols-[repeat(auto-fill,minmax(12rem,1fr))] gap-x-3 gap-y-2 overflow-y-auto py-1"
+          data-slot="issue-fields"
+        >
+          {fields.map((field) => (
+            <label key={field.key} className="grid gap-1 text-xs">
+              <span className="truncate text-muted-foreground" dir="auto">
+                {field.label || field.key}
+              </span>
+              <input
+                id={`issue-field-${field.key}`}
+                dir="auto"
+                value={values[field.key] ?? ''}
+                placeholder={field.sample ? t('blockEditor.issue.example', 'e.g. {sample}', { sample: field.sample }) : ''}
+                onChange={(e) => onValue(field.key, e.target.value)}
+                className="h-[var(--control-h-sm)] w-full min-w-0 rounded-md border border-input bg-card px-2.5 text-sm text-foreground outline-none placeholder:text-muted-foreground/60 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
+              />
+            </label>
+          ))}
+        </div>
+      )}
 
       {notice && <p className="m-0 text-[0.8125rem] text-muted-foreground">{notice}</p>}
 

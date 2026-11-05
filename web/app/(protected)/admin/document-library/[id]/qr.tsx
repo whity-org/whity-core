@@ -180,6 +180,7 @@ export function DocumentQrPanel({
 
   const [data, setData] = useState<DocumentQrPanelData | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [hidden, setHidden] = useState(false);
   const [actError, setActError] = useState<string | null>(null);
   const [busy, setBusy] = useState<'mint' | 'withdraw' | null>(null);
   const [pending, setPending] = useState<PendingAct>(null);
@@ -197,6 +198,12 @@ export function DocumentQrPanel({
 
   const read = useCallback(async (): Promise<DocumentQrPanelData | null> => {
     const response = await apiClient(`/api/v1/documents/${documentId}/qr`);
+    // A person a route reached can read the document without the permission this
+    // panel needs (WHIT-902). Nothing went wrong, so there is nothing to report.
+    if (response.status === 403) {
+      setHidden(true);
+      return null;
+    }
     if (!response.ok) {
       throw new Error(String(response.status));
     }
@@ -293,6 +300,8 @@ export function DocumentQrPanel({
     },
     [apiClient, documentId, read, t]
   );
+
+  if (hidden) return null;
 
   if (data === null) {
     return loadError !== null ? (

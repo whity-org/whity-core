@@ -501,12 +501,16 @@ final class CoreApiSchemas
             'requiredRole' => null,
             'requiredPermission' => null,
             'schema' => [
-                'summary' => 'Disable 2FA — clears the stored secret and invalidates all backup codes',
+                'summary' => 'Disable 2FA — needs a current code, backup code or password; clears the stored secret and invalidates all backup codes',
                 'tags' => ['auth'],
+                'request' => 'TwoFaProofRequest',
                 'responses' => [
                     200 => self::jsonResponse('2FA disabled', 'SimpleMessageResponse'),
+                    400 => self::errorResponse('2FA is not enabled'),
                     401 => self::errorResponse('Missing or invalid access token'),
+                    403 => self::errorResponse('Proof is missing or wrong; details.reason is proof_required or proof_invalid'),
                     404 => self::errorResponse('User/profile not found'),
+                    429 => self::errorResponse('Too many wrong proofs; details.reason is throttled'),
                     500 => self::errorResponse('Internal error'),
                 ],
             ],
@@ -519,13 +523,16 @@ final class CoreApiSchemas
             'requiredRole' => null,
             'requiredPermission' => null,
             'schema' => [
-                'summary' => 'Invalidate existing backup codes and generate 15 new ones',
+                'summary' => 'Invalidate existing backup codes and generate 15 new ones — needs a current code, backup code or password',
                 'tags' => ['auth'],
+                'request' => 'TwoFaProofRequest',
                 'responses' => [
                     200 => self::jsonResponse('15 new plaintext backup codes; old codes are invalidated', 'TwoFaRegenerateCodesResponse'),
                     400 => self::errorResponse('2FA is not enabled'),
                     401 => self::errorResponse('Missing or invalid access token'),
+                    403 => self::errorResponse('Proof is missing or wrong; details.reason is proof_required or proof_invalid'),
                     404 => self::errorResponse('User/profile not found'),
+                    429 => self::errorResponse('Too many wrong proofs; details.reason is throttled'),
                     500 => self::errorResponse('Internal error'),
                 ],
             ],
@@ -2003,6 +2010,17 @@ final class CoreApiSchemas
                     404 => self::errorResponse('Submission not found'),
                 ] + self::authErrors(),
             ]),
+            self::permissionRoute('GET', '/api/form-submissions/{id:\d+}/files/{fileId:\d+}', 'forms:read', [
+                'summary' => 'Download a file attached to a submission',
+                'description' => 'Always sent as an attachment with `nosniff`. Only a file attached to this '
+                    . 'submission, in this workspace, and named by one of its answers.',
+                'tags' => ['forms'],
+                'responses' => [
+                    200 => ['description' => 'The file, as an attachment', 'content' => ['application/octet-stream' => ['schema' => ['type' => 'string', 'format' => 'binary']]]],
+                    404 => self::errorResponse('File not found'),
+                    503 => self::errorResponse('The file could not be read from storage'),
+                ] + self::authErrors(),
+            ]),
             self::permissionRoute('GET', '/api/form-submissions/{id:\d+}/review', 'forms:read', [
                 'summary' => 'What the office recorded about a submission',
                 'description' => 'The current review, every earlier one, and the staff fields they answer. '
@@ -2047,6 +2065,58 @@ final class CoreApiSchemas
                     ],
                     'responses' => [
                         200 => self::jsonResponse('The caller\'s submissions', 'FormSubmissionListResponse'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'GET',
+                'path' => '/api/me/form-submissions/{id:\d+}',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'One of the caller\'s own submissions, with the questions they were asked',
+                    'description' => 'Only the caller\'s own: anybody else\'s is a 404. Staff questions and '
+                        . 'any answers to them are left out, because they have their own permission.',
+                    'tags' => ['forms'],
+                    'responses' => [
+                        200 => self::jsonResponse('The submission and its fields', 'FormSubmissionDetailResponse'),
+                        404 => self::errorResponse('Not one of the caller\'s submissions'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'GET',
+                'path' => '/api/me/form-submissions/{id:\d+}/files/{fileId:\d+}',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Download a file the caller attached to their own submission',
+                    'description' => 'Only the caller\'s own: anybody else\'s is a 404. Always sent as an '
+                        . 'attachment with `nosniff`.',
+                    'tags' => ['forms'],
+                    'responses' => [
+                        200 => ['description' => 'The file, as an attachment', 'content' => ['application/octet-stream' => ['schema' => ['type' => 'string', 'format' => 'binary']]]],
+                        404 => self::errorResponse('Not a file on one of the caller\'s submissions'),
+                        503 => self::errorResponse('The file could not be read from storage'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'POST',
+                'path' => '/api/me/form-submissions/{id:\d+}/withdraw',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Withdraw one of the caller\'s own submissions',
+                    'description' => 'Keeps the row and its answers, and withdraws the document it produced in '
+                        . 'the same transaction. Somebody else\'s submission is a 404. Refused with a 409 once '
+                        . 'a review is recorded or the route has finished (`details.reason` '
+                        . '`already_decided`), or if already withdrawn (`already_withdrawn`). There is no undo.',
+                    'tags' => ['forms'],
+                    'responses' => [
+                        200 => self::jsonResponse('The withdrawn submission', 'FormSubmissionWithdrawnResponse'),
+                        404 => self::errorResponse('Not one of the caller\'s submissions'),
+                        409 => self::errorResponse('Already decided or already withdrawn'),
                     ] + self::authErrors(),
                 ],
             ],
@@ -3244,6 +3314,22 @@ final class CoreApiSchemas
                     404 => self::errorResponse('Not found'),
                 ],
             ]),
+            self::permissionRoute('GET', '/api/plugins/trust-status', 'plugins:read', [
+                'summary' => 'Whether Verified can work here, and how fresh the signed revocation list is',
+                'tags' => ['platform-ops'],
+                'responses' => [
+                    200 => self::jsonResponse('Trust status', 'PluginTrustStatusResponse'),
+                ],
+            ]),
+            self::permissionRoute('POST', '/api/plugins/revocations', 'plugins:install', [
+                'summary' => 'Apply a signed revocation list (how an offline install keeps up)',
+                'tags' => ['platform-ops'],
+                'responses' => [
+                    200 => self::jsonResponse('Applied', 'PluginTrustStatusResponse'),
+                    403 => self::errorResponse('Not the platform operator'),
+                    422 => self::errorResponse('Refused'),
+                ],
+            ]),
             self::permissionRoute('GET', '/api/plugins/updates', 'plugins:read', [
                 'summary' => 'Newer store versions of installed plugins (empty outside the system tenant)',
                 'tags' => ['platform-ops'],
@@ -4408,6 +4494,13 @@ final class CoreApiSchemas
                 'message' => self::str(),
             ], ['backup_codes', 'message']),
 
+            // POST /api/auth/2fa/disable and /regenerate-codes — request body
+            // (TwoFactorHandler::refuseWithoutProof). One of the two is needed.
+            'TwoFaProofRequest' => self::object([
+                'code' => self::str(),
+                'password' => self::str(),
+            ], []),
+
             // POST /api/auth/2fa/regenerate-codes — 200 response
             'TwoFaRegenerateCodesResponse' => self::object([
                 'backup_codes' => ['type' => 'array', 'items' => self::str()],
@@ -4418,7 +4511,8 @@ final class CoreApiSchemas
             'TwoFaStatusResponse' => self::object([
                 'enabled' => self::bool(),
                 'backup_codes_available' => self::int(),
-            ], ['enabled', 'backup_codes_available']),
+                'password_available' => self::bool(),
+            ], ['enabled', 'backup_codes_available', 'password_available']),
 
             // ── SSO / federated identity (WC-e6287, WC-f3b17bd2; ADR 0009) ────
             // A tenant's configured OIDC provider. `client_secret` is WRITE-ONLY:
@@ -7941,7 +8035,8 @@ final class CoreApiSchemas
                     'not_routed' => self::int(),
                     'in_progress' => self::int(),
                     'completed' => self::int(),
-                ], ['not_routed', 'in_progress', 'completed']),
+                    'withdrawn' => self::int(),
+                ], ['not_routed', 'in_progress', 'completed', 'withdrawn']),
                 'questions' => ['type' => 'array', 'items' => self::object([
                     'field_key' => self::str(),
                     'field_type' => self::str(),
@@ -8013,6 +8108,8 @@ final class CoreApiSchemas
                 'document_id' => self::int(true),
                 'data' => ['type' => 'object', 'additionalProperties' => true],
                 'submitted_at' => self::str(),
+                // Null until its author takes it back. The row and answers stay.
+                'withdrawn_at' => self::str(true),
                 'created_at' => self::str(),
                 // Present only on the reads that join `forms`. Absent means "not
                 // fetched by this read", never "empty".
@@ -8025,10 +8122,18 @@ final class CoreApiSchemas
                     SchemaBuilder::ref('FormSubmission'),
                     self::object([
                         'fields' => ['type' => 'array', 'items' => SchemaBuilder::ref('FormField')],
+                        'files' => ['type' => 'array', 'items' => self::object([
+                            'id' => self::int(),
+                            'field_key' => self::str(),
+                            'content_type' => self::str(),
+                            'byte_size' => self::int(),
+                            'filename' => self::str(true),
+                        ], ['id', 'field_key', 'content_type', 'byte_size', 'filename'])],
                         'form_version_now' => self::int(true),
                     ], []),
                 ],
             ]),
+            'FormSubmissionWithdrawnResponse' => self::object(['data' => SchemaBuilder::ref('FormSubmission')], ['data']),
             'FormSubmissionCreateResponse' => self::object([
                 'data' => SchemaBuilder::ref('FormSubmission'),
                 'meta' => self::object([
@@ -9015,6 +9120,15 @@ final class CoreApiSchemas
             ], ['data']),
             'WorkspacePluginSwitchResponse' => self::object([
                 'data' => self::object(['plugin' => self::str(), 'enabled' => self::bool()], ['plugin', 'enabled']),
+            ], ['data']),
+            'PluginTrustStatusResponse' => self::object([
+                'data' => self::object([
+                    'keys' => self::int(),
+                    'sequence' => ['type' => 'integer', 'nullable' => true],
+                    'issued_at' => ['type' => 'integer', 'nullable' => true],
+                    'expires_at' => ['type' => 'integer', 'nullable' => true],
+                    'stale' => self::bool(),
+                ], ['keys', 'stale']),
             ], ['data']),
             'PluginRemovedResponse' => self::object([
                 'data' => ['type' => 'array', 'items' => self::object([
@@ -14349,10 +14463,11 @@ final class CoreApiSchemas
                 'plugin' => self::str() + ['description' => 'The plugin\'s name'],
                 'version_id' => self::int() + ['description' => 'The live version\'s id'],
                 'version' => self::str() + ['description' => 'The live version'],
+                'trust' => ['type' => 'string', 'enum' => ['verified', 'unverified'], 'description' => 'Verified only with a mark from a signature checked against a key pinned in core'],
                 'enabled' => self::bool() + ['description' => 'Whether the plugin is switched on'],
                 'automations_enabled' => self::bool() + ['description' => 'Whether its automations are switched on'],
                 'updated_at' => self::str(),
-            ], ['slug', 'plugin', 'version_id', 'version', 'enabled', 'automations_enabled']),
+            ], ['slug', 'plugin', 'version_id', 'version', 'trust', 'enabled', 'automations_enabled']),
             'WorkspacePluginListResponse' => self::listEnvelope('WorkspacePlugin'),
             'WorkspacePluginManifestRequest' => self::object(['manifest' => $manifest], ['manifest']),
             'PublishWorkspacePluginRequest' => self::object([

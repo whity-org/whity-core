@@ -1,9 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { NoAccess } from '@/components/no-access';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api/client';
 import { useCapabilities } from '@/hooks/useCapabilities';
+import { useAuth } from '@/lib/auth-context';
+import { SYSTEM_TENANT_ID } from '@/app/(protected)/admin/settings/settings-shared';
 import { useTranslation } from '@whity/features/i18n';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { PluginsTabs } from '@/components/plugins/plugins-tabs';
@@ -13,7 +16,7 @@ import { Button } from '@whity/ui/button';
 import { PluginTile } from '@whity/ui/plugin-card';
 import { SearchField } from '@whity/ui/search-field';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@whity/ui/select';
-import { AccessDeniedPanel, AreaError, EmptyFiltered, EmptyFirstTime } from '@whity/ui/page-states';
+import { AreaError, EmptyFiltered, EmptyFirstTime } from '@whity/ui/page-states';
 import { Skeleton } from '@whity/ui/skeleton';
 
 // Read access to the store matches the Installed tab (plugins:read). Install is
@@ -28,6 +31,8 @@ export default function PluginStorePage() {
   const usageLabel = useUsageLabel();
   const { hasPermission, loading: isCapabilitiesLoading } = useCapabilities();
   const hasAccess = hasPermission(PLUGINS_READ);
+  const { user } = useAuth();
+  const isOperator = user?.tenant_id === SYSTEM_TENANT_ID;
 
   const [allowedHosts, setAllowedHosts] = useState<string[]>([]);
   const [featureEnabled, setFeatureEnabled] = useState<boolean | null>(null);
@@ -116,13 +121,7 @@ export default function PluginStorePage() {
 
   if (!hasAccess) {
     return (
-      <AccessDeniedPanel
-        title={t('pluginStore.accessDenied.title', 'You cannot browse the plugin store')}
-        description={t(
-          'pluginStore.accessDenied',
-          'You do not have the required permission (`plugins:read`) to browse the Plugin Store.',
-        )}
-      />
+      <NoAccess area={t('access.area.pluginStore.accessDenied', 'the plugin store')} permission="plugins:read" />
     );
   }
 
@@ -130,7 +129,11 @@ export default function PluginStorePage() {
     <div className="mx-auto max-w-7xl space-y-6 px-4 pb-16 md:px-0">
       <AdminHeader
         title={t('plugins.title', 'Plugins')}
-        description={t('pluginStore.description', 'Browse a trusted store. A plugin installed here runs for every workspace on this deployment.')}
+        description={
+          isOperator
+            ? t('pluginStore.description', 'Browse a trusted store. A plugin installed here runs for every workspace on this deployment.')
+            : t('pluginStore.description.workspace', 'Browse a trusted store.')
+        }
       />
       <PluginsTabs />
 
@@ -144,10 +147,17 @@ export default function PluginStorePage() {
         <EmptyFirstTime
           icon="plugin"
           title={t('pluginStore.disabled.title', 'Plugin store disabled')}
-          description={t(
-            'pluginStore.disabled.description',
-            'Installing from a store is turned off on this instance. An operator can turn it on in Feature flags and add a trusted store in the global settings.',
-          )}
+          description={
+            isOperator
+              ? t(
+                  'pluginStore.disabled.description',
+                  'Installing from a store is turned off on this instance. It needs the plugin marketplace switched on in Feature flags and at least one trusted store added under Plugin store in the global settings.',
+                )
+              : t(
+                  'pluginStore.disabled.description.workspace',
+                  'Installing from a store is turned off on this instance. Ask the person who runs the platform to turn it on.',
+                )
+          }
         />
       ) : (
         <>

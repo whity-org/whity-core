@@ -282,8 +282,18 @@ class HttpKernel
                 // Create a closure that wraps the handler, passing params
                 $next = fn(Request $req) => $handler($req, $params);
 
+                $recordAccess = $matchedRoute['recordAccess'] ?? null;
+
                 // Pass through RBAC middleware (role + permission).
-                $response = $this->rbacMiddleware->handle($request, $next, $requiredRole, $requiredPermission);
+                $response = $this->rbacMiddleware->handle(
+                    $request,
+                    $next,
+                    $requiredRole,
+                    $requiredPermission,
+                    is_callable($recordAccess)
+                        ? static fn (int $profileId, int $tenantId): bool => $recordAccess($profileId, $tenantId, $params)
+                        : null,
+                );
             } else {
                 // Otherwise, call handler directly with params
                 $response = $handler($request, $params);

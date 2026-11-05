@@ -124,8 +124,27 @@ export interface SubmissionRow {
   form_name?: LocalizedMap | null
 }
 
+/** `GET /api/v1/me/form-drafts`: what somebody started and has not sent. */
+export interface FormDraftRow {
+  form_id: number
+  form_name: LocalizedMap | null
+  /** The step they were on, counted from 0. */
+  step: number | null
+  updated_at: string
+}
+
+/** A file somebody attached. Download it from the submission's `files/{id}` address. */
+export interface SubmissionFile {
+  id: number
+  field_key: string
+  content_type: string
+  byte_size: number
+  filename: string | null
+}
+
 export interface SubmissionDetail extends SubmissionRow {
   fields: FieldDraft[]
+  files?: SubmissionFile[]
   form_version_now: number | null
 }
 
@@ -143,4 +162,16 @@ export interface FormsScreenEnv {
   transport: Transport
   notify: (message: string, type: NotifyType, action?: { label: string; onClick: () => void }) => void
   navigate: (path: string) => void
+}
+
+/** `GET /api/v1/forms/{id}/responses/summary`: counts only, never free text. */
+export interface ResponsesSummary {
+  total: number
+  per_week: Array<{ week: string; count: number }>
+  routing: { not_routed: number; in_progress: number; completed: number; withdrawn?: number }
+  questions: Array<{
+    field_key: string
+    label: LocalizedMap
+    options: Array<{ value: string; label: LocalizedMap | null; count: number }>
+  }>
 }

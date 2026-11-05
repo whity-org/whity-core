@@ -1,6 +1,7 @@
 ﻿'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { NoAccess } from '@/components/no-access';
 import Link from 'next/link';
 import { api } from '@/lib/api/client';
 import type { components } from '@/lib/api/schema';
@@ -21,7 +22,7 @@ import { Badge } from '@whity/ui/badge';
 import { DataTable, type DataTableColumn } from '@whity/ui/data-table';
 import { ConfirmAction } from '@whity/ui/confirm-action';
 import { TechnicalDetails } from '@whity/ui/display-preferences';
-import { AccessDeniedPanel, AreaError, EmptyFirstTime, LoadingRows, ReadOnlyNotice } from '@whity/ui/page-states';
+import { AreaError, EmptyFirstTime, LoadingRows, ReadOnlyNotice } from '@whity/ui/page-states';
 import { Skeleton } from '@whity/ui/skeleton';
 import {
   Dialog,
@@ -144,6 +145,10 @@ export default function PluginsPage() {
     refetchWorkspacePlugins();
     void refreshNavigation();
   };
+  const { data: trustStatus } = useFetch(async () => {
+    const { data: responseData } = await api.GET('/api/v1/plugins/trust-status');
+    return responseData?.data ?? null;
+  }, []);
   const [updateTarget, setUpdateTarget] = useState<PluginUpdateTarget | null>(null);
   const waitingUpdates = plugins.filter((plugin) => plugin.install?.update_waiting);
   const availableUpdateFor = (plugin: PluginEntry) =>
@@ -193,14 +198,7 @@ export default function PluginsPage() {
   // RBAC gate: Access Denied if user lacks plugins:read
   if (!hasAccess) {
     return (
-      <AccessDeniedPanel
-        title={t('plugins.accessDenied.title', 'You cannot manage plugins')}
-        description={t(
-          'plugins.accessDenied',
-          'You do not have the required permissions (`plugins:read`) to access the Plugin ' +
-            'Management Console.'
-        )}
-      />
+      <NoAccess area={t('access.area.plugins.accessDenied', 'plugins')} permission="plugins:read" />
     );
   }
 
@@ -616,6 +614,16 @@ export default function PluginsPage() {
       />
       <PluginsTabs />
 
+      {isOperator && trustStatus && trustStatus.keys > 0 && trustStatus.stale ? (
+        <div role="status" className="flex items-center gap-2 rounded-card border border-warning/30 bg-warning-tint p-4 text-sm text-warning-text">
+          <IconAlertTriangle size={16} className="shrink-0" />
+          {t(
+            'plugins.trust.stale',
+            'The list of withdrawn plugins is out of date. Verified plugins keep running, and no new ones can start until it is updated.',
+          )}
+        </div>
+      ) : null}
+
       {data && !isOperator ? (
         <ReadOnlyNotice title={t('plugins.readOnly', 'Code plugins run for every workspace on this deployment, so the platform operator manages them.')} />
       ) : null}
@@ -705,6 +713,9 @@ export default function PluginsPage() {
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="font-medium text-foreground">{entry.plugin}</p>
                   <span className="text-muted-foreground">{entry.version}</span>
+                  <Badge variant={entry.trust === 'verified' ? 'default' : 'outline'}>
+                    {entry.trust === 'verified' ? t('pluginStore.verified', 'Verified') : t('pluginStore.notVerified', 'Not verified')}
+                  </Badge>
                   <Badge variant={entry.enabled ? 'success' : 'secondary'}>
                     {entry.enabled ? t('plugins.state.active', 'Active') : t('plugins.state.off', 'Turned off')}
                   </Badge>

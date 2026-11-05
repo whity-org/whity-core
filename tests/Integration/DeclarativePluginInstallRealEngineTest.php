@@ -16,6 +16,8 @@ use Whity\Core\Plugin\Tenant\RecordWriter;
 use Whity\Core\Plugin\Tenant\TenantManifestPublisher;
 use Whity\Core\Plugin\Tenant\TenantPluginRepository;
 use Whity\Core\Plugin\Tenant\TenantRecordRepository;
+use Whity\Core\Plugin\Trust\PluginTrust;
+use Whity\Core\Plugin\Trust\TrustedKeys;
 use Whity\Core\PluginRoleSeeder;
 use Whity\Core\RBAC\PermissionRegistry;
 use Whity\Core\Request;
@@ -43,6 +45,7 @@ final class DeclarativePluginInstallRealEngineTest extends TestCase
     private TenantPluginVersionsApiHandler $versions;
     private InstallFromStoreApiHandler $store;
     private ?string $served = null;
+    private ?string $attestation = null;
 
     protected function setUp(): void
     {
@@ -87,6 +90,138 @@ final class DeclarativePluginInstallRealEngineTest extends TestCase
     protected function tearDown(): void
     {
         TenantContext::reset();
+    }
+
+    public function testWithNoPinnedKeyAnAttestationChangesNothing(): void
+    {
+        [$store] = $this->storeWithTrust(TrustedKeys::pinned());
+        $this->served = (string) json_encode($this->manifest());
+        $this->attestation = '{"key":"x","payload":"e30=","signature":"AA=="}';
+
+        $response = $store->installDeclarative($this->request());
+
+        self::assertFalse(json_decode($response->getBody(), true)['data']['enabled']);
+        self::assertSame([], $this->plugins->active(self::BAKERY));
+    }
+
+    public function testAValidAttestationActivatesOnInstallAndShowsVerified(): void
+    {
+        [$store, $trust, $sign] = $this->storeWithTrust();
+        $this->served = (string) json_encode($this->manifest());
+        $trust->applyRevocationList($sign(PluginTrust::REVOCATIONS, ['sequence' => 1, 'issued_at' => time(), 'expires_at' => time() + 86400, 'revoked' => []]));
+        $this->attestation = $sign(PluginTrust::ATTESTATION, [
+            'plugin' => 'CakeOrders',
+            'version' => '1.0.0',
+            'sha256' => hash('sha256', $this->served),
+            'issued_at' => time(),
+            'expires_at' => time() + 86400,
+        ]);
+
+        $response = $store->installDeclarative($this->request());
+
+        self::assertTrue(json_decode($response->getBody(), true)['data']['enabled'], $response->getBody());
+        self::assertCount(1, $this->plugins->active(self::BAKERY));
+
+        $versions = $this->versionsWith($trust);
+        self::assertSame('verified', json_decode($versions->list(new Request('GET', '/x'))->getBody(), true)['data'][0]['trust']);
+    }
+
+    public function testAnAttestationForOtherBytesLeavesItOff(): void
+    {
+        [$store, $trust, $sign] = $this->storeWithTrust();
+        $this->served = (string) json_encode($this->manifest());
+        $trust->applyRevocationList($sign(PluginTrust::REVOCATIONS, ['sequence' => 1, 'issued_at' => time(), 'expires_at' => time() + 86400, 'revoked' => []]));
+        $this->attestation = $sign(PluginTrust::ATTESTATION, [
+            'plugin' => 'CakeOrders',
+            'version' => '1.0.0',
+            'sha256' => hash('sha256', 'what was really reviewed'),
+            'issued_at' => time(),
+            'expires_at' => time() + 86400,
+        ]);
+
+        $response = $store->installDeclarative($this->request());
+
+        self::assertFalse(json_decode($response->getBody(), true)['data']['enabled']);
+        self::assertSame([], $this->plugins->active(self::BAKERY));
+        self::assertSame('unverified', json_decode($this->versionsWith($trust)->list(new Request('GET', '/x'))->getBody(), true)['data'][0]['trust']);
+    }
+
+    public function testAKilledVersionCannotBeTurnedBackOn(): void
+    {
+        [$store, $trust, $sign] = $this->storeWithTrust();
+        $this->install($this->manifest());
+        $trust->applyRevocationList($sign(PluginTrust::REVOCATIONS, [
+            'sequence' => 1,
+            'issued_at' => time(),
+            'expires_at' => time() + 86400,
+            'revoked' => [['plugin' => 'CakeOrders', 'version' => '1.0.0', 'action' => 'kill']],
+        ]));
+
+        $response = $this->versionsWith($trust)->enable(new Request('POST', '/x'), ['plugin' => 'cakeorders']);
+
+        self::assertSame(409, $response->getStatusCode());
+        self::assertSame([], $this->plugins->active(self::BAKERY));
+    }
+
+    public function testAWorkspaceCannotImportARevocationList(): void
+    {
+        [$store] = $this->storeWithTrust();
+
+        $response = $store->importRevocations(new Request('POST', '/x', [], '{}'));
+
+        self::assertSame(403, $response->getStatusCode());
+    }
+
+    /** @return array{0: InstallFromStoreApiHandler, 1: PluginTrust, 2: \Closure(string, array<string, mixed>): string} */
+    private function storeWithTrust(?TrustedKeys $keys = null): array
+    {
+        $pair = sodium_crypto_sign_keypair();
+        $secret = sodium_crypto_sign_secretkey($pair);
+        $public = base64_encode(sodium_crypto_sign_publickey($pair));
+        $trust = new PluginTrust($this->pdo, $keys ?? new TrustedKeys([$public]));
+
+        $settings = new SettingsService(new GlobalSettingsRepository($this->pdo), new TenantSettingsRepository($this->pdo));
+        $store = new InstallFromStoreApiHandler(
+            sys_get_temp_dir(),
+            $settings,
+            null,
+            null,
+            fn (string $url, array $headers): ?string => str_ends_with($url, '/attestation') ? $this->attestation : $this->served,
+            static fn (string $url): array => ['data' => []],
+            null,
+            new TenantManifestPublisher($this->pdo, $this->plugins, new PluginRoleSeeder($this->pdo), []),
+            $this->plugins,
+            $trust,
+        );
+        $sign = static function (string $format, array $body) use ($secret, $public): string {
+            $payload = (string) json_encode(['format' => $format] + $body);
+
+            return (string) json_encode([
+                'key' => $public,
+                'payload' => base64_encode($payload),
+                'signature' => base64_encode(sodium_crypto_sign_detached($format . "\n" . $payload, $secret)),
+            ]);
+        };
+
+        return [$store, $trust, $sign];
+    }
+
+    private function versionsWith(PluginTrust $trust): TenantPluginVersionsApiHandler
+    {
+        $records = new TenantRecordRepository($this->pdo);
+
+        return new TenantPluginVersionsApiHandler(
+            $this->plugins,
+            new TenantManifestPublisher($this->pdo, $this->plugins, new PluginRoleSeeder($this->pdo), []),
+            new ManifestImpact($records),
+            new ManifestTestRunner(
+                $this->pdo,
+                $records,
+                new RecordWriter($this->pdo, $records, new RoleChecker(Database::withFactory(fn (): PDO => $this->pdo), new PermissionRegistry()))
+            ),
+            null,
+            $trust,
+        );
     }
 
     public function testItLandsTurnedOffAndServesNothingUntilTurnedOn(): void

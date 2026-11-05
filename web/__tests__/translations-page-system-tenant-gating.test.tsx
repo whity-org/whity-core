@@ -68,7 +68,7 @@ describe('TranslationsPage write-access column gating (WC-583)', () => {
 
     render(<TranslationsPage />);
 
-    expect(await screen.findByText('Access Denied')).toBeInTheDocument();
+    expect(await screen.findByText('You don’t have access to translations')).toBeInTheDocument();
   });
 
   it('marks the SYSTEM DEFAULT column editable for the system tenant, and the override read-only', async () => {

@@ -30,5 +30,5 @@ interface HttpClient
      * @param array<string, string> $params
      * @return array<string, mixed>|null Decoded object, or null on failure.
      */
-    public function postForm(string $url, array $params): ?array;
+    public function postForm(string $url, #[\SensitiveParameter] array $params): ?array;
 }

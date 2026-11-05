@@ -351,11 +351,11 @@ final class DocumentSourcesApiHandler
                 return Response::error('Changing how documents are numbered requires documents:publish', 403);
             }
             if ($body['numbering'] !== null) {
-                try {
-                    $numbering = DocumentNumberingRule::fromArray($body['numbering'])->toArray();
-                } catch (\InvalidArgumentException $e) {
-                    return Response::error($e->getMessage(), 422);
+                $problem = DocumentNumberingRule::problem($body['numbering']);
+                if ($problem !== null) {
+                    return Response::error($problem, 422);
                 }
+                $numbering = DocumentNumberingRule::fromArray($body['numbering'])->toArray();
             }
         }
         if ($fields === [] && !$hasNumbering) {

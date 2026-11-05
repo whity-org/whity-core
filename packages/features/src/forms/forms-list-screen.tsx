@@ -309,6 +309,7 @@ function NewFormDialog({ env, existingKeys, onClose }: { env: FormsScreenEnv; ex
   const typed = Object.values(name).some((value) => (value ?? "").trim() !== "")
 
   async function create() {
+    if (!typed || saving) return
     setSaving(true)
     setError(null)
     const base = name.en?.trim() || name.ar?.trim() || ""
@@ -327,23 +328,31 @@ function NewFormDialog({ env, existingKeys, onClose }: { env: FormsScreenEnv; ex
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{t("builder.new", "New form")}</DialogTitle>
-          <DialogDescription>{t("builder.new.body", "Name the form. You add the questions next.")}</DialogDescription>
-        </DialogHeader>
-        <BilingualField
-          id="new-form-name"
-          label={t("builder.new.name", "Form name")}
-          value={name}
-          onChange={setName}
-        />
-        {error !== null && <p role="alert" className="text-sm text-destructive">{error}</p>}
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>{t("builder.cancel", "Cancel")}</Button>
-          <Button disabled={!typed || saving} onClick={() => void create()}>
-            {t("builder.new.create", "Create form")}
-          </Button>
-        </DialogFooter>
+        <form
+          className="grid gap-4"
+          onSubmit={(event) => {
+            event.preventDefault()
+            void create()
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle>{t("builder.new", "New form")}</DialogTitle>
+            <DialogDescription>{t("builder.new.body", "Name the form. You add the questions next.")}</DialogDescription>
+          </DialogHeader>
+          <BilingualField
+            id="new-form-name"
+            label={t("builder.new.name", "Form name")}
+            value={name}
+            onChange={setName}
+          />
+          {error !== null && <p role="alert" className="text-sm text-destructive">{error}</p>}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose}>{t("builder.cancel", "Cancel")}</Button>
+            <Button type="submit" disabled={!typed || saving}>
+              {t("builder.new.create", "Create form")}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   )

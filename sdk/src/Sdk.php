@@ -944,6 +944,16 @@ namespace Whity\Sdk;
  *
  * Purely additive.)
  *
+ * 1.64 (PLUGIN AGENTS: the optional {@see PluginAgentsInterface} lets a plugin
+ * declare or customize agents under its own toolset root: a persona in English
+ * and Arabic, toolsets, where a person's grant starts, and the host feature
+ * flags it turns on ({@see Manifest\AgentFeatures}). Checked by
+ * {@see Manifest\AgentDeclarationValidator}, which refuses another plugin's or
+ * core's agent, a write at Allowed, and an unknown feature. Re-declaring a key
+ * with a higher version customizes it.
+ *
+ * Purely additive.)
+ *
  * 1.65 (DOCUMENT NUMBERS: {@see Documents\DocumentNumberingRule} says when a document
  * is numbered and what the number looks like. {@see Documents\TemplateSlot} and a
  * manifest slot's `numbering` declare one, {@see Documents\IssueResult} returns the

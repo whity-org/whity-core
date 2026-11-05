@@ -28,6 +28,21 @@ async function mailBackendLive(baseURL: string): Promise<boolean> {
 test.describe('Email settings — UI behaviour + gating (system-tenant operator)', () => {
   test.use({ storageState: systemStatePath });
 
+  test('choosing OAuth swaps the password for the OAuth fields and a status', async ({ page }) => {
+    await page.goto('/admin/settings/email');
+    await chooseOption(page, page.locator('#email-mail-transport'), 'SMTP');
+    await expect(page.getByTestId('email-password-field')).toBeVisible();
+    await expect(page.getByTestId('email-oauth-fields')).toHaveCount(0);
+
+    await chooseOption(page, page.locator('#email-mail-smtp-auth_mode'), 'OAuth');
+    await expect(page.getByTestId('email-password-field')).toHaveCount(0);
+    await expect(page.getByTestId('email-oauth-state')).toBeVisible();
+    await expect(page.getByTestId('email-oauth-save')).toBeDisabled();
+
+    await chooseOption(page, page.locator('#email-mail-oauth-provider'), 'Microsoft');
+    await expect(page.locator('#email-mail-oauth-microsoft_tenant')).toBeVisible();
+  });
+
   test('renders and reveals SMTP fields conditionally by transport', async ({ page }) => {
     await page.goto('/admin/settings/email');
     await expect(page.getByRole('heading', { name: 'Email', exact: true })).toBeVisible();

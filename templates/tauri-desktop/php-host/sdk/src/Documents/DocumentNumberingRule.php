@@ -72,6 +72,18 @@ final class DocumentNumberingRule
         return new self(trim($pattern), $assign);
     }
 
+    /** Why a manifest's or a request's `{pattern, assign?}` can't be used, or null when it can. */
+    public static function problem(mixed $value): ?string
+    {
+        try {
+            self::fromArray($value);
+        } catch (\InvalidArgumentException $e) {
+            return $e->getMessage();
+        }
+
+        return null;
+    }
+
     /** Why a pattern can't be used, or null when it can. */
     public static function patternProblem(string $pattern): ?string
     {

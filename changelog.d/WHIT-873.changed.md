@@ -1,1 +1,0 @@
-- **The Email domains page and tab follow `email_domains:manage`** instead of a role named admin, so a renamed administrative role still sees them.

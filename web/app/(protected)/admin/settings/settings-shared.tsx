@@ -287,6 +287,20 @@ export function fieldMeta(t: TranslateFn): Record<string, FieldMeta> {
         'Master switch for federated sign-in. When off, every configured identity provider is disabled instance-wide.'
       ),
     },
+    'auth.self_2fa_recovery_enabled': {
+      label: t('settings.meta.auth.self_2fa_recovery_enabled.label', 'Self-service two-step recovery'),
+      help: t(
+        'settings.meta.auth.self_2fa_recovery_enabled.help',
+        'Let people who lost their two-step device ask to get back in themselves. Requests still go through the approval gate.'
+      ),
+    },
+    'auth.sso_self_provision_workspace': {
+      label: t('settings.meta.auth.sso_self_provision_workspace.label', 'Workspace on first single sign-on'),
+      help: t(
+        'settings.meta.auth.sso_self_provision_workspace.help',
+        'Give a person who signs in through an operator identity provider, and belongs to no workspace, a new workspace of their own.'
+      ),
+    },
     'storage.driver': {
       label: t('settings.meta.storage.driver.label', 'Storage driver'),
       help: t(
@@ -341,6 +355,31 @@ export function fieldMeta(t: TranslateFn): Record<string, FieldMeta> {
         'Optional — leave blank for unauthenticated relays.'
       ),
     },
+    'mail.smtp.auth_mode': {
+      label: t('settings.meta.mail.smtp.auth_mode.label', 'How to sign in'),
+      help: t(
+        'settings.meta.mail.smtp.auth_mode.help',
+        'Google and Microsoft mailboxes usually need OAuth. Other mail servers usually use a password.'
+      ),
+    },
+    'mail.oauth.provider': {
+      label: t('settings.meta.mail.oauth.provider.label', 'Provider'),
+      help: t('settings.meta.mail.oauth.provider.help', 'Who runs this mailbox.'),
+    },
+    'mail.oauth.client_id': {
+      label: t('settings.meta.mail.oauth.client_id.label', 'Client ID'),
+      help: t(
+        'settings.meta.mail.oauth.client_id.help',
+        "From the app you registered with the provider."
+      ),
+    },
+    'mail.oauth.microsoft_tenant': {
+      label: t('settings.meta.mail.oauth.microsoft_tenant.label', 'Microsoft directory'),
+      help: t(
+        'settings.meta.mail.oauth.microsoft_tenant.help',
+        'Your directory ID. Use common if your app accepts accounts from any directory.'
+      ),
+    },
     'mail.from_address': {
       label: t('settings.meta.mail.from_address.label', 'From address'),
       help: t(
@@ -381,6 +420,13 @@ export function fieldMeta(t: TranslateFn): Record<string, FieldMeta> {
       help: t(
         'settings.meta.i18n.enabled.help',
         'Let people choose the language the interface is shown in, and mirror it for right-to-left languages. Off means everyone sees the default language, left-to-right, with no language control anywhere — stored preferences and translations are kept, so turning it back on restores them.'
+      ),
+    },
+    'plugins.store_allowed_hosts': {
+      label: t('settings.meta.plugins.store_allowed_hosts.label', 'Trusted plugin stores'),
+      help: t(
+        'settings.meta.plugins.store_allowed_hosts.help',
+        'The addresses of the stores people may install plugins from, separated by commas, for example store.example.com. Only secure (https) stores on the public internet are accepted when a plugin is installed. Leave this empty to keep the plugin store off.'
       ),
     },
     'plugins.store_enabled': {
@@ -461,6 +507,15 @@ export function settingsSections(t: TranslateFn): readonly SectionDef[] {
         'Machine-facing endpoints and connected tooling.'
       ),
       keys: ['mcp.enabled'],
+    },
+    {
+      id: 'plugin-store',
+      title: t('settings.section.pluginStore.title', 'Plugin store'),
+      description: t(
+        'settings.section.pluginStore.description',
+        'Which stores plugins can be installed from. The plugin marketplace switch is in Feature flags.'
+      ),
+      keys: ['plugins.store_allowed_hosts'],
     },
     {
       id: 'storage',
@@ -793,6 +848,8 @@ interface SettingsFieldProps {
   onChange: (value: string) => void;
   /** Optional inherited/overridden indicator (tenant form only). */
   status?: 'overridden' | 'inherited';
+  /** How an enum option reads, for a screen that translates its own choices. */
+  optionLabel?: (option: string) => string;
 }
 
 /**
@@ -855,6 +912,8 @@ interface RegistrySettingControlProps {
   /** A per-field validation message (e.g. from a 422), shown under the control. */
   error?: string;
   status?: 'overridden' | 'inherited';
+  /** How an enum option reads, for a screen that translates its own choices. */
+  optionLabel?: (option: string) => string;
   onChange: (value: string) => void;
 }
 
@@ -872,6 +931,7 @@ export function RegistrySettingControl({
   disabled = false,
   error,
   status,
+  optionLabel = enumOptionLabel,
   onChange,
 }: RegistrySettingControlProps) {
   const t = useTranslation('admin');
@@ -999,7 +1059,7 @@ export function RegistrySettingControl({
           invalid={Boolean(error)}
           describedBy={describedBy}
           onChange={onChange}
-          options={entry.options.map((option) => ({ value: option, label: enumOptionLabel(option) }))}
+          options={entry.options.map((option) => ({ value: option, label: optionLabel(option) }))}
         />
       ) : (
         <Input

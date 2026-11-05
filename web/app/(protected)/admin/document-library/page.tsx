@@ -1,6 +1,9 @@
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
+import { NoAccess } from '@/components/no-access';
+import { ForbiddenError, throwUnlessOk } from '@/lib/forbidden';
+import { TechnicalDetails } from '@whity/ui/display-preferences';
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/lib/toast-context';
 import { useFetch } from '@/hooks/useFetch';
@@ -11,6 +14,7 @@ import { Badge } from '@whity/ui/badge';
 import { Button } from '@whity/ui/button';
 import { IconFilePlus } from '@tabler/icons-react';
 import { useTranslation } from '@whity/features/i18n';
+import { formNameFrom } from '@/lib/documents/template-name';
 import { useDateDisplay } from '@whity/features/datetime';
 import { useRouter } from 'next/navigation';
 import { useCapabilities } from '@/hooks/useCapabilities';
@@ -210,9 +214,7 @@ export default function DocumentLibraryPage() {
 
   const views = useFetch<DocumentViewsResponse>(async () => {
     const response = await apiClient('/api/v1/documents/views');
-    if (!response.ok) {
-      throw new Error(t('organizer.error.views', 'Failed to load the document folders'));
-    }
+    throwUnlessOk(response, t('organizer.error.views', 'Failed to load the document folders'));
     return (await response.json()) as DocumentViewsResponse;
   }, [apiClient]);
 
@@ -319,6 +321,7 @@ export default function DocumentLibraryPage() {
     }
 
     const response = await apiClient(`/api/v1/documents?${params.toString()}`);
+    if (response.status === 403) throw new ForbiddenError();
     if (!response.ok) {
       // A 422 carries the server's own reason — "you do not belong to an
       // organizational unit" — and surfacing it verbatim is the point: a
@@ -576,7 +579,7 @@ export default function DocumentLibraryPage() {
             <div className="min-w-0">
               <DocumentTitle row={row} />
               <span dir="auto" className="block truncate text-sm text-muted-foreground">
-                {row.template_name}
+                {(formNameFrom(row.template_name) !== null ? t('organizer.template.fromForm', 'Form: {name}', { name: formNameFrom(row.template_name) ?? '' }) : row.template_name)}
                 {(row.withdrawn_at ?? null) !== null && (
                   <Badge variant="destructive" className="ms-2" data-testid="library-withdrawn">
                     {t('organizer.table.withdrawn', 'Withdrawn')}
@@ -647,7 +650,7 @@ export default function DocumentLibraryPage() {
         title={t('organizer.title', 'Documents')}
         description={t(
           'organizer.description',
-          'Every folder here is a query over what documents record — nothing stores where a document lives. Collections are your own.'
+          'Every folder here is a saved search over your documents. Collections are your own; adding a document to one does not move it.'
         )}
         action={
           // Gated on `documents:issue`, the capability the create route
@@ -674,12 +677,17 @@ export default function DocumentLibraryPage() {
         onChoose={(template) => router.push(issueHref(template.id))}
       />
 
-      {views.error && (
-        <p className="mb-4 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
-          {views.error}
-        </p>
+      {views.forbidden || documents.forbidden ? (
+        <NoAccess area={t('organizer.area', 'documents')} permission="documents:read" />
+      ) : (
+        views.error && (
+          <p className="mb-4 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+            {views.error}
+          </p>
+        )
       )}
 
+      {!(views.forbidden || documents.forbidden) && (
       <div className="flex gap-8">
         <ViewRail
           views={views.data?.data ?? []}
@@ -749,10 +757,11 @@ export default function DocumentLibraryPage() {
 
           {ous.error && (
             <p className="mb-3 text-sm text-muted-foreground">
-              {t(
-                'organizer.ous.unavailable',
-                'Unit names could not be loaded, so units are shown by id. Listing units needs the ous:read permission.'
-              )}
+              {t('organizer.ous.unavailable', 'Unit names could not be loaded, so they are not shown.')}
+              <TechnicalDetails>
+                {' '}
+                {t('organizer.ous.permission', 'Listing units needs the ous:read permission.')}
+              </TechnicalDetails>
             </p>
           )}
 
@@ -820,6 +829,7 @@ export default function DocumentLibraryPage() {
           )}
         </div>
       </div>
+      )}
 
       <CreateCollectionDialog
         open={creatingCollection}

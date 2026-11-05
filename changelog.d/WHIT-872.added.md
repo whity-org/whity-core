@@ -1,1 +1,0 @@
-- **One list of what is waiting for you.** `GET /api/me/waiting` merges every inbox source and your agent proposals, oldest first, with the real totals. A source that fails is named and the rest is still served (WHIT-872).

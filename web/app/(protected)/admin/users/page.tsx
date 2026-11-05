@@ -1,6 +1,8 @@
 'use client';
 
 import { useCallback, useState } from 'react';
+import { LoadProblem } from '@/components/load-problem';
+import { throwUnlessOk } from '@/lib/forbidden';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api-client';
 import { api } from '@/lib/api/client';
@@ -29,7 +31,6 @@ import {
 import { Avatar } from '@whity/ui/avatar';
 import { roleLabel } from '@whity/features/roles';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@whity/ui/tabs';
-import { AreaError } from '@whity/ui/page-states';
 import { ConfirmAction } from '@whity/ui/confirm-action';
 import { ToggleGroup } from '@whity/ui/toggle-group';
 import { IconMenu2, IconPlus } from '@tabler/icons-react';
@@ -81,7 +82,11 @@ export default function UsersPage() {
   const [statusFilter, setStatusFilter] = useState('active');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   // The role chosen in the bulk bar, waiting on the confirmation that names it.
+  // Kept after the dialog closes, along with the count, so it does not read
+  // "Change the 0 selected to ?" while it fades out.
   const [bulkRole, setBulkRole] = useState<{ id: number; name: string } | null>(null);
+  const [isBulkRoleOpen, setIsBulkRoleOpen] = useState(false);
+  const [bulkCount, setBulkCount] = useState(0);
   const [isBulkTwoStepOpen, setIsBulkTwoStepOpen] = useState(false);
 
   /**
@@ -143,11 +148,9 @@ export default function UsersPage() {
   // safe to call after a create/edit/delete: `refetch` re-runs THIS closure, so
   // the refetch carries the page, sort and term the operator was looking at
   // rather than dropping them back to an unfiltered page 1.
-  const { data, loading, error, refetch: fetchUsers } = useFetch(async () => {
+  const { data, loading, error, forbidden, refetch: fetchUsers } = useFetch(async () => {
     const response = await apiClient(`/api/v1/users?${queryString}`);
-    if (!response.ok) {
-      throw new Error(t('users.error.load', 'Failed to fetch users'));
-    }
+    throwUnlessOk(response, t('users.error.load', 'Failed to fetch users'));
     const body: UsersResponse = await response.json();
     const rows = body.data ?? [];
     return {
@@ -411,7 +414,7 @@ export default function UsersPage() {
         title={t('users.title', 'Users')}
         description={t('users.description', 'The people in your workspace, and what each of them may do.')}
         action={
-          canCreate ? (
+          canCreate && !forbidden ? (
             <div className="flex items-center gap-2">
               <Button
                 onClick={() => {
@@ -452,10 +455,11 @@ export default function UsersPage() {
 
         <TabsContent value="people" className="mt-6">
           {firstLoadFailed ? (
-            <AreaError
+            <LoadProblem
+              forbidden={forbidden}
               message={error}
-              retryLabel={t('users.tryAgain', 'Try again')}
               onRetry={() => fetchUsers()}
+              area={t('users.area', 'the people in this workspace')}
             />
           ) : (
             <div className="space-y-4">
@@ -529,7 +533,11 @@ export default function UsersPage() {
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" className="max-h-80 overflow-y-auto">
                                 {(roleOptions.data ?? []).map((role) => (
-                                  <DropdownMenuItem key={role.id} onClick={() => setBulkRole(role)}>
+                                  <DropdownMenuItem key={role.id} onClick={() => {
+                                    setBulkRole(role);
+                                    setBulkCount(targets.length);
+                                    setIsBulkRoleOpen(true);
+                                  }}>
                                     {roleLabel(role.name)}
                                   </DropdownMenuItem>
                                 ))}
@@ -537,7 +545,10 @@ export default function UsersPage() {
                             </DropdownMenu>
                           )}
                           {canRequireTwoStep && (
-                            <Button variant="outline" size="sm" data-testid="users-bulk-two-step" onClick={() => setIsBulkTwoStepOpen(true)}>
+                            <Button variant="outline" size="sm" data-testid="users-bulk-two-step" onClick={() => {
+                              setBulkCount(targets.length);
+                              setIsBulkTwoStepOpen(true);
+                            }}>
                               {t('users.bulk.twoStep', 'Require two-step')}
                             </Button>
                           )}
@@ -600,15 +611,17 @@ export default function UsersPage() {
 
       {/* Hard to undo in one step, so it asks and says how many it reaches (tier 2). */}
       <ConfirmAction
-        open={bulkRole !== null}
-        onOpenChange={(open) => {
-          if (!open) setBulkRole(null);
-        }}
+        open={isBulkRoleOpen}
+        onOpenChange={setIsBulkRoleOpen}
         variant="default"
-        title={t('users.bulk.role.ask', 'Change the {count} selected to {role}?', {
-          count: targets.length,
-          role: roleLabel(bulkRole?.name ?? ''),
-        })}
+        title={
+          bulkCount === 1
+            ? t('users.bulk.role.askOne', 'Change this person to {role}?', { role: roleLabel(bulkRole?.name ?? '') })
+            : t('users.bulk.role.ask', 'Change the {count} selected to {role}?', {
+                count: bulkCount,
+                role: roleLabel(bulkRole?.name ?? ''),
+              })
+        }
         description={t(
           'users.bulk.role.description',
           'They lose what their current role gives them straight away. If any of them cannot be changed, nobody is.'
@@ -624,7 +637,11 @@ export default function UsersPage() {
         open={isBulkTwoStepOpen}
         onOpenChange={setIsBulkTwoStepOpen}
         variant="default"
-        title={t('users.bulk.twoStep.title', 'Require two-step of the {count} selected?', { count: targets.length })}
+        title={
+          bulkCount === 1
+            ? t('users.bulk.twoStep.titleOne', 'Require two-step of this person?')
+            : t('users.bulk.twoStep.title', 'Require two-step of the {count} selected?', { count: bulkCount })
+        }
         description={t(
           'users.bulk.twoStep.description',
           'Anyone without it has to set it up the next time they sign in. They stay signed in until then.'

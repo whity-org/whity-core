@@ -376,7 +376,9 @@ export function DocumentRoutingPanel({ documentId, documentTitle, withdrawn = fa
     if (!response.ok) throw new Error('names');
     const body = (await response.json()) as { data?: Record<string, string> };
     return new Map(Object.entries(body.data ?? {}).map(([id, name]) => [Number(id), name]));
-  }, [apiClient, documentId]);
+    // Re-read after anything changes who is on the route, or a person just sent
+    // the document to shows as a former member until the page is reloaded.
+  }, [apiClient, documentId, version]);
 
   const roleNames = useMemo(() => {
     const map = new Map<number, string>();
