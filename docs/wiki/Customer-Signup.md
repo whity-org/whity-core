@@ -36,6 +36,12 @@ Each membership has a **kind**: `member` (staff) or `customer`. When every activ
 
 Profiles stay global (ADR 0005). The same email can be a customer in one workspace and staff in another. A person who already has an account, including one who signs in with Whity ID, joins with that account and keeps its password.
 
+## The pages
+
+- `/join/<workspace slug>`: the workspace's sign-up page (name, email, the bot check). Settings → Sign-up shows the full link to share. On a custom domain set up in Branding, the same path works on that domain.
+- `/join/confirm`: where the email link lands.
+- `/admin/settings/customer-signup`: Settings → Sign-up for workspace admins. In the system workspace, Settings → Sign-up is still the operator's platform sign-up.
+
 ## How a sign-up goes
 
 1. **Ask.** `POST /api/v1/public/signup/workspaces/{slug}` with `email`, `display_name` and `bot_token`. The answer is always `202 Check your email` for any address the workspace accepts. Nothing about the address is looked up at this step.

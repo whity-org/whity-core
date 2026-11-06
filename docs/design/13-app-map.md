@@ -50,12 +50,14 @@ Sidebar groups: (top) Dashboard · Inbox · Approvals — People — AI — Docu
 | A51 | Email · email domains | `/admin/settings/email`, `/email-domains` | `TplSettingsEmailDomains`; email in `TplPlatformSettings` | section 25 |
 | A52 | Security · SSO · sign-up | `/admin/settings/security`, `/sso`, `/signup` | `TplSettingsSecurity`, `TplSettingsSSO` | section 25 |
 | A52b | Public forms | `/admin/settings/public-forms` | none yet (ask WHIT-906) | section 25 |
+| A52c | Sign-up for a workspace's customers | `/admin/settings/customer-signup` | none yet (ask WHIT-915) | section 25; the operator's platform sign-up stays `/admin/settings/signup` |
 | A53 | Storage · feature flags · error tracking | `/admin/settings/storage`, `/feature-flags`, `/error-tracking` | `TplPlatformSettings` | section 25 |
 | **Account** | | | | |
 | U01 | Sign in · register · verify email | `/login`, `/register`, `/verify-email` | `TplAuthSignIn` | |
 | U01b | Two-step code · turn on · recovery codes | `/login` (step 2), `/settings` | `TplAuthTwoStep` | |
 | U02 | Forgot · reset password · recovery | `/forgot-password`, `/reset-password`, `/account-recovery` | `TplAuthReset` | |
 | U03 | Accept invitation · onboarding | `/accept-invitation`, `/onboarding` | `TplAuthInvite` | |
+| U03b | Join a workspace as a customer | `/join/[workspace]`, `/join/confirm` | none yet (ask WHIT-915) | built on `TplAuthInvite` and the `/f/[slug]` frame |
 | U04 | Settings · licensing | `/settings`, `/licensing` | `TplAccountPrefs`, `TplAccountSecurity`, `TplLicensing` | section 25; text size preference |
 | U05 | Status | `/status` | `TplSystemStates` | |
 | U06 | 404 · 403 · 500 · offline · maintenance · rate limit | `not-found`, `error`, middleware | `TplSystemStates` | |
