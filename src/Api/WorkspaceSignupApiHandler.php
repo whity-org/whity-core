@@ -83,27 +83,51 @@ final class WorkspaceSignupApiHandler
 
         $mode = array_key_exists('mode', $body) ? $body['mode'] : $current['mode'];
         if (!is_string($mode) || !in_array($mode, WorkspaceSignupSettings::MODES, true)) {
-            return Response::error('Validation failed', 422, ['mode' => 'Choose Off, Approval required or Open.']);
+            return Response::error('Validation failed', 422, [
+                'mode' => 'Choose Off, Approval required or Open.',
+                'code' => 'mode_invalid',
+            ]);
         }
 
         $roleId = array_key_exists('role_id', $body) ? $body['role_id'] : $current['role_id'];
         if ($roleId !== null && (!is_int($roleId) || $roleId <= 0)) {
-            return Response::error('Validation failed', 422, ['role_id' => 'Choose a role.']);
+            return Response::error('Validation failed', 422, ['role_id' => 'Choose a role.', 'code' => 'role_required']);
         }
         if ($roleId === null && $mode !== WorkspaceSignupSettings::MODE_OFF) {
-            return Response::error('Validation failed', 422, ['role_id' => 'Choose the role people get when they join.']);
+            return Response::error('Validation failed', 422, [
+                'role_id' => 'Choose the role people get when they join.',
+                'code' => 'role_required',
+            ]);
         }
         if ($roleId !== null && !$this->safeRoles->isCustomerSafe($roleId, $tenantId)) {
-            return Response::error('Validation failed', 422, ['role_id' => self::ROLE_REFUSED]);
+            return Response::error('Validation failed', 422, ['role_id' => self::ROLE_REFUSED, 'code' => 'role_not_customer_safe']);
         }
 
-        $domains = WorkspaceSignupSettings::normaliseDomains(
-            array_key_exists('allowed_domains', $body) ? $body['allowed_domains'] : $current['allowed_domains']
-        );
-        if ($domains === null) {
+        // A workspace with no slug has no sign-up page anyone can open, so
+        // turning sign-up on there would promise something nobody can reach.
+        if ($mode !== WorkspaceSignupSettings::MODE_OFF && $this->slugOf($tenantId) === null) {
             return Response::error('Validation failed', 422, [
-                'allowed_domains' => 'Enter domain names such as example.com, up to ' . WorkspaceSignupSettings::MAX_DOMAINS . '.',
+                'mode' => 'Give this workspace a web address (slug) before turning sign-up on.',
+                'code' => 'workspace_slug_missing',
             ]);
+        }
+
+        $rawDomains = array_key_exists('allowed_domains', $body) ? $body['allowed_domains'] : $current['allowed_domains'];
+        $domains = WorkspaceSignupSettings::normaliseDomains($rawDomains);
+        if ($domains === null) {
+            $bad = WorkspaceSignupSettings::firstInvalidDomain($rawDomains);
+
+            return Response::error('Validation failed', 422, $bad === null
+                ? [
+                    'allowed_domains' => 'List at most ' . WorkspaceSignupSettings::MAX_DOMAINS . ' domains.',
+                    'code' => 'domains_too_many',
+                    'max' => WorkspaceSignupSettings::MAX_DOMAINS,
+                ]
+                : [
+                    'allowed_domains' => 'Enter domain names such as example.com. This one is not: ' . $bad,
+                    'code' => 'domain_invalid',
+                    'value' => $bad,
+                ]);
         }
 
         try {
@@ -195,13 +219,15 @@ final class WorkspaceSignupApiHandler
             CustomerSignupService::DECIDE_DONE => $this->decided($ctx, $id, $approve, $result['membership_id']),
             CustomerSignupService::DECIDE_ROLE_UNSAFE => Response::error(
                 'The starting role in Sign-up settings is missing or has admin permissions. Choose a customer-safe role first.',
-                409
+                409,
+                ['code' => 'role_not_customer_safe']
             ),
             CustomerSignupService::DECIDE_CONFLICT => Response::error(
                 'This person already has a suspended membership or an open invitation here. Resolve that in People first.',
-                409
+                409,
+                ['code' => 'membership_conflict']
             ),
-            default => Response::error('No request waiting for a decision has that id', 404),
+            default => Response::error('No request waiting for a decision has that id', 404, ['code' => 'request_not_found']),
         };
     }
 
@@ -237,10 +263,7 @@ final class WorkspaceSignupApiHandler
             $roleName = $name === false ? null : (string) $name;
         }
 
-        // @tenant-guard-ignore: tenants registry, the caller's own row by id
-        $slugStmt = $this->db->prepare('SELECT slug FROM tenants WHERE id = :id');
-        $slugStmt->execute([':id' => $tenantId]);
-        $slug = $slugStmt->fetchColumn();
+        $slug = $this->slugOf($tenantId);
 
         return [
             'mode' => $current['mode'],
@@ -252,10 +275,21 @@ final class WorkspaceSignupApiHandler
             'allowed_domains' => $current['allowed_domains'],
             'eligible_roles' => $roles,
             'pending_count' => $this->service->pendingCount($tenantId),
-            'workspace_slug' => $slug === false ? null : (string) $slug,
+            'workspace_slug' => $slug,
             'bot_check_ready' => $this->bot?->isReady() ?? false,
             'updated_at' => $current['updated_at'],
         ];
+    }
+
+    /** The workspace's slug, or null when it has none: its sign-up page lives at /join/<slug>. */
+    private function slugOf(int $tenantId): ?string
+    {
+        // @tenant-guard-ignore: tenants registry, the caller's own row by id
+        $stmt = $this->db->prepare('SELECT slug FROM tenants WHERE id = :id');
+        $stmt->execute([':id' => $tenantId]);
+        $slug = $stmt->fetchColumn();
+
+        return is_string($slug) && trim($slug) !== '' ? $slug : null;
     }
 
     /** @return array{tenantId: int, userId: int}|Response */

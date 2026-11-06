@@ -457,8 +457,44 @@ final class CustomerSignupRealEngineTest extends TestCase
         self::assertSame(409, $this->confirm($this->tokenFromMail(0), 'a-long-enough-password')->getStatusCode());
         self::assertSame(0, $this->membershipCount(self::TENANT_A, 'student@uni.example'));
 
-        self::assertSame(422, $this->saveSettings(self::TENANT_A, self::ADMIN_A, ['allowed_domains' => ['not a domain']])->getStatusCode());
+        $bad = $this->saveSettings(self::TENANT_A, self::ADMIN_A, ['allowed_domains' => ['partner.example', 'not a domain']]);
+        self::assertSame(422, $bad->getStatusCode());
+        // A stable code and the line at fault, so the page can say it in Arabic too (WHIT-916).
+        self::assertSame('domain_invalid', $this->decode($bad)['details']['code']);
+        self::assertSame('not a domain', $this->decode($bad)['details']['value']);
         self::assertSame(422, $this->saveSettings(self::TENANT_A, self::ADMIN_A, ['allowed_domains' => ['10.0.0.1']])->getStatusCode());
+    }
+
+    public function testAWorkspaceWithNoSlugCannotTurnSignupOn(): void
+    {
+        // Its sign-up page lives at /join/<slug>; with no slug nobody could reach it (WHIT-916).
+        $this->pdo->exec("UPDATE tenants SET slug = '' WHERE id = " . self::TENANT_A);
+
+        $res = $this->saveSettings(self::TENANT_A, self::ADMIN_A, ['mode' => 'open', 'role_id' => $this->customerRole]);
+        self::assertSame(422, $res->getStatusCode());
+        self::assertSame('workspace_slug_missing', $this->decode($res)['details']['code']);
+
+        // Off, and the other settings, can still be saved.
+        self::assertSame(200, $this->saveSettings(self::TENANT_A, self::ADMIN_A, ['mode' => 'off', 'role_id' => $this->customerRole])->getStatusCode());
+        self::assertNull($this->decode($this->getSettings(self::TENANT_A, self::ADMIN_A))['data']['workspace_slug']);
+    }
+
+    public function testARejectedRequestIsListedAndCanStillBeApproved(): void
+    {
+        $this->configure(self::TENANT_A, self::ADMIN_A, 'approval', $this->customerRole);
+        $this->request('tenant-a', 'second.chance@example.test', 'Second Chance');
+        $this->confirm($this->tokenFromMail(0), 'a-long-enough-password');
+        $id = (int) $this->decode($this->listRequests(self::TENANT_A, self::ADMIN_A))['data'][0]['id'];
+        $this->decide(self::TENANT_A, self::ADMIN_A, $id, false);
+
+        $rejected = $this->decode($this->admin->listRequests(
+            $this->authed(self::TENANT_A, self::ADMIN_A, 'GET', '/api/signup/requests?status=rejected')
+        ))['data'];
+        self::assertSame([$id], array_column($rejected, 'id'));
+        self::assertSame('admin-a', $rejected[0]['decided_by_name']);
+
+        self::assertSame(200, $this->decide(self::TENANT_A, self::ADMIN_A, $id, true)->getStatusCode());
+        self::assertSame(1, $this->membershipCount(self::TENANT_A, 'second.chance@example.test'));
     }
 
     public function testPrivilegedPermissionClassification(): void
