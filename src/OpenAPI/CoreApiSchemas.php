@@ -9635,7 +9635,7 @@ final class CoreApiSchemas
                 'status' => ['type' => 'string', 'enum' => ['joined', 'already_member']],
                 'message' => self::str(),
             ], ['status', 'message'])),
-            // ── Workspace customer sign-up (WHIT-914) ─────────────────────────
+            // ── Workspace customer sign-up (WHIT-915) ─────────────────────────
             'PublicSignupInfoResponse' => self::dataEnvelope(self::object([
                 'workspace_name' => self::str(),
                 'workspace_slug' => self::str(),
@@ -10717,7 +10717,7 @@ final class CoreApiSchemas
     }
 
     /**
-     * Workspace-controlled customer sign-up (WHIT-914): four public routes and
+     * Workspace-controlled customer sign-up (WHIT-915): four public routes and
      * the workspace admin's five.
      *
      * @return list<array{method: string, path: string, requiredRole: ?string, requiredPermission: ?string, schema: array<string, mixed>}>

@@ -36,7 +36,7 @@ final class TenantHostRepository
         return $id === false ? null : (int) $id;
     }
 
-    /** The workspace's display name, for a public page that names it (WHIT-914). */
+    /** The workspace's display name, for a public page that names it (WHIT-915). */
     public function findNameById(int $tenantId): ?string
     {
         // @tenant-guard-ignore: tenants registry lookup by id; returns the display name only.

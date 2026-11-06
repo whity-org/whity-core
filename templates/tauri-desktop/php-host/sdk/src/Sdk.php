@@ -1021,7 +1021,7 @@ namespace Whity\Sdk;
  * 1.73 (CUSTOMER SIGN-UP: {@see Hooks\Events::MEMBERSHIP_CUSTOMER_JOINED},
  * `membership.customer_joined`, fires when somebody joins a workspace as a customer
  * through its own sign-up, at once when sign-up is Open or on an admin's approval.
- * Ids only, after commit, and the return value is ignored (WHIT-914).
+ * Ids only, after commit, and the return value is ignored (WHIT-915).
  *
  * Purely additive.)
  * Breaking changes require a new major version.

@@ -4801,7 +4801,7 @@ $router->register('POST',   '/api/branding/global/assets/{key}',    [$brandingHa
 $router->register('DELETE', '/api/branding/global/assets/{key}',    [$brandingHandler, 'clearGlobal'],   null, null, CorePermissions::SETTINGS_MANAGE);
 $router->register('PUT',    '/api/tenants/{id}/branding-host',      [$brandingHandler, 'setBrandingHost'], null, null, CorePermissions::SETTINGS_MANAGE);
 
-// WHIT-914: workspace-controlled customer sign-up. Platform sign-up
+// WHIT-915: workspace-controlled customer sign-up. Platform sign-up
 // (/api/register) creates a workspace and is the operator's; this joins ONE
 // existing workspace as a customer and is that workspace's admins'. The public
 // four are unauthenticated and on EnforceTenantIsolation's public list: the

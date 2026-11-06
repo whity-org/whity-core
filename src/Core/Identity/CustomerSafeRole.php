@@ -7,7 +7,7 @@ namespace Whity\Core\Identity;
 use PDO;
 
 /**
- * Whether a role may be handed to a customer (WHIT-914).
+ * Whether a role may be handed to a customer (WHIT-915).
  *
  * A workspace's customer sign-up gives strangers a role. That role must not be
  * able to run the workspace, so it is customer-safe only when, through its whole

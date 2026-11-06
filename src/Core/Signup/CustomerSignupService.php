@@ -10,7 +10,7 @@ use Whity\Core\Identity\CustomerSafeRole;
 use Whity\Core\Identity\MembershipRepository;
 
 /**
- * Workspace-controlled customer sign-up (WHIT-914).
+ * Workspace-controlled customer sign-up (WHIT-915).
  *
  * The second kind of self-service sign-up. Platform sign-up
  * ({@see \Whity\Api\RegisterApiHandler}) creates a workspace and is governed by

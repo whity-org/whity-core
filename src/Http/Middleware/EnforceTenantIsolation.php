@@ -113,7 +113,7 @@ class EnforceTenantIsolation
         // resolve; InvitationAcceptHandler rate-limits per IP and answers one
         // generic message for every way a token can fail.
         '/api/v1/invitations/accept',
-        // WHIT-914: the emailed link of a workspace customer sign-up. Like an
+        // WHIT-915: the emailed link of a workspace customer sign-up. Like an
         // invitation, the token names its own tenant.
         '/api/v1/public/signup/confirm',
         // ADR 0005 §6: multi-membership tenant selection. Public like login/2fa —
@@ -330,7 +330,7 @@ class EnforceTenantIsolation
         // opaque reference to the caller's own file — which is what separates it
         // from the person and unit pickers the public surface still strips.
         '#^/api/v1/public/forms/[^/]+$#',
-        // WHIT-914: workspace customer sign-up. GET says whether sign-up is open
+        // WHIT-915: workspace customer sign-up. GET says whether sign-up is open
         // and POST asks to join; both name the workspace by slug, checked against
         // the host. PublicSignupApiHandler throttles before examining anything
         // and answers the same 202 for every address it accepts.

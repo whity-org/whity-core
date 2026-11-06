@@ -154,7 +154,7 @@ final class SettingsApiHandler
         ['id' => 'general', 'href' => '/admin/settings', 'label' => 'General', 'requiredPermission' => CorePermissions::SETTINGS_READ],
         ['id' => 'branding', 'href' => '/admin/settings/branding', 'label' => 'Branding', 'requiredPermission' => CorePermissions::SETTINGS_READ],
         ['id' => 'signup', 'href' => '/admin/settings/signup', 'label' => 'Sign-up', 'requiredPermission' => CorePermissions::SETTINGS_MANAGE, 'systemTenantOnly' => true],
-        // WHIT-914: a workspace's own customer sign-up. The platform's sign-up
+        // WHIT-915: a workspace's own customer sign-up. The platform's sign-up
         // above is the operator's and system-tenant only; this one is every other
         // workspace's, so the two never show together.
         ['id' => 'customer-signup', 'href' => '/admin/settings/customer-signup', 'label' => 'Sign-up', 'requiredPermission' => CorePermissions::SIGNUP_MANAGE, 'workspaceOnly' => true],

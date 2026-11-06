@@ -11,7 +11,7 @@ use Whity\Core\Mail\Mailer;
 use Whity\Core\Settings\SettingsService;
 
 /**
- * Sends the "confirm your email to join" link for a customer sign-up (WHIT-914).
+ * Sends the "confirm your email to join" link for a customer sign-up (WHIT-915).
  *
  * Direct-call, like {@see \Whity\Core\Identity\InvitationMailer}: the raw token
  * exists only in this call and is never put on a hook payload.

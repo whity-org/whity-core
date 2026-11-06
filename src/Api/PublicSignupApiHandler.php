@@ -19,7 +19,7 @@ use Whity\Core\Store\SharedStoreInterface;
 use Whity\Http\JsonBody;
 
 /**
- * Public, unauthenticated side of workspace customer sign-up (WHIT-914).
+ * Public, unauthenticated side of workspace customer sign-up (WHIT-915).
  *
  *   GET  /api/v1/public/signup/workspaces/{workspace} — is sign-up open here, and how?
  *   POST /api/v1/public/signup/workspaces/{workspace} — ask to join (mails a link)

@@ -5,4 +5,4 @@
   bot check, and the request never reveals whether an address already has an account. Customers get
   a membership of kind `customer`, which can never hold admin permissions whatever its role. Joining
   never creates a workspace; platform sign-up is unchanged. Plugins get `membership.customer_joined`
-  (WHIT-914, SDK 1.73, migration 222).
+  (WHIT-915, SDK 1.73, migration 222).

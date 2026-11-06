@@ -19,7 +19,7 @@ use Whity\Http\JsonBody;
 use Whity\Http\PaginationParams;
 
 /**
- * The workspace admin's side of customer sign-up (WHIT-914): Settings → Sign-up
+ * The workspace admin's side of customer sign-up (WHIT-915): Settings → Sign-up
  * and the queue of people waiting to join.
  *
  *   GET  /api/v1/signup/settings

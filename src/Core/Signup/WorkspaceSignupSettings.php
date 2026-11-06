@@ -7,7 +7,7 @@ namespace Whity\Core\Signup;
 use PDO;
 
 /**
- * A workspace's customer sign-up settings (WHIT-914, migration 222).
+ * A workspace's customer sign-up settings (WHIT-915, migration 222).
  *
  * One row per workspace in `workspace_signup_settings`; a workspace with no row
  * is Off. Every statement binds tenant_id.

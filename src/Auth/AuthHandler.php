@@ -1114,7 +1114,7 @@ class AuthHandler
     {
         try {
             // m.* rather than m.kind: schemas from before migration 222 have
-            // no column, and every row there is staff (WHIT-914).
+            // no column, and every row there is staff (WHIT-915).
             // @tenant-guard-ignore: login flow — enumerates all tenant memberships for one profile (ADR 0005 §6)
             $stmt = $this->db->prepare(
                 "SELECT m.*, t.name AS tenant_name, r.name AS role

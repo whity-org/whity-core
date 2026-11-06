@@ -8,7 +8,7 @@ use Whity\Core\RBAC\CorePermissions;
 use Whity\Database\Database;
 
 /**
- * Workspace-controlled customer sign-up (WHIT-914).
+ * Workspace-controlled customer sign-up (WHIT-915).
  *
  * Until now the only self-service sign-up created a NEW workspace, governed by
  * the operator. This adds the second kind: a person joins ONE existing

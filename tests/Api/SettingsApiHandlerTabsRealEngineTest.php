@@ -276,7 +276,7 @@ final class SettingsApiHandlerTabsRealEngineTest extends TestCase
 
     public function testSignupManageShowsTheWorkspaceSignupTabOutsideTheSystemTenantOnly(): void
     {
-        // WHIT-914: a workspace's own customer sign-up, never in the system
+        // WHIT-915: a workspace's own customer sign-up, never in the system
         // tenant, where Sign-up is the operator's platform governance.
         $profileId = $this->seedProfileWithPermissions($this->tenantId, [CorePermissions::SIGNUP_MANAGE]);
         $this->assertSame(['customer-signup'], $this->tabIds($this->handler->tabs($this->requestAs($profileId, $this->tenantId))));

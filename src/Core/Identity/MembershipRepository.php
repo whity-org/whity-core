@@ -34,7 +34,7 @@ final class MembershipRepository
     public const STATUS_SUSPENDED = 'suspended';
 
     /**
-     * What a membership IS, beside what role it holds (WHIT-914, migration 222).
+     * What a membership IS, beside what role it holds (WHIT-915, migration 222).
      * `member` is staff, and every row written before customer sign-up existed.
      * `customer` joined through a workspace's own sign-up; RBAC caps it so no
      * role makes a customer an administrator.

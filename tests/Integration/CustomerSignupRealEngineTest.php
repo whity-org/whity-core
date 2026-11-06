@@ -37,7 +37,7 @@ use Whity\Database\Database;
 use Whity\Sdk\Http\Response;
 
 /**
- * Workspace-controlled customer sign-up (WHIT-914) end to end, against the
+ * Workspace-controlled customer sign-up (WHIT-915) end to end, against the
  * migration-built schema: in-memory SQLite locally, real PostgreSQL on the
  * postgres jobs.
  *

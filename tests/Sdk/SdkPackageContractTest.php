@@ -244,7 +244,7 @@ final class SdkPackageContractTest extends TestCase
         $this->assertSame(
             '1.73.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.73 ADDS membership.customer_joined: a customer joined a workspace through its own sign-up (WHIT-914). '
+            'SDK 1.73 ADDS membership.customer_joined: a customer joined a workspace through its own sign-up (WHIT-915). '
             . 'SDK 1.72: PluginRolesInterface grants a plugin only its own declared, non-core permissions, only to roles '
             . 'it created or the operator approved, and uninstall removes only the grants it made. '
             . 'SDK 1.71: THE HOST DECIDES WHETHER A TOOL ONLY READS, from the route method; authored tools are writes '

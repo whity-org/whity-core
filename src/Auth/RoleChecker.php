@@ -349,7 +349,7 @@ class RoleChecker
 
         $resolved = array_keys($permissions);
 
-        // WHIT-914: a customer is never staff. When every active membership the
+        // WHIT-915: a customer is never staff. When every active membership the
         // profile holds here is a customer one, privileged permissions are dropped
         // whatever the role, an OU, a resource grant or a delegation says — so an
         // admin who later gives a customer an admin role has not made them an
@@ -369,7 +369,7 @@ class RoleChecker
     /**
      * Whether the profile is ONLY a customer in this workspace: it holds at
      * least one active membership here and every active one is `kind =
-     * customer` (WHIT-914). A profile that is both staff and a customer (two
+     * customer` (WHIT-915). A profile that is both staff and a customer (two
      * rows) is staff.
      */
     public function isCustomerOnly(int $profileId, int $tenantId): bool
