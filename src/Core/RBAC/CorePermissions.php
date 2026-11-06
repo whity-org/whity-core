@@ -36,6 +36,15 @@ final class CorePermissions
      */
     public const STATS_READ = 'stats:read';
 
+    /**
+     * Database migrations (#990, migration 220). `migrations:read` lists core
+     * migrations and whether each has run (`GET /api/migrations`);
+     * `migrations:manage` runs and rolls them back, which only the CLI exposes.
+     * Two slugs because seeing the schema's state is not the authority to change it.
+     */
+    public const MIGRATIONS_READ = 'migrations:read';
+    public const MIGRATIONS_MANAGE = 'migrations:manage';
+
     // User management
     public const USERS_READ = 'users:read';
     public const USERS_WRITE = 'users:write';
@@ -471,6 +480,8 @@ final class CorePermissions
     {
         return [
             self::STATS_READ,
+            self::MIGRATIONS_READ,
+            self::MIGRATIONS_MANAGE,
             self::USERS_READ,
             self::USERS_WRITE,
             self::USERS_DELETE,

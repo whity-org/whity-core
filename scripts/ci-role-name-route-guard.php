@@ -59,12 +59,9 @@ declare(strict_types=1);
  * allowlist rots on unrelated edits gets deleted.
  */
 const GRANDFATHERED = [
-    // #990/#1258: no `migrations:*` slug. Registered in BOTH entry points and
-    // role-gated in both, so the two currently AGREE — re-gating one side
-    // alone would break the mirror rather than complete it.
-    'GET /api/migrations' => '#990: no migrations:* slug; role-gated in both entry points, so they agree',
-    'POST /api/migrations/run' => '#990: no migrations:* slug; CLI-only route',
-    'POST /api/migrations/rollback' => '#990: no migrations:* slug; CLI-only route',
+    // The migrations group is GONE — re-gated onto `migrations:read` and
+    // `migrations:manage` by migration 220, in both entry points at once.
+    // The deployments group is GONE too: the feature was removed (#1283).
 
     // The stats pair is GONE — the route and the `dashboard` nav item both moved
     // onto `stats:read` by migration 157, in one commit. This guard is what made

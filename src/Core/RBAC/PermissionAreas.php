@@ -64,6 +64,7 @@ final class PermissionAreas
         'stats' => ['system', 'System', self::GROUP_WORKSPACE],
         'jobs' => ['system', 'System', self::GROUP_WORKSPACE],
         'storage' => ['system', 'System', self::GROUP_WORKSPACE],
+        'migrations' => ['system', 'System', self::GROUP_WORKSPACE],
         'languages' => ['languages', 'Languages and translations', self::GROUP_WORKSPACE],
         'translations' => ['languages', 'Languages and translations', self::GROUP_WORKSPACE],
         'auth_providers' => ['sign_in', 'Sign-in', self::GROUP_WORKSPACE],

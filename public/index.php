@@ -2390,7 +2390,8 @@ $router->register('GET', '/api/desktop-app-updates/latest', [$desktopAppUpdateHa
 $migrationsHandler = new MigrationsApiHandler($db, __DIR__ . '/../database/migrations');
 // Only allow read-only access to migration status via API
 // Mutations (run/rollback) are performed via CLI only for security
-$router->register('GET', '/api/migrations', [$migrationsHandler, 'list'], 'admin');
+// #990: gated on `migrations:read` (migration 220), mirrored in BaseCommand.
+$router->register('GET', '/api/migrations', [$migrationsHandler, 'list'], null, null, CorePermissions::MIGRATIONS_READ);
 
 $adminHandler = new AdminApiHandler($db, __DIR__ . '/../database/migrations');
 // #990: gated on `stats:read` (6th positional arg; requiredRole stays null so
