@@ -8796,254 +8796,6 @@
                 ]
             }
         },
-        "/api/v1/deployments/apply": {
-            "post": {
-                "operationId": "post_api_v1_deployments_apply",
-                "summary": "Apply a deployment artefact",
-                "tags": [
-                    "platform-ops"
-                ],
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/DeploymentApplyRequest"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "201": {
-                        "description": "Deployment applied",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/SimpleMessageResponse"
-                                }
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Validation failed",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Error"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Error"
-                                }
-                            }
-                        }
-                    },
-                    "403": {
-                        "description": "Insufficient permissions",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Error"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Not found",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Error"
-                                }
-                            }
-                        }
-                    },
-                    "405": {
-                        "description": "Method not allowed",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Error"
-                                }
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Error"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/api/v1/deployments/rollback": {
-            "post": {
-                "operationId": "post_api_v1_deployments_rollback",
-                "summary": "Roll back the last deployment",
-                "tags": [
-                    "platform-ops"
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Rollback complete",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/SimpleMessageResponse"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Error"
-                                }
-                            }
-                        }
-                    },
-                    "403": {
-                        "description": "Insufficient permissions",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Error"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Not found",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Error"
-                                }
-                            }
-                        }
-                    },
-                    "405": {
-                        "description": "Method not allowed",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Error"
-                                }
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Error"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/api/v1/deployments/status": {
-            "get": {
-                "operationId": "get_api_v1_deployments_status",
-                "summary": "Get the current deployment status",
-                "tags": [
-                    "platform-ops"
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Current deployment status",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/DeploymentStatusResponse"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Error"
-                                }
-                            }
-                        }
-                    },
-                    "403": {
-                        "description": "Insufficient permissions",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Error"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Not found",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Error"
-                                }
-                            }
-                        }
-                    },
-                    "405": {
-                        "description": "Method not allowed",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Error"
-                                }
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Error"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
         "/api/v1/document-background-issuing": {
             "get": {
                 "operationId": "get_api_v1_document_background_issuing",
@@ -15381,7 +15133,7 @@
                 "tags": [
                     "documents"
                 ],
-                "description": "PUBLIC and unauthenticated by design: the caller is somebody holding a printed sheet, and the paper is the whole of their relationship with this system. Always 200. An unknown token, a malformed one, a withdrawn one and a superseded one produce the SAME body at the default disclosure level, so this endpoint cannot be asked whether a document exists. A tenant may raise `documents.qr_public_detail` to `stage`, which adds the current routing verb and distinguishes a revoked code from an unrecognised one, or LOWER it to `undated`, which withholds `issued_on` and leaves everything else as `minimal`. It never returns a document id, a title, any content, any recipient, or any name of a person or unit \u2014 a signed-in reader who wants the record calls GET /api/documents/by-verification/{token}, where RBAC decides unchanged.",
+                "description": "PUBLIC and unauthenticated by design: the caller is somebody holding a printed sheet, and the paper is the whole of their relationship with this system. Always 200. An unknown token, a malformed one, a withdrawn one and a superseded one produce the SAME body at the default disclosure level, so this endpoint cannot be asked whether a document exists. A tenant may raise `documents.qr_public_detail` to `stage`, which adds the current routing verb and distinguishes a revoked code from an unrecognised one, or LOWER it to `undated`, which withholds `issued_on` and leaves everything else as `minimal`. `described` adds to `stage` the kind (the template's public name), the revision letter, the page count, and on a revised document's code which revision replaced it. It never returns a price, the document number, a document id, a title, any content, any recipient, or any name of a person or unit \u2014 a signed-in reader who wants the record calls GET /api/documents/by-verification/{token}, where RBAC decides unchanged.",
                 "parameters": [
                     {
                         "name": "token",
@@ -15436,7 +15188,7 @@
                                                 },
                                                 "stage": {
                                                     "type": "string",
-                                                    "description": "Only at the `stage` disclosure level",
+                                                    "description": "Only at the `stage` and `described` disclosure levels",
                                                     "enum": [
                                                         "issued",
                                                         "forwarded",
@@ -15449,6 +15201,35 @@
                                                     "type": "string",
                                                     "nullable": true,
                                                     "description": "Date only, and only at the `stage` level"
+                                                },
+                                                "kind": {
+                                                    "type": "string",
+                                                    "description": "Only at `described`, and only when the template has a public name: what kind of document it is. Never its title."
+                                                },
+                                                "revision": {
+                                                    "type": "string",
+                                                    "description": "Only at `described`: the revision letter, A for the first"
+                                                },
+                                                "pages": {
+                                                    "type": "integer",
+                                                    "description": "Only at `described`, and only when the render service reported it"
+                                                },
+                                                "replaced_by": {
+                                                    "type": "object",
+                                                    "description": "Only at `described`, on a refused code whose document was revised",
+                                                    "properties": {
+                                                        "revision": {
+                                                            "type": "string"
+                                                        },
+                                                        "issued_on": {
+                                                            "type": "string",
+                                                            "nullable": true
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "revision",
+                                                        "issued_on"
+                                                    ]
                                                 }
                                             },
                                             "required": [
@@ -54507,33 +54288,6 @@
                     }
                 }
             },
-            "DeploymentApplyRequest": {
-                "type": "object",
-                "properties": {
-                    "version": {
-                        "type": "string"
-                    },
-                    "source_path": {
-                        "type": "string"
-                    }
-                },
-                "required": [
-                    "version",
-                    "source_path"
-                ]
-            },
-            "DeploymentStatusResponse": {
-                "type": "object",
-                "properties": {
-                    "data": {
-                        "type": "object",
-                        "additionalProperties": true
-                    }
-                },
-                "required": [
-                    "data"
-                ]
-            },
             "DeviceProvisionRequest": {
                 "type": "object",
                 "properties": {
@@ -55968,7 +55722,8 @@
                             "missing-plugin",
                             "block-without-print-view",
                             "unknown-field",
-                            "theme-unavailable"
+                            "theme-unavailable",
+                            "too-large"
                         ]
                     },
                     "count": {
@@ -55986,6 +55741,14 @@
                     "ref": {
                         "type": "string",
                         "description": "With theme-unavailable: the theme the document names that the workspace doesn't have"
+                    },
+                    "bytes": {
+                        "type": "integer",
+                        "description": "With too-large: what printing the template sends Whity Render, in bytes, before any record's values"
+                    },
+                    "max": {
+                        "type": "integer",
+                        "description": "With too-large: the render size ceiling (documents.flow_max_bytes), in bytes"
                     }
                 },
                 "required": [
@@ -56515,6 +56278,11 @@
                         "nullable": true,
                         "description": "How documents from this template are numbered, when it has its own rule"
                     },
+                    "public_name": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "What kind of document this makes, in words for strangers: the kind the public check shows at the `described` level. Null shows no kind."
+                    },
                     "id": {
                         "type": "integer"
                     },
@@ -56668,6 +56436,11 @@
             "DocumentSourceAudienceRequest": {
                 "type": "object",
                 "properties": {
+                    "public_name": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "What kind of document this makes, for the public check ('Handover certificate'), at most 120 characters; null or empty for none. Never a customer's name. Needs documents:publish."
+                    },
                     "numbering": {
                         "$ref": "#/components/schemas/DocumentNumbering",
                         "nullable": true,
@@ -71508,14 +71281,14 @@
                         "type": "string",
                         "format": "email",
                         "maxLength": 255,
-                        "description": "New sign-in email address."
+                        "description": "New sign-in email address. Refused with 409 when they also belong to another workspace, unless the caller is the system tenant."
                     },
                     "password": {
                         "type": "string",
                         "format": "password",
                         "minLength": 8,
                         "maxLength": 72,
-                        "description": "New password; must satisfy the site password policy."
+                        "description": "New password; must satisfy the site password policy. Refused with 409 when they also belong to another workspace, unless the caller is the system tenant."
                     },
                     "role": {
                         "oneOf": [
@@ -71553,7 +71326,7 @@
                             "active",
                             "inactive"
                         ],
-                        "description": "`inactive` blocks sign-in for this person everywhere; `active` restores it."
+                        "description": "`inactive` blocks sign-in for this person everywhere; `active` restores it. Refused with 409 when they also belong to another workspace, unless the caller is the system tenant."
                     },
                     "allowLocalPasswordOnIdpAccount": {
                         "type": "boolean",

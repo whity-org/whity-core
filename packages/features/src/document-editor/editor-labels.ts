@@ -235,6 +235,8 @@ export function useEditorLabels(): EditorLabels {
     blockerFieldHint: t('blockEditor.blockerFieldHint', 'Remove it, or pick a field the record has.'),
     blockerTheme: t('blockEditor.blockerTheme', 'This document uses a theme the workspace doesn’t have: {ref}'),
     blockerThemeHint: t('blockEditor.blockerThemeHint', 'Choose another theme or restore it.'),
+    blockerTooLarge: t('blockEditor.blockerTooLarge', 'This template is too large to print: {size}, and the limit is {max}'),
+    blockerTooLargeHint: t('blockEditor.blockerTooLargeHint', 'Use smaller images or fewer of them, then publish again.'),
     labelGrid: t('blockEditor.labelGrid', '{columns} × {rows} labels'),
     labelStock: t('blockEditor.labelStock', 'Label stock'),
     labelCertificate: t('blockEditor.labelCertificate', 'Certificate'),

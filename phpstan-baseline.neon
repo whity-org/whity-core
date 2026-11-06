@@ -37,30 +37,6 @@ parameters:
 			path: src/Api/AdminApiHandler.php
 
 		-
-			message: '#^Parameter \#1 \$tenantId of method Whity\\Core\\Deployment\\DeploymentManager\:\:apply\(\) expects int, int\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Api/DeploymentApiHandler.php
-
-		-
-			message: '#^Parameter \#1 \$tenantId of method Whity\\Core\\Deployment\\DeploymentManager\:\:getStatus\(\) expects int, int\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Api/DeploymentApiHandler.php
-
-		-
-			message: '#^Parameter \#1 \$tenantId of method Whity\\Core\\Deployment\\DeploymentManager\:\:rollback\(\) expects int, int\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Api/DeploymentApiHandler.php
-
-		-
-			message: '#^Parameter \#1 \$tenantId of method Whity\\Core\\Deployment\\DeploymentManager\:\:rollbackMigration\(\) expects int, int\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Api/DeploymentApiHandler.php
-
-		-
 			message: '#^Method Whity\\Api\\MigrationsApiHandler\:\:getExecutedMigrations\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
@@ -353,60 +329,6 @@ parameters:
 			identifier: missingType.iterableValue
 			count: 1
 			path: src/Console/GenerateOpenApiSchemaCommand.php
-
-		-
-			message: '#^Method Whity\\Core\\Deployment\\DeploymentManager\:\:getStatus\(\) return type has no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: src/Core/Deployment/DeploymentManager.php
-
-		-
-			message: '#^Method class@anonymous/src/Core/Deployment/DeploymentManager\.php\:214\:\:__construct\(\) has parameter \$pdo with no type specified\.$#'
-			identifier: missingType.parameter
-			count: 1
-			path: src/Core/Deployment/DeploymentManager.php
-
-		-
-			message: '#^Method class@anonymous/src/Core/Deployment/DeploymentManager\.php\:214\:\:exec\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: src/Core/Deployment/DeploymentManager.php
-
-		-
-			message: '#^Method class@anonymous/src/Core/Deployment/DeploymentManager\.php\:214\:\:exec\(\) has parameter \$sql with no type specified\.$#'
-			identifier: missingType.parameter
-			count: 1
-			path: src/Core/Deployment/DeploymentManager.php
-
-		-
-			message: '#^Method class@anonymous/src/Core/Deployment/DeploymentManager\.php\:214\:\:getPdo\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: src/Core/Deployment/DeploymentManager.php
-
-		-
-			message: '#^Method class@anonymous/src/Core/Deployment/DeploymentManager\.php\:214\:\:query\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: src/Core/Deployment/DeploymentManager.php
-
-		-
-			message: '#^Method class@anonymous/src/Core/Deployment/DeploymentManager\.php\:214\:\:query\(\) has parameter \$params with no type specified\.$#'
-			identifier: missingType.parameter
-			count: 1
-			path: src/Core/Deployment/DeploymentManager.php
-
-		-
-			message: '#^Method class@anonymous/src/Core/Deployment/DeploymentManager\.php\:214\:\:query\(\) has parameter \$sql with no type specified\.$#'
-			identifier: missingType.parameter
-			count: 1
-			path: src/Core/Deployment/DeploymentManager.php
-
-		-
-			message: '#^Property class@anonymous/src/Core/Deployment/DeploymentManager\.php\:214\:\:\$pdo has no type specified\.$#'
-			identifier: missingType.property
-			count: 1
-			path: src/Core/Deployment/DeploymentManager.php
 
 		-
 			message: '#^Method Whity\\Core\\Hooks\\HookManager\:\:dispatch\(\) has parameter \$data with no value type specified in iterable type array\.$#'
@@ -847,15 +769,9 @@ parameters:
 			path: tests/Integration/AuditLogRbacTest.php
 
 		-
-			message: '#^Cannot call method fetchAll\(\) on PDOStatement\|false\.$#'
-			identifier: method.nonObject
-			count: 1
-			path: tests/Integration/CrossTenantRejectionRealEngineTest.php
-
-		-
 			message: '#^Cannot call method fetchColumn\(\) on PDOStatement\|false\.$#'
 			identifier: method.nonObject
-			count: 48
+			count: 44
 			path: tests/Integration/CrossTenantRejectionRealEngineTest.php
 
 		-
@@ -1229,36 +1145,6 @@ parameters:
 			identifier: return.type
 			count: 1
 			path: tests/Unit/Core/Database/DatabaseConnectionPoolTest.php
-
-		-
-			message: '#^Method Tests\\Unit\\Core\\Deployment\\DeploymentManagerTest\:\:removeDirectory\(\) has no return type specified\.$#'
-			identifier: missingType.return
-			count: 1
-			path: tests/Unit/Core/Deployment/DeploymentManagerTest.php
-
-		-
-			message: '#^Method Tests\\Unit\\Core\\Deployment\\DeploymentManagerTest\:\:removeDirectory\(\) has parameter \$dir with no type specified\.$#'
-			identifier: missingType.parameter
-			count: 1
-			path: tests/Unit/Core/Deployment/DeploymentManagerTest.php
-
-		-
-			message: '#^Property Tests\\Unit\\Core\\Deployment\\DeploymentManagerTest\:\:\$db has no type specified\.$#'
-			identifier: missingType.property
-			count: 1
-			path: tests/Unit/Core/Deployment/DeploymentManagerTest.php
-
-		-
-			message: '#^Property Tests\\Unit\\Core\\Deployment\\DeploymentManagerTest\:\:\$manager has no type specified\.$#'
-			identifier: missingType.property
-			count: 1
-			path: tests/Unit/Core/Deployment/DeploymentManagerTest.php
-
-		-
-			message: '#^Property Tests\\Unit\\Core\\Deployment\\DeploymentManagerTest\:\:\$storagePath has no type specified\.$#'
-			identifier: missingType.property
-			count: 1
-			path: tests/Unit/Core/Deployment/DeploymentManagerTest.php
 
 		-
 			message: '#^Method Tests\\Unit\\Core\\Tenant\\TenantPredicateGuardTest\:\:scan\(\) return type has no value type specified in iterable type array\.$#'

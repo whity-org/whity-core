@@ -405,4 +405,6 @@ export type PublishBlocker =
   | { kind: 'block-without-print-view'; blockId: BlockId }   // E.18
   | { kind: 'unknown-field'; path: string }
   /** E.44: the document names a theme the workspace doesn't have. */
-  | { kind: 'theme-unavailable'; ref: string };
+  | { kind: 'theme-unavailable'; ref: string }
+  /** #1435: printing it would exceed the render size ceiling (documents.flow_max_bytes), in bytes. */
+  | { kind: 'too-large'; bytes: number; max: number };

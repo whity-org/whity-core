@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Whity\Api;
 
+use Whity\Core\Document\DocumentArtifactRepository;
 use Whity\Core\Document\DocumentRepository;
+use Whity\Core\Document\DocumentSourceRepository;
 use Whity\Core\Document\Qr\DocumentQrPolicy;
 use Whity\Core\Document\Qr\DocumentQrService;
 use Whity\Core\Document\Qr\VerificationPresenter;
@@ -88,6 +90,10 @@ final class DocumentVerificationApiHandler
         private readonly RouteEventRepository $events,
         private readonly SettingsService $settings,
         private readonly SharedStoreInterface $store,
+        // Read only at the `described` level (#1627). Without them that level
+        // still answers, with no kind and no page count.
+        private readonly ?DocumentSourceRepository $sources = null,
+        private readonly ?DocumentArtifactRepository $artifacts = null,
     ) {
     }
 
@@ -179,7 +185,7 @@ final class DocumentVerificationApiHandler
             // circulation, and somebody just tried to rely on it.
             $this->qr->recordScan($tokenRow, null);
 
-            return $this->refuse($tokenRow, $detail, $withdrawnAt);
+            return $this->refuse($tokenRow, $detail, $withdrawnAt, $document);
         }
 
         if ($document === null) {
@@ -193,25 +199,53 @@ final class DocumentVerificationApiHandler
 
         $this->qr->recordScan($tokenRow, null);
 
+        $described = $detail === VerificationPresenter::DETAIL_DESCRIBED;
+
         return Response::json([
             'data' => VerificationPresenter::verified(
                 $tokenRow,
                 $document,
                 $this->qr->reference((string) $tokenRow['token']),
                 $detail,
-                $detail === VerificationPresenter::DETAIL_STAGE
+                VerificationPresenter::showsStage($detail)
                     ? $this->latestEvent($tenantId, (int) $tokenRow['document_id'])
                     : null,
+                $described ? $this->publicKind($document, $tenantId) : null,
+                $described ? $this->pages((int) $tokenRow['document_id'], $tenantId) : null,
             ),
         ], 200);
     }
 
     /**
      * @param array<string, mixed>|null $tokenRow
+     * @param array<string, mixed>|null $document
      */
-    private function refuse(?array $tokenRow, string $detail, ?string $documentWithdrawnAt = null): Response
+    private function refuse(?array $tokenRow, string $detail, ?string $documentWithdrawnAt = null, ?array $document = null): Response
     {
-        return Response::json(['data' => VerificationPresenter::refusal($tokenRow, $detail, $documentWithdrawnAt)], 200);
+        return Response::json(['data' => VerificationPresenter::refusal($tokenRow, $detail, $documentWithdrawnAt, $document)], 200);
+    }
+
+    /**
+     * The template's public name, read in the document's own tenant. Never the
+     * title or the `template_name` snapshot: see {@see VerificationPresenter}.
+     *
+     * @param array<string, mixed> $document
+     */
+    private function publicKind(array $document, int $tenantId): ?string
+    {
+        $sourceId = $document['document_source_id'] ?? null;
+        if ($this->sources === null || !is_int($sourceId)) {
+            return null;
+        }
+
+        return $this->sources->publicName($sourceId, $tenantId);
+    }
+
+    private function pages(int $documentId, int $tenantId): ?int
+    {
+        $artifact = $this->artifacts?->findLatestForDocument($documentId, $tenantId);
+
+        return is_array($artifact) && is_int($artifact['pages'] ?? null) ? $artifact['pages'] : null;
     }
 
     /**

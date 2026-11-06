@@ -127,7 +127,7 @@ final class WhityDocumentPrinter
      * printer's values, without what a label can't hold (page breaks). The
      * sheet itself, the grid and the other labels are the caller's.
      *
-     * @param list<mixed> $blocks
+     * @param array<mixed> $blocks
      * @return list<array<string, mixed>>
      */
     public function labelContent(array $blocks): array

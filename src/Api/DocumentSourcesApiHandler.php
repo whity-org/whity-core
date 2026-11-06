@@ -69,6 +69,7 @@ final class DocumentSourcesApiHandler
     private const VIEWS = ['page', 'continuous'];
     private const MAX_BLOCKS = 5000;
     private const MAX_TITLE = 255;
+    private const PUBLIC_NAME_MAX = 120;
     private const MAX_OWN_FIELDS = 50;
 
     private DocumentSourceRepository $repo;
@@ -358,8 +359,20 @@ final class DocumentSourcesApiHandler
                 $numbering = DocumentNumberingRule::fromArray($body['numbering'])->toArray();
             }
         }
-        if ($fields === [] && !$hasNumbering) {
-            return Response::error('Send scope, required_permission, owner_ou_id or numbering', 422);
+        // The public check can name the kind (#1627): words strangers read, so a publish action too.
+        $hasPublicName = array_key_exists('public_name', $body);
+        $publicName = null;
+        if ($hasPublicName) {
+            if (!$this->permissionResolver($callerId, $tenantId)(CorePermissions::DOCUMENTS_PUBLISH)) {
+                return Response::error('Naming a template for the public check requires documents:publish', 403);
+            }
+            $publicName = self::publicName($body['public_name']);
+            if ($publicName === false) {
+                return Response::error('public_name must be text of at most ' . self::PUBLIC_NAME_MAX . ' characters, or null', 422);
+            }
+        }
+        if ($fields === [] && !$hasNumbering && !$hasPublicName) {
+            return Response::error('Send scope, required_permission, owner_ou_id, numbering or public_name', 422);
         }
 
         $changes = (array_key_exists('scope', $fields) && $fields['scope'] !== $row['scope'])
@@ -378,8 +391,31 @@ final class DocumentSourcesApiHandler
         if ($hasNumbering) {
             $this->repo->updateNumbering($id, $tenantId, $numbering);
         }
+        if ($hasPublicName) {
+            $this->repo->updatePublicName($id, $tenantId, $publicName);
+        }
 
         return Response::json(['data' => $this->repo->findById($id, $tenantId)]);
+    }
+
+    /**
+     * A public name as stored: trimmed, one line, null when empty, false when it
+     * isn't text or is too long.
+     */
+    private static function publicName(mixed $value): string|false|null
+    {
+        if ($value === null) {
+            return null;
+        }
+        if (!is_string($value)) {
+            return false;
+        }
+        $name = trim((string) preg_replace('/\s+/u', ' ', $value));
+        if ($name === '') {
+            return null;
+        }
+
+        return mb_strlen($name) <= self::PUBLIC_NAME_MAX ? $name : false;
     }
 
     /**

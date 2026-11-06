@@ -74,7 +74,7 @@ final class DocumentPublishingApiHandler
         private readonly DocumentFieldRegistry $fields,
         DocumentEmbedRegistry $embeds,
         private readonly RoleChecker $roleChecker,
-        SettingsService $settings,
+        private readonly SettingsService $settings,
         private readonly ?FlowDocumentRenderer $renderer = null,
         ?DocumentIssuer $issuer = null,
         ?DocumentSourceFileStore $files = null,
@@ -145,9 +145,9 @@ final class DocumentPublishingApiHandler
         if ($found instanceof Response) {
             return $found;
         }
-        [$tenantId, , $row] = $found;
+        [$tenantId, $callerId, $row] = $found;
 
-        return Response::json(['data' => $this->blockers($tenantId, $row)])
+        return Response::json(['data' => $this->blockers($tenantId, $callerId, $row)])
             ->withHeaders(['ETag' => '"' . (int) $row['draft_version'] . '"']);
     }
 
@@ -172,7 +172,7 @@ final class DocumentPublishingApiHandler
         if ($base !== (int) $row['draft_version']) {
             return Response::error('The document changed since it was checked', 409, ['draft_version' => (int) $row['draft_version']]);
         }
-        $blockers = $this->blockers($tenantId, $row);
+        $blockers = $this->blockers($tenantId, $callerId, $row);
         if ($blockers !== []) {
             return Response::error('The template has something that blocks publishing', 409, ['blockers' => $blockers]);
         }
@@ -549,7 +549,7 @@ final class DocumentPublishingApiHandler
      * @param array<string, mixed> $row
      * @return list<array<string, mixed>>
      */
-    private function blockers(int $tenantId, array $row): array
+    private function blockers(int $tenantId, int $callerId, array $row): array
     {
         $type = $row['record_type'] !== null ? (string) $row['record_type'] : null;
         $blockers = DocumentPublishCheck::blockers(
@@ -575,7 +575,57 @@ final class DocumentPublishingApiHandler
             }
         }
 
+        // #1435: a template too large for Whity Render would publish fine and
+        // then fail every print. Measured the way printing measures it.
+        $size = $this->printSize($tenantId, $callerId, $row);
+        if ($size !== null && $size['bytes'] > $size['max']) {
+            $blockers[] = ['kind' => 'too-large', 'bytes' => $size['bytes'], 'max' => $size['max']];
+        }
+
         return $blockers;
+    }
+
+    /**
+     * The size of what printing this draft would send Whity Render, against
+     * the render size ceiling (#1435), from the same payload builders and the
+     * same measure ({@see FlowDocumentRenderer::size()}) the print routes use,
+     * so publishing and printing can't disagree about what fits.
+     *
+     * It is printed with no record: field values are only known at print
+     * time, so this is the least any print of it can weigh. What makes a
+     * template too large on its own is its embedded images, and those are
+     * inlined here exactly as they print. A label sheet is measured as one
+     * label, the smallest sheet it can print. Null when the draft has
+     * nothing to print yet, which the render check reports on its own.
+     *
+     * @param array<string, mixed> $row
+     * @return array{bytes: int, max: int}|null
+     */
+    private function printSize(int $tenantId, int $callerId, array $row): ?array
+    {
+        $blocks = is_array($row['blocks'] ?? null) ? $row['blocks'] : [];
+        if ($blocks === []) {
+            return null;
+        }
+        $type = $row['record_type'] !== null ? (string) $row['record_type'] : null;
+        $printer = $this->print->printer($tenantId, $callerId, $this->permissions($callerId, $tenantId), (int) $row['id'], [], $type);
+        if ($row['kind'] === 'label') {
+            $payload = ['labels' => [$printer->labelContent($blocks)], 'title' => (string) $row['title']];
+        } else {
+            $payload = $this->print->payload(
+                $printer,
+                $tenantId,
+                ['title' => (string) $row['title'], 'lang' => (string) $row['lang'], 'page' => $row['page'], 'blocks' => $blocks],
+                null,
+                [],
+                $this->print->theme($tenantId, $row['theme'] ?? null, (string) $row['kind']),
+            );
+        }
+        try {
+            return FlowDocumentRenderer::size($this->settings, $tenantId, $payload);
+        } catch (DocumentRenderRejectedException) {
+            return null;
+        }
     }
 
     /**

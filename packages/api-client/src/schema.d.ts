@@ -1360,57 +1360,6 @@ export interface paths {
         patch: operations["patch_api_v1_demo_catalog_items_id"];
         trace?: never;
     };
-    "/api/v1/deployments/apply": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Apply a deployment artefact */
-        post: operations["post_api_v1_deployments_apply"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/deployments/rollback": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Roll back the last deployment */
-        post: operations["post_api_v1_deployments_rollback"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/deployments/status": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get the current deployment status */
-        get: operations["get_api_v1_deployments_status"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/document-background-issuing": {
         parameters: {
             query?: never;
@@ -2331,7 +2280,7 @@ export interface paths {
         };
         /**
          * Verify a document from the QR code printed on it (public, rate-limited)
-         * @description PUBLIC and unauthenticated by design: the caller is somebody holding a printed sheet, and the paper is the whole of their relationship with this system. Always 200. An unknown token, a malformed one, a withdrawn one and a superseded one produce the SAME body at the default disclosure level, so this endpoint cannot be asked whether a document exists. A tenant may raise `documents.qr_public_detail` to `stage`, which adds the current routing verb and distinguishes a revoked code from an unrecognised one, or LOWER it to `undated`, which withholds `issued_on` and leaves everything else as `minimal`. It never returns a document id, a title, any content, any recipient, or any name of a person or unit — a signed-in reader who wants the record calls GET /api/documents/by-verification/{token}, where RBAC decides unchanged.
+         * @description PUBLIC and unauthenticated by design: the caller is somebody holding a printed sheet, and the paper is the whole of their relationship with this system. Always 200. An unknown token, a malformed one, a withdrawn one and a superseded one produce the SAME body at the default disclosure level, so this endpoint cannot be asked whether a document exists. A tenant may raise `documents.qr_public_detail` to `stage`, which adds the current routing verb and distinguishes a revoked code from an unrecognised one, or LOWER it to `undated`, which withholds `issued_on` and leaves everything else as `minimal`. `described` adds to `stage` the kind (the template's public name), the revision letter, the page count, and on a revised document's code which revision replaced it. It never returns a price, the document number, a document id, a title, any content, any recipient, or any name of a person or unit — a signed-in reader who wants the record calls GET /api/documents/by-verification/{token}, where RBAC decides unchanged.
          */
         get: operations["get_api_v1_document_verifications_token"];
         put?: never;
@@ -8418,15 +8367,6 @@ export interface components {
         DemoCatalogItemResponse: {
             data: components["schemas"]["DemoCatalogItem"];
         };
-        DeploymentApplyRequest: {
-            version: string;
-            source_path: string;
-        };
-        DeploymentStatusResponse: {
-            data: {
-                [key: string]: unknown;
-            };
-        };
         DeviceProvisionRequest: {
             serial_numbers: (string | {
                 serial_number: string;
@@ -8843,13 +8783,17 @@ export interface components {
         };
         DocumentPublishBlocker: {
             /** @enum {string} */
-            kind: "open-suggestions" | "missing-plugin" | "block-without-print-view" | "unknown-field" | "theme-unavailable";
+            kind: "open-suggestions" | "missing-plugin" | "block-without-print-view" | "unknown-field" | "theme-unavailable" | "too-large";
             count?: number;
             plugin?: string;
             blockId?: string;
             path?: string;
             /** @description With theme-unavailable: the theme the document names that the workspace doesn't have */
             ref?: string;
+            /** @description With too-large: what printing the template sends Whity Render, in bytes, before any record's values */
+            bytes?: number;
+            /** @description With too-large: the render size ceiling (documents.flow_max_bytes), in bytes */
+            max?: number;
         };
         DocumentPublishCheckResponse: {
             data: components["schemas"]["DocumentPublishBlocker"][];
@@ -9006,6 +8950,8 @@ export interface components {
         DocumentSource: {
             /** @description How documents from this template are numbered, when it has its own rule */
             numbering?: components["schemas"]["DocumentNumbering"];
+            /** @description What kind of document this makes, in words for strangers: the kind the public check shows at the `described` level. Null shows no kind. */
+            public_name?: string | null;
             id: number;
             tenant_id: number;
             /** @enum {string} */
@@ -9049,6 +8995,8 @@ export interface components {
             updated_at: string;
         };
         DocumentSourceAudienceRequest: {
+            /** @description What kind of document this makes, for the public check ('Handover certificate'), at most 120 characters; null or empty for none. Never a customer's name. Needs documents:publish. */
+            public_name?: string | null;
             /** @description How documents from this template are numbered; it wins over a slot's rule. Needs documents:publish. */
             numbering?: components["schemas"]["DocumentNumbering"];
             /**
@@ -13064,12 +13012,12 @@ export interface components {
             displayName?: string;
             /**
              * Format: email
-             * @description New sign-in email address.
+             * @description New sign-in email address. Refused with 409 when they also belong to another workspace, unless the caller is the system tenant.
              */
             email?: string;
             /**
              * Format: password
-             * @description New password; must satisfy the site password policy.
+             * @description New password; must satisfy the site password policy. Refused with 409 when they also belong to another workspace, unless the caller is the system tenant.
              */
             password?: string;
             /** @description Replacement role in this tenant, by name or numeric id. */
@@ -13079,7 +13027,7 @@ export interface components {
             /** @description Organizational unit to move the user to. An explicit null removes them from their unit. */
             ou_id?: number | null;
             /**
-             * @description `inactive` blocks sign-in for this person everywhere; `active` restores it.
+             * @description `inactive` blocks sign-in for this person everywhere; `active` restores it. Refused with 409 when they also belong to another workspace, unless the caller is the system tenant.
              * @enum {string}
              */
             accountStatus?: "active" | "inactive";
@@ -20159,214 +20107,6 @@ export interface operations {
             };
         };
     };
-    post_api_v1_deployments_apply: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["DeploymentApplyRequest"];
-            };
-        };
-        responses: {
-            /** @description Deployment applied */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SimpleMessageResponse"];
-                };
-            };
-            /** @description Validation failed */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Method not allowed */
-            405: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Internal error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
-    post_api_v1_deployments_rollback: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Rollback complete */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SimpleMessageResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Method not allowed */
-            405: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Internal error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
-    get_api_v1_deployments_status: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Current deployment status */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DeploymentStatusResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Method not allowed */
-            405: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Internal error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
     get_api_v1_document_background_issuing: {
         parameters: {
             query?: never;
@@ -25320,12 +25060,23 @@ export interface operations {
                             /** @description The issue DATE (YYYY-MM-DD), not a timestamp. ABSENT at the `undated` disclosure level — absent rather than null, because null would be a statement about the document and this is a statement about the page. */
                             issued_on?: string | null;
                             /**
-                             * @description Only at the `stage` disclosure level
+                             * @description Only at the `stage` and `described` disclosure levels
                              * @enum {string}
                              */
                             stage?: "issued" | "forwarded" | "acknowledged" | "returned" | "noted";
                             /** @description Date only, and only at the `stage` level */
                             stage_on?: string | null;
+                            /** @description Only at `described`, and only when the template has a public name: what kind of document it is. Never its title. */
+                            kind?: string;
+                            /** @description Only at `described`: the revision letter, A for the first */
+                            revision?: string;
+                            /** @description Only at `described`, and only when the render service reported it */
+                            pages?: number;
+                            /** @description Only at `described`, on a refused code whose document was revised */
+                            replaced_by?: {
+                                revision: string;
+                                issued_on: string | null;
+                            };
                         };
                     };
                 };

@@ -3262,36 +3262,6 @@ final class CoreApiSchemas
                     ],
                 ],
             ],
-            // Deployment management — admin role required
-            self::adminRoute('POST', '/api/deployments/apply', [
-                'summary' => 'Apply a deployment artefact',
-                'tags' => ['platform-ops'],
-                'request' => 'DeploymentApplyRequest',
-                'responses' => [
-                    201 => self::jsonResponse('Deployment applied', 'SimpleMessageResponse'),
-                    400 => self::errorResponse('Validation failed'),
-                    403 => self::errorResponse('Insufficient permissions'),
-                    500 => self::errorResponse('Internal error'),
-                ],
-            ]),
-            self::adminRoute('POST', '/api/deployments/rollback', [
-                'summary' => 'Roll back the last deployment',
-                'tags' => ['platform-ops'],
-                'responses' => [
-                    200 => self::jsonResponse('Rollback complete', 'SimpleMessageResponse'),
-                    403 => self::errorResponse('Insufficient permissions'),
-                    500 => self::errorResponse('Internal error'),
-                ],
-            ]),
-            self::adminRoute('GET', '/api/deployments/status', [
-                'summary' => 'Get the current deployment status',
-                'tags' => ['platform-ops'],
-                'responses' => [
-                    200 => self::jsonResponse('Current deployment status', 'DeploymentStatusResponse'),
-                    403 => self::errorResponse('Insufficient permissions'),
-                    500 => self::errorResponse('Internal error'),
-                ],
-            ]),
             self::adminRoute('GET', '/api/migrations', [
                 'summary' => 'List database migrations and their execution state',
                 'tags' => ['platform-ops'],
@@ -6721,6 +6691,7 @@ final class CoreApiSchemas
             // List rows omit it; GET /{id} and saves return it.
             'DocumentSource' => self::object([
                 'numbering' => SchemaBuilder::ref('DocumentNumbering') + ['nullable' => true, 'description' => 'How documents from this template are numbered, when it has its own rule'],
+                'public_name' => self::str(true) + ['description' => 'What kind of document this makes, in words for strangers: the kind the public check shows at the `described` level. Null shows no kind.'],
                 'id' => self::int(),
                 'tenant_id' => self::int(),
                 'kind' => ['type' => 'string', 'enum' => ['template', 'letter', 'report', 'note', 'wiki', 'label']],
@@ -6749,6 +6720,7 @@ final class CoreApiSchemas
                 'updated_at' => self::str(),
             ], ['id', 'tenant_id', 'kind', 'title', 'lang', 'default_view', 'full_width', 'draft_version', 'scope', 'created_at', 'updated_at']),
             'DocumentSourceAudienceRequest' => self::object([
+                'public_name' => self::str(true) + ['description' => 'What kind of document this makes, for the public check (\'Handover certificate\'), at most 120 characters; null or empty for none. Never a customer\'s name. Needs documents:publish.'],
                 'numbering' => SchemaBuilder::ref('DocumentNumbering') + ['nullable' => true, 'description' => 'How documents from this template are numbered; it wins over a slot\'s rule. Needs documents:publish.'],
                 'scope' => ['type' => 'string', 'enum' => ['personal', 'tenant', 'global', 'system']] + ['description' => 'Who can see the document: `personal` (only its creator), `tenant`, `global` or `system`. Anything but personal needs documents:publish.'],
                 'required_permission' => self::str(true) + ['description' => 'A permission a reader must also hold to see a shared document; null for none. Needs documents:publish.'],
@@ -6843,12 +6815,14 @@ final class CoreApiSchemas
                 'data' => ['type' => 'array', 'items' => self::object(['id' => self::str(), 'label' => self::str()], ['id', 'label'])],
             ], ['data']),
             'DocumentPublishBlocker' => self::object([
-                'kind' => ['type' => 'string', 'enum' => ['open-suggestions', 'missing-plugin', 'block-without-print-view', 'unknown-field', 'theme-unavailable']],
+                'kind' => ['type' => 'string', 'enum' => ['open-suggestions', 'missing-plugin', 'block-without-print-view', 'unknown-field', 'theme-unavailable', 'too-large']],
                 'count' => self::int(),
                 'plugin' => self::str(),
                 'blockId' => self::str(),
                 'path' => self::str(),
                 'ref' => self::str() + ['description' => 'With theme-unavailable: the theme the document names that the workspace doesn\'t have'],
+                'bytes' => self::int() + ['description' => 'With too-large: what printing the template sends Whity Render, in bytes, before any record\'s values'],
+                'max' => self::int() + ['description' => 'With too-large: the render size ceiling (documents.flow_max_bytes), in bytes'],
             ], ['kind']),
             'DocumentPublishCheckResponse' => self::object([
                 'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('DocumentPublishBlocker')],
@@ -7366,14 +7340,14 @@ final class CoreApiSchemas
             ], ['email', 'password']),
             'UserUpdateRequest' => self::object([
                 'displayName' => self::str() + ['description' => 'The name shown for this person. Refused with 409 when they also belong to another workspace, unless the caller is the system tenant.'],
-                'email' => self::email() + ['description' => 'New sign-in email address.'],
-                'password' => self::password() + ['description' => 'New password; must satisfy the site password policy.'],
+                'email' => self::email() + ['description' => 'New sign-in email address. Refused with 409 when they also belong to another workspace, unless the caller is the system tenant.'],
+                'password' => self::password() + ['description' => 'New password; must satisfy the site password policy. Refused with 409 when they also belong to another workspace, unless the caller is the system tenant.'],
                 'role' => $permissionRef + ['description' => 'Replacement role in this tenant, by name or numeric id.'],
                 'role_id' => self::reference('/api/roles', 'name') + ['description' => 'Replacement role, by id (see GET /api/roles). Takes precedence over `role`.'],
                 // array_key_exists, not isset: an explicit null CLEARS the OU.
                 'ou_id' => self::reference('/api/ous', 'name', nullable: true) + ['description' => 'Organizational unit to move the user to. An explicit null removes them from their unit.'],
                 // WC-user-status: the admin deactivate/reactivate control.
-                'accountStatus' => ['type' => 'string', 'enum' => ['active', 'inactive'], 'description' => '`inactive` blocks sign-in for this person everywhere; `active` restores it.'],
+                'accountStatus' => ['type' => 'string', 'enum' => ['active', 'inactive'], 'description' => '`inactive` blocks sign-in for this person everywhere; `active` restores it. Refused with 409 when they also belong to another workspace, unless the caller is the system tenant.'],
                 // #917: permits `password` against an account whose credentials
                 // belong to an identity provider (`authMethod: 'idp'`), which is
                 // otherwise refused with 409. Taking it moves the account to
@@ -9234,19 +9208,8 @@ final class CoreApiSchemas
             // as an open object rather than pinned field-by-field.
             'OpenApiDocumentResponse' => ['type' => 'object', 'additionalProperties' => true],
 
-            // Shared bare { message } response (deployment and plugin handlers)
+            // Shared bare { message } response (plugin handlers)
             'SimpleMessageResponse' => self::object(['message' => self::str()], ['message']),
-
-            // POST /api/deployments/apply request body
-            'DeploymentApplyRequest' => self::object([
-                'version' => self::str(),
-                'source_path' => self::str(),
-            ], ['version', 'source_path']),
-
-            // GET /api/deployments/status — free-form data object
-            'DeploymentStatusResponse' => self::object([
-                'data' => ['type' => 'object', 'additionalProperties' => true],
-            ], ['data']),
 
             // GET /api/migrations
             'MigrationEntry' => self::object([
@@ -13127,7 +13090,9 @@ final class CoreApiSchemas
                         . '`documents.qr_public_detail` to `stage`, which adds the current routing verb '
                         . 'and distinguishes a revoked code from an unrecognised one, or LOWER it to '
                         . '`undated`, which withholds `issued_on` and leaves everything else as '
-                        . '`minimal`. It never returns a '
+                        . '`minimal`. `described` adds to `stage` the kind (the template\'s public name), '
+                        . 'the revision letter, the page count, and on a revised document\'s code which '
+                        . 'revision replaced it. It never returns a price, the document number, a '
                         . 'document id, a title, any content, any recipient, or any name of a person or '
                         . 'unit — a signed-in reader who wants the record calls '
                         . 'GET /api/documents/by-verification/{token}, where RBAC decides unchanged.',
@@ -13175,13 +13140,34 @@ final class CoreApiSchemas
                                             ],
                                             'stage' => [
                                                 'type' => 'string',
-                                                'description' => 'Only at the `stage` disclosure level',
+                                                'description' => 'Only at the `stage` and `described` disclosure levels',
                                                 'enum' => ['issued', 'forwarded', 'acknowledged', 'returned', 'noted'],
                                             ],
                                             'stage_on' => [
                                                 'type' => 'string',
                                                 'nullable' => true,
                                                 'description' => 'Date only, and only at the `stage` level',
+                                            ],
+                                            'kind' => [
+                                                'type' => 'string',
+                                                'description' => 'Only at `described`, and only when the template has a public name: what kind of document it is. Never its title.',
+                                            ],
+                                            'revision' => [
+                                                'type' => 'string',
+                                                'description' => 'Only at `described`: the revision letter, A for the first',
+                                            ],
+                                            'pages' => [
+                                                'type' => 'integer',
+                                                'description' => 'Only at `described`, and only when the render service reported it',
+                                            ],
+                                            'replaced_by' => [
+                                                'type' => 'object',
+                                                'description' => 'Only at `described`, on a refused code whose document was revised',
+                                                'properties' => [
+                                                    'revision' => ['type' => 'string'],
+                                                    'issued_on' => ['type' => 'string', 'nullable' => true],
+                                                ],
+                                                'required' => ['revision', 'issued_on'],
                                             ],
                                         ],
                                         'required' => ['verified'],

@@ -75,6 +75,7 @@ final class DocumentPublishingApiHandlerRealEngineTest extends TestCase
     private DocumentPublishingApiHandler $handler;
     private FakeRenderServiceClient $render;
     private SettingsService $settings;
+    private DocumentSourceFileStore $files;
     private string $storageRoot;
 
     protected function setUp(): void
@@ -85,7 +86,7 @@ final class DocumentPublishingApiHandlerRealEngineTest extends TestCase
         mkdir($this->storageRoot, 0o777, true);
         $roleChecker = new RoleChecker($this->wrap($this->pdo), new PermissionRegistry());
         $resourceRoles = new ResourceRoleAssignmentRepository($this->pdo, new ResourceTypeRegistry());
-        $files = new DocumentSourceFileStore(new LocalStorageDriver($this->storageRoot), $this->pdo);
+        $files = $this->files = new DocumentSourceFileStore(new LocalStorageDriver($this->storageRoot), $this->pdo);
         $this->sources = new DocumentSourcesApiHandler(
             new DocumentSourceRepository($this->pdo),
             new DocumentAccessPolicy(),
@@ -236,6 +237,56 @@ final class DocumentPublishingApiHandlerRealEngineTest extends TestCase
         $res = $this->publish(self::OWNER, $id, '"1"');
         self::assertSame(409, $res->getStatusCode());
         self::assertCount(3, json_decode($res->getBody(), true)['details']['blockers']);
+    }
+
+    /**
+     * #1435: a template too large for Whity Render can't be published, so it
+     * can't publish fine and then fail every print. The size is what printing
+     * sends, with its images inlined, against the same ceiling and measure
+     * the render refuses on.
+     */
+    public function testATemplateTooLargeToPrintIsBlockedFromPublishing(): void
+    {
+        $this->settings->setTenant(self::TENANT, SettingsRegistry::DOCUMENTS_FLOW_MAX_BYTES, '4096');
+        $id = $this->template(self::OWNER, [$this->para('Dear customer')]);
+        self::assertSame([], $this->data($this->check(self::OWNER, $id)), 'a small template is clear');
+
+        // The draft itself stays tiny: the image is a file reference, and only
+        // printing inlines it. So the check has to measure what prints.
+        $file = $this->files->put(self::TENANT, $id, str_repeat("PNG", 1500), 'image/png', 'scan.png', self::OWNER);
+        $this->save(self::OWNER, $id, '"1"', ['blocks' => [
+            $this->para('Dear customer'),
+            ['id' => 'img1', 'type' => 'image', 'src' => "/api/document-sources/{$id}/files/{$file['id']}/content", 'alt' => 'Scan', 'caption' => []],
+        ]]);
+
+        $check = $this->check(self::OWNER, $id);
+        self::assertSame(200, $check->getStatusCode(), $check->getBody());
+        $blockers = $this->blockerList($check);
+        self::assertCount(1, $blockers);
+        self::assertSame('too-large', $blockers[0]['kind']);
+        self::assertSame(4096, $blockers[0]['max']);
+        self::assertGreaterThan(4096 + 6000, $blockers[0]['bytes'], 'the image is counted base64-encoded, as it prints');
+        $bytes = $blockers[0]['bytes'];
+
+        // Publish runs the same check: refused, and nothing was published.
+        $res = $this->publish(self::OWNER, $id, '"2"');
+        self::assertSame(409, $res->getStatusCode(), $res->getBody());
+        self::assertSame($blockers, json_decode($res->getBody(), true)['details']['blockers']);
+        self::assertSame([], $this->data($this->handler->history($this->request('GET', "/api/document-sources/{$id}/versions", self::OWNER), ['id' => (string) $id])));
+
+        // Printing agrees: the same draft is refused by the render ceiling.
+        $doc = $this->issue(self::OWNER, 'Payment reminder');
+        $print = $this->renderPdf(self::OWNER, $id, ['record' => 'document:' . $doc, 'draft' => true]);
+        self::assertSame(422, $print->getStatusCode(), $print->getBody());
+        self::assertStringContainsString('maximum render size', $print->getBody());
+        self::assertSame([], $this->render->flowCalls, 'Whity Render was never asked');
+
+        // One byte under the measured size still blocks; at it, publishing goes through.
+        $this->settings->setTenant(self::TENANT, SettingsRegistry::DOCUMENTS_FLOW_MAX_BYTES, (string) ($bytes - 1));
+        self::assertSame('too-large', $this->blockerList($this->check(self::OWNER, $id))[0]['kind'] ?? null);
+        $this->settings->setTenant(self::TENANT, SettingsRegistry::DOCUMENTS_FLOW_MAX_BYTES, (string) $bytes);
+        self::assertSame([], $this->data($this->check(self::OWNER, $id)));
+        self::assertSame(201, $this->publish(self::OWNER, $id, '"2"')->getStatusCode());
     }
 
     public function testOnlyPrintedKindsHaveVersionsAndHiddenTemplatesAre404(): void
@@ -591,6 +642,13 @@ final class DocumentPublishingApiHandlerRealEngineTest extends TestCase
             ->execute([self::TENANT, 'Letters', $title, $userId, '2026-10-20 09:00:00']);
 
         return (int) $this->pdo->lastInsertId();
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function blockerList(Response $res): array
+    {
+        /** @var list<array<string, mixed>> */
+        return array_values($this->data($res));
     }
 
     private function check(int $userId, int $id, int $tenant = self::TENANT): Response

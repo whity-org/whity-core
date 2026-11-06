@@ -27,6 +27,7 @@ import { issueHref } from '@/lib/documents/issue';
 import { fetchAllPages } from '@/lib/api/fetch-all-pages';
 import { createDocumentSource } from '@/lib/documents/sources';
 import { NumberingDialog } from './numbering-dialog';
+import { PublicNameDialog } from './public-name-dialog';
 import { ScopeDialog } from './scope-dialog';
 import { DeleteDialog } from './delete-dialog';
 import { CopyDialog } from './copy-dialog';
@@ -121,6 +122,7 @@ export default function DocumentTemplatesPage() {
   const [copying, setCopying] = useState<TemplateRow | null>(null);
   const [scoping, setScoping] = useState<TemplateRow | null>(null);
   const [numbering, setNumbering] = useState<TemplateRow | null>(null);
+  const [naming, setNaming] = useState<TemplateRow | null>(null);
   const [deleting, setDeleting] = useState<TemplateRow | null>(null);
   const [creating, setCreating] = useState(false);
   const [starting, setStarting] = useState(false);
@@ -256,6 +258,11 @@ export default function DocumentTemplatesPage() {
             {t('documentTemplates.rowActions.numbering', 'Numbering…')}
           </DropdownMenuItem>
         )}
+        {row.kind === 'template' && (
+          <DropdownMenuItem onClick={() => setNaming(row)} disabled={!canPublish}>
+            {t('documentTemplates.rowActions.publicName', 'Name on the public check…')}
+          </DropdownMenuItem>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => setDeleting(row)} disabled={!canWrite} variant="destructive">
           {t('documentTemplates.rowActions.delete', 'Delete…')}
@@ -388,6 +395,20 @@ export default function DocumentTemplatesPage() {
           onClose={() => setNumbering(null)}
           onSaved={() => {
             setNumbering(null);
+            templates.refetch();
+          }}
+        />
+      )}
+
+      {naming !== null && (
+        <PublicNameDialog
+          row={naming}
+          name={nameOf(naming)}
+          apiClient={apiClient}
+          addToast={addToast}
+          onClose={() => setNaming(null)}
+          onSaved={() => {
+            setNaming(null);
             templates.refetch();
           }}
         />

@@ -469,6 +469,73 @@ final class SettingsApiRealEngineTest extends TestCase
         self::assertArrayHasKey('locale', $this->decode($response)['details']);
     }
 
+    /**
+     * #1622: an S3 endpoint the driver cannot parse is refused at save. It used
+     * to be stored, and the next boot killed every worker.
+     *
+     * @return iterable<string, array{string}>
+     */
+    public static function badS3Endpoints(): iterable
+    {
+        yield 'no scheme (as the Backblaze console shows it)' => ['s3.eu-central-003.backblazeb2.com'];
+        yield 'not http(s)' => ['ftp://s3.example.com'];
+        yield 'with a path' => ['https://s3.example.com/bucket'];
+        yield 'with a query' => ['https://s3.example.com?x=1'];
+        yield 'with credentials' => ['https://key:secret@s3.example.com'];
+        yield 'no host' => ['https://'];
+        yield 'inner whitespace' => ['https://s3 .example.com'];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('badS3Endpoints')]
+    public function testPatchGlobalRejectsAnS3EndpointTheDriverCannotUse(string $endpoint): void
+    {
+        TenantContext::setTenantId(self::SYSTEM_TENANT);
+        $response = $this->handler->patchGlobal(
+            $this->req('PATCH', '/api/settings/global', ['settings' => ['storage.s3.endpoint' => $endpoint]], self::USER_FULL, self::SYSTEM_TENANT)
+        );
+
+        self::assertSame(422, $response->getStatusCode(), $response->getBody());
+        self::assertArrayHasKey('storage.s3.endpoint', $this->decode($response)['details']);
+        self::assertSame(
+            0,
+            (int) $this->scalar("SELECT COUNT(*) FROM app_settings WHERE setting_key = 'storage.s3.endpoint'"),
+            'A refused endpoint must not be stored.'
+        );
+    }
+
+    public function testPatchGlobalAcceptsAWellFormedS3EndpointAndPublicBaseUrl(): void
+    {
+        TenantContext::setTenantId(self::SYSTEM_TENANT);
+        $response = $this->handler->patchGlobal($this->req('PATCH', '/api/settings/global', ['settings' => [
+            'storage.s3.endpoint' => 'https://s3.eu-central-003.backblazeb2.com',
+            // A CDN in front of the bucket may serve it under a prefix.
+            'storage.s3.public_base_url' => 'https://cdn.example.com/files',
+        ]], self::USER_FULL, self::SYSTEM_TENANT));
+
+        self::assertSame(200, $response->getStatusCode(), $response->getBody());
+        self::assertSame(
+            'https://s3.eu-central-003.backblazeb2.com',
+            $this->scalar("SELECT value FROM app_settings WHERE setting_key = 'storage.s3.endpoint'")
+        );
+
+        // A local MinIO on a port is a valid endpoint too.
+        $minio = $this->handler->patchGlobal($this->req('PATCH', '/api/settings/global', ['settings' => [
+            'storage.s3.endpoint' => 'http://minio.internal:9000',
+        ]], self::USER_FULL, self::SYSTEM_TENANT));
+        self::assertSame(200, $minio->getStatusCode(), $minio->getBody());
+    }
+
+    public function testPatchGlobalRejectsAPublicBaseUrlWithNoScheme(): void
+    {
+        TenantContext::setTenantId(self::SYSTEM_TENANT);
+        $response = $this->handler->patchGlobal($this->req('PATCH', '/api/settings/global', ['settings' => [
+            'storage.s3.public_base_url' => 'cdn.example.com',
+        ]], self::USER_FULL, self::SYSTEM_TENANT));
+
+        self::assertSame(422, $response->getStatusCode(), $response->getBody());
+        self::assertArrayHasKey('storage.s3.public_base_url', $this->decode($response)['details']);
+    }
+
     public function testGlobalPatchAcceptsInstanceGovernanceKey(): void
     {
         // Governance flags ARE writable on the global (system-tenant) surface.

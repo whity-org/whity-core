@@ -242,9 +242,12 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsOneEightForInteractiveBlocks(): void
     {
         $this->assertSame(
-            '1.68.0',
+            '1.69.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.68 ADDS DOCUMENT REVISIONS: document.revised says a revision replaced a document (WHIT-888). '
+            'SDK 1.69 ADDS PUBLIC READS: a route declared public => read answers GETs from anybody holding a key, '
+            . 'with the tenant from the key, the limits run by the host and the operator switch off by default; '
+            . 'Http\PublicRead carries the result (WHIT-704). Purely additive. '
+            . 'SDK 1.68 ADDS DOCUMENT REVISIONS: document.revised says a revision replaced a document (WHIT-888). '
             . 'Purely additive. '
             . 'SDK 1.67 ADDS PUBLIC FORMS: a route declared public => form takes anonymous browser submissions, with the '
             . 'tenant from a key and the checks run by the host; Http\\PublicForm carries the result (WHIT-906). Purely additive. '

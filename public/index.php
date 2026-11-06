@@ -288,7 +288,6 @@ use Whity\Core\Mail\MailerFactory;
 use Whity\Api\RolesApiHandler;
 use Whity\Api\TenantsApiHandler;
 use Whity\Api\PermissionsApiHandler;
-use Whity\Api\DeploymentApiHandler;
 use Whity\Api\PluginsApiHandler;
 use Whity\Api\MigrationsApiHandler;
 use Whity\Api\AdminApiHandler;
@@ -320,7 +319,6 @@ use Whity\Core\RBAC\CorePermissions;
 use Whity\Core\Hooks\HookManager;
 use Whity\Core\Audit\AuditContext;
 use Whity\Core\Audit\AuditLogger;
-use Whity\Core\Deployment\DeploymentManager;
 use Whity\Core\Log\ErrorLogLogger;
 use Whity\Core\Tenant\TenantContext;
 use Whity\Auth\TotpService;
@@ -1438,6 +1436,9 @@ $publicFormGate = new \Whity\Http\Middleware\PublicFormGate(
     $publicFormKeyRepository,
     new DatabaseSharedStore($db->getPdo()),
     $publicFormBotCheck,
+    null,
+    // A plugin's public GET (WHIT-704) is served only when the operator says so.
+    \Whity\Http\Middleware\PublicFormGate::readsEnabledFromEnv($_ENV),
 );
 $kernel->use($publicFormGate);
 $kernel->use(new RequestBodyValidator());
@@ -1490,7 +1491,6 @@ $pluginLoader = new PluginLoader(
 );
 
 // 9b. Initialize deployment manager
-$deploymentManager = new DeploymentManager($db->getPdo(), __DIR__ . '/../storage/deployments');
 
 // 10. Register authentication handler
 // Inject the shared $totpService (built at step 3b) so the login-path 2FA validation uses the
@@ -2310,11 +2310,6 @@ $router->register('GET', '/api/platform/version/latest', [$platformVersionHandle
 $openApiHandler = new OpenApiHandler($router, $pluginLoader);
 $router->registerUnversioned('GET', '/api/openapi.json', [$openApiHandler, 'handle']);
 
-$deploymentHandler = new DeploymentApiHandler($deploymentManager);
-$router->register('POST', '/api/deployments/apply', [$deploymentHandler, 'apply'], 'admin');
-$router->register('POST', '/api/deployments/rollback', [$deploymentHandler, 'rollback'], 'admin');
-$router->register('GET', '/api/deployments/status', [$deploymentHandler, 'status'], 'admin');
-
 // Plugins admin API (WC-9/PR #88, WC-10/PR #104). Pass the live $pluginLoader so
 // list/enable/disable use the WC-9 lifecycle at runtime. WC-218: each route is
 // gated by its OWN per-action plugin permission (6th positional arg to
@@ -3054,7 +3049,11 @@ $router->register('GET', '/api/subscription',                  [$subscriptionHan
 // split-backend hazard StorageDriverFactory's own docblock warns about. One
 // driver, built before anything that needs it.
 $storageRoot = getenv('STORAGE_ROOT') ?: (__DIR__ . '/../storage');
-$defaultStorageDriver = \Whity\Storage\StorageDriverFactory::fromSettings($settingsService, $_ENV, $storageRoot);
+// #1622: a storage configuration that cannot be built (an endpoint with no
+// scheme, s3 selected before the secret is in the environment) is logged at
+// CRITICAL and falls back to local disk instead of killing every worker — so
+// the settings API stays up to correct it.
+$defaultStorageDriver = \Whity\Storage\StorageDriverFactory::fromSettingsOrLocal($settingsService, $_ENV, $storageRoot, $logger);
 $storageResolver = new \Whity\Storage\TenantStorageResolver(
     $defaultStorageDriver,
     new \Whity\Storage\TenantStorageConfigRepository($db->getPdo()),
@@ -3639,7 +3638,9 @@ $documentVerificationHandler = new \Whity\Api\DocumentVerificationApiHandler(
     $documentRepository,
     $routeEventRepository,
     $settingsService,
-    new DatabaseSharedStore($db->getPdo())
+    new DatabaseSharedStore($db->getPdo()),
+    $documentSourceRepository,
+    $documentArtifactRepository,
 );
 
 // `/api/documents/views` is registered BEFORE the `{id:\d+}` routes and cannot

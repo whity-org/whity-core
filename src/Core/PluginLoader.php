@@ -2424,8 +2424,7 @@ class PluginLoader
     /**
      * Recursively remove a directory or single file.
      *
-     * Mirrors the pattern from DeploymentManager::removeRecursive(). Silently
-     * returns when the path does not exist.
+     * Silently returns when the path does not exist.
      *
      * @param string $path Absolute path to remove.
      */
@@ -3189,6 +3188,8 @@ class PluginLoader
             $wantsPublic = array_key_exists('public', $declared) && $declared['public'] !== false;
             // A public FORM (WHIT-906): `'public' => 'form'`, the only other value.
             $wantsPublicForm = $wantsPublic && $declared['public'] === 'form';
+            // A public READ (WHIT-704): `'public' => 'read'` on a keyed GET.
+            $wantsPublicRead = $wantsPublic && $declared['public'] === 'read';
             if ($wantsPublic) {
                 $refusal = match (true) {
                     $declared['public'] === true => \Whity\Core\Plugin\PluginPublicRoutes::refusal(
@@ -3205,7 +3206,14 @@ class PluginLoader
                         $requiredPermission,
                         $requiredRole,
                     ),
-                    default => "'public' must be the boolean true or 'form'",
+                    $wantsPublicRead => \Whity\Core\Plugin\PluginPublicRoutes::readRefusal(
+                        $plugin->getName(),
+                        (string) $method,
+                        (string) $path,
+                        $requiredPermission,
+                        $requiredRole,
+                    ),
+                    default => "'public' must be the boolean true, 'form' or 'read'",
                 };
                 if ($refusal !== null) {
                     $this->logWarning(
@@ -3221,7 +3229,7 @@ class PluginLoader
                 // OpenAPI declaration through to the router/generator.
                 $schema = isset($route['schema']) && is_array($route['schema']) ? $route['schema'] : null;
 
-                $wrappedHandler = $this->wrapHandler($pluginKey, $handler, $wantsPublic, $wantsPublicForm);
+                $wrappedHandler = $this->wrapHandler($pluginKey, $handler, $wantsPublic, $wantsPublicForm, $wantsPublicRead);
                 $accepted = $this->router->register(
                     $method,
                     $path,
@@ -3253,16 +3261,27 @@ class PluginLoader
                     $served = $this->router->versionedPath((string) $path);
                     // A form's path has a parameter, so it is probed with a real value.
                     $probe = str_replace('{key}', str_repeat('0', 64), $served);
-                    $resolved = $this->router->match(new \Whity\Core\Request('POST', $probe, [], ''));
+                    $probeMethod = $wantsPublicRead ? 'GET' : 'POST';
+                    $resolved = $this->router->match(new \Whity\Core\Request($probeMethod, $probe, [], ''));
                     if ($resolved !== null && ($resolved['namespacePrefix'] ?? null) === $namespacePrefix) {
-                        if ($wantsPublicForm) {
-                            \Whity\Core\Plugin\PluginPublicRoutes::addForm($namespacePrefix, $plugin->getName(), (string) $resolved['path'], (string) $path);
+                        if ($wantsPublicForm || $wantsPublicRead) {
+                            $recorded = $wantsPublicRead
+                                ? \Whity\Core\Plugin\PluginPublicRoutes::addRead($namespacePrefix, $plugin->getName(), (string) $resolved['path'], (string) $path)
+                                : \Whity\Core\Plugin\PluginPublicRoutes::addForm($namespacePrefix, $plugin->getName(), (string) $resolved['path'], (string) $path);
+                            if (!$recorded) {
+                                // Registered, but never public: the wrapper refuses it
+                                // without the gate's result, which it can't get.
+                                $this->logWarning(
+                                    "Plugin {$pluginKey} route {$probeMethod} {$path} shares its name with another of "
+                                    . "this plugin's keyed routes; it was registered PRIVATE."
+                                );
+                            }
                         } else {
                             \Whity\Core\Plugin\PluginPublicRoutes::add($namespacePrefix, 'POST', $served);
                         }
                     } else {
                         $this->logWarning(
-                            "Plugin {$pluginKey} route POST {$path} asks to be public, but another route answers "
+                            "Plugin {$pluginKey} route {$probeMethod} {$path} asks to be public, but another route answers "
                             . 'that path; it was registered PRIVATE.'
                         );
                     }
@@ -4855,12 +4874,17 @@ class PluginLoader
      * @param callable $handler The raw plugin route handler.
      * @return callable(Request, array<string, string>): Response
      */
-    private function wrapHandler(string $pluginKey, callable $handler, bool $public = false, bool $publicForm = false): callable
+    private function wrapHandler(string $pluginKey, callable $handler, bool $public = false, bool $publicForm = false, bool $publicRead = false): callable
     {
-        return function (Request $request, array $params = []) use ($pluginKey, $handler, $public, $publicForm): Response {
+        return function (Request $request, array $params = []) use ($pluginKey, $handler, $public, $publicForm, $publicRead): Response {
             // A public form's handler never runs on a request the gate didn't pass,
             // however that request got here (WHIT-906).
             if ($publicForm && \Whity\Sdk\Http\PublicForm::from($request) === null) {
+                return Response::error('Not Found', 404);
+            }
+            // The same for a public read (WHIT-704), which also covers reads the
+            // operator hasn't switched on: the gate then passes nothing.
+            if ($publicRead && \Whity\Sdk\Http\PublicRead::from($request) === null) {
                 return Response::error('Not Found', 404);
             }
 

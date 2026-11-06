@@ -46,7 +46,6 @@ final class ToolArgumentDescriptionsTest extends TestCase
         'post_api_time_windows_id_reopen' => ['reason'],
         'put_api_notification_settings_channel' => ['transport', 'from_address', 'from_name', 'reply_to', 'config', 'enabled'],
         'put_api_notification_settings_channel_credentials' => ['credentials'],
-        'post_api_deployments_apply' => ['version', 'source_path'],
         'get_api_plugins_store_catalog' => ['store_url', 'q'],
         'post_api_persons' => ['displayName', 'birthDate', 'deceased', 'notes'],
         'patch_api_persons_id' => ['displayName', 'birthDate', 'deceased', 'notes'],
