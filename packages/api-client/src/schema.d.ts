@@ -3470,6 +3470,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/labels/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resolve a few unit and role ids to their display names
+         * @description For a screen that holds unit and role ids and needs their names. The caller names the surface it is rendering and must hold that surface's permission: documents needs documents:read, documents.route needs documents:route. Directory permissions are not needed. Returns names only, keyed by id. An id that is unknown or belongs to another workspace has no entry. The number of ids per request is capped by labels.resolve_max_ids (default 100). People are not resolved here: they are named per record by GET /api/documents/{id}/people.
+         */
+        post: operations["post_api_v1_labels_resolve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/languages": {
         parameters: {
             query?: never;
@@ -31708,6 +31728,107 @@ export interface operations {
             };
             /** @description Too many invitations sent */
             429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_labels_resolve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    surface: "documents" | "documents.route";
+                    ous?: number[];
+                    roles?: number[];
+                };
+            };
+        };
+        responses: {
+            /** @description Names keyed by id, per kind */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            ous: {
+                                [key: string]: string;
+                            };
+                            roles: {
+                                [key: string]: string;
+                            };
+                        };
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unknown surface or key, a malformed id list, or too many ids */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

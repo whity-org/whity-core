@@ -12123,6 +12123,38 @@ final class CoreApiSchemas
                 ] + self::authErrors(),
             ]),
             [
+                'method' => 'POST',
+                'path' => '/api/labels/resolve',
+                'requiredRole' => null,
+                // The permission depends on the `surface` in the body, so the
+                // handler checks it (#1019). Never the directory permissions.
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Resolve a few unit and role ids to their display names',
+                    'description' => 'For a screen that holds unit and role ids and needs their names. The caller names '
+                        . 'the surface it is rendering and must hold that surface\'s permission: documents needs '
+                        . 'documents:read, documents.route needs documents:route. Directory permissions are not needed. '
+                        . 'Returns names only, keyed by id. An id that is unknown or belongs to another workspace has no '
+                        . 'entry. The number of ids per request is capped by labels.resolve_max_ids (default 100). '
+                        . 'People are not resolved here: they are named per record by GET /api/documents/{id}/people.',
+                    'tags' => ['labels'],
+                    'request' => self::object([
+                        'surface' => ['type' => 'string', 'enum' => ['documents', 'documents.route']],
+                        'ous' => ['type' => 'array', 'items' => ['type' => 'integer', 'minimum' => 1]],
+                        'roles' => ['type' => 'array', 'items' => ['type' => 'integer', 'minimum' => 1]],
+                    ], ['surface']),
+                    'responses' => [
+                        200 => self::jsonResponse('Names keyed by id, per kind', self::object([
+                            'data' => self::object([
+                                'ous' => ['type' => 'object', 'additionalProperties' => ['type' => 'string']],
+                                'roles' => ['type' => 'object', 'additionalProperties' => ['type' => 'string']],
+                            ], ['ous', 'roles']),
+                        ], ['data'])),
+                        422 => self::errorResponse('Unknown surface or key, a malformed id list, or too many ids'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
                 'method' => 'GET',
                 'path' => '/api/documents/{id:\\d+}/people',
                 'requiredRole' => null,

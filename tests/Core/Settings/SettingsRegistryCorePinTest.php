@@ -174,6 +174,8 @@ final class SettingsRegistryCorePinTest extends TestCase
             // being written, keeps being queryable, keeps its place in the
             // audit trail. Only the screen changes.
             'ui.hide_dates',
+            // #1019. The cap on one label-resolution request.
+            'labels.resolve_max_ids',
         ];
     }
 
@@ -371,6 +373,7 @@ final class SettingsRegistryCorePinTest extends TestCase
             // preference most of them have not expressed — which is the same
             // argument i18n.enabled won above, pointing the other way.
             'ui.hide_dates' => 'false',
+            'labels.resolve_max_ids' => '100',
         ];
     }
 
@@ -520,6 +523,9 @@ final class SettingsRegistryCorePinTest extends TestCase
             ['ui.hide_dates', 'false', true],
             ['ui.hide_dates', '1', false],
             ['ui.hide_dates', 'yes', false],
+            ['labels.resolve_max_ids', '500', true],
+            ['labels.resolve_max_ids', '501', false],
+            ['labels.resolve_max_ids', '0', false],
             ['branding_favicon', 'anything', false],
             ['not_a_setting_at_all', 'x', false],
         ];

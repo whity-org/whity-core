@@ -3535,6 +3535,17 @@ $reportsHandler = new \Whity\Api\ReportsApiHandler(
 $router->register('GET',  '/api/reports',                            [$reportsHandler, 'index'],    null, null, CorePermissions::DOCUMENTS_RENDER);
 $router->register('POST', '/api/reports/{source:[a-z][a-z0-9_]*}/document', [$reportsHandler, 'document'], null, null, CorePermissions::DOCUMENTS_RENDER);
 
+// #1019. The names of a few units and roles, for a screen that holds their ids.
+// Registered without a route permission because the permission depends on the
+// `surface` in the body (documents:read for `documents`, documents:route for
+// `documents.route`), and the handler checks it. Never ous:read or roles:read.
+$labelsHandler = new \Whity\Api\LabelsApiHandler(
+    new \Whity\Core\Labels\LabelResolver($db->getPdo()),
+    $roleChecker,
+    $settingsService,
+);
+$router->register('POST', '/api/labels/resolve', [$labelsHandler, 'resolve'], null);
+
 $documentPeople = new \Whity\Core\Document\DocumentPeople($db->getPdo());
 $documentsHandler = new \Whity\Api\DocumentsApiHandler(
     $documentRepository,

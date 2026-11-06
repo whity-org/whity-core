@@ -716,6 +716,15 @@ final class SettingsRegistry
     public const UI_HIDE_DATES = 'ui.hide_dates';
 
     /**
+     * How many ids one `POST /api/labels/resolve` may name, across all kinds
+     * (#1019). The endpoint answers "what are these few units and roles called"
+     * for a screen that holds their ids; a cap keeps it from becoming a way to
+     * read the directory out a page at a time. 100 covers a long trail page and
+     * a full library page. Tenant-overridable, 1 to 500.
+     */
+    public const LABELS_RESOLVE_MAX_IDS = 'labels.resolve_max_ids';
+
+    /**
      * The asset-kind keys (Tenant Branding). Their stored value is a storage
      * key (or '' when unset). They are NEVER writable via the text PATCH path —
      * uploads go through BrandingService and the binary endpoints.
@@ -1148,6 +1157,7 @@ final class SettingsRegistry
         // every screen of every deployment at upgrade time, for a preference
         // most of them have not expressed.
         self::UI_HIDE_DATES => 'false',
+        self::LABELS_RESOLVE_MAX_IDS => '100',
     ];
 
     /**
@@ -1506,6 +1516,7 @@ final class SettingsRegistry
             self::I18N_ENABLED => self::validateBoolean($value, self::I18N_ENABLED),
             self::INVITATION_TTL_DAYS => self::validateInvitationTtlDays($value),
             self::UI_HIDE_DATES => self::validateBoolean($value, self::UI_HIDE_DATES),
+            self::LABELS_RESOLVE_MAX_IDS => self::validateLabelsResolveMaxIds($value),
             // #billing free-text. Declared with defaults and no validate() arm,
             // these fell straight through to `default` below — so six keys the
             // registry plainly knows were refused as "Unknown setting key" and
@@ -1634,6 +1645,19 @@ final class SettingsRegistry
      * The setting can only shorten that lifetime, never extend it, so a value
      * above the ceiling is rejected rather than silently clamped.
      */
+    private static function validateLabelsResolveMaxIds(string $value): ?string
+    {
+        if (preg_match('/^\d+$/', $value) !== 1) {
+            return 'labels.resolve_max_ids must be a whole number.';
+        }
+        $max = (int) $value;
+        if ($max < 1 || $max > 500) {
+            return 'labels.resolve_max_ids must be between 1 and 500.';
+        }
+
+        return null;
+    }
+
     private static function validateDesktopLoginMaxHours(string $value): ?string
     {
         if (preg_match('/^\d+$/', $value) !== 1) {

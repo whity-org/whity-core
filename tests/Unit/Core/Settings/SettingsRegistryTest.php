@@ -115,7 +115,9 @@ final class SettingsRegistryTest extends TestCase
              // volunteers. Appended rather than slotted in beside the other
              // `ui.`-shaped keys because there are none: this opens the
              // namespace, and appending keeps the diff to one line.
-             'ui.hide_dates'],
+             'ui.hide_dates',
+             // #1019: how many ids one label-resolution request may name.
+             'labels.resolve_max_ids'],
             SettingsRegistry::keys()
         );
     }
@@ -277,7 +279,8 @@ final class SettingsRegistryTest extends TestCase
         // 38 since WHIT-742: documents.slot_bindings, each workspace's own.
         // 40 since WHIT-788: three billing.seller_* out, five company.* in.
         // 41 since WHIT-742 slice 3: documents.background_issuing.
-        self::assertCount(41, SettingsRegistry::tenantTextKeys());
+        // 42 since #1019: labels.resolve_max_ids, each workspace's own cap.
+        self::assertCount(42, SettingsRegistry::tenantTextKeys());
 
         // The desktop-login TTL is per-tenant overridable (NOT global-only) and a
         // plain numeric string key.
@@ -434,7 +437,8 @@ final class SettingsRegistryTest extends TestCase
         // 94 since WHIT-742 slice 3: documents.background_issuing.
         // 96 since WHIT-873: maintenance.active and maintenance.until.
         // 100 since WHIT-901: mail.smtp.auth_mode and three mail.oauth.* keys.
-        self::assertCount(100, $describe);
+        // 101 since #1019: labels.resolve_max_ids.
+        self::assertCount(101, $describe);
         self::assertSame(
             ['key' => 'site_name', 'type' => 'string', 'default' => 'Whity'],
             $describe[0]
