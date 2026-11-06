@@ -8,6 +8,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/lib/toast-context';
 import { useFetch } from '@/hooks/useFetch';
 import { fetchAllPages } from '@/lib/api/fetch-all-pages';
+import { labelRequestKey, resolveLabels } from '@/lib/api/resolve-labels';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { Button } from '@whity/ui/button';
@@ -333,6 +334,23 @@ export default function DocumentLibraryPage() {
   // Who these rows name, sent with the page (S5), so no directory is needed.
   const people = useMemo(() => documents.data?.people ?? {}, [documents.data]);
 
+  // The units this page of rows was raised from, named through the label
+  // endpoint on the `documents` surface (#1019). Naming them needs documents:read,
+  // which this screen already requires, not ous:read: the full unit list above is
+  // only the anchor picker's catalogue.
+  const pageUnitIds = useMemo(
+    () =>
+      (documents.data?.data ?? [])
+        .map((row) => row.origin_ou_id)
+        .filter((id): id is number => id !== null && id !== undefined),
+    [documents.data]
+  );
+  const pageUnitKey = labelRequestKey({ ous: pageUnitIds });
+  const unitLabels = useFetch(
+    () => resolveLabels(apiClient, 'documents', { ous: pageUnitIds }),
+    [apiClient, pageUnitKey]
+  );
+
   // `refetch` is stable (useFetch memoises it with no deps); the fetch RESULT
   // object is not, so the mutations below depend on these rather than on
   // `documents`/`collections` and are not rebuilt on every render.
@@ -530,14 +548,18 @@ export default function DocumentLibraryPage() {
         // nowhere.
         return t('organizer.table.noUnit', 'No unit');
       }
-      // A bare `#4` rather than a guess when the unit list could not be read —
-      // and the notice below says why, so an id in this column is never mistaken
-      // for a unit whose name is missing. Listing units needs `ous:read`, which
-      // migration 101 removed from the plain user role, so this is an ordinary
-      // state rather than a fault.
-      return (ous.data ?? []).find((ou) => ou.id === ouId)?.name ?? `#${ouId}`;
+      // A bare `#4` rather than a guess when the name could not be read — and
+      // the notice below says why, so an id in this column is never mistaken for
+      // a unit whose name is missing. The name comes from the label endpoint
+      // (#1019); the anchor picker's list is a second source for a caller who
+      // also holds `ous:read`.
+      return (
+        unitLabels.data?.ous.get(ouId) ??
+        (ous.data ?? []).find((ou) => ou.id === ouId)?.name ??
+        `#${ouId}`
+      );
     },
-    [ous.data, t]
+    [ous.data, unitLabels.data, t]
   );
 
   // Filing needs the collection list — to show what is already true, and to
@@ -754,9 +776,14 @@ export default function DocumentLibraryPage() {
             />
           )}
 
-          {ous.error && (
+          {unitLabels.data?.available === false && (
             <p className="mb-3 text-sm text-muted-foreground">
               {t('organizer.ous.unavailable', 'Unit names could not be loaded, so they are not shown.')}
+            </p>
+          )}
+          {ous.error && (
+            <p className="mb-3 text-sm text-muted-foreground">
+              {t('organizer.ous.filterUnavailable', 'Filtering by unit is not available to you.')}
               <TechnicalDetails>
                 {' '}
                 {t('organizer.ous.permission', 'Listing units needs the ous:read permission.')}

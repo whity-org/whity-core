@@ -51,12 +51,14 @@ import { useAuth } from '@/lib/auth-context';
 import { useFetch } from '@/hooks/useFetch';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { fetchAllPages } from '@/lib/api/fetch-all-pages';
+import { labelRequestKey, resolveLabels } from '@/lib/api/resolve-labels';
 import { DOCUMENTS_ROUTE } from '@/lib/capabilities';
 import type { AudienceGroupOption } from '@whity/ui/audience-group-picker';
 import type { AudiencePersonOption } from '@whity/ui/audience-people-picker';
 import { RouteComposer, type RoleOption } from '@/components/documents/route-composer';
 import { RouteFanout } from '@/components/documents/route-fanout';
 import { RouteActPanel } from '@/components/documents/route-act-panel';
+import { configuredRoleId } from '@/components/documents/routing-wire';
 import type {
   RecipientsResponse,
   RouteRecipient,
@@ -380,18 +382,44 @@ export function DocumentRoutingPanel({ documentId, documentTitle, withdrawn = fa
     // the document to shows as a former member until the page is reloaded.
   }, [apiClient, documentId, version]);
 
-  const roleNames = useMemo(() => {
-    const map = new Map<number, string>();
-    for (const role of rolesResult.data?.items ?? []) map.set(role.id, role.name);
-    return map;
-  }, [rolesResult.data]);
-
   const recipientRows = useMemo<RouteRecipient[]>(
     () => recipients.data?.data ?? [],
     [recipients.data]
   );
 
   const routeList = routes.data?.data ?? [];
+
+  /**
+   * The roles the steps on THIS document name, through the label endpoint
+   * (#1019), so a step reads "Everyone holding Department head" for a viewer who
+   * cannot list roles. Asked as the routing surface by a person who may route,
+   * and as the document surface otherwise.
+   */
+  const stepRoleIds = useMemo(() => {
+    const ids: number[] = [];
+    for (const route of routes.data?.data ?? []) {
+      for (const step of route.steps ?? []) {
+        const roleId = configuredRoleId(step.rule_config);
+        if (roleId !== null) ids.push(roleId);
+      }
+    }
+    return ids;
+  }, [routes.data]);
+  const labelSurface = has(DOCUMENTS_ROUTE) ? 'documents.route' : 'documents';
+  const stepRoleKey = labelRequestKey({ roles: stepRoleIds });
+  const stepRoleLabels = useFetch(
+    () => resolveLabels(apiClient, labelSurface, { roles: stepRoleIds }),
+    [apiClient, labelSurface, stepRoleKey]
+  );
+
+  const roleNames = useMemo(() => {
+    const map = new Map<number, string>();
+    // The picker's catalogue first, then the labels, which win: they are this
+    // workspace's names for exactly these ids.
+    for (const role of rolesResult.data?.items ?? []) map.set(role.id, role.name);
+    for (const [id, name] of stepRoleLabels.data?.roles ?? []) map.set(id, name);
+    return map;
+  }, [rolesResult.data, stepRoleLabels.data]);
 
   const onIssued = (): void => {
     setComposing(false);

@@ -63,13 +63,12 @@
  * ─────────────────────────────────────────────────────────────────────────────
  * The trail and the recipient rows are made of ids. The people come from
  * `GET .../people` (S5), which names everybody on this record to anybody who may
- * read it, so no directory permission is involved. Turning `origin_ou_id` into a
- * unit needs `ous:read`, and migration 101 removed that from the plain user role,
- * so a reader without it is an ordinary state.
+ * read it, so no directory permission is involved. The units this record shows
+ * are named by `POST /api/v1/labels/resolve` on the `documents` surface (#1019),
+ * which needs `documents:read` rather than `ous:read`.
  *
  * So the units are fetched best-effort and their ABSENCE IS REPORTED: they render
- * as `Unit #7` with a notice above the region saying which permission would have
- * named them. Printing a bare `#7` with no explanation is what #951 is about: the
+ * as `Unit #7` with a notice above the region saying why. Printing a bare `#7` with no explanation is what #951 is about: the
  * reader cannot tell a permission boundary from a data bug.
  */
 
@@ -92,7 +91,7 @@ import { Alert, AlertDescription, AlertTitle } from '@whity/ui/alert';
 import { Button } from '@whity/ui/button';
 import { useDateDisplay } from '@whity/features/datetime';
 import { useAuth } from '@/lib/auth-context';
-import { fetchAllPages } from '@/lib/api/fetch-all-pages';
+import { labelRequestKey, resolveLabels } from '@/lib/api/resolve-labels';
 import { DocumentViewer } from '@/components/plugin/blocks/document-viewer';
 
 import { DocumentTrail, personName, unitName } from './trail';
@@ -459,54 +458,72 @@ export function DocumentRecordScreen({ documentId, onBack }: DocumentRecordScree
 
   // ── the directory ───────────────────────────────────────────────────────
   //
-  // Two independent walks, two independent verdicts. Never throws: a directory
-  // this caller may not read is a state to REPORT, not a failure that should
-  // take the page down — the document, its versions and its trail are all still
-  // readable with ids in place of names.
-  const directory = useRecordResource<Directory>(
+  // Two independent requests, two independent verdicts. Never throws: names this
+  // caller may not read are a state to REPORT, not a failure that should take the
+  // page down — the document, its versions and its trail are all still readable
+  // with ids in place of names.
+  //
+  // The units are the ones THIS record shows (where it was raised, where its
+  // trail moved and where its recipients sit), named through the label endpoint
+  // on the `documents` surface (#1019), so no directory permission is needed.
+  const unitIds = useMemo(() => {
+    const ids: number[] = [];
+    if (record?.origin_ou_id != null) ids.push(record.origin_ou_id);
+    if (trail.status === 'ready') {
+      for (const event of trail.value.data) {
+        if (event.from_ou_id !== null) ids.push(event.from_ou_id);
+        if (event.to_ou_id !== null) ids.push(event.to_ou_id);
+      }
+    }
+    if (recipients.status === 'ready') {
+      for (const recipient of recipients.value) {
+        if (recipient.ou_id !== null) ids.push(recipient.ou_id);
+      }
+    }
+    return ids;
+  }, [record, trail, recipients]);
+  const unitIdsKey = labelRequestKey({ ous: unitIds });
+
+  const people = useRecordResource<Map<number, string>>(
     async () => {
-      const [peopleResponse, unitsResult] = await Promise.all([
-        // The people on THIS record (S5), so naming them needs no directory.
-        apiClient(`/api/v1/documents/${documentId}/people`),
-        fetchAllPages<{ id: number; name: string }>(apiClient, '/api/v1/ous'),
-      ]);
-
-      const people = new Map<number, string>();
-      if (peopleResponse.ok) {
-        const body = (await peopleResponse.json()) as { data?: Record<string, string> };
-        for (const [id, name] of Object.entries(body.data ?? {})) {
-          people.set(Number(id), name);
-        }
+      // The people on THIS record (S5), so naming them needs no directory.
+      const response = await apiClient(`/api/v1/documents/${documentId}/people`);
+      if (!response.ok) {
+        throw new Error(t('record.error.directory', 'Failed to load names'));
       }
-
-      const units = new Map<number, string>();
-      if (unitsResult.complete) {
-        for (const unit of unitsResult.items) {
-          units.set(unit.id, unit.name);
-        }
+      const body = (await response.json()) as { data?: Record<string, string> };
+      const names = new Map<number, string>();
+      for (const [id, name] of Object.entries(body.data ?? {})) {
+        names.set(Number(id), name);
       }
-
-      return {
-        people,
-        units,
-        peopleAvailable: peopleResponse.ok,
-        // A PARTIAL walk counts as unavailable, not as available-and-short.
-        unitsAvailable: unitsResult.complete,
-      };
+      return names;
     },
     [documentId, routingVersion],
     t('record.error.directory', 'Failed to load names')
   );
 
+  // Its own request, keyed by the ids, so a trail page arriving names its units
+  // without the people above being read again.
+  const units = useRecordResource<{ names: Map<number, string>; available: boolean }>(
+    async () => {
+      const labels = await resolveLabels(apiClient, 'documents', { ous: unitIds });
+      return { names: labels.ous, available: labels.available };
+    },
+    [unitIdsKey],
+    t('record.error.directory', 'Failed to load names')
+  );
+
   const resolvedDirectory: Directory = useMemo(
-    () =>
-      directory.status === 'ready'
-        ? directory.value
-        : // While it is in flight, or if it failed outright, ids are what we
-          // have and the notices below say so. Fail-closed on the FLAGS, so the
-          // explanation is shown rather than withheld.
-          { people: new Map(), units: new Map(), peopleAvailable: false, unitsAvailable: false },
-    [directory]
+    () => ({
+      // While a request is in flight, or if it failed outright, ids are what we
+      // have and the notices below say so. Fail-closed on the FLAGS, so the
+      // explanation is shown rather than withheld.
+      people: people.status === 'ready' ? people.value : new Map(),
+      units: units.status === 'ready' ? units.value.names : new Map(),
+      peopleAvailable: people.status === 'ready',
+      unitsAvailable: units.status === 'ready' && units.value.available,
+    }),
+    [people, units]
   );
 
   const onTrailPage = useCallback((page: number) => setTrailPage(page), []);
@@ -565,7 +582,7 @@ export function DocumentRecordScreen({ documentId, onBack }: DocumentRecordScree
   const withdrawnBy = personName(t, resolvedDirectory, record.withdrawn_by ?? null);
   const withdrawnWhen = dates.dateTime(record.withdrawn_at);
   // Only once the answer is in, so the notice does not flash while it loads.
-  const namesFailed = directory.status !== 'loading' && !resolvedDirectory.peopleAvailable;
+  const namesFailed = people.status !== 'loading' && !resolvedDirectory.peopleAvailable;
 
   const fields: DocumentRecordFields = {
     title: record.title,
@@ -577,15 +594,15 @@ export function DocumentRecordScreen({ documentId, onBack }: DocumentRecordScree
     createdAt: record.created_at,
     versionCount: record.artifacts.length,
     raisedBy:
-      record.created_by === null || directory.status === 'ready'
+      record.created_by === null || people.status === 'ready'
         ? record.created_by === null
           ? null
           : personName(t, resolvedDirectory, record.created_by)
         : null,
-    // The name once the directory has answered, and nothing before that. A unit
+    // The name once the units have answered, and nothing before that. A unit
     // with no id at all is a real answer ("No unit") and is not withheld.
     originUnit:
-      record.origin_ou_id === null || directory.status === 'ready'
+      record.origin_ou_id === null || units.status === 'ready'
         ? unitName(t, resolvedDirectory, record.origin_ou_id)
         : null,
     // Counted only from a settled answer, and only from the OPEN rows —
@@ -640,7 +657,7 @@ export function DocumentRecordScreen({ documentId, onBack }: DocumentRecordScree
     editor: (
       <div className="space-y-3">
         {namesFailed && <DirectoryNotice kind="people" t={t} />}
-        {!resolvedDirectory.unitsAvailable && <DirectoryNotice kind="units" t={t} />}
+        {units.status !== 'loading' && !resolvedDirectory.unitsAvailable && <DirectoryNotice kind="units" t={t} />}
         {trail.status === 'error' ? (
           <p className="text-sm text-destructive">{trail.message}</p>
         ) : trail.status === 'loading' ? (
@@ -838,7 +855,7 @@ function DirectoryNotice({ kind, t }: { kind: 'people' | 'units'; t: Translate }
           )
         : t(
             'record.directory.units',
-            'Units are shown by number: naming them needs the ous:read permission.'
+            'Units are shown by number: naming them needs the documents:read permission.'
           )}
     </p>
   );
