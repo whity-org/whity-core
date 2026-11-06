@@ -1,1 +1,0 @@
-- A plugin SDK coverage matrix rates how far plugins reach each part of core (`docs/sdk-coverage/coverage.json`, rendered to `docs/wiki/Plugin-SDK-Coverage.md`), with a roadmap for the gaps. CI fails an SDK minor that doesn't update it, and release-prepare stamps it with the release version.
