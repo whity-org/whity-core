@@ -53,6 +53,9 @@ final class FormDraftRepository
         );
         $stmt->execute([':tenant_id' => $tenantId, ':profile_id' => $profileId, ':status' => FormStatus::PUBLISHED]);
 
+        /** @var list<array<string, mixed>> $rows */
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
         return array_map(
             static fn (array $row): array => [
                 'form_id' => (int) $row['form_id'],
@@ -61,7 +64,7 @@ final class FormDraftRepository
                 'updated_at' => (string) $row['updated_at'],
                 'open_to_members' => \Whity\Core\Db\DbBool::of($row['open_to_members'] ?? false),
             ],
-            $stmt->fetchAll(PDO::FETCH_ASSOC),
+            $rows,
         );
     }
 

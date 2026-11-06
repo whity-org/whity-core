@@ -348,7 +348,7 @@ class HttpKernel
     private function wrapWithMiddleware(object $middleware, callable $next): callable
     {
         return function(Request $request) use ($middleware, $next): Response {
-            /** @var mixed $middleware */
+            // @phpstan-ignore method.notFound (middleware is duck-typed: any object with handle(Request, callable): Response, see use())
             return $middleware->handle($request, $next);
         };
     }

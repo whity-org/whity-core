@@ -118,7 +118,7 @@ final class PrefillSource
      */
     public static function backed(): array
     {
-        return array_values(array_keys(array_filter(self::SOURCES)));
+        return array_keys(array_filter(self::SOURCES));
     }
 
     public static function isValid(string $source): bool

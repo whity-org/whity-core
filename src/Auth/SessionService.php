@@ -141,9 +141,6 @@ final class SessionService
         $stmt->execute([$profileId, $tenantId]);
 
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        if (!is_array($rows)) {
-            return [];
-        }
 
         return array_values(array_map(static function (array $row) use ($currentAccessJti): array {
             $accessJti = $row['access_jti'] !== null ? (string) $row['access_jti'] : null;
@@ -206,9 +203,6 @@ final class SessionService
         );
         $stmt->execute([$profileId, $tenantId, $keepAccessJti]);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        if (!is_array($rows)) {
-            return 0;
-        }
 
         foreach ($rows as $row) {
             $this->blacklistAndStamp(

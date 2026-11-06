@@ -1363,9 +1363,9 @@ class OusApiHandler
         // Replace spaces with hyphens
         $slug = str_replace(' ', '-', $slug);
         // Remove special characters
-        $slug = preg_replace('/[^a-z0-9-]/', '', $slug);
+        $slug = preg_replace('/[^a-z0-9-]/', '', $slug) ?? '';
         // Replace multiple hyphens with single hyphen
-        $slug = preg_replace('/-+/', '-', $slug);
+        $slug = preg_replace('/-+/', '-', $slug) ?? '';
         // Trim hyphens from start and end
         $slug = trim($slug, '-');
         return $slug;

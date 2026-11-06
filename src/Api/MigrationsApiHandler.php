@@ -142,7 +142,8 @@ class MigrationsApiHandler
      */
     private function getMigrationFiles(): array
     {
-        $files = scandir($this->migrationDir);
+        // An unreadable directory has no migrations to list (as BuildApiHandler).
+        $files = scandir($this->migrationDir) ?: [];
         $migrationFiles = [];
         foreach ($files as $file) {
             if (pathinfo($file, PATHINFO_EXTENSION) === 'php') {

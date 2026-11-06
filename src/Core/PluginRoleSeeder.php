@@ -81,14 +81,8 @@ final class PluginRoleSeeder
             return;
         }
 
-        // Defensive runtime guard: getRoles()/getRolePermissions() are interface
-        // methods; a misbehaving plugin could return non-array values at runtime
-        // even though the PHPDoc says array. PHPStan flags this as always-false
-        // because it trusts the PHPDoc types.
-        if (!is_array($rolesRaw) || !is_array($permissionsRaw)) { // @phpstan-ignore booleanOr.alwaysFalse
-            return;
-        }
-
+        // getRoles()/getRolePermissions() declare a native `array` return, so a
+        // plugin that returns anything else throws a TypeError, caught above.
         /** @var array<mixed, mixed> $roles */
         $roles = $rolesRaw;
         /** @var array<mixed, mixed> $permissions */
@@ -194,10 +188,6 @@ final class PluginRoleSeeder
                 ),
                 ['plugin' => $plugin->getName(), 'tenant_id' => $tenantId]
             );
-            return;
-        }
-
-        if (!is_array($rolesRaw) || !is_array($permissionsRaw)) { // @phpstan-ignore booleanOr.alwaysFalse
             return;
         }
 
@@ -335,7 +325,7 @@ final class PluginRoleSeeder
             }
 
             $row = $stmt->fetch(PDO::FETCH_ASSOC);
-            if ($row === false || $row === null) {
+            if ($row === false) {
                 return null;
             }
 

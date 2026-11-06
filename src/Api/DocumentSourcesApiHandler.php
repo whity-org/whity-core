@@ -117,7 +117,7 @@ final class DocumentSourcesApiHandler
             $this->ouReach->reachFor($tenantId, $callerId),
         );
 
-        $rows = array_values($visible);
+        $rows = $visible;
         $names = $this->people?->names($tenantId, array_values(array_filter(
             array_map(static fn (array $row): ?int => isset($row['created_by']) ? (int) $row['created_by'] : null, $rows),
             static fn (?int $id): bool => $id !== null,

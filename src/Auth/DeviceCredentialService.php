@@ -120,9 +120,6 @@ final class DeviceCredentialService
         $stmt->execute([$profileId, $tenantId]);
 
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        if (!is_array($rows)) {
-            return [];
-        }
 
         return array_values(array_map(static function (array $row): array {
             return [

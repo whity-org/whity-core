@@ -49,7 +49,7 @@ final class WhityDocumentPrinter
      * Required fields this document uses that have no value (E.27): issuing is
      * refused while any is missing. Fiscal fields are required by their provider.
      *
-     * @param list<mixed> $blocks
+     * @param array<mixed> $blocks
      * @return list<string>
      */
     public function missingRequired(array $blocks): array
@@ -139,7 +139,7 @@ final class WhityDocumentPrinter
     }
 
     /**
-     * @param list<mixed> $blocks
+     * @param array<mixed> $blocks
      * @param list<array<string, mixed>> $out
      */
     private function blocks(array $blocks, array &$out): void

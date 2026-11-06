@@ -119,7 +119,7 @@ final class SessionBriefing
         if ($isAgent) {
             $off = 0;
             foreach ($principal->scope as $entry) {
-                if (is_string($entry) && str_starts_with($entry, 'grant:') && str_ends_with($entry, '=off')) {
+                if (str_starts_with($entry, 'grant:') && str_ends_with($entry, '=off')) {
                     $off++;
                 }
             }

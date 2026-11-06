@@ -464,7 +464,7 @@ final class RoutingRuleRegistry implements HostWiredService
      *
      * @param string                                      $source   Raw source name, kept for attribution.
      * @param string|null                                 $prefix   Namespace prefix, or null for core (bare kinds).
-     * @param array<string, RoutingRuleResolverInterface> $declared Bare slug => resolver.
+     * @param array<mixed>                                $declared Bare slug => resolver, from a plugin, so each is checked.
      * @return list<string>
      *
      * @throws InvalidRoutingRuleException

@@ -355,9 +355,8 @@ final class DocumentQrApiHandler
                 return Response::error('Document not found', 404);
             }
 
-            if ($tokenRow !== null) {
-                $this->qr->recordScan($tokenRow, $callerId);
-            }
+            // A document is only found through a token row, so one is in hand here.
+            $this->qr->recordScan($tokenRow, $callerId);
 
             return Response::json([
                 'data' => [
@@ -366,7 +365,7 @@ final class DocumentQrApiHandler
                     // person who scanned a superseded printing should be told
                     // so even though they can read the record — otherwise they
                     // walk away believing the paper in their hand is current.
-                    'code_honoured' => $tokenRow !== null && ($tokenRow['revoked_at'] ?? null) === null,
+                    'code_honoured' => ($tokenRow['revoked_at'] ?? null) === null,
                     // S5: this caller may read the record, so may be told. The
                     // public page says it only at the `stage` level.
                     'document_withdrawn' => ($document['withdrawn_at'] ?? null) !== null,

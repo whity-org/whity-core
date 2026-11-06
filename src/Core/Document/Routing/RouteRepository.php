@@ -151,10 +151,10 @@ final class RouteRepository
             // #1031. Null when the route was composed by hand, and null on
             // `template_id` alone once the design has been deleted — the name
             // outlives the pointer on purpose.
-            'template_id' => isset($row['template_id']) && $row['template_id'] !== null
+            'template_id' => isset($row['template_id'])
                 ? (int) $row['template_id']
                 : null,
-            'template_name' => isset($row['template_name']) && $row['template_name'] !== null
+            'template_name' => isset($row['template_name'])
                 ? (string) $row['template_name']
                 : null,
             'created_at' => (string) $row['created_at'],

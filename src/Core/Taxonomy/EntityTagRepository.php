@@ -127,6 +127,7 @@ final class EntityTagRepository
             ':entity_type' => $entityType,
             ':entity_id'   => $entityId,
         ]);
+        /** @var list<array<string, mixed>> $rows */
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         return array_map([self::class, 'normalizeTagRow'], $rows);
@@ -152,6 +153,7 @@ final class EntityTagRepository
             ':entity_type' => $entityType,
             ':tag_id'      => $tagId,
         ]);
+        /** @var list<array<string, mixed>> $rows */
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         return array_map(static fn(array $row): array => [

@@ -119,9 +119,7 @@ final class LocalVariableRenamer
         $unsafe = false;
 
         foreach ($body as $stmt) {
-            if ($stmt instanceof Node) {
-                self::collect($stmt, $vars, $nested, $unsafe);
-            }
+            self::collect($stmt, $vars, $nested, $unsafe);
         }
 
         $renameable = !($fn instanceof ArrowFunction) && !$unsafe && $nested === [];
@@ -134,8 +132,12 @@ final class LocalVariableRenamer
             }
 
             $map = self::buildRenameMap(array_keys($vars), $excluded, $forbidden);
-            foreach ($map as $original => $replacement) {
-                foreach ($vars[$original] as $variable) {
+            foreach ($vars as $original => $variables) {
+                $replacement = $map[$original] ?? null;
+                if ($replacement === null) {
+                    continue;
+                }
+                foreach ($variables as $variable) {
                     $variable->name = $replacement;
                 }
             }

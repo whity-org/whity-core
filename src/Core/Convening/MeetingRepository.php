@@ -65,7 +65,7 @@ final class MeetingRepository
 
         if ($statuses !== []) {
             $placeholders = [];
-            foreach (array_values($statuses) as $i => $status) {
+            foreach ($statuses as $i => $status) {
                 $placeholders[] = ':status_' . $i;
                 $params[':status_' . $i] = $status;
             }
@@ -104,7 +104,7 @@ final class MeetingRepository
 
         if ($statuses !== []) {
             $placeholders = [];
-            foreach (array_values($statuses) as $i => $status) {
+            foreach ($statuses as $i => $status) {
                 $placeholders[] = ':status_' . $i;
                 $params[':status_' . $i] = $status;
             }

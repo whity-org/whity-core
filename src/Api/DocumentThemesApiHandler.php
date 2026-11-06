@@ -356,7 +356,6 @@ final class DocumentThemesApiHandler
             $fields['tokens'] = DocumentThemeTokens::normalize($tokens);
         }
 
-        /** @var array{name?: string, name_ar?: string, extends?: ?string, tokens?: array<string, mixed>} $fields */
         return $fields;
     }
 

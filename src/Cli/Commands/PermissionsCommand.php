@@ -66,8 +66,8 @@ final class PermissionsCommand implements CliCommand, CommandHelp
         return true;
     }
 
-    /** @return list<string>|null */
-    public function knownFlags(): ?array
+    /** @return list<string> */
+    public function knownFlags(): array
     {
         return [];
     }

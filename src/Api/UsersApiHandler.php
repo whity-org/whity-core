@@ -452,7 +452,7 @@ class UsersApiHandler
             'role' => (string)($row['role'] ?? ''),
             'roleId' => isset($row['role_id']) ? (int)$row['role_id'] : null,
             'tenantId' => (int)($row['tenant_id'] ?? 0),
-            'ou_id' => isset($row['ou_id']) && $row['ou_id'] !== null ? (int)$row['ou_id'] : null,
+            'ou_id' => isset($row['ou_id']) ? (int)$row['ou_id'] : null,
             'ouName' => isset($row['ou_name']) ? (string)$row['ou_name'] : null,
             'lastActiveAt' => isset($row['last_active_at']) ? (string)$row['last_active_at'] : null,
             'twoStep' => [
@@ -1028,13 +1028,13 @@ class UsersApiHandler
 
             try {
                 // Identity writes (global tables).
-                if ($emailChanged && $newEmail !== null) {
+                if ($emailChanged) {
                     // @tenant-guard-ignore: profile_emails is a sanctioned GLOBAL identity table (ADR 0005 §2); scoped to the target profile's PRIMARY email
                     $this->db->prepare(
                         'UPDATE profile_emails SET email = ? WHERE profile_id = ? AND is_primary = true'
                     )->execute([$newEmail, $profileId]);
                 }
-                if ($passwordChanged && $newPasswordHash !== null) {
+                if ($passwordChanged) {
                     // token_epoch is bumped WITH the hash, never separately.
                     //
                     // A password change is a credential change and must
@@ -1064,13 +1064,13 @@ class UsersApiHandler
                         $idpOverrideUsed
                     );
                 }
-                if ($displayNameChanged && $newDisplayName !== null) {
+                if ($displayNameChanged) {
                     // @tenant-guard-ignore: profiles is a sanctioned GLOBAL identity table (ADR 0005 §1); the shared-profile refusal above keeps this to the caller's own people
                     $this->db->prepare(
                         'UPDATE profiles SET display_name = ?, updated_at = NOW() WHERE id = ?'
                     )->execute([$newDisplayName, $profileId]);
                 }
-                if ($accountStatusChanged && $newAccountStatus !== null) {
+                if ($accountStatusChanged) {
                     // @tenant-guard-ignore: profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
                     $this->db->prepare(
                         'UPDATE profiles SET status = ?, updated_at = NOW() WHERE id = ?'
@@ -1084,7 +1084,7 @@ class UsersApiHandler
                 // proved equals the acting tenant).
                 $membershipUpdates = [];
                 $membershipParams = [];
-                if ($roleChanged && $newRoleId !== null) {
+                if ($roleChanged) {
                     $membershipUpdates[] = 'role_id = ?';
                     $membershipParams[] = $newRoleId;
                 }
@@ -1168,7 +1168,7 @@ class UsersApiHandler
                 $payload['previous_display_name'] = (string)($membership['display_name'] ?? '');
                 $payload['display_name'] = $newDisplayName;
             }
-            if ($roleChanged && $newRoleId !== null) {
+            if ($roleChanged) {
                 $previousRoleId = (int) $membership['role_id'];
                 $payload['previous_role_id'] = $previousRoleId;
                 $payload['previous_role_name'] = isset($membership['role']) ? (string) $membership['role'] : null;
@@ -1179,7 +1179,7 @@ class UsersApiHandler
                 $payload['previous_ou_id'] = $membership['ou_id'] !== null ? (int) $membership['ou_id'] : null;
                 $payload['ou_id'] = $ouSetNull ? null : $newOuId;
             }
-            if ($accountStatusChanged && $newAccountStatus !== null) {
+            if ($accountStatusChanged) {
                 $payload['previous_account_status'] = (string) ($membership['account_status'] ?? 'active');
                 $payload['account_status'] = $newAccountStatus;
             }

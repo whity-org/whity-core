@@ -60,7 +60,7 @@ class RelationRepository
             static fn (array $row): array => [
                 'id' => (int) $row['id'],
                 'name' => (string) $row['name'],
-                'inverseTypeId' => isset($row['inverse_type_id']) && $row['inverse_type_id'] !== null
+                'inverseTypeId' => isset($row['inverse_type_id'])
                     ? (int) $row['inverse_type_id']
                     : null,
                 'symmetric' => self::toBool($row['is_symmetric'] ?? false),
@@ -90,7 +90,7 @@ class RelationRepository
         return [
             'id' => (int) $row['id'],
             'name' => (string) $row['name'],
-            'inverseTypeId' => isset($row['inverse_type_id']) && $row['inverse_type_id'] !== null
+            'inverseTypeId' => isset($row['inverse_type_id'])
                 ? (int) $row['inverse_type_id']
                 : null,
             'symmetric' => self::toBool($row['is_symmetric'] ?? false),
@@ -302,7 +302,7 @@ class RelationRepository
                 'relationId' => (int) $row['relation_id'],
                 'otherPersonId' => (int) $row['other_id'],
                 'otherPersonName' => (string) $row['other_name'],
-                'otherPersonProfileId' => isset($row['other_profile_id']) && $row['other_profile_id'] !== null
+                'otherPersonProfileId' => isset($row['other_profile_id'])
                     ? (int) $row['other_profile_id']
                     : null,
                 'typeId' => (int) $row['type_id'],
@@ -391,7 +391,7 @@ class RelationRepository
                 'toPersonId' => (int) $row['to_person_id'],
                 'typeId' => (int) $row['type_id'],
                 'typeName' => (string) $row['type_name'],
-                'inverseTypeName' => isset($row['inverse_name']) && $row['inverse_name'] !== null
+                'inverseTypeName' => isset($row['inverse_name'])
                     ? (string) $row['inverse_name']
                     : null,
             ],

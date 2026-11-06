@@ -54,7 +54,7 @@ final class RateLimitMiddleware
         array $exemptPaths = [],
         ?LoggerInterface $logger = null,
     ) {
-        $this->exemptPaths = array_values($exemptPaths);
+        $this->exemptPaths = $exemptPaths;
         $this->logger = $logger ?? new NullLogger();
     }
 

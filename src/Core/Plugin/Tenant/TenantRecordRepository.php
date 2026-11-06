@@ -43,7 +43,10 @@ final class TenantRecordRepository
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
 
-        return array_map([self::class, 'row'], $stmt->fetchAll(PDO::FETCH_ASSOC));
+        /** @var list<array<string, mixed>> $rows */
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return array_map([self::class, 'row'], $rows);
     }
 
     /**

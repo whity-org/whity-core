@@ -208,7 +208,8 @@ final class LicensingApiHandler
                     'serial_number' => $serial,
                     'reason' => sprintf(
                         'this workspace has used all %d device(s) its plan allows',
-                        $this->allowance?->capFor($tenantId) ?? 0
+                        // $room is only counted when an allowance is wired.
+                        $this->allowance->capFor($tenantId)
                     ),
                 ];
                 continue;

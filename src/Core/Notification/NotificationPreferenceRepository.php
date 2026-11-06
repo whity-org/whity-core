@@ -42,11 +42,11 @@ final class NotificationPreferenceRepository
         /** @var list<array<string, mixed>> $rows */
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        return array_values(array_map(static fn (array $r): array => [
+        return array_map(static fn (array $r): array => [
             'type'    => (string) $r['type'],
             'channel' => (string) $r['channel'],
             'enabled' => self::toBool($r['enabled']),
-        ], $rows));
+        ], $rows);
     }
 
     /**

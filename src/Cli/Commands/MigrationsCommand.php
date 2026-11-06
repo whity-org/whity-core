@@ -565,9 +565,8 @@ class MigrationsCommand implements CommandHelp, CliCommand
             $matches
         );
 
-        /** @var list<string> $names */
-        $names = array_unique(array_filter(array_map('trim', $matches[2])));
-        return array_values($names);
+        // array_unique() and array_filter() keep keys, so array_values() makes the list.
+        return array_values(array_unique(array_filter(array_map('trim', $matches[2]))));
     }
 
     /**
@@ -688,7 +687,8 @@ class MigrationsCommand implements CommandHelp, CliCommand
      */
     private function getMigrationFiles(): array
     {
-        $files = scandir($this->migrationDir);
+        // An unreadable directory has no migrations to list (as BuildApiHandler).
+        $files = scandir($this->migrationDir) ?: [];
         $migrationFiles = [];
         foreach ($files as $file) {
             if (pathinfo($file, PATHINFO_EXTENSION) === 'php') {
@@ -814,6 +814,8 @@ class MigrationsCommand implements CommandHelp, CliCommand
             $pluginName = $plugin->getName();
 
             try {
+                // Typed list<string>, but a plugin's own code answers: checked below.
+                /** @var array<mixed> $declared */
                 $declared = $plugin->getMigrations();
             } catch (\Throwable $e) {
                 // WC-214: a throwing getMigrations() is a MALFORMED plugin. We

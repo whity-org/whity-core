@@ -247,10 +247,10 @@ final class TenantEmailDomainsRepository
      */
     private function normalizeRow(array $row): array
     {
-        $verifiedAt = isset($row['verified_at']) && $row['verified_at'] !== null
+        $verifiedAt = isset($row['verified_at'])
             ? (string) $row['verified_at']
             : null;
-        $token = isset($row['verification_token']) && $row['verification_token'] !== null
+        $token = isset($row['verification_token'])
             ? (string) $row['verification_token']
             : null;
 

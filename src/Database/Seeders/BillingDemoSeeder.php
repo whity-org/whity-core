@@ -202,6 +202,7 @@ final class BillingDemoSeeder
     /** @param list<string> $notes */
     private function seedPromotions(DateTimeImmutable $now, array &$notes): void
     {
+        /** @var list<array{string, ?string, ?int, ?int, ?DateTimeImmutable, ?DateTimeImmutable, ?int, bool}> $promotions */
         $promotions = [
             // name, code, percent, amount, starts, ends, cap, active
             [

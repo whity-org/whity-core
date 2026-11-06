@@ -486,7 +486,7 @@ final class DocumentRepository
                 return $sql . ' AND 1 = 0';
             }
             $placeholders = [];
-            foreach (array_values($criteria->originOuIds) as $i => $ouId) {
+            foreach ($criteria->originOuIds as $i => $ouId) {
                 $name = ':origin_ou_' . $i;
                 $placeholders[] = $name;
                 $bindings[$name] = $ouId;
@@ -569,7 +569,7 @@ final class DocumentRepository
                 return $sql . ' AND 1 = 0';
             }
             $placeholders = [];
-            foreach (array_values($criteria->routedThroughOuIds) as $i => $ouId) {
+            foreach ($criteria->routedThroughOuIds as $i => $ouId) {
                 $name = ':through_ou_' . $i;
                 $placeholders[] = $name;
                 $bindings[$name] = $ouId;

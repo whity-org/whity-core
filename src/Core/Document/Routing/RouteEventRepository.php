@@ -287,7 +287,7 @@ final class RouteEventRepository
             'note' => $row['note'] !== null ? (string) $row['note'] : null,
             // NULL means "this act said nothing about approval", never "not
             // approved". See append().
-            'verdict' => isset($row['verdict']) && $row['verdict'] !== null ? (string) $row['verdict'] : null,
+            'verdict' => isset($row['verdict']) ? (string) $row['verdict'] : null,
             'withdrawal' => $row['withdrawal'] ?? false,
             'occurred_at' => (string) $row['occurred_at'],
         ];

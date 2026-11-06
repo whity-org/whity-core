@@ -128,7 +128,7 @@ final class RoleBelowActorRuleResolver implements RoutingRuleResolverInterface, 
         // from a tenant-scoped query above, never from the request.
         $placeholders = [];
         $params = [':tenant_id' => $context->tenantId, ':role_id' => $roleId];
-        foreach (array_values($scope) as $i => $ouId) {
+        foreach ($scope as $i => $ouId) {
             $name = ':ou' . $i;
             $placeholders[] = $name;
             $params[$name] = $ouId;

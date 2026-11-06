@@ -635,7 +635,7 @@ final class DocumentIssuing
      */
     private function printer(ActingAs $actor, array $source, array $values): WhityDocumentPrinter
     {
-        $type = isset($source['record_type']) && $source['record_type'] !== null ? (string) $source['record_type'] : null;
+        $type = isset($source['record_type']) ? (string) $source['record_type'] : null;
 
         return $this->print->printer($actor->tenantId, $actor->profileId, $actor->hasPermission, (int) $source['id'], $values, $type);
     }

@@ -185,8 +185,8 @@ class DeploymentManager
     private function runMigrations(string $migrationPath): void
     {
         $files = glob($migrationPath . '/*.php');
+        if ($files === false) throw new RuntimeException("Failed to list migrations in {$migrationPath}");
         sort($files);
-
         // We need a Whity\Database\Database instance that uses our current PDO transaction
         // Since we can't easily do that without modifying Database.php,
         // we'll assume the migrations can take a PDO or we'll have to pass the wrapper.
@@ -247,6 +247,7 @@ class DeploymentManager
         }
 
         $files = scandir($source);
+        if ($files === false) throw new RuntimeException("Failed to read {$source}");
         foreach ($files as $file) {
             if ($file === '.' || $file === '..') continue;
             $src = $source . '/' . $file;
@@ -262,7 +263,9 @@ class DeploymentManager
     private function removeRecursive(string $dir): void
     {
         if (!is_dir($dir)) return;
-        $files = array_diff(scandir($dir), ['.', '..']);
+        $entries = scandir($dir);
+        if ($entries === false) throw new RuntimeException("Failed to read {$dir}");
+        $files = array_diff($entries, ['.', '..']);
         foreach ($files as $file) {
             (is_dir("$dir/$file")) ? $this->removeRecursive("$dir/$file") : unlink("$dir/$file");
         }

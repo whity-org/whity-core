@@ -134,8 +134,8 @@ final class InboxApiHandler
             'body'       => (string) $row['body'],
             'data'       => is_array($row['data'] ?? null) ? $row['data'] : [],
             'read'       => ($row['read_at'] ?? null) !== null,
-            'read_at'    => isset($row['read_at']) && $row['read_at'] !== null ? (string) $row['read_at'] : null,
-            'created_at' => isset($row['created_at']) && $row['created_at'] !== null ? (string) $row['created_at'] : null,
+            'read_at'    => isset($row['read_at']) ? (string) $row['read_at'] : null,
+            'created_at' => isset($row['created_at']) ? (string) $row['created_at'] : null,
         ];
     }
 
