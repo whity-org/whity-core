@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.71).
+ * SDK identity (v1.72).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1010,12 +1010,19 @@ namespace Whity\Sdk;
  * clients (WHIT-912).
  *
  * No signature changes.)
+ *
+ * 1.72 (PLUGIN ROLE GRANTS STAY THE PLUGIN'S OWN: {@see PluginRolesInterface} grants
+ * only permissions the plugin declares in {@see PluginInterface::getPermissions()},
+ * never a core permission or one under a core resource, and only to a role the plugin
+ * created or one the operator approved for it. Uninstall removes only the grants the
+ * plugin made. A plugin that listed a core permission, or named a role it did not
+ * create, no longer gets that grant; the host logs it.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.71.0';
+    public const VERSION = '1.72.0';
 
     /**
      * Static identity only — never instantiated.

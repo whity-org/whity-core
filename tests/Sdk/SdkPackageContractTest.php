@@ -242,9 +242,11 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsOneEightForInteractiveBlocks(): void
     {
         $this->assertSame(
-            '1.71.0',
+            '1.72.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.71: THE HOST DECIDES WHETHER A TOOL ONLY READS, from the route method; authored tools are writes '
+            'SDK 1.72: PluginRolesInterface grants a plugin only its own declared, non-core permissions, only to roles '
+            . 'it created or the operator approved, and uninstall removes only the grants it made. '
+            . 'SDK 1.71: THE HOST DECIDES WHETHER A TOOL ONLY READS, from the route method; authored tools are writes '
             . 'for agents (WHIT-912). No signature changes. '
             . 'SDK 1.70 MAKES user.creating READ-ONLY: email and role_id only, no password, the return value is ignored, '
             . 'and a listener can refuse the create with HookVetoException (WHIT-911). '
