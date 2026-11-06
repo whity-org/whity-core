@@ -486,7 +486,6 @@ class LanguageRegistryIntegrationTest extends TestCase
         $this->registry->boot();
 
         $t = $this->registry->getTranslator('common');
-        $this->assertIsCallable($t);
         $this->assertSame('Save', $t('button.save'));
     }
 

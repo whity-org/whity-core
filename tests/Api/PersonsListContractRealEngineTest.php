@@ -351,7 +351,7 @@ final class PersonsListContractRealEngineTest extends TestCase
         return array_column($this->body($path)['data'], 'displayName');
     }
 
-    /** @return list<bool> */
+    /** @return array<int, bool> */
     private function accountFlags(string $path): array
     {
         return array_map(
@@ -364,7 +364,7 @@ final class PersonsListContractRealEngineTest extends TestCase
      * Assert a boolean sequence changes value at most once — i.e. the true rows
      * form one block and the false rows another.
      *
-     * @param list<bool> $flags
+     * @param array<int, bool> $flags
      */
     private static function assertContiguous(array $flags, string $what): void
     {

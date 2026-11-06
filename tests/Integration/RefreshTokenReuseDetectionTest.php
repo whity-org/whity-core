@@ -308,7 +308,7 @@ class RefreshTokenReuseDetectionTest extends TestCase
     }
 
     /**
-     * @return list<array<string, mixed>>
+     * @return array<int, array<string, mixed>>
      */
     private function getAuditLogEntries(string $action): array
     {

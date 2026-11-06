@@ -67,10 +67,8 @@ final class BaseImagePinTest extends TestCase
 
         self::assertSame(1, $matched, 'no FROM dunglas/frankenphp:… AS base line in the Dockerfile');
 
-        // Read through `??` rather than indexing $m directly: a successful
-        // preg_match guarantees the group to a reader but not to PHPStan,
-        // which types the matches array as array{0?: string, 1?: non-empty-string}.
-        $tag = $m[1] ?? '';
+        // The assertSame above guarantees the match, so group 1 is present.
+        $tag = $m[1];
 
         self::assertMatchesRegularExpression(
             '/php\d+\.\d+\.\d+/',

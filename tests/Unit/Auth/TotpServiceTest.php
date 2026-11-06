@@ -27,7 +27,6 @@ class TotpServiceTest extends TestCase
     {
         $secret = $this->totpService->generateSecret();
 
-        $this->assertIsString($secret);
         $this->assertNotEmpty($secret);
         // Base32 string contains only A-Z and 2-7
         $this->assertMatchesRegularExpression('/^[A-Z2-7]+$/', $secret);
@@ -143,7 +142,6 @@ class TotpServiceTest extends TestCase
         $url = $this->totpService->generateQrCodeUrl($email, $secret);
 
         // The URL should be properly encoded (+ should be encoded as %2B or similar)
-        $this->assertIsString($url);
         $this->assertTrue(filter_var($url, FILTER_VALIDATE_URL) !== false);
     }
 
@@ -172,7 +170,7 @@ class TotpServiceTest extends TestCase
             $this->assertNotSame($secret, $decrypted);
         } catch (\Exception $e) {
             // Exception is also acceptable since decryption fails
-            $this->assertTrue(true);
+            $this->addToAssertionCount(1);
         }
     }
 

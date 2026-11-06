@@ -208,7 +208,7 @@ final class AgentResourceRealEngineTest extends TestCase
     private function verifier(): OAuthAccessTokenVerifier
     {
         $http = new class implements HttpClient {
-            public function getJson(string $url): ?array
+            public function getJson(string $url): array
             {
                 return ['issuer' => AgentResourceRealEngineTest::issuer(), 'jwks_uri' => AgentResourceRealEngineTest::issuer() . '/jwks'];
             }

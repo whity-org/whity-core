@@ -177,7 +177,9 @@ final class ExplicitRuleResolverTest extends TestCase
 
         (new ExplicitRuleResolver())->validate(['profile_ids' => $atLimit]);
 
-        self::assertTrue(true, 'the ceiling is inclusive — an off-by-one here refuses a legal set');
+        // Reaching here without a refusal is the assertion: the ceiling is
+        // inclusive — an off-by-one here refuses a legal set.
+        $this->addToAssertionCount(1);
     }
 
     /**

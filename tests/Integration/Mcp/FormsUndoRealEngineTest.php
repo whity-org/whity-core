@@ -111,6 +111,7 @@ final class FormsUndoRealEngineTest extends TestCase
         $stmt = $this->pdo->prepare('SELECT name, description FROM forms WHERE id = ?');
         $stmt->execute([$form['data']['id']]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        self::assertIsArray($row);
         self::assertEquals(['en' => 'Leave request'], json_decode((string) $row['name'], true));
         self::assertEquals(['en' => 'For time off'], json_decode((string) $row['description'], true));
     }

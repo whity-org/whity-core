@@ -77,6 +77,7 @@ final class UsersApiHandlerRealEngineTest extends TestCase
         $membership = $this->pdo
             ->query("SELECT role_id, status, tenant_id FROM memberships WHERE profile_id = {$profileId}")
             ->fetch(PDO::FETCH_ASSOC);
+        $this->assertIsArray($membership);
         $this->assertSame(1, (int) $membership['role_id'], 'A user created as admin must get an admin membership.');
         $this->assertSame('active', (string) $membership['status']);
         $this->assertSame(1, (int) $membership['tenant_id']);
@@ -412,6 +413,7 @@ final class UsersApiHandlerRealEngineTest extends TestCase
         $membership = $this->pdo
             ->query('SELECT status, role_id, ou_id FROM memberships WHERE profile_id = 510 AND tenant_id = 1')
             ->fetch(PDO::FETCH_ASSOC);
+        $this->assertIsArray($membership);
         $this->assertSame('active', (string) $membership['status']);
         $this->assertSame(1, (int) $membership['role_id']);
         $this->assertSame($ouId, (int) $membership['ou_id'], 'The promote path must honour the submitted ou_id.');
@@ -517,6 +519,7 @@ final class UsersApiHandlerRealEngineTest extends TestCase
         $this->assertSame(200, $response->getStatusCode());
 
         $row = $this->pdo->query('SELECT tenant_id, role_id FROM memberships WHERE profile_id = 11')->fetch(PDO::FETCH_ASSOC);
+        $this->assertIsArray($row);
         $this->assertSame(1, (int) $row['tenant_id'], 'tenantId in the body must NOT move the membership.');
         $this->assertSame(1, (int) $row['role_id'], 'role must still persist.');
 

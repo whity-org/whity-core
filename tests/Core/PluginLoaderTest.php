@@ -2002,7 +2002,7 @@ PHP;
         $this->assertNotNull($plan);
         $this->assertSame('PlanUninstallPlugin', $plan['plugin']);
         $this->assertArrayHasKey('status', $plan);
-        $this->assertIsArray($plan['migrations_to_roll_back']);
+        $this->assertArrayHasKey('migrations_to_roll_back', $plan);
         $this->assertArrayHasKey('directory', $plan);
         $this->assertArrayHasKey('will_remove_directory', $plan);
         // No mutations: plugin file must still exist.

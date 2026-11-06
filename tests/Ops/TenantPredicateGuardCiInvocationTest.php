@@ -56,10 +56,9 @@ final class TenantPredicateGuardCiInvocationTest extends TestCase
             'automated-tests.yml must invoke scripts/ci-tenant-predicate-guard.php exactly once.'
         );
 
-        $command = $m[1] ?? '';
-        self::assertNotSame('', $command, 'The invocation pattern must capture the run: command.');
-
-        return trim($command);
+        // The assertSame above guarantees the match, and the pattern's group
+        // cannot be empty (it starts with `php`), so the command is captured.
+        return trim($m[1]);
     }
 
     public function testGuardIsInvokedWithExplicitRoots(): void

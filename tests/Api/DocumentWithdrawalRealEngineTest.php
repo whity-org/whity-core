@@ -691,7 +691,11 @@ final class DocumentWithdrawalRealEngineTest extends TestCase
     }
 
     /**
+     * Each call is a fresh request against current state, so the answer changes
+     * as the document moves.
+     *
      * @return array<string, mixed>
+     * @phpstan-impure
      */
     private function verify(string $token): array
     {

@@ -130,7 +130,8 @@ final class HostWiredRegistryConventionTest extends TestCase
     }
 
     /**
-     * @param ReflectionClass<object> $reflection
+     * @template T of object
+     * @param ReflectionClass<T> $reflection
      */
     private function holdsInstanceState(ReflectionClass $reflection): bool
     {

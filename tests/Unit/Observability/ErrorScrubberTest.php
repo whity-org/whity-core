@@ -101,7 +101,7 @@ final class ErrorScrubberTest extends TestCase
 
         $out = $this->scrubber->context($deep);
 
-        self::assertIsArray($out);
+        self::assertArrayHasKey('child', $out);
     }
 
     public function testTruncatesEnormousStrings(): void

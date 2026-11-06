@@ -648,11 +648,13 @@ final class DocumentsApiHandlerRealEngineTest extends TestCase
         self::assertSame('issued', $shown['state']);
         self::assertNotNull($shown['number_assigned_at']);
 
+        self::assertNotEmpty($this->fakeRender->flowCalls);
         $printed = EditorTemplateFixture::texts($this->fakeRender->flowCalls[array_key_last($this->fakeRender->flowCalls)]);
         self::assertContains($number, $printed, 'issued_document.number must reach the PDF');
 
         // A correction prints the same number, and the counter doesn't move.
         self::assertSame(201, $this->call('rerender', self::OWNER, ['id' => (string) $id])->getStatusCode());
+        self::assertNotEmpty($this->fakeRender->flowCalls);
         self::assertContains($number, EditorTemplateFixture::texts($this->fakeRender->flowCalls[array_key_last($this->fakeRender->flowCalls)]));
         self::assertSame($number, self::data($this->call('show', self::OWNER, ['id' => (string) $id]))['number']);
 
@@ -833,6 +835,7 @@ final class DocumentsApiHandlerRealEngineTest extends TestCase
 
         self::assertTrue($outcome['stored'] ?? false);
         self::assertCount(2, $this->artifactRepo->listForDocument($id, self::TENANT), 'the earlier PDF stays');
+        self::assertNotEmpty($this->fakeRender->flowCalls);
         self::assertContains('MIN-001', EditorTemplateFixture::texts($this->fakeRender->flowCalls[array_key_last($this->fakeRender->flowCalls)]));
 
         // A template that doesn't print the number has nothing to change, and spends no render.
@@ -1054,7 +1057,7 @@ final class DocumentsApiHandlerRealEngineTest extends TestCase
 
     /**
      * @param array<string, string> $query
-     * @return list<int>
+     * @return array<int, int>
      */
     private function listedIds(array $query): array
     {

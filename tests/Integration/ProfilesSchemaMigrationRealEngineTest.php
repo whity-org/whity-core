@@ -204,7 +204,7 @@ final class ProfilesSchemaMigrationRealEngineTest extends TestCase
     }
 
     /**
-     * @return list<string>
+     * @return array<int, string>
      */
     private function columns(string $table): array
     {

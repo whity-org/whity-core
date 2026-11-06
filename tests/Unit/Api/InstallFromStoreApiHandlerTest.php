@@ -50,8 +50,9 @@ final class InstallFromStoreApiHandlerTest extends TestCase
     /**
      * Build a handler with the given allowlist and a stub fetcher.
      *
-     * @param array{0: array<int, array{url: string, headers: array<string, string>}>} $calls
-     *   By-reference sink recording each fetcher invocation (index 0 holds the list).
+     * @param array<mixed> $calls
+     * @param-out list<array{url: string, headers: array<string, string>}> $calls
+     *   By-reference sink recording each fetcher invocation.
      */
     private function handler(string $allowlist, ?string $fetchReturns, array &$calls): InstallFromStoreApiHandler
     {
@@ -76,7 +77,8 @@ final class InstallFromStoreApiHandlerTest extends TestCase
      * master switch explicitly (WC-feature-flags-audit), so tests can prove
      * the flag gates independently of the allowlist.
      *
-     * @param array{0: array<int, array{url: string, headers: array<string, string>}>} $calls
+     * @param array<mixed> $calls
+     * @param-out list<array{url: string, headers: array<string, string>}> $calls
      */
     private function handlerWithStoreEnabled(string $allowlist, bool $storeEnabled, ?string $fetchReturns, array &$calls): InstallFromStoreApiHandler
     {
@@ -324,7 +326,8 @@ final class InstallFromStoreApiHandlerTest extends TestCase
      * Build a handler with a stub JSON catalogue fetcher (for browse tests).
      *
      * @param array<string, mixed>|null $jsonReturns catalogue payload the store "returns"
-     * @param array{0: list<string>}     $urls        by-ref sink of fetched URLs (index 0)
+     * @param array<mixed>              $urls        by-ref sink of fetched URLs
+     * @param-out list<string>           $urls
      */
     private function browseHandler(string $allowlist, ?array $jsonReturns, array &$urls): InstallFromStoreApiHandler
     {
@@ -357,7 +360,8 @@ final class InstallFromStoreApiHandlerTest extends TestCase
      * explicitly.
      *
      * @param array<string, mixed>|null $jsonReturns catalogue payload the store "returns"
-     * @param array{0: list<string>}    $urls        by-ref sink of fetched URLs (index 0)
+     * @param array<mixed>             $urls        by-ref sink of fetched URLs
+     * @param-out list<string>          $urls
      */
     private function browseHandlerWithStoreEnabled(string $allowlist, bool $storeEnabled, ?array $jsonReturns, array &$urls): InstallFromStoreApiHandler
     {

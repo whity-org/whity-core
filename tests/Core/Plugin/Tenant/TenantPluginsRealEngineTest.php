@@ -116,7 +116,8 @@ final class TenantPluginsRealEngineTest extends TestCase
         $this->publisher->publish(self::A, $second, 7);
 
         // Same request: the memo still answers.
-        self::assertSame('First', $this->host->frontendFeatures(self::A)[0]['blocks'][0]['text']);
+        $memoised = $this->host->frontendFeatures(self::A);
+        self::assertSame('First', $memoised[0]['blocks'][0]['text']);
 
         // Next request: the new hash is read and served.
         $this->host->resetRequest();
@@ -314,7 +315,7 @@ final class TenantPluginsRealEngineTest extends TestCase
         return array_column($body['data'] ?? [], 'id');
     }
 
-    /** @return list<mixed> */
+    /** @return array<int, mixed> */
     private function column(string $sql): array
     {
         $stmt = $this->pdo->query($sql);
@@ -323,7 +324,7 @@ final class TenantPluginsRealEngineTest extends TestCase
         return $stmt->fetchAll(PDO::FETCH_COLUMN);
     }
 
-    /** @return list<array<string, mixed>> */
+    /** @return array<int, array<string, mixed>> */
     private function rows(string $sql): array
     {
         $stmt = $this->pdo->query($sql);

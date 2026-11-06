@@ -100,13 +100,11 @@ final class TenantSwitcherTest extends TestCase
         $this->pdo->exec("INSERT OR IGNORE INTO roles (id, name) VALUES (1, 'admin'), (2, 'user')");
 
         // Alice: multi-tenant profile — ACTIVE in A and B; no membership in C
-        $this->seedUser('alice@example.com', self::TENANT_A);
         $this->aliceProfileId = $this->seedProfile('Alice', 'alice@example.com');
         $this->seedMembership($this->aliceProfileId, self::TENANT_A, 1, 'active');
         $this->seedMembership($this->aliceProfileId, self::TENANT_B, 2, 'active');
 
         // Bob: single-tenant profile — SUSPENDED in A (used for suspension test)
-        $this->seedUser('bob@example.com', self::TENANT_A);
         $this->bobProfileId = $this->seedProfile('Bob', 'bob@example.com');
         $this->seedMembership($this->bobProfileId, self::TENANT_A, 1, 'suspended');
     }

@@ -12,7 +12,6 @@ class SchemaBuilderTest extends TestCase
         $builder = new SchemaBuilder('Test API', '1.0.0');
         $spec = $builder->build();
 
-        $this->assertIsArray($spec);
         $this->assertEquals('3.0.0', $spec['openapi']);
         $this->assertEquals('Test API', $spec['info']['title']);
         $this->assertEquals('1.0.0', $spec['info']['version']);

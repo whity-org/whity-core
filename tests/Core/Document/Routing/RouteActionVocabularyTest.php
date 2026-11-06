@@ -52,18 +52,11 @@ final class RouteActionVocabularyTest extends TestCase
             . 'a permanent row nothing renders.'
         );
 
-        // assertSame above guarantees the match succeeded, but PHPStan reasons
-        // about preg_match's shape rather than about the assertion, so the group
-        // is narrowed explicitly. Asserting it is also the honest thing: a regex
-        // that matched with no capture would otherwise compare an empty list
-        // against an empty list and pass while checking nothing.
-        // `?? ''` rather than an assertArrayHasKey: PHPStan reasons about
-        // preg_match's return shape, not about a runtime assertion, so the
-        // coalesce is what actually narrows it. The emptiness check below is the
-        // real guard — a regex that matched with no capture would otherwise
-        // compare an empty list against an empty list and pass while checking
-        // nothing.
-        $verbList = $m[1] ?? '';
+        // assertSame above guarantees the match succeeded, so group 1 exists.
+        // The emptiness check below is the real guard — a regex that matched
+        // with an empty capture would otherwise compare an empty list against
+        // an empty list and pass while checking nothing.
+        $verbList = $m[1];
         self::assertNotSame('', $verbList, 'the CHECK constraint must expose its verb list');
 
         preg_match_all("/'([a-z_]+)'/", $verbList, $verbs);

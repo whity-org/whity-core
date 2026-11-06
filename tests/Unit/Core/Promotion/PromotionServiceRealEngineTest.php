@@ -324,7 +324,7 @@ final class PromotionServiceRealEngineTest extends TestCase
                 $this->repo->createPercentOff("Bad {$bad}", $bad);
                 self::fail("percent_off {$bad} should have been refused");
             } catch (PromotionValidationException) {
-                self::assertTrue(true);
+                $this->addToAssertionCount(1);
             }
         }
     }

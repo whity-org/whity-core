@@ -64,11 +64,14 @@ class BootScopedStaticSurvivalTest extends TestCase
     {
         return new class ($records) extends AbstractLogger {
             /** @param list<array{level:mixed,message:string,context:array<string,mixed>}> $records */
-            public function __construct(private array &$records)
+            public function __construct(
+                // @phpstan-ignore property.onlyWritten (by-reference sink: the test reads the caller's array)
+                private array &$records
+            )
             {
             }
 
-            public function log($level, $message, array $context = []): void
+            public function log($level, string|\Stringable $message, array $context = []): void
             {
                 $this->records[] = [
                     'level' => $level,

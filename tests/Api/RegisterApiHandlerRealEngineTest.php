@@ -200,6 +200,7 @@ final class RegisterApiHandlerRealEngineTest extends TestCase
         // Tenant created with a URL-safe slug.
         $tenant = $this->pdo->query("SELECT name, slug FROM tenants WHERE id = {$tenantId}")
             ->fetch(PDO::FETCH_ASSOC);
+        self::assertIsArray($tenant);
         self::assertSame('Acme Inc', $tenant['name']);
         self::assertSame('acme-inc', $tenant['slug']);
 
@@ -209,6 +210,7 @@ final class RegisterApiHandlerRealEngineTest extends TestCase
         $emailRow = $this->pdo->query(
             "SELECT email, verified, is_primary FROM profile_emails WHERE profile_id = {$profileId}"
         )->fetch(PDO::FETCH_ASSOC);
+        self::assertIsArray($emailRow);
         self::assertSame('owner@acme.test', $emailRow['email']);
         self::assertContains((string) $emailRow['verified'], ['1', 't', 'true']);
         self::assertContains((string) $emailRow['is_primary'], ['1', 't', 'true']);
@@ -219,6 +221,7 @@ final class RegisterApiHandlerRealEngineTest extends TestCase
              FROM memberships m JOIN roles r ON r.id = m.role_id
              WHERE m.profile_id = {$profileId} AND m.tenant_id = {$tenantId}"
         )->fetch(PDO::FETCH_ASSOC);
+        self::assertIsArray($membership);
         self::assertSame('active', $membership['status']);
         self::assertSame('admin', $membership['role']);
 

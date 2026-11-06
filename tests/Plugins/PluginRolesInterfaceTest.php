@@ -42,14 +42,11 @@ final class PluginRolesInterfaceTest extends TestCase
     {
         $roles = (new HelloWorldPlugin())->getRoles();
 
-        $this->assertIsArray($roles);
         $this->assertArrayHasKey('hello_viewer', $roles);
 
         $descriptor = $roles['hello_viewer'];
-        $this->assertIsArray($descriptor);
         $this->assertArrayHasKey('description', $descriptor);
         /** @var array{description: string} $descriptor */
-        $this->assertIsString($descriptor['description']);
         $this->assertNotEmpty($descriptor['description']);
     }
 
@@ -57,15 +54,12 @@ final class PluginRolesInterfaceTest extends TestCase
     {
         $permissions = (new HelloWorldPlugin())->getRolePermissions();
 
-        $this->assertIsArray($permissions);
         $this->assertArrayHasKey('hello_viewer', $permissions);
 
         $slugs = $permissions['hello_viewer'];
-        $this->assertIsArray($slugs);
         $this->assertNotEmpty($slugs);
 
         foreach ($slugs as $slug) {
-            $this->assertIsString($slug);
             // Verify colon-notation (resource:action).
             $this->assertMatchesRegularExpression(
                 '/^[a-z][a-z0-9_]*:[a-z][a-z0-9_]*$/',

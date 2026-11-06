@@ -609,7 +609,7 @@ final class CommissionAccrualRealEngineTest extends TestCase
         return $statement === false ? -1 : (int) $statement->fetchColumn();
     }
 
-    /** @return list<int> */
+    /** @return array<int, int> */
     private function commissionAmounts(): array
     {
         $statement = $this->pdo->query('SELECT amount_minor FROM affiliate_commissions ORDER BY id ASC');

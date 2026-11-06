@@ -381,10 +381,10 @@ final class HealthProbeRegistryTest extends TestCase
         // A plugin ignoring the contract: PHP will not catch a wrong return type
         // through a `callable` parameter, so the host has to. It must degrade to
         // "down" — not fatal, and above all not silently "operational".
-        /** @var callable(): \Whity\Sdk\Health\ProbeResult $rogue */
         $rogue = static fn (): string => 'fine, honest';
 
         $registry->register('Acme', [
+            // @phpstan-ignore argument.type (the rogue probe breaks the contract on purpose)
             new HealthProbeDefinition('ldap', 'Directory', $rogue),
         ]);
 

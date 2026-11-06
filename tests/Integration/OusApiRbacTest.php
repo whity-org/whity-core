@@ -306,7 +306,7 @@ final class OusApiRbacTest extends TestCase
             $routes[$match[1] . ' ' . $match[2]] = [
                 'method' => $match[1],
                 'path' => $match[2],
-                'requiredRole' => self::literal($args[0] ?? 'null'),
+                'requiredRole' => self::literal($args[0]),
                 'requiredPermission' => self::literal($args[2] ?? 'null'),
             ];
         }

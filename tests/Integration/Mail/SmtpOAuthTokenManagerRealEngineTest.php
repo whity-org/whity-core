@@ -105,6 +105,7 @@ final class SmtpOAuthTokenManagerRealEngineTest extends TestCase
         self::assertSame('tok-1', $tokens->accessToken());
 
         $this->now += 3600 - SmtpOAuthTokenManager::REFRESH_AHEAD_SECONDS - 1;
+        // @phpstan-ignore staticMethod.alreadyNarrowedType (the clock moved, so accessToken() is asked again; PHPStan remembers the first call)
         self::assertSame('tok-1', $tokens->accessToken());
         self::assertSame(1, $this->http->calls);
 

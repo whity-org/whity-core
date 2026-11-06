@@ -118,7 +118,7 @@ final class DemoCatalogGrantMigrationRealEngineTest extends TestCase
     }
 
     /**
-     * @return list<string>
+     * @return array<int, string>
      */
     private function permissionNames(): array
     {
@@ -131,7 +131,7 @@ final class DemoCatalogGrantMigrationRealEngineTest extends TestCase
     }
 
     /**
-     * @return list<string>
+     * @return array<int, string>
      */
     private function grantedTo(string $roleName): array
     {

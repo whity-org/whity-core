@@ -698,7 +698,7 @@ final class DataTypeCompositionRealEngineTest extends TestCase
     }
 
     /**
-     * @return list<int>
+     * @return array<int, int>
      */
     private function lineIds(): array
     {

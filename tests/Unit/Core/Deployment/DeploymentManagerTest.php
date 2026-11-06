@@ -63,7 +63,6 @@ class DeploymentManagerTest extends TestCase
 
     public function testRollbackToPreviousVersion(): void
     {
-        // TODO: Implement
-        $this->assertTrue(true);
+        $this->markTestIncomplete('Rollback to a previous version is not covered yet.');
     }
 }

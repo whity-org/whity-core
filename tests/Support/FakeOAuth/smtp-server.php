@@ -13,6 +13,12 @@ declare(strict_types=1);
  * challenge, an empty line from the client, then 535.
  */
 
+if (!isset($argv)) {
+    fwrite(STDERR, "Run this from the command line.
+");
+    exit(2);
+}
+
 [$_, $port, $dir] = $argv;
 
 $server = stream_socket_server('tcp://127.0.0.1:' . $port, $errno, $errstr);

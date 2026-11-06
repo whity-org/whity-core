@@ -63,33 +63,27 @@ class PluginInterfaceTest extends TestCase
         $this->assertSame('1.0.0', $plugin->getVersion());
         
         $routes = $plugin->getRoutes();
-        $this->assertIsArray($routes);
         $this->assertCount(2, $routes);
         
         // Verify route 1
         $this->assertSame('GET', $routes[0]['method']);
         $this->assertSame('/api/example/hello', $routes[0]['path']);
-        $this->assertIsCallable($routes[0]['handler']);
-        $this->assertNull($routes[0]['requiredRole']);
+        $this->assertNull($routes[0]['requiredRole'] ?? null);
         
         // Verify route 2
         $this->assertSame('POST', $routes[1]['method']);
         $this->assertSame('/api/example/secure', $routes[1]['path']);
-        $this->assertIsCallable($routes[1]['handler']);
-        $this->assertSame('admin', $routes[1]['requiredRole']);
+        $this->assertSame('admin', $routes[1]['requiredRole'] ?? null);
 
         $permissions = $plugin->getPermissions();
-        $this->assertIsArray($permissions);
         $this->assertContains('example:view', $permissions);
         $this->assertContains('example:admin', $permissions);
 
         $hooks = $plugin->getHooks();
-        $this->assertIsArray($hooks);
         $this->assertArrayHasKey('user.login', $hooks);
         $this->assertIsCallable($hooks['user.login']);
 
         $migrations = $plugin->getMigrations();
-        $this->assertIsArray($migrations);
         $this->assertEmpty($migrations);
     }
 }

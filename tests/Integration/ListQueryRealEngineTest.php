@@ -79,7 +79,7 @@ final class ListQueryRealEngineTest extends TestCase
     /**
      * Run one page and return the ids it contains.
      *
-     * @return list<int>
+     * @return array<int, int>
      */
     private function idsFor(string $path): array
     {

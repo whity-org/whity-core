@@ -109,6 +109,7 @@ final class DeclarativePluginInstallRealEngineTest extends TestCase
         [$store, $trust, $sign] = $this->storeWithTrust();
         $this->served = (string) json_encode($this->manifest());
         $trust->applyRevocationList($sign(PluginTrust::REVOCATIONS, ['sequence' => 1, 'issued_at' => time(), 'expires_at' => time() + 86400, 'revoked' => []]));
+        self::assertNotNull($this->served);
         $this->attestation = $sign(PluginTrust::ATTESTATION, [
             'plugin' => 'CakeOrders',
             'version' => '1.0.0',
