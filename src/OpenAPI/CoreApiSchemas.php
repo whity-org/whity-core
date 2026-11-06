@@ -3262,7 +3262,7 @@ final class CoreApiSchemas
                     ],
                 ],
             ],
-            self::adminRoute('GET', '/api/migrations', [
+            self::permissionRoute('GET', '/api/migrations', 'migrations:read', [
                 'summary' => 'List database migrations and their execution state',
                 'tags' => ['platform-ops'],
                 'responses' => [
