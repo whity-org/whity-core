@@ -179,7 +179,8 @@ $page = render($data, $groups, $areas);
 
 if ($check) {
     $current = @file_get_contents($pagePath);
-    if ($current !== $page) {
+    // Line endings are git's business (core.autocrlf on Windows), not ours.
+    if ($current === false || str_replace("\r\n", "\n", $current) !== $page) {
         failWith(['docs/wiki/Plugin-SDK-Coverage.md is out of date with coverage.json.']);
     }
     $counts = array_count_values(array_map(static fn (array $a): string => $a['rating'], $areas));
