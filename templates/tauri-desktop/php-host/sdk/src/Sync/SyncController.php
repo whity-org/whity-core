@@ -63,6 +63,7 @@ final class SyncController
         $this->table = self::assertIdentifier($resource->table(), 'table');
         $this->domainColumns = array_map(
             static fn (string $c): string => self::assertIdentifier($c, 'column'),
+            // @phpstan-ignore arrayValues.list (a third-party SyncableResource may return a keyed array despite its documented list)
             array_values($resource->domainColumns()),
         );
         $this->projection = 'id, tenant_id, '
@@ -421,8 +422,8 @@ final class SyncController
             'tenantId' => (int) ($row['tenant_id'] ?? 0),
             'clientUuid' => isset($row['client_uuid']) ? (string) $row['client_uuid'] : null,
             'version' => (int) ($row['version'] ?? 1),
-            'deletedAt' => isset($row['deleted_at']) && $row['deleted_at'] !== null ? (string) $row['deleted_at'] : null,
-            'updatedBy' => isset($row['updated_by']) && $row['updated_by'] !== null ? (int) $row['updated_by'] : null,
+            'deletedAt' => isset($row['deleted_at']) ? (string) $row['deleted_at'] : null,
+            'updatedBy' => isset($row['updated_by']) ? (int) $row['updated_by'] : null,
             'createdAt' => isset($row['created_at']) ? (string) $row['created_at'] : null,
             'updatedAt' => isset($row['updated_at']) ? (string) $row['updated_at'] : null,
         ];

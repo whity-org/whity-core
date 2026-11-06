@@ -917,7 +917,6 @@ final class BlockValidator
                 continue;
             }
 
-            /** @var string $field */
             $field = $item['field'];
 
             if (isset($seen[$field])) {

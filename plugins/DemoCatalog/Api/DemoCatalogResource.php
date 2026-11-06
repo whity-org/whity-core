@@ -72,7 +72,7 @@ final class DemoCatalogResource implements SyncableResource
     {
         return [
             'name' => (string) ($row['name'] ?? ''),
-            'description' => isset($row['description']) && $row['description'] !== null ? (string) $row['description'] : null,
+            'description' => isset($row['description']) ? (string) $row['description'] : null,
             'status' => (string) ($row['status'] ?? 'active'),
         ];
     }

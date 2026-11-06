@@ -130,6 +130,7 @@ final class TenantPredicateScanner
      */
     public function scanSource(string $source, string $file = '<source>'): array
     {
+        /** @var list<\PhpToken> $tokens tokenize() returns a list; its stub says array. */
         $tokens = \PhpToken::tokenize($source);
 
         // Pre-compute, per line, whether an ignore annotation with a non-empty
@@ -400,6 +401,7 @@ final class TenantPredicateScanner
      * `$var .= ...`, return the variable name (and set $isAppend); else null.
      *
      * @param list<\PhpToken> $tokens
+     * @param-out bool $isAppend
      */
     private function precedingAssignmentTarget(array $tokens, int $start, ?bool &$isAppend = null): ?string
     {

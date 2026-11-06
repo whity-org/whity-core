@@ -308,7 +308,18 @@ final class Expression
                 foreach ($values as $v) {
                     self::number($v, $op);
                 }
+                // evaluate() does not run validate() first, so an unvalidated
+                // `{"min": []}` reaches here with no values. min()/max() would
+                // throw a ValueError, which is not the ExpressionError callers
+                // are promised.
                 /** @var list<int|float> $values */
+                if ($values === []) {
+                    return match ($op) {
+                        '+' => 0,
+                        '*' => 1,
+                        default => throw new ExpressionError(ExpressionError::TYPE, "{$op}: needs at least one number"),
+                    };
+                }
                 return match ($op) {
                     '+' => array_sum($values),
                     '*' => array_product($values),
@@ -474,7 +485,8 @@ final class Expression
                         return false;
                     }
                     if ($op === 'count' && $hit) {
-                        $result++;
+                        // Always an int here: count starts at 0 above.
+                        $result = (int) $result + 1;
                     }
                 }
                 return $result;
