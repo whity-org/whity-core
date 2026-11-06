@@ -128,6 +128,11 @@ final class AuditSentences
      *   audit.sentence.tenant_invitation_created = {actor} invited someone
      *   audit.sentence.tenant_invitation_resent = {actor} sent an invitation again
      *   audit.sentence.tenant_invitation_revoked = {actor} cancelled an invitation
+     *   audit.sentence.tenant_signup_approved = {actor} let someone join as a customer
+     *   audit.sentence.tenant_signup_confirmed = {actor} confirmed their email to join as a customer
+     *   audit.sentence.tenant_signup_rejected = {actor} turned down a customer sign-up
+     *   audit.sentence.tenant_signup_requested = Someone asked to join as a customer
+     *   audit.sentence.tenant_signup_settings_updated = {actor} changed the sign-up settings
      *   audit.sentence.tenant_updated = {actor} changed workspace {target}
      *   audit.sentence.user_created = {actor} added {target}
      *   audit.sentence.user_deleted = {actor} removed {target}
@@ -228,6 +233,11 @@ final class AuditSentences
         'tenant.invitation.created' => '{actor} invited someone',
         'tenant.invitation.resent' => '{actor} sent an invitation again',
         'tenant.invitation.revoked' => '{actor} cancelled an invitation',
+        'tenant.signup.approved' => '{actor} let someone join as a customer',
+        'tenant.signup.confirmed' => '{actor} confirmed their email to join as a customer',
+        'tenant.signup.rejected' => '{actor} turned down a customer sign-up',
+        'tenant.signup.requested' => 'Someone asked to join as a customer',
+        'tenant.signup.settings_updated' => '{actor} changed the sign-up settings',
         'tenant.updated' => '{actor} changed workspace {target}',
         'user.created' => '{actor} added {target}',
         'user.deleted' => '{actor} removed {target}',

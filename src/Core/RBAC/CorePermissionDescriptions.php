@@ -145,6 +145,7 @@ final class CorePermissionDescriptions
         CorePermissions::FORMS_MANAGE                 => 'Author forms — add and order fields, decide what is required, and set where submissions go',
         CorePermissions::FORMS_SUBMIT                 => 'Fill in and submit a published form, and read back one\'s own submissions',
         CorePermissions::FORMS_REVIEW                 => 'Record the office\'s decision and notes on a submitted form',
+        CorePermissions::SIGNUP_MANAGE                => 'Turn customer sign-up on or off for this workspace, choose the starting role, and approve or reject people waiting to join',
         CorePermissions::PUBLIC_FORM_KEYS_MANAGE      => 'Issue and revoke the keys that open a plugin\'s public form for this workspace',
         CorePermissions::CONVENING_READ               => 'See the tenant\'s convening bodies, their meetings, agendas and recorded decisions',
         CorePermissions::CONVENING_MANAGE             => 'Create and change convening bodies and their membership, build agendas, schedule ',

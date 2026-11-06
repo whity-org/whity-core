@@ -677,6 +677,14 @@
     "en": "See the default settings for all workspaces",
     "ar": "عرض الإعدادات الافتراضية العامة"
   },
+  "get_api_signup_requests": {
+    "en": "List people waiting to join as customers",
+    "ar": "عرض من ينتظرون الانضمام كعملاء"
+  },
+  "get_api_signup_settings": {
+    "en": "Read your workspace's customer sign-up settings",
+    "ar": "عرض إعدادات تسجيل العملاء"
+  },
   "get_api_storage_config": {
     "en": "See where your workspace stores files",
     "ar": "عرض مكان تخزين الملفات"
@@ -1277,6 +1285,14 @@
     "en": "Add permissions to a role",
     "ar": "إضافة صلاحيات إلى دور"
   },
+  "post_api_signup_requests_id_approve": {
+    "en": "Let a waiting person join as a customer",
+    "ar": "قبول انضمام شخص كعميل"
+  },
+  "post_api_signup_requests_id_reject": {
+    "en": "Turn away a waiting person",
+    "ar": "رفض طلب انضمام"
+  },
   "post_api_tag_groups": {
     "ar": "إنشاء مجموعة وسوم"
   },
@@ -1398,6 +1414,10 @@
   "put_api_plans_id_entitlements": {
     "en": "Set what a plan includes",
     "ar": "تعيين ما تتضمنه باقة"
+  },
+  "put_api_signup_settings": {
+    "en": "Change your workspace's customer sign-up settings",
+    "ar": "تغيير إعدادات تسجيل العملاء"
   },
   "put_api_storage_config": {
     "en": "Set or replace where your workspace stores files",

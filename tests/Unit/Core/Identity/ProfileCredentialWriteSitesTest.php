@@ -74,6 +74,8 @@ final class ProfileCredentialWriteSitesTest extends TestCase
         'src/Api/RegisterApiHandler.php',
         'src/Core/Identity/FederatedIdentityLinker.php',
         'src/Core/Identity/ProfileProvisioner.php',
+        // WHIT-915: customer sign-up creates a profile only with a chosen password, as `local`.
+        'src/Core/Signup/CustomerSignupService.php',
         'src/Database/ScaleSeeder/ScaleSeeder.php',
         'src/Database/Seeder.php',
     ];

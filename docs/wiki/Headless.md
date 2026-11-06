@@ -39,10 +39,10 @@ Two settings tell the backend where your frontend lives.
 `APP_URL` stays the backend's own address, because the SSO callback is built on
 it. If your routes don't match the defaults (`/verify-email`, `/reset-password`,
 `/accept-invitation`, `/account-recovery`, `/dashboard`, `/login`, `/f`,
-`/verify`, `/admin/errors`), override any single link with its full URL:
+`/verify`, `/admin/errors`, `/join/confirm`), override any single link with its full URL:
 `EMAIL_VERIFICATION_URL`, `PASSWORD_RESET_URL`, `TWO_FACTOR_RECOVERY_URL`,
 `INVITATION_ACCEPT_URL`, `SSO_SUCCESS_URL`, `SSO_LOGIN_URL`, `PUBLIC_FORM_URL`,
-`DOCUMENT_VERIFY_URL`, `ERROR_DETAILS_URL`. See `.env.example` for each one.
+`DOCUMENT_VERIFY_URL`, `ERROR_DETAILS_URL`, `SIGNUP_CONFIRM_URL`. See `.env.example` for each one.
 
 What your pages receive:
 

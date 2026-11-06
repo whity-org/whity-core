@@ -155,6 +155,7 @@ final class CoreApiSchemas
             self::tagRoutes(),
             self::passwordResetRoutes(),
             self::invitationRoutes(),
+            self::customerSignupRoutes(),
             self::twoFactorRecoveryRoutes(),
             self::dataTypeRoutes(),
             self::reportRoutes(),
@@ -9634,6 +9635,93 @@ final class CoreApiSchemas
                 'status' => ['type' => 'string', 'enum' => ['joined', 'already_member']],
                 'message' => self::str(),
             ], ['status', 'message'])),
+            // ── Workspace customer sign-up (WHIT-915) ─────────────────────────
+            'PublicSignupInfoResponse' => self::dataEnvelope(self::object([
+                'workspace_name' => self::str(),
+                'workspace_slug' => self::str(),
+                'approval_required' => self::bool(),
+                'allowed_domains' => ['type' => 'array', 'items' => ['type' => 'string']],
+                'bot_check' => [
+                    'type' => 'object',
+                    'nullable' => true,
+                    'properties' => ['provider' => self::str(), 'site_key' => self::str()],
+                    'required' => ['provider', 'site_key'],
+                ],
+            ], ['workspace_name', 'workspace_slug', 'approval_required', 'allowed_domains', 'bot_check'])),
+            'PublicSignupRequest' => self::object([
+                'email' => self::str(),
+                'display_name' => self::str(),
+                'bot_token' => self::str(),
+            ], ['email', 'display_name']),
+            'PublicSignupAcceptedResponse' => self::dataEnvelope(self::object([
+                'status' => ['type' => 'string', 'enum' => ['check_email']],
+                'message' => self::str(),
+            ], ['status', 'message'])),
+            'PublicSignupPreviewResponse' => self::dataEnvelope(self::object([
+                'workspace_name' => self::str(),
+                'email' => self::str(),
+                'requires_password' => self::bool(),
+            ], ['workspace_name', 'email', 'requires_password'])),
+            'PublicSignupConfirmRequest' => self::object([
+                'token' => self::str(),
+                'password' => self::str(),
+            ], ['token']),
+            'PublicSignupConfirmResponse' => self::dataEnvelope(self::object([
+                'status' => ['type' => 'string', 'enum' => ['joined', 'pending_approval', 'already_member']],
+                'message' => self::str(),
+            ], ['status', 'message'])),
+            'SignupEligibleRole' => self::object([
+                'id' => self::int(),
+                'name' => self::str(),
+                'description' => self::str(),
+                'global' => self::bool(),
+            ], ['id', 'name', 'description', 'global']),
+            'SignupSettings' => self::object([
+                'mode' => ['type' => 'string', 'enum' => ['off', 'approval', 'open']],
+                'role_id' => self::int(true),
+                'role_name' => self::str(true),
+                'role_customer_safe' => self::bool(true),
+                'allowed_domains' => ['type' => 'array', 'items' => ['type' => 'string']],
+                'eligible_roles' => ['type' => 'array', 'items' => SchemaBuilder::ref('SignupEligibleRole')],
+                'pending_count' => self::int(),
+                'workspace_slug' => self::str(true),
+                'bot_check_ready' => self::bool(),
+                'updated_at' => self::str(true),
+            ], [
+                'mode', 'role_id', 'role_name', 'role_customer_safe', 'allowed_domains',
+                'eligible_roles', 'pending_count', 'workspace_slug', 'bot_check_ready', 'updated_at',
+            ]),
+            'SignupSettingsResponse' => self::dataEnvelope(SchemaBuilder::ref('SignupSettings')),
+            'SignupSettingsUpdateRequest' => self::object([
+                'mode' => [
+                    'type' => 'string',
+                    'enum' => ['off', 'approval', 'open'],
+                    'description' => 'Who can sign up: `off` (nobody), `approval` (an admin approves each person) or `open` (people join once they confirm their email).',
+                ],
+                'role_id' => self::int(true) + [
+                    'description' => 'The role people get when they join. Must be one of `eligible_roles` from GET /api/v1/signup/settings. Required unless the mode is `off`.',
+                ],
+                'allowed_domains' => [
+                    'type' => 'array',
+                    'items' => ['type' => 'string'],
+                    'description' => 'Email domains that may sign up, like `example-bakery.com`. Empty means any address.',
+                ],
+            ], []),
+            'SignupRequestItem' => self::object([
+                'id' => self::int(),
+                'email' => self::str(),
+                'display_name' => self::str(),
+                'status' => ['type' => 'string', 'enum' => ['pending', 'approved', 'rejected']],
+                'requested_at' => self::str(),
+                'verified_at' => self::str(true),
+                'decided_at' => self::str(true),
+                'decided_by_name' => self::str(true),
+            ], ['id', 'email', 'display_name', 'status', 'requested_at', 'verified_at', 'decided_at', 'decided_by_name']),
+            'SignupRequestListResponse' => self::paginatedListEnvelope('SignupRequestItem'),
+            'SignupDecisionResponse' => self::dataEnvelope(self::object([
+                'id' => self::int(),
+                'status' => ['type' => 'string', 'enum' => ['approved', 'rejected']],
+            ], ['id', 'status'])),
             'PendingTwoFactorRecoveryItem' => self::object([
                 'id' => self::int(),
                 'profile_id' => self::int(),
@@ -10623,6 +10711,159 @@ final class CoreApiSchemas
                 'tags' => ['auth'],
                 'responses' => [
                     200 => self::jsonResponse('Approver coverage for the calling tenant', 'PasswordResetApproverCoverageResponse'),
+                ] + self::authErrors(),
+            ]),
+        ];
+    }
+
+    /**
+     * Workspace-controlled customer sign-up (WHIT-915): four public routes and
+     * the workspace admin's five.
+     *
+     * @return list<array{method: string, path: string, requiredRole: ?string, requiredPermission: ?string, schema: array<string, mixed>}>
+     */
+    private static function customerSignupRoutes(): array
+    {
+        $slug = [
+            'name' => 'workspace',
+            'in' => 'path',
+            'required' => true,
+            'description' => 'The workspace\'s slug. When the request\'s host names a workspace too, they must agree.',
+            'schema' => ['type' => 'string'],
+        ];
+
+        return [
+            [
+                'method' => 'GET',
+                'path' => '/api/public/signup/confirm',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Describe a sign-up link without using it (public, rate-limited)',
+                    'description' => 'Only the holder of the emailed link learns whether the address '
+                        . 'already has an account (`requires_password: false`).',
+                    'tags' => ['signup'],
+                    'parameters' => [self::queryParam('token', 'string', 'The token from the sign-up link')],
+                    'responses' => [
+                        200 => self::jsonResponse('The sign-up the link is for', 'PublicSignupPreviewResponse'),
+                        404 => self::errorResponse('The link is invalid, expired, or already used'),
+                        429 => self::errorResponse('Too many attempts'),
+                    ],
+                ],
+            ],
+            [
+                'method' => 'POST',
+                'path' => '/api/public/signup/confirm',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Use a sign-up link (public); a password is required only for a new address',
+                    'description' => 'Joins at once when the workspace\'s sign-up is Open, or waits for a '
+                        . 'workspace admin when it is Approval required. The workspace comes from the link, '
+                        . 'never from the request. An existing account keeps its password.',
+                    'tags' => ['signup'],
+                    'request' => 'PublicSignupConfirmRequest',
+                    'responses' => [
+                        200 => self::jsonResponse('Confirmed - see `data.status`', 'PublicSignupConfirmResponse'),
+                        400 => self::errorResponse('The link is invalid, expired, or already used'),
+                        409 => self::errorResponse('Sign-up has closed, or this person cannot join through sign-up'),
+                        422 => self::errorResponse('Missing token, or a password is required and was not supplied'),
+                        429 => self::errorResponse('Too many attempts'),
+                    ],
+                ],
+            ],
+            [
+                'method' => 'GET',
+                'path' => '/api/public/signup/workspaces/{workspace}',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Whether a workspace takes customer sign-ups, and how (public)',
+                    'description' => 'An unknown workspace and one with sign-up off answer the same 404.',
+                    'tags' => ['signup'],
+                    'parameters' => [$slug],
+                    'responses' => [
+                        200 => self::jsonResponse('Sign-up is open', 'PublicSignupInfoResponse'),
+                        404 => self::errorResponse('Sign-up is not open for this workspace'),
+                        429 => self::errorResponse('Too many attempts'),
+                    ],
+                ],
+            ],
+            [
+                'method' => 'POST',
+                'path' => '/api/public/signup/workspaces/{workspace}',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Ask to join a workspace as a customer (public); mails a confirmation link',
+                    'description' => 'Answers the same 202 for every address it accepts and never looks '
+                        . 'up whether the address has an account or already belongs to the workspace, '
+                        . 'so it cannot be used to learn either. Never creates a workspace. Protected '
+                        . 'by the instance\'s bot check (Turnstile) and per-IP, per-address and '
+                        . 'per-workspace limits.',
+                    'tags' => ['signup'],
+                    'parameters' => [$slug],
+                    'request' => 'PublicSignupRequest',
+                    'responses' => [
+                        202 => self::jsonResponse('Check your email', 'PublicSignupAcceptedResponse'),
+                        404 => self::errorResponse('Sign-up is not open for this workspace'),
+                        422 => self::errorResponse('Invalid email or name, failed bot check, or an email domain the workspace does not accept'),
+                        429 => self::errorResponse('Too many attempts'),
+                        503 => self::errorResponse('The bot check is not available'),
+                    ],
+                ],
+            ],
+            self::permissionRoute('GET', '/api/signup/settings', 'signup:manage', [
+                'summary' => 'Read this workspace\'s customer sign-up settings',
+                'description' => '`eligible_roles` lists only customer-safe roles: the workspace\'s own or '
+                    . 'global roles holding no admin permission. `role_customer_safe` is false when the '
+                    . 'saved role has since gained one, and sign-ups are refused until it is changed.',
+                'tags' => ['signup'],
+                'responses' => [
+                    200 => self::jsonResponse('The settings', 'SignupSettingsResponse'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('PUT', '/api/signup/settings', 'signup:manage', [
+                'summary' => 'Change this workspace\'s customer sign-up settings',
+                'description' => 'Omitted fields keep their value. A starting role is required unless the '
+                    . 'mode is `off`, and must be customer-safe.',
+                'tags' => ['signup'],
+                'request' => 'SignupSettingsUpdateRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The saved settings', 'SignupSettingsResponse'),
+                    422 => self::errorResponse('Unknown mode, missing or unsafe role, or invalid domains'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/signup/requests', 'signup:manage', [
+                'summary' => 'People who confirmed their email and wait to join, or were decided on',
+                'tags' => ['signup'],
+                'parameters' => [
+                    self::queryParam('status', 'string', '`pending` (default), `approved` or `rejected`'),
+                    self::queryParam('page', 'integer', 'Page number, from 1'),
+                    self::queryParam('per_page', 'integer', 'Items per page'),
+                ],
+                'responses' => [
+                    200 => self::jsonResponse('The requests, oldest first', 'SignupRequestListResponse'),
+                    422 => self::errorResponse('Unknown status'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/signup/requests/{id:\d+}/approve', 'signup:manage', [
+                'summary' => 'Let a waiting person join as a customer',
+                'description' => 'Creates the customer membership with the current starting role. A '
+                    . 'rejected request can be approved later.',
+                'tags' => ['signup'],
+                'responses' => [
+                    200 => self::jsonResponse('Approved', 'SignupDecisionResponse'),
+                    404 => self::errorResponse('No request waiting for a decision has that id'),
+                    409 => self::errorResponse('The starting role is missing or unsafe, or the person is suspended or invited here'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/signup/requests/{id:\d+}/reject', 'signup:manage', [
+                'summary' => 'Turn a waiting person away',
+                'tags' => ['signup'],
+                'responses' => [
+                    200 => self::jsonResponse('Rejected', 'SignupDecisionResponse'),
+                    404 => self::errorResponse('No pending request has that id'),
                 ] + self::authErrors(),
             ]),
         ];

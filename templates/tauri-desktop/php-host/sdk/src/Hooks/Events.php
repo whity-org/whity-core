@@ -100,6 +100,19 @@ final class Events
     public const OU_ROLE_ASSIGNED = 'ou.role_assigned';
     public const OU_ROLE_REMOVED = 'ou.role_removed';
 
+    // ---- memberships (SDK 1.73) ----
+    /**
+     * Somebody joined a workspace as a CUSTOMER through the workspace's own
+     * sign-up: at once when sign-up is Open, or when an admin approves them
+     * when it is Approval required. Fired after the membership is committed,
+     * and the return value is ignored, so a listener cannot change or undo it.
+     * Payload: `tenant_id`, `profile_id`, `membership_id`, `role_id`,
+     * `role_name`, `via` (`open` or `approval`), `approved_by` (the approving
+     * admin's profile id, or null). Ids only: read anything else under your
+     * own permissions.
+     */
+    public const MEMBERSHIP_CUSTOMER_JOINED = 'membership.customer_joined';
+
     // ---- documents (SDK 1.49; DOCUMENT-AUTOMATION.md) ----
     // Before a document is issued: a listener may veto with HookVetoException,
     // and nothing is written. Payload: tenant_id, source_id, version, record,
