@@ -71,7 +71,7 @@ final class ToolSurfaceTest extends TestCase
             'schema' => ['summary' => 'List forms', 'tags' => ['forms']],
         ]], 'get_api_forms');
 
-        self::assertSame(['dev.whity/toolset' => 'core.forms', 'dev.whity/visibility' => 'discoverable', 'dev.whity/agentPolicy' => 'allow'], $meta);
+        self::assertSame(['dev.whity/toolset' => 'core.forms', 'dev.whity/visibility' => 'discoverable', 'dev.whity/agentPolicy' => 'allow', 'dev.whity/readsOnly' => true], $meta);
     }
 
     public function testThePermissionMapWinsOverTheTag(): void

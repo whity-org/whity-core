@@ -69,7 +69,12 @@ namespace Whity\Sdk;
  *   `readOnlyHint: true` on a tool that only reads. The host derives nothing
  *   for an authored tool (it has no HTTP method to go on), and omitted hints
  *   take the spec's cautious defaults. Hints only: they never change who may
- *   call the tool. Unknown keys and wrong types are dropped.
+ *   call the tool. Unknown keys and wrong types are dropped. From SDK 1.71 they
+ *   do not decide whether an AI agent must ask first either: the host treats
+ *   every authored tool as a write for agents, so each agent call is a
+ *   proposal a person approves unless the tool declares an `undo` and the
+ *   person's grant allows it. A read an agent should run unasked belongs on a
+ *   GET route, whose tool the host knows only reads.
  *
  * SDK 1.52 (WHIT-752, docs/design/MCP-TOOL-SURFACE.md §5.7), all optional:
  *

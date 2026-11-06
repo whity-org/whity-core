@@ -35,11 +35,10 @@ final class ToolCatalogue
     public static function describe(array $tool, ?string $permission = null): array
     {
         $meta        = is_array($tool['_meta'] ?? null) ? $tool['_meta'] : [];
-        $annotations = is_array($tool['annotations'] ?? null) ? $tool['annotations'] : [];
         $name        = (string) ($tool['name'] ?? '');
         $window      = $meta[ToolSurface::META_UNDO_WINDOW] ?? null;
         $window      = is_int($window) && $window > 0 ? $window : null;
-        $readOnly    = ($annotations['readOnlyHint'] ?? false) === true;
+        $readOnly    = ToolSurface::readsOnly($tool);
         $policy      = $meta[ToolSurface::META_AGENT_POLICY] ?? null;
         $names       = self::names()[$name] ?? [];
 

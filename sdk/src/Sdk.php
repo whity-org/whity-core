@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.70).
+ * SDK identity (v1.71).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -998,12 +998,24 @@ namespace Whity\Sdk;
  *
  * Narrows the payload; a listener that read `password` or returned a changed
  * `role_id` or `email` must stop relying on it.)
+ *
+ * 1.71 (THE HOST DECIDES WHAT A TOOL WRITES: whether an AI agent may run a tool at
+ * once or must ask a person first starts from whether the tool only reads, and the
+ * host now decides that itself. A plugin route's tool reads only when its method is
+ * GET or HEAD; a `readOnlyHint: true` in its `mcp_annotations` on any other method
+ * is published as `false`. A hand-authored tool ({@see PluginMcpToolsInterface}) is
+ * a write for agents whatever its `annotations` say, so a person approves each
+ * agent call unless the tool declares an `undo` and the grant allows it. Expose a
+ * read an agent should run unasked as a GET route. Annotations stay hints for
+ * clients (WHIT-912).
+ *
+ * No signature changes.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.70.0';
+    public const VERSION = '1.71.0';
 
     /**
      * Static identity only — never instantiated.
