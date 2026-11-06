@@ -251,17 +251,25 @@ final class PublicFormKeysApiHandler
         $label = is_string($body['label'] ?? null) ? trim($body['label']) : '';
         if ($label === '' || mb_strlen($label) > self::MAX_LABEL_LENGTH) {
             $errors['label'] = 'Give this key a name of up to ' . self::MAX_LABEL_LENGTH . ' characters.';
+            $errors['code'] = 'label_invalid';
+            $errors['max'] = self::MAX_LABEL_LENGTH;
         }
 
         $origins = [];
         $given = $body['allowed_origins'] ?? [];
         if (!is_array($given) || !array_is_list($given) || count($given) > PublicFormOrigins::MAX_ORIGINS) {
             $errors['allowed_origins'] = 'Give at most ' . PublicFormOrigins::MAX_ORIGINS . ' sites.';
+            $errors['code'] ??= 'origins_too_many';
+            $errors['max'] ??= PublicFormOrigins::MAX_ORIGINS;
         } else {
             foreach ($given as $origin) {
                 $normalized = is_string($origin) ? PublicFormOrigins::normalize($origin) : null;
                 if ($normalized === null) {
                     $errors['allowed_origins'] = 'Each site must look like https://www.example.com, with no path.';
+                    // A stable code and the line at fault, so the page can say
+                    // it in the reader's language (WHIT-916).
+                    $errors['code'] ??= 'origin_invalid';
+                    $errors['value'] = is_string($origin) ? $origin : '';
                     break;
                 }
                 $origins[$normalized] = true;

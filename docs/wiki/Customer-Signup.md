@@ -15,7 +15,7 @@ Workspace sign-up never creates a workspace.
 
 Admins with the `signup:manage` permission manage it. Migration 222 gave that permission to every role that already holds `settings:write`.
 
-- **Mode.** Off (the default), Approval required, or Open.
+- **Mode.** Off (the default), Approval required, or Open. Sign-up can only be turned on once the workspace has a web address (slug), because its sign-up page lives at `/join/<slug>`.
 - **Starting role.** The role everyone gets when they join. Only customer-safe roles can be chosen. If none qualifies yet, create a role in Roles with just what customers need (for example `forms:submit`).
 - **Allowed email domains.** Optional. When you list domains, only addresses on those domains can sign up. Domain names follow the email-domain policy's rules: no IP addresses, no wildcards. A leading `@` is dropped.
 - **Requests.** People who confirmed their email and are waiting for an admin, when the mode is Approval required.
@@ -50,7 +50,7 @@ Profiles stay global (ADR 0005). The same email can be a customer in one workspa
    - **Open:** the customer membership is created now (`joined`).
    - **Approval required:** the person waits (`pending_approval`). No membership exists until an admin approves them in Settings → Sign-up.
 
-A rejected person, or one whose membership is suspended, can't get in by signing up again. A rejected request can still be approved later.
+A rejected person, or one whose membership is suspended, can't get in by signing up again. Reject asks first. A rejected request stays under **Turned away** in the queue, and can still be approved from there.
 
 ## Safety
 
@@ -59,6 +59,10 @@ A rejected person, or one whose membership is suspended, can't get in by signing
 - **Limits.** Per IP, per address and per workspace. Over the per-address limit the answer is still 202, but no email is sent.
 - **Bot check.** The instance's public-form bot check (Cloudflare Turnstile, Settings → Public forms). With no provider configured, sign-up is refused unless the operator has allowed public forms without one.
 - **Audit.** Requests, confirmations, settings changes, approvals and rejections are recorded. Each grant is also recorded as `user.membership.added` with `kind: customer`.
+
+## Errors
+
+Refusals from the settings and queue endpoints carry a stable `code` in `details` beside the English sentence, so a client can show them in the reader's language: `mode_invalid`, `role_required`, `role_not_customer_safe`, `workspace_slug_missing`, `domain_invalid` (with `value`, the line at fault), `domains_too_many` (with `max`), `membership_conflict` and `request_not_found`.
 
 ## For plugins
 

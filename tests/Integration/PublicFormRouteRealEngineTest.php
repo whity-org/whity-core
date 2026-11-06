@@ -654,7 +654,16 @@ final class PublicFormRouteRealEngineTest extends TestCase
         ]));
 
         self::assertSame(422, $response->getStatusCode());
-        self::assertArrayHasKey($field, json_decode($response->getBody(), true)['details']);
+        $details = json_decode($response->getBody(), true)['details'];
+        self::assertArrayHasKey($field, $details);
+        // WHIT-916: a stable code beside the English, so the page can translate it.
+        if ($field === 'allowed_origins') {
+            self::assertSame('origin_invalid', $details['code']);
+            self::assertSame($change['allowed_origins'][0], $details['value']);
+        }
+        if ($field === 'label') {
+            self::assertSame('label_invalid', $details['code']);
+        }
     }
 
     public function testRevokingThroughTheApiStopsTheKeyAndOnlyInItsOwnTenant(): void

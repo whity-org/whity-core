@@ -12,12 +12,12 @@ import { PublishCheck } from '@whity/ui/editor/publish-check';
 
 const BLOCKER = { kind: 'too-large' as const, bytes: 23_068_672, max: 20_971_520 };
 
-function check(labels = EDITOR_LABELS) {
+function check(labels = EDITOR_LABELS, blocker: { kind: 'too-large'; bytes: number; max: number } = BLOCKER) {
   render(
     <PublishCheck
       open
       onOpenChange={() => {}}
-      blockers={[BLOCKER]}
+      blockers={[blocker]}
       nextVersion={2}
       onPublish={() => {}}
       onFix={() => {}}
@@ -35,6 +35,13 @@ describe('Publish check: a template too large to print', () => {
     expect([...list.querySelectorAll('bdi')].map((b) => b.textContent)).toEqual(['22.0 MB', '20.0 MB']);
     expect(screen.queryByRole('button', { name: 'Show' })).toBeNull();
     expect((screen.getByRole('button', { name: 'Publish version 2' }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('shows sizes under 1 MB in KB, never as 0.0 MB (WHIT-916)', () => {
+    check(EDITOR_LABELS, { kind: 'too-large', bytes: 61_440, max: 51_200 });
+    const list = screen.getByRole('list', { name: 'What blocks publishing' });
+    expect([...list.querySelectorAll('bdi')].map((b) => b.textContent)).toEqual(['60 KB', '50 KB']);
+    expect(list.textContent).not.toContain('0.0 MB');
   });
 
   it('keeps the sizes left to right inside the Arabic sentence', () => {

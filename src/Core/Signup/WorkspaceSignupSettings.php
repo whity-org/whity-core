@@ -131,6 +131,30 @@ final class WorkspaceSignupSettings
     }
 
     /**
+     * The first entry {@see self::normaliseDomains()} refuses as a domain, so
+     * the admin can be told which line to fix. Null when every entry is a
+     * domain and the refusal was the count or the shape instead.
+     */
+    public static function firstInvalidDomain(mixed $input): ?string
+    {
+        if (!is_array($input)) {
+            return null;
+        }
+
+        foreach ($input as $entry) {
+            if (!is_string($entry)) {
+                return '';
+            }
+            $domain = ltrim(strtolower(trim($entry)), '@');
+            if ($domain !== '' && !self::isDomain($domain)) {
+                return trim($entry);
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Whether an address may sign up under a domain list. An empty list allows
      * every address.
      *

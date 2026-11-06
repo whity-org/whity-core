@@ -18,7 +18,7 @@ import { ConfirmAction } from '@whity/ui/confirm-action';
 import { Switch } from '@whity/ui/switch';
 import { Textarea } from '@whity/ui/textarea';
 import { IconAlertCircle, IconCopy, IconForms, IconPlus } from '@tabler/icons-react';
-import { useTranslation } from '@whity/features/i18n';
+import { useTranslation, type TranslateFn } from '@whity/features/i18n';
 import { SETTINGS_MANAGE, SYSTEM_TENANT_ID } from '../settings-shared';
 
 interface FormKey {
@@ -59,11 +59,41 @@ interface IssuedKey {
 
 const PROVIDER_LABELS: Readonly<Record<string, string>> = { turnstile: 'Cloudflare Turnstile' };
 
-async function readError(res: Response, fallback: string): Promise<string> {
+/**
+ * The server's refusal in the reader's language (WHIT-916): the server sends a
+ * stable `code` (and, for a bad site, the line at fault) beside its English
+ * sentence, which is only the fallback for a code this page doesn't know.
+ */
+function codeText(t: TranslateFn, details: Record<string, unknown>): string | null {
+  const value = typeof details.value === 'string' ? details.value : '';
+  const max = typeof details.max === 'number' ? String(details.max) : '';
+  switch (details.code) {
+    case 'origin_invalid':
+      return t(
+        'settings.publicForms.error.originInvalid',
+        '“{value}” isn’t a site address. Each site must look like https://www.example-bakery.com, with no path.',
+        { value }
+      );
+    case 'origins_too_many':
+      return t('settings.publicForms.error.originsTooMany', 'List at most {max} sites.', { max });
+    case 'label_invalid':
+      return t('settings.publicForms.error.labelInvalid', 'Give this key a name of up to {max} characters.', { max });
+    default:
+      return null;
+  }
+}
+
+async function readError(res: Response, fallback: string, t: TranslateFn): Promise<string> {
   try {
     const body = (await res.json()) as { error?: unknown; details?: Record<string, unknown> };
-    const detail = body.details ? Object.values(body.details).find((v) => typeof v === 'string') : undefined;
-    if (typeof detail === 'string') return detail;
+    if (body.details) {
+      const translated = codeText(t, body.details);
+      if (translated !== null) return translated;
+      const detail = Object.entries(body.details).find(
+        ([key, v]) => key !== 'code' && key !== 'value' && typeof v === 'string'
+      )?.[1];
+      if (typeof detail === 'string') return detail;
+    }
     if (typeof body.error === 'string' && body.error !== '') return body.error;
   } catch {
     // no JSON body
@@ -101,7 +131,7 @@ export default function PublicFormsPage() {
   const { data, error: loadError, refetch } = useFetch<KeysPayload>(async () => {
     const res = await apiClient('/api/v1/public-form-keys');
     if (!res.ok) {
-      throw new Error(await readError(res, t('settings.publicForms.loadFailed', 'The keys could not be loaded')));
+      throw new Error(await readError(res, t('settings.publicForms.loadFailed', 'The keys could not be loaded'), t));
     }
     const body = (await res.json()) as {
       data: FormKey[];
@@ -130,7 +160,7 @@ export default function PublicFormsPage() {
     if (revoking === null) return;
     const res = await apiClient(`/api/v1/public-form-keys/${revoking.id}/revoke`, { method: 'POST' });
     if (!res.ok && res.status !== 204) {
-      addToast(await readError(res, t('settings.publicForms.revoke.failed', 'The key could not be revoked')), 'error');
+      addToast(await readError(res, t('settings.publicForms.revoke.failed', 'The key could not be revoked'), t), 'error');
       return;
     }
     addToast(t('settings.publicForms.revoke.done', 'Key revoked. Its form no longer takes submissions.'), 'success');
@@ -377,7 +407,7 @@ function IssueCard({
     });
     setBusy(false);
     if (!res.ok) {
-      addToast(await readError(res, t('settings.publicForms.issue.failed', 'The key could not be issued')), 'error');
+      addToast(await readError(res, t('settings.publicForms.issue.failed', 'The key could not be issued'), t), 'error');
       return;
     }
     const body = (await res.json()) as { data: { key: string; plugin: string; form: string } };
@@ -495,7 +525,7 @@ function EditCard({
     });
     setBusy(false);
     if (!res.ok) {
-      addToast(await readError(res, t('settings.publicForms.edit.failed', 'The key could not be changed')), 'error');
+      addToast(await readError(res, t('settings.publicForms.edit.failed', 'The key could not be changed'), t), 'error');
       return;
     }
     addToast(t('settings.publicForms.edit.done', 'Key changed.'), 'success');
@@ -530,7 +560,7 @@ function BotCheckCard({ onSaved }: { onSaved: () => void }) {
   const { data, error, refetch } = useFetch<BotSettings>(async () => {
     const res = await apiClient('/api/v1/settings/public-forms/bot-check');
     if (!res.ok) {
-      throw new Error(await readError(res, t('settings.publicForms.bot.loadFailed', 'The bot check settings could not be loaded')));
+      throw new Error(await readError(res, t('settings.publicForms.bot.loadFailed', 'The bot check settings could not be loaded'), t));
     }
     return ((await res.json()) as { data: BotSettings }).data;
   }, []);
@@ -589,7 +619,7 @@ function BotCheckForm({ settings, onSaved }: { settings: BotSettings; onSaved: (
     });
     setBusy(false);
     if (!res.ok) {
-      addToast(await readError(res, t('settings.publicForms.bot.saveFailed', 'The bot check settings could not be saved')), 'error');
+      addToast(await readError(res, t('settings.publicForms.bot.saveFailed', 'The bot check settings could not be saved'), t), 'error');
       return;
     }
     addToast(t('settings.publicForms.bot.saved', 'Bot check settings saved.'), 'success');

@@ -31,8 +31,13 @@ const ICON: Record<PublishBlocker["kind"], IconName> = {
 }
 
 /** A size in megabytes with one decimal, Western digits in either language. */
+/** A size in MB, or in KB below 1 MB so a small limit never reads "0.0 MB" (WHIT-916). */
 function megabytes(bytes: number): string {
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  const mb = 1024 * 1024
+  if (bytes < mb) {
+    return `${Math.max(1, Math.round(bytes / 1024))} KB`
+  }
+  return `${(bytes / mb).toFixed(1)} MB`
 }
 
 /**

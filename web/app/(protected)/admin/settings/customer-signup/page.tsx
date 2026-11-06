@@ -33,7 +33,8 @@ import { RadioGroup, RadioGroupItem } from '@whity/ui/radio-group';
 import { SaveBar, ChangedField } from '@whity/ui/save-bar';
 import { Textarea } from '@whity/ui/textarea';
 import { IconUserCheck } from '@tabler/icons-react';
-import { useTranslation } from '@whity/features/i18n';
+import { useTranslation, type TranslateFn } from '@whity/features/i18n';
+import { ConfirmAction } from '@whity/ui/confirm-action';
 import { useDateDisplay } from '@whity/features/datetime';
 
 type Mode = 'off' | 'approval' | 'open';
@@ -63,7 +64,11 @@ interface SignupRequest {
   display_name: string;
   requested_at: string;
   verified_at: string | null;
+  decided_at: string | null;
+  decided_by_name: string | null;
 }
+
+type QueueStatus = 'pending' | 'rejected';
 
 interface Draft {
   mode: Mode;
@@ -86,11 +91,60 @@ function splitDomains(text: string): string[] {
     .filter((d) => d !== '');
 }
 
-async function readError(res: Response, fallback: string): Promise<string> {
+/**
+ * The server's refusal in the reader's language (WHIT-916). The server sends a
+ * stable `code` (and, for a bad domain, the line at fault) beside its English
+ * sentence; the sentence is only a fallback for a code this page doesn't know.
+ */
+function codeText(t: TranslateFn, details: Record<string, unknown>): string | null {
+  const value = typeof details.value === 'string' ? details.value : '';
+  const max = typeof details.max === 'number' ? String(details.max) : '';
+  switch (details.code) {
+    case 'domain_invalid':
+      return t(
+        'settings.customerSignup.error.domainInvalid',
+        '“{value}” isn’t a domain name. Enter domains such as example-bakery.com, one per line.',
+        { value }
+      );
+    case 'domains_too_many':
+      return t('settings.customerSignup.error.domainsTooMany', 'List at most {max} domains.', { max });
+    case 'mode_invalid':
+      return t('settings.customerSignup.error.modeInvalid', 'Choose Off, Approval required or Open.');
+    case 'role_required':
+      return t('settings.customerSignup.error.roleRequired', 'Choose the role people get when they join.');
+    case 'role_not_customer_safe':
+      return t(
+        'settings.customerSignup.error.roleUnsafe',
+        'That role has admin permissions, so it can’t be given to customers. Choose another role.'
+      );
+    case 'workspace_slug_missing':
+      return t(
+        'settings.customerSignup.error.noSlug',
+        'This workspace has no web address yet, so nobody could open its sign-up page. Ask the person who runs this Whity to give it one, then turn sign-up on.'
+      );
+    case 'membership_conflict':
+      return t(
+        'settings.customerSignup.error.membershipConflict',
+        'This person already has a suspended membership or an open invitation here. Sort that out in People first.'
+      );
+    case 'request_not_found':
+      return t('settings.customerSignup.error.requestGone', 'This request was already decided or no longer exists.');
+    default:
+      return null;
+  }
+}
+
+async function readError(res: Response, fallback: string, t: TranslateFn): Promise<string> {
   try {
     const body = (await res.json()) as { error?: unknown; details?: Record<string, unknown> };
-    const detail = body.details ? Object.values(body.details).find((v) => typeof v === 'string') : undefined;
-    if (typeof detail === 'string') return detail;
+    if (body.details) {
+      const translated = codeText(t, body.details);
+      if (translated !== null) return translated;
+      const detail = Object.entries(body.details).find(
+        ([key, v]) => key !== 'code' && key !== 'value' && typeof v === 'string'
+      )?.[1];
+      if (typeof detail === 'string') return detail;
+    }
     if (typeof body.error === 'string' && body.error !== '') return body.error;
   } catch {
     // no JSON body
@@ -111,7 +165,7 @@ export default function CustomerSignupSettingsPage() {
   } = useFetch<SignupSettings>(async () => {
     const res = await apiClient('/api/v1/signup/settings');
     if (!res.ok) {
-      throw new Error(await readError(res, t('settings.customerSignup.loadFailed', 'Sign-up settings could not be loaded')));
+      throw new Error(await readError(res, t('settings.customerSignup.loadFailed', 'Sign-up settings could not be loaded'), t));
     }
     return ((await res.json()) as { data: SignupSettings }).data;
   }, []);
@@ -160,7 +214,7 @@ export default function CustomerSignupSettingsPage() {
     });
     setSaving(false);
     if (!res.ok) {
-      setSaveError(await readError(res, t('settings.customerSignup.saveFailed', 'The settings could not be saved')));
+      setSaveError(await readError(res, t('settings.customerSignup.saveFailed', 'The settings could not be saved'), t));
       return;
     }
     setDraft(null);
@@ -213,6 +267,16 @@ export default function CustomerSignupSettingsPage() {
         )
       ) : (
         <>
+          {settings.workspace_slug === null && (
+            <Alert data-testid="customer-signup-no-slug">
+              <AlertDescription>
+                {t(
+                  'settings.customerSignup.error.noSlug',
+                  'This workspace has no web address yet, so nobody could open its sign-up page. Ask the person who runs this Whity to give it one, then turn sign-up on.'
+                )}
+              </AlertDescription>
+            </Alert>
+          )}
           {settings.mode !== 'off' && settings.role_customer_safe === false && (
             <Alert variant="destructive" data-testid="customer-signup-unsafe-role">
               <AlertDescription>
@@ -372,14 +436,16 @@ function PendingQueue({ pendingCount, onDecided }: { pendingCount: number; onDec
   const { addToast } = useToast();
   const dates = useDateDisplay();
   const [busy, setBusy] = useState<number | null>(null);
+  const [status, setStatus] = useState<QueueStatus>('pending');
+  const [rejecting, setRejecting] = useState<SignupRequest | null>(null);
 
   const { data, error, refetch } = useFetch<SignupRequest[]>(async () => {
-    const res = await apiClient('/api/v1/signup/requests?status=pending&per_page=100');
+    const res = await apiClient(`/api/v1/signup/requests?status=${status}&per_page=100`);
     if (!res.ok) {
-      throw new Error(await readError(res, t('settings.customerSignup.queue.loadFailed', 'The requests could not be loaded')));
+      throw new Error(await readError(res, t('settings.customerSignup.queue.loadFailed', 'The requests could not be loaded'), t));
     }
     return ((await res.json()) as { data: SignupRequest[] }).data;
-  }, [pendingCount]);
+  }, [pendingCount, status]);
 
   const rows = useMemo(() => data ?? [], [data]);
 
@@ -390,7 +456,7 @@ function PendingQueue({ pendingCount, onDecided }: { pendingCount: number; onDec
     });
     setBusy(null);
     if (!res.ok) {
-      addToast(await readError(res, t('settings.customerSignup.queue.failed', 'The request could not be updated')), 'error');
+      addToast(await readError(res, t('settings.customerSignup.queue.failed', 'The request could not be updated'), t), 'error');
       return;
     }
     addToast(
@@ -415,11 +481,35 @@ function PendingQueue({ pendingCount, onDecided }: { pendingCount: number; onDec
           )}
         </div>
         <CardDescription>
-          {t(
-            'settings.customerSignup.queue.hint',
-            'People who confirmed their email while sign-up needs approval. Oldest first.'
-          )}
+          {status === 'pending'
+            ? t(
+                'settings.customerSignup.queue.hint',
+                'People who confirmed their email while sign-up needs approval. Oldest first.'
+              )
+            : t(
+                'settings.customerSignup.queue.rejectedHint',
+                'People you turned away. You can still let any of them in.'
+              )}
         </CardDescription>
+        <div role="group" aria-label={t('settings.customerSignup.queue.show', 'Show')} className="flex gap-2 pt-2">
+          {(
+            [
+              ['pending', t('settings.customerSignup.queue.filter.pending', 'Waiting')],
+              ['rejected', t('settings.customerSignup.queue.filter.rejected', 'Turned away')],
+            ] as const
+          ).map(([value, label]) => (
+            <Button
+              key={value}
+              size="sm"
+              variant={status === value ? 'secondary' : 'ghost'}
+              aria-pressed={status === value}
+              data-testid={`customer-signup-filter-${value}`}
+              onClick={() => setStatus(value)}
+            >
+              {label}
+            </Button>
+          ))}
+        </div>
       </CardHeader>
       <CardContent>
         {error ? (
@@ -432,7 +522,9 @@ function PendingQueue({ pendingCount, onDecided }: { pendingCount: number; onDec
           <div className="flex flex-col items-center gap-2 py-8 text-center" data-testid="customer-signup-queue-empty">
             <IconUserCheck className="h-8 w-8 text-muted-foreground" aria-hidden="true" />
             <p className="text-sm text-muted-foreground">
-              {t('settings.customerSignup.queue.empty', 'Nobody is waiting.')}
+              {status === 'pending'
+                ? t('settings.customerSignup.queue.empty', 'Nobody is waiting.')
+                : t('settings.customerSignup.queue.emptyRejected', 'Nobody has been turned away.')}
             </p>
           </div>
         ) : (
@@ -447,12 +539,25 @@ function PendingQueue({ pendingCount, onDecided }: { pendingCount: number; onDec
                   <ActorChip name={request.display_name} />
                   <p className="text-sm text-muted-foreground">
                     <span dir="ltr">{request.email}</span>
-                    {dates.dateTime(request.verified_at ?? request.requested_at) !== null && (
+                    {status === 'pending' && dates.dateTime(request.verified_at ?? request.requested_at) !== null && (
                       <>
                         {' · '}
                         {t('settings.customerSignup.queue.since', 'Waiting since {when}', {
                           when: dates.dateTime(request.verified_at ?? request.requested_at) ?? '',
                         })}
+                      </>
+                    )}
+                    {status === 'rejected' && dates.dateTime(request.decided_at) !== null && (
+                      <>
+                        {' · '}
+                        {request.decided_by_name
+                          ? t('settings.customerSignup.queue.rejectedBy', 'Turned away by {name} on {when}', {
+                              name: request.decided_by_name,
+                              when: dates.dateTime(request.decided_at) ?? '',
+                            })
+                          : t('settings.customerSignup.queue.rejectedOn', 'Turned away on {when}', {
+                              when: dates.dateTime(request.decided_at) ?? '',
+                            })}
                       </>
                     )}
                   </p>
@@ -468,22 +573,45 @@ function PendingQueue({ pendingCount, onDecided }: { pendingCount: number; onDec
                   >
                     {t('settings.customerSignup.queue.approve', 'Approve')}
                   </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-destructive"
-                    disabled={busy !== null}
-                    data-testid={`customer-signup-reject-${request.id}`}
-                    onClick={() => void decide(request, false)}
-                  >
-                    {t('settings.customerSignup.queue.reject', 'Reject')}
-                  </Button>
+                  {status === 'pending' && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive"
+                      disabled={busy !== null}
+                      data-testid={`customer-signup-reject-${request.id}`}
+                      onClick={() => setRejecting(request)}
+                    >
+                      {t('settings.customerSignup.queue.reject', 'Reject')}
+                    </Button>
+                  )}
                 </div>
               </li>
             ))}
           </ul>
         )}
       </CardContent>
+
+      {/* Reversible (a rejected request can still be approved under Turned
+          away), so a short confirmation that says so is enough (section 21). */}
+      <ConfirmAction
+        open={rejecting !== null}
+        onOpenChange={(open) => {
+          if (!open) setRejecting(null);
+        }}
+        title={t('settings.customerSignup.queue.rejectTitle', 'Turn {name} away?', { name: rejecting?.display_name ?? '' })}
+        description={t(
+          'settings.customerSignup.queue.rejectDescription',
+          'They won’t be able to join by signing up again. You can still let them in later from Turned away.'
+        )}
+        confirmLabel={t('settings.customerSignup.queue.reject', 'Reject')}
+        cancelLabel={t('settings.customerSignup.queue.cancel', 'Cancel')}
+        onConfirm={async () => {
+          const request = rejecting;
+          setRejecting(null);
+          if (request !== null) await decide(request, false);
+        }}
+      />
     </Card>
   );
 }
