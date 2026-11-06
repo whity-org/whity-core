@@ -272,7 +272,7 @@ final class DocumentCollectionRepository
 
         $placeholders = [];
         $bindings = [':tenant_id' => $tenantId, ':profile_id' => $profileId];
-        foreach (array_values($documentIds) as $i => $documentId) {
+        foreach ($documentIds as $i => $documentId) {
             $name = ':doc_' . $i;
             $placeholders[] = $name;
             $bindings[$name] = $documentId;

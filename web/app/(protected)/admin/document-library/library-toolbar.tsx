@@ -175,7 +175,7 @@ export function LibraryToolbar({
           }}
         >
           <Input
-            label={t('organizer.search.label', 'Search titles')}
+            label={t('organizer.search.label', 'Search titles and numbers')}
             value={search}
             onChange={(event) => onSearchChange(event.target.value)}
             placeholder={t('organizer.search.placeholder', 'Invoice, minutes, …')}

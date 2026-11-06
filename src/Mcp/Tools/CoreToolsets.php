@@ -138,6 +138,8 @@ final class CoreToolsets
         'rbac'                     => 'core.people',
         'ous'                      => 'core.people',
         'invitations'              => 'core.people',
+        // WHIT-915: who may join the workspace as a customer, and the queue.
+        'signup'                   => 'core.people',
         'delegations'              => 'core.people',
         'relations'                => 'core.people',
         'documents'                => 'core.documents',

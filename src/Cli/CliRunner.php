@@ -57,7 +57,7 @@ class CliRunner
     /**
      * Run the CLI application
      *
-     * @param array $argv Command line arguments
+     * @param list<string> $argv Command line arguments
      * @return int Exit code
      */
     public function run(array $argv): int

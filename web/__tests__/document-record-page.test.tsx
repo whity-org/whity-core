@@ -199,6 +199,9 @@ function serve(options: {
       );
     }
     if (url.includes('/recipients')) return Promise.resolve(jsonResponse({ data: recipients }));
+    // The Routing tab's own list. Without it the request fell through to the
+    // record below and the panel was handed an object where a list belongs.
+    if (url.endsWith('/routes')) return Promise.resolve(jsonResponse({ data: [] }));
     if (url.includes('/people')) {
       return Promise.resolve(
         peopleStatus === 200
@@ -206,17 +209,13 @@ function serve(options: {
           : jsonResponse({ error: 'nope' }, peopleStatus)
       );
     }
-    if (url.startsWith('/api/v1/ous')) {
+    // #1019: the units this record shows are named by the label endpoint on the
+    // `documents` surface, never by listing the directory.
+    if (url === '/api/v1/labels/resolve') {
       return Promise.resolve(
         directoryStatus === 200
-          ? jsonResponse({
-              data: [
-                { id: 7, name: 'Registry' },
-                { id: 8, name: 'Finance' },
-              ],
-              pagination: { page: 1, perPage: 100, total: 2, totalPages: 1 },
-            })
-          : jsonResponse({ error: 'nope' }, directoryStatus)
+          ? jsonResponse({ data: { ous: { 7: 'Registry', 8: 'Finance' }, roles: {} } })
+          : jsonResponse({ error: 'Insufficient permissions', required: 'documents:read' }, directoryStatus)
       );
     }
     // The record itself. Matched LAST so the more specific sub-resources above
@@ -270,6 +269,32 @@ describe('the record is built from the URL alone', () => {
     // refused to store one precisely so position IS issue order.
     expect(screen.getByTestId('document-record-stat-versions')).toHaveTextContent('1');
     expect(screen.getByTestId('document-record-stat-unit')).toHaveTextContent('Registry');
+  });
+
+  it('shows the number, the state and the pages when the document has them', async () => {
+    params = { id: '5' };
+    serve({
+      record: {
+        number: 'INV-2026-0142',
+        state: 'in_review',
+        artifacts: [{ id: 1, document_id: 42, content_type: 'application/pdf', byte_size: 10, checksum_sha256: 'x', rendered_at: '2026-11-05 10:00:00', pages: 2, content_url: '/api/v1/documents/42/artifacts/1/content' }],
+      },
+    });
+    render(<DocumentRecordPage />);
+
+    expect(await screen.findByText('⁦INV-2026-0142⁩')).toBeInTheDocument();
+    expect(screen.getByText('In review')).toBeInTheDocument();
+    expect(screen.getByText('Pages')).toBeInTheDocument();
+  });
+
+  it('says nothing about a number an older document never had', async () => {
+    params = { id: '5' };
+    serve({});
+    render(<DocumentRecordPage />);
+
+    await screen.findAllByText('PO 4471');
+    expect(screen.queryByText('Number')).not.toBeInTheDocument();
+    expect(screen.queryByText('Pages')).not.toBeInTheDocument();
   });
 
   it('never fetches for a non-numeric segment', async () => {
@@ -524,6 +549,27 @@ describe('the trail and the recipients render the ids they were given', () => {
     expect(trail).toHaveTextContent('Please check the totals.');
   });
 
+  it('names units through the label endpoint, for the ids on this record only', async () => {
+    params = { id: '5' };
+    openTab('history');
+    serve({});
+
+    render(<DocumentRecordPage />);
+
+    const trail = await screen.findByTestId('document-record-trail');
+    await waitFor(() => expect(trail).toHaveTextContent('Finance'));
+    expect(requestedPaths().some((path) => path.startsWith('/api/v1/ous'))).toBe(false);
+
+    const bodies = rawApiClient.mock.calls
+      .filter((call) => call[0] === '/api/v1/labels/resolve')
+      .map((call) => JSON.parse(String((call[1] as RequestInit).body)) as { surface: string; ous: number[] });
+    expect(bodies.length).toBeGreaterThan(0);
+    for (const body of bodies) {
+      expect(body.surface).toBe('documents');
+    }
+    expect(bodies[bodies.length - 1].ous).toEqual(expect.arrayContaining([7, 8]));
+  });
+
   it('names people without the directory, and says so when names could not load', async () => {
     params = { id: '5' };
     openTab('history');
@@ -536,7 +582,7 @@ describe('the trail and the recipients render the ids they were given', () => {
     const named = await screen.findByTestId('document-record-trail');
     expect(named).toHaveTextContent('amira');
     expect(screen.queryByTestId('document-record-directory-people')).not.toBeInTheDocument();
-    expect(screen.getByTestId('document-record-directory-units')).toHaveTextContent('ous:read');
+    expect(screen.getByTestId('document-record-directory-units')).toHaveTextContent('documents:read');
     first.unmount();
 
     // Names that failed to load are unknown, not "a former member".

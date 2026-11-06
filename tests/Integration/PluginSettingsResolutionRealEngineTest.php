@@ -346,7 +346,7 @@ final class PluginSettingsResolutionRealEngineTest extends TestCase
     }
 
     /**
-     * @return list<string>
+     * @return array<int, string>
      */
     private function keysIn(string $sql): array
     {

@@ -54,7 +54,6 @@ class RequestBodyValidatorTest extends TestCase
         $this->assertSame(400, $response->getStatusCode());
 
         $body = $response->getBody();
-        /** @var array<string, mixed> $data */
         $data = json_decode($body, true);
         $this->assertIsArray($data);
         $this->assertArrayHasKey('error', $data);

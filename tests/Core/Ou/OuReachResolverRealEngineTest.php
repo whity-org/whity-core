@@ -173,7 +173,7 @@ final class OuReachResolverRealEngineTest extends TestCase
         $ids = $this->resolver->reachableOuIds($tenantId, $profileId);
         sort($ids);
 
-        return array_values($ids);
+        return $ids;
     }
 
     private function makeSchema(): PDO

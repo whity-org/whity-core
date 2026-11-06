@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Whity\Core\Document\Qr;
 
+use Whity\Core\Document\DocumentState;
 use Whity\Core\Document\Routing\RouteAction;
 use Whity\Core\Settings\SettingsRegistry;
 
@@ -83,6 +84,21 @@ use Whity\Core\Settings\SettingsRegistry;
  * `stage` also makes a REVOKED code distinguishable from an unrecognised one,
  * which is the "unless the tenant has chosen otherwise" half of #1036's
  * existence-oracle requirement. See {@see refusal()}.
+ *
+ * WHAT `described` ADDS (#1627)
+ * -----------------------------
+ * Everything `stage` says, plus enough to compare the page with the paper:
+ *   kind      — the template's PUBLIC name (`document_sources.public_name`),
+ *               which somebody who may publish wrote for this purpose. Never the
+ *               title, and never the `template_name` snapshot, because both are
+ *               free text that often names a customer. No public name, no kind.
+ *   revision  — the letter (A, B, …), which is printed on the paper.
+ *   pages     — the page count the render service reported, when it did.
+ *   replaced_by — on a refused code whose document was revised: the revision
+ *               that replaced it and the date. Not its id, number or code.
+ * Still never a price, a name, a subject or the number: the number can be
+ * counted, and "INV-2026-0142" says how many invoices were issued this year.
+ * Signatures aren't in core yet, so nothing is said about them.
  */
 final class VerificationPresenter
 {
@@ -109,6 +125,9 @@ final class VerificationPresenter
 
     /** Adds the current routing stage, and tells a revoked code from an unknown one. */
     public const DETAIL_STAGE = 'stage';
+
+    /** Adds what kind of document it is, its revision and pages (#1627). Off unless chosen. */
+    public const DETAIL_DESCRIBED = 'described';
 
     /**
      * The single answer every way a code can fail to verify collapses to at the
@@ -151,10 +170,17 @@ final class VerificationPresenter
         $level = $effectiveSettings[SettingsRegistry::DOCUMENTS_QR_PUBLIC_DETAIL] ?? self::DETAIL_MINIMAL;
 
         return match ($level) {
+            self::DETAIL_DESCRIBED => self::DETAIL_DESCRIBED,
             self::DETAIL_STAGE => self::DETAIL_STAGE,
             self::DETAIL_UNDATED => self::DETAIL_UNDATED,
             default => self::DETAIL_MINIMAL,
         };
+    }
+
+    /** Whether a level says where a document is, and tells a revoked code from an unknown one. */
+    public static function showsStage(string $detailLevel): bool
+    {
+        return $detailLevel === self::DETAIL_STAGE || $detailLevel === self::DETAIL_DESCRIBED;
     }
 
     /**
@@ -163,6 +189,8 @@ final class VerificationPresenter
      * @param array<string, mixed>      $tokenRow  From {@see DocumentQrTokenRepository::findByToken()}.
      * @param array<string, mixed>      $document  The `documents` row, read tenant-scoped.
      * @param array<string, mixed>|null $lastEvent The newest trail row, or null.
+     * @param string|null               $kind      The template's public name, read only at `described`.
+     * @param int|null                  $pages     The newest artifact's page count, read only at `described`.
      * @return array<string, mixed>
      */
     public static function verified(
@@ -171,6 +199,8 @@ final class VerificationPresenter
         string $reference,
         string $detailLevel,
         ?array $lastEvent,
+        ?string $kind = null,
+        ?int $pages = null,
     ): array {
         $body = [
             'verified' => true,
@@ -189,7 +219,7 @@ final class VerificationPresenter
 
         $body['issued_on'] = self::dateOnly($document['created_at'] ?? null);
 
-        if ($detailLevel !== self::DETAIL_STAGE) {
+        if (!self::showsStage($detailLevel)) {
             return $body;
         }
 
@@ -202,6 +232,20 @@ final class VerificationPresenter
         $body['stage_on'] = is_array($lastEvent)
             ? self::dateOnly($lastEvent['occurred_at'] ?? null)
             : $body['issued_on'];
+
+        if ($detailLevel !== self::DETAIL_DESCRIBED) {
+            return $body;
+        }
+
+        // Absent rather than null when unknown, as `issued_on` is at `undated`.
+        $kind = $kind !== null ? trim($kind) : '';
+        if ($kind !== '') {
+            $body['kind'] = $kind;
+        }
+        $body['revision'] = DocumentState::revisionLetter((int) ($document['revision'] ?? 1));
+        if ($pages !== null && $pages > 0) {
+            $body['pages'] = $pages;
+        }
 
         return $body;
     }
@@ -228,12 +272,21 @@ final class VerificationPresenter
      * A withdrawn document follows the same rule: at `minimal` it collapses with
      * the other three, and `$documentWithdrawnAt` is heard only at `stage`.
      *
+     * At `described`, a code whose document was REVISED also says which revision
+     * replaced it and when (#1627), so the holder knows to ask for that one. A
+     * withdrawal wins over that: the organisation no longer stands behind either.
+     *
      * @param array<string, mixed>|null $tokenRow Null when nothing resolved.
-     * @return array{verified: false, reason: string, revoked_on?: string|null}
+     * @param array<string, mixed>|null $document The document, read tenant-scoped; used only at `described`.
+     * @return array{verified: false, reason: string, revoked_on?: string|null, replaced_by?: array{revision: string, issued_on: string|null}}
      */
-    public static function refusal(?array $tokenRow, string $detailLevel, ?string $documentWithdrawnAt = null): array
-    {
-        if ($detailLevel !== self::DETAIL_STAGE
+    public static function refusal(
+        ?array $tokenRow,
+        string $detailLevel,
+        ?string $documentWithdrawnAt = null,
+        ?array $document = null,
+    ): array {
+        if (!self::showsStage($detailLevel)
             || $tokenRow === null
             || !isset($tokenRow['revoked_at'])) {
             return ['verified' => false, 'reason' => self::REASON_UNRECOGNISED];
@@ -248,12 +301,22 @@ final class VerificationPresenter
         }
 
         $reason = (string) ($tokenRow['revoked_reason'] ?? '');
-
-        return [
+        $body = [
             'verified' => false,
             'reason' => QrRevocationReason::isKnown($reason) ? $reason : self::REASON_UNRECOGNISED,
             'revoked_on' => self::dateOnly($tokenRow['revoked_at']),
         ];
+
+        if ($detailLevel === self::DETAIL_DESCRIBED
+            && $document !== null
+            && isset($document['superseded_by_revision'])) {
+            $body['replaced_by'] = [
+                'revision' => DocumentState::revisionLetter((int) $document['superseded_by_revision']),
+                'issued_on' => self::dateOnly($document['superseded_on'] ?? null),
+            ];
+        }
+
+        return $body;
     }
 
     /**

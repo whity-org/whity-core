@@ -186,8 +186,8 @@ final class LegacyTemplateConverter
      * block's own elements, moved to where the instance sat. A block that is
      * gone, contains itself or nests too deep is left out and counted.
      *
-     * @param list<array<string, mixed>> $elements
-     * @param list<string>               $path     The blocks open above this point.
+     * @param array<mixed>  $elements Decoded legacy JSON, so each element is checked.
+     * @param list<string> $path     The blocks open above this point.
      * @return list<array<string, mixed>>
      */
     private function expanded(array $elements, float $dx, float $dy, array $path): array
@@ -452,7 +452,12 @@ final class LegacyTemplateConverter
         return ['type' => 'field', 'path' => 'template.' . $field['key'], 'label' => $field['label']];
     }
 
-    /** @return array{key: string, label: string, sample?: string} */
+    /**
+     * Records the field in $this->own, so it is not a pure lookup.
+     *
+     * @return array{key: string, label: string, sample?: string}
+     * @phpstan-impure
+     */
     private function ownField(string $placeholder, ?string $label, ?string $sample): array
     {
         if (isset($this->own[$placeholder])) {

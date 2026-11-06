@@ -371,6 +371,7 @@ final class BootstrapIdentityRealEngineTest extends TestCase
      * Build a migrated schema and run the seeder over it.
      *
      * @param PDO|null $pdo Receives the underlying PDO for direct assertions.
+     * @param-out PDO $pdo
      */
     private function seededDatabase(?PDO &$pdo): Database
     {
@@ -501,6 +502,7 @@ final class BootstrapIdentityRealEngineTest extends TestCase
         );
         $stmt->execute([':email' => self::DEFAULT_EMAIL]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        self::assertIsArray($row);
 
         self::assertSame('', (string) $row['password_hash']);
         self::assertSame('idp', (string) $row['auth_method']);

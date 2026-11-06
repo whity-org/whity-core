@@ -129,7 +129,7 @@ class MigrateUsersToProfiles
         // tenant_id = 0 is the system tenant (a technical artifact seeded by
         // migration 010); system users are excluded — they are internal service
         // accounts and do not participate in the profile/membership model.
-        // @tenant-guard-ignore: cross-tenant migration reads all users to collapse email identities
+        // Unscoped by design (migration): cross-tenant migration reads all users to collapse email identities
         $stmt = $db->query("
             SELECT
                 u.id,
@@ -163,7 +163,7 @@ class MigrateUsersToProfiles
                 // ── First (canonical) occurrence for this email ───────────────
                 // Check whether a profile already exists for this email (idempotent
                 // re-run: a previous up() may have inserted it).
-                // @tenant-guard-ignore: profile_emails is a global (non-tenant-scoped) table
+                // Unscoped by design (migration): profile_emails is a global (non-tenant-scoped) table
                 $existingRow = $db->query(
                     'SELECT profile_id FROM profile_emails WHERE email = :email',
                     [':email' => $normEmail]
@@ -387,7 +387,7 @@ class MigrateUsersToProfiles
         }
 
         // ── Remove memberships created by this migration ──────────────────────
-        // @tenant-guard-ignore: cross-tenant reversal — removes all migration-created membership rows
+        // Unscoped by design (migration): cross-tenant reversal — removes all migration-created membership rows
         $db->exec("
             DELETE FROM memberships
             WHERE profile_id IN (
@@ -396,7 +396,7 @@ class MigrateUsersToProfiles
         ");
 
         // ── Remove profile_emails created by this migration ───────────────────
-        // @tenant-guard-ignore: profile_emails is a global (non-tenant-scoped) table
+        // Unscoped by design (migration): profile_emails is a global (non-tenant-scoped) table
         $db->exec("
             DELETE FROM profile_emails
             WHERE profile_id IN (
@@ -405,7 +405,7 @@ class MigrateUsersToProfiles
         ");
 
         // ── Remove profiles created by this migration ─────────────────────────
-        // @tenant-guard-ignore: profiles is a global (non-tenant-scoped) table
+        // Unscoped by design (migration): profiles is a global (non-tenant-scoped) table
         $db->exec("
             DELETE FROM profiles
             WHERE id IN (

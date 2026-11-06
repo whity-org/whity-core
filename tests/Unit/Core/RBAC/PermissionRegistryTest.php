@@ -106,8 +106,7 @@ class PermissionRegistryTest extends TestCase
     {
         $result = $this->registry->getBySource('nonexistent-plugin');
 
-        $this->assertIsArray($result);
-        $this->assertEmpty($result);
+        $this->assertSame([], $result);
     }
 
     /**

@@ -64,7 +64,7 @@ class LanguageRegistryTest extends TestCase
         $this->languageRepository
             ->expects($this->once())
             ->method('findAll')
-            ->with(enabled: true)
+            ->with(true)
             ->willReturn($languages);
 
         $this->translationRepository
@@ -106,7 +106,7 @@ class LanguageRegistryTest extends TestCase
 
         $this->languageRepository
             ->method('findAll')
-            ->with(enabled: true)
+            ->with(true)
             ->willReturn($languages);
 
         $this->translationRepository
@@ -135,7 +135,7 @@ class LanguageRegistryTest extends TestCase
         $this->languageRepository
             ->expects($this->exactly(2))
             ->method('findAll')
-            ->with(enabled: true)
+            ->with(true)
             ->willReturn($languages);
 
         $this->translationRepository
@@ -147,8 +147,8 @@ class LanguageRegistryTest extends TestCase
         $this->registry->boot();
 
         // If boot was not idempotent, the second call would fail or corrupt state.
-        // Both calls succeed, so the test passes.
-        $this->assertTrue(true);
+        // Both calls succeed and the registry still holds exactly one language.
+        $this->assertSame(['en'], array_keys($this->registry->getLanguages()));
     }
 
     /**
@@ -219,7 +219,7 @@ class LanguageRegistryTest extends TestCase
 
         $this->languageRepository
             ->method('findAll')
-            ->with(enabled: true)
+            ->with(true)
             ->willReturn($languages);
 
         $this->translationRepository
@@ -265,7 +265,7 @@ class LanguageRegistryTest extends TestCase
 
         $this->languageRepository
             ->method('findAll')
-            ->with(enabled: true)
+            ->with(true)
             ->willReturn($languages);
 
         $this->translationRepository
@@ -305,7 +305,6 @@ class LanguageRegistryTest extends TestCase
         ]);
 
         $t = $this->registry->getTranslator('common');
-        $this->assertIsCallable($t);
         $this->assertSame('Save', $t('button.save'));
     }
 
@@ -337,7 +336,7 @@ class LanguageRegistryTest extends TestCase
 
         $this->languageRepository
             ->method('findAll')
-            ->with(enabled: true)
+            ->with(true)
             ->willReturn($languages);
 
         $this->translationRepository
@@ -361,7 +360,7 @@ class LanguageRegistryTest extends TestCase
 
         $this->languageRepository
             ->method('findAll')
-            ->with(enabled: true)
+            ->with(true)
             ->willReturn($languages);
 
         $this->translationRepository
@@ -386,7 +385,7 @@ class LanguageRegistryTest extends TestCase
 
         $this->languageRepository
             ->method('findAll')
-            ->with(enabled: true)
+            ->with(true)
             ->willReturn($languages);
 
         $this->translationRepository
@@ -413,7 +412,7 @@ class LanguageRegistryTest extends TestCase
 
         $this->languageRepository
             ->method('findAll')
-            ->with(enabled: true)
+            ->with(true)
             ->willReturn($languages);
 
         $this->translationRepository
@@ -440,7 +439,7 @@ class LanguageRegistryTest extends TestCase
         $this->languageRepository
             ->expects($this->exactly(2))
             ->method('findAll')
-            ->with(enabled: true)
+            ->with(true)
             ->willReturn($languages);
 
         $this->translationRepository
@@ -451,8 +450,9 @@ class LanguageRegistryTest extends TestCase
         $this->registry->boot();
         $this->registry->invalidateCache();
 
-        // If invalidateCache worked, both boot calls completed without error.
-        $this->assertTrue(true);
+        // If invalidateCache worked, both boot calls completed without error
+        // and the reloaded registry holds the languages again.
+        $this->assertSame(['en'], array_keys($this->registry->getLanguages()));
     }
 
     /**
@@ -480,7 +480,7 @@ class LanguageRegistryTest extends TestCase
 
         $this->languageRepository
             ->method('findAll')
-            ->with(enabled: true)
+            ->with(true)
             ->willReturn($languages);
 
         $this->translationRepository
@@ -535,7 +535,7 @@ class LanguageRegistryTest extends TestCase
 
         $this->languageRepository
             ->method('findAll')
-            ->with(enabled: true)
+            ->with(true)
             ->willReturn($languages);
 
         $this->translationRepository
@@ -570,7 +570,7 @@ class LanguageRegistryTest extends TestCase
 
         $this->languageRepository
             ->method('findAll')
-            ->with(enabled: true)
+            ->with(true)
             ->willReturn($languages);
 
         $this->translationRepository

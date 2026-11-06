@@ -67,7 +67,7 @@ final class SeedCliServicePrincipal
     {
         $pdo = $db->getPdo();
 
-        // @tenant-guard-ignore: profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
+        // Unscoped by design (migration): profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
         $existing = $pdo->query("SELECT id FROM profiles WHERE auth_method = 'service' LIMIT 1");
         $row = $existing !== false ? $existing->fetch() : false;
         if (is_array($row) && isset($row['id'])) {
@@ -79,14 +79,14 @@ final class SeedCliServicePrincipal
         // password_hash '' is what the storage layer has always meant by "no
         // verifiable credential" (migration 104). It is belt to auth_method's
         // braces, not the mechanism: the refusal lives in AuthMethod.
-        // @tenant-guard-ignore: profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
+        // Unscoped by design (migration): profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
         $insert = $pdo->prepare(
             "INSERT INTO profiles (display_name, password_hash, auth_method, created_at, updated_at)
              VALUES (:name, '', 'service', NOW(), NOW())"
         );
         $insert->execute([':name' => self::DISPLAY_NAME]);
 
-        // @tenant-guard-ignore: profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
+        // Unscoped by design (migration): profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
         $created = $pdo->query("SELECT id FROM profiles WHERE auth_method = 'service' LIMIT 1");
         $createdRow = $created !== false ? $created->fetch() : false;
         if (!is_array($createdRow) || !isset($createdRow['id'])) {
@@ -107,11 +107,11 @@ final class SeedCliServicePrincipal
     {
         $pdo = $db->getPdo();
 
-        // @tenant-guard-ignore: seed-time bootstrap; role lookup by name is global
+        // Unscoped by design (migration): seed-time bootstrap; role lookup by name is global
         $roleRow = $pdo->query("SELECT id FROM roles WHERE name = 'admin' AND tenant_id IS NULL LIMIT 1");
         $role = $roleRow !== false ? $roleRow->fetch() : false;
         if (!is_array($role) || !isset($role['id'])) {
-            // @tenant-guard-ignore: seed-time bootstrap; role lookup by name is global
+            // Unscoped by design (migration): seed-time bootstrap; role lookup by name is global
             $fallback = $pdo->query("SELECT id FROM roles WHERE name = 'admin' LIMIT 1");
             $role = $fallback !== false ? $fallback->fetch() : false;
         }
@@ -156,7 +156,7 @@ final class SeedCliServicePrincipal
     {
         $pdo = $db->getPdo();
 
-        // @tenant-guard-ignore: profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
+        // Unscoped by design (migration): profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
         $stmt = $pdo->query("SELECT id FROM profiles WHERE auth_method = 'service'");
         $ids = $stmt !== false ? $stmt->fetchAll() : [];
 
@@ -169,7 +169,7 @@ final class SeedCliServicePrincipal
             $del = $pdo->prepare('DELETE FROM memberships WHERE profile_id = :id AND tenant_id = 0');
             $del->execute([':id' => $profileId]);
 
-            // @tenant-guard-ignore: profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
+            // Unscoped by design (migration): profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
             $delProfile = $pdo->prepare('DELETE FROM profiles WHERE id = :id');
             $delProfile->execute([':id' => $profileId]);
         }

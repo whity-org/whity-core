@@ -319,7 +319,8 @@ final class SchemaFromMigrations
         }
 
         $optOut = $_ENV['PHPUNIT_PG_NO_TEMPLATE'] ?? getenv('PHPUNIT_PG_NO_TEMPLATE') ?: null;
-        if (is_string($optOut) && $optOut !== '' && $optOut !== '0') {
+        // `?: null` above already turns '' and '0' into null.
+        if (is_string($optOut)) {
             self::$pgTemplateUnavailable = true;
             return null;
         }
@@ -1097,7 +1098,7 @@ final class SchemaFromMigrations
         $files = glob($dir . '/*.php') ?: [];
         sort($files);
 
-        return array_values($files);
+        return $files;
     }
 
     /**

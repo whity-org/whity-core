@@ -392,14 +392,14 @@ class PersonRepository
             'id' => (int) $row['id'],
             'tenant_id' => (int) $row['tenant_id'],
             'display_name' => (string) $row['display_name'],
-            'profile_id' => isset($row['profile_id']) && $row['profile_id'] !== null ? (int) $row['profile_id'] : null,
-            'birth_date' => isset($row['birth_date']) && $row['birth_date'] !== null
+            'profile_id' => isset($row['profile_id']) ? (int) $row['profile_id'] : null,
+            'birth_date' => isset($row['birth_date'])
                 ? (string) $row['birth_date']
                 : null,
             // A BOOLEAN arrives in several spellings across the two engines;
             // {@see DbBool} normalises all of them.
             'deceased' => self::toBool($row['deceased'] ?? false),
-            'notes' => isset($row['notes']) && $row['notes'] !== null ? (string) $row['notes'] : null,
+            'notes' => isset($row['notes']) ? (string) $row['notes'] : null,
             'created_at' => isset($row['created_at']) ? (string) $row['created_at'] : null,
         ];
     }

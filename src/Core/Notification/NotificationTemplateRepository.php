@@ -100,7 +100,7 @@ final class NotificationTemplateRepository
         /** @var list<array<string, mixed>> $rows */
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        return array_values(array_map(static fn (array $r): array => self::map($r), $rows));
+        return array_map(static fn (array $r): array => self::map($r), $rows);
     }
 
     /**
@@ -156,7 +156,7 @@ final class NotificationTemplateRepository
             'locale'     => (string) $row['locale'],
             'subject'    => (string) $row['subject'],
             'body_text'  => (string) $row['body_text'],
-            'body_html'  => isset($row['body_html']) && $row['body_html'] !== null ? (string) $row['body_html'] : null,
+            'body_html'  => isset($row['body_html']) ? (string) $row['body_html'] : null,
         ];
     }
 }

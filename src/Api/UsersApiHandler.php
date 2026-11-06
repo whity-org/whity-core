@@ -21,6 +21,7 @@ use Whity\Http\ListSpec;
 use Whity\Core\Tenant\TenantContext;
 use PDO;
 use Whity\Core\Db\DbBool;
+use Whity\Sdk\Hooks\HookVetoException;
 
 /**
  * Users API Handler
@@ -452,7 +453,7 @@ class UsersApiHandler
             'role' => (string)($row['role'] ?? ''),
             'roleId' => isset($row['role_id']) ? (int)$row['role_id'] : null,
             'tenantId' => (int)($row['tenant_id'] ?? 0),
-            'ou_id' => isset($row['ou_id']) && $row['ou_id'] !== null ? (int)$row['ou_id'] : null,
+            'ou_id' => isset($row['ou_id']) ? (int)$row['ou_id'] : null,
             'ouName' => isset($row['ou_name']) ? (string)$row['ou_name'] : null,
             'lastActiveAt' => isset($row['last_active_at']) ? (string)$row['last_active_at'] : null,
             'twoStep' => [
@@ -641,16 +642,31 @@ class UsersApiHandler
                 $ouId = $resolvedOu;
             }
 
-            // Dispatch filter hook before creating the user (may modify email/role).
-            $userData = $this->hookManager->dispatch('user.creating', [
-                'email' => $email,
-                'password' => $body['password'], // Pass plaintext password to hooks
-                'role_id' => $roleId,
-            ]);
+            // `user.creating` is read-only (SDK 1.70, WHIT-911). Listeners see
+            // the email and the role core resolved and checked above, and may
+            // refuse the create with HookVetoException; whatever they return is
+            // ignored. The password is never in the payload, and neither the
+            // email nor the role can be changed here: the role was authorised
+            // against the caller, and a listener is not the caller.
+            try {
+                $this->hookManager->dispatch('user.creating', [
+                    'email' => $email,
+                    'role_id' => $roleId,
+                ]);
+            } catch (HookVetoException $e) {
+                error_log(sprintf(
+                    '[users] create vetoed by a hook listener: tenant_id=%s event=%s',
+                    var_export($tenantId, true),
+                    $e->eventName()
+                ));
+                return Response::error(
+                    'Cannot create user: blocked by an installed plugin',
+                    409,
+                    ['reason' => $e->reason()]
+                );
+            }
 
-            $email = (string)$userData['email'];
-            $roleId = (int)$userData['role_id'];
-            $passwordHash = password_hash((string)$userData['password'], PASSWORD_BCRYPT);
+            $passwordHash = password_hash((string)$body['password'], PASSWORD_BCRYPT);
 
             // Whether this act revived an existing invited/suspended membership
             // rather than creating one. Initialised out here because the audit
@@ -807,7 +823,10 @@ class UsersApiHandler
      * permission). It is deliberately GLOBAL (unlike the membership-lifecycle
      * `status` in the response, which stays per-tenant): toggling it blocks/
      * restores login for the profile everywhere it holds a membership, not just
-     * in the caller's tenant. `name` is derived/read-only and `tenantId` is out
+     * in the caller's tenant. Because email, password, account status and
+     * display name are global, a non-system tenant may change them only for a
+     * person who belongs to it alone (409 `shared_profile` otherwise, WHIT-909).
+     * `name` is derived/read-only and `tenantId` is out
      * of scope; both are ignored if sent. Tenant-scoped + ownership-checked: a
      * non-system tenant may edit ONLY a profile with a membership in its own
      * tenant (else 404), the
@@ -1010,6 +1029,26 @@ class UsersApiHandler
                 }
             }
 
+            // Email, password and account status live on the GLOBAL profile, like
+            // the display name above, so a change here is a change in every
+            // workspace the person belongs to. A workspace may change them for
+            // its own people only: a membership here can be obtained for a person
+            // another workspace already relies on (adding them by email attaches
+            // the existing profile), and that must not make their sign-in this
+            // workspace's to rewrite. The person changes it themselves, or the
+            // system tenant does. Checked before any write, so a refused field
+            // leaves the rest of the request unapplied too.
+            if (($emailChanged || $passwordChanged || $accountStatusChanged)
+                && $currentTenantId !== self::SYSTEM_TENANT_ID
+                && $this->belongsToAnotherTenant($profileId, $currentTenantId)
+            ) {
+                return Response::error(
+                    'This person also belongs to another workspace, so only they can change how they sign in',
+                    409,
+                    ['reason' => 'shared_profile']
+                );
+            }
+
             // A true no-op (nothing genuinely changed) still returns a sensible 200.
             if (!$roleChanged && !$ouChanged && !$emailChanged && !$passwordChanged && !$accountStatusChanged && !$displayNameChanged) {
                 $this->log('info', 'User update was a no-op', [
@@ -1028,13 +1067,13 @@ class UsersApiHandler
 
             try {
                 // Identity writes (global tables).
-                if ($emailChanged && $newEmail !== null) {
+                if ($emailChanged) {
                     // @tenant-guard-ignore: profile_emails is a sanctioned GLOBAL identity table (ADR 0005 §2); scoped to the target profile's PRIMARY email
                     $this->db->prepare(
                         'UPDATE profile_emails SET email = ? WHERE profile_id = ? AND is_primary = true'
                     )->execute([$newEmail, $profileId]);
                 }
-                if ($passwordChanged && $newPasswordHash !== null) {
+                if ($passwordChanged) {
                     // token_epoch is bumped WITH the hash, never separately.
                     //
                     // A password change is a credential change and must
@@ -1064,13 +1103,13 @@ class UsersApiHandler
                         $idpOverrideUsed
                     );
                 }
-                if ($displayNameChanged && $newDisplayName !== null) {
+                if ($displayNameChanged) {
                     // @tenant-guard-ignore: profiles is a sanctioned GLOBAL identity table (ADR 0005 §1); the shared-profile refusal above keeps this to the caller's own people
                     $this->db->prepare(
                         'UPDATE profiles SET display_name = ?, updated_at = NOW() WHERE id = ?'
                     )->execute([$newDisplayName, $profileId]);
                 }
-                if ($accountStatusChanged && $newAccountStatus !== null) {
+                if ($accountStatusChanged) {
                     // @tenant-guard-ignore: profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
                     $this->db->prepare(
                         'UPDATE profiles SET status = ?, updated_at = NOW() WHERE id = ?'
@@ -1084,7 +1123,7 @@ class UsersApiHandler
                 // proved equals the acting tenant).
                 $membershipUpdates = [];
                 $membershipParams = [];
-                if ($roleChanged && $newRoleId !== null) {
+                if ($roleChanged) {
                     $membershipUpdates[] = 'role_id = ?';
                     $membershipParams[] = $newRoleId;
                 }
@@ -1168,7 +1207,7 @@ class UsersApiHandler
                 $payload['previous_display_name'] = (string)($membership['display_name'] ?? '');
                 $payload['display_name'] = $newDisplayName;
             }
-            if ($roleChanged && $newRoleId !== null) {
+            if ($roleChanged) {
                 $previousRoleId = (int) $membership['role_id'];
                 $payload['previous_role_id'] = $previousRoleId;
                 $payload['previous_role_name'] = isset($membership['role']) ? (string) $membership['role'] : null;
@@ -1179,7 +1218,7 @@ class UsersApiHandler
                 $payload['previous_ou_id'] = $membership['ou_id'] !== null ? (int) $membership['ou_id'] : null;
                 $payload['ou_id'] = $ouSetNull ? null : $newOuId;
             }
-            if ($accountStatusChanged && $newAccountStatus !== null) {
+            if ($accountStatusChanged) {
                 $payload['previous_account_status'] = (string) ($membership['account_status'] ?? 'active');
                 $payload['account_status'] = $newAccountStatus;
             }

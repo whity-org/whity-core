@@ -50,6 +50,18 @@ export interface TemplateRow extends GovernedRow {
   starter_key: string | null;
   /** Non-null when it was converted from the old Document designer. */
   legacy_template_id: number | null;
+  /** Its own numbering rule. Null uses the rule of the slot it is bound to, or none. */
+  numbering: DocumentNumberingRule | null;
+  /** What kind of document it makes, for strangers on the public check (#1627). Null shows no kind. */
+  public_name?: string | null;
+}
+
+export type NumberingAssign = 'on_issue' | 'on_final_approval';
+
+/** How documents from a template are numbered (WHIT-684). */
+export interface DocumentNumberingRule {
+  pattern: string;
+  assign: NumberingAssign;
 }
 
 /** A unit, as `GET /api/v1/ous` lists them. */

@@ -581,6 +581,10 @@ final class SettingsRegistry
     //             endpoint cannot be asked "does this document exist".
     //   stage   — adds the current routing verb and its date, and tells a
     //             withdrawn or superseded code apart from an unrecognised one.
+    //   described — adds what kind of document it is (the template's public
+    //             name, never its title), its revision letter and page count,
+    //             and which revision replaced a revised one (#1627). Never a
+    //             price, a name, a subject or the document's number.
     //
     // Tenant-overridable because #1036 is explicit that this is a tenant's
     // decision: some institutions want a holder to see where a document sits,
@@ -710,6 +714,15 @@ final class SettingsRegistry
      * {@see \Whity\Core\Document\Qr\VerificationPresenter}.
      */
     public const UI_HIDE_DATES = 'ui.hide_dates';
+
+    /**
+     * How many ids one `POST /api/labels/resolve` may name, across all kinds
+     * (#1019). The endpoint answers "what are these few units and roles called"
+     * for a screen that holds their ids; a cap keeps it from becoming a way to
+     * read the directory out a page at a time. 100 covers a long trail page and
+     * a full library page. Tenant-overridable, 1 to 500.
+     */
+    public const LABELS_RESOLVE_MAX_IDS = 'labels.resolve_max_ids';
 
     /**
      * The asset-kind keys (Tenant Branding). Their stored value is a storage
@@ -927,7 +940,7 @@ final class SettingsRegistry
         // DEFAULT sits: `minimal` is the middle value and stays the default,
         // because it is what shipped and adding a quieter level must not change
         // what any existing tenant discloses.
-        self::DOCUMENTS_QR_PUBLIC_DETAIL => ['undated', 'minimal', 'stage'],
+        self::DOCUMENTS_QR_PUBLIC_DETAIL => ['undated', 'minimal', 'stage', 'described'],
         // 'internal' stores errors in this deployment's own database (no extra
         // infrastructure); 'sentry' ships them to any Sentry-PROTOCOL backend —
         // hosted Sentry, or a self-hosted GlitchTip/Bugsink — via the encrypted
@@ -1144,6 +1157,7 @@ final class SettingsRegistry
         // every screen of every deployment at upgrade time, for a preference
         // most of them have not expressed.
         self::UI_HIDE_DATES => 'false',
+        self::LABELS_RESOLVE_MAX_IDS => '100',
     ];
 
     /**
@@ -1412,11 +1426,14 @@ final class SettingsRegistry
             self::AUTH_DESKTOP_LOGIN_MAX_HOURS => self::validateDesktopLoginMaxHours($value),
             self::STORAGE_DRIVER => self::validateStorageDriver($value),
             self::STORAGE_S3_PATH_STYLE => self::validateBoolean($value, self::STORAGE_S3_PATH_STYLE),
-            self::STORAGE_S3_ENDPOINT,
+            // #1622: the endpoint is checked HERE, at save, because the driver is
+            // built while every worker boots — an endpoint the driver cannot
+            // parse used to be accepted and then take the whole instance down.
+            self::STORAGE_S3_ENDPOINT => self::validateS3Url($value, self::STORAGE_S3_ENDPOINT, false),
+            self::STORAGE_S3_PUBLIC_BASE_URL => self::validateS3Url($value, self::STORAGE_S3_PUBLIC_BASE_URL, true),
             self::STORAGE_S3_REGION,
             self::STORAGE_S3_BUCKET,
-            self::STORAGE_S3_ACCESS_KEY,
-            self::STORAGE_S3_PUBLIC_BASE_URL => null, // free-form strings (validated at driver build)
+            self::STORAGE_S3_ACCESS_KEY => null, // free-form strings
             self::MAIL_TRANSPORT,
             self::MAIL_SMTP_ENCRYPTION,
             self::MAIL_SMTP_AUTH_MODE,
@@ -1499,6 +1516,7 @@ final class SettingsRegistry
             self::I18N_ENABLED => self::validateBoolean($value, self::I18N_ENABLED),
             self::INVITATION_TTL_DAYS => self::validateInvitationTtlDays($value),
             self::UI_HIDE_DATES => self::validateBoolean($value, self::UI_HIDE_DATES),
+            self::LABELS_RESOLVE_MAX_IDS => self::validateLabelsResolveMaxIds($value),
             // #billing free-text. Declared with defaults and no validate() arm,
             // these fell straight through to `default` below — so six keys the
             // registry plainly knows were refused as "Unknown setting key" and
@@ -1627,6 +1645,19 @@ final class SettingsRegistry
      * The setting can only shorten that lifetime, never extend it, so a value
      * above the ceiling is rejected rather than silently clamped.
      */
+    private static function validateLabelsResolveMaxIds(string $value): ?string
+    {
+        if (preg_match('/^\d+$/', $value) !== 1) {
+            return 'labels.resolve_max_ids must be a whole number.';
+        }
+        $max = (int) $value;
+        if ($max < 1 || $max > 500) {
+            return 'labels.resolve_max_ids must be between 1 and 500.';
+        }
+
+        return null;
+    }
+
     private static function validateDesktopLoginMaxHours(string $value): ?string
     {
         if (preg_match('/^\d+$/', $value) !== 1) {
@@ -1674,6 +1705,43 @@ final class SettingsRegistry
     {
         if ($value !== 'local' && $value !== 's3') {
             return "storage.driver must be 'local' or 's3'.";
+        }
+
+        return null;
+    }
+
+    /**
+     * An S3 endpoint / public base URL: an absolute `http(s)://host[:port]` URL
+     * (#1622). Empty is allowed — it clears the value. The endpoint takes no
+     * path (the driver builds every request from scheme + host + port); the
+     * public base URL may carry one, since a CDN often fronts a bucket under a
+     * prefix. Neither takes a query, fragment or credentials.
+     */
+    private static function validateS3Url(string $value, string $key, bool $allowPath): ?string
+    {
+        if ($value === '') {
+            return null;
+        }
+
+        $shape = $allowPath ? 'http(s)://host[:port][/path]' : 'http(s)://host[:port]';
+        $message = "{$key} must be an absolute URL of the form {$shape}, for example https://s3.eu-central-003.backblazeb2.com.";
+
+        if (trim($value) !== $value || preg_match('/\s/', $value) === 1) {
+            return $message;
+        }
+
+        $parts = parse_url($value);
+        if ($parts === false || !isset($parts['scheme'], $parts['host']) || $parts['host'] === '') {
+            return $message;
+        }
+        if (!in_array(strtolower($parts['scheme']), ['http', 'https'], true)) {
+            return $message;
+        }
+        if (isset($parts['user']) || isset($parts['pass']) || isset($parts['query']) || isset($parts['fragment'])) {
+            return $message;
+        }
+        if (!$allowPath && isset($parts['path']) && $parts['path'] !== '/') {
+            return $message;
         }
 
         return null;

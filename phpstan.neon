@@ -27,3 +27,8 @@ parameters:
         # analyser would create the second implementation #1020 was spent
         # removing, so the analyser is told where it lives instead.
         - scripts/lib
+    # Corrects the bundled PDO stub so PHPStan stops carrying a remembered
+    # inTransaction() result across the calls that change transaction state.
+    # See the file header for why the rollback guards are not dead code.
+    stubFiles:
+        - phpstan-stubs/PDO.stub

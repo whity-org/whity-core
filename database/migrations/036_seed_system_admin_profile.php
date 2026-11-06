@@ -74,7 +74,7 @@ class SeedSystemAdminProfile
         $normEmail = 'system@whity.local';
 
         // ── Idempotency guard: skip if the profile_email already exists ────────
-        // @tenant-guard-ignore: profile_emails is a sanctioned GLOBAL table (ADR 0005 §2)
+        // Unscoped by design (migration): profile_emails is a sanctioned GLOBAL table (ADR 0005 §2)
         $existing = $db->query(
             'SELECT profile_id FROM profile_emails WHERE email = :email',
             [':email' => $normEmail]
@@ -87,7 +87,7 @@ class SeedSystemAdminProfile
         }
 
         // ── 1. Resolve the admin role id ──────────────────────────────────────
-        // @tenant-guard-ignore: seed-time bootstrap; role lookup by name is global
+        // Unscoped by design (migration): seed-time bootstrap; role lookup by name is global
         $roleRow = $db->query(
             "SELECT id FROM roles WHERE name = 'admin' LIMIT 1"
         )->fetch(PDO::FETCH_ASSOC);
@@ -99,7 +99,7 @@ class SeedSystemAdminProfile
         $passwordHash = InitialPassword::hashFor('INITIAL_SYSTEM_ADMIN_PASSWORD', $normEmail);
 
         // ── 3. INSERT the profiles row ─────────────────────────────────────────
-        // @tenant-guard-ignore: profiles is a sanctioned GLOBAL table (ADR 0005 §1)
+        // Unscoped by design (migration): profiles is a sanctioned GLOBAL table (ADR 0005 §1)
         $profileParams = [
             ':display_name'                    => 'system',
             ':password_hash'                   => $passwordHash,
@@ -144,7 +144,7 @@ class SeedSystemAdminProfile
         if ($profileId <= 0) {
             // ON CONFLICT DO NOTHING fired (parallel run or seeder-first scenario).
             // Re-fetch the id so the email + membership rows can reference it.
-            // @tenant-guard-ignore: profiles is a sanctioned GLOBAL table (ADR 0005 §1)
+            // Unscoped by design (migration): profiles is a sanctioned GLOBAL table (ADR 0005 §1)
             $refetch = $db->query(
                 'SELECT p.id FROM profiles p
                  JOIN profile_emails pe ON pe.profile_id = p.id
@@ -162,7 +162,7 @@ class SeedSystemAdminProfile
         }
 
         // ── 4. INSERT the primary verified profile_email ──────────────────────
-        // @tenant-guard-ignore: profile_emails is a sanctioned GLOBAL table (ADR 0005 §2)
+        // Unscoped by design (migration): profile_emails is a sanctioned GLOBAL table (ADR 0005 §2)
         $db->query(
             "INSERT INTO profile_emails
                  (profile_id, email, verified, is_primary, created_at)
@@ -179,7 +179,7 @@ class SeedSystemAdminProfile
 
         // ── 5. INSERT the tenant-0 membership ────────────────────────────────
         // memberships is tenant-scoped; tenant_id = 0 is the system tenant (ADR 0005 §3).
-        // @tenant-guard-ignore: seed-time bootstrap for the system tenant (tenant_id = 0)
+        // Unscoped by design (migration): seed-time bootstrap for the system tenant (tenant_id = 0)
         $db->query(
             "INSERT INTO memberships
                  (profile_id, tenant_id, role_id, ou_id, status, created_at)
@@ -198,7 +198,7 @@ class SeedSystemAdminProfile
         $normEmail = 'system@whity.local';
 
         // Look up the profile_id so we can remove exactly the rows we created.
-        // @tenant-guard-ignore: profile_emails is a sanctioned GLOBAL table (ADR 0005 §2)
+        // Unscoped by design (migration): profile_emails is a sanctioned GLOBAL table (ADR 0005 §2)
         $row = $db->query(
             'SELECT profile_id FROM profile_emails WHERE email = :email',
             [':email' => $normEmail]
@@ -212,14 +212,14 @@ class SeedSystemAdminProfile
         $profileId = (int) $row['profile_id'];
 
         // Remove the tenant-0 membership.
-        // @tenant-guard-ignore: seed-time reversal for the system tenant (tenant_id = 0)
+        // Unscoped by design (migration): seed-time reversal for the system tenant (tenant_id = 0)
         $db->query(
             'DELETE FROM memberships WHERE profile_id = :pid AND tenant_id = 0',
             [':pid' => $profileId]
         );
 
         // Remove the profile_email.
-        // @tenant-guard-ignore: profile_emails is a sanctioned GLOBAL table (ADR 0005 §2)
+        // Unscoped by design (migration): profile_emails is a sanctioned GLOBAL table (ADR 0005 §2)
         $db->query(
             'DELETE FROM profile_emails WHERE email = :email',
             [':email' => $normEmail]
@@ -228,14 +228,14 @@ class SeedSystemAdminProfile
         // Remove the profile only when it holds no other memberships or emails
         // (guard against scenarios where the seeder or another migration also
         // created rows referencing this profile).
-        // @tenant-guard-ignore: profiles is a sanctioned GLOBAL table (ADR 0005 §1)
+        // Unscoped by design (migration): profiles is a sanctioned GLOBAL table (ADR 0005 §1)
         $otherEmails = (int) $db->query(
             'SELECT COUNT(*) FROM profile_emails WHERE profile_id = :pid',
             [':pid' => $profileId]
         )->fetchColumn();
 
         if ($otherEmails === 0) {
-            // @tenant-guard-ignore: profiles is a sanctioned GLOBAL table (ADR 0005 §1)
+            // Unscoped by design (migration): profiles is a sanctioned GLOBAL table (ADR 0005 §1)
             $db->query(
                 'DELETE FROM profiles WHERE id = :pid',
                 [':pid' => $profileId]

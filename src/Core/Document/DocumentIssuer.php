@@ -6,6 +6,9 @@ namespace Whity\Core\Document;
 
 use PDO;
 use Whity\Core\Document\Numbering\DocumentNumbering;
+use Whity\Core\Document\Qr\DocumentQrTokenRepository;
+use Whity\Core\Document\Qr\QrRevocationReason;
+use Whity\Core\Plugin\PluginDocumentLinks;
 use Whity\Core\Ou\PrimaryMembershipOu;
 use Whity\Storage\StorageException;
 
@@ -199,6 +202,13 @@ final class DocumentIssuer
             if (($template['number_now'] ?? false) === true) {
                 $this->numbering->assign($tenantId, $documentId);
             }
+            // A revision (WHIT-888): the paper it replaces stops verifying exactly when
+            // the replacement exists, and it stays with the plugin that issued the original.
+            if (isset($template['supersedes_id'])) {
+                $replaced = (int) $template['supersedes_id'];
+                (new DocumentQrTokenRepository($this->db))->revokeAllLive($tenantId, $replaced, $actorId, QrRevocationReason::SUPERSEDED);
+                (new PluginDocumentLinks($this->db))->inherit($tenantId, $replaced, $documentId);
+            }
             $document = $this->documents->findById($documentId, $tenantId);
 
             if ($ownTransaction) {
@@ -256,6 +266,11 @@ final class DocumentIssuer
             'record_type'          => isset($template['record_type']) ? (string) $template['record_type'] : null,
             'record_id'            => isset($template['record_id']) ? (string) $template['record_id'] : null,
             'slot'                 => isset($template['slot']) ? (string) $template['slot'] : null,
+            'number'               => isset($template['number']) ? (string) $template['number'] : null,
+            'number_assigned_at'   => isset($template['number_assigned_at']) ? (string) $template['number_assigned_at'] : null,
+            'supersedes_id'        => isset($template['supersedes_id']) ? (int) $template['supersedes_id'] : null,
+            'revision'             => isset($template['revision']) ? (int) $template['revision'] : 1,
+            'revision_reason'      => isset($template['revision_reason']) ? (string) $template['revision_reason'] : null,
             // The values a person typed, and the only place they survive when
             // there is no artifact to bake them into. Migration 118.
             'variable_data'        => $variableData,

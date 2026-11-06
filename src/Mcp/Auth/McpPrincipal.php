@@ -22,7 +22,7 @@ final readonly class McpPrincipal
      *                                that read it. Both are equal to profile_id post-cutover.
      * @param int      $tenantId      Tenant the token is scoped to.
      * @param string   $principalKind Token principal kind ('user' or 'session').
-     * @param string[] $scope         Granted scopes (e.g. ['tools:call']).
+     * @param list<string> $scope     Granted scopes (e.g. ['tools:call']).
      * @param string   $jti           JWT ID (unique revocation handle).
      * @param ?string  $agentId       The agent's stable principal id when it is not the
      *                                jti: `agent:<assignmentId>` for a credential bound to

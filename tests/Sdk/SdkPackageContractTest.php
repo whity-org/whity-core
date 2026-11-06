@@ -242,9 +242,26 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsOneEightForInteractiveBlocks(): void
     {
         $this->assertSame(
-            '1.65.0',
+            '1.73.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.65 ADDS DOCUMENT NUMBERS: DocumentNumberingRule says when a document is numbered and what the '
+            'SDK 1.73 ADDS membership.customer_joined: a customer joined a workspace through its own sign-up (WHIT-915). '
+            . 'SDK 1.72: PluginRolesInterface grants a plugin only its own declared, non-core permissions, only to roles '
+            . 'it created or the operator approved, and uninstall removes only the grants it made. '
+            . 'SDK 1.71: THE HOST DECIDES WHETHER A TOOL ONLY READS, from the route method; authored tools are writes '
+            . 'for agents (WHIT-912). No signature changes. '
+            . 'SDK 1.70 MAKES user.creating READ-ONLY: email and role_id only, no password, the return value is ignored, '
+            . 'and a listener can refuse the create with HookVetoException (WHIT-911). '
+            . 'SDK 1.69 ADDS PUBLIC READS: a route declared public => read answers GETs from anybody holding a key, '
+            . 'with the tenant from the key, the limits run by the host and the operator switch off by default; '
+            . 'Http\PublicRead carries the result (WHIT-704). Purely additive. '
+            . 'SDK 1.68 ADDS DOCUMENT REVISIONS: document.revised says a revision replaced a document (WHIT-888). '
+            . 'Purely additive. '
+            . 'SDK 1.67 ADDS PUBLIC FORMS: a route declared public => form takes anonymous browser submissions, with the '
+            . 'tenant from a key and the checks run by the host; Http\\PublicForm carries the result (WHIT-906). Purely additive. '
+            . 'SDK 1.66 ADDS DOCUMENT PREFLIGHT: Documents::preflight and PluginDocumentStore::preflight say whether a '
+            . 'document would issue and every reason it would not, writing nothing; document.issuing listeners get '
+            . 'check_only and answer with checks (WHIT-892). Purely additive. '
+            . 'SDK 1.65 ADDS DOCUMENT NUMBERS: DocumentNumberingRule says when a document is numbered and what the '
             . 'number looks like, on a slot or in a manifest; IssueResult returns the number and document.numbered '
             . 'says one was handed out at final approval (WHIT-684). Purely additive. '
             . 'SDK 1.64 ADDS PLUGIN AGENTS: PluginAgentsInterface lets a plugin declare or customize agents under its '

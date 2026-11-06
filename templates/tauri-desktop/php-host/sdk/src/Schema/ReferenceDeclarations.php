@@ -68,7 +68,8 @@ final class ReferenceDeclarations
     /**
      * Read the declared reference graph out of a `getDataTypes()` return value.
      *
-     * @param array<string, array<string, mixed>> $dataTypes Slug => declaration.
+     * @param array<string, mixed> $dataTypes Slug => declaration. Plugin
+     *        code supplies it, so a non-array declaration is skipped, not trusted.
      * @param string $source Optional plugin name, used only to make the type key
      *        in a violation message match what `GET /api/data-types` publishes.
      */

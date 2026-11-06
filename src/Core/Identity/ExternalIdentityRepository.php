@@ -217,7 +217,7 @@ final class ExternalIdentityRepository
         return [
             'id'            => (int) $row['id'],
             'profile_id'    => (int) $row['profile_id'],
-            'provider_id'   => isset($row['provider_id']) && $row['provider_id'] !== null ? (int) $row['provider_id'] : null,
+            'provider_id'   => isset($row['provider_id']) ? (int) $row['provider_id'] : null,
             'provider_key'  => (string) $row['provider_key'],
             'issuer'        => (string) $row['issuer'],
             'subject'       => (string) $row['subject'],

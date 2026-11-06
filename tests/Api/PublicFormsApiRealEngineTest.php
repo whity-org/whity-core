@@ -846,7 +846,7 @@ final class PublicFormsApiRealEngineTest extends TestCase
         self::assertIsArray($value);
 
         /** @var list<array<string, mixed>> $value */
-        return array_values($value);
+        return $value;
     }
 
     private function render(string $slug): Response

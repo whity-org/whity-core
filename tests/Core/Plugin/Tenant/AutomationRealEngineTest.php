@@ -133,8 +133,10 @@ final class AutomationRealEngineTest extends TestCase
         // A retry (the job delivered again, or a worker that died after the
         // last step) issues nothing more.
         $this->pdo->exec("UPDATE plugin_automation_runs SET status = 'running' WHERE id = {$run['id']}");
-        self::assertSame(['status' => 'done'], $this->runner()->run(self::A, $run['id']));
-        self::assertSame(['status' => 'done'], $this->runner()->run(self::A, $run['id']));
+        $firstRetry = $this->runner()->run(self::A, $run['id']);
+        self::assertSame(['status' => 'done'], $firstRetry);
+        $secondRetry = $this->runner()->run(self::A, $run['id']);
+        self::assertSame(['status' => 'done'], $secondRetry);
         self::assertCount(1, $this->records->list(self::A, 'CakeOrders', 'task', null, null, 10));
         self::assertSame(self::BAKERS, $this->notified());
     }
@@ -449,7 +451,7 @@ final class AutomationRealEngineTest extends TestCase
         return $id === null || $id === false ? null : (int) $id;
     }
 
-    /** @return list<int> */
+    /** @return array<int, int> */
     private function notified(): array
     {
         $ids = $this->q('SELECT recipient_profile_id FROM notifications ORDER BY recipient_profile_id')->fetchAll(PDO::FETCH_COLUMN);

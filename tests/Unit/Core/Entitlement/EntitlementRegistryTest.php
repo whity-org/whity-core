@@ -21,8 +21,7 @@ final class EntitlementRegistryTest extends TestCase
                 ['bool', 'int'],
                 "{$key} must be a known type",
             );
-            // defaultFor / describe must not throw for a known key.
-            self::assertIsString(EntitlementRegistry::defaultFor($key));
+            // defaultFor (called below) / describe must not throw for a known key.
             self::assertNotSame('', EntitlementRegistry::describe($key));
             // The default value must itself validate.
             self::assertNull(

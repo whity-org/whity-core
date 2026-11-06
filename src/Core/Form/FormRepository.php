@@ -141,7 +141,10 @@ final class FormRepository
         $stmt->bindValue(':offset', max(0, $offset), PDO::PARAM_INT);
         $stmt->execute();
 
-        return array_map([self::class, 'normalizeRow'], $stmt->fetchAll(PDO::FETCH_ASSOC));
+        /** @var list<array<string, mixed>> $rows */
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return array_map([self::class, 'normalizeRow'], $rows);
     }
 
     /**
@@ -275,7 +278,10 @@ final class FormRepository
         );
         $stmt->execute([':tenant_id' => $tenantId, ':status' => FormStatus::PUBLISHED]);
 
-        return array_map([self::class, 'normalizeRow'], $stmt->fetchAll(PDO::FETCH_ASSOC));
+        /** @var list<array<string, mixed>> $rows */
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return array_map([self::class, 'normalizeRow'], $rows);
     }
 
     /**

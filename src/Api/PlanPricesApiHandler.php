@@ -110,7 +110,6 @@ final class PlanPricesApiHandler
             // SQLSTATE by looking, and the next exception type to arrive here
             // will be the unsafe one. Mirrors PlansApiHandler.
             return Response::error('Validation failed', 422, [$e->field() => $e->reason()]);
-            // @phpstan-ignore catch.neverThrown
         } catch (\PDOException) {
             // NOT DEAD, whatever the analyser thinks: the partial unique index
             // on `plan_prices` raises this, and two tests prove it — the

@@ -250,6 +250,14 @@ The no-code plugin builder (`WHITY-BUILDER.md`, separate session) needs three th
 - **Pages.** `document_artifacts.pages` keeps what the render service reports, returned on each artifact and on `document.rendered`.
 - **Older rows** have no number, no record and null pages, and are `issued` unless their routing says otherwise.
 
+### 3.13 Preflight (#1629)
+
+`POST /api/documents/preflight` and `Documents::preflight()` take an issue's body and say whether it would go through, and every reason it wouldn't. They run `TemplateIssuing`'s own steps, so they can't drift from an issue, and don't stop at the first problem. Nothing is written: a letter's draft is read rather than frozen, no number is allocated, nothing renders. `document.issuing` listeners get `check_only: true` and answer by appending `{label, ok, why?}` to `checks`; a veto counts as one failed check. A key naming an existing document is reported as `replays_document_id`, since the issue would return it. The real issue checks everything again.
+
+### 3.14 Revisions (WHIT-888, #1625)
+
+`POST /api/documents/{id}/revisions` with `{reason, template?, record?}` issues a new document through `DocumentIssuing`, from the record as it is now. It keeps the number, takes the next letter and links with `supersedes_id`. `pinned` (default) prints the same template version and `latest` the published one. The fields the record resolves are read again, and the rest (a template's own fields) carry over. The record, the retired codes and the plugin link commit together, and a unique index means two people revising one document can't both win. `superseded` is derived from the new row, and `diff` returns `added`, `removed` and `changed`. Refused: no record, withdrawn, already replaced, still in review. A correction (`POST .../render`) is still more bytes on the same record, and is refused once a document has been replaced. `issued_document.revision` prints the letter.
+
 ## 4. Phasing
 
 | Phase | What | Depends on |

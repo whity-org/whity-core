@@ -264,7 +264,6 @@ final class ProfileLoginRealEngineTest extends TestCase
     public function testLoginWithUnverifiedEmailIsRejected(): void
     {
         $unverifiedId = $this->seedProfile('unverified@corp.com', false); // verified=false
-        $this->seedUser('unverified@corp.com', self::TENANT_A);
         $this->memberships->insert($unverifiedId, self::TENANT_A, 1);
 
         $response = $this->login('unverified@corp.com');
@@ -301,7 +300,6 @@ final class ProfileLoginRealEngineTest extends TestCase
     public function testLoginWithOnlySuspendedMembershipIsRejected(): void
     {
         $profileId = $this->seedProfile('suspended@corp.com', true);
-        $this->seedUser('suspended@corp.com', self::TENANT_A);
         $membershipId = $this->memberships->insert($profileId, self::TENANT_A, 1);
         $this->memberships->suspend($membershipId, self::TENANT_A);
 
@@ -315,7 +313,6 @@ final class ProfileLoginRealEngineTest extends TestCase
     public function testLoginWithOnlyInvitedMembershipIsRejected(): void
     {
         $profileId = $this->seedProfile('invited@corp.com', true);
-        $this->seedUser('invited@corp.com', self::TENANT_A);
         $this->memberships->invite($profileId, self::TENANT_A, 1);
 
         $response = $this->login('invited@corp.com');
@@ -328,7 +325,6 @@ final class ProfileLoginRealEngineTest extends TestCase
     public function testLoginWithNoMembershipsIsRejected(): void
     {
         $this->seedProfile('orphan@corp.com', true);
-        $this->seedUser('orphan@corp.com', self::TENANT_A);
 
         $response = $this->login('orphan@corp.com');
         self::assertSame(401, $response->getStatusCode(), 'Profile with no memberships must be refused with a generic 401.');
@@ -438,7 +434,7 @@ final class ProfileLoginRealEngineTest extends TestCase
         self::assertSame([self::TENANT_A, self::TENANT_B], $tenantIds);
         self::assertArrayHasKey('tenant_name', $body['data']['memberships'][0]);
         self::assertArrayHasKey('role', $body['data']['memberships'][0]);
-        self::assertSame(['tenant_id', 'tenant_name', 'role'], array_keys($body['data']['memberships'][0]));
+        self::assertSame(['tenant_id', 'tenant_name', 'role', 'kind'], array_keys($body['data']['memberships'][0]));
         self::assertNull($this->jwtParser->lastPayloadOfType('access'), 'Reading the choice must not mint a session.');
         // Still usable to complete the choice.
         self::assertSame(200, $this->selectTenant(self::TENANT_B)->getStatusCode());
@@ -559,7 +555,6 @@ final class ProfileLoginRealEngineTest extends TestCase
     public function testSingleSystemTenantMembershipLogsInWithSystemAuthority(): void
     {
         $sysProfileId = $this->seedProfile('sysadmin@corp.com', true);
-        $this->seedUser('sysadmin@corp.com', 0); // legacy users row in tenant 0
         $this->pdo->exec(
             "INSERT OR IGNORE INTO tenants (id, name, created_at) VALUES (0, 'system', datetime('now'))"
         );

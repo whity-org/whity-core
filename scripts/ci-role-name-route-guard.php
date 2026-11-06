@@ -59,28 +59,9 @@ declare(strict_types=1);
  * allowlist rots on unrelated edits gets deleted.
  */
 const GRANDFATHERED = [
-    // BLOCKED ON #1283, not merely unslugged — do not mint a slug family here
-    // without reading it first.
-    //
-    // DeploymentManager has ONE commit (2026-05-18), the feature has no UI and
-    // no caller anywhere in the repo, and `rollbackMigration()` says in its own
-    // comment that it only records the intent. The routes are nonetheless
-    // published in public/openapi.json and the generated typed client, and are
-    // reachable by anyone holding `admin`.
-    //
-    // Minting `deployments:*` would add catalogue rows, a grant migration and a
-    // permanent RBAC surface for something that may be deleted instead. #1283
-    // asks whether to finish it, unpublish the routes, or remove it.
-    'POST /api/deployments/apply' => '#1283: feature unfinished and uncalled; decide before slugging',
-    'POST /api/deployments/rollback' => '#1283: feature unfinished and uncalled; decide before slugging',
-    'GET /api/deployments/status' => '#1283: feature unfinished and uncalled; decide before slugging',
-
-    // #990/#1258: no `migrations:*` slug. Registered in BOTH entry points and
-    // role-gated in both, so the two currently AGREE — re-gating one side
-    // alone would break the mirror rather than complete it.
-    'GET /api/migrations' => '#990: no migrations:* slug; role-gated in both entry points, so they agree',
-    'POST /api/migrations/run' => '#990: no migrations:* slug; CLI-only route',
-    'POST /api/migrations/rollback' => '#990: no migrations:* slug; CLI-only route',
+    // The migrations group is GONE — re-gated onto `migrations:read` and
+    // `migrations:manage` by migration 220, in both entry points at once.
+    // The deployments group is GONE too: the feature was removed (#1283).
 
     // The stats pair is GONE — the route and the `dashboard` nav item both moved
     // onto `stats:read` by migration 157, in one commit. This guard is what made

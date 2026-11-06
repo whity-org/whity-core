@@ -338,7 +338,7 @@ final class NotificationProfileFkMigrationRealEngineTest extends TestCase
      * the way a non-idempotent re-run fails — is visible rather than hidden
      * behind "a key exists".
      *
-     * @return list<string>
+     * @return array<int, string>
      */
     private function profileForeignKeys(string $table, string $column): array
     {
@@ -385,7 +385,7 @@ final class NotificationProfileFkMigrationRealEngineTest extends TestCase
     }
 
     /**
-     * @return list<string>
+     * @return array<int, string>
      */
     private function indexNames(string $table): array
     {

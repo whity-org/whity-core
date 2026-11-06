@@ -288,7 +288,6 @@ use Whity\Core\Mail\MailerFactory;
 use Whity\Api\RolesApiHandler;
 use Whity\Api\TenantsApiHandler;
 use Whity\Api\PermissionsApiHandler;
-use Whity\Api\DeploymentApiHandler;
 use Whity\Api\PluginsApiHandler;
 use Whity\Api\MigrationsApiHandler;
 use Whity\Api\AdminApiHandler;
@@ -320,7 +319,6 @@ use Whity\Core\RBAC\CorePermissions;
 use Whity\Core\Hooks\HookManager;
 use Whity\Core\Audit\AuditContext;
 use Whity\Core\Audit\AuditLogger;
-use Whity\Core\Deployment\DeploymentManager;
 use Whity\Core\Log\ErrorLogLogger;
 use Whity\Core\Tenant\TenantContext;
 use Whity\Auth\TotpService;
@@ -1424,6 +1422,25 @@ $postAuthRateLimiter = new RateLimitMiddleware(
 
 // Pre-auth IP limiter runs FIRST so a flood is shed before body/CSRF/tenant work.
 $kernel->use($preAuthRateLimiter);
+// A plugin's public form (WHIT-906): before anything that reads a credential, so
+// CSRF and the rest see the anonymous request this gate leaves behind.
+$publicFormKeyRepository = new \Whity\Core\Plugin\PublicForm\PublicFormKeyRepository($db->getPdo());
+$publicFormGlobals = new \Whity\Core\Settings\GlobalSettingsRepository($db->getPdo());
+$publicFormBotCheck = new \Whity\Core\Plugin\PublicForm\BotCheck(
+    $publicFormGlobals,
+    \Whity\Core\Security\EncryptedSecretStore::fromEnv($_ENV),
+    new \Whity\Core\Http\HttpFetcher(),
+);
+$publicFormGate = new \Whity\Http\Middleware\PublicFormGate(
+    $router,
+    $publicFormKeyRepository,
+    new DatabaseSharedStore($db->getPdo()),
+    $publicFormBotCheck,
+    null,
+    // A plugin's public GET (WHIT-704) is served only when the operator says so.
+    \Whity\Http\Middleware\PublicFormGate::readsEnabledFromEnv($_ENV),
+);
+$kernel->use($publicFormGate);
 $kernel->use(new RequestBodyValidator());
 $kernel->use(new CsrfGuard());
 $kernel->use($tenantIsolationMiddleware);
@@ -1474,7 +1491,6 @@ $pluginLoader = new PluginLoader(
 );
 
 // 9b. Initialize deployment manager
-$deploymentManager = new DeploymentManager($db->getPdo(), __DIR__ . '/../storage/deployments');
 
 // 10. Register authentication handler
 // Inject the shared $totpService (built at step 3b) so the login-path 2FA validation uses the
@@ -2294,11 +2310,6 @@ $router->register('GET', '/api/platform/version/latest', [$platformVersionHandle
 $openApiHandler = new OpenApiHandler($router, $pluginLoader);
 $router->registerUnversioned('GET', '/api/openapi.json', [$openApiHandler, 'handle']);
 
-$deploymentHandler = new DeploymentApiHandler($deploymentManager);
-$router->register('POST', '/api/deployments/apply', [$deploymentHandler, 'apply'], 'admin');
-$router->register('POST', '/api/deployments/rollback', [$deploymentHandler, 'rollback'], 'admin');
-$router->register('GET', '/api/deployments/status', [$deploymentHandler, 'status'], 'admin');
-
 // Plugins admin API (WC-9/PR #88, WC-10/PR #104). Pass the live $pluginLoader so
 // list/enable/disable use the WC-9 lifecycle at runtime. WC-218: each route is
 // gated by its OWN per-action plugin permission (6th positional arg to
@@ -2379,7 +2390,8 @@ $router->register('GET', '/api/desktop-app-updates/latest', [$desktopAppUpdateHa
 $migrationsHandler = new MigrationsApiHandler($db, __DIR__ . '/../database/migrations');
 // Only allow read-only access to migration status via API
 // Mutations (run/rollback) are performed via CLI only for security
-$router->register('GET', '/api/migrations', [$migrationsHandler, 'list'], 'admin');
+// #990: gated on `migrations:read` (migration 220), mirrored in BaseCommand.
+$router->register('GET', '/api/migrations', [$migrationsHandler, 'list'], null, null, CorePermissions::MIGRATIONS_READ);
 
 $adminHandler = new AdminApiHandler($db, __DIR__ . '/../database/migrations');
 // #990: gated on `stats:read` (6th positional arg; requiredRole stays null so
@@ -3038,7 +3050,11 @@ $router->register('GET', '/api/subscription',                  [$subscriptionHan
 // split-backend hazard StorageDriverFactory's own docblock warns about. One
 // driver, built before anything that needs it.
 $storageRoot = getenv('STORAGE_ROOT') ?: (__DIR__ . '/../storage');
-$defaultStorageDriver = \Whity\Storage\StorageDriverFactory::fromSettings($settingsService, $_ENV, $storageRoot);
+// #1622: a storage configuration that cannot be built (an endpoint with no
+// scheme, s3 selected before the secret is in the environment) is logged at
+// CRITICAL and falls back to local disk instead of killing every worker — so
+// the settings API stays up to correct it.
+$defaultStorageDriver = \Whity\Storage\StorageDriverFactory::fromSettingsOrLocal($settingsService, $_ENV, $storageRoot, $logger);
 $storageResolver = new \Whity\Storage\TenantStorageResolver(
     $defaultStorageDriver,
     new \Whity\Storage\TenantStorageConfigRepository($db->getPdo()),
@@ -3519,6 +3535,17 @@ $reportsHandler = new \Whity\Api\ReportsApiHandler(
 $router->register('GET',  '/api/reports',                            [$reportsHandler, 'index'],    null, null, CorePermissions::DOCUMENTS_RENDER);
 $router->register('POST', '/api/reports/{source:[a-z][a-z0-9_]*}/document', [$reportsHandler, 'document'], null, null, CorePermissions::DOCUMENTS_RENDER);
 
+// #1019. The names of a few units and roles, for a screen that holds their ids.
+// Registered without a route permission because the permission depends on the
+// `surface` in the body (documents:read for `documents`, documents:route for
+// `documents.route`), and the handler checks it. Never ous:read or roles:read.
+$labelsHandler = new \Whity\Api\LabelsApiHandler(
+    new \Whity\Core\Labels\LabelResolver($db->getPdo()),
+    $roleChecker,
+    $settingsService,
+);
+$router->register('POST', '/api/labels/resolve', [$labelsHandler, 'resolve'], null);
+
 $documentPeople = new \Whity\Core\Document\DocumentPeople($db->getPdo());
 $documentsHandler = new \Whity\Api\DocumentsApiHandler(
     $documentRepository,
@@ -3562,7 +3589,8 @@ $documentsHandler = new \Whity\Api\DocumentsApiHandler(
     $documentQrService,
     // WHIT-742: `slot` in the body names the template through the workspace's bindings.
     $templateSlotRegistry,
-    $documentPeople
+    $documentPeople,
+    $documentFieldLabels
 );
 // The one issuing path (WHIT-742), registered for plugin code and automations
 // running in a request. BaseCommand registers the same for CLI commands, and
@@ -3573,6 +3601,7 @@ $documentsHandler = new \Whity\Api\DocumentsApiHandler(
     $settingsService,
     static fn (int $id, int $tenantId, int $profileId): ?array => $documentSourcesHandler->visibleRow($id, $tenantId, $profileId),
     $templateSlotRegistry,
+    labels: $documentFieldLabels,
 ));
 // The SDK's Documents (1.56): plugins issue through the same service, as the
 // person whose request it is.
@@ -3621,7 +3650,9 @@ $documentVerificationHandler = new \Whity\Api\DocumentVerificationApiHandler(
     $documentRepository,
     $routeEventRepository,
     $settingsService,
-    new DatabaseSharedStore($db->getPdo())
+    new DatabaseSharedStore($db->getPdo()),
+    $documentSourceRepository,
+    $documentArtifactRepository,
 );
 
 // `/api/documents/views` is registered BEFORE the `{id:\d+}` routes and cannot
@@ -3641,6 +3672,8 @@ $router->register('GET',  '/api/documents',                                     
 // questions, and the handler renders opportunistically. See
 // DocumentsApiHandler::create().
 $router->register('POST', '/api/documents',                                            [$documentsHandler, 'create'],          null, null, CorePermissions::DOCUMENTS_ISSUE);
+$router->register('POST', '/api/documents/{id:\d+}/revisions',                         [$documentsHandler, 'revise'],          null, null, CorePermissions::DOCUMENTS_ISSUE);
+$router->register('POST', '/api/documents/preflight',                                  [$documentsHandler, 'preflight'],       null, null, CorePermissions::DOCUMENTS_ISSUE);
 $router->register('GET',  '/api/documents/{id:\d+}',                                   [$documentsHandler, 'show'],            null, null, CorePermissions::DOCUMENTS_READ);
 $router->register('GET',  '/api/documents/{id:\d+}/content',                           [$documentsHandler, 'content'],         null, null, CorePermissions::DOCUMENTS_READ);
 $router->register('GET',  '/api/documents/{id:\d+}/artifacts/{artifactId:\d+}/content', [$documentsHandler, 'artifactContent'], null, null, CorePermissions::DOCUMENTS_READ);
@@ -4148,6 +4181,18 @@ $publicFormsHandler = new \Whity\Api\PublicFormsApiHandler(
     // a reason for a second storage path.
     $formUploadStore
 );
+$publicFormKeysHandler = new \Whity\Api\PublicFormKeysApiHandler(
+    $publicFormKeyRepository,
+    $publicFormBotCheck,
+    new DatabaseSharedStore($db->getPdo()),
+    $auditLogger ?? null,
+);
+$router->register('GET', '/api/public-form-keys', [$publicFormKeysHandler, 'index'], null, null, CorePermissions::PUBLIC_FORM_KEYS_MANAGE);
+$router->register('POST', '/api/public-form-keys', [$publicFormKeysHandler, 'issue'], null, null, CorePermissions::PUBLIC_FORM_KEYS_MANAGE);
+$router->register('PATCH', '/api/public-form-keys/{id:\d+}', [$publicFormKeysHandler, 'update'], null, null, CorePermissions::PUBLIC_FORM_KEYS_MANAGE);
+$router->register('POST', '/api/public-form-keys/{id:\d+}/revoke', [$publicFormKeysHandler, 'revoke'], null, null, CorePermissions::PUBLIC_FORM_KEYS_MANAGE);
+$router->register('GET', '/api/public/plugin-forms/{key}', [$publicFormKeysHandler, 'config'], null);
+
 $router->register('GET', '/api/public/forms/{slug}', [$publicFormsHandler, 'render'], null);
 // AN ANONYMOUS UPLOAD (migration 134). `file` fields used to be stripped from
 // the public surface on the grounds that every upload route was gated, so a
@@ -4710,6 +4755,14 @@ $mailSettingsHandler = new \Whity\Api\MailSettingsApiHandler(
 $router->register('GET', '/api/settings/mail/status',        [$mailSettingsHandler, 'status'],      null, null, CorePermissions::SETTINGS_MANAGE);
 $router->register('PUT', '/api/settings/mail/smtp-password', [$mailSettingsHandler, 'setPassword'], null, null, CorePermissions::SETTINGS_MANAGE);
 $router->register('PUT', '/api/settings/mail/oauth-credentials', [$mailSettingsHandler, 'setOAuthCredentials'], null, null, CorePermissions::SETTINGS_MANAGE);
+$publicFormBotSettingsHandler = new \Whity\Api\PublicFormBotSettingsApiHandler(
+    $publicFormGlobals,
+    $publicFormBotCheck,
+    $roleChecker,
+    $auditLogger ?? null,
+);
+$router->register('GET', '/api/settings/public-forms/bot-check', [$publicFormBotSettingsHandler, 'show'], null, null, CorePermissions::SETTINGS_MANAGE);
+$router->register('PUT', '/api/settings/public-forms/bot-check', [$publicFormBotSettingsHandler, 'update'], null, null, CorePermissions::SETTINGS_MANAGE);
 $router->register('POST', '/api/settings/mail/test',         [$mailSettingsHandler, 'test'],        null, null, CorePermissions::SETTINGS_MANAGE);
 
 // 13c. Register the Tenant Branding API (WC-233). Public GET /api/v1/branding
@@ -4747,6 +4800,56 @@ $router->register('DELETE', '/api/branding/assets/{key}',           [$brandingHa
 $router->register('POST',   '/api/branding/global/assets/{key}',    [$brandingHandler, 'uploadGlobal'],  null, null, CorePermissions::SETTINGS_MANAGE);
 $router->register('DELETE', '/api/branding/global/assets/{key}',    [$brandingHandler, 'clearGlobal'],   null, null, CorePermissions::SETTINGS_MANAGE);
 $router->register('PUT',    '/api/tenants/{id}/branding-host',      [$brandingHandler, 'setBrandingHost'], null, null, CorePermissions::SETTINGS_MANAGE);
+
+// WHIT-915: workspace-controlled customer sign-up. Platform sign-up
+// (/api/register) creates a workspace and is the operator's; this joins ONE
+// existing workspace as a customer and is that workspace's admins'. The public
+// four are unauthenticated and on EnforceTenantIsolation's public list: the
+// workspace comes from the slug in the path (checked against the host, the
+// resolution branding uses) and, after the request, from the stored row only.
+// The admin five need signup:manage in the caller's own workspace.
+$signupSettings = new \Whity\Core\Signup\WorkspaceSignupSettings($db->getPdo());
+$customerSafeRoles = \Whity\Core\Identity\CustomerSafeRole::make($db->getPdo());
+$customerSignupService = new \Whity\Core\Signup\CustomerSignupService(
+    $db->getPdo(),
+    $signupSettings,
+    $customerSafeRoles,
+    $hookManager
+);
+$publicSignupHandler = new \Whity\Api\PublicSignupApiHandler(
+    $customerSignupService,
+    $signupSettings,
+    $brandingHostRepo,
+    $hostResolver,
+    $publicFormBotCheck,
+    new \Whity\Core\Signup\CustomerSignupMailer(
+        $mailer,
+        $frontendUrls->linkOrPath(\Whity\Core\Http\FrontendUrls::SIGNUP_CONFIRM),
+        new \Whity\Core\Mail\EmailLayout(),
+        $settingsService
+    ),
+    new DatabaseSharedStore($db->getPdo()),
+    $auditLogger
+);
+// The confirm pair first, so it can never be read as a workspace slug.
+$router->register('GET',  '/api/public/signup/confirm',               [$publicSignupHandler, 'preview'], null);
+$router->register('POST', '/api/public/signup/confirm',               [$publicSignupHandler, 'confirm'], null);
+$router->register('GET',  '/api/public/signup/workspaces/{workspace}', [$publicSignupHandler, 'info'],    null);
+$router->register('POST', '/api/public/signup/workspaces/{workspace}', [$publicSignupHandler, 'request'], null);
+$workspaceSignupHandler = new \Whity\Api\WorkspaceSignupApiHandler(
+    $db->getPdo(),
+    $roleChecker,
+    $signupSettings,
+    $customerSafeRoles,
+    $customerSignupService,
+    $auditLogger,
+    $publicFormBotCheck
+);
+$router->register('GET',  '/api/signup/settings',                   [$workspaceSignupHandler, 'getSettings'],    null, null, CorePermissions::SIGNUP_MANAGE);
+$router->register('PUT',  '/api/signup/settings',                   [$workspaceSignupHandler, 'updateSettings'], null, null, CorePermissions::SIGNUP_MANAGE);
+$router->register('GET',  '/api/signup/requests',                   [$workspaceSignupHandler, 'listRequests'],   null, null, CorePermissions::SIGNUP_MANAGE);
+$router->register('POST', '/api/signup/requests/{id:\d+}/approve',  [$workspaceSignupHandler, 'approve'],        null, null, CorePermissions::SIGNUP_MANAGE);
+$router->register('POST', '/api/signup/requests/{id:\d+}/reject',   [$workspaceSignupHandler, 'reject'],         null, null, CorePermissions::SIGNUP_MANAGE);
 
 // 13c-ter. UI display preferences (#1068) — public GET /api/v1/ui/preferences.
 // Registered here rather than beside the settings routes because it resolves
@@ -5446,7 +5549,7 @@ if ($isWorker) {
         // are gated behind development/DEBUG. Decision is computed once per
         // iteration and captured by the request closure below.
         $logLifecycle = WorkerRuntime::shouldLogLifecycle($_ENV);
-        $keepRunning = \frankenphp_handle_request(static function () use ($kernel, $hookManager, $pluginLoader, $db, $logLifecycle, $securityHeaders, $errorTracker, $tenantManifestHost, $documentFieldRegistry) {
+        $keepRunning = \frankenphp_handle_request(static function () use ($kernel, $hookManager, $pluginLoader, $db, $logLifecycle, $securityHeaders, $errorTracker, $tenantManifestHost, $documentFieldRegistry, $publicFormGate) {
             try {
                 // Dispatch request start hook
                 if ($logLifecycle) {
@@ -5471,7 +5574,14 @@ if ($isWorker) {
                 $request = Request::fromGlobals();
 
                 // Resolve CORS headers once per request from the allowlist (WC-53).
-                $corsHeaders = Cors::headers($request->getHeader('Origin'));
+                // A plugin's public form sets its own (WHIT-906): they never allow credentials.
+                $corsHeaders = $publicFormGate->ownsCors($request) ? [] : Cors::headers($request->getHeader('Origin'));
+
+                $publicFormPreflight = $publicFormGate->preflight($request);
+                if ($publicFormPreflight !== null) {
+                    $publicFormPreflight->withHeaders($securityHeaders)->send();
+                    return;
+                }
 
                 // Handle OPTIONS preflight requests for CORS
                 if ($request->getMethod() === 'OPTIONS') {
@@ -5605,7 +5715,14 @@ if ($isWorker) {
         $request = Request::fromGlobals();
 
         // Resolve CORS headers once per request from the allowlist (WC-53).
-        $corsHeaders = Cors::headers($request->getHeader('Origin'));
+        // A plugin's public form sets its own (WHIT-906): they never allow credentials.
+        $corsHeaders = $publicFormGate->ownsCors($request) ? [] : Cors::headers($request->getHeader('Origin'));
+
+        $publicFormPreflight = $publicFormGate->preflight($request);
+        if ($publicFormPreflight !== null) {
+            $publicFormPreflight->withHeaders($securityHeaders)->send();
+            exit;
+        }
 
         // Handle OPTIONS preflight requests for CORS
         if ($request->getMethod() === 'OPTIONS') {

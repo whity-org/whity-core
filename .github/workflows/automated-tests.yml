@@ -121,6 +121,7 @@ jobs:
       date_display: ${{ steps.mode.outputs.all == 'true' && 'true' || steps.filter.outputs.date_display }}
       desktop_host: ${{ steps.mode.outputs.all == 'true' && 'true' || steps.filter.outputs.desktop_host }}
       watchdog: ${{ steps.mode.outputs.all == 'true' && 'true' || steps.filter.outputs.watchdog }}
+      sdk_coverage: ${{ steps.mode.outputs.all == 'true' && 'true' || steps.filter.outputs.sdk_coverage }}
       # full: the dialect shards run. coverage: the SQLite shards run under
       # pcov and the coverage floor is enforced. See "What runs where" above.
       full: ${{ steps.mode.outputs.full }}
@@ -259,6 +260,14 @@ jobs:
             # the drift, and `frontend` runs a Node job with no PHP. Its own
             # filter is the only way it fires on every change that can move the
             # catalogue.
+            # The plugin SDK coverage matrix: its data, its generated page, the
+            # SDK whose ledger it is checked against, and the script itself.
+            sdk_coverage:
+              - 'sdk/**'
+              - 'docs/sdk-coverage/**'
+              - 'docs/wiki/Plugin-SDK-Coverage.md'
+              - 'scripts/sdk-coverage.php'
+              - '.github/workflows/automated-tests.yml'
             i18n:
               - 'web/**'
               - 'packages/**'
@@ -554,34 +563,30 @@ jobs:
           key: phpstan-${{ github.sha }}
           restore-keys: phpstan-
 
-      # The paths live in ONE place — the `phpstan` script in composer.json — and
-      # this step, scripts/ci-local.sh and any hand-run all go through it (#934).
-      # The memory limit does too, except that this step raises it: see below.
+      # The paths and the memory limit live in ONE place — the `phpstan` script
+      # in composer.json — and this step, scripts/ci-local.sh, release.yml and
+      # any hand-run all go through it (#934).
       #
-      # 1G, not 512M. PHPStan runs parallel workers and each holds its own
-      # analysis state, so the ceiling is per-worker rather than total — 512M
-      # was enough until the suite grew past it, at which point a worker
-      # crashes and the whole job fails with "Result is incomplete because of
-      # severe errors" rather than with a real finding. That reads exactly like
-      # a code defect and is not one, which is the expensive part: the failure
-      # names a memory limit only if you open the log. At 128M it is worse
-      # still — the summary line reads "Found 7 errors", and every one of them
-      # is a crashed worker rather than a finding.
+      # The limit is per worker: PHPStan runs parallel workers and each holds
+      # its own analysis state. When a worker runs out it crashes, and the job
+      # fails with "Result is incomplete because of severe errors" (or, at very
+      # low limits, a plausible "Found 7 errors" that are all crashed workers)
+      # rather than with a real finding. Open the log before believing it.
       #
-      # 2G here, not the script's 1G. A cold analysis of this tree used 2.01 GB in
-      # one process (1.71 GB a week earlier, with files up by the same 17%, so it
-      # is growth and not a leak). Split between a few workers that sits close to
-      # 1G each, and a warm result cache hides it, so it only crashes some runs.
-      # The later --memory-limit wins.
-      #
-      # The runner has ~7GB, so this is not near anything.
+      # 1G is enough again since PHPStan 2 (WHIT-908). Under 1.12 a cold
+      # analysis on two workers peaked at about 1.5 GB per worker, so 1G
+      # crashed on a 2-CPU runner (#1620) and this step had to raise it to 2G.
+      # Under 2.3 the same cold analysis peaks at about 0.56 GB per worker, and
+      # 1.2 GB in a single process (--debug), measured on the same machine.
+      # A single-process run is the only one that needs more than 1G: pass a
+      # higher --memory-limit for it, the later flag wins.
       #
       # `ops` is in the path list (see the composer script) because
       # ops/health-watch-healthcheck.php is a container HEALTHCHECK: a probe
       # that fatals is a probe that reports nothing, and nothing was analysing
       # it (WC-766).
       - name: Run PHPStan
-        run: composer phpstan -- --memory-limit=2G
+        run: composer phpstan
 
       - name: Plugin-load smoke
         run: php scripts/ci-plugin-smoke.php
@@ -634,12 +639,13 @@ jobs:
       - name: Emitted-URL version guard
         run: php scripts/ci-emitted-url-version-guard.php
 
-      # Plugin tenant-isolation conformance kit (WC-194): run the SDK migration
-      # linter + tenant-predicate scanner over the in-tree HelloWorld reference
-      # plugin, the way an out-of-repo plugin runs it in its own CI. Fails if a
-      # plugin tenant table lacks a tenant_id column or a handler runs an
-      # unscoped query on a tenant-owned table.
-      - name: Plugin tenant-isolation conformance (HelloWorld)
+      # Plugin tenant-isolation conformance kit (WC-194, #1262): run the SDK
+      # migration linter + tenant-predicate scanner over EVERY plugin under
+      # plugins/, the way an out-of-repo plugin runs it in its own CI. Each
+      # plugin's tenant tables are read from its own migrations. Fails if a
+      # plugin tenant table lacks a tenant_id column or any non-migration plugin
+      # code runs an unscoped query on a tenant-owned table.
+      - name: Plugin tenant-isolation conformance (all plugins)
         run: php scripts/ci-plugin-tenant-conformance.php
 
       # Undeclared-reference guard: fail CI on a relationship core CANNOT SEE —
@@ -788,6 +794,29 @@ jobs:
   #
   # Its own job, and not a step in `static-analysis`, because the input it reads
   # is the FRONTEND and the guard is PHP — see the `i18n` path filter above.
+  # Plugin SDK coverage matrix. An SDK minor that does not say which areas it
+  # moved is how the matrix goes stale, so this fails when coverage.json is
+  # behind Sdk::VERSION, when a ledger minor is placed in no area, or when the
+  # generated page differs from the data. Reads files only: no Composer.
+  sdk-coverage:
+    name: Plugin SDK coverage matrix
+    needs: changes
+    if: needs.changes.outputs.sdk_coverage == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          coverage: none
+
+      - name: The coverage matrix matches the SDK
+        run: php scripts/sdk-coverage.php --check
+
   i18n-catalogue:
     name: i18n catalogue drift
     needs: changes
@@ -1910,6 +1939,7 @@ jobs:
       - coverage
       - static-analysis
       - history-guards
+      - sdk-coverage
       - i18n-catalogue
       - date-display
       - postgres-migrations

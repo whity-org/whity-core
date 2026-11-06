@@ -229,6 +229,8 @@ export const EDITOR_LABELS = {
   blockerFieldHint: "Remove it, or pick a field the record has.",
   blockerTheme: "This document uses a theme the workspace doesn’t have: {ref}",
   blockerThemeHint: "Choose another theme or restore it.",
+  blockerTooLarge: "This template is too large to print: {size}, and the limit is {max}",
+  blockerTooLargeHint: "Use smaller images or fewer of them, then publish again.",
   labelGrid: "{columns} × {rows} labels",
   labelStock: "Label stock",
   labelCertificate: "Certificate",

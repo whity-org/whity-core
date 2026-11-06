@@ -3,6 +3,7 @@
 namespace Whity\Cli\Commands;
 
 use Whity\Core\Hooks\HookManager;
+use Whity\Core\i18n\TranslationRefresh;
 use Whity\Core\PluginLoader;
 use Whity\Core\Router;
 use Whity\Database\Database;
@@ -263,6 +264,27 @@ class MigrationsCommand implements CommandHelp, CliCommand
     /**
      * Run pending migrations
      */
+    /**
+     * Load new labels, so an upgrade needs no separate step for them. Runs with no
+     * migration pending too, because a release can change labels and not schema.
+     *
+     * A failure here warns and doesn't fail the command: the migrations succeeded,
+     * and only wording is at stake. Written to stdout, like the rest of this command.
+     */
+    private function refreshTranslations(): void
+    {
+        try {
+            $totals = (new TranslationRefresh($this->db->getPdo(), dirname(__DIR__, 3)))->run();
+            if ($totals !== null) {
+                echo "\033[0;32m✓ Translations: {$totals['inserted']} added, {$totals['updated']} refreshed, "
+                    . "{$totals['divergent']} left as edited\033[0m\n";
+            }
+        } catch (\Throwable $e) {
+            echo "\033[1;33m! Translations weren't loaded: " . $e->getMessage() . "\033[0m\n"
+                . "  New labels may show in English. Run `php bin/whity-cli i18n:sync --all` to retry.\n";
+        }
+    }
+
     private function run(): int
     {
         // WC-214: reset the malformed-plugin flag per action (see status()),
@@ -310,6 +332,8 @@ class MigrationsCommand implements CommandHelp, CliCommand
             } else {
                 echo "\033[0;32m✓ Successfully ran $count migration(s)\033[0m\n";
             }
+
+            $this->refreshTranslations();
 
             // WC-214: a malformed plugin (getMigrations() threw) did not block
             // the healthy migrations above, but it must still surface as a
@@ -541,9 +565,8 @@ class MigrationsCommand implements CommandHelp, CliCommand
             $matches
         );
 
-        /** @var list<string> $names */
-        $names = array_unique(array_filter(array_map('trim', $matches[2])));
-        return array_values($names);
+        // array_unique() and array_filter() keep keys, so array_values() makes the list.
+        return array_values(array_unique(array_filter(array_map('trim', $matches[2]))));
     }
 
     /**
@@ -664,7 +687,8 @@ class MigrationsCommand implements CommandHelp, CliCommand
      */
     private function getMigrationFiles(): array
     {
-        $files = scandir($this->migrationDir);
+        // An unreadable directory has no migrations to list (as BuildApiHandler).
+        $files = scandir($this->migrationDir) ?: [];
         $migrationFiles = [];
         foreach ($files as $file) {
             if (pathinfo($file, PATHINFO_EXTENSION) === 'php') {
@@ -790,6 +814,8 @@ class MigrationsCommand implements CommandHelp, CliCommand
             $pluginName = $plugin->getName();
 
             try {
+                // Typed list<string>, but a plugin's own code answers: checked below.
+                /** @var array<mixed> $declared */
                 $declared = $plugin->getMigrations();
             } catch (\Throwable $e) {
                 // WC-214: a throwing getMigrations() is a MALFORMED plugin. We

@@ -8,6 +8,7 @@ Welcome to the Whity Core documentation.
 - **[Whity CLI](Whity-CLI.md)** — Install and update a self-hosted Whity with one command
 - **[Architecture](Architecture.md)** — How a request flows through the worker, the plugin loader and the tenant context
 - **[Plugin Development](Plugin-Development.md)** — Build plugins
+- **[Public forms for plugins](Plugin-Public-Forms.md)** — Take anonymous form submissions with no proxy
 
 ## System documentation
 
@@ -16,6 +17,7 @@ Welcome to the Whity Core documentation.
 - **[Permission System](PERMISSION_SYSTEM.md)** — RBAC permissions, registry, role hierarchy, enforcement.
 - **[Tenant Isolation](TENANT_ISOLATION.md)** — Multi-tenancy, `TenantContext`, query scoping.
 - **[Monetization & Metering](Monetization-and-Metering.md)** — Entitlements → plans → subscriptions → payment wall → rate limits: the one runtime access gate, per-tenant enforcement modes, and plan-driven throughput (the operator never walls themselves).
+- **[Customer sign-up for a workspace](Customer-Signup.md)** — Let customers join one workspace on their own: Off / Approval required / Open, customer-safe starting roles, allowed email domains, the approval queue, and how it differs from platform sign-up.
 - **[Sign in with Google (SSO)](SSO-Google-Setup.md)** — End-to-end federated sign-in setup: Google OAuth client, provider config, trust tiers, first-login behaviour, troubleshooting.
 - **[Email (SMTP) Setup](Email-SMTP-Setup.md)** — Configure outbound email end to end: cPanel/SMTP credentials, the `mail.*` settings + write-only encrypted password, local Mailpit testing, troubleshooting.
 - **[Hook System](HOOK_SYSTEM.md)** — Plugin event/extension mechanism.

@@ -173,6 +173,7 @@ final class LanguagesApiHandlerTest extends TestCase
         $stmt = $this->pdo->prepare('SELECT language_code FROM profiles WHERE id = ?');
         $stmt->execute([$this->testProfileId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        $this->assertIsArray($row);
         $this->assertSame('ar', $row['language_code']);
     }
 
@@ -199,6 +200,7 @@ final class LanguagesApiHandlerTest extends TestCase
         $stmt = $this->pdo->prepare('SELECT language_code FROM profiles WHERE id = ?');
         $stmt->execute([$this->testProfileId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        $this->assertIsArray($row);
         $this->assertNull($row['language_code']);
     }
 

@@ -140,7 +140,10 @@ final class TimeWindowRepository
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
 
-        return array_map([self::class, 'normalizeRow'], $stmt->fetchAll(PDO::FETCH_ASSOC));
+        /** @var list<array<string, mixed>> $rows */
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return array_map([self::class, 'normalizeRow'], $rows);
     }
 
     /**
@@ -541,6 +544,9 @@ final class TimeWindowRepository
         );
         $stmt->execute([':tenant_id' => $tenantId, ':id' => $id]);
 
+        /** @var list<array<string, mixed>> $rows */
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
         return array_map(static fn (array $row): array => [
             'id' => (int) $row['id'],
             'window_id' => (int) $row['time_window_id'],
@@ -551,7 +557,7 @@ final class TimeWindowRepository
                 ? null
                 : (int) $row['cascaded_from_window_id'],
             'occurred_at' => (string) $row['occurred_at'],
-        ], $stmt->fetchAll(PDO::FETCH_ASSOC));
+        ], $rows);
     }
 
     /**

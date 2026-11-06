@@ -247,7 +247,7 @@ final class RouteStepRepository
             // scripts/ci-db-bool-guard.php fails a build on the bare form.
             'decision' => DbBool::of($row['decision'] ?? false),
             // NULL means "ask the settings chain", not "no quorum".
-            'decision_quorum' => isset($row['decision_quorum']) && $row['decision_quorum'] !== null
+            'decision_quorum' => isset($row['decision_quorum'])
                 ? (string) $row['decision_quorum']
                 : null,
             // #1054: WHAT SETTLES THIS STEP. Normalised through the vocabulary

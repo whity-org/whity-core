@@ -36,6 +36,15 @@ final class CorePermissions
      */
     public const STATS_READ = 'stats:read';
 
+    /**
+     * Database migrations (#990, migration 220). `migrations:read` lists core
+     * migrations and whether each has run (`GET /api/migrations`);
+     * `migrations:manage` runs and rolls them back, which only the CLI exposes.
+     * Two slugs because seeing the schema's state is not the authority to change it.
+     */
+    public const MIGRATIONS_READ = 'migrations:read';
+    public const MIGRATIONS_MANAGE = 'migrations:manage';
+
     // User management
     public const USERS_READ = 'users:read';
     public const USERS_WRITE = 'users:write';
@@ -440,6 +449,11 @@ final class CorePermissions
     // `forms:read`, because reading a submission must not be enough to change its
     // outcome, and from `forms:manage`, because recording decisions is not authoring.
     public const FORMS_REVIEW = 'forms:review';
+    // Issue and revoke the keys that open a plugin's public form (migration 217).
+    public const PUBLIC_FORM_KEYS_MANAGE = 'public_form_keys:manage';
+    // Workspace-controlled customer sign-up (WHIT-915, migration 222): the mode,
+    // the starting role and the queue of people waiting to join.
+    public const SIGNUP_MANAGE = 'signup:manage';
     // CONVENING (migrations 130/131). Deliberative BODIES that meet, minute a
     // numbered decision, and — where the agenda item carried a document — drive
     // that document's existing approval route with the decision.
@@ -469,6 +483,8 @@ final class CorePermissions
     {
         return [
             self::STATS_READ,
+            self::MIGRATIONS_READ,
+            self::MIGRATIONS_MANAGE,
             self::USERS_READ,
             self::USERS_WRITE,
             self::USERS_DELETE,
@@ -550,6 +566,8 @@ final class CorePermissions
             self::FORMS_MANAGE,
             self::FORMS_SUBMIT,
             self::FORMS_REVIEW,
+            self::PUBLIC_FORM_KEYS_MANAGE,
+            self::SIGNUP_MANAGE,
             self::CONVENING_READ,
             self::CONVENING_MANAGE,
             self::CONVENING_DECIDE,

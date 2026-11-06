@@ -150,7 +150,8 @@ final class ToolDeriver
                 (string) ($route['path'] ?? ''),
                 $schema,
             );
-            $tool['_meta'] = $this->surfaceMeta($route, (string) $tool['name']);
+            $tool = self::withCoreReadDecision($tool, $route);
+            $tool['_meta'] = $this->surfaceMeta($route, (string) $tool['name'], ($tool['annotations']['readOnlyHint'] ?? false) === true);
             $tools[] = $tool;
         }
 
@@ -401,9 +402,9 @@ final class ToolDeriver
      * first tag maps to ({@see CoreToolsets}).
      *
      * @param array<string, mixed> $route
-     * @return array<string, string|int>
+     * @return array<string, string|int|bool>
      */
-    private function surfaceMeta(array $route, string $name): array
+    private function surfaceMeta(array $route, string $name, bool $readsOnly): array
     {
         $schema  = is_array($route['schema'] ?? null) ? $route['schema'] : [];
         $options = ToolSurface::routeOptions($schema);
@@ -427,7 +428,35 @@ final class ToolDeriver
             $visibility,
             $options['agentPolicy'] ?? ToolSurface::AGENT_ALLOW,
             \Whity\Mcp\Tools\Undo\UndoSpec::fromRouteSchema($schema)?->windowSeconds,
+            $readsOnly,
         );
+    }
+
+    /**
+     * WHIT-912: a plugin route is read-only only when its method is GET or
+     * HEAD. Its `mcp_annotations` may still refine the other hints, but a
+     * POST, PUT, PATCH or DELETE it declares read-only is published as a
+     * write, to clients and to the agent check alike. Core's own routes keep
+     * what core declares (a few POSTs that only validate or test).
+     *
+     * @param array<string, mixed> $tool
+     * @param array<string, mixed> $route
+     * @return array<string, mixed>
+     */
+    private static function withCoreReadDecision(array $tool, array $route): array
+    {
+        $prefix = $route['namespacePrefix'] ?? null;
+        if (!is_string($prefix) || $prefix === '') {
+            return $tool;
+        }
+        if (in_array(strtoupper((string) ($route['method'] ?? '')), ['GET', 'HEAD'], true)) {
+            return $tool;
+        }
+        $annotations = is_array($tool['annotations'] ?? null) ? $tool['annotations'] : [];
+        $annotations['readOnlyHint'] = false;
+        $tool['annotations'] = $annotations;
+
+        return $tool;
     }
 
     /** A core toolset, or a sub-toolset of one (`core.documents.themes`). */

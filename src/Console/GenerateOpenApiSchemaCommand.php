@@ -23,7 +23,8 @@ class GenerateOpenApiSchemaCommand
             // Load environment variables from .env file (skip if already set)
             $envFile = dirname(__DIR__, 2) . '/.env';
             if (file_exists($envFile)) {
-                $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+                // file() answers false on an unreadable .env; skip it rather than warn.
+                $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [];
                 foreach ($lines as $line) {
                     if (empty(trim($line)) || strpos(trim($line), '#') === 0) {
                         continue;

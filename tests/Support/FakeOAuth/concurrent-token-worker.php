@@ -21,6 +21,12 @@ use Whity\Core\Settings\GlobalSettingsRepository;
 use Whity\Core\Settings\SettingsService;
 use Whity\Core\Settings\TenantSettingsRepository;
 
+if (!isset($argv)) {
+    fwrite(STDERR, "Run this from the command line.
+");
+    exit(2);
+}
+
 [$_, $dsn, $user, $password, $key, $tokenBase, $startAt] = $argv;
 
 $pdo = new PDO($dsn, $user, $password, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);

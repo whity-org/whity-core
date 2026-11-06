@@ -6,6 +6,143 @@ uses tag-based releases (see the `v*` tags in the repository).
 
 ## [Unreleased]
 
+## [0.2.26] - 2026-11-06
+
+### Added
+
+- **Real-engine tests for a person in two workspaces.** The people routes are
+  now proven, on SQLite and PostgreSQL, to keep each workspace to its own
+  memberships, roles and rows when the same person belongs to both. This is
+  the first slice of the cross-tenant isolation work in #1144 (WHIT-594).
+- Plugins can declare public GET routes (`'public' => 'read'` on `/api/<slug>/public/<name>/{key}`, SDK 1.69) without editing core. They use the same workspace keys, tenant rule and allowed sites as public forms, are rate-limited per address and per workspace, and stay off until the operator sets `PLUGIN_PUBLIC_READS=on` (#522).
+- **Email domains and 2FA policies can be edited.** Each email domain now has an Edit button to
+  change its default role and whether it auto-provisions, and each 2FA policy has one to change its
+  grace period. The domain name and who a policy covers stay fixed; remove and add to change those
+  (WHIT-773, #884).
+- **Unit and role names without the directory.** `POST /api/v1/labels/resolve`
+  names a few organizational units and roles by id for a caller holding the
+  permission of the screen asking (`documents:read`, or `documents:route` for
+  routing), not `ous:read` or `roles:read`. It returns names only, from the
+  caller's own workspace; unknown and other-workspace ids are left out, and
+  each request is capped by the new `labels.resolve_max_ids` setting (default
+  100, per workspace). The document library, the document record and the
+  routing panel now name units and roles through it (#1019, WHIT-779).
+- **Issue a revision of a document.** `POST /api/documents/{id}/revisions` with a reason issues
+  a new document from the record as it is now, with the same number and the next revision letter.
+  The original becomes `superseded`, its QR code stops verifying, and the response says what
+  changed, field by field. A document with no record, a withdrawn one and one still in review are
+  refused with a clear reason (WHIT-888, #1625, SDK 1.68).
+- **The public check can describe a document.** A workspace that sets `documents.qr_public_detail`
+  to the new `described` level shows, beside what `stage` shows, what kind of document it is,
+  its revision letter and its page count, and on a revised document's code which revision
+  replaced it and when. The kind is a template's new public name ("Handover certificate"), set
+  from the templates list by someone who may publish, never the title. It never shows a price,
+  a name, the subject or the document's number. Off by default (WHIT-890, #1627).
+- **Ask whether a document would issue before issuing it.** `POST /api/documents/preflight`
+  and `Documents::preflight()` take the same request as an issue and return every check with
+  its reason, including a plugin's own. Nothing is written and no number is allocated, and the
+  real issue still checks everything again (WHIT-892, #1629, SDK 1.66).
+- **Document numbers and states show on screen.** The library and the record page show a
+  document's number and whether it is a draft, in review, replaced or withdrawn, and the record
+  page shows the page count. On Document templates, Numbering… sets a template's number format
+  and when a document gets its number (WHIT-905).
+- **Plugins can take forms from anonymous visitors, with no proxy.** A route declared
+  `'public' => 'form'` on POST `/api/<slug>/forms/<name>/{key}` is reached only through checks the
+  host runs: a per-address limit, a ceiling for each form and workspace, a size cap, an allowed-sites
+  check and a bot check (Cloudflare Turnstile to start with). The workspace comes only from a key an
+  admin issues and can revoke in Settings, Public forms, never from the request. With no bot check
+  set up, forms stay closed unless the operator chooses to allow that (WHIT-906, SDK 1.67).
+- A plugin SDK coverage matrix rates how far plugins reach each part of core (`docs/sdk-coverage/coverage.json`, rendered to `docs/wiki/Plugin-SDK-Coverage.md`), with a roadmap for the gaps. CI fails an SDK minor that doesn't update it, and release-prepare stamps it with the release version.
+- **Workspaces can let customers sign up.** In Settings, Sign-up, a workspace's own admins choose
+  Off (the default), Approval required or Open, the role people get when they join, and optionally
+  which email domains may sign up. Only roles with no admin permissions can be chosen, and the role
+  is checked again at every sign-up. People confirm their email first, the form is protected by the
+  bot check, and the request never reveals whether an address already has an account. Customers get
+  a membership of kind `customer`, which can never hold admin permissions whatever its role. Joining
+  never creates a workspace; platform sign-up is unchanged. Plugins get `membership.customer_joined`
+  (WHIT-915, SDK 1.73, migration 222).
+
+### Changed
+
+- **The plugin tenant-isolation check now covers every plugin, not just
+  HelloWorld.** CI runs the SDK conformance kit over each plugin under
+  `plugins/`, bundled or installed, reading each plugin's tenant tables from its
+  own migrations and scanning all of its code outside migrations. Migrations are
+  left out of tenant scoping by path, so their `@tenant-guard-ignore` tags are
+  gone and the reasons stay as plain comments (WHIT-772, #1262).
+- **Static analysis runs on PHPStan 2.** The PHP code is now checked with
+  PHPStan 2.3 at level 8, which also reports conditions that are always true and
+  enforces `list` types. A cold analysis takes about a fifth of the time it did and
+  each worker uses about a third of the memory, so CI is back to the 1G limit the
+  `composer phpstan` script has always used. No new finding went into the baseline:
+  each was fixed, or ignored on its line with the reason where a runtime check on
+  plugin-supplied data has to stay. The baseline lost 34 entries that no longer
+  apply (WHIT-908).
+
+### Removed
+
+- **The deployments API is gone.** `POST /api/deployments/apply`,
+  `POST /api/deployments/rollback` and `GET /api/deployments/status` are removed,
+  with their entries in the OpenAPI document and the typed client. Nothing in Whity
+  called them, and updates ship as container images (see Core Update) (WHIT-787).
+
+### Fixed
+
+- **Upgrading now loads a release's new labels.** `migrate run` also loads labels
+  in every language, so an upgraded install no longer shows English for labels added
+  since it was first seeded. Strings edited in `/admin/translations` and workspace
+  overrides stay as they are. If you've upgraded to 0.2.25 already, run
+  `php bin/whity-cli i18n:sync --all` once and restart the app, or wait for the next
+  release (WHIT-907).
+- **A few PHP calls no longer fail when the file system answers `false`.** The admin
+  stats endpoint, the migrations list and the OpenAPI generator each used the result
+  of `glob()`, `scandir()` or `file()` without checking it, so an unreadable directory
+  became a `TypeError` or a warning. They now treat it as empty (WHIT-908).
+- **An expression with an empty `min` or `max` fails as an expression error.** The
+  plugin SDK's `Expression::evaluate()` threw PHP's `ValueError` for `{"min": []}`
+  instead of the `ExpressionError` it documents. Validated expressions were never
+  affected, because validation already rejects it (WHIT-908).
+- **Sign-up and Public forms settings speak Arabic when they refuse something.** A bad email domain or
+  site is now named in the reader's language, with the line at fault, instead of the server's English.
+  A workspace with no web address is told why its sign-up page can't be reached and can't turn sign-up
+  on. People turned away from a workspace's sign-up can be found under Turned away and let in later,
+  and Reject asks first. The publish check shows sizes under 1 MB in KB instead of "0.0 MB" (WHIT-916).
+- **A template too large to print can't be published.** Publishing now checks
+  the template against the same render size limit printing uses, with its
+  images counted as they print, so it no longer publishes fine and then fails
+  every print. The editor's publish check says how large it is and what the
+  limit is, in English and Arabic (WHIT-1435, #1435).
+- **A bad storage setting no longer takes the instance down.** The admin now refuses
+  an S3 endpoint or public base URL that isn't an absolute `http(s)://` address (for
+  example `s3.eu-central-003.backblazeb2.com` with no scheme). If a storage setting
+  stored earlier still can't be used, or `storage.driver` is `s3` before the
+  deployment has `STORAGE_S3_SECRET_KEY`, the app logs a critical error and starts on
+  local storage, so you can sign in and correct it in the admin (WHIT-1622).
+
+### Security
+
+- **Migration routes check a permission, not a role name.** Listing migrations
+  needs `migrations:read`, and running or rolling them back from the command line
+  needs `migrations:manage`. Upgrading grants them to the roles that already read
+  the server statistics (and, for `migrations:manage`, may also install plugins),
+  so the administrator keeps access under any role name (WHIT-771).
+- **Signing out now ends every access token from that session.** A refresh
+  revokes the access token it replaces, so an older one no longer keeps working
+  for up to 15 minutes after the person signs out (WHIT-905).
+- **Tenant isolation fix in people management.** A workspace now changes the
+  sign-in details of its own people only; a person who also belongs to another
+  workspace changes them themselves, or the platform operator does (WHIT-909).
+- **User hooks no longer carry passwords or set roles.** The `user.creating`
+  hook now gives plugins only the new user's email and role, and ignores what a
+  plugin returns, so the person creating the user decides the role. A plugin can
+  still refuse the create, and the caller then gets a 409. Plugin SDK 1.70
+  records the narrower contract (WHIT-911).
+- **Core decides whether an agent tool only reads.** Whether an AI agent runs a tool at once or asks a person first no longer rests on the read-only hint a plugin declares. A plugin route's tool reads only when its method is GET or HEAD, and a plugin's hand-authored tool is a write for agents, so its calls are proposals a person approves. Core's own tools are unchanged. Plugin SDK 1.71 documents it.
+- **Plugin role seeding stays within the plugin's own grants.** A plugin now grants
+  only permissions it declares itself, never core ones, and only to roles it
+  created or the operator approved for it. Uninstalling a plugin removes only the
+  grants that plugin made (WHIT-913).
+
 ## [0.2.25] - 2026-11-05
 
 ### Added
@@ -209,8 +346,9 @@ uses tag-based releases (see the `v*` tags in the repository).
   Before this, the API checked a token's signature but not its type. A temporary
   token from the password step could skip two-step sign-in, and refresh, device and
   AI app tokens acted with the person's full permissions, past an app's scope and
-  after it was disconnected. A signed-out session's access token now also stops
-  working at once, not when it expires. Update if you run an earlier version
+  after it was disconnected. The access token a person signs out with now also
+  stops working at once, not when it expires; an older one from before a refresh
+  still runs out on its own, within 15 minutes. Update if you run an earlier version
   (WHIT-903).
 
 ## [0.2.24] - 2026-11-03

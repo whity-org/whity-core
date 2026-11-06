@@ -214,8 +214,10 @@ final class DataTypeRestoreStateRealEngineTest extends TestCase
         $recordId = $this->seedRecord(self::TENANT_A, 'thing', 'archived');
 
         $service->trash(self::TYPE, self::TENANT_A, $recordId);
-        self::assertSame('archived', $service->restore(self::TYPE, self::TENANT_A, $recordId)->state());
-        self::assertSame('archived', $service->restore(self::TYPE, self::TENANT_A, $recordId)->state());
+        $first = $service->restore(self::TYPE, self::TENANT_A, $recordId);
+        self::assertSame('archived', $first->state());
+        $second = $service->restore(self::TYPE, self::TENANT_A, $recordId);
+        self::assertSame('archived', $second->state());
         self::assertSame('archived', $this->statusOf($recordId));
     }
 

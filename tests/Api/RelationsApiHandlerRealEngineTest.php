@@ -141,7 +141,9 @@ final class RelationsApiHandlerRealEngineTest extends TestCase
             ['id' => (string) $alice]
         );
         $this->assertSame(200, $response->getStatusCode());
-        $this->assertSame('Alice B', $this->personRepo->findById($alice, 1)['display_name']);
+        $person = $this->personRepo->findById($alice, 1);
+        $this->assertNotNull($person);
+        $this->assertSame('Alice B', $person['display_name']);
     }
 
     // ==================== Relation create: typed errors ====================

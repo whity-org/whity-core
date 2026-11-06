@@ -333,7 +333,7 @@ class TokenValidator
             ...array_values(array_filter($registered['scope'], static fn (string $e): bool => str_starts_with($e, AgentScopeGrant::PREFIX))),
         ];
 
-        /** @var string[] $scope */
+        /** @var list<string> $scope */
         return new McpPrincipal(
             profileId: $resolvedId,
             userId: $resolvedId,

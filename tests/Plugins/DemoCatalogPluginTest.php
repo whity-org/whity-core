@@ -57,7 +57,6 @@ final class DemoCatalogPluginTest extends TestCase
         $this->assertSame('demo_catalog:manage', $byKey['DELETE /api/demo-catalog/items/{id:\d+}']['requiredPermission'] ?? null);
 
         foreach ($byKey as $key => $route) {
-            $this->assertIsCallable($route['handler'], "{$key} must have a callable handler");
             $this->assertNull($route['requiredRole'] ?? null, "{$key} must gate on permission, not role");
             $this->assertArrayHasKey('schema', $route, "{$key} must declare a typed OpenAPI schema");
         }

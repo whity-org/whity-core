@@ -42,7 +42,7 @@ final class DocumentPublishCheck
     /**
      * Ids of blocks, nested ones included, that have no print view.
      *
-     * @param list<mixed> $blocks
+     * @param array<mixed> $blocks
      * @return list<string>
      */
     private static function unprintable(array $blocks): array

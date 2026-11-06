@@ -122,11 +122,12 @@ final class ToolsCallHandler implements MethodHandler
 
         if (($inverse['handler'] ?? false) === true) {
             $tool    = (string) ($action['tool'] ?? '');
-            $handler = $this->authoredTools?->get($tool)['undo']['handler'] ?? null;
+            $authored = $this->authoredTools?->get($tool) ?? [];
+            $handler  = $authored['undo']['handler'] ?? null;
             if (!is_callable($handler)) {
                 throw new McpException(ErrorCode::METHOD_NOT_FOUND, "Unknown tool: {$tool}");
             }
-            $this->assertPersonMay($person, $this->authoredTools?->get($tool) ?? []);
+            $this->assertPersonMay($person, $authored);
             AuditContext::setActor($person->actor());
             $out = $handler($inverse['result'] ?? null, $action['arguments'] ?? [], $person->tenantId);
             return ['content' => [['type' => 'text', 'text' => is_string($out) ? $out : (string) json_encode($out, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)]]];
@@ -380,7 +381,7 @@ final class ToolsCallHandler implements MethodHandler
             $authored = $this->authoredTools?->get($toolName);
             if ($authored !== null) {
                 try {
-                    $this->assertInTokenToolsets($principal, $this->authoredTools?->toolsetOf($toolName));
+                    $this->assertInTokenToolsets($principal, $this->authoredTools->toolsetOf($toolName));
                     $proposal = $this->assertAgentMayRun($principal, $toolName, $arguments, $this->authoredTool($toolName), $authored, $approved);
                     if ($proposal !== null) {
                         return $proposal;
@@ -501,7 +502,7 @@ final class ToolsCallHandler implements MethodHandler
         $plain       = function (mixed $result) use ($principal, $toolName, $arguments, $proposalId, $summary, $permissions): mixed {
             if (is_array($result) && ($result['isError'] ?? false) !== true) {
                 try {
-                    $this->actions?->record($principal->tenantId, $principal->agentPrincipalId(), $principal->userId, $proposalId, $toolName, $arguments, $summary, $permissions, null, null);
+                    $this->actions->record($principal->tenantId, $principal->agentPrincipalId(), $principal->userId, $proposalId, $toolName, $arguments, $summary, $permissions, null, null);
                 } catch (\Throwable $e) {
                     error_log("[mcp] recording {$toolName} failed (tenant {$principal->tenantId}): " . $e->getMessage());
                 }
@@ -550,7 +551,8 @@ final class ToolsCallHandler implements MethodHandler
                 $inverse['result']  = $answer;
             }
 
-            if ($spec->readOperation !== null && $readArguments !== null) {
+            // A read operation with no resolved arguments returned above.
+            if ($spec->readOperation !== null) {
                 $after = $this->readJson($principal, $spec->readOperation, $readArguments);
                 if ($after !== null) {
                     $watch = [];

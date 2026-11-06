@@ -18,6 +18,12 @@ use Whity\Sdk\PluginNamespace;
  * - Notification hooks (`*.created` / `*.updated` / `*.deleted` and the
  *   `*.async` variants): listeners observe; async variants are queued.
  *
+ * `user.creating` (SDK 1.70) is the exception to the FILTER rule above: it is
+ * read-only. Listeners receive `email` and `role_id`, the host ignores what they
+ * return, and the only way to affect the create is to refuse it with
+ * {@see HookVetoException} (`409 Conflict`, nothing written). The new user's
+ * password is never part of any hook payload.
+ *
  * Deletion ordering + transactionality (SDK 1.15, WC-713)
  * -------------------------------------------------------
  * For `tenant.*`, `ou.*` and `role.*`, the host runs
@@ -94,10 +100,29 @@ final class Events
     public const OU_ROLE_ASSIGNED = 'ou.role_assigned';
     public const OU_ROLE_REMOVED = 'ou.role_removed';
 
+    // ---- memberships (SDK 1.73) ----
+    /**
+     * Somebody joined a workspace as a CUSTOMER through the workspace's own
+     * sign-up: at once when sign-up is Open, or when an admin approves them
+     * when it is Approval required. Fired after the membership is committed,
+     * and the return value is ignored, so a listener cannot change or undo it.
+     * Payload: `tenant_id`, `profile_id`, `membership_id`, `role_id`,
+     * `role_name`, `via` (`open` or `approval`), `approved_by` (the approving
+     * admin's profile id, or null). Ids only: read anything else under your
+     * own permissions.
+     */
+    public const MEMBERSHIP_CUSTOMER_JOINED = 'membership.customer_joined';
+
     // ---- documents (SDK 1.49; DOCUMENT-AUTOMATION.md) ----
     // Before a document is issued: a listener may veto with HookVetoException,
     // and nothing is written. Payload: tenant_id, source_id, version, record,
     // origin_key, actor — ids only, never field values.
+    //
+    // SDK 1.66: it also fires for a preflight, with `check_only: true`, `checks: []`
+    // and `missing_fields` in the payload, and nothing will be issued. Change
+    // nothing, append {label, ok, why?} to `checks` for each thing you check, and
+    // return the payload, so a person sees every reason at once. A veto still counts,
+    // as one failed check. The real issue fires this again, so check again there.
     public const DOCUMENT_ISSUING = 'document.issuing';
     // A document was issued (its record exists, with its QR code when the
     // tenant has them on). Payload as above, plus id.
@@ -115,6 +140,13 @@ final class Events
      */
     public const DOCUMENT_NUMBERED = 'document.numbered';
     public const DOCUMENT_NUMBERED_ASYNC = 'document.numbered.async';
+
+    /**
+     * SDK 1.68: a revision replaced a document. Payload: `id`, `supersedes_id`, `reason`,
+     * `actor`, `number`, `revision`. It also fires `document.issued` for the new document.
+     */
+    public const DOCUMENT_REVISED = 'document.revised';
+    public const DOCUMENT_REVISED_ASYNC = 'document.revised.async';
 
     // ---- platform ----
     public const NAVIGATION_REGISTER = 'navigation.register';

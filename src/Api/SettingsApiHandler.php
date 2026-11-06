@@ -89,7 +89,7 @@ final class SettingsApiHandler
      * list (not hook/plugin-extensible like the sidebar), so it lives here
      * rather than behind the `navigation.register` hook.
      *
-     * @var list<array{id: string, href: string, label: string, requiredPermission?: string, requiredRole?: string, systemTenantOnly?: bool}>
+     * @var list<array{id: string, href: string, label: string, requiredPermission?: string, requiredRole?: string, systemTenantOnly?: bool, workspaceOnly?: bool}>
      */
     /**
      * Key prefix for a tab's name. The id completes it.
@@ -98,9 +98,11 @@ final class SettingsApiHandler
      *   settings.tab.general = General
      *   settings.tab.branding = Branding
      *   settings.tab.signup = Sign-up
+     *   settings.tab.customer_signup = Sign-up
      *   settings.tab.sso = Single sign-on
      *   settings.tab.email = Email
      *   settings.tab.email_domains = Email domains
+     *   settings.tab.public_forms = Public forms
      *   settings.tab.storage = Storage
      *   settings.tab.feature_flags = Feature flags
      *   settings.tab.security = Security
@@ -152,10 +154,15 @@ final class SettingsApiHandler
         ['id' => 'general', 'href' => '/admin/settings', 'label' => 'General', 'requiredPermission' => CorePermissions::SETTINGS_READ],
         ['id' => 'branding', 'href' => '/admin/settings/branding', 'label' => 'Branding', 'requiredPermission' => CorePermissions::SETTINGS_READ],
         ['id' => 'signup', 'href' => '/admin/settings/signup', 'label' => 'Sign-up', 'requiredPermission' => CorePermissions::SETTINGS_MANAGE, 'systemTenantOnly' => true],
+        // WHIT-915: a workspace's own customer sign-up. The platform's sign-up
+        // above is the operator's and system-tenant only; this one is every other
+        // workspace's, so the two never show together.
+        ['id' => 'customer-signup', 'href' => '/admin/settings/customer-signup', 'label' => 'Sign-up', 'requiredPermission' => CorePermissions::SIGNUP_MANAGE, 'workspaceOnly' => true],
         ['id' => 'sso', 'href' => '/admin/settings/sso', 'label' => 'Single sign-on', 'requiredPermission' => CorePermissions::AUTH_PROVIDERS_MANAGE],
         ['id' => 'email', 'href' => '/admin/settings/email', 'label' => 'Email', 'requiredPermission' => CorePermissions::SETTINGS_MANAGE, 'systemTenantOnly' => true],
         // Email-domain policy (WC-ac35b6cf): follows the route's own permission,
         // so a deployment with a renamed administrative role still sees it.
+        ['id' => 'public-forms', 'href' => '/admin/settings/public-forms', 'label' => 'Public forms', 'requiredPermission' => CorePermissions::PUBLIC_FORM_KEYS_MANAGE],
         ['id' => 'email-domains', 'href' => '/admin/settings/email-domains', 'label' => 'Email domains', 'requiredPermission' => CorePermissions::EMAIL_DOMAINS_MANAGE],
         ['id' => 'storage', 'href' => '/admin/settings/storage', 'label' => 'Storage', 'requiredPermission' => CorePermissions::SETTINGS_MANAGE, 'systemTenantOnly' => true],
         // Feature Flags (WC-feature-flags-settings-page): a generic admin
@@ -226,7 +233,7 @@ final class SettingsApiHandler
      * Whether the caller satisfies a tab's declared gate(s). Mirrors
      * {@see NavigationApiHandler::isVisibleTo()}'s ALL-gates-must-pass model.
      *
-     * @param array{id: string, href: string, label: string, requiredPermission?: string, requiredRole?: string, systemTenantOnly?: bool} $tab
+     * @param array{id: string, href: string, label: string, requiredPermission?: string, requiredRole?: string, systemTenantOnly?: bool, workspaceOnly?: bool} $tab
      */
     private function tabVisibleTo(array $tab, int $userId, int $tenantId): bool
     {
@@ -243,6 +250,10 @@ final class SettingsApiHandler
         }
 
         if (($tab['systemTenantOnly'] ?? false) === true && $tenantId !== SettingsService::SYSTEM_TENANT_ID) {
+            return false;
+        }
+
+        if (($tab['workspaceOnly'] ?? false) === true && $tenantId === SettingsService::SYSTEM_TENANT_ID) {
             return false;
         }
 

@@ -42,14 +42,11 @@ final class PluginRolesInterfaceTest extends TestCase
     {
         $roles = (new HelloWorldPlugin())->getRoles();
 
-        $this->assertIsArray($roles);
         $this->assertArrayHasKey('hello_viewer', $roles);
 
         $descriptor = $roles['hello_viewer'];
-        $this->assertIsArray($descriptor);
         $this->assertArrayHasKey('description', $descriptor);
         /** @var array{description: string} $descriptor */
-        $this->assertIsString($descriptor['description']);
         $this->assertNotEmpty($descriptor['description']);
     }
 
@@ -57,15 +54,12 @@ final class PluginRolesInterfaceTest extends TestCase
     {
         $permissions = (new HelloWorldPlugin())->getRolePermissions();
 
-        $this->assertIsArray($permissions);
         $this->assertArrayHasKey('hello_viewer', $permissions);
 
         $slugs = $permissions['hello_viewer'];
-        $this->assertIsArray($slugs);
         $this->assertNotEmpty($slugs);
 
         foreach ($slugs as $slug) {
-            $this->assertIsString($slug);
             // Verify colon-notation (resource:action).
             $this->assertMatchesRegularExpression(
                 '/^[a-z][a-z0-9_]*:[a-z][a-z0-9_]*$/',
@@ -118,6 +112,7 @@ final class PluginRolesInterfaceTest extends TestCase
                 description TEXT    NOT NULL DEFAULT \'\',
                 parent_id   INTEGER NULL REFERENCES roles(id) ON DELETE SET NULL,
                 tenant_id   INTEGER NULL REFERENCES tenants(id) ON DELETE CASCADE,
+                plugin_key  TEXT    NULL,
                 created_at  TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP
             )
         ');
@@ -136,8 +131,20 @@ final class PluginRolesInterfaceTest extends TestCase
                 id            INTEGER PRIMARY KEY AUTOINCREMENT,
                 role_id       INTEGER NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
                 permission_id INTEGER NOT NULL REFERENCES permissions(id) ON DELETE CASCADE,
+                granted_by_plugin TEXT NULL,
                 created_at    TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(role_id, permission_id)
+            )
+        ');
+
+        $pdo->exec('
+            CREATE TABLE plugin_role_approvals (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                role_id     INTEGER NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+                plugin_key  TEXT    NOT NULL,
+                approved_by INTEGER NULL,
+                created_at  TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(role_id, plugin_key)
             )
         ');
 

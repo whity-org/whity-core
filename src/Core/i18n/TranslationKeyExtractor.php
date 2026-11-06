@@ -284,7 +284,7 @@ final class TranslationKeyExtractor
 
         return [
             'catalog' => $catalog,
-            'problems' => array_values($problems),
+            'problems' => $problems,
             'entries' => $entries,
             'files' => count($files),
         ];

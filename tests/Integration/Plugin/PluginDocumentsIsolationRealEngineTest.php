@@ -223,6 +223,13 @@ final class FakeDocumentIssuer implements Documents
         return true;
     }
 
+    public function preflight(IssueRequest $request): \Whity\Sdk\Documents\PreflightResult
+    {
+        $this->lastOriginKey = $request->originKey;
+
+        return new \Whity\Sdk\Documents\PreflightResult(true, []);
+    }
+
     public function issue(IssueRequest $request): IssueResult
     {
         $this->lastOriginKey = $request->originKey;

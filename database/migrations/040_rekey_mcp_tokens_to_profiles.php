@@ -79,7 +79,7 @@ class RekeyMcpTokensToProfiles
         $hasLegacyUserId = self::columnExists($db, $driver, 'mcp_tokens', 'user_id');
 
         if ($hasMapping && $hasLegacyUserId) {
-            // @tenant-guard-ignore: cross-table migration backfill; updates own table rows using external mapping
+            // Unscoped by design (migration): cross-table migration backfill; updates own table rows using external mapping
             $db->exec('
                 UPDATE mcp_tokens
                 SET profile_id = (
@@ -95,7 +95,7 @@ class RekeyMcpTokensToProfiles
         // ── 3. Delete orphan rows (user_id had no mapping) ───────────────────
         $orphanCount = self::countWhere($db, 'profile_id IS NULL');
         if ($orphanCount > 0) {
-            // @tenant-guard-ignore: migration cleanup of dangling mcp_tokens rows across all tenants
+            // Unscoped by design (migration): migration cleanup of dangling mcp_tokens rows across all tenants
             $db->exec('DELETE FROM mcp_tokens WHERE profile_id IS NULL');
             self::log("migration 040: deleted {$orphanCount} mcp_tokens row(s) with no profile mapping (orphaned user_id).");
         }
@@ -154,7 +154,7 @@ class RekeyMcpTokensToProfiles
 
         // ── 2. Reverse-backfill user_id from the 035 mapping ─────────────────
         if (self::tableExists($db, $driver, 'migration_035_profile_ids')) {
-            // @tenant-guard-ignore: reverse migration backfill; profile_id → kept user_id
+            // Unscoped by design (migration): reverse migration backfill; profile_id → kept user_id
             $db->exec('
                 UPDATE mcp_tokens
                 SET user_id = (
@@ -172,7 +172,7 @@ class RekeyMcpTokensToProfiles
         // cannot be represented in the old schema — delete them.
         $unmappable = self::countWhere($db, 'user_id IS NULL');
         if ($unmappable > 0) {
-            // @tenant-guard-ignore: reverse migration cleanup of profile-native mcp_tokens rows
+            // Unscoped by design (migration): reverse migration cleanup of profile-native mcp_tokens rows
             $db->exec('DELETE FROM mcp_tokens WHERE user_id IS NULL');
             self::log("migration 040 down(): deleted {$unmappable} mcp_tokens row(s) with no reverse mapping (profile-native, unrecoverable).");
         }
@@ -255,7 +255,7 @@ class RekeyMcpTokensToProfiles
     private static function countWhere(Database $db, string $whereFragment): int
     {
         $pdo  = $db->getPdo();
-        // @tenant-guard-ignore: migration-internal count over all tenants; fragment is a constant literal
+        // Unscoped by design (migration): migration-internal count over all tenants; fragment is a constant literal
         $stmt = $pdo->query("SELECT COUNT(*) AS c FROM mcp_tokens WHERE {$whereFragment}");
         if ($stmt === false) {
             return 0;

@@ -155,6 +155,7 @@ final class CoreApiSchemas
             self::tagRoutes(),
             self::passwordResetRoutes(),
             self::invitationRoutes(),
+            self::customerSignupRoutes(),
             self::twoFactorRecoveryRoutes(),
             self::dataTypeRoutes(),
             self::reportRoutes(),
@@ -1768,6 +1769,98 @@ final class CoreApiSchemas
             ],
             [
                 'method' => 'GET',
+                'path' => '/api/public/plugin-forms/{key}',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'What the page of a plugin\'s public form needs (PUBLIC, rate-limited)',
+                    'description' => 'The provider and site key for the form\'s bot check, neither of which is secret. '
+                        . 'Answers only to a live key, with the same 404 for anything else. An Origin that is '
+                        . 'sent must be on the key\'s list or the instance\'s.',
+                    'tags' => ['plugins'],
+                    'mcp' => ['expose' => false],
+                    'responses' => [
+                        200 => self::jsonResponse('Whether the form is accepting, and its bot check', 'PublicFormConfigResponse'),
+                        403 => self::errorResponse('This site may not use this key'),
+                        404 => self::errorResponse('No live key at this address'),
+                        429 => self::errorResponse('Too many attempts from this address'),
+                        503 => self::errorResponse('Temporarily unavailable'),
+                    ],
+                ],
+            ],
+            self::permissionRoute('GET', '/api/public-form-keys', 'public_form_keys:manage', [
+                'summary' => 'This workspace\'s public form keys',
+                'description' => 'Revoked keys included, newest first. `meta.forms` is what a key can be issued for. '
+                    . 'A key can\'t be read back: this returns its name and first characters.',
+                'tags' => ['plugins'],
+                // Never a tool: its answer carries a key or its input a secret.
+                'mcp' => ['expose' => false],
+                'responses' => [
+                    200 => self::jsonResponse('The keys', 'PublicFormKeyListResponse'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/public-form-keys', 'public_form_keys:manage', [
+                'summary' => 'Issue a key that opens a plugin\'s public form for this workspace',
+                'description' => 'The answer is the only time the key can be read.',
+                'tags' => ['plugins'],
+                // Never a tool: its answer carries a key or its input a secret.
+                'mcp' => ['expose' => false],
+                'request' => 'PublicFormKeyCreateRequest',
+                'responses' => [
+                    201 => self::jsonResponse('The new key', 'PublicFormKeyIssuedResponse'),
+                    422 => self::errorResponse('No plugin has this form, or a field failed validation'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('PATCH', '/api/public-form-keys/{id:\d+}', 'public_form_keys:manage', [
+                'summary' => 'Change a key\'s name or allowed sites',
+                'tags' => ['plugins'],
+                // Never a tool: its answer carries a key or its input a secret.
+                'mcp' => ['expose' => false],
+                'request' => 'PublicFormKeyUpdateRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The changed key', 'PublicFormKeyResponse'),
+                    404 => self::errorResponse('Key not found'),
+                    409 => self::errorResponse('The key has been revoked'),
+                    422 => self::errorResponse('A field failed validation'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/public-form-keys/{id:\d+}/revoke', 'public_form_keys:manage', [
+                'summary' => 'Revoke a key, at once and for good',
+                'description' => 'Revoking twice changes nothing.',
+                'tags' => ['plugins'],
+                // Never a tool: its answer carries a key or its input a secret.
+                'mcp' => ['expose' => false],
+                'responses' => [
+                    204 => ['description' => 'Revoked'],
+                    404 => self::errorResponse('Key not found'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/settings/public-forms/bot-check', 'settings:manage', [
+                'summary' => 'The instance\'s bot check for public forms',
+                'description' => 'System tenant only. The secret is never returned: `has_secret` says whether one is stored.',
+                'tags' => ['settings'],
+                // Never a tool: its answer carries a key or its input a secret.
+                'mcp' => ['expose' => false],
+                'responses' => [
+                    200 => self::jsonResponse('The settings', 'PublicFormBotSettingsResponse'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('PUT', '/api/settings/public-forms/bot-check', 'settings:manage', [
+                'summary' => 'Change the instance\'s bot check for public forms',
+                'description' => 'System tenant only. A field left out stays as it is. With no provider, every public '
+                    . 'form is refused unless `allow_without_bot_check` is true. The secret is write-only and '
+                    . 'encrypted: null or empty clears it.',
+                'tags' => ['settings'],
+                // Never a tool: its answer carries a key or its input a secret.
+                'mcp' => ['expose' => false],
+                'request' => 'PublicFormBotSettingsUpdateRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The settings', 'PublicFormBotSettingsResponse'),
+                    422 => self::errorResponse('A field failed validation'),
+                ] + self::authErrors(),
+            ]),
+            [
+                'method' => 'GET',
                 'path' => '/api/public/forms/{slug}',
                 'requiredRole' => null,
                 'requiredPermission' => null,
@@ -3170,37 +3263,7 @@ final class CoreApiSchemas
                     ],
                 ],
             ],
-            // Deployment management — admin role required
-            self::adminRoute('POST', '/api/deployments/apply', [
-                'summary' => 'Apply a deployment artefact',
-                'tags' => ['platform-ops'],
-                'request' => 'DeploymentApplyRequest',
-                'responses' => [
-                    201 => self::jsonResponse('Deployment applied', 'SimpleMessageResponse'),
-                    400 => self::errorResponse('Validation failed'),
-                    403 => self::errorResponse('Insufficient permissions'),
-                    500 => self::errorResponse('Internal error'),
-                ],
-            ]),
-            self::adminRoute('POST', '/api/deployments/rollback', [
-                'summary' => 'Roll back the last deployment',
-                'tags' => ['platform-ops'],
-                'responses' => [
-                    200 => self::jsonResponse('Rollback complete', 'SimpleMessageResponse'),
-                    403 => self::errorResponse('Insufficient permissions'),
-                    500 => self::errorResponse('Internal error'),
-                ],
-            ]),
-            self::adminRoute('GET', '/api/deployments/status', [
-                'summary' => 'Get the current deployment status',
-                'tags' => ['platform-ops'],
-                'responses' => [
-                    200 => self::jsonResponse('Current deployment status', 'DeploymentStatusResponse'),
-                    403 => self::errorResponse('Insufficient permissions'),
-                    500 => self::errorResponse('Internal error'),
-                ],
-            ]),
-            self::adminRoute('GET', '/api/migrations', [
+            self::permissionRoute('GET', '/api/migrations', 'migrations:read', [
                 'summary' => 'List database migrations and their execution state',
                 'tags' => ['platform-ops'],
                 'responses' => [
@@ -5521,10 +5584,16 @@ final class CoreApiSchemas
                 'record_type' => self::str(true) + ['description' => 'The type of the business record it was issued from'],
                 'record_id' => self::str(true) + ['description' => 'The id of that record'],
                 'slot' => self::str(true) + ['description' => 'The template slot it was issued through'],
+                'revision' => self::str() + ['description' => 'Its revision letter. The number stays the same across revisions: INV-2026-0142 rev B.'],
+                'revision_reason' => self::str(true) + ['description' => 'Why this revision was issued'],
+                'supersedes_id' => self::int(true) + ['description' => 'The document this revision replaces'],
+                'superseded_by' => self::int(true) + ['description' => 'The revision that replaced this document'],
+                'superseded_by_revision' => self::str(true) + ['description' => 'That revision\'s letter'],
+                'superseded_on' => self::str(true) + ['description' => 'When it was replaced'],
                 'state' => [
                     'type' => 'string',
                     'enum' => ['draft', 'in_review', 'issued', 'superseded', 'withdrawn'],
-                    'description' => 'Where it is, derived from the routing trail and never stored. `in_review`: a route has an open item. `draft`: its newest route ended rejected, or it waits for final approval to be numbered. `withdrawn`: taken back; the record stays. `issued`: everything else. Absent where a route did not read it.',
+                    'description' => 'Where it is, derived from the routing trail and never stored. `in_review`: a route has an open item. `draft`: its newest route ended rejected, or it waits for final approval to be numbered. `superseded`: a later revision replaced it. `withdrawn`: taken back; the record stays. `issued`: everything else. Absent where a route did not read it.',
                 ],
                 'template_name' => self::str(),
                 'title' => self::str(),
@@ -5620,6 +5689,34 @@ final class CoreApiSchemas
             // absent = "render if this instance can", true = "I require an
             // artifact" (503 when it cannot), false = "record only". Omitting it
             // is what a client that does not care should do.
+            'DocumentRevisionRequest' => self::object([
+                'reason' => self::str() + ['description' => 'Why it is being replaced, at most 1000 characters'],
+                'template' => ['type' => 'string', 'enum' => ['pinned', 'latest'], 'description' => 'The version it printed (default), or the template\'s latest published version'],
+                'record' => self::str() + ['description' => 'If sent, it must be the record the document was issued from, as `type:id`'],
+            ], ['reason']),
+            'DocumentRevisionResponse' => self::object([
+                'data' => SchemaBuilder::ref('Document'),
+                'render' => ['type' => 'object', 'description' => 'Whether a PDF was stored, as on POST /api/documents'],
+                'diff' => self::object([
+                    'added' => ['type' => 'object', 'additionalProperties' => ['type' => 'string'], 'description' => 'Field path => value, new in this revision'],
+                    'removed' => ['type' => 'object', 'additionalProperties' => ['type' => 'string'], 'description' => 'Field path => value, gone from this revision'],
+                    'changed' => ['type' => 'object', 'additionalProperties' => self::object(['from' => self::str(), 'to' => self::str()], ['from', 'to']), 'description' => 'Field path => what it said and says now'],
+                ], ['added', 'removed', 'changed']),
+            ], ['data', 'render', 'diff']),
+            'DocumentPreflightCheck' => self::object([
+                'code' => self::str() + ['description' => '`template`, `record`, `values`, `fields`, `origin_key` or `render` from core; `plugin` from a listener'],
+                'label' => self::str() + ['description' => 'What was checked, in the reader\'s language'],
+                'ok' => self::bool(),
+                'why' => self::str() + ['description' => 'Why it failed, for a person. Absent when it passed.'],
+                'reason' => self::str() + ['description' => 'The refusal code the real issue would give. Core\'s checks only.'],
+                'detail' => self::str() + ['description' => 'The refusal\'s own English sentence, for a developer. Core\'s checks only.'],
+            ], ['code', 'label', 'ok']),
+            'DocumentPreflightResponse' => self::object([
+                'ok' => self::bool() + ['description' => 'Whether an issue would go through now'],
+                'checks' => ['type' => 'array', 'items' => SchemaBuilder::ref('DocumentPreflightCheck')],
+                'missing_fields' => ['type' => 'array', 'items' => self::str(), 'description' => 'Required fields with no value'],
+                'replays_document_id' => self::int(true) + ['description' => 'The document `origin_key` already names. An issue would return it instead of raising one, and no listener would be asked.'],
+            ], ['ok', 'checks', 'missing_fields', 'replays_document_id']),
             'DocumentCreateRequest' => self::object([
                 'document_source_id' => self::int() + ['description' => 'The template to issue the document from (see GET /api/document-sources?kind=template): its published version is issued. A letter or report (a copy made to edit before issuing) is issued as it is now, frozen as a version. Send this or `slot`.'],
                 'slot' => self::str() + ['description' => 'A template slot key such as `bakery.order_confirmation` (GET /api/document-template-slots): the template the workspace bound to it is issued, so a plugin needn\'t know which one. Send this or `document_source_id`. 409 `slot_unavailable` when its plugin is off, `slot_unbound` when nothing is bound, `slot_misfit` when the bound template no longer fits.'],
@@ -6595,6 +6692,7 @@ final class CoreApiSchemas
             // List rows omit it; GET /{id} and saves return it.
             'DocumentSource' => self::object([
                 'numbering' => SchemaBuilder::ref('DocumentNumbering') + ['nullable' => true, 'description' => 'How documents from this template are numbered, when it has its own rule'],
+                'public_name' => self::str(true) + ['description' => 'What kind of document this makes, in words for strangers: the kind the public check shows at the `described` level. Null shows no kind.'],
                 'id' => self::int(),
                 'tenant_id' => self::int(),
                 'kind' => ['type' => 'string', 'enum' => ['template', 'letter', 'report', 'note', 'wiki', 'label']],
@@ -6623,6 +6721,7 @@ final class CoreApiSchemas
                 'updated_at' => self::str(),
             ], ['id', 'tenant_id', 'kind', 'title', 'lang', 'default_view', 'full_width', 'draft_version', 'scope', 'created_at', 'updated_at']),
             'DocumentSourceAudienceRequest' => self::object([
+                'public_name' => self::str(true) + ['description' => 'What kind of document this makes, for the public check (\'Handover certificate\'), at most 120 characters; null or empty for none. Never a customer\'s name. Needs documents:publish.'],
                 'numbering' => SchemaBuilder::ref('DocumentNumbering') + ['nullable' => true, 'description' => 'How documents from this template are numbered; it wins over a slot\'s rule. Needs documents:publish.'],
                 'scope' => ['type' => 'string', 'enum' => ['personal', 'tenant', 'global', 'system']] + ['description' => 'Who can see the document: `personal` (only its creator), `tenant`, `global` or `system`. Anything but personal needs documents:publish.'],
                 'required_permission' => self::str(true) + ['description' => 'A permission a reader must also hold to see a shared document; null for none. Needs documents:publish.'],
@@ -6717,12 +6816,14 @@ final class CoreApiSchemas
                 'data' => ['type' => 'array', 'items' => self::object(['id' => self::str(), 'label' => self::str()], ['id', 'label'])],
             ], ['data']),
             'DocumentPublishBlocker' => self::object([
-                'kind' => ['type' => 'string', 'enum' => ['open-suggestions', 'missing-plugin', 'block-without-print-view', 'unknown-field', 'theme-unavailable']],
+                'kind' => ['type' => 'string', 'enum' => ['open-suggestions', 'missing-plugin', 'block-without-print-view', 'unknown-field', 'theme-unavailable', 'too-large']],
                 'count' => self::int(),
                 'plugin' => self::str(),
                 'blockId' => self::str(),
                 'path' => self::str(),
                 'ref' => self::str() + ['description' => 'With theme-unavailable: the theme the document names that the workspace doesn\'t have'],
+                'bytes' => self::int() + ['description' => 'With too-large: what printing the template sends Whity Render, in bytes, before any record\'s values'],
+                'max' => self::int() + ['description' => 'With too-large: the render size ceiling (documents.flow_max_bytes), in bytes'],
             ], ['kind']),
             'DocumentPublishCheckResponse' => self::object([
                 'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('DocumentPublishBlocker')],
@@ -7240,14 +7341,14 @@ final class CoreApiSchemas
             ], ['email', 'password']),
             'UserUpdateRequest' => self::object([
                 'displayName' => self::str() + ['description' => 'The name shown for this person. Refused with 409 when they also belong to another workspace, unless the caller is the system tenant.'],
-                'email' => self::email() + ['description' => 'New sign-in email address.'],
-                'password' => self::password() + ['description' => 'New password; must satisfy the site password policy.'],
+                'email' => self::email() + ['description' => 'New sign-in email address. Refused with 409 when they also belong to another workspace, unless the caller is the system tenant.'],
+                'password' => self::password() + ['description' => 'New password; must satisfy the site password policy. Refused with 409 when they also belong to another workspace, unless the caller is the system tenant.'],
                 'role' => $permissionRef + ['description' => 'Replacement role in this tenant, by name or numeric id.'],
                 'role_id' => self::reference('/api/roles', 'name') + ['description' => 'Replacement role, by id (see GET /api/roles). Takes precedence over `role`.'],
                 // array_key_exists, not isset: an explicit null CLEARS the OU.
                 'ou_id' => self::reference('/api/ous', 'name', nullable: true) + ['description' => 'Organizational unit to move the user to. An explicit null removes them from their unit.'],
                 // WC-user-status: the admin deactivate/reactivate control.
-                'accountStatus' => ['type' => 'string', 'enum' => ['active', 'inactive'], 'description' => '`inactive` blocks sign-in for this person everywhere; `active` restores it.'],
+                'accountStatus' => ['type' => 'string', 'enum' => ['active', 'inactive'], 'description' => '`inactive` blocks sign-in for this person everywhere; `active` restores it. Refused with 409 when they also belong to another workspace, unless the caller is the system tenant.'],
                 // #917: permits `password` against an account whose credentials
                 // belong to an identity provider (`authMethod: 'idp'`), which is
                 // otherwise refused with 409. Taking it moves the account to
@@ -7745,6 +7846,66 @@ final class CoreApiSchemas
                 'title' => self::localizedText() + ['nullable' => true],
                 'description' => self::localizedText() + ['nullable' => true],
             ], ['key', 'field_keys']),
+            'PublicFormKey' => self::object([
+                'id' => self::int(),
+                'plugin' => self::str(),
+                'form' => self::str(),
+                'label' => self::str(),
+                'key_hint' => self::str(),
+                'allowed_origins' => ['type' => 'array', 'items' => ['type' => 'string']],
+                'created_at' => self::str(),
+                'revoked_at' => self::str(true),
+            ], ['id', 'plugin', 'form', 'label', 'key_hint', 'allowed_origins', 'created_at', 'revoked_at']),
+            'PublicFormKeyResponse' => self::dataEnvelope(SchemaBuilder::ref('PublicFormKey')),
+            'PublicFormKeyIssuedResponse' => self::dataEnvelope(self::object([
+                'id' => self::int(),
+                'plugin' => self::str(),
+                'form' => self::str(),
+                'label' => self::str(),
+                'key_hint' => self::str(),
+                'allowed_origins' => ['type' => 'array', 'items' => ['type' => 'string']],
+                'created_at' => self::str(),
+                'revoked_at' => self::str(true),
+                'key' => self::str(),
+            ], ['id', 'plugin', 'form', 'label', 'key_hint', 'allowed_origins', 'created_at', 'revoked_at', 'key'])),
+            'PublicFormKeyListResponse' => self::object([
+                'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('PublicFormKey')],
+                'meta' => self::object([
+                    'forms' => ['type' => 'array', 'items' => self::object(['plugin' => self::str(), 'form' => self::str()], ['plugin', 'form'])],
+                    'bot_check_ready' => ['type' => 'boolean'],
+                ], ['forms', 'bot_check_ready']),
+            ], ['data', 'meta']),
+            'PublicFormKeyCreateRequest' => self::object([
+                'plugin' => self::str(),
+                'form' => self::str(),
+                'label' => self::str(),
+                'allowed_origins' => ['type' => 'array', 'items' => ['type' => 'string']],
+            ], ['plugin', 'form', 'label']),
+            'PublicFormKeyUpdateRequest' => self::object([
+                'label' => self::str(),
+                'allowed_origins' => ['type' => 'array', 'items' => ['type' => 'string']],
+            ], []),
+            'PublicFormConfigResponse' => self::dataEnvelope(self::object([
+                'accepting' => ['type' => 'boolean'],
+                'bot_check' => self::object([
+                    'provider' => self::str(true),
+                    'site_key' => self::str(),
+                ], ['provider', 'site_key']) + ['nullable' => true],
+            ], ['accepting', 'bot_check'])),
+            'PublicFormBotSettingsResponse' => self::dataEnvelope(self::object([
+                'provider' => self::str(true),
+                'providers' => ['type' => 'array', 'items' => ['type' => 'string']],
+                'site_key' => self::str(),
+                'has_secret' => ['type' => 'boolean'],
+                'allow_without_bot_check' => ['type' => 'boolean'],
+                'ready' => ['type' => 'boolean'],
+            ], ['provider', 'providers', 'site_key', 'has_secret', 'allow_without_bot_check', 'ready'])),
+            'PublicFormBotSettingsUpdateRequest' => self::object([
+                'provider' => self::str(true),
+                'site_key' => self::str(true),
+                'secret' => self::str(true),
+                'allow_without_bot_check' => ['type' => 'boolean'],
+            ], []),
             'FormSubmissionReview' => self::object([
                 'id' => self::int(),
                 'submission_id' => self::int(),
@@ -9048,19 +9209,8 @@ final class CoreApiSchemas
             // as an open object rather than pinned field-by-field.
             'OpenApiDocumentResponse' => ['type' => 'object', 'additionalProperties' => true],
 
-            // Shared bare { message } response (deployment and plugin handlers)
+            // Shared bare { message } response (plugin handlers)
             'SimpleMessageResponse' => self::object(['message' => self::str()], ['message']),
-
-            // POST /api/deployments/apply request body
-            'DeploymentApplyRequest' => self::object([
-                'version' => self::str(),
-                'source_path' => self::str(),
-            ], ['version', 'source_path']),
-
-            // GET /api/deployments/status — free-form data object
-            'DeploymentStatusResponse' => self::object([
-                'data' => ['type' => 'object', 'additionalProperties' => true],
-            ], ['data']),
 
             // GET /api/migrations
             'MigrationEntry' => self::object([
@@ -9485,6 +9635,93 @@ final class CoreApiSchemas
                 'status' => ['type' => 'string', 'enum' => ['joined', 'already_member']],
                 'message' => self::str(),
             ], ['status', 'message'])),
+            // ── Workspace customer sign-up (WHIT-915) ─────────────────────────
+            'PublicSignupInfoResponse' => self::dataEnvelope(self::object([
+                'workspace_name' => self::str(),
+                'workspace_slug' => self::str(),
+                'approval_required' => self::bool(),
+                'allowed_domains' => ['type' => 'array', 'items' => ['type' => 'string']],
+                'bot_check' => [
+                    'type' => 'object',
+                    'nullable' => true,
+                    'properties' => ['provider' => self::str(), 'site_key' => self::str()],
+                    'required' => ['provider', 'site_key'],
+                ],
+            ], ['workspace_name', 'workspace_slug', 'approval_required', 'allowed_domains', 'bot_check'])),
+            'PublicSignupRequest' => self::object([
+                'email' => self::str(),
+                'display_name' => self::str(),
+                'bot_token' => self::str(),
+            ], ['email', 'display_name']),
+            'PublicSignupAcceptedResponse' => self::dataEnvelope(self::object([
+                'status' => ['type' => 'string', 'enum' => ['check_email']],
+                'message' => self::str(),
+            ], ['status', 'message'])),
+            'PublicSignupPreviewResponse' => self::dataEnvelope(self::object([
+                'workspace_name' => self::str(),
+                'email' => self::str(),
+                'requires_password' => self::bool(),
+            ], ['workspace_name', 'email', 'requires_password'])),
+            'PublicSignupConfirmRequest' => self::object([
+                'token' => self::str(),
+                'password' => self::str(),
+            ], ['token']),
+            'PublicSignupConfirmResponse' => self::dataEnvelope(self::object([
+                'status' => ['type' => 'string', 'enum' => ['joined', 'pending_approval', 'already_member']],
+                'message' => self::str(),
+            ], ['status', 'message'])),
+            'SignupEligibleRole' => self::object([
+                'id' => self::int(),
+                'name' => self::str(),
+                'description' => self::str(),
+                'global' => self::bool(),
+            ], ['id', 'name', 'description', 'global']),
+            'SignupSettings' => self::object([
+                'mode' => ['type' => 'string', 'enum' => ['off', 'approval', 'open']],
+                'role_id' => self::int(true),
+                'role_name' => self::str(true),
+                'role_customer_safe' => self::bool(true),
+                'allowed_domains' => ['type' => 'array', 'items' => ['type' => 'string']],
+                'eligible_roles' => ['type' => 'array', 'items' => SchemaBuilder::ref('SignupEligibleRole')],
+                'pending_count' => self::int(),
+                'workspace_slug' => self::str(true),
+                'bot_check_ready' => self::bool(),
+                'updated_at' => self::str(true),
+            ], [
+                'mode', 'role_id', 'role_name', 'role_customer_safe', 'allowed_domains',
+                'eligible_roles', 'pending_count', 'workspace_slug', 'bot_check_ready', 'updated_at',
+            ]),
+            'SignupSettingsResponse' => self::dataEnvelope(SchemaBuilder::ref('SignupSettings')),
+            'SignupSettingsUpdateRequest' => self::object([
+                'mode' => [
+                    'type' => 'string',
+                    'enum' => ['off', 'approval', 'open'],
+                    'description' => 'Who can sign up: `off` (nobody), `approval` (an admin approves each person) or `open` (people join once they confirm their email).',
+                ],
+                'role_id' => self::int(true) + [
+                    'description' => 'The role people get when they join. Must be one of `eligible_roles` from GET /api/v1/signup/settings. Required unless the mode is `off`.',
+                ],
+                'allowed_domains' => [
+                    'type' => 'array',
+                    'items' => ['type' => 'string'],
+                    'description' => 'Email domains that may sign up, like `example-bakery.com`. Empty means any address.',
+                ],
+            ], []),
+            'SignupRequestItem' => self::object([
+                'id' => self::int(),
+                'email' => self::str(),
+                'display_name' => self::str(),
+                'status' => ['type' => 'string', 'enum' => ['pending', 'approved', 'rejected']],
+                'requested_at' => self::str(),
+                'verified_at' => self::str(true),
+                'decided_at' => self::str(true),
+                'decided_by_name' => self::str(true),
+            ], ['id', 'email', 'display_name', 'status', 'requested_at', 'verified_at', 'decided_at', 'decided_by_name']),
+            'SignupRequestListResponse' => self::paginatedListEnvelope('SignupRequestItem'),
+            'SignupDecisionResponse' => self::dataEnvelope(self::object([
+                'id' => self::int(),
+                'status' => ['type' => 'string', 'enum' => ['approved', 'rejected']],
+            ], ['id', 'status'])),
             'PendingTwoFactorRecoveryItem' => self::object([
                 'id' => self::int(),
                 'profile_id' => self::int(),
@@ -10474,6 +10711,159 @@ final class CoreApiSchemas
                 'tags' => ['auth'],
                 'responses' => [
                     200 => self::jsonResponse('Approver coverage for the calling tenant', 'PasswordResetApproverCoverageResponse'),
+                ] + self::authErrors(),
+            ]),
+        ];
+    }
+
+    /**
+     * Workspace-controlled customer sign-up (WHIT-915): four public routes and
+     * the workspace admin's five.
+     *
+     * @return list<array{method: string, path: string, requiredRole: ?string, requiredPermission: ?string, schema: array<string, mixed>}>
+     */
+    private static function customerSignupRoutes(): array
+    {
+        $slug = [
+            'name' => 'workspace',
+            'in' => 'path',
+            'required' => true,
+            'description' => 'The workspace\'s slug. When the request\'s host names a workspace too, they must agree.',
+            'schema' => ['type' => 'string'],
+        ];
+
+        return [
+            [
+                'method' => 'GET',
+                'path' => '/api/public/signup/confirm',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Describe a sign-up link without using it (public, rate-limited)',
+                    'description' => 'Only the holder of the emailed link learns whether the address '
+                        . 'already has an account (`requires_password: false`).',
+                    'tags' => ['signup'],
+                    'parameters' => [self::queryParam('token', 'string', 'The token from the sign-up link')],
+                    'responses' => [
+                        200 => self::jsonResponse('The sign-up the link is for', 'PublicSignupPreviewResponse'),
+                        404 => self::errorResponse('The link is invalid, expired, or already used'),
+                        429 => self::errorResponse('Too many attempts'),
+                    ],
+                ],
+            ],
+            [
+                'method' => 'POST',
+                'path' => '/api/public/signup/confirm',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Use a sign-up link (public); a password is required only for a new address',
+                    'description' => 'Joins at once when the workspace\'s sign-up is Open, or waits for a '
+                        . 'workspace admin when it is Approval required. The workspace comes from the link, '
+                        . 'never from the request. An existing account keeps its password.',
+                    'tags' => ['signup'],
+                    'request' => 'PublicSignupConfirmRequest',
+                    'responses' => [
+                        200 => self::jsonResponse('Confirmed - see `data.status`', 'PublicSignupConfirmResponse'),
+                        400 => self::errorResponse('The link is invalid, expired, or already used'),
+                        409 => self::errorResponse('Sign-up has closed, or this person cannot join through sign-up'),
+                        422 => self::errorResponse('Missing token, or a password is required and was not supplied'),
+                        429 => self::errorResponse('Too many attempts'),
+                    ],
+                ],
+            ],
+            [
+                'method' => 'GET',
+                'path' => '/api/public/signup/workspaces/{workspace}',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Whether a workspace takes customer sign-ups, and how (public)',
+                    'description' => 'An unknown workspace and one with sign-up off answer the same 404.',
+                    'tags' => ['signup'],
+                    'parameters' => [$slug],
+                    'responses' => [
+                        200 => self::jsonResponse('Sign-up is open', 'PublicSignupInfoResponse'),
+                        404 => self::errorResponse('Sign-up is not open for this workspace'),
+                        429 => self::errorResponse('Too many attempts'),
+                    ],
+                ],
+            ],
+            [
+                'method' => 'POST',
+                'path' => '/api/public/signup/workspaces/{workspace}',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Ask to join a workspace as a customer (public); mails a confirmation link',
+                    'description' => 'Answers the same 202 for every address it accepts and never looks '
+                        . 'up whether the address has an account or already belongs to the workspace, '
+                        . 'so it cannot be used to learn either. Never creates a workspace. Protected '
+                        . 'by the instance\'s bot check (Turnstile) and per-IP, per-address and '
+                        . 'per-workspace limits.',
+                    'tags' => ['signup'],
+                    'parameters' => [$slug],
+                    'request' => 'PublicSignupRequest',
+                    'responses' => [
+                        202 => self::jsonResponse('Check your email', 'PublicSignupAcceptedResponse'),
+                        404 => self::errorResponse('Sign-up is not open for this workspace'),
+                        422 => self::errorResponse('Invalid email or name, failed bot check, or an email domain the workspace does not accept'),
+                        429 => self::errorResponse('Too many attempts'),
+                        503 => self::errorResponse('The bot check is not available'),
+                    ],
+                ],
+            ],
+            self::permissionRoute('GET', '/api/signup/settings', 'signup:manage', [
+                'summary' => 'Read this workspace\'s customer sign-up settings',
+                'description' => '`eligible_roles` lists only customer-safe roles: the workspace\'s own or '
+                    . 'global roles holding no admin permission. `role_customer_safe` is false when the '
+                    . 'saved role has since gained one, and sign-ups are refused until it is changed.',
+                'tags' => ['signup'],
+                'responses' => [
+                    200 => self::jsonResponse('The settings', 'SignupSettingsResponse'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('PUT', '/api/signup/settings', 'signup:manage', [
+                'summary' => 'Change this workspace\'s customer sign-up settings',
+                'description' => 'Omitted fields keep their value. A starting role is required unless the '
+                    . 'mode is `off`, and must be customer-safe.',
+                'tags' => ['signup'],
+                'request' => 'SignupSettingsUpdateRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The saved settings', 'SignupSettingsResponse'),
+                    422 => self::errorResponse('Unknown mode, missing or unsafe role, or invalid domains'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/signup/requests', 'signup:manage', [
+                'summary' => 'People who confirmed their email and wait to join, or were decided on',
+                'tags' => ['signup'],
+                'parameters' => [
+                    self::queryParam('status', 'string', '`pending` (default), `approved` or `rejected`'),
+                    self::queryParam('page', 'integer', 'Page number, from 1'),
+                    self::queryParam('per_page', 'integer', 'Items per page'),
+                ],
+                'responses' => [
+                    200 => self::jsonResponse('The requests, oldest first', 'SignupRequestListResponse'),
+                    422 => self::errorResponse('Unknown status'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/signup/requests/{id:\d+}/approve', 'signup:manage', [
+                'summary' => 'Let a waiting person join as a customer',
+                'description' => 'Creates the customer membership with the current starting role. A '
+                    . 'rejected request can be approved later.',
+                'tags' => ['signup'],
+                'responses' => [
+                    200 => self::jsonResponse('Approved', 'SignupDecisionResponse'),
+                    404 => self::errorResponse('No request waiting for a decision has that id'),
+                    409 => self::errorResponse('The starting role is missing or unsafe, or the person is suspended or invited here'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/signup/requests/{id:\d+}/reject', 'signup:manage', [
+                'summary' => 'Turn a waiting person away',
+                'tags' => ['signup'],
+                'responses' => [
+                    200 => self::jsonResponse('Rejected', 'SignupDecisionResponse'),
+                    404 => self::errorResponse('No pending request has that id'),
                 ] + self::authErrors(),
             ]),
         ];
@@ -11741,6 +12131,40 @@ final class CoreApiSchemas
                     ),
                 ] + self::authErrors(),
             ]),
+            self::permissionRoute('POST', '/api/documents/{id:\d+}/revisions', 'documents:issue', [
+                'summary' => 'Issue a revision that replaces this document, from its record as it is now',
+                // Like issuing, it can't be undone, so an agent only ever proposes it.
+                'mcp' => ['agentPolicy' => 'propose'],
+                'description' =>
+                    'A new document with the same number and the next revision letter, linked by `supersedes_id`. '
+                    . 'The fields are read again from the record; a template\'s own fields carry over. The original\'s '
+                    . 'state becomes `superseded` and its verification codes stop verifying. `diff` says what changed. '
+                    . 'Refused for a document with no record (`no_record`), a withdrawn one (`withdrawn`), one already '
+                    . 'replaced (`already_revised`) and one still in review (`in_review`).',
+                'tags' => ['documents'],
+                'request' => 'DocumentRevisionRequest',
+                'responses' => [
+                    201 => self::jsonResponse('The new revision, whether it was rendered, and what changed', 'DocumentRevisionResponse'),
+                    404 => self::errorResponse('No such document or template, or the caller can\'t see it'),
+                    409 => self::errorResponse('`withdrawn`, `already_revised`, `in_review`, `vetoed`, `version_gone`, `template_unpublished` or `record_type_changed`'),
+                    422 => self::errorResponse('`no_record`, `no_source`, a missing or too long reason, or required fields with no value'),
+                    503 => self::errorResponse('The revision could not be created'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/documents/preflight', 'documents:issue', [
+                'summary' => 'Whether a document would issue, and every reason it would not',
+                // It writes nothing, so asking is safe where issuing isn't.
+                'mcp' => ['agentPolicy' => 'allow'],
+                'description' =>
+                    'The body is the same as POST /api/documents. Runs the same checks and `document.issuing` '
+                    . 'listeners (with `check_only: true`), but writes nothing, renders nothing and allocates no '
+                    . 'number. Always 200: `ok` is the answer and `checks` says why. A real issue checks everything again.',
+                'tags' => ['documents'],
+                'request' => 'DocumentCreateRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The answer', 'DocumentPreflightResponse'),
+                ] + self::authErrors(),
+            ]),
             self::permissionRoute('GET', '/api/documents', 'documents:read', [
                 'summary' => 'List issued documents visible to the caller (newest first, paginated)',
                 'description' =>
@@ -11939,6 +12363,38 @@ final class CoreApiSchemas
                     404 => self::errorResponse('Document not found or not visible to the caller'),
                 ] + self::authErrors(),
             ]),
+            [
+                'method' => 'POST',
+                'path' => '/api/labels/resolve',
+                'requiredRole' => null,
+                // The permission depends on the `surface` in the body, so the
+                // handler checks it (#1019). Never the directory permissions.
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Resolve a few unit and role ids to their display names',
+                    'description' => 'For a screen that holds unit and role ids and needs their names. The caller names '
+                        . 'the surface it is rendering and must hold that surface\'s permission: documents needs '
+                        . 'documents:read, documents.route needs documents:route. Directory permissions are not needed. '
+                        . 'Returns names only, keyed by id. An id that is unknown or belongs to another workspace has no '
+                        . 'entry. The number of ids per request is capped by labels.resolve_max_ids (default 100). '
+                        . 'People are not resolved here: they are named per record by GET /api/documents/{id}/people.',
+                    'tags' => ['labels'],
+                    'request' => self::object([
+                        'surface' => ['type' => 'string', 'enum' => ['documents', 'documents.route']],
+                        'ous' => ['type' => 'array', 'items' => ['type' => 'integer', 'minimum' => 1]],
+                        'roles' => ['type' => 'array', 'items' => ['type' => 'integer', 'minimum' => 1]],
+                    ], ['surface']),
+                    'responses' => [
+                        200 => self::jsonResponse('Names keyed by id, per kind', self::object([
+                            'data' => self::object([
+                                'ous' => ['type' => 'object', 'additionalProperties' => ['type' => 'string']],
+                                'roles' => ['type' => 'object', 'additionalProperties' => ['type' => 'string']],
+                            ], ['ous', 'roles']),
+                        ], ['data'])),
+                        422 => self::errorResponse('Unknown surface or key, a malformed id list, or too many ids'),
+                    ] + self::authErrors(),
+                ],
+            ],
             [
                 'method' => 'GET',
                 'path' => '/api/documents/{id:\\d+}/people',
@@ -12907,7 +13363,9 @@ final class CoreApiSchemas
                         . '`documents.qr_public_detail` to `stage`, which adds the current routing verb '
                         . 'and distinguishes a revoked code from an unrecognised one, or LOWER it to '
                         . '`undated`, which withholds `issued_on` and leaves everything else as '
-                        . '`minimal`. It never returns a '
+                        . '`minimal`. `described` adds to `stage` the kind (the template\'s public name), '
+                        . 'the revision letter, the page count, and on a revised document\'s code which '
+                        . 'revision replaced it. It never returns a price, the document number, a '
                         . 'document id, a title, any content, any recipient, or any name of a person or '
                         . 'unit — a signed-in reader who wants the record calls '
                         . 'GET /api/documents/by-verification/{token}, where RBAC decides unchanged.',
@@ -12955,13 +13413,34 @@ final class CoreApiSchemas
                                             ],
                                             'stage' => [
                                                 'type' => 'string',
-                                                'description' => 'Only at the `stage` disclosure level',
+                                                'description' => 'Only at the `stage` and `described` disclosure levels',
                                                 'enum' => ['issued', 'forwarded', 'acknowledged', 'returned', 'noted'],
                                             ],
                                             'stage_on' => [
                                                 'type' => 'string',
                                                 'nullable' => true,
                                                 'description' => 'Date only, and only at the `stage` level',
+                                            ],
+                                            'kind' => [
+                                                'type' => 'string',
+                                                'description' => 'Only at `described`, and only when the template has a public name: what kind of document it is. Never its title.',
+                                            ],
+                                            'revision' => [
+                                                'type' => 'string',
+                                                'description' => 'Only at `described`: the revision letter, A for the first',
+                                            ],
+                                            'pages' => [
+                                                'type' => 'integer',
+                                                'description' => 'Only at `described`, and only when the render service reported it',
+                                            ],
+                                            'replaced_by' => [
+                                                'type' => 'object',
+                                                'description' => 'Only at `described`, on a refused code whose document was revised',
+                                                'properties' => [
+                                                    'revision' => ['type' => 'string'],
+                                                    'issued_on' => ['type' => 'string', 'nullable' => true],
+                                                ],
+                                                'required' => ['revision', 'issued_on'],
                                             ],
                                         ],
                                         'required' => ['verified'],

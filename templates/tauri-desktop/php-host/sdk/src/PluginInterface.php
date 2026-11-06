@@ -84,6 +84,34 @@ interface PluginInterface
      *   the one that answers that path, is admitted without a tenant.
      *   On an older host the key is ignored and the route stays private.
      *
+     *   `'form'` (SDK 1.67, core 0.2.26) is the other accepted value, for a form an
+     *   anonymous browser submits. Accepted for exactly one shape: method POST, path
+     *   `/api/<your plugin's slug>/forms/<name>/{key}` (<name> as above), and no
+     *   requiredPermission or requiredRole; anything else is NOT registered, with a
+     *   logged reason. YOU DO NOT CHECK ANYTHING BUT THE FORM'S CONTENT: before your
+     *   handler runs the host resolves the tenant from `{key}`, applies its per-IP
+     *   limit, its ceiling per form and tenant, a body cap and JSON-only rule, the
+     *   Origin check and the bot check, and strips cookies and Authorization. Read
+     *   the tenant from {@see Http\PublicForm::from()}, never from the request. Your
+     *   handler answers strangers, so it must return a 4xx on bad input rather than
+     *   throw. A workspace admin issues the key. An older host doesn't register
+     *   the route or keeps it private, so it is never public by accident: use
+     *   {@see PluginRequirementsInterface::getCoreConstraint()} to refuse to load there.
+     *
+     *   `'read'` (SDK 1.69, WHIT-704) is the third, for something anybody holding a
+     *   link may see. Accepted for exactly one shape: method GET, path
+     *   `/api/<your plugin's slug>/public/<name>/{key}` (<name> as above, and not
+     *   the name of one of your forms), and no requiredPermission or requiredRole;
+     *   anything else is NOT registered, with a logged reason. The key is the same
+     *   kind a form uses, issued by a workspace admin. Before your handler runs the
+     *   host resolves the tenant from `{key}`, applies a per-IP limit and a ceiling
+     *   per read and tenant, checks the Origin when the caller sends one, and strips
+     *   cookies and Authorization. Read the tenant from
+     *   {@see Http\PublicRead::from()}, never from the request. OFF BY DEFAULT: the
+     *   route stays private (sign-in required, and then still refused) until the
+     *   instance's operator sets `PLUGIN_PUBLIC_READS=on`. Return only what anybody
+     *   with the link may see, and a 4xx on bad input rather than a throw.
+     *
      * @return array<array{method: string, path: string, handler: callable, requiredRole?: ?string, requiredPermission?: ?string, schema?: array<string, mixed>}>
      */
     public function getRoutes(): array;

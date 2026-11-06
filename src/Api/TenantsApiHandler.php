@@ -603,9 +603,9 @@ class TenantsApiHandler
                 "SELECT COUNT(DISTINCT profile_id) as count FROM memberships WHERE tenant_id = ? AND status = 'active'"
             );
             $checkStmt->execute([$id]);
-            $result = $checkStmt->fetch(PDO::FETCH_ASSOC);
-            if ($result['count'] > 0) {
-                return Response::error('Cannot delete tenant with ' . $result['count'] . ' member(s)', 409);
+            $activeMembers = (int) $checkStmt->fetchColumn();
+            if ($activeMembers > 0) {
+                return Response::error('Cannot delete tenant with ' . $activeMembers . ' member(s)', 409);
             }
 
             // WC-713: the `tenant.deleting` hook, the DELETE, and the
@@ -837,9 +837,9 @@ class TenantsApiHandler
         // Replace spaces with hyphens
         $slug = str_replace(' ', '-', $slug);
         // Remove special characters
-        $slug = preg_replace('/[^a-z0-9-]/', '', $slug);
+        $slug = preg_replace('/[^a-z0-9-]/', '', $slug) ?? '';
         // Replace multiple hyphens with single hyphen
-        $slug = preg_replace('/-+/', '-', $slug);
+        $slug = preg_replace('/-+/', '-', $slug) ?? '';
         // Trim hyphens from start and end
         $slug = trim($slug, '-');
         return $slug;

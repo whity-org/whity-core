@@ -533,6 +533,7 @@ final class AgentPauseAndActivityRealEngineTest extends TestCase
         return $this->agents->find($this->clerk, self::BAKERY)['may_read'] ?? null;
     }
 
+    /** @phpstan-impure Reads the row the calls before it just wrote. */
     private function lastActive(int $assignmentId): ?string
     {
         $stmt = $this->pdo->prepare('SELECT last_active_at FROM agent_assignments WHERE id = ?');

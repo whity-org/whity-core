@@ -27,7 +27,12 @@ use UnexpectedValueException;
  */
 final class HealthProbeDefinition
 {
-    /** @var callable(): ProbeResult */
+    /**
+     * Documented to the plugin as returning a ProbeResult, held as returning
+     * anything: run() checks, because plugin code can break the promise.
+     *
+     * @var callable(): mixed
+     */
     private $probe;
 
     /**

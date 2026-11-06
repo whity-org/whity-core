@@ -101,6 +101,7 @@ final class ActivationServiceRealEngineTest extends TestCase
 
         $row = $this->q('SELECT redeemed_by_user_id, redeemed_from_ip FROM device_activation_redemptions')
             ->fetch(PDO::FETCH_ASSOC);
+        self::assertIsArray($row);
 
         self::assertNull($row['redeemed_by_user_id'], 'an absent actor is recorded as absent, not invented');
         self::assertSame('203.0.113.9', $row['redeemed_from_ip']);
@@ -117,6 +118,7 @@ final class ActivationServiceRealEngineTest extends TestCase
 
         $row = $this->q("SELECT status, activated_at FROM licensed_devices WHERE id = {$device}")
             ->fetch(PDO::FETCH_ASSOC);
+        self::assertIsArray($row);
 
         self::assertSame('active', $row['status']);
         self::assertNotNull($row['activated_at'], 'an activation-based invoice is computed from this date');

@@ -630,7 +630,7 @@ PHP);
     }
 
     /**
-     * @param array<string> $argv
+     * @param list<string> $argv
      */
     private function runQuiet(MigrationsCommand $command, array $argv): int
     {

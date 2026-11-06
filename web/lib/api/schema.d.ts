@@ -1360,57 +1360,6 @@ export interface paths {
         patch: operations["patch_api_v1_demo_catalog_items_id"];
         trace?: never;
     };
-    "/api/v1/deployments/apply": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Apply a deployment artefact */
-        post: operations["post_api_v1_deployments_apply"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/deployments/rollback": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Roll back the last deployment */
-        post: operations["post_api_v1_deployments_rollback"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/deployments/status": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get the current deployment status */
-        get: operations["get_api_v1_deployments_status"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/document-background-issuing": {
         parameters: {
             query?: never;
@@ -2331,7 +2280,7 @@ export interface paths {
         };
         /**
          * Verify a document from the QR code printed on it (public, rate-limited)
-         * @description PUBLIC and unauthenticated by design: the caller is somebody holding a printed sheet, and the paper is the whole of their relationship with this system. Always 200. An unknown token, a malformed one, a withdrawn one and a superseded one produce the SAME body at the default disclosure level, so this endpoint cannot be asked whether a document exists. A tenant may raise `documents.qr_public_detail` to `stage`, which adds the current routing verb and distinguishes a revoked code from an unrecognised one, or LOWER it to `undated`, which withholds `issued_on` and leaves everything else as `minimal`. It never returns a document id, a title, any content, any recipient, or any name of a person or unit — a signed-in reader who wants the record calls GET /api/documents/by-verification/{token}, where RBAC decides unchanged.
+         * @description PUBLIC and unauthenticated by design: the caller is somebody holding a printed sheet, and the paper is the whole of their relationship with this system. Always 200. An unknown token, a malformed one, a withdrawn one and a superseded one produce the SAME body at the default disclosure level, so this endpoint cannot be asked whether a document exists. A tenant may raise `documents.qr_public_detail` to `stage`, which adds the current routing verb and distinguishes a revoked code from an unrecognised one, or LOWER it to `undated`, which withholds `issued_on` and leaves everything else as `minimal`. `described` adds to `stage` the kind (the template's public name), the revision letter, the page count, and on a revised document's code which revision replaced it. It never returns a price, the document number, a document id, a title, any content, any recipient, or any name of a person or unit — a signed-in reader who wants the record calls GET /api/documents/by-verification/{token}, where RBAC decides unchanged.
          */
         get: operations["get_api_v1_document_verifications_token"];
         put?: never;
@@ -2380,6 +2329,26 @@ export interface paths {
         get: operations["get_api_v1_documents_by_verification_token"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/preflight": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Whether a document would issue, and every reason it would not
+         * @description The body is the same as POST /api/documents. Runs the same checks and `document.issuing` listeners (with `check_only: true`), but writes nothing, renders nothing and allocates no number. Always 200: `ok` is the answer and `checks` says why. A real issue checks everything again.
+         */
+        post: operations["post_api_v1_documents_preflight"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2556,6 +2525,26 @@ export interface paths {
          * @description Re-renders the template version the document was issued from, with the values it printed; records and charts are read again. A document issued from the old Document designer cannot be re-rendered (409, with details.document_source_id naming its converted template to issue a new one from).
          */
         post: operations["post_api_v1_documents_id_render"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/{id}/revisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Issue a revision that replaces this document, from its record as it is now
+         * @description A new document with the same number and the next revision letter, linked by `supersedes_id`. The fields are read again from the record; a template's own fields carry over. The original's state becomes `superseded` and its verification codes stop verifying. `diff` says what changed. Refused for a document with no record (`no_record`), a withdrawn one (`withdrawn`), one already replaced (`already_revised`) and one still in review (`in_review`).
+         */
+        post: operations["post_api_v1_documents_id_revisions"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3475,6 +3464,26 @@ export interface paths {
         put?: never;
         /** Mint a fresh token and re-send it; the previous link stops working */
         post: operations["post_api_v1_invitations_id_resend"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/labels/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resolve a few unit and role ids to their display names
+         * @description For a screen that holds unit and role ids and needs their names. The caller names the surface it is rendering and must hold that surface's permission: documents needs documents:read, documents.route needs documents:route. Directory permissions are not needed. Returns names only, keyed by id. An id that is unknown or belongs to another workspace has no entry. The number of ids per request is capped by labels.resolve_max_ids (default 100). People are not resolved here: they are named per record by GET /api/documents/{id}/people.
+         */
+        post: operations["post_api_v1_labels_resolve"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5725,6 +5734,67 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/public-form-keys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * This workspace's public form keys
+         * @description Revoked keys included, newest first. `meta.forms` is what a key can be issued for. A key can't be read back: this returns its name and first characters.
+         */
+        get: operations["get_api_v1_public_form_keys"];
+        put?: never;
+        /**
+         * Issue a key that opens a plugin's public form for this workspace
+         * @description The answer is the only time the key can be read.
+         */
+        post: operations["post_api_v1_public_form_keys"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public-form-keys/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Change a key's name or allowed sites */
+        patch: operations["patch_api_v1_public_form_keys_id"];
+        trace?: never;
+    };
+    "/api/v1/public-form-keys/{id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revoke a key, at once and for good
+         * @description Revoking twice changes nothing.
+         */
+        post: operations["post_api_v1_public_form_keys_id_revoke"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/public/forms/{slug}": {
         parameters: {
             query?: never;
@@ -5799,6 +5869,74 @@ export interface paths {
          * @description UNAUTHENTICATED BY DESIGN. The person typing the code may be an end user or a student with no account and no session, so they are authorised by POSSESSION: the code's own entropy and check characters, the pre-auth IP rate limiter, and the fact that every fact used to resolve the activation comes from the code rather than the caller. Nothing the caller sends is trusted, including any tenant they name. Send `serial_number` — the number printed on the unit — when the code is not already bound to one; never an internal id, which a person cannot know and which would let a caller enumerate rows by number. ERRORS NEVER DISTINGUISH AN UNKNOWN CODE FROM A MISTYPED ONE, because doing so would let an anonymous caller learn which well-formed codes exist.
          */
         post: operations["post_api_v1_public_licensing_redeem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/plugin-forms/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What the page of a plugin's public form needs (PUBLIC, rate-limited)
+         * @description The provider and site key for the form's bot check, neither of which is secret. Answers only to a live key, with the same 404 for anything else. An Origin that is sent must be on the key's list or the instance's.
+         */
+        get: operations["get_api_v1_public_plugin_forms_key"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/signup/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Describe a sign-up link without using it (public, rate-limited)
+         * @description Only the holder of the emailed link learns whether the address already has an account (`requires_password: false`).
+         */
+        get: operations["get_api_v1_public_signup_confirm"];
+        put?: never;
+        /**
+         * Use a sign-up link (public); a password is required only for a new address
+         * @description Joins at once when the workspace's sign-up is Open, or waits for a workspace admin when it is Approval required. The workspace comes from the link, never from the request. An existing account keeps its password.
+         */
+        post: operations["post_api_v1_public_signup_confirm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/signup/workspaces/{workspace}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Whether a workspace takes customer sign-ups, and how (public)
+         * @description An unknown workspace and one with sign-up off answer the same 404.
+         */
+        get: operations["get_api_v1_public_signup_workspaces_workspace"];
+        put?: never;
+        /**
+         * Ask to join a workspace as a customer (public); mails a confirmation link
+         * @description Answers the same 202 for every address it accepts and never looks up whether the address has an account or already belongs to the workspace, so it cannot be used to learn either. Never creates a workspace. Protected by the instance's bot check (Turnstile) and per-IP, per-address and per-workspace limits.
+         */
+        post: operations["post_api_v1_public_signup_workspaces_workspace"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6142,6 +6280,30 @@ export interface paths {
         patch: operations["patch_api_v1_settings_language"];
         trace?: never;
     };
+    "/api/v1/settings/public-forms/bot-check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The instance's bot check for public forms
+         * @description System tenant only. The secret is never returned: `has_secret` says whether one is stored.
+         */
+        get: operations["get_api_v1_settings_public_forms_bot_check"];
+        /**
+         * Change the instance's bot check for public forms
+         * @description System tenant only. A field left out stays as it is. With no provider, every public form is refused unless `allow_without_bot_check` is true. The secret is write-only and encrypted: null or empty clears it.
+         */
+        put: operations["put_api_v1_settings_public_forms_bot_check"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/settings/tabs": {
         parameters: {
             query?: never;
@@ -6152,6 +6314,84 @@ export interface paths {
         /** List the settings console tabs visible to the caller */
         get: operations["get_api_v1_settings_tabs"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/signup/requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** People who confirmed their email and wait to join, or were decided on */
+        get: operations["get_api_v1_signup_requests"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/signup/requests/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Let a waiting person join as a customer
+         * @description Creates the customer membership with the current starting role. A rejected request can be approved later.
+         */
+        post: operations["post_api_v1_signup_requests_id_approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/signup/requests/{id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Turn a waiting person away */
+        post: operations["post_api_v1_signup_requests_id_reject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/signup/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read this workspace's customer sign-up settings
+         * @description `eligible_roles` lists only customer-safe roles: the workspace's own or global roles holding no admin permission. `role_customer_safe` is false when the saved role has since gained one, and sign-ups are refused until it is changed.
+         */
+        get: operations["get_api_v1_signup_settings"];
+        /**
+         * Change this workspace's customer sign-up settings
+         * @description Omitted fields keep their value. A starting role is required unless the mode is `off`, and must be customer-safe.
+         */
+        put: operations["put_api_v1_signup_settings"];
         post?: never;
         delete?: never;
         options?: never;
@@ -8273,15 +8513,6 @@ export interface components {
         DemoCatalogItemResponse: {
             data: components["schemas"]["DemoCatalogItem"];
         };
-        DeploymentApplyRequest: {
-            version: string;
-            source_path: string;
-        };
-        DeploymentStatusResponse: {
-            data: {
-                [key: string]: unknown;
-            };
-        };
         DeviceProvisionRequest: {
             serial_numbers: (string | {
                 serial_number: string;
@@ -8326,8 +8557,20 @@ export interface components {
             record_id?: string | null;
             /** @description The template slot it was issued through */
             slot?: string | null;
+            /** @description Its revision letter. The number stays the same across revisions: INV-2026-0142 rev B. */
+            revision?: string;
+            /** @description Why this revision was issued */
+            revision_reason?: string | null;
+            /** @description The document this revision replaces */
+            supersedes_id?: number | null;
+            /** @description The revision that replaced this document */
+            superseded_by?: number | null;
+            /** @description That revision's letter */
+            superseded_by_revision?: string | null;
+            /** @description When it was replaced */
+            superseded_on?: string | null;
             /**
-             * @description Where it is, derived from the routing trail and never stored. `in_review`: a route has an open item. `draft`: its newest route ended rejected, or it waits for final approval to be numbered. `withdrawn`: taken back; the record stays. `issued`: everything else. Absent where a route did not read it.
+             * @description Where it is, derived from the routing trail and never stored. `in_review`: a route has an open item. `draft`: its newest route ended rejected, or it waits for final approval to be numbered. `superseded`: a later revision replaced it. `withdrawn`: taken back; the record stays. `issued`: everything else. Absent where a route did not read it.
              * @enum {string}
              */
             state?: "draft" | "in_review" | "issued" | "superseded" | "withdrawn";
@@ -8652,6 +8895,28 @@ export interface components {
             /** @description An example value, at most 200 characters. */
             sample?: string;
         };
+        DocumentPreflightCheck: {
+            /** @description `template`, `record`, `values`, `fields`, `origin_key` or `render` from core; `plugin` from a listener */
+            code: string;
+            /** @description What was checked, in the reader's language */
+            label: string;
+            ok: boolean;
+            /** @description Why it failed, for a person. Absent when it passed. */
+            why?: string;
+            /** @description The refusal code the real issue would give. Core's checks only. */
+            reason?: string;
+            /** @description The refusal's own English sentence, for a developer. Core's checks only. */
+            detail?: string;
+        };
+        DocumentPreflightResponse: {
+            /** @description Whether an issue would go through now */
+            ok: boolean;
+            checks: components["schemas"]["DocumentPreflightCheck"][];
+            /** @description Required fields with no value */
+            missing_fields: string[];
+            /** @description The document `origin_key` already names. An issue would return it instead of raising one, and no listener would be asked. */
+            replays_document_id: number | null;
+        };
         DocumentPreviewResponse: {
             data: {
                 /** @description The record as it is named, for example `INV-1042 · Example Clinic` */
@@ -8664,13 +8929,17 @@ export interface components {
         };
         DocumentPublishBlocker: {
             /** @enum {string} */
-            kind: "open-suggestions" | "missing-plugin" | "block-without-print-view" | "unknown-field" | "theme-unavailable";
+            kind: "open-suggestions" | "missing-plugin" | "block-without-print-view" | "unknown-field" | "theme-unavailable" | "too-large";
             count?: number;
             plugin?: string;
             blockId?: string;
             path?: string;
             /** @description With theme-unavailable: the theme the document names that the workspace doesn't have */
             ref?: string;
+            /** @description With too-large: what printing the template sends Whity Render, in bytes, before any record's values */
+            bytes?: number;
+            /** @description With too-large: the render size ceiling (documents.flow_max_bytes), in bytes */
+            max?: number;
         };
         DocumentPublishCheckResponse: {
             data: components["schemas"]["DocumentPublishBlocker"][];
@@ -8682,6 +8951,39 @@ export interface components {
         };
         DocumentResponse: {
             data: components["schemas"]["Document"];
+        };
+        DocumentRevisionRequest: {
+            /** @description Why it is being replaced, at most 1000 characters */
+            reason: string;
+            /**
+             * @description The version it printed (default), or the template's latest published version
+             * @enum {string}
+             */
+            template?: "pinned" | "latest";
+            /** @description If sent, it must be the record the document was issued from, as `type:id` */
+            record?: string;
+        };
+        DocumentRevisionResponse: {
+            data: components["schemas"]["Document"];
+            /** @description Whether a PDF was stored, as on POST /api/documents */
+            render: Record<string, never>;
+            diff: {
+                /** @description Field path => value, new in this revision */
+                added: {
+                    [key: string]: string;
+                };
+                /** @description Field path => value, gone from this revision */
+                removed: {
+                    [key: string]: string;
+                };
+                /** @description Field path => what it said and says now */
+                changed: {
+                    [key: string]: {
+                        from: string;
+                        to: string;
+                    };
+                };
+            };
         };
         DocumentRoute: {
             id: number;
@@ -8794,6 +9096,8 @@ export interface components {
         DocumentSource: {
             /** @description How documents from this template are numbered, when it has its own rule */
             numbering?: components["schemas"]["DocumentNumbering"];
+            /** @description What kind of document this makes, in words for strangers: the kind the public check shows at the `described` level. Null shows no kind. */
+            public_name?: string | null;
             id: number;
             tenant_id: number;
             /** @enum {string} */
@@ -8837,6 +9141,8 @@ export interface components {
             updated_at: string;
         };
         DocumentSourceAudienceRequest: {
+            /** @description What kind of document this makes, for the public check ('Handover certificate'), at most 120 characters; null or empty for none. Never a customer's name. Needs documents:publish. */
+            public_name?: string | null;
             /** @description How documents from this template are numbered; it wins over a slot's rule. Needs documents:publish. */
             numbering?: components["schemas"]["DocumentNumbering"];
             /**
@@ -11418,6 +11724,31 @@ export interface components {
         PromotionResponse: {
             data: components["schemas"]["Promotion"];
         };
+        PublicFormBotSettingsResponse: {
+            data: {
+                provider: string | null;
+                providers: string[];
+                site_key: string;
+                has_secret: boolean;
+                allow_without_bot_check: boolean;
+                ready: boolean;
+            };
+        };
+        PublicFormBotSettingsUpdateRequest: {
+            provider?: string | null;
+            site_key?: string | null;
+            secret?: string | null;
+            allow_without_bot_check?: boolean;
+        };
+        PublicFormConfigResponse: {
+            data: {
+                accepting: boolean;
+                bot_check: {
+                    provider: string | null;
+                    site_key: string;
+                } | null;
+            };
+        };
         PublicFormField: {
             field_key: string;
             /** @enum {string} */
@@ -11442,6 +11773,52 @@ export interface components {
             position: number;
             visible_when?: components["schemas"]["FormFieldCondition"];
             multi_valued?: boolean;
+        };
+        PublicFormKey: {
+            id: number;
+            plugin: string;
+            form: string;
+            label: string;
+            key_hint: string;
+            allowed_origins: string[];
+            created_at: string;
+            revoked_at: string | null;
+        };
+        PublicFormKeyCreateRequest: {
+            plugin: string;
+            form: string;
+            label: string;
+            allowed_origins?: string[];
+        };
+        PublicFormKeyIssuedResponse: {
+            data: {
+                id: number;
+                plugin: string;
+                form: string;
+                label: string;
+                key_hint: string;
+                allowed_origins: string[];
+                created_at: string;
+                revoked_at: string | null;
+                key: string;
+            };
+        };
+        PublicFormKeyListResponse: {
+            data: components["schemas"]["PublicFormKey"][];
+            meta: {
+                forms: {
+                    plugin: string;
+                    form: string;
+                }[];
+                bot_check_ready: boolean;
+            };
+        };
+        PublicFormKeyResponse: {
+            data: components["schemas"]["PublicFormKey"];
+        };
+        PublicFormKeyUpdateRequest: {
+            label?: string;
+            allowed_origins?: string[];
         };
         PublicFormResponse: {
             data: {
@@ -11476,6 +11853,48 @@ export interface components {
                 routed: boolean;
                 ignored_keys: string[];
             };
+        };
+        PublicSignupAcceptedResponse: {
+            data: {
+                /** @enum {string} */
+                status: "check_email";
+                message: string;
+            };
+        };
+        PublicSignupConfirmRequest: {
+            token: string;
+            password?: string;
+        };
+        PublicSignupConfirmResponse: {
+            data: {
+                /** @enum {string} */
+                status: "joined" | "pending_approval" | "already_member";
+                message: string;
+            };
+        };
+        PublicSignupInfoResponse: {
+            data: {
+                workspace_name: string;
+                workspace_slug: string;
+                approval_required: boolean;
+                allowed_domains: string[];
+                bot_check: {
+                    provider: string;
+                    site_key: string;
+                } | null;
+            };
+        };
+        PublicSignupPreviewResponse: {
+            data: {
+                workspace_name: string;
+                email: string;
+                requires_password: boolean;
+            };
+        };
+        PublicSignupRequest: {
+            email: string;
+            display_name: string;
+            bot_token?: string;
         };
         PublishWorkspacePluginRequest: {
             /** @description The plugin.json object (format whity.plugin/1). See sdk/resources/plugin-manifest.schema.json. */
@@ -11949,6 +12368,61 @@ export interface components {
                 done: number;
                 total: number;
             };
+        };
+        SignupDecisionResponse: {
+            data: {
+                id: number;
+                /** @enum {string} */
+                status: "approved" | "rejected";
+            };
+        };
+        SignupEligibleRole: {
+            id: number;
+            name: string;
+            description: string;
+            global: boolean;
+        };
+        SignupRequestItem: {
+            id: number;
+            email: string;
+            display_name: string;
+            /** @enum {string} */
+            status: "pending" | "approved" | "rejected";
+            requested_at: string;
+            verified_at: string | null;
+            decided_at: string | null;
+            decided_by_name: string | null;
+        };
+        SignupRequestListResponse: {
+            data: components["schemas"]["SignupRequestItem"][];
+            pagination: components["schemas"]["Pagination"];
+        };
+        SignupSettings: {
+            /** @enum {string} */
+            mode: "off" | "approval" | "open";
+            role_id: number | null;
+            role_name: string | null;
+            role_customer_safe: boolean | null;
+            allowed_domains: string[];
+            eligible_roles: components["schemas"]["SignupEligibleRole"][];
+            pending_count: number;
+            workspace_slug: string | null;
+            bot_check_ready: boolean;
+            updated_at: string | null;
+        };
+        SignupSettingsResponse: {
+            data: components["schemas"]["SignupSettings"];
+        };
+        SignupSettingsUpdateRequest: {
+            /**
+             * @description Who can sign up: `off` (nobody), `approval` (an admin approves each person) or `open` (people join once they confirm their email).
+             * @enum {string}
+             */
+            mode?: "off" | "approval" | "open";
+            /** @description The role people get when they join. Must be one of `eligible_roles` from GET /api/v1/signup/settings. Required unless the mode is `off`. */
+            role_id?: number | null;
+            /** @description Email domains that may sign up, like `example-bakery.com`. Empty means any address. */
+            allowed_domains?: string[];
         };
         SimpleMessageResponse: {
             message: string;
@@ -12781,12 +13255,12 @@ export interface components {
             displayName?: string;
             /**
              * Format: email
-             * @description New sign-in email address.
+             * @description New sign-in email address. Refused with 409 when they also belong to another workspace, unless the caller is the system tenant.
              */
             email?: string;
             /**
              * Format: password
-             * @description New password; must satisfy the site password policy.
+             * @description New password; must satisfy the site password policy. Refused with 409 when they also belong to another workspace, unless the caller is the system tenant.
              */
             password?: string;
             /** @description Replacement role in this tenant, by name or numeric id. */
@@ -12796,7 +13270,7 @@ export interface components {
             /** @description Organizational unit to move the user to. An explicit null removes them from their unit. */
             ou_id?: number | null;
             /**
-             * @description `inactive` blocks sign-in for this person everywhere; `active` restores it.
+             * @description `inactive` blocks sign-in for this person everywhere; `active` restores it. Refused with 409 when they also belong to another workspace, unless the caller is the system tenant.
              * @enum {string}
              */
             accountStatus?: "active" | "inactive";
@@ -19876,214 +20350,6 @@ export interface operations {
             };
         };
     };
-    post_api_v1_deployments_apply: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["DeploymentApplyRequest"];
-            };
-        };
-        responses: {
-            /** @description Deployment applied */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SimpleMessageResponse"];
-                };
-            };
-            /** @description Validation failed */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Method not allowed */
-            405: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Internal error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
-    post_api_v1_deployments_rollback: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Rollback complete */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SimpleMessageResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Method not allowed */
-            405: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Internal error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
-    get_api_v1_deployments_status: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Current deployment status */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DeploymentStatusResponse"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Method not allowed */
-            405: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description Internal error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-        };
-    };
     get_api_v1_document_background_issuing: {
         parameters: {
             query?: never;
@@ -25037,12 +25303,23 @@ export interface operations {
                             /** @description The issue DATE (YYYY-MM-DD), not a timestamp. ABSENT at the `undated` disclosure level — absent rather than null, because null would be a statement about the document and this is a statement about the page. */
                             issued_on?: string | null;
                             /**
-                             * @description Only at the `stage` disclosure level
+                             * @description Only at the `stage` and `described` disclosure levels
                              * @enum {string}
                              */
                             stage?: "issued" | "forwarded" | "acknowledged" | "returned" | "noted";
                             /** @description Date only, and only at the `stage` level */
                             stage_on?: string | null;
+                            /** @description Only at `described`, and only when the template has a public name: what kind of document it is. Never its title. */
+                            kind?: string;
+                            /** @description Only at `described`: the revision letter, A for the first */
+                            revision?: string;
+                            /** @description Only at `described`, and only when the render service reported it */
+                            pages?: number;
+                            /** @description Only at `described`, on a refused code whose document was revised */
+                            replaced_by?: {
+                                revision: string;
+                                issued_on: string | null;
+                            };
                         };
                     };
                 };
@@ -25359,6 +25636,84 @@ export interface operations {
                 };
             };
             /** @description No such code, or the document it names is not visible to the caller */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_documents_preflight: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DocumentCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description The answer */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentPreflightResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -26229,6 +26584,113 @@ export interface operations {
                 };
             };
             /** @description Rendering or persistence is disabled, or the render service is unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_documents_id_revisions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DocumentRevisionRequest"];
+            };
+        };
+        responses: {
+            /** @description The new revision, whether it was rendered, and what changed */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentRevisionResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No such document or template, or the caller can't see it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `withdrawn`, `already_revised`, `in_review`, `vetoed`, `version_gone`, `template_unpublished` or `record_type_changed` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `no_record`, `no_source`, a missing or too long reason, or required fields with no value */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The revision could not be created */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -31489,6 +31951,107 @@ export interface operations {
             };
             /** @description Too many invitations sent */
             429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_labels_resolve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    surface: "documents" | "documents.route";
+                    ous?: number[];
+                    roles?: number[];
+                };
+            };
+        };
+        responses: {
+            /** @description Names keyed by id, per kind */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            ous: {
+                                [key: string]: string;
+                            };
+                            roles: {
+                                [key: string]: string;
+                            };
+                        };
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unknown surface or key, a malformed id list, or too many ids */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -42604,6 +43167,321 @@ export interface operations {
             };
         };
     };
+    get_api_v1_public_form_keys: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The keys */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicFormKeyListResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_public_form_keys: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublicFormKeyCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description The new key */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicFormKeyIssuedResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No plugin has this form, or a field failed validation */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    patch_api_v1_public_form_keys_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublicFormKeyUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description The changed key */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicFormKeyResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Key not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The key has been revoked */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A field failed validation */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_public_form_keys_id_revoke: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Revoked */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Key not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     get_api_v1_public_forms_slug: {
         parameters: {
             query?: never;
@@ -42924,6 +43802,377 @@ export interface operations {
             };
             /** @description Internal server error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_public_plugin_forms_key: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Whether the form is accepting, and its bot check */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicFormConfigResponse"];
+                };
+            };
+            /** @description This site may not use this key */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No live key at this address */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too many attempts from this address */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Temporarily unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_public_signup_confirm: {
+        parameters: {
+            query?: {
+                /** @description The token from the sign-up link */
+                token?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The sign-up the link is for */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSignupPreviewResponse"];
+                };
+            };
+            /** @description The link is invalid, expired, or already used */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too many attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_public_signup_confirm: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublicSignupConfirmRequest"];
+            };
+        };
+        responses: {
+            /** @description Confirmed - see `data.status` */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSignupConfirmResponse"];
+                };
+            };
+            /** @description The link is invalid, expired, or already used */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Sign-up has closed, or this person cannot join through sign-up */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing token, or a password is required and was not supplied */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too many attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_public_signup_workspaces_workspace: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace's slug. When the request's host names a workspace too, they must agree. */
+                workspace: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sign-up is open */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSignupInfoResponse"];
+                };
+            };
+            /** @description Sign-up is not open for this workspace */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too many attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_public_signup_workspaces_workspace: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace's slug. When the request's host names a workspace too, they must agree. */
+                workspace: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublicSignupRequest"];
+            };
+        };
+        responses: {
+            /** @description Check your email */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSignupAcceptedResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Sign-up is not open for this workspace */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Invalid email or name, failed bot check, or an email domain the workspace does not accept */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too many attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The bot check is not available */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -45135,6 +46384,158 @@ export interface operations {
             };
         };
     };
+    get_api_v1_settings_public_forms_bot_check: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The settings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicFormBotSettingsResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    put_api_v1_settings_public_forms_bot_check: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublicFormBotSettingsUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description The settings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicFormBotSettingsResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A field failed validation */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     get_api_v1_settings_tabs: {
         parameters: {
             query?: never;
@@ -45173,6 +46574,382 @@ export interface operations {
             };
             /** @description Method not allowed */
             405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_signup_requests: {
+        parameters: {
+            query?: {
+                /** @description `pending` (default), `approved` or `rejected` */
+                status?: string;
+                /** @description Page number, from 1 */
+                page?: number;
+                /** @description Items per page */
+                per_page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The requests, oldest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignupRequestListResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unknown status */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_signup_requests_id_approve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Approved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignupDecisionResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No request waiting for a decision has that id */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The starting role is missing or unsafe, or the person is suspended or invited here */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_signup_requests_id_reject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Rejected */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignupDecisionResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No pending request has that id */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_signup_settings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The settings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignupSettingsResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    put_api_v1_signup_settings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignupSettingsUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description The saved settings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignupSettingsResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unknown mode, missing or unsafe role, or invalid domains */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

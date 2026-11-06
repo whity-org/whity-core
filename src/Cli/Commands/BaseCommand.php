@@ -26,7 +26,6 @@ use Whity\Api\PermissionsApiHandler;
 use Whity\Api\PluginsApiHandler;
 use Whity\Api\MigrationsApiHandler;
 use Whity\Api\OusApiHandler;
-use Whity\Core\Deployment\DeploymentManager;
 
 /**
  * Base Command class for CLI commands
@@ -647,15 +646,11 @@ abstract class BaseCommand implements CliCommand, CommandHelp
         $router->register('POST', '/api/plugins/{id}/uninstall', [$pluginsHandler, 'uninstall'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_UNINSTALL);
 
         $migrationsHandler = new MigrationsApiHandler($db, $baseDir . '/database/migrations');
-        // #1258/#990: STILL ROLE-GATED, and deliberately so. Unlike the three
-        // groups above there is no `migrations:*` slug to mirror onto — and
-        // index.php gates these on the role name too, so the two entry points
-        // already agree. Moving only this side would BREAK the mirror rather
-        // than complete it. Inventing a slug here needs a naming decision and a
-        // grant migration, which is what keeps it in #990.
-        $router->register('GET', '/api/migrations', [$migrationsHandler, 'list'], 'admin');
-        $router->register('POST', '/api/migrations/run', [$migrationsHandler, 'run'], 'admin');
-        $router->register('POST', '/api/migrations/rollback', [$migrationsHandler, 'rollback'], 'admin');
+        // #990: gated on the `migrations:*` slugs (migration 220). The list
+        // mirrors public/index.php; run and rollback exist only here.
+        $router->register('GET', '/api/migrations', [$migrationsHandler, 'list'], null, null, \Whity\Core\RBAC\CorePermissions::MIGRATIONS_READ);
+        $router->register('POST', '/api/migrations/run', [$migrationsHandler, 'run'], null, null, \Whity\Core\RBAC\CorePermissions::MIGRATIONS_MANAGE);
+        $router->register('POST', '/api/migrations/rollback', [$migrationsHandler, 'rollback'], null, null, \Whity\Core\RBAC\CorePermissions::MIGRATIONS_MANAGE);
 
         $ousHandler = new OusApiHandler($db->getPdo(), $hookManager);
         // #1258: gated on the `ous:*` slugs, mirroring public/index.php

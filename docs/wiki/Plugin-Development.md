@@ -423,22 +423,23 @@ event **`user.creating`**, fired by
 
 ```php
 // src/Api/UsersApiHandler.php (core)
-$userData = $this->hookManager->dispatch('user.creating', [
-    'email' => $email,
-    'password' => $body['password'], // plaintext, pre-hash
-    'role_id' => $roleId,
-]);
-
-// the core reads the (possibly modified) payload back out
-$email    = $userData['email'];
-$roleId   = $userData['role_id'];
-$password = password_hash($userData['password'], PASSWORD_BCRYPT);
+try {
+    $this->hookManager->dispatch('user.creating', [
+        'email' => $email,
+        'role_id' => $roleId,
+    ]);
+} catch (HookVetoException $e) {
+    return Response::error('Cannot create user: blocked by an installed plugin', 409, ['reason' => $e->reason()]);
+}
 ```
 
-`user.creating` is a **synchronous filter** hook: every listener receives the
-payload and the execution context, and must **return the (possibly modified)
-array** so downstream listeners and the core see the change. Our plugin
-subscribes to it:
+Since SDK 1.70 `user.creating` is **read-only**. Listeners receive `email` and
+`role_id` plus the execution context. The core ignores what they return, so a
+listener cannot change the new user's email or role; the role was already
+checked against the person creating the user. To refuse the create, throw
+`Whity\Sdk\Hooks\HookVetoException`: nothing is written and the caller gets
+`409 Conflict` with your `reason()`. The password is never in any hook payload.
+Our plugin subscribes to it:
 
 ```php
 public function getHooks(): array
@@ -453,7 +454,7 @@ public function getHooks(): array
 
 public function onUserCreating(array $data, array $context): array
 {
-    // Normalise the email before the user is persisted.
+    // Read-only hook: this changes only the listener's own copy.
     if (isset($data['email']) && is_string($data['email'])) {
         $data['email'] = strtolower(trim($data['email']));
     }
@@ -1539,6 +1540,18 @@ Only `value` is required, with at most 5 lines and 12 chart points. **The route 
 A workspace plugin has no routes, so its `homeCard` names a `record` type instead of a `source`, plus a `caption`. The host counts the records.
 
 ---
+
+## Step 12c — Take a form from an anonymous visitor (SDK 1.67)
+
+Declare `'public' => 'form'` on POST `/api/<your slug>/forms/<name>/{key}`. The host resolves the workspace from the key and runs its limits, allowed-sites check and bot check before your handler, so you don't run a proxy that checks a bot token and signs requests. Your handler validates the form's content and reads the workspace from `Whity\Sdk\Http\PublicForm::from($request)`.
+
+See [Public forms for plugins](Plugin-Public-Forms.md).
+
+## Step 12d — Answer a public GET (SDK 1.69)
+
+Declare `'public' => 'read'` on GET `/api/<your slug>/public/<name>/{key}` for something anybody holding a link may see. It uses the same keys and the same tenant rule as a public form, the host runs its limits and the Origin check first, and your handler reads the workspace from `Whity\Sdk\Http\PublicRead::from($request)`. The operator must switch these on with `PLUGIN_PUBLIC_READS=on`; until then the route stays private.
+
+See [Public reads](Plugin-Public-Forms.md#public-reads-sdk-169).
 
 ## Step 13 — Declare it in `plugin.json` instead (SDK 1.47)
 

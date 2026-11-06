@@ -203,6 +203,7 @@ final class DocumentsApiHandler
         private readonly ?TemplateSlotRegistry $slots = null,
         // S5: names for the library's "Raised by", from the page being served.
         private readonly ?DocumentPeople $people = null,
+        private readonly ?\Whity\Core\Document\Fields\FieldLabels $fieldLabels = null,
     ) {
     }
 
@@ -215,6 +216,7 @@ final class DocumentsApiHandler
             $this->settings,
             fn (int $id, int $tenantId, int $callerId): ?array => $this->sources->visibleRow($id, $tenantId, $callerId),
             $this->slots,
+            labels: $this->fieldLabels,
         );
     }
 
@@ -276,6 +278,63 @@ final class DocumentsApiHandler
             'render' => $issued['render'],
             'replayed' => $issued['replayed'],
         ], $issued['replayed'] ? 200 : 201);
+    }
+
+    /**
+     * POST /api/documents/{id}/revisions — a new document that replaces this one, from
+     * the record as it is now (#1625). The body is `{reason, template?, record?}`.
+     *
+     * @param array<string, string> $params
+     */
+    public function revise(Request $request, array $params): Response
+    {
+        $resolved = $this->resolveVisibleDocument($request, $params);
+        if ($resolved instanceof Response) {
+            return $resolved;
+        }
+        [$tenantId, $callerId, $document] = $resolved;
+        $body = JsonBody::parsed($request);
+
+        try {
+            $issued = $this->templateIssuing()->revise(
+                new ActingAs($tenantId, $callerId, $this->permissionResolver($callerId, $tenantId)),
+                $document,
+                $body['reason'] ?? null,
+                $body['template'] ?? null,
+                $body['record'] ?? null,
+            );
+        } catch (DocumentIssueRefused $e) {
+            return Response::error($e->clientMessage, $e->status, $e->details);
+        } catch (\Throwable $e) {
+            error_log('[DocumentsApiHandler] revising the document failed: ' . $e->getMessage());
+
+            return Response::error('The revision could not be created', 503);
+        }
+
+        return Response::json([
+            'data' => DocumentPresenter::document($issued['document'], $issued['artifacts']),
+            'render' => $issued['render'],
+            'diff' => $issued['diff'],
+        ], 201);
+    }
+
+    /**
+     * POST /api/documents/preflight — would this issue, and if not, why? The body is
+     * an issue's. Nothing is written and no number is allocated. Always 200 with the
+     * answer, since "no, because" is what was asked for.
+     */
+    public function preflight(Request $request): Response
+    {
+        $ctx = $this->context($request);
+        if ($ctx instanceof Response) {
+            return $ctx;
+        }
+        [$tenantId, $callerId] = $ctx;
+
+        return Response::json($this->templateIssuing()->preflight(
+            new ActingAs($tenantId, $callerId, $this->permissionResolver($callerId, $tenantId)),
+            IssueInput::fromBody(JsonBody::parsed($request)),
+        ));
     }
 
     /**
@@ -619,6 +678,9 @@ final class DocumentsApiHandler
 
         if (($document['withdrawn_at'] ?? null) !== null) {
             return Response::error('This document has been withdrawn, so it cannot be corrected', 409);
+        }
+        if (($document['superseded_by'] ?? null) !== null) {
+            return Response::error('A later revision replaced this document, so correct that one', 409);
         }
 
         $effective = $this->settings->effective($tenantId);

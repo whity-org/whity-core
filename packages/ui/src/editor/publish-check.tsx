@@ -27,6 +27,17 @@ const ICON: Record<PublishBlocker["kind"], IconName> = {
   "block-without-print-view": "plugin",
   "unknown-field": "field",
   "theme-unavailable": "branding",
+  "too-large": "image",
+}
+
+/** A size in megabytes with one decimal, Western digits in either language. */
+/** A size in MB, or in KB below 1 MB so a small limit never reads "0.0 MB" (WHIT-916). */
+function megabytes(bytes: number): string {
+  const mb = 1024 * 1024
+  if (bytes < mb) {
+    return `${Math.max(1, Math.round(bytes / 1024))} KB`
+  }
+  return `${(bytes / mb).toFixed(1)} MB`
 }
 
 /**
@@ -61,6 +72,14 @@ function blockerText(
     case "theme-unavailable":
       // No way to fix it here until the theme picker (WHIT-736): the hint says what to do.
       return { title: fillNodes(labels.blockerTheme, { ref: <bdi dir="ltr">{b.ref}</bdi> }), hint: labels.blockerThemeHint }
+    case "too-large":
+      return {
+        title: fillNodes(labels.blockerTooLarge, {
+          size: <bdi dir="ltr">{megabytes(b.bytes)}</bdi>,
+          max: <bdi dir="ltr">{megabytes(b.max)}</bdi>,
+        }),
+        hint: labels.blockerTooLargeHint,
+      }
   }
 }
 

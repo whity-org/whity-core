@@ -113,6 +113,9 @@ class EnforceTenantIsolation
         // resolve; InvitationAcceptHandler rate-limits per IP and answers one
         // generic message for every way a token can fail.
         '/api/v1/invitations/accept',
+        // WHIT-915: the emailed link of a workspace customer sign-up. Like an
+        // invitation, the token names its own tenant.
+        '/api/v1/public/signup/confirm',
         // ADR 0005 §6: multi-membership tenant selection. Public like login/2fa —
         // the caller holds only the short-lived selection cookie (no session yet);
         // AuthHandler::handleSelectTenant re-validates membership before minting.
@@ -327,8 +330,17 @@ class EnforceTenantIsolation
         // opaque reference to the caller's own file — which is what separates it
         // from the person and unit pickers the public surface still strips.
         '#^/api/v1/public/forms/[^/]+$#',
+        // WHIT-915: workspace customer sign-up. GET says whether sign-up is open
+        // and POST asks to join; both name the workspace by slug, checked against
+        // the host. PublicSignupApiHandler throttles before examining anything
+        // and answers the same 202 for every address it accepts.
+        '#^/api/v1/public/signup/workspaces/[a-z0-9-]+$#',
         '#^/api/v1/public/forms/[^/]+/uploads$#',
         '#^/api/v1/public/forms/[^/]+/submissions$#',
+
+        // What the page of a plugin's public form needs to show its bot check
+        // (WHIT-906). The key in the path is the only thing it answers to.
+        '#^/api/v1/public/plugin-forms/[^/]+$#',
 
         // Per-device licensing: redeeming an activation code. The person doing
         // it may be an end user or a student with NO account, so there is no

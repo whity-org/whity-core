@@ -226,7 +226,8 @@ final class SchemaInspectorDualEngineTest extends TestCase
     public function testPostgresLookupsAreConfinedToTheSearchPath(): void
     {
         if ($this->driver !== SchemaInspector::DRIVER_PGSQL) {
-            self::assertTrue(true, 'Search-path scoping is a PostgreSQL-only concern.');
+            // Search-path scoping is a PostgreSQL-only concern.
+            $this->addToAssertionCount(1);
             return;
         }
 
@@ -261,7 +262,8 @@ final class SchemaInspectorDualEngineTest extends TestCase
     public function testSqliteColumnLookupBindsRatherThanInterpolates(): void
     {
         if ($this->driver !== SchemaInspector::DRIVER_SQLITE) {
-            self::assertTrue(true, 'The unbindable-PRAGMA trap is SQLite-only.');
+            // The unbindable-PRAGMA trap is SQLite-only.
+            $this->addToAssertionCount(1);
             return;
         }
 

@@ -138,6 +138,9 @@ final class AgentStatsRepository
         $stmt = $this->db->prepare($sql . ' GROUP BY asg.agent_id');
         $stmt->execute($params);
 
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        /** @var list<array<string, mixed>> $rows */
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return $rows;
     }
 }

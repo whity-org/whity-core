@@ -426,6 +426,7 @@ final class UpdateMeRealEngineTest extends TestCase
         $stmt = $this->pdo->prepare('SELECT password_hash, auth_method FROM profiles WHERE id = ?');
         $stmt->execute([$profileId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        $this->assertIsArray($row);
         $this->assertSame('', (string) $row['password_hash'], 'no credential may be created');
         $this->assertSame(AuthMethod::IDP, (string) $row['auth_method']);
     }
@@ -479,6 +480,7 @@ final class UpdateMeRealEngineTest extends TestCase
         $read = $this->pdo->prepare('SELECT password_hash, auth_method FROM profiles WHERE id = ?');
         $read->execute([$profileId]);
         $row = $read->fetch(PDO::FETCH_ASSOC);
+        $this->assertIsArray($row);
         $this->assertTrue(password_verify('new-local-pw', (string) $row['password_hash']));
         $this->assertSame(AuthMethod::BOTH, (string) $row['auth_method'], 'the held fact must survive a rotation');
     }

@@ -343,7 +343,7 @@ final class TagGroupsListContractRealEngineTest extends TestCase
         );
 
         $remaining = count($ids);
-        foreach (array_values($ids) as $index => $id) {
+        foreach ($ids as $index => $id) {
             $stmt->execute([
                 ':created' => $index < self::EARLY_COUNT ? '2026-01-01 00:00:00' : '2026-02-01 00:00:00',
                 ':updated' => sprintf('2026-03-%02d 00:00:00', $remaining--),

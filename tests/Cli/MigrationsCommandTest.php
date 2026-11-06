@@ -4,6 +4,7 @@ namespace Whity\Tests\Cli;
 
 use PHPUnit\Framework\TestCase;
 use Tests\Support\RequiresConfiguredDatabase;
+use Whity\Database\Database;
 use Whity\Cli\Commands\MigrationsCommand;
 
 /**
@@ -33,9 +34,18 @@ class MigrationsCommandTest extends TestCase
      */
     public function testHelpCommandOutput(): void
     {
-        // Test that help action outputs correct usage information
-        // We can't test execute() directly without DB, so test the concept
-        $this->assertTrue(true);
+        // The help action needs no schema: an in-memory connection is enough to
+        // get past the connect step and print the usage text.
+        $db = Database::withFactory(static fn (): \PDO => new \PDO('sqlite::memory:'), 86400, 86400);
+        $command = new MigrationsCommand($db);
+
+        ob_start();
+        $exitCode = $command->execute(['help']);
+        $output = (string) ob_get_clean();
+
+        $this->assertSame(0, $exitCode);
+        $this->assertStringContainsString('Usage:', $output);
+        $this->assertStringContainsString('rollback --plugin <PluginName>', $output);
     }
 
     /**
@@ -78,8 +88,6 @@ class MigrationsCommandTest extends TestCase
         $exitCode = $command->execute(['run']);
         $output = ob_get_clean();
 
-        // Should return an integer exit code
-        $this->assertIsInt($exitCode);
         // Output should mention migrations
         $this->assertStringContainsString('migration', strtolower($output));
     }

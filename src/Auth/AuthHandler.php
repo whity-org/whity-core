@@ -1113,9 +1113,11 @@ class AuthHandler
     private function listActiveMemberships(int $profileId): array
     {
         try {
+            // m.* rather than m.kind: schemas from before migration 222 have
+            // no column, and every row there is staff (WHIT-915).
             // @tenant-guard-ignore: login flow — enumerates all tenant memberships for one profile (ADR 0005 §6)
             $stmt = $this->db->prepare(
-                "SELECT m.tenant_id, t.name AS tenant_name, r.name AS role
+                "SELECT m.*, t.name AS tenant_name, r.name AS role
                  FROM memberships m
                  JOIN tenants t ON t.id = m.tenant_id
                  LEFT JOIN roles r ON r.id = m.role_id
@@ -1131,6 +1133,10 @@ class AuthHandler
                     'tenant_id'   => (int) $row['tenant_id'],
                     'tenant_name' => (string) ($row['tenant_name'] ?? ''),
                     'role'        => (string) ($row['role'] ?? ''),
+                    // `customer` for a membership from the workspace's own
+                    // sign-up: the app hides admin and create-workspace
+                    // surfaces, and RBAC caps it server-side.
+                    'kind'        => (string) ($row['kind'] ?? 'member'),
                 ];
             }
             return $out;
@@ -1693,7 +1699,7 @@ class AuthHandler
             if ($accessJti === '' || $refreshJti === '') {
                 return;
             }
-            $expiresAt = is_array($rf) && isset($rf['exp'])
+            $expiresAt = isset($rf['exp'])
                 ? date('Y-m-d H:i:s', (int) $rf['exp'])
                 : date('Y-m-d H:i:s', time() + 604800);
 
@@ -2363,7 +2369,7 @@ class AuthHandler
         // ── Resolve 2FA credentials from the profile ──────────────────────────
         // Post-cutover: profile_id is required in the temp token (ADR 0005 §1)
         // and must be a positive int (is_int, never is_numeric).
-        if (!isset($claims['profile_id']) || !is_int($claims['profile_id']) || $claims['profile_id'] <= 0) {
+        if (!is_int($claims['profile_id']) || $claims['profile_id'] <= 0) {
             return Response::error('Invalid temporary token', 401);
         }
 
@@ -2417,9 +2423,9 @@ class AuthHandler
 
         // Backup-code fallback. backup_codes is keyed on profile_id after
         // migration 038 ($backupCodesUserId holds the resolved profiles.id).
-        // When no profile could be resolved, backup-code validation is skipped
-        // (fail-closed) and the caller falls through to the invalid-code path.
-        if (!$isValid && $backupCodesVersion > 0 && $backupCodesUserId !== null) {
+        // The temp token's profile_id was proved a positive int above, so a
+        // profile is always resolved here.
+        if (!$isValid && $backupCodesVersion > 0) {
             try {
                 $backupCodesService = $this->getBackupCodesService();
                 if ($backupCodesService->validateCode($backupCodesUserId, $code, $backupCodesVersion)) {

@@ -519,8 +519,8 @@ PHP);
         // The constructor demonstrably ran (load instantiates the plugin).
         // The fixture class is written to disk at runtime, so it is referenced
         // by name and read reflectively to keep static analysis happy.
-        /** @var class-string $pluginClass */
         $pluginClass = 'Wc214CtorFlag\\Plugin';
+        // @phpstan-ignore argument.type (the fixture class only exists once the test writes it to disk)
         $constructed = (new \ReflectionClass($pluginClass))->getStaticPropertyValue('constructed');
         $this->assertTrue(
             $constructed,
@@ -617,7 +617,7 @@ PHP);
     // ==================== helpers ====================
 
     /**
-     * @param array<string> $argv
+     * @param list<string> $argv
      */
     private function runQuiet(MigrationsCommand $command, array $argv): int
     {

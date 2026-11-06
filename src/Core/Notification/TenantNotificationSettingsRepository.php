@@ -42,7 +42,7 @@ final class TenantNotificationSettingsRepository
         /** @var list<array<string, mixed>> $rows */
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        return array_values(array_map(static fn (array $r): array => self::mapRedacted($r), $rows));
+        return array_map(static fn (array $r): array => self::mapRedacted($r), $rows);
     }
 
     /**
@@ -70,7 +70,7 @@ final class TenantNotificationSettingsRepository
             return null;
         }
         $mapped = self::mapRedacted($row);
-        $mapped['credentials_encrypted'] = isset($row['credentials_encrypted']) && $row['credentials_encrypted'] !== null
+        $mapped['credentials_encrypted'] = isset($row['credentials_encrypted'])
             ? (string) $row['credentials_encrypted']
             : null;
 
@@ -164,10 +164,10 @@ final class TenantNotificationSettingsRepository
 
         return [
             'channel'         => (string) $row['channel'],
-            'transport'       => isset($row['transport']) && $row['transport'] !== null ? (string) $row['transport'] : null,
-            'from_address'    => isset($row['from_address']) && $row['from_address'] !== null ? (string) $row['from_address'] : null,
-            'from_name'       => isset($row['from_name']) && $row['from_name'] !== null ? (string) $row['from_name'] : null,
-            'reply_to'        => isset($row['reply_to']) && $row['reply_to'] !== null ? (string) $row['reply_to'] : null,
+            'transport'       => isset($row['transport']) ? (string) $row['transport'] : null,
+            'from_address'    => isset($row['from_address']) ? (string) $row['from_address'] : null,
+            'from_name'       => isset($row['from_name']) ? (string) $row['from_name'] : null,
+            'reply_to'        => isset($row['reply_to']) ? (string) $row['reply_to'] : null,
             'config'          => is_array($config) ? $config : [],
             'has_credentials' => $creds !== null && $creds !== '',
             'enabled'         => self::toBool($row['enabled'] ?? true),

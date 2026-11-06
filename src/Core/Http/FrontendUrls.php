@@ -39,6 +39,7 @@ final class FrontendUrls
     public const PUBLIC_FORM = 'PUBLIC_FORM_URL';
     public const DOCUMENT_VERIFY = 'DOCUMENT_VERIFY_URL';
     public const ERROR_DETAILS = 'ERROR_DETAILS_URL';
+    public const SIGNUP_CONFIRM = 'SIGNUP_CONFIRM_URL';
 
     /**
      * The bundled admin's path for each link — what an override replaces.
@@ -53,6 +54,7 @@ final class FrontendUrls
         self::PUBLIC_FORM => '/f',
         self::DOCUMENT_VERIFY => '/verify',
         self::ERROR_DETAILS => '/admin/errors',
+        self::SIGNUP_CONFIRM => '/join/confirm',
     ];
 
     /**

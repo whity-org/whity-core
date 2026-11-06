@@ -298,7 +298,7 @@ final class SuggestionPatchTest extends TestCase
         ];
         foreach ($bad as $why => $patch) {
             self::assertNotNull(SuggestionPatch::problem($patch), $why);
-            /** @var array<string, mixed> $patch */
+            // @phpstan-ignore argument.type (deliberately invalid patches, including one that is not an object)
             self::assertNull(SuggestionPatch::apply(self::doc(), $patch), $why . ' never applies');
         }
     }

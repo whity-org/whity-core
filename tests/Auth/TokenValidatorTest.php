@@ -396,6 +396,7 @@ class TokenValidatorTest extends TestCase
         // Parse to get jti for token1
         $claims1 = $this->jwtParser->parse($token1);
         $claims2 = $this->jwtParser->parse($token2);
+        $this->assertNotNull($claims1);
 
         // Track state across calls
         $revokedJti = $claims1['jti'];

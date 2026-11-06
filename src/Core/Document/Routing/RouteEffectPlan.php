@@ -56,7 +56,7 @@ final class RouteEffectPlan
     /**
      * Notify these people.
      *
-     * @param list<int>            $profileIds
+     * @param array<mixed>         $profileIds Anything that is not a positive int is dropped.
      * @param array<string, mixed> $data
      *
      * @throws InvalidRouteEffectException When the audience is empty or the type

@@ -98,6 +98,7 @@ final class DbBooleanRealEngineTest extends TestCase
         $this->pdo->exec("INSERT INTO languages (code, name, enabled) VALUES ('zz', 'Test Off', false)");
 
         $row = $this->query("SELECT * FROM languages WHERE code = 'zz'")->fetch(PDO::FETCH_ASSOC);
+        self::assertIsArray($row);
 
         $language = Language::fromRow($row);
 
@@ -112,6 +113,7 @@ final class DbBooleanRealEngineTest extends TestCase
         $this->pdo->exec("INSERT INTO languages (code, name, enabled) VALUES ('zy', 'Test On', true)");
 
         $row = $this->query("SELECT * FROM languages WHERE code = 'zy'")->fetch(PDO::FETCH_ASSOC);
+        self::assertIsArray($row);
 
         self::assertTrue(Language::fromRow($row)->enabled);
     }

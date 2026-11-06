@@ -247,3 +247,90 @@ describe('EmailDomainsPage — verify + delete', () => {
     await waitFor(() => expect(addToast).toHaveBeenCalledWith(expect.stringContaining('removed'), 'success'));
   });
 });
+
+describe('EmailDomainsPage — edit domain', () => {
+  function routesWithPatch(domains: EmailDomain[], patchStatus = 200) {
+    mockApiClient.mockImplementation((url: string, opts?: { method?: string }) => {
+      if (opts?.method === 'PATCH' && url === '/api/v1/email-domains/1') {
+        return patchStatus === 200
+          ? jsonResponse(200, { data: { ...VERIFIED_DOMAIN, default_role_id: 1, auto_provision: false } })
+          : jsonResponse(patchStatus, { error: 'Role not assignable' });
+      }
+      if (url === '/api/v1/email-domains') {
+        return jsonResponse(200, { data: domains });
+      }
+      if (url.startsWith('/api/v1/roles')) {
+        return jsonResponse(200, { data: ROLES });
+      }
+      return jsonResponse(404, {});
+    });
+  }
+
+  it('opens the form on the row with the current values and the name locked', async () => {
+    routesWithPatch([VERIFIED_DOMAIN]);
+    render(<EmailDomainsPage />);
+
+    await waitFor(() => expect(screen.getByTestId('email-domain-edit-1')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('email-domain-edit-1'));
+
+    expect(await screen.findByTestId('email-domain-form')).toBeInTheDocument();
+    expect(screen.queryByTestId('email-domain-1')).not.toBeInTheDocument();
+    const domainInput = screen.getByLabelText('Domain');
+    expect(domainInput).toHaveValue('example.com');
+    expect(domainInput).toBeDisabled();
+    expect(screen.getByTestId('email-domain-name-locked')).toBeInTheDocument();
+    expect(screen.getByTestId('email-domain-auto-provision-switch')).toBeChecked();
+  });
+
+  it('PATCHes only the role and the switch, never the domain name', async () => {
+    routesWithPatch([VERIFIED_DOMAIN]);
+    render(<EmailDomainsPage />);
+
+    await waitFor(() => expect(screen.getByTestId('email-domain-edit-1')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('email-domain-edit-1'));
+    await screen.findByTestId('email-domain-form');
+    fireEvent.click(screen.getByTestId('email-domain-auto-provision-switch'));
+    fireEvent.click(screen.getByTestId('email-domain-save'));
+
+    await waitFor(() => {
+      expect(mockApiClient).toHaveBeenCalledWith(
+        '/api/v1/email-domains/1',
+        expect.objectContaining({
+          method: 'PATCH',
+          body: JSON.stringify({ default_role_id: 2, auto_provision: false }),
+        })
+      );
+    });
+    await waitFor(() => expect(addToast).toHaveBeenCalledWith('Domain updated.', 'success'));
+    await waitFor(() => expect(screen.queryByTestId('email-domain-form')).not.toBeInTheDocument());
+  });
+
+  it('keeps the form open and shows the server error when the update is refused', async () => {
+    routesWithPatch([VERIFIED_DOMAIN], 422);
+    render(<EmailDomainsPage />);
+
+    await waitFor(() => expect(screen.getByTestId('email-domain-edit-1')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('email-domain-edit-1'));
+    await screen.findByTestId('email-domain-form');
+    fireEvent.click(screen.getByTestId('email-domain-save'));
+
+    await waitFor(() => expect(addToast).toHaveBeenCalledWith('Role not assignable', 'error'));
+    expect(screen.getByTestId('email-domain-form')).toBeInTheDocument();
+  });
+
+  it('Cancel puts the row back without calling the API', async () => {
+    routesWithPatch([VERIFIED_DOMAIN]);
+    render(<EmailDomainsPage />);
+
+    await waitFor(() => expect(screen.getByTestId('email-domain-edit-1')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('email-domain-edit-1'));
+    await screen.findByTestId('email-domain-form');
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(await screen.findByTestId('email-domain-1')).toBeInTheDocument();
+    expect(mockApiClient).not.toHaveBeenCalledWith(
+      '/api/v1/email-domains/1',
+      expect.objectContaining({ method: 'PATCH' })
+    );
+  });
+});

@@ -197,7 +197,7 @@ class DeactivationEndsSessionsTest extends TestCase
             ->execute([$status, self::TEST_USER_ID]);
     }
 
-    /** @return list<array<string, mixed>> */
+    /** @return array<int, array<string, mixed>> */
     private function auditRows(string $action): array
     {
         $stmt = $this->pdo->prepare('SELECT * FROM audit_log WHERE action = ?');

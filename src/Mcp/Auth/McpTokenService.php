@@ -127,9 +127,6 @@ final class McpTokenService
         $stmt->execute([$profileId, $tenantId]);
 
         $rows = $stmt->fetchAll();
-        if (!is_array($rows)) {
-            return [];
-        }
 
         return array_values(array_map(function (array $row): array {
             $decoded = json_decode((string) $row['scope'], true);
@@ -177,7 +174,7 @@ final class McpTokenService
     public function updateScope(string $jti, int $profileId, int $tenantId, array $scope): void
     {
         $stmt = $this->db->prepare('UPDATE mcp_tokens SET scope = ? WHERE jti = ? AND profile_id = ? AND tenant_id = ?');
-        $stmt->execute([json_encode(array_values($scope), JSON_THROW_ON_ERROR), $jti, $profileId, $tenantId]);
+        $stmt->execute([json_encode($scope, JSON_THROW_ON_ERROR), $jti, $profileId, $tenantId]);
     }
 
     /**

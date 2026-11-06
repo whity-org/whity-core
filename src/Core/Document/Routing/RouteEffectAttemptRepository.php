@@ -94,9 +94,12 @@ final class RouteEffectAttemptRepository
         $statement->bindValue('limit', max(1, $limit), PDO::PARAM_INT);
         $statement->execute();
 
+        /** @var list<array<string, mixed>> $rows */
+        $rows = $statement->fetchAll(PDO::FETCH_ASSOC);
+
         return array_map(
             static fn (array $row): array => self::normalize($row),
-            $statement->fetchAll(PDO::FETCH_ASSOC)
+            $rows
         );
     }
 

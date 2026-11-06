@@ -44,7 +44,10 @@ final class AgentRepository
         }
         $stmt->execute($params);
 
-        return array_map(self::normalize(...), $stmt->fetchAll(PDO::FETCH_ASSOC));
+        /** @var list<array<string, mixed>> $rows */
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return array_map(self::normalize(...), $rows);
     }
 
     /** @return array<string, mixed>|null */

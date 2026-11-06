@@ -178,8 +178,7 @@ class HookManagerTest extends TestCase
     {
         $listeners = $this->hookManager->getListeners('nonexistent_event');
 
-        $this->assertIsArray($listeners);
-        $this->assertEmpty($listeners);
+        $this->assertSame([], $listeners);
     }
 
     public function testRemoveListenerRemovesMatchingCallback(): void

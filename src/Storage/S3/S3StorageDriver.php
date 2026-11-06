@@ -211,7 +211,7 @@ final class S3StorageDriver implements StorageDriverInterface
 
         $truncated = false;
         $next = null;
-        foreach ($doc->documentElement?->childNodes ?? [] as $node) {
+        foreach ($doc->documentElement->childNodes ?? [] as $node) {
             if ($node->nodeName === 'IsTruncated') {
                 $truncated = strtolower(trim($node->textContent)) === 'true';
             }

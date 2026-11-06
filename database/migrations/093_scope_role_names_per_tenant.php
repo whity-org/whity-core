@@ -215,7 +215,7 @@ class ScopeRoleNamesPerTenant
         foreach (self::duplicateGroups($db) as $group) {
             // Keep the first (lowest id); rename the rest.
             foreach (array_slice($group, 1) as $roleId) {
-                // @tenant-guard-ignore: schema-repair rename addressed by primary key; runs before the tenant-scoped index exists
+                // Unscoped by design (migration): schema-repair rename addressed by primary key; runs before the tenant-scoped index exists
                 $db->query(
                     'UPDATE roles SET name = name || :suffix WHERE id = :id',
                     [':suffix' => ' #' . $roleId, ':id' => $roleId]
@@ -237,7 +237,7 @@ class ScopeRoleNamesPerTenant
      */
     private static function duplicateGroups(Database $db): array
     {
-        // @tenant-guard-ignore: schema-repair pre-flight; deliberately scans every tenant to find cross-row name collisions
+        // Unscoped by design (migration): schema-repair pre-flight; deliberately scans every tenant to find cross-row name collisions
         $stmt = $db->query(
             'SELECT id, name, COALESCE(tenant_id, -1) AS scope
              FROM roles
@@ -265,7 +265,7 @@ class ScopeRoleNamesPerTenant
      */
     private static function globallyDuplicatedNames(Database $db): array
     {
-        // @tenant-guard-ignore: rollback pre-flight; the restored constraint is platform-global, so the check must be too
+        // Unscoped by design (migration): rollback pre-flight; the restored constraint is platform-global, so the check must be too
         $stmt = $db->query(
             'SELECT name FROM roles GROUP BY name HAVING COUNT(*) > 1 ORDER BY name'
         );

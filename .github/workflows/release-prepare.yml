@@ -205,6 +205,12 @@ jobs:
           file_put_contents($path, $log);
           PHP
 
+      # The plugin SDK coverage matrix names the core release it describes. A
+      # matrix behind Sdk::VERSION fails here too, so a release cannot ship an
+      # SDK minor the matrix does not account for.
+      - name: Stamp the plugin SDK coverage matrix
+        run: php scripts/sdk-coverage.php --release "${{ steps.check.outputs.version }}"
+
       - name: Regenerate the OpenAPI spec and typed clients
         run: |
           # The spec embeds the version, and both typed clients are generated

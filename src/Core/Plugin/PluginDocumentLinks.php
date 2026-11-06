@@ -49,6 +49,19 @@ final class PluginDocumentLinks
     }
 
     /** Whether $pluginSlug issued $documentId in $tenantId. */
+    /** A revision stays with the plugin that issued the document it replaces. */
+    public function inherit(int $tenantId, int $fromDocumentId, int $toDocumentId): void
+    {
+        $stmt = $this->db->prepare(
+            'INSERT INTO plugin_document_links (tenant_id, plugin_slug, document_id)
+             SELECT tenant_id, plugin_slug, :to_document
+               FROM plugin_document_links
+              WHERE tenant_id = :tenant_id AND document_id = :from_document
+             ON CONFLICT (tenant_id, document_id) DO NOTHING'
+        );
+        $stmt->execute([':to_document' => $toDocumentId, ':tenant_id' => $tenantId, ':from_document' => $fromDocumentId]);
+    }
+
     public function owns(int $tenantId, string $pluginSlug, int $documentId): bool
     {
         $stmt = $this->db->prepare(

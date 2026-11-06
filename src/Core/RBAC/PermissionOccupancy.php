@@ -89,7 +89,7 @@ final class PermissionOccupancy
                JOIN role_permissions rp ON rp.permission_id = p.id
               WHERE p.name IN ({$placeholders})"
         );
-        $stmt->execute(array_values($slugs));
+        $stmt->execute($slugs);
 
         $held = [];
         foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $name) {

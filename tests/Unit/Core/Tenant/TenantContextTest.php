@@ -466,14 +466,11 @@ class TenantContextTest extends TestCase
      */
     public function testSetSystemModeAuditLogsActivation(): void
     {
-        $records = [];
-        $logger = new class ($records) extends AbstractLogger {
-            /** @param list<array{level:mixed,message:string,context:array<string,mixed>}> $records */
-            public function __construct(private array &$records)
-            {
-            }
+        $logger = new class () extends AbstractLogger {
+            /** @var list<array{level:mixed,message:string,context:array<mixed>}> */
+            public array $records = [];
 
-            public function log($level, $message, array $context = []): void
+            public function log($level, string|\Stringable $message, array $context = []): void
             {
                 $this->records[] = [
                     'level' => $level,
@@ -486,6 +483,7 @@ class TenantContextTest extends TestCase
         TenantContext::setLogger($logger);
         TenantContext::setSystemMode(true, 'db:migrate', ['reason' => 'schema upgrade']);
 
+        $records = $logger->records;
         $this->assertCount(1, $records, 'Exactly one audit record on activation');
         $record = $records[0];
         $this->assertStringContainsStringIgnoringCase('system mode', $record['message']);
@@ -500,14 +498,11 @@ class TenantContextTest extends TestCase
      */
     public function testSetSystemModeAuditLogsDeactivation(): void
     {
-        $records = [];
-        $logger = new class ($records) extends AbstractLogger {
-            /** @param list<array<string,mixed>> $records */
-            public function __construct(private array &$records)
-            {
-            }
+        $logger = new class () extends AbstractLogger {
+            /** @var list<array{message:string,context:array<mixed>}> */
+            public array $records = [];
 
-            public function log($level, $message, array $context = []): void
+            public function log($level, string|\Stringable $message, array $context = []): void
             {
                 $this->records[] = ['message' => (string) $message, 'context' => $context];
             }
@@ -517,6 +512,7 @@ class TenantContextTest extends TestCase
         TenantContext::setSystemMode(true, 'admin');
         TenantContext::setSystemMode(false, 'admin');
 
+        $records = $logger->records;
         $this->assertCount(2, $records);
         $this->assertFalse($records[1]['context']['enabled']);
     }

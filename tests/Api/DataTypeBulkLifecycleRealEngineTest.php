@@ -1134,7 +1134,7 @@ final class DataTypeBulkLifecycleRealEngineTest extends TestCase
      * Every surviving record id, as strings, ascending. The evidence for what a
      * batch really did.
      *
-     * @return list<string>
+     * @return array<int, string>
      */
     private function recordIds(): array
     {

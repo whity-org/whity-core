@@ -134,7 +134,7 @@ final class DocumentCommentRepository
         }
         $placeholders = [];
         $params = [':tenant_id' => $tenantId];
-        foreach (array_values($threadIds) as $i => $id) {
+        foreach ($threadIds as $i => $id) {
             $placeholders[] = ':t' . $i;
             $params[':t' . $i] = $id;
         }

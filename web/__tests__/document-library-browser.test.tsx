@@ -168,6 +168,7 @@ function installApi(options: {
   views?: Handled;
   collections?: Handled;
   ous?: Handled;
+  labels?: Handled;
   templates?: Handled;
   documents?: (url: string) => Handled;
   mutation?: Handled;
@@ -184,6 +185,11 @@ function installApi(options: {
         json: () => Promise.resolve(handled.body),
       } as Response);
 
+    if (url === '/api/v1/labels/resolve') {
+      return answer(
+        options.labels ?? { ok: true, body: { data: { ous: { 3: 'Registry Unit' }, roles: {} } } }
+      );
+    }
     if (method !== 'GET') {
       return answer(options.mutation ?? { ok: true, body: { data: {} } });
     }
@@ -326,6 +332,31 @@ describe('the several ways a page can have no rows', () => {
 });
 
 // ── 2. sorting is the server's ─────────────────────────────────────────────
+
+describe('the unit a document was raised from (#1019)', () => {
+  it('is named without the unit directory, through the label endpoint', async () => {
+    installApi({ ous: { ok: false, status: 403, body: { error: 'Insufficient permissions', required: 'ous:read' } } });
+    render(<DocumentLibraryPage />);
+
+    await waitFor(() => expect(screen.getAllByText('Registry Unit').length).toBeGreaterThan(0));
+    const label = calls.find((call) => call.url === '/api/v1/labels/resolve');
+    expect(label?.method).toBe('POST');
+    const body = JSON.parse(String(mockApiClient.mock.calls.find((call) => call[0] === '/api/v1/labels/resolve')?.[1]?.body));
+    expect(body).toEqual({ surface: 'documents', ous: [3], roles: [] });
+    // The filter that needs the whole list says so; the column does not.
+    expect(screen.getByText('Filtering by unit is not available to you.')).toBeInTheDocument();
+    expect(screen.queryByText('Unit names could not be loaded, so they are not shown.')).not.toBeInTheDocument();
+  });
+
+  it('shows the id, and says so, when the names could not be loaded', async () => {
+    installApi({ labels: { ok: false, status: 403, body: { error: 'Insufficient permissions' } } });
+    render(<DocumentLibraryPage />);
+
+    await waitFor(() =>
+      expect(screen.getByText('Unit names could not be loaded, so they are not shown.')).toBeInTheDocument()
+    );
+  });
+});
 
 describe('sorting', () => {
   it('asks the SERVER to sort, and sends no direction until one is chosen', async () => {
@@ -716,7 +747,7 @@ it('offers no search, sort or layout switch to a caller who cannot read the fold
   expect(screen.queryByLabelText('Sort by')).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Grid' })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'List' })).not.toBeInTheDocument();
-  expect(screen.queryByLabelText('Search titles')).not.toBeInTheDocument();
+  expect(screen.queryByLabelText('Search titles and numbers')).not.toBeInTheDocument();
 });
 
 /**

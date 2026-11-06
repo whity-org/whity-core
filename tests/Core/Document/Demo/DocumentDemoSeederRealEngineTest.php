@@ -1637,7 +1637,7 @@ final class DocumentDemoSeederRealEngineTest extends TestCase
         return (int) $stmt->fetchColumn();
     }
 
-    /** @return list<int> */
+    /** @return array<int, int> */
     private function actorProfileIds(int $documentId): array
     {
         $stmt = $this->pdo->prepare(
@@ -1800,7 +1800,7 @@ final class DocumentDemoSeederRealEngineTest extends TestCase
     /**
      * Every permission any template in this tenant is gated on.
      *
-     * @return list<string>
+     * @return array<int, string>
      */
     private function taggedPermissions(): array
     {
@@ -1847,7 +1847,7 @@ final class DocumentDemoSeederRealEngineTest extends TestCase
      * readable in a failure message. Same pattern as
      * {@see \Tests\Api\RolePermissionDeltaRealEngineTest}.
      *
-     * @return list<string>
+     * @return array<int, string>
      */
     private function permissionsOfRole(int $roleId): array
     {

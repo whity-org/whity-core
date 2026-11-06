@@ -9,6 +9,7 @@ use Throwable;
 use Whity\Core\Document\DocumentArtifactRepository;
 use Whity\Core\Document\DocumentIssuer;
 use Whity\Core\Document\DocumentRepository;
+use Whity\Core\Document\DocumentState;
 use Whity\Core\Document\DocumentSourceVersionRepository;
 use Whity\Core\Document\Print\SourceDocumentPrinter;
 use Whity\Core\Document\Print\WhityDocumentPrinter;
@@ -68,6 +69,9 @@ final class DocumentIssuing
     /** The field a template prints a document's number with. */
     public const NUMBER_FIELD = 'issued_document.number';
 
+    /** The field a template prints a document's revision letter with. */
+    public const REVISION_FIELD = 'issued_document.revision';
+
     /** The limits one rendered document spends. */
     public const RENDER_METERS = [
         EntitlementRegistry::DOCUMENTS_RENDER_PER_DAY,
@@ -99,6 +103,16 @@ final class DocumentIssuing
         return ($source['published_version'] ?? null) !== null
             ? $this->versions->find((int) $source['id'], $tenantId, (int) $source['published_version'])
             : null;
+    }
+
+    /**
+     * The version a document printed, for a revision that keeps its template as it was.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function version(int $tenantId, int $sourceId, int $version): ?array
+    {
+        return $this->versions->find($sourceId, $tenantId, $version);
     }
 
     /**
@@ -174,22 +188,12 @@ final class DocumentIssuing
             }
         }
 
-        $event = [
-            'tenant_id' => $tenantId,
-            'source_id' => (int) $source['id'],
-            'version' => (int) $version['version'],
-            'record' => $request->record,
-            'slot' => $request->slot,
-            'origin_key' => $originKey,
-            'actor' => $callerId,
-        ];
-        if ($actor->plugin !== null) {
-            // A plugin in the background: no person, and which plugin it was.
-            $event['origin'] = 'plugin:' . $actor->plugin;
-        }
+        $event = self::issuingEvent($request, $actor);
         $this->veto(Events::DOCUMENT_ISSUING, $event);
 
-        $numbering = self::rule($source, $request->numbering);
+        // A revision keeps its original's number and rule; it never starts a series.
+        $replaced = $request->revisionOf;
+        $numbering = $replaced === null ? self::rule($source, $request->numbering) : null;
         $record = TemplateIssuing::parseRecord($request->record);
 
         try {
@@ -201,8 +205,13 @@ final class DocumentIssuing
                     'source_id' => (int) $source['id'],
                     'source_version' => (int) $version['version'],
                     'origin_key' => $originKey,
-                    'number_pattern' => $numbering?->pattern,
+                    'number_pattern' => $replaced !== null ? ($replaced['number_pattern'] ?? null) : $numbering?->pattern,
                     'number_now' => $numbering?->assign === DocumentNumberingRule::ON_ISSUE,
+                    'number' => $replaced['number'] ?? null,
+                    'number_assigned_at' => $replaced['number_assigned_at'] ?? null,
+                    'supersedes_id' => $replaced['id'] ?? null,
+                    'revision' => $replaced !== null ? (int) ($replaced['revision'] ?? 1) + 1 : 1,
+                    'revision_reason' => $request->revisionReason,
                     'record_type' => $record[0] ?? null,
                     'record_id' => $record[1] ?? null,
                     'slot' => $request->slot,
@@ -212,6 +221,14 @@ final class DocumentIssuing
                 [array_map(static fn (?string $v): string => $v ?? '', $values)],
             );
         } catch (PDOException $e) {
+            // Two people revising one document: the unique index let one through.
+            if ($replaced !== null) {
+                $current = $this->documents?->findById((int) $replaced['id'], $tenantId);
+                if (($current['superseded_by'] ?? null) !== null) {
+                    throw new DocumentRevisionConflictException((int) $current['superseded_by']);
+                }
+                throw $e;
+            }
             // Two requests with the same origin key at once: the unique index
             // let one through, and the other answers with that one's document.
             $existing = $originKey !== null ? $this->documents?->findByOriginKey($originKey, $tenantId) : null;
@@ -223,6 +240,17 @@ final class DocumentIssuing
         }
         $event = ['id' => (int) $document['id'], 'number' => $document['number'] ?? null] + $event;
         $this->announce(Events::DOCUMENT_ISSUED, $event);
+        if ($replaced !== null) {
+            $this->announce(Events::DOCUMENT_REVISED, [
+                'id' => (int) $document['id'],
+                'tenant_id' => $tenantId,
+                'supersedes_id' => (int) $replaced['id'],
+                'number' => $document['number'] ?? null,
+                'revision' => DocumentState::revisionLetter((int) $document['revision']),
+                'reason' => $request->revisionReason,
+                'actor' => $callerId,
+            ]);
+        }
 
         // The verification code is minted now, with the record, whether or not
         // a PDF follows: the record page shows it, and a later render (or a
@@ -235,6 +263,100 @@ final class DocumentIssuing
         [$outcome, $artifact] = $this->renderAndStore($actor, $source, $version, $values, $request->recordLabel, $document);
 
         return ['document' => $document, 'artifacts' => $artifact !== null ? [$artifact] : [], 'render' => $outcome, 'replayed' => false];
+    }
+
+    /**
+     * What `document.issuing` carries, for an issue and for a preflight alike.
+     *
+     * @return array<string, mixed>
+     */
+    private static function issuingEvent(IssueRequest $request, ActingAs $actor): array
+    {
+        $event = [
+            'tenant_id' => $actor->tenantId,
+            'source_id' => (int) $request->source['id'],
+            'version' => (int) $request->version['version'],
+            'record' => $request->record,
+            'slot' => $request->slot,
+            'origin_key' => $request->originKey,
+            'actor' => $actor->issuerId(),
+        ];
+        if ($actor->plugin !== null) {
+            // A plugin in the background: no person, and which plugin it was.
+            $event['origin'] = 'plugin:' . $actor->plugin;
+        }
+
+        return $event;
+    }
+
+    /**
+     * The document this request's origin key already names, when an issue would
+     * return it instead of raising one.
+     *
+     * @throws DocumentOriginKeyConflictException When the key names a document from another template.
+     */
+    public function replaysDocument(IssueRequest $request): ?int
+    {
+        if ($request->originKey === null) {
+            return null;
+        }
+        $existing = $this->documents?->findByOriginKey($request->originKey, (int) $request->source['tenant_id']);
+        if ($existing === null) {
+            return null;
+        }
+        if (($existing['document_source_id'] ?? null) !== (int) $request->source['id']) {
+            throw new DocumentOriginKeyConflictException((int) $existing['id']);
+        }
+
+        return (int) $existing['id'];
+    }
+
+    /**
+     * Ask `document.issuing` listeners, without issuing (WHIT-892). The payload is an
+     * issue's plus `check_only: true`, `checks: []` and `missing_fields`. A listener
+     * that knows the flag appends `{label, ok, why?}` to `checks` and returns the
+     * payload, so it can give every reason. One that doesn't know it may still veto,
+     * which is reported as a failed check and can't hide core's own.
+     *
+     * @param list<string> $missing
+     * @param callable(string, string): string $label
+     * @return list<array<string, mixed>>
+     */
+    public function listenerChecks(IssueRequest $request, ActingAs $actor, array $missing, callable $label): array
+    {
+        if ($this->hooks === null) {
+            return [];
+        }
+        $payload = self::issuingEvent($request, $actor) + ['check_only' => true, 'checks' => [], 'missing_fields' => $missing];
+        try {
+            $answer = $this->hooks->dispatch(Events::DOCUMENT_ISSUING, $payload);
+        } catch (HookVetoException $e) {
+            return [[
+                'code' => 'plugin',
+                'label' => $label('preflight.check.plugin', 'A plugin\'s own check'),
+                'ok' => false,
+                'why' => $e->reason(),
+            ]];
+        } catch (Throwable $e) {
+            error_log('[DocumentIssuing] a listener on ' . Events::DOCUMENT_ISSUING . ' failed a preflight: ' . $e->getMessage());
+
+            return [];
+        }
+
+        $checks = [];
+        foreach (is_array($answer['checks'] ?? null) ? $answer['checks'] : [] as $check) {
+            if (!is_array($check) || !is_string($check['label'] ?? null) || trim($check['label']) === '' || !is_bool($check['ok'] ?? null)) {
+                error_log('[DocumentIssuing] a preflight listener returned a check with no label or no ok');
+                continue;
+            }
+            $row = ['code' => 'plugin', 'label' => mb_substr(trim($check['label']), 0, HookVetoException::REASON_MAX_LENGTH), 'ok' => $check['ok']];
+            if (!$check['ok'] && is_string($check['why'] ?? null) && trim($check['why']) !== '') {
+                $row['why'] = mb_substr(trim($check['why']), 0, HookVetoException::REASON_MAX_LENGTH);
+            }
+            $checks[] = $row;
+        }
+
+        return $checks;
     }
 
     /**
@@ -448,6 +570,7 @@ final class DocumentIssuing
         // Stored on the record, and read from it for every print: an issue, a
         // correction and a reprint after final approval all show the same one.
         $values[self::NUMBER_FIELD] = isset($document['number']) ? (string) $document['number'] : null;
+        $values[self::REVISION_FIELD] = DocumentState::revisionLetter((int) ($document['revision'] ?? 1));
 
         $printer = $this->printer($actor, $source, $values);
         $payload = $this->print->payload(
@@ -512,7 +635,7 @@ final class DocumentIssuing
      */
     private function printer(ActingAs $actor, array $source, array $values): WhityDocumentPrinter
     {
-        $type = isset($source['record_type']) && $source['record_type'] !== null ? (string) $source['record_type'] : null;
+        $type = isset($source['record_type']) ? (string) $source['record_type'] : null;
 
         return $this->print->printer($actor->tenantId, $actor->profileId, $actor->hasPermission, (int) $source['id'], $values, $type);
     }

@@ -127,4 +127,23 @@ final class ExpressionTest extends TestCase
         }
         self::assertSame($expected, $actual);
     }
+
+    /**
+     * evaluate() does not validate first, so an empty min/max must still fail
+     * as an ExpressionError rather than PHP's ValueError from min([]).
+     */
+    public function testEmptyMinAndMaxFailAsExpressionErrors(): void
+    {
+        $ctx = new ExpressionContext();
+        foreach (['min', 'max'] as $op) {
+            try {
+                Expression::evaluate([$op => []], $ctx);
+                self::fail("{$op} with no values should not evaluate");
+            } catch (ExpressionError $e) {
+                self::assertSame(ExpressionError::TYPE, $e->kind);
+            }
+        }
+        self::assertSame(0, Expression::evaluate(['+' => []], $ctx));
+        self::assertSame(1, Expression::evaluate(['*' => []], $ctx));
+    }
 }

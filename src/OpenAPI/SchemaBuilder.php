@@ -208,7 +208,7 @@ class SchemaBuilder
 
         $this->collectDanglingRefs($this->spec, $errors, 0);
 
-        return array_values($errors);
+        return $errors;
     }
 
     /**

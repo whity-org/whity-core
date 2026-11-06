@@ -31,6 +31,12 @@ final class CurlBillingTransport implements BillingTransport
      */
     public function send(string $method, string $url, array $headers, ?string $body = null): array
     {
+        if ($method === '' || $url === '') {
+            // cURL would fail the same way at curl_exec(); saying so here keeps
+            // the option types honest.
+            throw BillingPortalException::unreachable('no request method or URL to send to');
+        }
+
         $handle = curl_init();
         if ($handle === false) {
             throw BillingPortalException::unreachable('could not initialise an HTTP client');

@@ -22,7 +22,6 @@ class SchemaGeneratorTest extends TestCase
         $spec = $generator->generate();
 
         // Check OpenAPI version and basic structure
-        $this->assertIsArray($spec);
         $this->assertEquals('3.0.0', $spec['openapi']);
         $this->assertEquals('Whity API', $spec['info']['title']);
     }

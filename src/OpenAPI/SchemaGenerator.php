@@ -177,7 +177,7 @@ class SchemaGenerator
 
         return [
             'spec' => $builder->build(),
-            'errors' => array_values(array_merge($builder->validate(), $this->conflicts)),
+            'errors' => array_merge($builder->validate(), $this->conflicts),
         ];
     }
 
@@ -348,7 +348,7 @@ class SchemaGenerator
                     error_log("[openapi] {$method} {$path}: " . $e->getMessage());
                 }
             }
-        } elseif ($components !== null && $components !== []) {
+        } else {
             error_log("[openapi] {$method} {$path}: 'components' must be an array of name => schema");
         }
 
@@ -363,7 +363,7 @@ class SchemaGenerator
             'summary' => is_string($schema['summary'] ?? null)
                 ? $schema['summary']
                 : $this->generateSummary($method, $path),
-            'tags' => is_array($schema['tags'] ?? null) && ($schema['tags'] ?? []) !== []
+            'tags' => is_array($schema['tags'] ?? null) && $schema['tags'] !== []
                 ? array_values($schema['tags'])
                 : [$this->getTag($path)],
         ];

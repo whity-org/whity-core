@@ -794,7 +794,7 @@ final class RouteTemplateInstantiationRealEngineTest extends TestCase
         $ids = array_map(static fn (array $r): int => (int) $r['profile_id'], $rows);
         sort($ids);
 
-        return array_values($ids);
+        return $ids;
     }
 
     private function seedDocument(): int

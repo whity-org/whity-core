@@ -132,7 +132,7 @@ class CookieManagerTest extends TestCase
         CookieManager::setAccessToken('test-token-123');
 
         ob_end_clean();
-        $this->assertTrue(true); // Method executed without error
+        $this->addToAssertionCount(1); // Method executed without error
     }
 
     /**
@@ -143,7 +143,7 @@ class CookieManagerTest extends TestCase
         ob_start();
         CookieManager::setAccessToken('token-value', 1800); // 30 minutes
         ob_end_clean();
-        $this->assertTrue(true); // Method executed without error
+        $this->addToAssertionCount(1); // Method executed without error
     }
 
     /**
@@ -154,7 +154,7 @@ class CookieManagerTest extends TestCase
         ob_start();
         CookieManager::setRefreshToken('test-refresh-token-456');
         ob_end_clean();
-        $this->assertTrue(true); // Method executed without error
+        $this->addToAssertionCount(1); // Method executed without error
     }
 
     /**
@@ -165,7 +165,7 @@ class CookieManagerTest extends TestCase
         ob_start();
         CookieManager::setRefreshToken('refresh-value', 2592000); // 30 days
         ob_end_clean();
-        $this->assertTrue(true); // Method executed without error
+        $this->addToAssertionCount(1); // Method executed without error
     }
 
     /**
@@ -176,7 +176,7 @@ class CookieManagerTest extends TestCase
         ob_start();
         CookieManager::clearAccessToken();
         ob_end_clean();
-        $this->assertTrue(true); // Method executed without error
+        $this->addToAssertionCount(1); // Method executed without error
     }
 
     /**
@@ -187,7 +187,7 @@ class CookieManagerTest extends TestCase
         ob_start();
         CookieManager::clearRefreshToken();
         ob_end_clean();
-        $this->assertTrue(true); // Method executed without error
+        $this->addToAssertionCount(1); // Method executed without error
     }
 
     /**
@@ -238,7 +238,7 @@ class CookieManagerTest extends TestCase
         // The actual value would be sent in the header
         CookieManager::setAccessToken('token');
         ob_end_clean();
-        $this->assertTrue(true);
+        $this->addToAssertionCount(1);
     }
 
     /**
@@ -251,7 +251,7 @@ class CookieManagerTest extends TestCase
         // The actual value would be sent in the header
         CookieManager::setRefreshToken('token');
         ob_end_clean();
-        $this->assertTrue(true);
+        $this->addToAssertionCount(1);
     }
 
     /**
@@ -265,7 +265,7 @@ class CookieManagerTest extends TestCase
         ob_end_clean();
 
         // In a real integration test, both headers would be present
-        $this->assertTrue(true);
+        $this->addToAssertionCount(1);
     }
 
     /**

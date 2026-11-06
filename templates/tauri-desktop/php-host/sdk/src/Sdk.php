@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.65).
+ * SDK identity (v1.73).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -961,12 +961,75 @@ namespace Whity\Sdk;
  * approval (WHIT-684).
  *
  * Purely additive.)
+ *
+ * 1.66 (DOCUMENT PREFLIGHT: {@see Documents\Documents::preflight()} and
+ * {@see Documents\PluginDocumentStore::preflight()} say whether a document would
+ * issue and every reason it wouldn't, writing nothing and allocating no number, in a
+ * {@see Documents\PreflightResult}. `document.issuing` listeners get `check_only` and
+ * can answer with `checks` (WHIT-892). Only the host implements these interfaces.
+ *
+ * 1.67 (PUBLIC FORMS: a route declared `'public' => 'form'` on POST
+ * `/api/<slug>/forms/<name>/{key}` takes anonymous browser submissions. The host
+ * resolves the tenant from the key and runs the limits, Origin check and bot check
+ * before the handler, which reads the result from {@see Http\PublicForm}. On an
+ * older host the route is not public (WHIT-906).
+ *
+ * Purely additive.)
+ *
+ * 1.68 (DOCUMENT REVISIONS: {@see Hooks\Events::DOCUMENT_REVISED} says a revision replaced
+ * a document (WHIT-888).
+ *
+ * Purely additive.)
+ *
+ * 1.69 (PUBLIC READS: a route declared `'public' => 'read'` on GET
+ * `/api/<slug>/public/<name>/{key}` answers anybody holding the link. The host
+ * resolves the tenant from the same kind of key a public form uses, runs its limits
+ * and Origin check before the handler, which reads the result from
+ * {@see Http\PublicRead}, and serves it only when the operator has switched public
+ * reads on. On an older host the route is not public (WHIT-704).
+ *
+ * Purely additive.)
+ *
+ * 1.70 (`user.creating` IS READ-ONLY: the payload is `email` and `role_id`, and
+ * the host ignores what a listener returns, so neither the email nor the role of
+ * the new user can be changed there. The password is no longer in the payload.
+ * A listener that must refuse a create throws {@see Hooks\HookVetoException}; the
+ * host writes nothing and answers `409 Conflict` with its `reason()` (WHIT-911).
+ *
+ * Narrows the payload; a listener that read `password` or returned a changed
+ * `role_id` or `email` must stop relying on it.)
+ *
+ * 1.71 (THE HOST DECIDES WHAT A TOOL WRITES: whether an AI agent may run a tool at
+ * once or must ask a person first starts from whether the tool only reads, and the
+ * host now decides that itself. A plugin route's tool reads only when its method is
+ * GET or HEAD; a `readOnlyHint: true` in its `mcp_annotations` on any other method
+ * is published as `false`. A hand-authored tool ({@see PluginMcpToolsInterface}) is
+ * a write for agents whatever its `annotations` say, so a person approves each
+ * agent call unless the tool declares an `undo` and the grant allows it. Expose a
+ * read an agent should run unasked as a GET route. Annotations stay hints for
+ * clients (WHIT-912).
+ *
+ * No signature changes.)
+ *
+ * 1.72 (PLUGIN ROLE GRANTS STAY THE PLUGIN'S OWN: {@see PluginRolesInterface} grants
+ * only permissions the plugin declares in {@see PluginInterface::getPermissions()},
+ * never a core permission or one under a core resource, and only to a role the plugin
+ * created or one the operator approved for it. Uninstall removes only the grants the
+ * plugin made. A plugin that listed a core permission, or named a role it did not
+ * create, no longer gets that grant; the host logs it.)
+ *
+ * 1.73 (CUSTOMER SIGN-UP: {@see Hooks\Events::MEMBERSHIP_CUSTOMER_JOINED},
+ * `membership.customer_joined`, fires when somebody joins a workspace as a customer
+ * through its own sign-up, at once when sign-up is Open or on an admin's approval.
+ * Ids only, after commit, and the return value is ignored (WHIT-915).
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.65.0';
+    public const VERSION = '1.73.0';
 
     /**
      * Static identity only — never instantiated.

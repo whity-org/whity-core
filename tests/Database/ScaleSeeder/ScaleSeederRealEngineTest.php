@@ -320,7 +320,7 @@ final class ScaleSeederRealEngineTest extends TestCase
         self::assertSame(4, $plan->totalRelations);
     }
 
-    /** @return list<string> */
+    /** @return array<int, string> */
     private function fetchColumnList(PDO $pdo, string $sql): array
     {
         $stmt = $pdo->query($sql);

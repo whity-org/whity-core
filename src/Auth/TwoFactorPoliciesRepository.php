@@ -40,6 +40,7 @@ final class TwoFactorPoliciesRepository
              ORDER BY id DESC'
         );
         $stmt->execute([':tenant_id' => $tenantId]);
+        /** @var list<array<string, mixed>> $rows */
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         return array_map([self::class, 'normalizeRow'], $rows);

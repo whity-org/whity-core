@@ -64,7 +64,10 @@ final class WindowTypeRepository
         );
         $stmt->execute([':tenant_id' => $tenantId]);
 
-        return array_map([self::class, 'normalizeRow'], $stmt->fetchAll(PDO::FETCH_ASSOC));
+        /** @var list<array<string, mixed>> $rows */
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return array_map([self::class, 'normalizeRow'], $rows);
     }
 
     /**

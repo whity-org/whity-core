@@ -473,6 +473,51 @@ final class DocumentSourcesApiHandlerRealEngineTest extends TestCase
         self::assertSame(404, $this->show(self::WRITER, $id)->getStatusCode());
     }
 
+    // ── the public name (#1627) ─────────────────────────────────────────────
+
+    /**
+     * What kind of document a template makes, for strangers on the public check.
+     * Words strangers read, so saving them is a publish action, as numbering is.
+     */
+    public function testAPublicNameIsSavedTrimmedAndClearedByWhoMayPublish(): void
+    {
+        $id = $this->idOf($this->create(self::OWNER, ['kind' => 'template', 'title' => 'Handover for Example Bakery']));
+        self::assertNull($this->data($this->show(self::OWNER, $id))['public_name'], 'none until somebody writes one');
+
+        $saved = $this->audience(self::OWNER, $id, ['public_name' => "  Handover 
+ certificate  "]);
+        self::assertSame(200, $saved->getStatusCode(), $saved->getBody());
+        self::assertSame('Handover certificate', $this->data($saved)['public_name'], 'one line, trimmed');
+        self::assertSame('Handover for Example Bakery', $this->data($saved)['title'], 'the title is untouched');
+
+        self::assertNull($this->data($this->audience(self::OWNER, $id, ['public_name' => '   ']))['public_name'], 'empty clears it');
+        $this->audience(self::OWNER, $id, ['public_name' => 'Handover certificate']);
+        self::assertNull($this->data($this->audience(self::OWNER, $id, ['public_name' => null]))['public_name'], 'null clears it');
+    }
+
+    public function testAPublicNameNeedsPublishAndIsBounded(): void
+    {
+        $id = $this->idOf($this->create(self::WRITER, ['kind' => 'template', 'title' => 'Mine']));
+
+        self::assertSame(403, $this->audience(self::WRITER, $id, ['public_name' => 'Certificate'])->getStatusCode());
+        $owned = $this->idOf($this->create(self::OWNER, ['kind' => 'template', 'title' => 'Ours']));
+        self::assertSame(422, $this->audience(self::OWNER, $owned, ['public_name' => str_repeat('a', 121)])->getStatusCode());
+        self::assertSame(422, $this->audience(self::OWNER, $owned, ['public_name' => ['Certificate']])->getStatusCode());
+        self::assertSame(200, $this->audience(self::OWNER, $owned, ['public_name' => str_repeat('a', 120)])->getStatusCode());
+        self::assertNull($this->data($this->show(self::WRITER, $id))['public_name'], 'the refused write changed nothing');
+    }
+
+    /** Another workspace can neither name nor see the name of this one's template. */
+    public function testAPublicNameStaysInItsTenant(): void
+    {
+        $id = $this->idOf($this->create(self::OWNER, ['kind' => 'template', 'title' => 'Ours', 'scope' => 'tenant']));
+        $this->audience(self::OWNER, $id, ['public_name' => 'Handover certificate']);
+
+        self::assertSame(404, $this->audience(self::FOREIGN, $id, ['public_name' => 'Hijacked'], self::OTHER_TENANT)->getStatusCode());
+        self::assertSame('Handover certificate', (new DocumentSourceRepository($this->pdo))->publicName($id, self::TENANT));
+        self::assertNull((new DocumentSourceRepository($this->pdo))->publicName($id, self::OTHER_TENANT));
+    }
+
     // ── helpers ─────────────────────────────────────────────────────────────
 
     private function upload(int $userId, int $id, string $bytes, string $filename, string $type, int $tenant = self::TENANT): Response

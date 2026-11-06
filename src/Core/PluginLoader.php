@@ -1618,7 +1618,7 @@ class PluginLoader
                 // is worthless without the handlers it names, so half a
                 // declaration is no declaration.
                 $jobs = $plugin->getJobs();
-                $submittable = array_values($plugin->getSubmittableJobs());
+                $submittable = array_values($plugin->getSubmittableJobs()); // @phpstan-ignore arrayValues.list (plugin-supplied value; the SDK type is PHPDoc only)
             } catch (Throwable $e) {
                 $this->handlePluginThrowable($pluginKey, $e, 'getJobs');
                 continue;
@@ -1717,7 +1717,7 @@ class PluginLoader
             }
 
             foreach ($descriptors as $descriptor) {
-                if (!is_array($descriptor)) {
+                if (!is_array($descriptor)) { // @phpstan-ignore function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
                     $this->logWarning("[Plugin:{$pluginKey}] getMcpTools() returned a non-array descriptor — skipped.");
                     continue;
                 }
@@ -1989,7 +1989,7 @@ class PluginLoader
 
         $lifecycle->reEnable();
 
-        if ($reRegister && $info !== null) {
+        if ($reRegister) {
             $registered = $this->registerCapabilities(
                 $info['plugin'],
                 $info['namespacePrefix'],
@@ -2145,7 +2145,7 @@ class PluginLoader
         // Migrations cannot be queried without a PDO, so report what is declared.
         $declaredMigrations = [];
         foreach ($plugin->getMigrations() as $fqcn) {
-            if (is_string($fqcn)) {
+            if (is_string($fqcn)) { // @phpstan-ignore function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
                 $short = substr((string) strrchr('\\' . $fqcn, '\\'), 1);
                 $declaredMigrations[] = 'plugin:' . $plugin->getName() . ':' . $short;
             }
@@ -2424,8 +2424,7 @@ class PluginLoader
     /**
      * Recursively remove a directory or single file.
      *
-     * Mirrors the pattern from DeploymentManager::removeRecursive(). Silently
-     * returns when the path does not exist.
+     * Silently returns when the path does not exist.
      *
      * @param string $path Absolute path to remove.
      */
@@ -2765,7 +2764,7 @@ class PluginLoader
 
         $valid = [];
         foreach ($plugin->getPluginDependencies() as $name => $constraint) {
-            if (is_string($name) && is_string($constraint)) {
+            if (is_string($name) && is_string($constraint)) { // @phpstan-ignore function.alreadyNarrowedType, function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
                 $valid[$name] = $constraint;
             }
         }
@@ -3041,7 +3040,7 @@ class PluginLoader
 
         if ($fields !== null) {
             foreach ($providers as $provider) {
-                if (!$provider instanceof \Whity\Sdk\Documents\DocumentFieldProvider) {
+                if (!$provider instanceof \Whity\Sdk\Documents\DocumentFieldProvider) { // @phpstan-ignore instanceof.alwaysTrue (plugin-supplied value; the SDK type is PHPDoc only)
                     $this->logWarning("Plugin {$pluginKey} declares a document field provider that is not a DocumentFieldProvider");
                     continue;
                 }
@@ -3061,7 +3060,7 @@ class PluginLoader
         if ($slotRegistry !== null) {
             $slots = [];
             foreach ($declaredSlots as $slot) {
-                if (!$slot instanceof \Whity\Sdk\Documents\TemplateSlot) {
+                if (!$slot instanceof \Whity\Sdk\Documents\TemplateSlot) { // @phpstan-ignore instanceof.alwaysTrue (plugin-supplied value; the SDK type is PHPDoc only)
                     $this->logWarning("Plugin {$pluginKey} declares a template slot that is not a TemplateSlot");
                     continue;
                 }
@@ -3168,7 +3167,7 @@ class PluginLoader
             $requiredPermission = $route['requiredPermission'] ?? null;
             if (
                 $requiredPermission !== null
-                && (!is_string($requiredPermission) || preg_match(self::PERMISSION_PATTERN, $requiredPermission) !== 1)
+                && (!is_string($requiredPermission) || preg_match(self::PERMISSION_PATTERN, $requiredPermission) !== 1) // @phpstan-ignore function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
             ) {
                 $this->logWarning(
                     "Plugin {$pluginKey} route {$method} {$path} declares an invalid requiredPermission; "
@@ -3187,16 +3186,35 @@ class PluginLoader
             /** @var array<string, mixed> $declared */
             $declared = $route;
             $wantsPublic = array_key_exists('public', $declared) && $declared['public'] !== false;
+            // A public FORM (WHIT-906): `'public' => 'form'`, the only other value.
+            $wantsPublicForm = $wantsPublic && $declared['public'] === 'form';
+            // A public READ (WHIT-704): `'public' => 'read'` on a keyed GET.
+            $wantsPublicRead = $wantsPublic && $declared['public'] === 'read';
             if ($wantsPublic) {
-                $refusal = $declared['public'] === true
-                    ? \Whity\Core\Plugin\PluginPublicRoutes::refusal(
+                $refusal = match (true) {
+                    $declared['public'] === true => \Whity\Core\Plugin\PluginPublicRoutes::refusal(
                         $plugin->getName(),
                         (string) $method,
                         (string) $path,
                         $requiredPermission,
                         $requiredRole,
-                    )
-                    : "'public' must be the boolean true";
+                    ),
+                    $wantsPublicForm => \Whity\Core\Plugin\PluginPublicRoutes::formRefusal(
+                        $plugin->getName(),
+                        (string) $method,
+                        (string) $path,
+                        $requiredPermission,
+                        $requiredRole,
+                    ),
+                    $wantsPublicRead => \Whity\Core\Plugin\PluginPublicRoutes::readRefusal(
+                        $plugin->getName(),
+                        (string) $method,
+                        (string) $path,
+                        $requiredPermission,
+                        $requiredRole,
+                    ),
+                    default => "'public' must be the boolean true, 'form' or 'read'",
+                };
                 if ($refusal !== null) {
                     $this->logWarning(
                         "Plugin {$pluginKey} route {$method} {$path} asks to be public: {$refusal}; "
@@ -3206,12 +3224,12 @@ class PluginLoader
                 }
             }
 
-            if (is_callable($handler)) {
+            if (is_callable($handler)) { // @phpstan-ignore function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
                 // The optional 'schema' key (WC-166) carries the route's typed
                 // OpenAPI declaration through to the router/generator.
                 $schema = isset($route['schema']) && is_array($route['schema']) ? $route['schema'] : null;
 
-                $wrappedHandler = $this->wrapHandler($pluginKey, $handler, $wantsPublic);
+                $wrappedHandler = $this->wrapHandler($pluginKey, $handler, $wantsPublic, $wantsPublicForm, $wantsPublicRead);
                 $accepted = $this->router->register(
                     $method,
                     $path,
@@ -3241,12 +3259,29 @@ class PluginLoader
                     // it: a core pattern route registered earlier (first match
                     // wins) could otherwise capture the literal path.
                     $served = $this->router->versionedPath((string) $path);
-                    $resolved = $this->router->match(new \Whity\Core\Request('POST', $served, [], ''));
+                    // A form's path has a parameter, so it is probed with a real value.
+                    $probe = str_replace('{key}', str_repeat('0', 64), $served);
+                    $probeMethod = $wantsPublicRead ? 'GET' : 'POST';
+                    $resolved = $this->router->match(new \Whity\Core\Request($probeMethod, $probe, [], ''));
                     if ($resolved !== null && ($resolved['namespacePrefix'] ?? null) === $namespacePrefix) {
-                        \Whity\Core\Plugin\PluginPublicRoutes::add($namespacePrefix, 'POST', $served);
+                        if ($wantsPublicForm || $wantsPublicRead) {
+                            $recorded = $wantsPublicRead
+                                ? \Whity\Core\Plugin\PluginPublicRoutes::addRead($namespacePrefix, $plugin->getName(), (string) $resolved['path'], (string) $path)
+                                : \Whity\Core\Plugin\PluginPublicRoutes::addForm($namespacePrefix, $plugin->getName(), (string) $resolved['path'], (string) $path);
+                            if (!$recorded) {
+                                // Registered, but never public: the wrapper refuses it
+                                // without the gate's result, which it can't get.
+                                $this->logWarning(
+                                    "Plugin {$pluginKey} route {$probeMethod} {$path} shares its name with another of "
+                                    . "this plugin's keyed routes; it was registered PRIVATE."
+                                );
+                            }
+                        } else {
+                            \Whity\Core\Plugin\PluginPublicRoutes::add($namespacePrefix, 'POST', $served);
+                        }
                     } else {
                         $this->logWarning(
-                            "Plugin {$pluginKey} route POST {$path} asks to be public, but another route answers "
+                            "Plugin {$pluginKey} route {$probeMethod} {$path} asks to be public, but another route answers "
                             . 'that path; it was registered PRIVATE.'
                         );
                     }
@@ -3537,7 +3572,7 @@ class PluginLoader
         //     and the registry are untouched.
         try {
             foreach ($plugin->getPermissions() as $permission) {
-                if (is_string($permission) && !isset($this->claimedPermissions[$permission])) {
+                if (is_string($permission) && !isset($this->claimedPermissions[$permission])) { // @phpstan-ignore function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
                     $this->claimedPermissions[$permission] = $pluginKey;
                 }
             }
@@ -3720,7 +3755,7 @@ class PluginLoader
             return null;
         }
 
-        if (!is_string($path) || $path === '') {
+        if ($path === '') {
             $this->logWarning(
                 "Plugin {$pluginKey} declares a theme-override route that is not a non-empty string; ignored."
             );
@@ -4839,9 +4874,20 @@ class PluginLoader
      * @param callable $handler The raw plugin route handler.
      * @return callable(Request, array<string, string>): Response
      */
-    private function wrapHandler(string $pluginKey, callable $handler, bool $public = false): callable
+    private function wrapHandler(string $pluginKey, callable $handler, bool $public = false, bool $publicForm = false, bool $publicRead = false): callable
     {
-        return function (Request $request, array $params = []) use ($pluginKey, $handler, $public): Response {
+        return function (Request $request, array $params = []) use ($pluginKey, $handler, $public, $publicForm, $publicRead): Response {
+            // A public form's handler never runs on a request the gate didn't pass,
+            // however that request got here (WHIT-906).
+            if ($publicForm && \Whity\Sdk\Http\PublicForm::from($request) === null) {
+                return Response::error('Not Found', 404);
+            }
+            // The same for a public read (WHIT-704), which also covers reads the
+            // operator hasn't switched on: the gate then passes nothing.
+            if ($publicRead && \Whity\Sdk\Http\PublicRead::from($request) === null) {
+                return Response::error('Not Found', 404);
+            }
+
             $lifecycle = $this->lifecycles[$pluginKey] ?? null;
 
             if ($lifecycle !== null && $lifecycle->isFailed()) {

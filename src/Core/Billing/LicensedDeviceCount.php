@@ -144,7 +144,7 @@ final class LicensedDeviceCount
 
         $default = SettingsRegistry::defaultFor(SettingsRegistry::LICENSING_BILLING_BASIS);
 
-        return is_string($default) && $default !== '' ? $default : 'activated';
+        return $default !== '' ? $default : 'activated';
     }
 
     private function count(

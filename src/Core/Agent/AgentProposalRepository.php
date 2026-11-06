@@ -115,7 +115,10 @@ final class AgentProposalRepository
         $stmt->bindValue(':limit', max(1, min($limit, 200)), PDO::PARAM_INT);
         $stmt->execute();
 
-        return array_map(self::normalize(...), $stmt->fetchAll(PDO::FETCH_ASSOC));
+        /** @var list<array<string, mixed>> $rows */
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return array_map(self::normalize(...), $rows);
     }
 
     /**
@@ -154,7 +157,10 @@ final class AgentProposalRepository
         $stmt->bindValue(':limit', max(1, min($limit, 200)), PDO::PARAM_INT);
         $stmt->execute();
 
-        return array_map(self::normalize(...), $stmt->fetchAll(PDO::FETCH_ASSOC));
+        /** @var list<array<string, mixed>> $rows */
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return array_map(self::normalize(...), $rows);
     }
 
     /**

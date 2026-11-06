@@ -176,7 +176,7 @@ final class RouteEffectRegistry implements HostWiredService
     }
 
     /**
-     * @param array<string, RouteEffectInterface> $declared
+     * @param array<mixed> $declared Bare slug => effect, from a plugin, so each is checked.
      * @return list<string>
      *
      * @throws InvalidRouteEffectException

@@ -44,11 +44,15 @@ final class IssuedDocumentNumberFieldProvider implements DocumentFieldProvider
                 'path' => DocumentIssuing::NUMBER_FIELD,
                 'label' => $this->labels->get('fields.issuedDocument.number', 'This document\'s number'),
                 'sample' => 'INV-2026-0142',
+            ], [
+                'path' => DocumentIssuing::REVISION_FIELD,
+                'label' => $this->labels->get('fields.issuedDocument.revision', 'This document\'s revision'),
+                'sample' => 'A',
             ]],
         ]];
     }
 
-    public function values(int $tenantId, int $callerId, callable $hasPermission, ?string $recordId): ?array
+    public function values(int $tenantId, int $callerId, callable $hasPermission, ?string $recordId): array
     {
         return ['label' => '', 'values' => []];
     }
