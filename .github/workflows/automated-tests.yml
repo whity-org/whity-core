@@ -630,12 +630,13 @@ jobs:
       - name: Emitted-URL version guard
         run: php scripts/ci-emitted-url-version-guard.php
 
-      # Plugin tenant-isolation conformance kit (WC-194): run the SDK migration
-      # linter + tenant-predicate scanner over the in-tree HelloWorld reference
-      # plugin, the way an out-of-repo plugin runs it in its own CI. Fails if a
-      # plugin tenant table lacks a tenant_id column or a handler runs an
-      # unscoped query on a tenant-owned table.
-      - name: Plugin tenant-isolation conformance (HelloWorld)
+      # Plugin tenant-isolation conformance kit (WC-194, #1262): run the SDK
+      # migration linter + tenant-predicate scanner over EVERY plugin under
+      # plugins/, the way an out-of-repo plugin runs it in its own CI. Each
+      # plugin's tenant tables are read from its own migrations. Fails if a
+      # plugin tenant table lacks a tenant_id column or any non-migration plugin
+      # code runs an unscoped query on a tenant-owned table.
+      - name: Plugin tenant-isolation conformance (all plugins)
         run: php scripts/ci-plugin-tenant-conformance.php
 
       # Undeclared-reference guard: fail CI on a relationship core CANNOT SEE —

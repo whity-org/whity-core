@@ -47,6 +47,12 @@ if ($roots === []) {
  * count is reported on every run: an exclusion nobody can see is how this guard
  * came to scan `src/` alone for so long while being trusted to cover more.
  *
+ * It follows that migration files carry NO `@tenant-guard-ignore:` tags (#1262):
+ * a tag the guard never reads would still look like a reviewed exception. Where
+ * a statement deserves a reason, it is a plain comment
+ * (`// Unscoped by design (migration): ...`), and
+ * tests/Ops/PluginTenantConformanceScriptTest.php keeps tags out.
+ *
  * NOT excluded, and deliberately so: a plugin's Api/ and Jobs/ code, which is
  * request-scoped exactly like core's.
  */

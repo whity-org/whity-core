@@ -78,7 +78,7 @@ class RekeyBackupCodesToProfiles
         $hasLegacyUserId = self::columnExists($db, $driver, 'backup_codes', 'user_id');
 
         if ($hasMapping && $hasLegacyUserId) {
-            // @tenant-guard-ignore: cross-table migration backfill; updates own table rows using external mapping
+            // Unscoped by design (migration): cross-table migration backfill; updates own table rows using external mapping
             $db->exec('
                 UPDATE backup_codes
                 SET profile_id = (
@@ -98,7 +98,7 @@ class RekeyBackupCodesToProfiles
         // NOT NULL constraint below can be enforced honestly.
         $orphanCount = self::countWhere($db, 'profile_id IS NULL');
         if ($orphanCount > 0) {
-            // @tenant-guard-ignore: migration cleanup of dangling backup-code rows across all tenants
+            // Unscoped by design (migration): migration cleanup of dangling backup-code rows across all tenants
             $db->exec('DELETE FROM backup_codes WHERE profile_id IS NULL');
             self::log("migration 038: deleted {$orphanCount} backup_codes row(s) with no profile mapping (orphaned user_id).");
         }
@@ -159,7 +159,7 @@ class RekeyBackupCodesToProfiles
 
         // ── 2. Reverse-backfill user_id from the 035 mapping ─────────────────
         if (self::tableExists($db, $driver, 'migration_035_profile_ids')) {
-            // @tenant-guard-ignore: reverse migration backfill; profile_id → kept user_id
+            // Unscoped by design (migration): reverse migration backfill; profile_id → kept user_id
             $db->exec('
                 UPDATE backup_codes
                 SET user_id = (
@@ -177,7 +177,7 @@ class RekeyBackupCodesToProfiles
         // cannot be represented in the old schema — delete them.
         $unmappable = self::countWhere($db, 'user_id IS NULL');
         if ($unmappable > 0) {
-            // @tenant-guard-ignore: reverse migration cleanup of profile-native backup-code rows
+            // Unscoped by design (migration): reverse migration cleanup of profile-native backup-code rows
             $db->exec('DELETE FROM backup_codes WHERE user_id IS NULL');
             self::log("migration 038 down(): deleted {$unmappable} backup_codes row(s) with no reverse mapping (profile-native, unrecoverable).");
         }
@@ -260,7 +260,7 @@ class RekeyBackupCodesToProfiles
     private static function countWhere(Database $db, string $whereFragment): int
     {
         $pdo  = $db->getPdo();
-        // @tenant-guard-ignore: migration-internal count over all tenants; fragment is a constant literal
+        // Unscoped by design (migration): migration-internal count over all tenants; fragment is a constant literal
         $stmt = $pdo->query("SELECT COUNT(*) AS c FROM backup_codes WHERE {$whereFragment}");
         if ($stmt === false) {
             return 0;
