@@ -119,7 +119,7 @@ class RekeyDelegationsToProfiles
 
         if ($hasMapping && $hasLegacyGrantor) {
             // Grantor: user_id → profile_id.
-            // @tenant-guard-ignore: cross-table migration backfill; updates own table rows using external mapping
+            // Unscoped by design (migration): cross-table migration backfill; updates own table rows using external mapping
             $db->exec('
                 UPDATE permission_delegations
                 SET grantor_profile_id = (
@@ -135,7 +135,7 @@ class RekeyDelegationsToProfiles
             // set grantee_id to the profile_id AND flip grantee_type to 'profile'.
             // Doing both together guarantees the resolver (which matches
             // grantee_type='profile') keeps finding the row.
-            // @tenant-guard-ignore: cross-table migration backfill; grantee re-keyed user→profile in lock-step
+            // Unscoped by design (migration): cross-table migration backfill; grantee re-keyed user→profile in lock-step
             $db->exec("
                 UPDATE permission_delegations
                 SET grantee_id = (
@@ -166,7 +166,7 @@ class RekeyDelegationsToProfiles
         if ($hasLegacyGrantor || self::columnExists($db, $driver, 'permission_delegations', 'grantor_profile_id')) {
             $orphanGrantors = self::countWhere($db, 'grantor_profile_id IS NULL');
             if ($orphanGrantors > 0) {
-                // @tenant-guard-ignore: migration cleanup of dangling grantor rows across all tenants
+                // Unscoped by design (migration): migration cleanup of dangling grantor rows across all tenants
                 $db->exec('DELETE FROM permission_delegations WHERE grantor_profile_id IS NULL');
                 self::log("migration 037: deleted {$orphanGrantors} delegation row(s) with an unmappable grantor_user_id (no profile mapping).");
             }
@@ -174,7 +174,7 @@ class RekeyDelegationsToProfiles
 
         $orphanGrantees = self::countWhere($db, "grantee_type = 'user'");
         if ($orphanGrantees > 0) {
-            // @tenant-guard-ignore: migration cleanup of unresolvable user-grantee rows across all tenants
+            // Unscoped by design (migration): migration cleanup of unresolvable user-grantee rows across all tenants
             $db->exec("DELETE FROM permission_delegations WHERE grantee_type = 'user'");
             self::log("migration 037: deleted {$orphanGrantees} delegation row(s) with an unmappable user grantee (no profile mapping).");
         }
@@ -245,7 +245,7 @@ class RekeyDelegationsToProfiles
         // so no 'profile' row survives to violate the narrowed constraint on PG.
         if (self::tableExists($db, $driver, 'migration_035_profile_ids')) {
             // 2. Grantor: profile_id → kept user_id.
-            // @tenant-guard-ignore: reverse migration backfill; profile_id → kept user_id
+            // Unscoped by design (migration): reverse migration backfill; profile_id → kept user_id
             $db->exec('
                 UPDATE permission_delegations
                 SET grantor_user_id = (
@@ -261,7 +261,7 @@ class RekeyDelegationsToProfiles
             // 3. Grantee: profile → user (id + type) in lock-step. Only rows that
             // have a reverse mapping are converted; any without a mapping stay
             // 'profile' and are cleaned up below so the narrowed CHECK holds.
-            // @tenant-guard-ignore: reverse migration backfill; grantee profile→user in lock-step
+            // Unscoped by design (migration): reverse migration backfill; grantee profile→user in lock-step
             $db->exec("
                 UPDATE permission_delegations
                 SET grantee_id = (
@@ -285,7 +285,7 @@ class RekeyDelegationsToProfiles
         // represented under the narrowed CHECK — delete it (unrecoverable).
         $unconvertible = self::countWhere($db, "grantee_type = 'profile'");
         if ($unconvertible > 0) {
-            // @tenant-guard-ignore: reverse migration cleanup of unconvertible profile-grantee rows
+            // Unscoped by design (migration): reverse migration cleanup of unconvertible profile-grantee rows
             $db->exec("DELETE FROM permission_delegations WHERE grantee_type = 'profile'");
             self::log("migration 037 down(): deleted {$unconvertible} profile-grantee delegation row(s) with no reverse mapping (unrecoverable).");
         }
@@ -381,7 +381,7 @@ class RekeyDelegationsToProfiles
     private static function countWhere(Database $db, string $whereFragment): int
     {
         $pdo  = $db->getPdo();
-        // @tenant-guard-ignore: migration-internal count over all tenants; fragment is a constant literal
+        // Unscoped by design (migration): migration-internal count over all tenants; fragment is a constant literal
         $stmt = $pdo->query("SELECT COUNT(*) AS c FROM permission_delegations WHERE {$whereFragment}");
         if ($stmt === false) {
             return 0;

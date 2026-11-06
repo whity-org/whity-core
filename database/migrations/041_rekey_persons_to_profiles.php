@@ -86,7 +86,7 @@ class RekeyPersonsToProfiles
         $hasLegacyUserId = self::columnExists($db, $driver, 'persons', 'user_id');
 
         if ($hasMapping && $hasLegacyUserId) {
-            // @tenant-guard-ignore: cross-table migration backfill; updates own table rows using external mapping
+            // Unscoped by design (migration): cross-table migration backfill; updates own table rows using external mapping
             $db->exec('
                 UPDATE persons
                 SET profile_id = (
@@ -170,7 +170,7 @@ class RekeyPersonsToProfiles
 
         // ── 2. Reverse-backfill user_id from the 035 mapping ─────────────────
         if (self::tableExists($db, $driver, 'migration_035_profile_ids')) {
-            // @tenant-guard-ignore: reverse migration backfill; profile_id → kept user_id
+            // Unscoped by design (migration): reverse migration backfill; profile_id → kept user_id
             $db->exec('
                 UPDATE persons
                 SET user_id = (
