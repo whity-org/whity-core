@@ -17,6 +17,8 @@ docs/*
 !docs/wiki/
 !docs/adr/
 !docs/design/
+# The plugin SDK coverage matrix data (scripts/sdk-coverage.php renders it into the wiki)
+!docs/sdk-coverage/
 .worktrees/
 .phpunit.cache/
 # PHPStan result cache (project-local tmpDir; restored across CI runs for a fast

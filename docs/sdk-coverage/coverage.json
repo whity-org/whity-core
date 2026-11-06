@@ -1,0 +1,1565 @@
+{
+    "$comment": "Plugin SDK coverage matrix: the single source of truth. Edit this file, then run `php scripts/sdk-coverage.php` to regenerate docs/wiki/Plugin-SDK-Coverage.md. CI fails when sdk_version is behind Sdk::VERSION, when an SDK minor in the Sdk.php ledger is not named by any `since`, or when the generated page is stale. Security notes say only that a design is needed; vulnerabilities go through SECURITY.md, never here.",
+    "sdk_version": "1.69.0",
+    "core_version": "0.2.26",
+    "updated": "2026-11-06",
+    "ratings": {
+        "full": "A plugin can read, change, react to and extend this area through a published SDK contract.",
+        "partial": "Some of it is in the SDK; the rest is missing or reachable only through internal core classes.",
+        "none": "No SDK contract. A plugin cannot interact with this area in a supported way."
+    },
+    "groups": [
+        {
+            "id": "people",
+            "name": "People and access"
+        },
+        {
+            "id": "documents",
+            "name": "Documents"
+        },
+        {
+            "id": "workflow",
+            "name": "Forms and workflow"
+        },
+        {
+            "id": "platform",
+            "name": "Platform services"
+        },
+        {
+            "id": "interface",
+            "name": "Interface"
+        },
+        {
+            "id": "agents",
+            "name": "Agents and integrations"
+        },
+        {
+            "id": "runtime",
+            "name": "Plugin runtime"
+        }
+    ],
+    "areas": [
+        {
+            "id": "users",
+            "group": "people",
+            "name": "Users and accounts",
+            "rating": "partial",
+            "has": [
+                {
+                    "what": "user.creating, user.created, user.updated, user.deleted hook events",
+                    "since": "1.0"
+                }
+            ],
+            "missing": [
+                "A user directory and membership reader",
+                "A supported way to provision or update users",
+                "user.updating and a user.deleting veto",
+                "Creation events on self-registration, invitation acceptance and SSO provisioning (only admin create fires them)",
+                "Custom profile fields",
+                "A slot on the user record page"
+            ],
+            "security": "Hooks on account creation must not expose credentials or let a listener change the role. A read-only notification payload and a narrow, audited mutation contract are needed rather than more filter hooks.",
+            "plan": "0.2.27"
+        },
+        {
+            "id": "people-directory",
+            "group": "people",
+            "name": "People directory",
+            "rating": "none",
+            "has": [],
+            "missing": [
+                "A person read and search contract",
+                "person.* events",
+                "Custom person fields",
+                "A person picker block"
+            ],
+            "security": "People records are personal data. A reader must be pinned to the current workspace, checked against relations:read for the caller, and able to redact fields.",
+            "plan": "0.2.28"
+        },
+        {
+            "id": "authentication",
+            "group": "people",
+            "name": "Sign-in, SSO and two-factor",
+            "rating": "none",
+            "has": [
+                {
+                    "what": "ExternalAuthProvider and ExternalIdentity types (not yet wired to a registration path)",
+                    "since": null
+                }
+            ],
+            "missing": [
+                "Registering a plugin identity provider",
+                "Read-only sign-in, sign-out, two-factor and password-reset events",
+                "Custom second factors",
+                "Password policy extension"
+            ],
+            "security": "An identity provider decides who an account belongs to. It needs a trust tier, operator-only enablement and binding per workspace. Sign-in events must be observe-only so no plugin can capture credentials or block sign-in.",
+            "plan": "later"
+        },
+        {
+            "id": "tenants",
+            "group": "people",
+            "name": "Workspaces",
+            "rating": "partial",
+            "has": [
+                {
+                    "what": "tenant.creating to tenant.deleted hook events",
+                    "since": "1.0"
+                },
+                {
+                    "what": "Veto a workspace deletion inside its transaction",
+                    "since": "1.15"
+                },
+                {
+                    "what": "Owned tables cascade on workspace deletion (PluginTablesInterface)",
+                    "since": "1.20"
+                }
+            ],
+            "missing": [
+                "A workspace read contract (name, plan, locale, enabled plugins)",
+                "Workspace custom fields",
+                "A slot on workspace settings"
+            ],
+            "security": "Install-wide plugins see every workspace's events. Hook subscriptions scoped to a workspace need a design before more workspace data is exposed.",
+            "plan": "0.2.28"
+        },
+        {
+            "id": "rbac",
+            "group": "people",
+            "name": "Roles and permissions",
+            "rating": "partial",
+            "has": [
+                {
+                    "what": "Route requiredPermission enforced by the host",
+                    "since": "1.2"
+                },
+                {
+                    "what": "PermissionResolver: read-only permission checks",
+                    "since": "1.16"
+                },
+                {
+                    "what": "Permission checks scoped to one record",
+                    "since": "1.17"
+                },
+                {
+                    "what": "Plugin-declared resource types",
+                    "since": "1.18"
+                },
+                {
+                    "what": "Role checks scoped to one record",
+                    "since": "1.22"
+                },
+                {
+                    "what": "Declared permissions and seeded roles (PluginRolesInterface)",
+                    "since": "1.0"
+                }
+            ],
+            "missing": [
+                "Granting and revoking record-level roles through a contract",
+                "Events when a role's permissions change, and a veto on grants",
+                "Roles namespaced to the plugin"
+            ],
+            "security": "Anything that grants authority can escalate privilege. Role seeding and grants must be limited to the plugin's own roles and permissions, and every check must be bound to the caller's workspace by the host.",
+            "plan": "0.2.27"
+        },
+        {
+            "id": "delegations",
+            "group": "people",
+            "name": "Delegations",
+            "rating": "none",
+            "has": [],
+            "missing": [
+                "Reading active delegations and the acting-for context",
+                "Delegation events",
+                "A veto on delegating a plugin-owned permission"
+            ],
+            "security": "Delegation transfers authority, so plugins may observe and refuse it but must never create it.",
+            "plan": "later"
+        },
+        {
+            "id": "groups-audiences",
+            "group": "people",
+            "name": "User groups and audiences",
+            "rating": "partial",
+            "has": [
+                {
+                    "what": "Plugin rule kinds in groups and routing (RoutingRuleResolverInterface)",
+                    "since": "1.37"
+                },
+                {
+                    "what": "Audience rule vocabulary shared with groups",
+                    "since": "1.38"
+                }
+            ],
+            "missing": [
+                "Resolving a group's or audience's members",
+                "Group events",
+                "A group picker block"
+            ],
+            "security": "A plugin rule resolver returns people for a workspace. The host must drop anyone who is not an active member of that workspace rather than trusting the resolver.",
+            "plan": "0.2.28"
+        },
+        {
+            "id": "ous",
+            "group": "people",
+            "name": "Organizational units",
+            "rating": "full",
+            "has": [
+                {
+                    "what": "ou.* hook events, including role assignment and a delete veto",
+                    "since": "1.0"
+                },
+                {
+                    "what": "Plugin OU types an admin adopts",
+                    "since": "1.30"
+                },
+                {
+                    "what": "ouScopePicker block",
+                    "since": "1.32"
+                }
+            ],
+            "missing": [
+                "A server-side OU tree reader",
+                "OU custom fields"
+            ],
+            "security": null,
+            "plan": "0.2.28"
+        },
+        {
+            "id": "invitations-registration",
+            "group": "people",
+            "name": "Invitations and registration",
+            "rating": "partial",
+            "has": [],
+            "missing": [
+                "Published constants for registration.completed, registration.approved and registration.rejected (fired today, not in Events)",
+                "Invitation events",
+                "Custom registration fields",
+                "An accept-or-reject check on registration"
+            ],
+            "security": "A registration check may accept or reject, never set the role or unit, or it becomes an escalation path.",
+            "plan": "0.2.27"
+        },
+        {
+            "id": "relations",
+            "group": "people",
+            "name": "Relations",
+            "rating": "none",
+            "has": [],
+            "missing": [
+                "Plugin relationship types",
+                "Reading and writing relations",
+                "Relation events"
+            ],
+            "security": "Relations hold family and guardian links. Writes need permission-checked contracts.",
+            "plan": "later"
+        },
+        {
+            "id": "tags",
+            "group": "people",
+            "name": "Tags and taxonomy",
+            "rating": "none",
+            "has": [],
+            "missing": [
+                "Declared taggable types and vocabularies",
+                "Reading and attaching tags",
+                "A tag picker block",
+                "Tag events"
+            ],
+            "security": null,
+            "issues": [
+                714
+            ],
+            "plan": "0.2.28"
+        },
+        {
+            "id": "documents",
+            "group": "documents",
+            "name": "Documents",
+            "rating": "partial",
+            "has": [
+                {
+                    "what": "documentViewer block",
+                    "since": "1.36"
+                },
+                {
+                    "what": "document.issuing (veto and checks), document.issued, document.rendered events",
+                    "since": "1.49"
+                },
+                {
+                    "what": "Issue documents as the person (Documents::issue)",
+                    "since": "1.56"
+                },
+                {
+                    "what": "Issue in the background where the workspace allows it",
+                    "since": "1.58"
+                },
+                {
+                    "what": "PluginDocumentStore, QR verification links and tracking",
+                    "since": "1.63"
+                },
+                {
+                    "what": "Document numbering rules and document.numbered",
+                    "since": "1.65"
+                },
+                {
+                    "what": "Preflight an issue without writing",
+                    "since": "1.66"
+                },
+                {
+                    "what": "document.revised",
+                    "since": "1.68"
+                }
+            ],
+            "missing": [
+                "Reading and listing documents other than the plugin's own",
+                "Withdraw and revise contracts, and document.withdrawn",
+                "Issue events for documents raised by form submissions",
+                "Published constants for document.routed and document.route_acted",
+                "Embed record providers and chart sources",
+                "Collections and organizer views"
+            ],
+            "security": "Document visibility depends on the caller and the route. A reader must apply the host's visibility policy per caller, and withdraw or revise must keep the audit trail intact.",
+            "plan": "0.2.27"
+        },
+        {
+            "id": "templates-editor",
+            "group": "documents",
+            "name": "Templates, themes and the editor",
+            "rating": "partial",
+            "has": [
+                {
+                    "what": "Template slots in plugin.json",
+                    "since": "1.55"
+                },
+                {
+                    "what": "Template slots and merge-field providers for code plugins",
+                    "since": "1.56"
+                }
+            ],
+            "missing": [
+                "Plugin document themes",
+                "Editor blocks, toolbar items and slash-menu entries",
+                "Starter templates shipped by a plugin",
+                "Reading templates",
+                "Template and theme events"
+            ],
+            "security": "Merge fields and editor blocks end up in printed, immutable documents. Providers must be held to the caller's workspace and permissions by the host, and plugin block markup needs a sandbox and server-side schema checks.",
+            "plan": "later"
+        },
+        {
+            "id": "render",
+            "group": "documents",
+            "name": "Render service",
+            "rating": "partial",
+            "has": [
+                {
+                    "what": "DocumentRenderer, FlowDocument, PageSpec",
+                    "since": "1.41"
+                },
+                {
+                    "what": "Inline runs in flowing text",
+                    "since": "1.44"
+                }
+            ],
+            "missing": [
+                "Choosing a theme or brand when rendering",
+                "Rendering from a workspace template outside Documents::issue",
+                "Rendering from a job (the seam is HTTP-only)"
+            ],
+            "security": "HTML or CSS input to the renderer would be an injection and server-side request surface. Keep input structured.",
+            "issues": [
+                1151
+            ],
+            "plan": "0.2.28"
+        },
+        {
+            "id": "routing",
+            "group": "documents",
+            "name": "Routing and approvals",
+            "rating": "partial",
+            "has": [
+                {
+                    "what": "Plugin routing rules that resolve recipients",
+                    "since": "1.37"
+                }
+            ],
+            "missing": [
+                "Reading a document's route and trail",
+                "Starting or acting on a route",
+                "Plugin route effects",
+                "route.completed, step-due events and a veto before an action"
+            ],
+            "security": "Acting on a route is an approval on a person's behalf. It needs the actor bound by the host and the agent proposal policy.",
+            "plan": "later"
+        },
+        {
+            "id": "plugin-forms",
+            "group": "workflow",
+            "name": "Plugin forms and public routes",
+            "rating": "full",
+            "has": [
+                {
+                    "what": "form block and input blocks",
+                    "since": "1.8"
+                },
+                {
+                    "what": "Form preload from the plugin's own GET (dataSource)",
+                    "since": "1.40"
+                },
+                {
+                    "what": "Discriminated sub-forms (variant)",
+                    "since": "1.42"
+                },
+                {
+                    "what": "Anonymous form posts ('public' => 'form', PublicForm)",
+                    "since": "1.67"
+                },
+                {
+                    "what": "Anonymous link reads ('public' => 'read', PublicRead)",
+                    "since": "1.69"
+                }
+            ],
+            "missing": [
+                "Per-route rate limits beyond the host defaults"
+            ],
+            "security": null,
+            "plan": "later"
+        },
+        {
+            "id": "core-forms",
+            "group": "workflow",
+            "name": "Core forms and submissions",
+            "rating": "none",
+            "has": [],
+            "missing": [
+                "form.submitted, submission.reviewed and submission.withdrawn events",
+                "Reading submissions",
+                "Custom field types, validators and prefill sources",
+                "Mapping a submission to a plugin record",
+                "A slot in the form builder and in submission review"
+            ],
+            "security": "Submissions hold personal data and anonymous input. Readers must respect member and reviewer scope, events should carry ids only, and a plugin field type on a public form needs the same gate public forms already have.",
+            "plan": "0.2.27"
+        },
+        {
+            "id": "convening",
+            "group": "workflow",
+            "name": "Meetings and decisions",
+            "rating": "none",
+            "has": [],
+            "missing": [
+                "meeting.scheduled, meeting.held and decision.recorded events",
+                "Reading meetings and decisions",
+                "Agenda-item sources and a minutes slot"
+            ],
+            "security": "Attendance, quorum and decisions are legal facts. Writes need a host-bound actor and audit.",
+            "plan": "later"
+        },
+        {
+            "id": "inbox",
+            "group": "workflow",
+            "name": "Inbox and Waiting for you",
+            "rating": "partial",
+            "has": [
+                {
+                    "what": "inbox and timeline blocks for the plugin's own items",
+                    "since": "1.31"
+                }
+            ],
+            "missing": [
+                "An inbox source contract so plugin tasks reach Waiting for you",
+                "Acting on an inbox item from a plugin"
+            ],
+            "security": "Each source must answer only for the caller in the current workspace. The host has to enforce that rather than trust the source.",
+            "issues": [
+                881
+            ],
+            "plan": "0.2.28"
+        },
+        {
+            "id": "time-windows",
+            "group": "workflow",
+            "name": "Time windows",
+            "rating": "partial",
+            "has": [
+                {
+                    "what": "Plugin window types an admin adopts",
+                    "since": "1.39"
+                }
+            ],
+            "missing": [
+                "Resolving a date to its window",
+                "window.closing veto, window.closed and window.reopened",
+                "A closed-period guard for plugin records",
+                "A published close-report contract"
+            ],
+            "security": "A closed period is a bookkeeping rule. Writes into it need a host-enforced guard.",
+            "plan": "later"
+        },
+        {
+            "id": "records-automations",
+            "group": "workflow",
+            "name": "Workspace records and automations",
+            "rating": "full",
+            "has": [
+                {
+                    "what": "plugin.json manifest",
+                    "since": "1.47"
+                },
+                {
+                    "what": "Manifest expressions",
+                    "since": "1.48"
+                },
+                {
+                    "what": "Record types",
+                    "since": "1.50"
+                },
+                {
+                    "what": "Record rules, defaults, computed and locked fields",
+                    "since": "1.51"
+                },
+                {
+                    "what": "Automations",
+                    "since": "1.53"
+                },
+                {
+                    "what": "Manifest tests",
+                    "since": "1.54"
+                },
+                {
+                    "what": "issue_document automation step",
+                    "since": "1.57"
+                }
+            ],
+            "missing": [
+                "send_webhook, ask_approval, wait and call_action steps",
+                "Triggers from core events (form submitted, document issued)",
+                "Record types for code plugins"
+            ],
+            "security": "Triggers from another area's events must carry ids and re-read under the run's permissions. send_webhook needs an egress allowlist.",
+            "plan": "later"
+        },
+        {
+            "id": "data-types",
+            "group": "workflow",
+            "name": "Data types",
+            "rating": "full",
+            "has": [
+                {
+                    "what": "Plugin-owned data types with generic admin screens",
+                    "since": "1.20"
+                },
+                {
+                    "what": "Lifecycle writes and guards",
+                    "since": "1.24"
+                }
+            ],
+            "missing": [
+                "Lifecycle events (trashed, restored, deleted)",
+                "Data types as document merge fields"
+            ],
+            "security": null,
+            "plan": "later"
+        },
+        {
+            "id": "reports",
+            "group": "workflow",
+            "name": "Reports",
+            "rating": "none",
+            "has": [],
+            "missing": [
+                "A report source contract",
+                "Custom columns and filters",
+                "Scheduled reports"
+            ],
+            "security": "A report aggregates across records, so row visibility per caller must be enforced by the host or totals leak across units.",
+            "plan": "0.2.28"
+        },
+        {
+            "id": "search",
+            "group": "workflow",
+            "name": "Search and the command palette",
+            "rating": "partial",
+            "has": [
+                {
+                    "what": "Data types that declare search are found by /api/search",
+                    "since": null
+                }
+            ],
+            "missing": [
+                "Workspace records in search",
+                "A custom search source",
+                "Palette commands and actions",
+                "Searching from a plugin"
+            ],
+            "security": "Results must be filtered by what the caller can see. The declarative path is safe; a free-form source needs host-side scoping.",
+            "plan": "0.2.28"
+        },
+        {
+            "id": "settings",
+            "group": "platform",
+            "name": "Settings",
+            "rating": "partial",
+            "has": [
+                {
+                    "what": "Declared, typed, namespaced settings keys",
+                    "since": "1.21"
+                }
+            ],
+            "missing": [
+                "An SDK reader and writer for the plugin's own keys",
+                "A settings-changed event",
+                "A settings page per plugin and per workspace"
+            ],
+            "security": "The internal settings service also covers core and install-wide keys. The SDK reader must be limited to the plugin's own keys in the current workspace.",
+            "plan": "0.2.27"
+        },
+        {
+            "id": "secrets",
+            "group": "platform",
+            "name": "Secrets",
+            "rating": "partial",
+            "has": [
+                {
+                    "what": "PluginSecrets: encrypted per plugin and workspace",
+                    "since": "1.60"
+                }
+            ],
+            "missing": [
+                "A host-rendered secret entry field",
+                "Listing and rotation"
+            ],
+            "security": "The host, not the caller, must decide which plugin and workspace a store belongs to.",
+            "plan": "0.2.27"
+        },
+        {
+            "id": "files",
+            "group": "platform",
+            "name": "File storage",
+            "rating": "partial",
+            "has": [
+                {
+                    "what": "Multipart uploads",
+                    "since": "1.5"
+                },
+                {
+                    "what": "PluginFiles and ready-made file routes",
+                    "since": "1.63"
+                }
+            ],
+            "missing": [
+                "Signed temporary links",
+                "Quotas and a scan hook",
+                "file.uploaded event"
+            ],
+            "security": "The host must decide which plugin and workspace a store belongs to.",
+            "plan": "0.2.28"
+        },
+        {
+            "id": "notifications",
+            "group": "platform",
+            "name": "Notifications and mail",
+            "rating": "partial",
+            "has": [
+                {
+                    "what": "NotificationTransport contract (not yet discovered from plugins)",
+                    "since": "1.14"
+                }
+            ],
+            "missing": [
+                "A Notifier service: send to a person, role or unit",
+                "Declared notification types with English and Arabic labels",
+                "Registering plugin transports",
+                "Sent and failed events"
+            ],
+            "security": "Sending must be bound to the current workspace, reach only its members, and respect opt-outs; a plugin must not be able to pose as a security or billing notice.",
+            "plan": "0.2.27"
+        },
+        {
+            "id": "i18n",
+            "group": "platform",
+            "name": "Languages and translations",
+            "rating": "partial",
+            "has": [
+                {
+                    "what": "English and Arabic labels on settings, data types, manifest screens and agents",
+                    "since": "1.21"
+                }
+            ],
+            "missing": [
+                "Shipping a translation catalogue",
+                "Arabic labels on frontend features, navigation and block text",
+                "The request's language in the SDK Request"
+            ],
+            "security": null,
+            "issues": [
+                521
+            ],
+            "plan": "0.2.27"
+        },
+        {
+            "id": "branding",
+            "group": "platform",
+            "name": "Branding and themes",
+            "rating": "partial",
+            "has": [
+                {
+                    "what": "Theme token override from a plugin route",
+                    "since": "1.12"
+                }
+            ],
+            "missing": [
+                "Reading workspace branding",
+                "Choosing which plugin's override applies per workspace",
+                "Fonts, logos and radii"
+            ],
+            "security": "The theme route is public and runs on every page. Per-workspace overrides need a design.",
+            "plan": "later"
+        },
+        {
+            "id": "navigation",
+            "group": "platform",
+            "name": "Navigation",
+            "rating": "full",
+            "has": [
+                {
+                    "what": "Frontend features become sidebar items; navigation.register hook",
+                    "since": "1.2"
+                }
+            ],
+            "missing": [
+                "Top bar, user menu and create quick actions",
+                "Arabic labels"
+            ],
+            "security": "Navigation listeners receive the whole menu. Contributions should be append-only with links checked as internal paths.",
+            "plan": "0.2.27"
+        },
+        {
+            "id": "home",
+            "group": "platform",
+            "name": "Home page",
+            "rating": "partial",
+            "has": [
+                {
+                    "what": "One home card per plugin",
+                    "since": "1.62"
+                }
+            ],
+            "missing": [
+                "More than one card, and actions on cards",
+                "Contributing to Waiting for you"
+            ],
+            "security": null,
+            "plan": "0.2.28"
+        },
+        {
+            "id": "audit",
+            "group": "platform",
+            "name": "Audit log",
+            "rating": "partial",
+            "has": [
+                {
+                    "what": "Declared audited plugin events",
+                    "since": "1.29"
+                },
+                {
+                    "what": "timeline block",
+                    "since": "1.31"
+                }
+            ],
+            "missing": [
+                "Reading the plugin's own audit entries",
+                "Recording an entry with a target and actor directly"
+            ],
+            "security": "Audit rows must be attributed by the host to the plugin that wrote them, so one plugin cannot write rows under another's or core's name.",
+            "plan": "0.2.27"
+        },
+        {
+            "id": "jobs",
+            "group": "platform",
+            "name": "Jobs and scheduling",
+            "rating": "partial",
+            "has": [
+                {
+                    "what": "Plugin job handlers",
+                    "since": "1.28"
+                }
+            ],
+            "missing": [
+                "Enqueueing through the SDK",
+                "Scheduled (cron) jobs",
+                "Job status for the UI"
+            ],
+            "security": "Enqueueing must accept only the plugin's own job names in the current workspace.",
+            "plan": "0.2.27"
+        },
+        {
+            "id": "health",
+            "group": "platform",
+            "name": "Health and status",
+            "rating": "full",
+            "has": [
+                {
+                    "what": "Plugin health probes on the status page",
+                    "since": "1.19"
+                }
+            ],
+            "missing": [
+                "Probes per workspace",
+                "Alerting hook"
+            ],
+            "security": null,
+            "plan": "later"
+        },
+        {
+            "id": "billing",
+            "group": "platform",
+            "name": "Plans, entitlements and payments",
+            "rating": "partial",
+            "has": [
+                {
+                    "what": "Declared sellable limits in the plan catalogue (PluginEntitlementsInterface)",
+                    "since": null
+                }
+            ],
+            "missing": [
+                "Reading entitlements and consuming meters through the SDK",
+                "requiredEntitlement on routes",
+                "Plan, subscription and seat events",
+                "Charging through Whity Pay"
+            ],
+            "security": "Charging moves money. It needs consent, the ledger, idempotency and webhook trust; meters must stay bound to the workspace.",
+            "plan": "0.2.28"
+        },
+        {
+            "id": "plugin-lifecycle",
+            "group": "runtime",
+            "name": "Install, versions and lifecycle",
+            "rating": "partial",
+            "has": [
+                {
+                    "what": "SDK version constraint",
+                    "since": "1.1"
+                },
+                {
+                    "what": "Core version constraint",
+                    "since": "1.4"
+                }
+            ],
+            "missing": [
+                "Enabled, installed and upgraded callbacks",
+                "Knowing whether the plugin is on for the current workspace",
+                "The running core version"
+            ],
+            "security": "Installing and enabling stay operator-only. A lifecycle callback must not let a plugin enable others.",
+            "plan": "0.2.28"
+        },
+        {
+            "id": "observability",
+            "group": "runtime",
+            "name": "Logging, errors and rate limits",
+            "rating": "none",
+            "has": [],
+            "missing": [
+                "A scrubbed logger",
+                "Reporting errors to the error tracker",
+                "Rate limits declared per route",
+                "Metrics"
+            ],
+            "security": "Plugin payloads must pass through the same scrubber before they reach logs or the error tracker.",
+            "plan": "0.2.28"
+        },
+        {
+            "id": "database",
+            "group": "runtime",
+            "name": "Database and migrations",
+            "rating": "full",
+            "has": [
+                {
+                    "what": "Migrations",
+                    "since": "1.0"
+                },
+                {
+                    "what": "Tenant-isolation conformance kit",
+                    "since": "1.3"
+                },
+                {
+                    "what": "SchemaInspector",
+                    "since": "1.23"
+                },
+                {
+                    "what": "Upsert and SequenceAllocator",
+                    "since": "1.25"
+                },
+                {
+                    "what": "Undeclared-reference linter",
+                    "since": "1.26"
+                },
+                {
+                    "what": "Offline-host conformance kit",
+                    "since": "1.27"
+                }
+            ],
+            "missing": [
+                "A runtime connection handle from the SDK",
+                "Read-only views of core tables"
+            ],
+            "security": "Workspace isolation is checked by lint and tests, not enforced. A connection bound to the workspace is a design question.",
+            "plan": "later"
+        },
+        {
+            "id": "http-routes",
+            "group": "runtime",
+            "name": "HTTP routes",
+            "rating": "full",
+            "has": [
+                {
+                    "what": "Request and Response",
+                    "since": "1.0"
+                },
+                {
+                    "what": "Multipart requests",
+                    "since": "1.5"
+                },
+                {
+                    "what": "Route schemas in the OpenAPI document",
+                    "since": null
+                }
+            ],
+            "missing": [
+                "Workspace, language and actor kind on Request",
+                "Per-route rate limits and entitlements"
+            ],
+            "security": "Routes cannot tell an agent from a person today, so they cannot apply stricter rules to agents.",
+            "plan": "0.2.27"
+        },
+        {
+            "id": "events",
+            "group": "runtime",
+            "name": "Hook events",
+            "rating": "partial",
+            "has": [
+                {
+                    "what": "Events catalogue",
+                    "since": "1.0"
+                },
+                {
+                    "what": "Veto exception",
+                    "since": "1.15"
+                }
+            ],
+            "missing": [
+                "Constants for events core already fires (membership, registration, federated sign-in, resource grants, routing, close report)",
+                "Observe-only listeners that cannot change the payload",
+                "Events for settings, plugins, plans, notifications, files and jobs"
+            ],
+            "security": "Every listener can rewrite the payload today. Observe-only listeners, and a per-event list of what may change, are needed before more events are published.",
+            "plan": "0.2.27"
+        },
+        {
+            "id": "cli",
+            "group": "runtime",
+            "name": "Command line",
+            "rating": "none",
+            "has": [],
+            "missing": [
+                "Plugin commands"
+            ],
+            "security": "Commands run with full database rights outside RBAC. A plugin command must be operator-only and name its workspace explicitly.",
+            "plan": "later"
+        },
+        {
+            "id": "preferences",
+            "group": "runtime",
+            "name": "Personal preferences",
+            "rating": "none",
+            "has": [],
+            "missing": [
+                "Reading the person's language, calendar and density",
+                "Plugin preference keys"
+            ],
+            "security": null,
+            "plan": "0.2.27"
+        },
+        {
+            "id": "plugin-screens",
+            "group": "interface",
+            "name": "Plugin screens and blocks",
+            "rating": "full",
+            "has": [
+                {
+                    "what": "Frontend features (crud, action, custom)",
+                    "since": "1.2"
+                },
+                {
+                    "what": "Server-driven blocks",
+                    "since": "1.6"
+                },
+                {
+                    "what": "Data blocks",
+                    "since": "1.7"
+                },
+                {
+                    "what": "chart block",
+                    "since": "1.10"
+                },
+                {
+                    "what": "Sort, filter and paging",
+                    "since": "1.11"
+                },
+                {
+                    "what": "Embedded screens",
+                    "since": "1.13"
+                },
+                {
+                    "what": "dataRecord and recordFields blocks",
+                    "since": "1.33"
+                },
+                {
+                    "what": "visibleWhen and accessGate",
+                    "since": "1.34"
+                },
+                {
+                    "what": "flow block",
+                    "since": "1.35"
+                }
+            ],
+            "missing": [
+                "Native screens for store plugins (custom screens need a change in this repository)",
+                "Blocks outside /admin/x pages"
+            ],
+            "security": "Embedded screens are not isolated from the app. Third-party UI needs a separate origin, a message bridge and a scoped token first.",
+            "plan": "later"
+        },
+        {
+            "id": "core-screen-slots",
+            "group": "interface",
+            "name": "Slots in core screens",
+            "rating": "none",
+            "has": [],
+            "missing": [
+                "Tabs, sections and actions on person, user, role, unit, workspace and document record pages",
+                "Slots in admin screens, settings and the person's own settings",
+                "Top bar and user menu entries"
+            ],
+            "security": "A slot receives the record it sits on. It needs per-record permission checks and the same own-routes rule blocks have.",
+            "plan": "0.2.28"
+        },
+        {
+            "id": "desktop",
+            "group": "interface",
+            "name": "Desktop app",
+            "rating": "partial",
+            "has": [
+                {
+                    "what": "Plugins run under the offline desktop PHP host",
+                    "since": "1.27"
+                }
+            ],
+            "missing": [
+                "Rendering plugin blocks in the desktop or Flutter apps",
+                "Desktop plugin releases per workspace"
+            ],
+            "security": null,
+            "plan": "later"
+        },
+        {
+            "id": "mcp-tools",
+            "group": "agents",
+            "name": "MCP tools",
+            "rating": "full",
+            "has": [
+                {
+                    "what": "Plugin routes become MCP tools",
+                    "since": null
+                },
+                {
+                    "what": "Hand-authored tools",
+                    "since": "1.43"
+                },
+                {
+                    "what": "Tool annotations",
+                    "since": "1.45"
+                },
+                {
+                    "what": "Tool context",
+                    "since": "1.46"
+                },
+                {
+                    "what": "Toolsets, visibility, agent policy and undo windows",
+                    "since": "1.52"
+                },
+                {
+                    "what": "Caller identity: person, agent or system",
+                    "since": "1.59"
+                }
+            ],
+            "missing": [
+                "Previews of what a proposed tool call would change"
+            ],
+            "security": "Whether an agent must ask first has to come from the host's view of the operation, never from a hint the plugin declares.",
+            "plan": "0.2.27"
+        },
+        {
+            "id": "mcp-prompts-resources",
+            "group": "agents",
+            "name": "MCP prompts and resources",
+            "rating": "partial",
+            "has": [
+                {
+                    "what": "Plugin prompts",
+                    "since": "1.9"
+                }
+            ],
+            "missing": [
+                "Authored resources and subscriptions",
+                "Workspace-specific prompts"
+            ],
+            "security": "Prompt text goes straight into an agent's context. Third-party prompts should be limited to verified plugins and gated by permission.",
+            "plan": "later"
+        },
+        {
+            "id": "agents",
+            "group": "agents",
+            "name": "Agents and presets",
+            "rating": "full",
+            "has": [
+                {
+                    "what": "Agent presets",
+                    "since": "1.61"
+                },
+                {
+                    "what": "Plugin agents",
+                    "since": "1.64"
+                }
+            ],
+            "missing": [
+                "Agent and token lifecycle events"
+            ],
+            "security": null,
+            "plan": "later"
+        },
+        {
+            "id": "agent-proposals",
+            "group": "agents",
+            "name": "Agent proposals",
+            "rating": "partial",
+            "has": [
+                {
+                    "what": "agentPolicy propose and suggest-only on plugin tools",
+                    "since": "1.52"
+                }
+            ],
+            "missing": [
+                "Proposal created, decided and undone events",
+                "Plugin-provided previews of a proposal"
+            ],
+            "security": "Only the granting person decides a proposal. Any plugin view must be read-only.",
+            "plan": "0.2.28"
+        },
+        {
+            "id": "webhooks",
+            "group": "agents",
+            "name": "Outbound webhooks and connectors",
+            "rating": "none",
+            "has": [],
+            "missing": [
+                "Subscribing external URLs to events, with signing, retries and a delivery log",
+                "An outbound HTTP client",
+                "Admin-registered connectors"
+            ],
+            "security": "Outbound calls need a guard against private addresses, signing secrets kept in PluginSecrets, a workspace check per event and id-only payloads.",
+            "issues": [
+                342
+            ],
+            "plan": "later"
+        }
+    ],
+    "roadmap": {
+        "hardening": {
+            "summary": "Before new surface: tighten the existing extension points the sweep found too permissive. Tracked privately under SECURITY.md and fixed in 0.2.27; each fix is listed here once it ships.",
+            "release": "0.2.27"
+        },
+        "releases": [
+            {
+                "version": "0.2.27",
+                "theme": "Events, context and the basics every plugin rebuilds",
+                "items": [
+                    {
+                        "id": "events-catalogue",
+                        "title": "Publish constants for every event core already fires, and add observe-only listeners",
+                        "areas": [
+                            "events",
+                            "invitations-registration",
+                            "users",
+                            "documents"
+                        ],
+                        "value": "high",
+                        "risk": "low",
+                        "issues": [
+                            1673
+                        ]
+                    },
+                    {
+                        "id": "form-events",
+                        "title": "form.submitted, submission.reviewed and submission.withdrawn, and issue events for submission documents",
+                        "areas": [
+                            "core-forms",
+                            "documents"
+                        ],
+                        "value": "high",
+                        "risk": "medium",
+                        "issues": [
+                            1674
+                        ]
+                    },
+                    {
+                        "id": "request-context",
+                        "title": "Workspace, language and actor kind (person, agent, system) on the SDK Request",
+                        "areas": [
+                            "http-routes",
+                            "i18n",
+                            "preferences"
+                        ],
+                        "value": "high",
+                        "risk": "low",
+                        "issues": [
+                            1675
+                        ]
+                    },
+                    {
+                        "id": "settings-reader",
+                        "title": "Read and write the plugin's own settings for the current workspace, a settings-changed event, and a host-rendered secret field",
+                        "areas": [
+                            "settings",
+                            "secrets"
+                        ],
+                        "value": "high",
+                        "risk": "medium",
+                        "issues": [
+                            1676
+                        ]
+                    },
+                    {
+                        "id": "notifier",
+                        "title": "Notifier: declared notification types, sent to a person, role or unit in the current workspace",
+                        "areas": [
+                            "notifications"
+                        ],
+                        "value": "high",
+                        "risk": "medium",
+                        "issues": [
+                            1677
+                        ]
+                    },
+                    {
+                        "id": "plugin-translations",
+                        "title": "Ship English and Arabic catalogues, and Arabic labels on features, navigation and blocks",
+                        "areas": [
+                            "i18n",
+                            "navigation"
+                        ],
+                        "value": "medium",
+                        "risk": "low",
+                        "issues": [
+                            521
+                        ]
+                    },
+                    {
+                        "id": "jobs-enqueue",
+                        "title": "Enqueue the plugin's own jobs, and declare scheduled jobs",
+                        "areas": [
+                            "jobs"
+                        ],
+                        "value": "medium",
+                        "risk": "medium",
+                        "issues": [
+                            1678
+                        ]
+                    },
+                    {
+                        "id": "audit-record",
+                        "title": "Record and read the plugin's own audit entries, attributed by the host",
+                        "areas": [
+                            "audit"
+                        ],
+                        "value": "medium",
+                        "risk": "low",
+                        "issues": [
+                            1679
+                        ]
+                    }
+                ]
+            },
+            {
+                "version": "0.2.28",
+                "theme": "Reading core data safely, and appearing inside core screens",
+                "items": [
+                    {
+                        "id": "directory-reader",
+                        "title": "People, user, group and unit readers pinned to the workspace and checked per caller, with picker blocks",
+                        "areas": [
+                            "people-directory",
+                            "users",
+                            "groups-audiences",
+                            "ous",
+                            "tenants"
+                        ],
+                        "value": "high",
+                        "risk": "high",
+                        "design_first": true,
+                        "issues": [
+                            1680
+                        ]
+                    },
+                    {
+                        "id": "inbox-sources",
+                        "title": "Inbox source contract: plugin tasks in Waiting for you",
+                        "areas": [
+                            "inbox",
+                            "home"
+                        ],
+                        "value": "high",
+                        "risk": "medium",
+                        "design_first": true,
+                        "issues": [
+                            881
+                        ]
+                    },
+                    {
+                        "id": "record-page-slots",
+                        "title": "Tabs, sections and actions on core record pages, rendered with blocks",
+                        "areas": [
+                            "core-screen-slots"
+                        ],
+                        "value": "high",
+                        "risk": "high",
+                        "design_first": true,
+                        "issues": [
+                            1681
+                        ]
+                    },
+                    {
+                        "id": "search-report-sources",
+                        "title": "Search and report source contracts, filtered per caller by the host; workspace records in search",
+                        "areas": [
+                            "search",
+                            "reports"
+                        ],
+                        "value": "medium",
+                        "risk": "medium",
+                        "design_first": true,
+                        "issues": [
+                            1682
+                        ]
+                    },
+                    {
+                        "id": "entitlements-reader",
+                        "title": "Read entitlements and consume meters, and requiredEntitlement on routes",
+                        "areas": [
+                            "billing"
+                        ],
+                        "value": "medium",
+                        "risk": "medium",
+                        "issues": [
+                            1683
+                        ]
+                    },
+                    {
+                        "id": "document-reader",
+                        "title": "Read and list documents under the host's visibility policy; withdraw and revise contracts",
+                        "areas": [
+                            "documents"
+                        ],
+                        "value": "medium",
+                        "risk": "high",
+                        "design_first": true,
+                        "issues": [
+                            1684
+                        ]
+                    },
+                    {
+                        "id": "proposal-previews",
+                        "title": "Plugin previews for proposals, and proposal events",
+                        "areas": [
+                            "agent-proposals",
+                            "mcp-tools"
+                        ],
+                        "value": "medium",
+                        "risk": "low",
+                        "issues": [
+                            1685
+                        ]
+                    },
+                    {
+                        "id": "tag-vocabularies",
+                        "title": "Plugin tag vocabularies and taggable types",
+                        "areas": [
+                            "tags"
+                        ],
+                        "value": "medium",
+                        "risk": "low",
+                        "issues": [
+                            714
+                        ]
+                    },
+                    {
+                        "id": "lifecycle-observability",
+                        "title": "Lifecycle callbacks, a scrubbed logger, error reporting and per-route rate limits",
+                        "areas": [
+                            "plugin-lifecycle",
+                            "observability"
+                        ],
+                        "value": "medium",
+                        "risk": "low",
+                        "issues": [
+                            1686
+                        ]
+                    },
+                    {
+                        "id": "render-from-jobs",
+                        "title": "Render and issue from a job, and render with a workspace theme",
+                        "areas": [
+                            "render",
+                            "files"
+                        ],
+                        "value": "medium",
+                        "risk": "medium",
+                        "issues": [
+                            1151
+                        ]
+                    }
+                ]
+            },
+            {
+                "version": "later",
+                "theme": "High-risk surface, each behind its own design",
+                "items": [
+                    {
+                        "id": "outbound-webhooks",
+                        "title": "Outbound webhooks and connectors, and the send_webhook automation step",
+                        "areas": [
+                            "webhooks",
+                            "records-automations"
+                        ],
+                        "value": "high",
+                        "risk": "high",
+                        "design_first": true,
+                        "issues": [
+                            342
+                        ]
+                    },
+                    {
+                        "id": "whity-pay-charges",
+                        "title": "Charging through Whity Pay",
+                        "areas": [
+                            "billing"
+                        ],
+                        "value": "high",
+                        "risk": "high",
+                        "design_first": true,
+                        "issues": [
+                            1687
+                        ]
+                    },
+                    {
+                        "id": "isolated-plugin-ui",
+                        "title": "Isolated origin for embedded and store-plugin UI, then native screens for store plugins",
+                        "areas": [
+                            "plugin-screens"
+                        ],
+                        "value": "high",
+                        "risk": "high",
+                        "design_first": true,
+                        "issues": [
+                            1688
+                        ]
+                    },
+                    {
+                        "id": "editor-blocks-themes",
+                        "title": "Editor blocks and document themes from plugins",
+                        "areas": [
+                            "templates-editor"
+                        ],
+                        "value": "medium",
+                        "risk": "high",
+                        "design_first": true,
+                        "issues": [
+                            1689
+                        ]
+                    },
+                    {
+                        "id": "identity-providers",
+                        "title": "Plugin identity providers and sign-in events",
+                        "areas": [
+                            "authentication"
+                        ],
+                        "value": "medium",
+                        "risk": "high",
+                        "design_first": true,
+                        "issues": [
+                            1690
+                        ]
+                    },
+                    {
+                        "id": "form-field-types",
+                        "title": "Custom form field types, validators and prefill sources",
+                        "areas": [
+                            "core-forms"
+                        ],
+                        "value": "medium",
+                        "risk": "medium",
+                        "design_first": true,
+                        "issues": [
+                            1691
+                        ]
+                    },
+                    {
+                        "id": "workflow-events",
+                        "title": "Routing, meeting and time-window events, and a closed-period guard",
+                        "areas": [
+                            "routing",
+                            "convening",
+                            "time-windows"
+                        ],
+                        "value": "medium",
+                        "risk": "medium",
+                        "issues": [
+                            1692
+                        ]
+                    },
+                    {
+                        "id": "capability-sandbox",
+                        "title": "Least-privilege plugin capabilities: plugins reach only the services they declare",
+                        "areas": [
+                            "database",
+                            "events"
+                        ],
+                        "value": "medium",
+                        "risk": "high",
+                        "design_first": true,
+                        "issues": [
+                            1693
+                        ]
+                    },
+                    {
+                        "id": "remaining-people",
+                        "title": "Relations, delegations and plugin CLI commands",
+                        "areas": [
+                            "relations",
+                            "delegations",
+                            "cli"
+                        ],
+                        "value": "low",
+                        "risk": "high",
+                        "design_first": true,
+                        "issues": [
+                            1694
+                        ]
+                    }
+                ]
+            }
+        ]
+    }
+}
