@@ -75,6 +75,7 @@ Areas marked **Needs a design** have gaps that could cross workspaces, skip perm
 **In the SDK**
 
 - user.creating, user.created, user.updated, user.deleted hook events (SDK 1.0)
+- user.creating is read-only and can refuse an admin create with HookVetoException (SDK 1.70)
 
 **Missing**
 

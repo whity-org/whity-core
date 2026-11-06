@@ -246,6 +246,8 @@ final class SdkPackageContractTest extends TestCase
             \Whity\Sdk\Sdk::VERSION,
             'SDK 1.72: PluginRolesInterface grants a plugin only its own declared, non-core permissions, only to roles '
             . 'it created or the operator approved, and uninstall removes only the grants it made. '
+            . 'SDK 1.70 MAKES user.creating READ-ONLY: email and role_id only, no password, the return value is ignored, '
+            . 'and a listener can refuse the create with HookVetoException (WHIT-911). '
             . 'SDK 1.69 ADDS PUBLIC READS: a route declared public => read answers GETs from anybody holding a key, '
             . 'with the tenant from the key, the limits run by the host and the operator switch off by default; '
             . 'Http\PublicRead carries the result (WHIT-704). Purely additive. '

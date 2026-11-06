@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.69).
+ * SDK identity (v1.70).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -989,6 +989,15 @@ namespace Whity\Sdk;
  * reads on. On an older host the route is not public (WHIT-704).
  *
  * Purely additive.)
+ *
+ * 1.70 (`user.creating` IS READ-ONLY: the payload is `email` and `role_id`, and
+ * the host ignores what a listener returns, so neither the email nor the role of
+ * the new user can be changed there. The password is no longer in the payload.
+ * A listener that must refuse a create throws {@see Hooks\HookVetoException}; the
+ * host writes nothing and answers `409 Conflict` with its `reason()` (WHIT-911).
+ *
+ * Narrows the payload; a listener that read `password` or returned a changed
+ * `role_id` or `email` must stop relying on it.)
  *
  * 1.72 (PLUGIN ROLE GRANTS STAY THE PLUGIN'S OWN: {@see PluginRolesInterface} grants
  * only permissions the plugin declares in {@see PluginInterface::getPermissions()},

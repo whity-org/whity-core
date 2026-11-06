@@ -18,6 +18,12 @@ use Whity\Sdk\PluginNamespace;
  * - Notification hooks (`*.created` / `*.updated` / `*.deleted` and the
  *   `*.async` variants): listeners observe; async variants are queued.
  *
+ * `user.creating` (SDK 1.70) is the exception to the FILTER rule above: it is
+ * read-only. Listeners receive `email` and `role_id`, the host ignores what they
+ * return, and the only way to affect the create is to refuse it with
+ * {@see HookVetoException} (`409 Conflict`, nothing written). The new user's
+ * password is never part of any hook payload.
+ *
  * Deletion ordering + transactionality (SDK 1.15, WC-713)
  * -------------------------------------------------------
  * For `tenant.*`, `ou.*` and `role.*`, the host runs

@@ -423,22 +423,23 @@ event **`user.creating`**, fired by
 
 ```php
 // src/Api/UsersApiHandler.php (core)
-$userData = $this->hookManager->dispatch('user.creating', [
-    'email' => $email,
-    'password' => $body['password'], // plaintext, pre-hash
-    'role_id' => $roleId,
-]);
-
-// the core reads the (possibly modified) payload back out
-$email    = $userData['email'];
-$roleId   = $userData['role_id'];
-$password = password_hash($userData['password'], PASSWORD_BCRYPT);
+try {
+    $this->hookManager->dispatch('user.creating', [
+        'email' => $email,
+        'role_id' => $roleId,
+    ]);
+} catch (HookVetoException $e) {
+    return Response::error('Cannot create user: blocked by an installed plugin', 409, ['reason' => $e->reason()]);
+}
 ```
 
-`user.creating` is a **synchronous filter** hook: every listener receives the
-payload and the execution context, and must **return the (possibly modified)
-array** so downstream listeners and the core see the change. Our plugin
-subscribes to it:
+Since SDK 1.70 `user.creating` is **read-only**. Listeners receive `email` and
+`role_id` plus the execution context. The core ignores what they return, so a
+listener cannot change the new user's email or role; the role was already
+checked against the person creating the user. To refuse the create, throw
+`Whity\Sdk\Hooks\HookVetoException`: nothing is written and the caller gets
+`409 Conflict` with your `reason()`. The password is never in any hook payload.
+Our plugin subscribes to it:
 
 ```php
 public function getHooks(): array
@@ -453,7 +454,7 @@ public function getHooks(): array
 
 public function onUserCreating(array $data, array $context): array
 {
-    // Normalise the email before the user is persisted.
+    // Read-only hook: this changes only the listener's own copy.
     if (isset($data['email']) && is_string($data['email'])) {
         $data['email'] = strtolower(trim($data['email']));
     }

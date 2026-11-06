@@ -48,6 +48,10 @@
                 {
                     "what": "user.creating, user.created, user.updated, user.deleted hook events",
                     "since": "1.0"
+                },
+                {
+                    "what": "user.creating is read-only and can refuse an admin create with HookVetoException",
+                    "since": "1.70"
                 }
             ],
             "missing": [
