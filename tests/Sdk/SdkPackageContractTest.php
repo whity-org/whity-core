@@ -242,9 +242,11 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsOneEightForInteractiveBlocks(): void
     {
         $this->assertSame(
-            '1.69.0',
+            '1.70.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.69 ADDS PUBLIC READS: a route declared public => read answers GETs from anybody holding a key, '
+            'SDK 1.70 MAKES user.creating READ-ONLY: email and role_id only, no password, the return value is ignored, '
+            . 'and a listener can refuse the create with HookVetoException (WHIT-911). '
+            . 'SDK 1.69 ADDS PUBLIC READS: a route declared public => read answers GETs from anybody holding a key, '
             . 'with the tenant from the key, the limits run by the host and the operator switch off by default; '
             . 'Http\PublicRead carries the result (WHIT-704). Purely additive. '
             . 'SDK 1.68 ADDS DOCUMENT REVISIONS: document.revised says a revision replaced a document (WHIT-888). '

@@ -21,6 +21,7 @@ use Whity\Http\ListSpec;
 use Whity\Core\Tenant\TenantContext;
 use PDO;
 use Whity\Core\Db\DbBool;
+use Whity\Sdk\Hooks\HookVetoException;
 
 /**
  * Users API Handler
@@ -641,16 +642,31 @@ class UsersApiHandler
                 $ouId = $resolvedOu;
             }
 
-            // Dispatch filter hook before creating the user (may modify email/role).
-            $userData = $this->hookManager->dispatch('user.creating', [
-                'email' => $email,
-                'password' => $body['password'], // Pass plaintext password to hooks
-                'role_id' => $roleId,
-            ]);
+            // `user.creating` is read-only (SDK 1.70, WHIT-911). Listeners see
+            // the email and the role core resolved and checked above, and may
+            // refuse the create with HookVetoException; whatever they return is
+            // ignored. The password is never in the payload, and neither the
+            // email nor the role can be changed here: the role was authorised
+            // against the caller, and a listener is not the caller.
+            try {
+                $this->hookManager->dispatch('user.creating', [
+                    'email' => $email,
+                    'role_id' => $roleId,
+                ]);
+            } catch (HookVetoException $e) {
+                error_log(sprintf(
+                    '[users] create vetoed by a hook listener: tenant_id=%s event=%s',
+                    var_export($tenantId, true),
+                    $e->eventName()
+                ));
+                return Response::error(
+                    'Cannot create user: blocked by an installed plugin',
+                    409,
+                    ['reason' => $e->reason()]
+                );
+            }
 
-            $email = (string)$userData['email'];
-            $roleId = (int)$userData['role_id'];
-            $passwordHash = password_hash((string)$userData['password'], PASSWORD_BCRYPT);
+            $passwordHash = password_hash((string)$body['password'], PASSWORD_BCRYPT);
 
             // Whether this act revived an existing invited/suspended membership
             // rather than creating one. Initialised out here because the audit
