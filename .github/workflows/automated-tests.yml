@@ -121,6 +121,7 @@ jobs:
       date_display: ${{ steps.mode.outputs.all == 'true' && 'true' || steps.filter.outputs.date_display }}
       desktop_host: ${{ steps.mode.outputs.all == 'true' && 'true' || steps.filter.outputs.desktop_host }}
       watchdog: ${{ steps.mode.outputs.all == 'true' && 'true' || steps.filter.outputs.watchdog }}
+      sdk_coverage: ${{ steps.mode.outputs.all == 'true' && 'true' || steps.filter.outputs.sdk_coverage }}
       # full: the dialect shards run. coverage: the SQLite shards run under
       # pcov and the coverage floor is enforced. See "What runs where" above.
       full: ${{ steps.mode.outputs.full }}
@@ -259,6 +260,14 @@ jobs:
             # the drift, and `frontend` runs a Node job with no PHP. Its own
             # filter is the only way it fires on every change that can move the
             # catalogue.
+            # The plugin SDK coverage matrix: its data, its generated page, the
+            # SDK whose ledger it is checked against, and the script itself.
+            sdk_coverage:
+              - 'sdk/**'
+              - 'docs/sdk-coverage/**'
+              - 'docs/wiki/Plugin-SDK-Coverage.md'
+              - 'scripts/sdk-coverage.php'
+              - '.github/workflows/automated-tests.yml'
             i18n:
               - 'web/**'
               - 'packages/**'
@@ -785,6 +794,29 @@ jobs:
   #
   # Its own job, and not a step in `static-analysis`, because the input it reads
   # is the FRONTEND and the guard is PHP — see the `i18n` path filter above.
+  # Plugin SDK coverage matrix. An SDK minor that does not say which areas it
+  # moved is how the matrix goes stale, so this fails when coverage.json is
+  # behind Sdk::VERSION, when a ledger minor is placed in no area, or when the
+  # generated page differs from the data. Reads files only: no Composer.
+  sdk-coverage:
+    name: Plugin SDK coverage matrix
+    needs: changes
+    if: needs.changes.outputs.sdk_coverage == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          coverage: none
+
+      - name: The coverage matrix matches the SDK
+        run: php scripts/sdk-coverage.php --check
+
   i18n-catalogue:
     name: i18n catalogue drift
     needs: changes
@@ -1907,6 +1939,7 @@ jobs:
       - coverage
       - static-analysis
       - history-guards
+      - sdk-coverage
       - i18n-catalogue
       - date-display
       - postgres-migrations

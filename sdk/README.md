@@ -76,6 +76,14 @@ optional surface existing plugins can ignore —
   [Proving offline-host compatibility](#proving-offline-host-compatibility-127)
   below.
 
+**Every minor updates the coverage matrix in the same pull request.**
+[`docs/sdk-coverage/coverage.json`](../docs/sdk-coverage/coverage.json) rates how far
+plugins reach each core area; add what the minor gave plugins to the area it
+moved (a `has` entry with `since`), bump `sdk_version`, and run
+`php scripts/sdk-coverage.php` to regenerate
+[`docs/wiki/Plugin-SDK-Coverage.md`](../docs/wiki/Plugin-SDK-Coverage.md). CI
+fails a minor the matrix does not account for.
+
 The list above is illustrative, not a changelog. The authoritative,
 version-by-version ledger is the docblock on
 [`Sdk.php`](src/Sdk.php), which every release appends to.
