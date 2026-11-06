@@ -212,7 +212,8 @@ final class StreamedResponse extends Response
             return [$start, $fileSize - 1];
         }
 
-        if ($rawStart === '' && $rawEnd === '') {
+        // $rawEnd is '' here too: the suffix form returned above.
+        if ($rawStart === '') {
             return [null, 0];
         }
 

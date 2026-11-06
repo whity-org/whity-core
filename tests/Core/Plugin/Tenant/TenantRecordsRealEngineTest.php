@@ -239,7 +239,7 @@ final class TenantRecordsRealEngineTest extends TestCase
         return json_decode($response->getBody(), true) ?? [];
     }
 
-    /** @return list<mixed> */
+    /** @return array<int, mixed> */
     private function rows(): array
     {
         $stmt = $this->pdo->query('SELECT id FROM plugin_records');

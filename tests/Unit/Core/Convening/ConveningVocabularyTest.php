@@ -215,7 +215,7 @@ final class ConveningVocabularyTest extends TestCase
                 ConveningBodyRepository::assertKey($bad);
                 self::fail("'{$bad}' must be refused as a body key");
             } catch (ConveningRejectedException) {
-                self::assertTrue(true);
+                $this->addToAssertionCount(1);
             }
         }
     }

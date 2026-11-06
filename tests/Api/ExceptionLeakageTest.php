@@ -196,6 +196,7 @@ final class ExceptionLeakageTest extends TestCase
                 throw new PDOException(ExceptionLeakageTest::SECRET);
             }
 
+            /** @param array<int, mixed> $options */
             public function prepare(string $query, array $options = []): \PDOStatement|false
             {
                 throw new PDOException(ExceptionLeakageTest::SECRET);

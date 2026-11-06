@@ -142,7 +142,7 @@ final class PluginMigrationRunner
         $entries = [];
         $seen = [];
         foreach ($declared as $fqcn) {
-            if (!is_string($fqcn) || !class_exists($fqcn)) {
+            if (!is_string($fqcn) || !class_exists($fqcn)) { // @phpstan-ignore function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
                 continue;
             }
             if (!is_subclass_of($fqcn, MigrationInterface::class)) {

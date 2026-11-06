@@ -97,7 +97,10 @@ final class LegacyTemplateMigrator
         );
         $stmt->execute([':tenant_id' => $tenantId]);
 
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        /** @var list<array<string, mixed>> $rows */
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return $rows;
     }
 
     /**

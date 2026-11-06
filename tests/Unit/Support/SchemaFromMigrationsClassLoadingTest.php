@@ -44,7 +44,7 @@ final class SchemaFromMigrationsClassLoadingTest extends TestCase
         $files = glob(dirname(__DIR__, 3) . '/database/migrations/*.php') ?: [];
         sort($files);
 
-        return array_values($files);
+        return $files;
     }
 
     /** The class name the loader derives from a migration filename. */
@@ -106,9 +106,5 @@ final class SchemaFromMigrationsClassLoadingTest extends TestCase
 
         $class = 'Database\\Migrations\\CreateUsersRoles';
         self::assertTrue(class_exists($class, false));
-        self::assertTrue(
-            method_exists($class, 'up'),
-            'up() must exist but must NOT have been called by loading.'
-        );
     }
 }

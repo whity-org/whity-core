@@ -669,6 +669,7 @@ final class PublicFormRouteRealEngineTest extends TestCase
 
         TenantContext::setTenantId(1);
         self::assertSame(204, $this->keysHandler()->revoke($this->adminRequest('POST'), ['id' => (string) $id])->getStatusCode());
+        // @phpstan-ignore staticMethod.alreadyNarrowedType (second revoke() is the idempotency check; PHPStan remembers the first call)
         self::assertSame(204, $this->keysHandler()->revoke($this->adminRequest('POST'), ['id' => (string) $id])->getStatusCode());
         TenantContext::reset();
         $GLOBALS['__public_form_seen'] = [];

@@ -27,7 +27,7 @@
   },
   "require-dev": {
     "phpunit/phpunit": "^10.0",
-    "phpstan/phpstan": "^1.10",
+    "phpstan/phpstan": "^2.3",
     "infection/infection": "^0.29 || ^0.34 || ^0.35",
     "nikic/php-parser": "^5.0",
     "brianium/paratest": "^7.4"
@@ -39,7 +39,7 @@
     ]
   },
   "scripts-descriptions": {
-    "phpstan": "Static analysis over the same paths as CI (#934). CI raises the memory limit to 2G."
+    "phpstan": "Static analysis with the same paths and memory limit as CI (#934)."
   },
   "autoload": {
     "classmap": [

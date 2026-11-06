@@ -127,9 +127,12 @@ final class ListChangedNotifierTest extends TestCase
         $notifier = $this->notifier();
         $notifier->markSeen(self::CLIENT);
 
-        self::assertSame([], $notifier->drainFor(self::CLIENT));
-        self::assertSame([], $notifier->drainFor(self::CLIENT));
-        self::assertSame([], $notifier->drainFor(self::CLIENT));
+        $first = $notifier->drainFor(self::CLIENT);
+        $second = $notifier->drainFor(self::CLIENT);
+        $third = $notifier->drainFor(self::CLIENT);
+        self::assertSame([], $first);
+        self::assertSame([], $second);
+        self::assertSame([], $third);
     }
 
     public function testClientIsToldOnlyOncePerChange(): void

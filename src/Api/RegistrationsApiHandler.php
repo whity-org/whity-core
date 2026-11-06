@@ -242,7 +242,7 @@ final class RegistrationsApiHandler
 
             $this->hooks->dispatch('registration.' . $verb, [
                 'email' => $email,
-                'name'  => is_array($row) ? (string) ($row['name'] ?? '') : '',
+                'name'  => (string) ($row['name'] ?? ''),
             ]);
         } catch (\Throwable $e) {
             error_log('[registrations] decision notify failed: ' . $e->getMessage());

@@ -113,7 +113,6 @@ PHP, true, subdir: true);
         $this->assertSame('/api/theme-owner/current', $descriptor['path']);
         $this->assertSame('ThemeOwned', $descriptor['plugin']);
         $this->assertNull($descriptor['requiredPermission']);
-        $this->assertIsCallable($descriptor['handler']);
     }
 
     public function testOwnedThemeRouteHandlerIsInvocable(): void

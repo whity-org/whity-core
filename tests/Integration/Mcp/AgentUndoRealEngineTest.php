@@ -340,6 +340,6 @@ final class AgentUndoRealEngineTest extends TestCase
 
     private static function agent(string ...$grants): McpPrincipal
     {
-        return new McpPrincipal(self::RANA, self::RANA, self::TENANT, AgentScopeGrant::AGENT_KIND, ['tools:call', ...$grants], self::AGENT);
+        return new McpPrincipal(self::RANA, self::RANA, self::TENANT, AgentScopeGrant::AGENT_KIND, ['tools:call', ...array_values($grants)], self::AGENT);
     }
 }

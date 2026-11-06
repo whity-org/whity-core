@@ -248,7 +248,7 @@ final class RouteCatalogueCompletenessTest extends TestCase
         }
 
         sort($routes);
-        return array_unique($routes);
+        return array_values(array_unique($routes));
     }
 
     /**
@@ -262,7 +262,7 @@ final class RouteCatalogueCompletenessTest extends TestCase
         }
 
         sort($routes);
-        return array_unique($routes);
+        return array_values(array_unique($routes));
     }
 
     /**

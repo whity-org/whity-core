@@ -86,6 +86,7 @@ final class InstanceApiHandlerRealEngineTest extends TestCase
     public function testCompleteSetupIsIdempotent(): void
     {
         self::assertSame(200, $this->handler->completeSetup($this->request('POST', self::SYSTEM_TENANT))->getStatusCode());
+        // @phpstan-ignore staticMethod.alreadyNarrowedType (second completeSetup() is a fresh write; PHPStan remembers the first call)
         self::assertSame(200, $this->handler->completeSetup($this->request('POST', self::SYSTEM_TENANT))->getStatusCode());
         self::assertTrue($this->service->isConfigured());
     }

@@ -49,7 +49,7 @@ final class Translation
             domain: (string) $row['domain'],
             key: (string) $row['key'],
             translation: (string) $row['translation'],
-            tenantId: isset($row['tenant_id']) && $row['tenant_id'] !== null ? (int) $row['tenant_id'] : null,
+            tenantId: isset($row['tenant_id']) ? (int) $row['tenant_id'] : null,
             createdAt: (string) $row['created_at'],
             updatedAt: (string) $row['updated_at'],
             // Absent means FALSE — the hands-off answer. A row array assembled

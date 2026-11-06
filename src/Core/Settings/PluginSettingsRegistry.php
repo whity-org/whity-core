@@ -229,7 +229,7 @@ class PluginSettingsRegistry implements HostWiredService
      */
     public function keysBySource(string $source): array
     {
-        return array_values($this->keysBySource[$source] ?? []);
+        return $this->keysBySource[$source] ?? [];
     }
 
     /**

@@ -9,7 +9,7 @@
 ## Verify checklist
 
 - [ ] `declare(strict_types=1);` on every new/changed PHP file (PSR-12)
-- [ ] `phpstan analyse src tests plugins sdk` — level 8, clean
+- [ ] `composer phpstan` — level 8, clean
 - [ ] Full PHPUnit suite passes locally (100%)
 - [ ] For migration / data-layer / SQL / auth changes: verified against **real
       PostgreSQL**, not just SQLite

@@ -195,6 +195,6 @@ final class PluginRecords
     /** @param list<string> $values */
     private static function encode(array $values): string
     {
-        return (string) json_encode(array_values($values), JSON_UNESCAPED_SLASHES);
+        return (string) json_encode($values, JSON_UNESCAPED_SLASHES);
     }
 }

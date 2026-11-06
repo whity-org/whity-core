@@ -150,8 +150,8 @@ class AuthFlowTest extends TestCase
 
         $accessToken = $this->mintAccess(0);
         $refreshToken = $this->mintRefresh(0);
-        $accessJti = (string) $this->jwtParser->parse($accessToken)['jti'];
-        $refreshJti = (string) $this->jwtParser->parse($refreshToken)['jti'];
+        $accessJti = $this->jtiOf($accessToken);
+        $refreshJti = $this->jtiOf($refreshToken);
 
         $_COOKIE['access_token'] = $accessToken;
         $_COOKIE['refresh_token'] = $refreshToken;
@@ -178,7 +178,7 @@ class AuthFlowTest extends TestCase
         $logoutHandler = new AuthHandler($this->pdo, $this->jwtParser);
 
         $refreshToken = $this->mintRefresh(0);
-        $refreshJti = (string) $this->jwtParser->parse($refreshToken)['jti'];
+        $refreshJti = $this->jtiOf($refreshToken);
 
         $_COOKIE['refresh_token'] = $refreshToken;
         $logoutHandler->handleLogout(new Request('POST', '/api/auth/logout', []));
@@ -222,7 +222,7 @@ class AuthFlowTest extends TestCase
 
         // Step 3: Refresh.
         $refreshToken = $this->mintRefresh(0);
-        $refreshJti = (string) $this->jwtParser->parse($refreshToken)['jti'];
+        $refreshJti = $this->jtiOf($refreshToken);
         $_COOKIE['refresh_token'] = $refreshToken;
         $response = $handler->handleRefresh(new Request('POST', '/api/auth/refresh', []));
         $this->assertSame(200, $response->getStatusCode());
@@ -263,6 +263,14 @@ class AuthFlowTest extends TestCase
             'role' => self::TEST_ROLE_NAME,
             'token_epoch' => $epoch,
         ], 604800, 'refresh');
+    }
+
+    private function jtiOf(string $token): string
+    {
+        $claims = $this->jwtParser->parse($token);
+        $this->assertNotNull($claims);
+
+        return (string) $claims['jti'];
     }
 
     private function isRevoked(string $jti): bool

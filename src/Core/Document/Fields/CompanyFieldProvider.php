@@ -54,7 +54,7 @@ final class CompanyFieldProvider implements DocumentFieldProvider
         return [['group' => $this->recordLabel(), 'items' => $items]];
     }
 
-    public function values(int $tenantId, int $callerId, callable $hasPermission, ?string $recordId): ?array
+    public function values(int $tenantId, int $callerId, callable $hasPermission, ?string $recordId): array
     {
         return ['label' => '', 'values' => $this->read($tenantId)];
     }

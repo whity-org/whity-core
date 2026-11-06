@@ -1256,7 +1256,6 @@ final class DocumentOrganizerApiRealEngineTest extends TestCase
     public function testCollectionNamesAreValidated(): void
     {
         foreach ([[], ['name' => '   '], ['name' => str_repeat('x', 161)], ['name' => 42]] as $body) {
-            /** @var array<string, mixed> $body */
             $res = $this->call('create', self::AUDITOR, [], $body);
             self::assertSame(422, $res->getStatusCode());
         }

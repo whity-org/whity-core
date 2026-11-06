@@ -62,9 +62,12 @@ final class RouteStepEffectRepository
         );
         $statement->execute(['tenant_id' => $tenantId, 'step_id' => $stepId]);
 
+        /** @var list<array<string, mixed>> $rows */
+        $rows = $statement->fetchAll(PDO::FETCH_ASSOC);
+
         return array_map(
             static fn (array $row): array => self::normalize($row),
-            $statement->fetchAll(PDO::FETCH_ASSOC)
+            $rows
         );
     }
 

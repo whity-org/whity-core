@@ -593,17 +593,17 @@ class DelegationRepository
             'grantee_type'       => (string) $row['grantee_type'],
             'grantee_id'         => (int) $row['grantee_id'],
             'permission'         => (string) $row['permission'],
-            'ou_id'              => isset($row['ou_id']) && $row['ou_id'] !== null
+            'ou_id'              => isset($row['ou_id'])
                 ? (int) $row['ou_id']
                 : null,
             'granted_at'  => isset($row['granted_at']) ? (string) $row['granted_at'] : null,
-            'revoked_at'  => isset($row['revoked_at']) && $row['revoked_at'] !== null
+            'revoked_at'  => isset($row['revoked_at'])
                 ? (string) $row['revoked_at']
                 : null,
-            'expires_at'  => isset($row['expires_at']) && $row['expires_at'] !== null
+            'expires_at'  => isset($row['expires_at'])
                 ? (string) $row['expires_at']
                 : null,
-            'revoked_by_profile_id' => isset($row['revoked_by_profile_id']) && $row['revoked_by_profile_id'] !== null
+            'revoked_by_profile_id' => isset($row['revoked_by_profile_id'])
                 ? (int) $row['revoked_by_profile_id']
                 : null,
         ];

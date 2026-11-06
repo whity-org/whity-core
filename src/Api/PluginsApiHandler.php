@@ -601,7 +601,7 @@ class PluginsApiHandler
         // Parse body options (all optional).
         $body = [];
         $rawBody = $request->getBody();
-        if ($rawBody !== '' && $rawBody !== null) {
+        if ($rawBody !== '') {
             $decoded = json_decode($rawBody, true);
             if (is_array($decoded)) {
                 $body = $decoded;
@@ -702,10 +702,8 @@ class PluginsApiHandler
         }
 
         // Plugin is loaded — use PluginLoader's orchestrated uninstall.
-        // $key !== null here means $this->pluginLoader !== null (resolvePluginKey requires it).
-        if ($this->pluginLoader === null) {
-            return Response::error('Plugin loader unavailable', 503);
-        }
+        // $key !== null here means $this->pluginLoader !== null (resolvePluginKey
+        // is only asked when a loader is wired, and every null-key path returned above).
 
         if ($dryRun) {
             $plan = $this->pluginLoader->planUninstall($key);
@@ -823,7 +821,8 @@ class PluginsApiHandler
         }
         $version ??= $this->records->install($name)['version'] ?? null;
 
-        if ($key !== null && $this->pluginLoader !== null) {
+        // A key is only resolved when a loader is wired (see above).
+        if ($key !== null) {
             try {
                 $this->pluginLoader->disablePlugin($key);
             } catch (PluginPersistenceException $e) {

@@ -25,6 +25,8 @@ use Whity\Sdk\Manifest\PluginManifest;
  * The plan's `level` is its worst change. Publishing a destructive plan has
  * to be confirmed. Nothing is deleted from the store either way: a rollback
  * serves the values again.
+ *
+ * @phpstan-type Change array{effect: string, change: string, path: string, records?: int, message: string, messageAr: string}
  */
 final class ManifestImpact
 {
@@ -44,7 +46,7 @@ final class ManifestImpact
      *   from: ?string,
      *   to: string,
      *   level: string,
-     *   changes: list<array{effect: string, change: string, path: string, records?: int, message: string, messageAr: string}>
+     *   changes: list<Change>
      * }
      */
     public function plan(int $tenantId, ?PluginManifest $live, PluginManifest $draft): array
@@ -57,7 +59,7 @@ final class ManifestImpact
         } else {
             $counts = $this->records->countByType($tenantId, $plugin);
             $this->records($tenantId, $plugin, $live->records(), $draft->records(), $counts, $changes);
-            $this->named('permission', array_values($live->permissions()), array_values($draft->permissions()), self::DATA, $changes);
+            $this->named('permission', $live->permissions(), $draft->permissions(), self::DATA, $changes);
             $this->named('automation', array_keys($live->automations()), array_keys($draft->automations()), self::SAFE, $changes);
             foreach (array_intersect_key($draft->automations(), $live->automations()) as $key => $automation) {
                 if (AutomationRunRepository::hash($automation) !== AutomationRunRepository::hash($live->automations()[$key])) {
@@ -87,7 +89,7 @@ final class ManifestImpact
      * @param array<string, array<string, mixed>> $before
      * @param array<string, array<string, mixed>> $after
      * @param array<string, int> $counts
-     * @param list<array<string, mixed>> $changes
+     * @param list<Change> $changes
      */
     private function records(int $tenantId, string $plugin, array $before, array $after, array $counts, array &$changes): void
     {
@@ -169,7 +171,7 @@ final class ManifestImpact
      *
      * @param list<string> $before
      * @param list<string> $after
-     * @param list<array<string, mixed>> $changes
+     * @param list<Change> $changes
      */
     private function named(string $kind, array $before, array $after, string $removedEffect, array &$changes): void
     {
@@ -201,11 +203,11 @@ final class ManifestImpact
     /** @return list<string> */
     private static function screenIds(PluginManifest $manifest): array
     {
-        return array_values(array_map(static fn (array $f): string => (string) $f['id'], $manifest->frontendFeatures()));
+        return array_map(static fn (array $f): string => (string) $f['id'], $manifest->frontendFeatures());
     }
 
     /**
-     * @return array{effect: string, change: string, path: string, records?: int, message: string, messageAr: string}
+     * @return Change
      */
     private static function change(string $effect, string $change, string $path, string $message, string $messageAr, ?int $records = null): array
     {

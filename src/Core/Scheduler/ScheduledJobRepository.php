@@ -93,7 +93,7 @@ final class ScheduledJobRepository
         /** @var list<array<string, mixed>> $rows */
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        return array_values(array_map(static fn (array $r): array => self::mapRow($r), $rows));
+        return array_map(static fn (array $r): array => self::mapRow($r), $rows);
     }
 
     /**
@@ -137,7 +137,7 @@ final class ScheduledJobRepository
         /** @var list<array<string, mixed>> $rows */
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        return array_values(array_map(static fn (array $r): array => self::mapRow($r), $rows));
+        return array_map(static fn (array $r): array => self::mapRow($r), $rows);
     }
 
     /**
@@ -181,8 +181,8 @@ final class ScheduledJobRepository
             'payload'         => is_array($payload) ? $payload : [],
             'queue'           => (string) $row['queue'],
             'enabled'         => DbBool::of($row['enabled']),
-            'last_run_at'     => isset($row['last_run_at']) && $row['last_run_at'] !== null ? (string) $row['last_run_at'] : null,
-            'next_run_at'     => isset($row['next_run_at']) && $row['next_run_at'] !== null ? (string) $row['next_run_at'] : null,
+            'last_run_at'     => isset($row['last_run_at']) ? (string) $row['last_run_at'] : null,
+            'next_run_at'     => isset($row['next_run_at']) ? (string) $row['next_run_at'] : null,
         ];
     }
 }

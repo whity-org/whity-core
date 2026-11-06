@@ -291,7 +291,7 @@ final class AgendaRepository
                 'UPDATE meeting_agenda_items SET position = :position
                   WHERE tenant_id = :tenant_id AND meeting_id = :meeting_id AND id = :id'
             );
-            foreach (array_values($orderedIds) as $index => $itemId) {
+            foreach ($orderedIds as $index => $itemId) {
                 $set->execute([
                     ':position' => $index + 1,
                     ':tenant_id' => $tenantId,

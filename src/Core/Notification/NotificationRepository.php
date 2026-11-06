@@ -93,7 +93,7 @@ final class NotificationRepository
         /** @var list<array<string, mixed>> $rows */
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        return array_values(array_map(static fn (array $r): array => self::mapNotification($r), $rows));
+        return array_map(static fn (array $r): array => self::mapNotification($r), $rows);
     }
 
     /**
@@ -194,7 +194,7 @@ final class NotificationRepository
         /** @var list<array<string, mixed>> $rows */
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        return array_values(array_map(static fn (array $r): array => self::mapDelivery($r), $rows));
+        return array_map(static fn (array $r): array => self::mapDelivery($r), $rows);
     }
 
     /**
@@ -269,15 +269,15 @@ final class NotificationRepository
         return [
             'id'                   => (int) $row['id'],
             'tenant_id'            => (int) $row['tenant_id'],
-            'recipient_profile_id' => isset($row['recipient_profile_id']) && $row['recipient_profile_id'] !== null
+            'recipient_profile_id' => isset($row['recipient_profile_id'])
                 ? (int) $row['recipient_profile_id']
                 : null,
             'type'                 => (string) $row['type'],
             'subject'              => (string) $row['subject'],
             'body'                 => (string) $row['body'],
             'data'                 => is_array($data) ? $data : [],
-            'read_at'              => isset($row['read_at']) && $row['read_at'] !== null ? (string) $row['read_at'] : null,
-            'created_at'           => isset($row['created_at']) && $row['created_at'] !== null ? (string) $row['created_at'] : null,
+            'read_at'              => isset($row['read_at']) ? (string) $row['read_at'] : null,
+            'created_at'           => isset($row['created_at']) ? (string) $row['created_at'] : null,
         ];
     }
 
@@ -293,12 +293,12 @@ final class NotificationRepository
             'notification_id' => (int) $row['notification_id'],
             'channel'         => (string) $row['channel'],
             'status'          => (string) $row['status'],
-            'provider_id'     => isset($row['provider_id']) && $row['provider_id'] !== null ? (string) $row['provider_id'] : null,
-            'error'           => isset($row['error']) && $row['error'] !== null ? (string) $row['error'] : null,
+            'provider_id'     => isset($row['provider_id']) ? (string) $row['provider_id'] : null,
+            'error'           => isset($row['error']) ? (string) $row['error'] : null,
             'attempts'        => (int) $row['attempts'],
-            'available_at'    => isset($row['available_at']) && $row['available_at'] !== null ? (string) $row['available_at'] : null,
-            'sent_at'         => isset($row['sent_at']) && $row['sent_at'] !== null ? (string) $row['sent_at'] : null,
-            'created_at'      => isset($row['created_at']) && $row['created_at'] !== null ? (string) $row['created_at'] : null,
+            'available_at'    => isset($row['available_at']) ? (string) $row['available_at'] : null,
+            'sent_at'         => isset($row['sent_at']) ? (string) $row['sent_at'] : null,
+            'created_at'      => isset($row['created_at']) ? (string) $row['created_at'] : null,
         ];
     }
 }

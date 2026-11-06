@@ -172,9 +172,9 @@ class TestFixtureBuilder
         // Replace spaces with hyphens
         $slug = str_replace(' ', '-', $slug);
         // Remove any non-alphanumeric characters except hyphens
-        $slug = preg_replace('/[^a-z0-9\-]/', '', $slug);
+        $slug = preg_replace('/[^a-z0-9\-]/', '', $slug) ?? '';
         // Replace multiple consecutive hyphens with a single hyphen
-        $slug = preg_replace('/-+/', '-', $slug);
+        $slug = preg_replace('/-+/', '-', $slug) ?? '';
         // Trim hyphens from start and end
         $slug = trim($slug, '-');
         return $slug;

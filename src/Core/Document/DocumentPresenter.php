@@ -75,7 +75,7 @@ final class DocumentPresenter
         $id = (int) $document['id'];
 
         $filing = $collectionIds === null ? [] : [
-            'collection_ids' => array_values($collectionIds),
+            'collection_ids' => $collectionIds,
             'starred' => $starredCollectionId !== null && in_array($starredCollectionId, $collectionIds, true),
         ];
 

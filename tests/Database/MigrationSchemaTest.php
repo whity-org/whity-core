@@ -64,7 +64,7 @@ final class MigrationSchemaTest extends TestCase
     }
 
     /**
-     * @return list<array{0:string}>
+     * @return array<string, array{0:string}> keyed by file basename
      */
     public static function migrationFileProvider(): array
     {
@@ -160,6 +160,7 @@ final class MigrationSchemaTest extends TestCase
         // So gaps are unlimited inside the trailing window and forbidden below
         // it. A branch may run as far ahead as it likes; removing 050 still
         // fails.
+        $this->assertNotEmpty($prefixes);
         $highest = max($prefixes);
         $missing = array_values(array_diff(range(1, $highest), $prefixes));
 

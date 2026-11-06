@@ -223,7 +223,7 @@ final class DbBoolScanner
 
         usort($violations, static fn (array $a, array $b): int => $a['line'] <=> $b['line']);
 
-        return array_values($violations);
+        return $violations;
     }
 
     /**

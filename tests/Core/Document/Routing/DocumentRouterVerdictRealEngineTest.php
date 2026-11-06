@@ -833,7 +833,7 @@ final class DocumentRouterVerdictRealEngineTest extends TestCase
         );
         sort($ids);
 
-        return array_values($ids);
+        return $ids;
     }
 
     private function seedDocument(): int

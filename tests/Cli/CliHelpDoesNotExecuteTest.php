@@ -214,7 +214,7 @@ final class HelpProbeCommand implements CliCommand, CommandHelp
     }
 
     /** @return list<string> */
-    public function knownFlags(): ?array
+    public function knownFlags(): array
     {
         return ['--known', '--help', '-h'];
     }

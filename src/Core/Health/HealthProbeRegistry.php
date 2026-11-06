@@ -284,7 +284,7 @@ class HealthProbeRegistry implements HostWiredService
     {
         $this->ensureCoreRegistered();
 
-        return array_values($this->keysBySource[$source] ?? []);
+        return $this->keysBySource[$source] ?? [];
     }
 
     /**

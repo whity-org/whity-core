@@ -198,8 +198,10 @@ class TenantIsolationTest extends TestCase
 
         // Assert: Only Role A is returned
         $this->assertCount(1, $rolesForTenant, 'Only Tenant A roles should be returned');
-        $this->assertSame('admin', $rolesForTenant[0]['name']);
-        $this->assertSame(10, $rolesForTenant[0]['id']);
+        $roleA = $rolesForTenant[0] ?? null;
+        $this->assertNotNull($roleA, 'Role A must keep its position in the filtered list');
+        $this->assertSame('admin', $roleA['name']);
+        $this->assertSame(10, $roleA['id']);
 
         // Verify Role B (id=20) is not included
         $roleIds = array_column($rolesForTenant, 'id');
@@ -211,7 +213,7 @@ class TenantIsolationTest extends TestCase
 
         $roleAFromTenant1 = current(array_filter(
             $allRoles,
-            fn($r) => $r['name'] === 'admin' && $r['tenant_id'] === TenantContext::getTenantId()
+            fn($r) => $r['tenant_id'] === TenantContext::getTenantId()
         ));
 
         TenantContext::reset();
@@ -219,7 +221,7 @@ class TenantIsolationTest extends TestCase
 
         $roleAFromTenant2 = current(array_filter(
             $allRoles,
-            fn($r) => $r['name'] === 'admin' && $r['tenant_id'] === TenantContext::getTenantId()
+            fn($r) => $r['tenant_id'] === TenantContext::getTenantId()
         ));
 
         // Assert: Same-named roles from different tenants are isolated

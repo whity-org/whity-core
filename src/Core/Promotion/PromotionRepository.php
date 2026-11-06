@@ -293,7 +293,10 @@ final class PromotionRepository
         $stmt = $this->db->prepare('SELECT plan_id FROM promotion_plans WHERE promotion_id = :id ORDER BY plan_id');
         $stmt->execute([':id' => $promotionId]);
 
-        return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+        /** @var list<mixed> $values */
+        $values = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+        return array_map('intval', $values);
     }
 
     public function deactivate(int $id): int

@@ -52,7 +52,7 @@ final class IssuedDocumentNumberFieldProvider implements DocumentFieldProvider
         ]];
     }
 
-    public function values(int $tenantId, int $callerId, callable $hasPermission, ?string $recordId): ?array
+    public function values(int $tenantId, int $callerId, callable $hasPermission, ?string $recordId): array
     {
         return ['label' => '', 'values' => []];
     }

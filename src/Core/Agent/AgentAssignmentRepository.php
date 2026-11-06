@@ -199,7 +199,10 @@ final class AgentAssignmentRepository
         );
         $stmt->execute([$tenantId, ...array_keys($ids)]);
 
-        return array_map(static fn (mixed $id): string => self::principalId((int) $id), $stmt->fetchAll(PDO::FETCH_COLUMN));
+        /** @var list<mixed> $values */
+        $values = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+        return array_map(static fn (mixed $id): string => self::principalId((int) $id), $values);
     }
 
     /**

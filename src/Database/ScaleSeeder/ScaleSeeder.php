@@ -396,7 +396,7 @@ final class ScaleSeeder
 
         for ($level = 2; $level <= $config->ouDepth; $level++) {
             $nextParents = [];
-            foreach (array_values($parents) as $parentIndex => $parentId) {
+            foreach ($parents as $parentIndex => $parentId) {
                 for ($child = 1; $child <= $config->ouBreadth; $child++) {
                     $pathLabel = sprintf('L%d-%d-%d', $level, $parentIndex + 1, $child);
                     $slug = NameGenerator::ouSlug($seed, $tenantIndex, $pathLabel);
@@ -795,10 +795,12 @@ final class ScaleSeeder
     {
         $stmt = $pdo->prepare('SELECT id FROM permissions');
         $stmt->execute();
+        /** @var list<array<string, mixed>> $rows */
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         return array_map(
             static fn(array $row): int => (int) $row['id'],
-            $stmt->fetchAll(PDO::FETCH_ASSOC)
+            $rows
         );
     }
 

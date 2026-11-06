@@ -329,7 +329,6 @@ final class FederatedIdentityLinker
             $this->identities->touchLastLogin($linkId);
             return ['status' => 'provisioned', 'profile_id' => $profileId];
         } catch (\PDOException $e) {
-            // @phpstan-ignore booleanAnd.leftAlwaysTrue
             if ($ownTx && $this->db->inTransaction()) {
                 $this->db->rollBack();
             }
@@ -436,7 +435,6 @@ final class FederatedIdentityLinker
             // Flow analysis over-narrows $ownTx to always-true here; the guard is
             // still correct for the nested-transaction case (only roll back a tx
             // WE started).
-            // @phpstan-ignore booleanAnd.leftAlwaysTrue
             if ($ownTx && $this->db->inTransaction()) {
                 $this->db->rollBack();
             }

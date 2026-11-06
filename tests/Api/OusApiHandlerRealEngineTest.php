@@ -673,6 +673,7 @@ final class OusApiHandlerRealEngineTest extends TestCase
 
         $this->assertSame(200, $response->getStatusCode());
         $row = $this->pdo->query("SELECT name, slug FROM organizational_units WHERE id = 14")->fetch(PDO::FETCH_ASSOC);
+        $this->assertIsArray($row);
         $this->assertSame('Sales Ops', $row['name']);
         $this->assertSame('sales-ops', $row['slug']);
     }

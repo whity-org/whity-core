@@ -212,7 +212,7 @@ final class DeviceAllowanceRealEngineTest extends TestCase
 
         $result = $uncapped->redeem($this->issueCode($this->device('SN-NEW')), null, null, null);
 
-        self::assertIsInt($result['licensed_device_id']);
+        self::assertGreaterThan(0, $result['licensed_device_id']);
     }
 
     // ── Fixtures ────────────────────────────────────────────────────────────

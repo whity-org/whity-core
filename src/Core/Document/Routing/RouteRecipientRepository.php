@@ -275,10 +275,10 @@ final class RouteRecipientRepository
 
         return array_map(
             static fn (array $row): array => self::normalize($row) + [
-                'closing_action' => isset($row['closing_action']) && $row['closing_action'] !== null
+                'closing_action' => isset($row['closing_action'])
                     ? (string) $row['closing_action']
                     : null,
-                'closing_verdict' => isset($row['closing_verdict']) && $row['closing_verdict'] !== null
+                'closing_verdict' => isset($row['closing_verdict'])
                     ? (string) $row['closing_verdict']
                     : null,
             ],
@@ -347,7 +347,10 @@ final class RouteRecipientRepository
         );
         $stmt->execute([':tenant_id' => $tenantId, ':document_id' => $documentId]);
 
-        return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+        /** @var list<mixed> $values */
+        $values = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+        return array_map('intval', $values);
     }
 
     /**

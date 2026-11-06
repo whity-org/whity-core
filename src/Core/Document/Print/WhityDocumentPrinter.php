@@ -49,7 +49,7 @@ final class WhityDocumentPrinter
      * Required fields this document uses that have no value (E.27): issuing is
      * refused while any is missing. Fiscal fields are required by their provider.
      *
-     * @param list<mixed> $blocks
+     * @param array<mixed> $blocks
      * @return list<string>
      */
     public function missingRequired(array $blocks): array
@@ -127,7 +127,7 @@ final class WhityDocumentPrinter
      * printer's values, without what a label can't hold (page breaks). The
      * sheet itself, the grid and the other labels are the caller's.
      *
-     * @param list<mixed> $blocks
+     * @param array<mixed> $blocks
      * @return list<array<string, mixed>>
      */
     public function labelContent(array $blocks): array
@@ -139,7 +139,7 @@ final class WhityDocumentPrinter
     }
 
     /**
-     * @param list<mixed> $blocks
+     * @param array<mixed> $blocks
      * @param list<array<string, mixed>> $out
      */
     private function blocks(array $blocks, array &$out): void

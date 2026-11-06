@@ -212,7 +212,7 @@ final class JobRepository
         /** @var list<array<string, mixed>> $rows */
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        return array_values(array_map(static fn (array $r): array => self::mapJob($r), $rows));
+        return array_map(static fn (array $r): array => self::mapJob($r), $rows);
     }
 
     /**
@@ -365,7 +365,7 @@ final class JobRepository
     private static function mapJob(array $row): array
     {
         $payload = json_decode((string) ($row['payload'] ?? '{}'), true);
-        $result = isset($row['result']) && $row['result'] !== null
+        $result = isset($row['result'])
             ? json_decode((string) $row['result'], true)
             : null;
 
@@ -380,10 +380,10 @@ final class JobRepository
             'max_attempts' => (int) $row['max_attempts'],
             'payload'      => is_array($payload) ? $payload : [],
             'result'       => is_array($result) ? $result : null,
-            'last_error'   => isset($row['last_error']) && $row['last_error'] !== null ? (string) $row['last_error'] : null,
-            'available_at' => isset($row['available_at']) && $row['available_at'] !== null ? (string) $row['available_at'] : null,
-            'completed_at' => isset($row['completed_at']) && $row['completed_at'] !== null ? (string) $row['completed_at'] : null,
-            'created_at'   => isset($row['created_at']) && $row['created_at'] !== null ? (string) $row['created_at'] : null,
+            'last_error'   => isset($row['last_error']) ? (string) $row['last_error'] : null,
+            'available_at' => isset($row['available_at']) ? (string) $row['available_at'] : null,
+            'completed_at' => isset($row['completed_at']) ? (string) $row['completed_at'] : null,
+            'created_at'   => isset($row['created_at']) ? (string) $row['created_at'] : null,
         ];
     }
 }

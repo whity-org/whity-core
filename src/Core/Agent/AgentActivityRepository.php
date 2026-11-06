@@ -102,7 +102,10 @@ final class AgentActivityRepository
         $stmt->bindValue(':offset', max(0, $offset), PDO::PARAM_INT);
         $stmt->execute();
 
-        return array_map(self::normalize(...), $stmt->fetchAll(PDO::FETCH_ASSOC));
+        /** @var list<array<string, mixed>> $rows */
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return array_map(self::normalize(...), $rows);
     }
 
     /**

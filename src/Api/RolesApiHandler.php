@@ -1349,8 +1349,8 @@ class RolesApiHandler
                     // NULL when the profile carries no primary email row; the
                     // LEFT JOIN is deliberate — a person with no primary email
                     // still holds the role and must still be counted and shown.
-                    'email' => isset($row['email']) && $row['email'] !== null ? (string)$row['email'] : null,
-                    'ouId' => isset($row['ou_id']) && $row['ou_id'] !== null ? (int)$row['ou_id'] : null,
+                    'email' => isset($row['email']) ? (string)$row['email'] : null,
+                    'ouId' => isset($row['ou_id']) ? (int)$row['ou_id'] : null,
                     'isPrimary' => DbBool::of($row['is_primary'] ?? false),
                     'status' => (string)($row['status'] ?? ''),
                     'assignedAt' => isset($row['created_at']) ? (string)$row['created_at'] : null,
@@ -2228,7 +2228,7 @@ class RolesApiHandler
      * constraint while preserving first-seen order.
      *
      * @param array<int, string|int> $permissions Permission ids and/or names.
-     * @return array<int, int> Resolved, validated, de-duplicated permission ids.
+     * @return list<int> Resolved, validated, de-duplicated permission ids.
      */
     private function resolvePermissionIds(array $permissions): array
     {
@@ -2238,7 +2238,7 @@ class RolesApiHandler
         $order = [];
 
         foreach ($permissions as $entry) {
-            if (is_int($entry) || (is_string($entry) && $this->isNumericId($entry))) {
+            if (is_int($entry) || $this->isNumericId($entry)) {
                 $id = (int)$entry;
                 $candidateIds[$id] = true;
                 $order[] = ['id', $id];

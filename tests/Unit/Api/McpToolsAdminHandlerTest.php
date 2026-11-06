@@ -72,13 +72,13 @@ final class McpToolsAdminHandlerTest extends TestCase
         $request       = new Request('GET', '/api/admin/mcp/tools');
         $request->user = (object) ['profile_id' => 7];
 
-        $list = static function (array $enabled) use ($router, $roleChecker, $authored, $request): array {
+        $list = static function (string ...$enabled) use ($router, $roleChecker, $authored, $request): array {
             ToolDeriver::clearCache();
-            $handler = new McpToolsAdminHandler(new ToolDeriver([], [], $router), $roleChecker, $authored, static fn (int $t): array => $enabled);
+            $handler = new McpToolsAdminHandler(new ToolDeriver([], [], $router), $roleChecker, $authored, static fn (int $t): array => array_values($enabled));
             return json_decode($handler->list($request)->getBody(), true);
         };
 
-        $off  = $list([]);
+        $off  = $list();
         $rows = array_column($off['data'], null, 'name');
         self::assertSame('core.forms', $rows['get_api_widgets']['toolset']);
         self::assertSame('period-close', $rows['period_close_status']['toolset']);
@@ -89,7 +89,7 @@ final class McpToolsAdminHandlerTest extends TestCase
         self::assertSame(3, $off['sizes']['default']['tools'], 'init_session plus search and call');
         self::assertSame(3, $off['sizes']['full']['tools']);
 
-        $on = $list(['period_close_status']);
+        $on = $list('period_close_status');
         self::assertTrue(array_column($on['data'], null, 'name')['period_close_status']['alwaysOnEnabled']);
         self::assertSame(4, $on['sizes']['default']['tools']);
         self::assertGreaterThan($off['sizes']['default']['bytes'], $on['sizes']['default']['bytes']);

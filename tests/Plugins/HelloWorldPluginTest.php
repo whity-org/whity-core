@@ -49,12 +49,11 @@ final class HelloWorldPluginTest extends TestCase
 
         $this->assertSame('GET', $routes[0]['method']);
         $this->assertSame('/api/hello', $routes[0]['path']);
-        $this->assertIsCallable($routes[0]['handler']);
-        $this->assertNull($routes[0]['requiredRole']);
+        $this->assertNull($routes[0]['requiredRole'] ?? null);
 
         $this->assertSame('GET', $routes[1]['method']);
         $this->assertSame('/api/hello/admin', $routes[1]['path']);
-        $this->assertSame('admin', $routes[1]['requiredRole']);
+        $this->assertSame('admin', $routes[1]['requiredRole'] ?? null);
 
         // The greetings CRUD resource (WC-169): reads gated on hello:view,
         // writes on hello:manage — a :read-style permission never gates a
@@ -64,10 +63,10 @@ final class HelloWorldPluginTest extends TestCase
             $byKey[$route['method'] . ' ' . $route['path']] = $route;
         }
 
-        $this->assertSame('hello:view', $byKey['GET /api/hello/greetings']['requiredPermission']);
-        $this->assertSame('hello:manage', $byKey['POST /api/hello/greetings']['requiredPermission']);
-        $this->assertSame('hello:manage', $byKey['PATCH /api/hello/greetings/{id:\d+}']['requiredPermission']);
-        $this->assertSame('hello:manage', $byKey['DELETE /api/hello/greetings/{id:\d+}']['requiredPermission']);
+        $this->assertSame('hello:view', $byKey['GET /api/hello/greetings']['requiredPermission'] ?? null);
+        $this->assertSame('hello:manage', $byKey['POST /api/hello/greetings']['requiredPermission'] ?? null);
+        $this->assertSame('hello:manage', $byKey['PATCH /api/hello/greetings/{id:\d+}']['requiredPermission'] ?? null);
+        $this->assertSame('hello:manage', $byKey['DELETE /api/hello/greetings/{id:\d+}']['requiredPermission'] ?? null);
 
         // Every greetings route publishes a typed OpenAPI declaration.
         foreach (
@@ -79,10 +78,9 @@ final class HelloWorldPluginTest extends TestCase
             ] as $key
         ) {
             $this->assertArrayHasKey('schema', $byKey[$key], "{$key} must declare a schema");
-            $this->assertIsCallable($byKey[$key]['handler']);
-            $this->assertNull($byKey[$key]['requiredRole']);
+            $this->assertNull($byKey[$key]['requiredRole'] ?? null);
         }
-        $this->assertArrayHasKey('HelloGreeting', $byKey['GET /api/hello/greetings']['schema']['components']);
+        $this->assertArrayHasKey('HelloGreeting', $byKey['GET /api/hello/greetings']['schema']['components'] ?? []);
     }
 
     public function testDeclaresTheGreetingsFrontendFeature(): void

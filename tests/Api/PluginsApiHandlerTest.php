@@ -43,6 +43,7 @@ class PluginsApiHandlerTest extends TestCase
         $loader->load();
 
         $match = $this->router->match(new Request('GET', '/api/status/run'));
+        $this->assertNotNull($match);
         $handler = $match['handler'];
         for ($i = 0; $i < 3; $i++) {
             $handler(new Request('GET', '/api/status/run'), []);
@@ -76,6 +77,7 @@ class PluginsApiHandlerTest extends TestCase
         $loader->load();
 
         $match = $this->router->match(new Request('GET', '/api/reenable/run'));
+        $this->assertNotNull($match);
         $handler = $match['handler'];
         for ($i = 0; $i < 3; $i++) {
             $handler(new Request('GET', '/api/reenable/run'), []);

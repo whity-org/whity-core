@@ -101,6 +101,7 @@ final class TagGroupRepository
             $query?->bindSearch($stmt);
         }
         $stmt->execute();
+        /** @var list<array<string, mixed>> $rows */
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         return array_map([self::class, 'normalizeRow'], $rows);

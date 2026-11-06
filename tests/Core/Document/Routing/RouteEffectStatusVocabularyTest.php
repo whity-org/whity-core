@@ -44,8 +44,9 @@ final class RouteEffectStatusVocabularyTest extends TestCase
         );
         self::assertSame(1, $matched, 'migration 139 must declare the status CHECK inline on the column');
 
-        $valueList = $m[1] ?? null;
-        self::assertIsString($valueList, 'the CHECK must capture its value list');
+        // assertSame above guarantees the match succeeded, so group 1 exists.
+        $valueList = $m[1];
+        self::assertNotSame('', $valueList, 'the CHECK must capture its value list');
 
         $inSql = array_map(
             static fn (string $value): string => trim($value, " '"),

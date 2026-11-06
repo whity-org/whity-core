@@ -91,7 +91,7 @@ final class PaymentWall
     ) {
         $this->subscriptions = $subscriptions;
         $this->enabled = $enabled;
-        $this->exemptPrefixes = array_values($exemptPrefixes);
+        $this->exemptPrefixes = $exemptPrefixes;
         $this->billingUrl = ($billingUrl !== null && $billingUrl !== '') ? $billingUrl : null;
         $this->logger = $logger ?? new NullLogger();
     }

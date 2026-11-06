@@ -119,7 +119,7 @@ final class PlanPriceRepositoryRealEngineTest extends TestCase
                 $this->prices->create($this->planId, $bad, 100, PlanPriceRepository::PERIOD_MONTH);
                 self::fail("currency '{$bad}' should have been refused");
             } catch (PlanValidationException) {
-                self::assertTrue(true);
+                $this->addToAssertionCount(1);
             }
         }
     }

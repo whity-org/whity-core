@@ -59,7 +59,7 @@ final class DesktopPluginReleaseServiceTest extends TestCase
         // removed once the desktop app stopped shipping demo/example plugins, and
         // plugins/HelloWorld is the source of truth the release pipeline packages.
         $this->source = dirname(__DIR__, 3) . '/plugins/HelloWorld';
-        $this->autoloadersOnEntry = array_values(spl_autoload_functions());
+        $this->autoloadersOnEntry = spl_autoload_functions();
     }
 
     protected function tearDown(): void
@@ -82,7 +82,7 @@ final class DesktopPluginReleaseServiceTest extends TestCase
         // the class that had the leak, and the cost of the check is a comparison.
         $this->assertSame(
             $this->autoloadersOnEntry,
-            array_values(spl_autoload_functions()),
+            spl_autoload_functions(),
             'this test changed the process-wide autoloader stack and did not restore it'
         );
     }

@@ -273,7 +273,7 @@ class TestNoteResource implements SyncableResource
     {
         return [
             'title' => (string) ($row['title'] ?? ''),
-            'body' => isset($row['body']) && $row['body'] !== null ? (string) $row['body'] : null,
+            'body' => isset($row['body']) ? (string) $row['body'] : null,
             'status' => (string) ($row['status'] ?? 'open'),
         ];
     }

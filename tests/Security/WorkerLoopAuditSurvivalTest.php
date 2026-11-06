@@ -81,7 +81,10 @@ class WorkerLoopAuditSurvivalTest extends TestCase
     {
         return new class ($records) extends AbstractLogger {
             /** @param list<array{level:mixed,message:string,context:array<string,mixed>}> $records */
-            public function __construct(private array &$records)
+            public function __construct(
+                // @phpstan-ignore property.onlyWritten (by-reference sink: the test reads the caller's array)
+                private array &$records
+            )
             {
             }
 
@@ -242,7 +245,10 @@ class WorkerLoopAuditSurvivalTest extends TestCase
             $warmup = new Request('GET', '/loop', ['Authorization' => 'Bearer t1.token']);
             $this->assertSame(200, $kernel->handle($warmup)->getStatusCode());
         }
-        $this->assertSame([], $records, 'Warm-up loop must not audit anything');
+        // assertCount rather than assertSame([]): $records is a by-reference
+        // sink the logger fills later, and an assertSame would pin its static
+        // type to an empty array for the rest of the test.
+        $this->assertCount(0, $records, 'Warm-up loop must not audit anything');
 
         // Trusted tooling activates the cross-tenant bypass for this request.
         // setSystemMode() is TenantContext::audit()'s only caller -> seam #1.

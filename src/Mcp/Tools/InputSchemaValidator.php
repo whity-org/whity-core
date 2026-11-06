@@ -37,9 +37,10 @@ final class InputSchemaValidator
      */
     public function validate(array $schema, array &$arguments): void
     {
-        /** @var array<string, array<string, mixed>> $properties */
+        // A plugin-authored schema can carry anything, so keys and entries are checked below.
+        /** @var array<array-key, array<string, mixed>> $properties */
         $properties = is_array($schema['properties'] ?? null) ? $schema['properties'] : [];
-        /** @var list<string> $required */
+        /** @var array<mixed> $required */
         $required = is_array($schema['required'] ?? null) ? $schema['required'] : [];
 
         // Check all required fields are present.

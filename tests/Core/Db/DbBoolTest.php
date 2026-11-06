@@ -103,9 +103,11 @@ final class DbBoolTest extends TestCase
      */
     public function testDivergesFromABareCastPreciselyWhereItMatters(): void
     {
+        // @phpstan-ignore staticMethod.alreadyNarrowedType (documents PHP's own cast, which is the point)
         self::assertTrue((bool) 'false', 'PHP casts the non-empty string "false" to TRUE.');
         self::assertFalse(DbBool::of('false'));
 
+        // @phpstan-ignore staticMethod.alreadyNarrowedType (documents PHP's own cast, which is the point)
         self::assertTrue((bool) 'f', 'PHP casts the non-empty string "f" to TRUE.');
         self::assertFalse(DbBool::of('f'));
     }

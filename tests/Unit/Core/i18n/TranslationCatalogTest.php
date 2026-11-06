@@ -297,7 +297,7 @@ final class TranslationCatalogTest extends TestCase
                 $catalog->localeDirectory($bad);
                 self::fail("'{$bad}' must not be accepted as a language code.");
             } catch (RuntimeException) {
-                self::assertTrue(true);
+                $this->addToAssertionCount(1);
             }
         }
 

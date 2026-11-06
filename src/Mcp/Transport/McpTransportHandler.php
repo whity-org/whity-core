@@ -88,7 +88,7 @@ final class McpTransportHandler
         $rawBody    = $request->getBody();
         $surface    = match (true) {
             $agent !== null                       => ToolSurfaceRequest::forSplit(self::query($request), OAuthAccessTokenVerifier::AGENT_RESOURCE_PREFIX . $agent, []),
-            $split !== null && $toolsets !== null => ToolSurfaceRequest::forSplit(self::query($request), $split, $toolsets),
+            $split !== null                       => ToolSurfaceRequest::forSplit(self::query($request), $split, $toolsets),
             default                               => ToolSurfaceRequest::fromQuery(self::query($request)),
         };
         $dispatcher = $this->dispatcherFor($surface);

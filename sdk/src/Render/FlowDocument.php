@@ -328,7 +328,10 @@ final class FlowDocument
      * HTML is loaded by a real browser in the render container in order to be
      * printed: `javascript:` there is script execution, not a broken link.
      *
-     * @param  list<array<string, mixed>> $runs
+     * Typed as loosely as it is checked: runs come from plugin code, and a
+     * narrower type would let the analyser call the checks below unreachable.
+     *
+     * @param  array<mixed> $runs
      * @return list<array<string, mixed>>
      *
      * @throws RenderRejectedException
@@ -385,8 +388,9 @@ final class FlowDocument
      * analyser prove the check below unreachable on the one shape that never
      * occurs (a literal) while saying nothing about the shape that does.
      *
-     * @param list<string>       $columns Header cells; pass `[]` for a table
-     *                                    with no header row.
+     * @param array<int, string> $columns Header cells; pass `[]` for a table
+     *                                    with no header row. Re-indexed, so
+     *                                    a filtered array is fine.
      * @param array<int, mixed>  $rows    Body rows: each must be a LIST of cell
      *                                    values (strings, numbers or null).
      * @param string|null        $caption Captioned tables are numbered and can

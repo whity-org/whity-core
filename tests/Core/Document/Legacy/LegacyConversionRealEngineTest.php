@@ -190,7 +190,12 @@ final class LegacyConversionRealEngineTest extends TestCase
     public function testEveryOldStarterConvertsToADocumentTheEditorCanPublish(): void
     {
         $converter = new LegacyTemplateConverter();
-        $blocks = array_map(static fn (array $b): array => $b['elements'], $this->old['blocks']);
+        $blocks = [];
+        foreach ($this->old['blocks'] as $id => $b) {
+            self::assertIsArray($b);
+            self::assertIsList($b['elements']);
+            $blocks[$id] = $b['elements'];
+        }
         self::assertCount(4, $this->old['templates']);
         foreach ($this->old['templates'] as $starter) {
             $doc = $converter->convert($starter['name'], $starter['data'], $blocks);
@@ -345,7 +350,7 @@ final class LegacyConversionRealEngineTest extends TestCase
     /** @return list<string> */
     private function starterTitles(): array
     {
-        return array_values(array_column((new DocumentSourceStarterSeeder($this->sources))->starters(), 'title'));
+        return array_column((new DocumentSourceStarterSeeder($this->sources))->starters(), 'title');
     }
 
     /** The schema as it was before migration 165: the old tables, empty. */
@@ -477,7 +482,7 @@ final class LegacyConversionRealEngineTest extends TestCase
         return $stmt->fetchColumn();
     }
 
-    /** @return list<array<string, mixed>> */
+    /** @return array<int, array<string, mixed>> */
     private function rows(string $sql): array
     {
         $stmt = $this->pdo->query($sql);

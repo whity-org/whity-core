@@ -152,7 +152,8 @@ class AdminApiHandler
 
             // 4. Migration Status
             $executedMigrations = $pdo->query('SELECT COUNT(*) FROM core_schema_migrations')->fetchColumn();
-            $allMigrationFiles = count(glob($this->migrationDir . '/*.php'));
+            // glob() answers false on an unreadable directory; that is no files, not a TypeError.
+            $allMigrationFiles = count(glob($this->migrationDir . '/*.php') ?: []);
 
             // 5. Database Health
             $dbSize = $pdo->query("SELECT pg_size_pretty(pg_database_size(current_database()))")->fetchColumn();
@@ -187,7 +188,7 @@ class AdminApiHandler
                     'maintenance' => [
                         'migrations_executed' => (int)$executedMigrations,
                         'migrations_total' => $allMigrationFiles,
-                        'pending_migrations' => max(0, $allMigrationFiles - $executedMigrations),
+                        'pending_migrations' => max(0, $allMigrationFiles - (int)$executedMigrations),
                     ],
                     'database' => [
                         'size' => $dbSize,
@@ -206,7 +207,7 @@ class AdminApiHandler
         $units = ['B', 'KB', 'MB', 'GB', 'TB'];
         $bytes = max($bytes, 0);
         $pow = floor(($bytes ? log($bytes) : 0) / log(1024));
-        $pow = min($pow, count($units) - 1);
+        $pow = (int) min($pow, count($units) - 1);
         $bytes /= (1 << (10 * $pow));
         return round($bytes, $precision) . ' ' . $units[$pow];
     }

@@ -114,9 +114,7 @@ final class SvgSanitizer
             $attrs[] = $attr;
         }
         foreach ($attrs as $attr) {
-            if ($attr instanceof DOMAttr) {
-                $this->cleanAttribute($el, $attr);
-            }
+            $this->cleanAttribute($el, $attr);
         }
     }
 

@@ -1488,7 +1488,7 @@ final class DocumentRouter
         }
 
         $out = [];
-        foreach (array_values($steps) as $i => $step) {
+        foreach ($steps as $i => $step) {
             $position = $i + 1;
 
             $kind = $step['rule_kind'] ?? null;

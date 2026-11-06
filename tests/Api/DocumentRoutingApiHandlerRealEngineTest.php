@@ -778,7 +778,7 @@ final class DocumentRoutingApiHandlerRealEngineTest extends TestCase
         );
         sort($ids);
 
-        return array_values($ids);
+        return $ids;
     }
 
     private function revoke(int $roleId, string $permission): void
@@ -863,9 +863,9 @@ final class DocumentRoutingApiHandlerRealEngineTest extends TestCase
             }
 
             /**
-             * @return array<string, mixed>|null
+             * @return array<string, mixed>
              */
-            public function validateAccessToken(): ?array
+            public function validateAccessToken(): array
             {
                 return ['profile_id' => $this->profileId, 'active_tenant_id' => $this->tenantId];
             }

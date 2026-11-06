@@ -25,6 +25,7 @@ final class BaseCommandCallApiTest extends TestCase
     public function testCallApiReturnsKernelErrorResponsesWithoutTypeError(): void
     {
         $command = new class extends BaseCommand {
+            /** @param list<string> $argv */
             public function execute(array $argv): int
             {
                 return 0;

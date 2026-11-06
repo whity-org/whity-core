@@ -118,6 +118,7 @@ final class TwoFactorPolicyResolver
              WHERE tenant_id = :tenantId AND (' . implode(' OR ', $scopeConditions) . ')',
             $params
         );
+        /** @var list<array<string, mixed>> $results */
         $results = $statement->fetchAll();
 
         if ($results === []) {

@@ -50,7 +50,7 @@ final class PublicFormKeyRepository
             ':key_hash' => hash('sha256', $key),
             ':key_hint' => substr($key, 0, 8),
             ':label' => $label,
-            ':allowed_origins' => json_encode(array_values($origins), JSON_THROW_ON_ERROR),
+            ':allowed_origins' => json_encode($origins, JSON_THROW_ON_ERROR),
             ':created_by' => $createdBy,
         ]);
 
@@ -109,7 +109,7 @@ final class PublicFormKeyRepository
         );
         $stmt->execute([
             ':label' => $label,
-            ':allowed_origins' => json_encode(array_values($origins), JSON_THROW_ON_ERROR),
+            ':allowed_origins' => json_encode($origins, JSON_THROW_ON_ERROR),
             ':tenant_id' => $tenantId,
             ':id' => $id,
         ]);

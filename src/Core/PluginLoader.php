@@ -1618,7 +1618,7 @@ class PluginLoader
                 // is worthless without the handlers it names, so half a
                 // declaration is no declaration.
                 $jobs = $plugin->getJobs();
-                $submittable = array_values($plugin->getSubmittableJobs());
+                $submittable = array_values($plugin->getSubmittableJobs()); // @phpstan-ignore arrayValues.list (plugin-supplied value; the SDK type is PHPDoc only)
             } catch (Throwable $e) {
                 $this->handlePluginThrowable($pluginKey, $e, 'getJobs');
                 continue;
@@ -1717,7 +1717,7 @@ class PluginLoader
             }
 
             foreach ($descriptors as $descriptor) {
-                if (!is_array($descriptor)) {
+                if (!is_array($descriptor)) { // @phpstan-ignore function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
                     $this->logWarning("[Plugin:{$pluginKey}] getMcpTools() returned a non-array descriptor — skipped.");
                     continue;
                 }
@@ -1989,7 +1989,7 @@ class PluginLoader
 
         $lifecycle->reEnable();
 
-        if ($reRegister && $info !== null) {
+        if ($reRegister) {
             $registered = $this->registerCapabilities(
                 $info['plugin'],
                 $info['namespacePrefix'],
@@ -2145,7 +2145,7 @@ class PluginLoader
         // Migrations cannot be queried without a PDO, so report what is declared.
         $declaredMigrations = [];
         foreach ($plugin->getMigrations() as $fqcn) {
-            if (is_string($fqcn)) {
+            if (is_string($fqcn)) { // @phpstan-ignore function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
                 $short = substr((string) strrchr('\\' . $fqcn, '\\'), 1);
                 $declaredMigrations[] = 'plugin:' . $plugin->getName() . ':' . $short;
             }
@@ -2764,7 +2764,7 @@ class PluginLoader
 
         $valid = [];
         foreach ($plugin->getPluginDependencies() as $name => $constraint) {
-            if (is_string($name) && is_string($constraint)) {
+            if (is_string($name) && is_string($constraint)) { // @phpstan-ignore function.alreadyNarrowedType, function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
                 $valid[$name] = $constraint;
             }
         }
@@ -3040,7 +3040,7 @@ class PluginLoader
 
         if ($fields !== null) {
             foreach ($providers as $provider) {
-                if (!$provider instanceof \Whity\Sdk\Documents\DocumentFieldProvider) {
+                if (!$provider instanceof \Whity\Sdk\Documents\DocumentFieldProvider) { // @phpstan-ignore instanceof.alwaysTrue (plugin-supplied value; the SDK type is PHPDoc only)
                     $this->logWarning("Plugin {$pluginKey} declares a document field provider that is not a DocumentFieldProvider");
                     continue;
                 }
@@ -3060,7 +3060,7 @@ class PluginLoader
         if ($slotRegistry !== null) {
             $slots = [];
             foreach ($declaredSlots as $slot) {
-                if (!$slot instanceof \Whity\Sdk\Documents\TemplateSlot) {
+                if (!$slot instanceof \Whity\Sdk\Documents\TemplateSlot) { // @phpstan-ignore instanceof.alwaysTrue (plugin-supplied value; the SDK type is PHPDoc only)
                     $this->logWarning("Plugin {$pluginKey} declares a template slot that is not a TemplateSlot");
                     continue;
                 }
@@ -3167,7 +3167,7 @@ class PluginLoader
             $requiredPermission = $route['requiredPermission'] ?? null;
             if (
                 $requiredPermission !== null
-                && (!is_string($requiredPermission) || preg_match(self::PERMISSION_PATTERN, $requiredPermission) !== 1)
+                && (!is_string($requiredPermission) || preg_match(self::PERMISSION_PATTERN, $requiredPermission) !== 1) // @phpstan-ignore function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
             ) {
                 $this->logWarning(
                     "Plugin {$pluginKey} route {$method} {$path} declares an invalid requiredPermission; "
@@ -3224,7 +3224,7 @@ class PluginLoader
                 }
             }
 
-            if (is_callable($handler)) {
+            if (is_callable($handler)) { // @phpstan-ignore function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
                 // The optional 'schema' key (WC-166) carries the route's typed
                 // OpenAPI declaration through to the router/generator.
                 $schema = isset($route['schema']) && is_array($route['schema']) ? $route['schema'] : null;
@@ -3572,7 +3572,7 @@ class PluginLoader
         //     and the registry are untouched.
         try {
             foreach ($plugin->getPermissions() as $permission) {
-                if (is_string($permission) && !isset($this->claimedPermissions[$permission])) {
+                if (is_string($permission) && !isset($this->claimedPermissions[$permission])) { // @phpstan-ignore function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
                     $this->claimedPermissions[$permission] = $pluginKey;
                 }
             }
@@ -3755,7 +3755,7 @@ class PluginLoader
             return null;
         }
 
-        if (!is_string($path) || $path === '') {
+        if ($path === '') {
             $this->logWarning(
                 "Plugin {$pluginKey} declares a theme-override route that is not a non-empty string; ignored."
             );

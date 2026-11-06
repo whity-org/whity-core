@@ -146,6 +146,7 @@ abstract class OfflinePluginHostConformanceTestCase extends TestCase
         // test always makes an assertion (phpunit failOnRisky) instead of being
         // reported "risky" for the (valid) no-routes case, e.g. a migration- or
         // hooks-only plugin.
+        // @phpstan-ignore staticMethod.alreadyNarrowedType (deliberate: the only assertion when a plugin has no routes)
         self::assertIsArray($routes, 'getRoutes() must return a list of route descriptors.');
 
         foreach ($routes as $route) {
@@ -242,6 +243,7 @@ abstract class OfflinePluginHostConformanceTestCase extends TestCase
         // A plugin with no hooks trivially conforms — assert the shape so this
         // test always makes an assertion (phpunit failOnRisky) instead of being
         // reported "risky" for the (common) no-hooks case.
+        // @phpstan-ignore staticMethod.alreadyNarrowedType (deliberate: the only assertion when a plugin has no hooks)
         self::assertIsArray($hooks, 'getHooks() must return an array (event => listener(s)).');
 
         foreach ($hooks as $eventName => $hookData) {

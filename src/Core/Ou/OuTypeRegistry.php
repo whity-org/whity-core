@@ -338,7 +338,7 @@ class OuTypeRegistry implements HostWiredService
      *
      * @param string                              $source       Raw source name, kept for attribution.
      * @param string|null                         $prefix       Namespace prefix, or null for core (bare keys).
-     * @param array<string, array<string, mixed>> $declarations Bare slug => declaration.
+     * @param array<mixed>                        $declarations Bare slug => declaration, from a plugin, so each is checked.
      * @return list<string>
      *
      * @throws InvalidOuTypeException

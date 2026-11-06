@@ -79,7 +79,7 @@ final class StatusReport
             $components[] = [
                 'key' => $key,
                 'name' => $name,
-                'status' => $status?->value ?? 'unknown',
+                'status' => $status->value ?? 'unknown',
                 'uptime' => $count !== null && $count['total'] > 0
                     ? round((($count['total'] - $count['down']) / $count['total']) * 100, 3)
                     : null,

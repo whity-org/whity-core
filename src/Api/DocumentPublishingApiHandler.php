@@ -312,7 +312,9 @@ final class DocumentPublishingApiHandler
         $values = $resolved['values'];
 
         $title = $resolved['label'] !== '' ? $doc['title'] . ' · ' . $resolved['label'] : $doc['title'];
-        if ($persist && $this->issuing !== null && $version !== null) {
+        // Persisting already returned above without an issuer or for a draft,
+        // so here both the issuer and a published version are in hand.
+        if ($persist) {
             // E.27: refuse rather than issue a document with a required field missing.
             $actor = new ActingAs($tenantId, $callerId, $hasPermission);
             $missing = $this->issuing->missing(new IssueRequest($row, $version, $values, $title), $actor);
@@ -551,7 +553,7 @@ final class DocumentPublishingApiHandler
     {
         $type = $row['record_type'] !== null ? (string) $row['record_type'] : null;
         $blockers = DocumentPublishCheck::blockers(
-            is_array($row['blocks'] ?? null) ? $row['blocks'] : [],
+            is_array($row['blocks'] ?? null) ? array_values($row['blocks']) : [],
             $this->fields->paths($tenantId, $type) + self::ownPaths($row['own_fields'] ?? []),
         );
 

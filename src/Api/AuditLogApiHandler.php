@@ -198,9 +198,13 @@ final class AuditLogApiHandler
             );
             $principals->execute($params);
 
+            /** @var list<mixed> $actorIds */
+            $actorIds = $actors->fetchAll(PDO::FETCH_COLUMN);
+            /** @var list<mixed> $principalIds */
+            $principalIds = $principals->fetchAll(PDO::FETCH_COLUMN);
             $facets = $this->presenter->facets(
-                array_map('intval', $actors->fetchAll(PDO::FETCH_COLUMN)),
-                array_map('strval', $principals->fetchAll(PDO::FETCH_COLUMN)),
+                array_map('intval', $actorIds),
+                array_map('strval', $principalIds),
             );
 
             $areas = [];
@@ -721,18 +725,18 @@ final class AuditLogApiHandler
         return [
             'id' => (int) ($row['id'] ?? 0),
             'tenantId' => isset($row['tenant_id']) ? (int) $row['tenant_id'] : null,
-            'actorUserId' => isset($row['actor_user_id']) && $row['actor_user_id'] !== null
+            'actorUserId' => isset($row['actor_user_id'])
                 ? (int) $row['actor_user_id']
                 : null,
             'action' => (string) ($row['action'] ?? ''),
-            'targetType' => isset($row['target_type']) && $row['target_type'] !== null
+            'targetType' => isset($row['target_type'])
                 ? (string) $row['target_type']
                 : null,
-            'targetId' => isset($row['target_id']) && $row['target_id'] !== null
+            'targetId' => isset($row['target_id'])
                 ? (int) $row['target_id']
                 : null,
             'metadata' => $publicMetadata,
-            'ipAddress' => isset($row['ip_address']) && $row['ip_address'] !== null
+            'ipAddress' => isset($row['ip_address'])
                 ? (string) $row['ip_address']
                 : null,
             'createdAt' => isset($row['created_at']) ? (string) $row['created_at'] : null,

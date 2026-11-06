@@ -393,6 +393,7 @@ final class OuTypesApiHandlerRealEngineTest extends TestCase
         TenantContext::reset();
 
         MockRequestFactory::setTestTenant(2);
+        // @phpstan-ignore method.alreadyNarrowedType (a second create() under another tenant; PHPStan remembers the first call)
         $this->assertSame(201, $this->handler()->create($this->post(['key' => 'faculty']))->getStatusCode());
 
         $this->assertSame(

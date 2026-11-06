@@ -79,9 +79,9 @@ final class SendNotificationDeliveryJob implements JobInterface
             type: (string) ($payload['type'] ?? ''),
             subject: (string) ($payload['subject'] ?? ''),
             body: (string) ($payload['body'] ?? ''),
-            bodyHtml: isset($payload['body_html']) && $payload['body_html'] !== null ? (string) $payload['body_html'] : null,
+            bodyHtml: isset($payload['body_html']) ? (string) $payload['body_html'] : null,
             data: is_array($data) ? $data : [],
-            locale: isset($payload['locale']) && $payload['locale'] !== null ? (string) $payload['locale'] : null,
+            locale: isset($payload['locale']) ? (string) $payload['locale'] : null,
         );
 
         $result = $transport->send($message);

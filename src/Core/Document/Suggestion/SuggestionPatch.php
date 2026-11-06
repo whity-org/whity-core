@@ -454,7 +454,7 @@ final class SuggestionPatch
                     $done = true;
                     array_splice($list, $i + 1, 0, $new);
 
-                    return array_values($list);
+                    return $list;
                 }
             }
 
@@ -711,7 +711,7 @@ final class SuggestionPatch
             }
         }
 
-        return self::normalize(array_merge($head, array_values($middle), $tail));
+        return self::normalize(array_merge($head, $middle, $tail));
     }
 
     /** @param list<array<string, mixed>> $inlines */
