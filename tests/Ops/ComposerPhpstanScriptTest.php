@@ -95,15 +95,27 @@ final class ComposerPhpstanScriptTest extends TestCase
         );
     }
 
-    public function testCiGoesThroughTheScriptAndOnlyRaisesItsLimit(): void
+    /**
+     * CI and the release workflow run the script exactly as a developer does.
+     * Under PHPStan 1.12 CI had to raise the limit to 2G (#1620); PHPStan 2 peaks
+     * at about 0.6 GB per worker on a cold analysis, so the override is gone and
+     * a second limit cannot drift from the script again (WHIT-908).
+     */
+    public function testCiAndReleaseRunTheScriptAsIs(): void
     {
-        $workflow = (string) file_get_contents(dirname(__DIR__, 2) . '/.github/workflows/automated-tests.yml');
-
-        self::assertStringContainsString(
-            'run: composer phpstan -- --memory-limit=2G',
-            $workflow,
-            'CI must keep using the script, which is the only place the path list exists. A cold '
-            . 'analysis on its runner needs more than the 1G a hand-run gets.'
-        );
+        foreach (['automated-tests.yml', 'release.yml'] as $file) {
+            $workflow = (string) file_get_contents(dirname(__DIR__, 2) . '/.github/workflows/' . $file);
+            self::assertMatchesRegularExpression(
+                '/^\s*run: composer phpstan\s*$/m',
+                $workflow,
+                "{$file} must run `composer phpstan`, the only place the path list and the "
+                . 'memory limit exist.'
+            );
+            self::assertDoesNotMatchRegularExpression(
+                '/vendor\/bin\/phpstan|composer phpstan --/',
+                $workflow,
+                "{$file} must not call PHPStan with its own paths or limit."
+            );
+        }
     }
 }
