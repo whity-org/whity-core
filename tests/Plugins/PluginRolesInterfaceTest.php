@@ -112,6 +112,7 @@ final class PluginRolesInterfaceTest extends TestCase
                 description TEXT    NOT NULL DEFAULT \'\',
                 parent_id   INTEGER NULL REFERENCES roles(id) ON DELETE SET NULL,
                 tenant_id   INTEGER NULL REFERENCES tenants(id) ON DELETE CASCADE,
+                plugin_key  TEXT    NULL,
                 created_at  TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP
             )
         ');
@@ -130,8 +131,20 @@ final class PluginRolesInterfaceTest extends TestCase
                 id            INTEGER PRIMARY KEY AUTOINCREMENT,
                 role_id       INTEGER NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
                 permission_id INTEGER NOT NULL REFERENCES permissions(id) ON DELETE CASCADE,
+                granted_by_plugin TEXT NULL,
                 created_at    TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(role_id, permission_id)
+            )
+        ');
+
+        $pdo->exec('
+            CREATE TABLE plugin_role_approvals (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                role_id     INTEGER NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+                plugin_key  TEXT    NOT NULL,
+                approved_by INTEGER NULL,
+                created_at  TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(role_id, plugin_key)
             )
         ');
 

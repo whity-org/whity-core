@@ -989,12 +989,19 @@ namespace Whity\Sdk;
  * reads on. On an older host the route is not public (WHIT-704).
  *
  * Purely additive.)
+ *
+ * 1.70 (PLUGIN ROLE GRANTS STAY THE PLUGIN'S OWN: {@see PluginRolesInterface} grants
+ * only permissions the plugin declares in {@see PluginInterface::getPermissions()},
+ * never a core permission or one under a core resource, and only to a role the plugin
+ * created or one the operator approved for it. Uninstall removes only the grants the
+ * plugin made. A plugin that listed a core permission, or named a role it did not
+ * create, no longer gets that grant; the host logs it.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.69.0';
+    public const VERSION = '1.70.0';
 
     /**
      * Static identity only — never instantiated.

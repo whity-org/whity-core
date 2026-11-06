@@ -37,10 +37,18 @@ namespace Whity\Sdk;
  * Permission slugs must already exist in the `permissions` catalogue; slugs
  * that are absent at seed time are silently skipped. Grants are idempotent.
  *
+ * Since SDK 1.70 the host grants a slug only when it is one of the plugin's
+ * own: declared in {@see PluginInterface::getPermissions()}, not a core
+ * permission and not under a core resource (`users:*`, `roles:*`, ...). It
+ * grants only to a role this plugin created, or to an existing role the
+ * operator approved for the plugin. Anything else is skipped and logged.
+ *
  * Uninstall
  * ---------
- * On uninstall the host removes the role_permissions entries seeded for each
- * declared role. The role rows themselves are intentionally retained — an
+ * On uninstall the host removes the role_permissions entries this plugin made,
+ * and nothing else: a grant that core or the operator made stays, even when
+ * the plugin lists the same permission. The role rows themselves are
+ * intentionally retained — an
  * operator or another migration may have assigned users to them, so deleting
  * the role could orphan user accounts. Operators can remove the roles manually
  * if desired.
