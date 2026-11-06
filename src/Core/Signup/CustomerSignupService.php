@@ -486,12 +486,15 @@ final class CustomerSignupService
     {
         $name = trim($displayName) !== '' ? trim($displayName) : $email;
 
+        // `local`, stated rather than left to migration 104's default: this
+        // path only creates a profile when the person chose a password (an
+        // address that already has one keeps its own profile).
         // @tenant-guard-ignore: profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
         $this->db->prepare(
-            'INSERT INTO profiles
-                 (display_name, password_hash, two_factor_enabled,
+            "INSERT INTO profiles
+                 (display_name, password_hash, auth_method, two_factor_enabled,
                   two_factor_backup_codes_version, token_epoch, created_at, updated_at)
-             VALUES (?, ?, false, 0, 0, NOW(), NOW())'
+             VALUES (?, ?, 'local', false, 0, 0, NOW(), NOW())"
         )->execute([$name, $passwordHash]);
         $profileId = (int) $this->db->lastInsertId();
 

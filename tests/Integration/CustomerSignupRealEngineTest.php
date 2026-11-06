@@ -191,6 +191,9 @@ final class CustomerSignupRealEngineTest extends TestCase
         self::assertSame('active', $row['status']);
         self::assertSame('customer', $row['kind']);
         self::assertSame($this->customerRole, (int) $row['role_id']);
+        self::assertSame('local', $this->scalar(
+            "SELECT p.auth_method FROM profiles p JOIN profile_emails pe ON pe.profile_id = p.id WHERE pe.email = 'new.customer@example.test'"
+        ));
         self::assertSame('Nadia Customer', $this->scalar(
             "SELECT p.display_name FROM profiles p JOIN profile_emails pe ON pe.profile_id = p.id WHERE pe.email = 'new.customer@example.test'"
         ));
