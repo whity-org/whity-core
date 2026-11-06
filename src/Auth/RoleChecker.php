@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Whity\Auth;
 
 use Psr\Log\LoggerInterface;
+use Whity\Core\Identity\CustomerSafeRole;
 use Whity\Database\Database;
 use Whity\Core\RBAC\PermissionRegistry;
 
@@ -347,9 +348,55 @@ class RoleChecker
         }
 
         $resolved = array_keys($permissions);
+
+        // WHIT-914: a customer is never staff. When every active membership the
+        // profile holds here is a customer one, privileged permissions are dropped
+        // whatever the role, an OU, a resource grant or a delegation says — so an
+        // admin who later gives a customer an admin role has not made them an
+        // admin. Promoting a customer is a change of membership kind, not of role.
+        if ($resolved !== [] && $this->isCustomerOnly($profileId, $tenantId)) {
+            $resolved = array_values(array_filter(
+                $resolved,
+                static fn (string $p): bool => !CustomerSafeRole::isPrivilegedPermission($p)
+            ));
+        }
+
         self::$effectiveUserPermissionCache[$cacheKey] = $resolved;
 
         return $resolved;
+    }
+
+    /**
+     * Whether the profile is ONLY a customer in this workspace: it holds at
+     * least one active membership here and every active one is `kind =
+     * customer` (WHIT-914). A profile that is both staff and a customer (two
+     * rows) is staff.
+     */
+    public function isCustomerOnly(int $profileId, int $tenantId): bool
+    {
+        try {
+            $statement = $this->db->query(
+                "SELECT kind FROM memberships
+                  WHERE profile_id = :profileId AND tenant_id = :tenantId AND status = 'active'",
+                [':profileId' => $profileId, ':tenantId' => $tenantId]
+            );
+            $kinds = $statement->fetchAll(\PDO::FETCH_COLUMN);
+        } catch (\Throwable) {
+            // Only a schema from before migration 222 lacks the column, and
+            // every row there is staff.
+            return false;
+        }
+
+        if ($kinds === []) {
+            return false;
+        }
+        foreach ($kinds as $kind) {
+            if ($kind !== 'customer') {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**

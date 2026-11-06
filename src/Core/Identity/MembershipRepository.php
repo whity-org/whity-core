@@ -33,6 +33,15 @@ final class MembershipRepository
     public const STATUS_INVITED   = 'invited';
     public const STATUS_SUSPENDED = 'suspended';
 
+    /**
+     * What a membership IS, beside what role it holds (WHIT-914, migration 222).
+     * `member` is staff, and every row written before customer sign-up existed.
+     * `customer` joined through a workspace's own sign-up; RBAC caps it so no
+     * role makes a customer an administrator.
+     */
+    public const KIND_MEMBER   = 'member';
+    public const KIND_CUSTOMER = 'customer';
+
     private PDO $db;
 
     /**
@@ -80,25 +89,43 @@ final class MembershipRepository
         int $roleId,
         ?int $ouId = null,
         string $status = self::STATUS_ACTIVE,
+        string $kind = self::KIND_MEMBER,
+        string $via = '',
     ): int {
-        $stmt = $this->db->prepare(
-            'INSERT INTO memberships (profile_id, tenant_id, role_id, ou_id, status, created_at)
-             VALUES (:profile_id, :tenant_id, :role_id, :ou_id, :status, NOW())'
-        );
-        $stmt->execute([
+        if ($kind !== self::KIND_MEMBER && $kind !== self::KIND_CUSTOMER) {
+            throw new \InvalidArgumentException('Unknown membership kind');
+        }
+
+        // The column is named only for a customer, so the many test schemas
+        // built by hand before migration 222 keep working for staff rows,
+        // which the column's default already describes.
+        $stmt = $kind === self::KIND_MEMBER
+            ? $this->db->prepare(
+                'INSERT INTO memberships (profile_id, tenant_id, role_id, ou_id, status, created_at)
+                 VALUES (:profile_id, :tenant_id, :role_id, :ou_id, :status, NOW())'
+            )
+            : $this->db->prepare(
+                'INSERT INTO memberships (profile_id, tenant_id, role_id, ou_id, status, kind, created_at)
+                 VALUES (:profile_id, :tenant_id, :role_id, :ou_id, :status, :kind, NOW())'
+            );
+        $params = [
             ':profile_id' => $profileId,
             ':tenant_id'  => $tenantId,
             ':role_id'    => $roleId,
             ':ou_id'      => $ouId,
             ':status'     => $status,
-        ]);
+        ];
+        if ($kind !== self::KIND_MEMBER) {
+            $params[':kind'] = $kind;
+        }
+        $stmt->execute($params);
         $membershipId = (int) $this->db->lastInsertId();
 
         // Announce the grant so it reaches the audit trail (#889). `status` is
         // carried rather than filtered on: an `invited` row is a STAGED grant,
         // not access, and the trail should say which one happened instead of
         // this method deciding that a pending invitation is not worth recording.
-        $this->announce('user.membership.added', [
+        $payload = [
             'profile_id'    => $profileId,
             'tenant_id'     => $tenantId,
             'membership_id' => $membershipId,
@@ -106,7 +133,14 @@ final class MembershipRepository
             'role_name'     => $this->roleName($roleId, $tenantId),
             'ou_id'         => $ouId,
             'status'        => $status,
-        ]);
+        ];
+        if ($kind !== self::KIND_MEMBER) {
+            $payload['kind'] = $kind;
+        }
+        if ($via !== '') {
+            $payload['via'] = $via;
+        }
+        $this->announce('user.membership.added', $payload);
 
         return $membershipId;
     }
@@ -453,6 +487,7 @@ final class MembershipRepository
             'role_id'    => (int) $row['role_id'],
             'ou_id'      => $row['ou_id'] !== null ? (int) $row['ou_id'] : null,
             'status'     => (string) $row['status'],
+            'kind'       => isset($row['kind']) ? (string) $row['kind'] : self::KIND_MEMBER,
             'created_at' => (string) $row['created_at'],
         ];
     }

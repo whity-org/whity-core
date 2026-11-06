@@ -99,6 +99,8 @@ final class CoreTables
         'agent_proposals' => '176_create_agent_proposals.php',
         'plugin_secrets' => '187_create_plugin_secrets.php',
         'public_form_keys' => '217_create_public_form_keys.php',
+        'workspace_signup_settings' => '222_create_workspace_signup.php',
+        'customer_signups' => '222_create_workspace_signup.php',
         'agents' => '180_create_agents.php',
         'agent_assignments' => '181_create_agent_assignments.php',
         'agent_actions' => '182_create_agent_actions.php',

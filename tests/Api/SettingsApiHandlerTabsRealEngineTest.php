@@ -274,6 +274,18 @@ final class SettingsApiHandlerTabsRealEngineTest extends TestCase
         $this->assertSame(['email-domains'], $tabs);
     }
 
+    public function testSignupManageShowsTheWorkspaceSignupTabOutsideTheSystemTenantOnly(): void
+    {
+        // WHIT-914: a workspace's own customer sign-up, never in the system
+        // tenant, where Sign-up is the operator's platform governance.
+        $profileId = $this->seedProfileWithPermissions($this->tenantId, [CorePermissions::SIGNUP_MANAGE]);
+        $this->assertSame(['customer-signup'], $this->tabIds($this->handler->tabs($this->requestAs($profileId, $this->tenantId))));
+
+        TenantContext::reset();
+        $systemProfile = $this->seedProfileWithPermissions(0, [CorePermissions::SIGNUP_MANAGE]);
+        $this->assertNotContains('customer-signup', $this->tabIds($this->handler->tabs($this->requestAs($systemProfile, 0))));
+    }
+
     public function testARoleWithoutThePermissionDoesNotSeeTheEmailDomainsTab(): void
     {
         $profileId = $this->seedProfileWithRoleName($this->tenantId, 'a-role-that-is-not-admin');

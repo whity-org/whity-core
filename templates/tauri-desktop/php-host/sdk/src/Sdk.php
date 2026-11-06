@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.72).
+ * SDK identity (v1.73).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1017,12 +1017,19 @@ namespace Whity\Sdk;
  * created or one the operator approved for it. Uninstall removes only the grants the
  * plugin made. A plugin that listed a core permission, or named a role it did not
  * create, no longer gets that grant; the host logs it.)
+ *
+ * 1.73 (CUSTOMER SIGN-UP: {@see Hooks\Events::MEMBERSHIP_CUSTOMER_JOINED},
+ * `membership.customer_joined`, fires when somebody joins a workspace as a customer
+ * through its own sign-up, at once when sign-up is Open or on an admin's approval.
+ * Ids only, after commit, and the return value is ignored (WHIT-914).
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.72.0';
+    public const VERSION = '1.73.0';
 
     /**
      * Static identity only — never instantiated.

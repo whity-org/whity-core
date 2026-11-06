@@ -36,6 +36,16 @@ final class TenantHostRepository
         return $id === false ? null : (int) $id;
     }
 
+    /** The workspace's display name, for a public page that names it (WHIT-914). */
+    public function findNameById(int $tenantId): ?string
+    {
+        // @tenant-guard-ignore: tenants registry lookup by id; returns the display name only.
+        $stmt = $this->db->prepare('SELECT name FROM tenants WHERE id = :id LIMIT 1');
+        $stmt->execute([':id' => $tenantId]);
+        $name = $stmt->fetchColumn();
+        return $name === false || $name === null ? null : (string) $name;
+    }
+
     public function brandingHostExists(string $host, int $exceptTenantId): bool
     {
         // @tenant-guard-ignore: uniqueness check across the tenants registry.

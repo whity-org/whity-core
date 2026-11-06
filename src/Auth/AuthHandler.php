@@ -1115,7 +1115,9 @@ class AuthHandler
         try {
             // @tenant-guard-ignore: login flow — enumerates all tenant memberships for one profile (ADR 0005 §6)
             $stmt = $this->db->prepare(
-                "SELECT m.tenant_id, t.name AS tenant_name, r.name AS role
+                // m.* rather than m.kind: schemas from before migration 222
+                // have no column, and every row there is staff (WHIT-914).
+                "SELECT m.*, t.name AS tenant_name, r.name AS role
                  FROM memberships m
                  JOIN tenants t ON t.id = m.tenant_id
                  LEFT JOIN roles r ON r.id = m.role_id
@@ -1131,6 +1133,10 @@ class AuthHandler
                     'tenant_id'   => (int) $row['tenant_id'],
                     'tenant_name' => (string) ($row['tenant_name'] ?? ''),
                     'role'        => (string) ($row['role'] ?? ''),
+                    // `customer` for a membership from the workspace's own
+                    // sign-up: the app hides admin and create-workspace
+                    // surfaces, and RBAC caps it server-side.
+                    'kind'        => (string) ($row['kind'] ?? 'member'),
                 ];
             }
             return $out;

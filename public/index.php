@@ -4801,6 +4801,56 @@ $router->register('POST',   '/api/branding/global/assets/{key}',    [$brandingHa
 $router->register('DELETE', '/api/branding/global/assets/{key}',    [$brandingHandler, 'clearGlobal'],   null, null, CorePermissions::SETTINGS_MANAGE);
 $router->register('PUT',    '/api/tenants/{id}/branding-host',      [$brandingHandler, 'setBrandingHost'], null, null, CorePermissions::SETTINGS_MANAGE);
 
+// WHIT-914: workspace-controlled customer sign-up. Platform sign-up
+// (/api/register) creates a workspace and is the operator's; this joins ONE
+// existing workspace as a customer and is that workspace's admins'. The public
+// four are unauthenticated and on EnforceTenantIsolation's public list: the
+// workspace comes from the slug in the path (checked against the host, the
+// resolution branding uses) and, after the request, from the stored row only.
+// The admin five need signup:manage in the caller's own workspace.
+$signupSettings = new \Whity\Core\Signup\WorkspaceSignupSettings($db->getPdo());
+$customerSafeRoles = \Whity\Core\Identity\CustomerSafeRole::make($db->getPdo());
+$customerSignupService = new \Whity\Core\Signup\CustomerSignupService(
+    $db->getPdo(),
+    $signupSettings,
+    $customerSafeRoles,
+    $hookManager
+);
+$publicSignupHandler = new \Whity\Api\PublicSignupApiHandler(
+    $customerSignupService,
+    $signupSettings,
+    $brandingHostRepo,
+    $hostResolver,
+    $publicFormBotCheck,
+    new \Whity\Core\Signup\CustomerSignupMailer(
+        $mailer,
+        $frontendUrls->linkOrPath(\Whity\Core\Http\FrontendUrls::SIGNUP_CONFIRM),
+        new \Whity\Core\Mail\EmailLayout(),
+        $settingsService
+    ),
+    new DatabaseSharedStore($db->getPdo()),
+    $auditLogger
+);
+// The confirm pair first, so it can never be read as a workspace slug.
+$router->register('GET',  '/api/public/signup/confirm',               [$publicSignupHandler, 'preview'], null);
+$router->register('POST', '/api/public/signup/confirm',               [$publicSignupHandler, 'confirm'], null);
+$router->register('GET',  '/api/public/signup/workspaces/{workspace}', [$publicSignupHandler, 'info'],    null);
+$router->register('POST', '/api/public/signup/workspaces/{workspace}', [$publicSignupHandler, 'request'], null);
+$workspaceSignupHandler = new \Whity\Api\WorkspaceSignupApiHandler(
+    $db->getPdo(),
+    $roleChecker,
+    $signupSettings,
+    $customerSafeRoles,
+    $customerSignupService,
+    $auditLogger,
+    $publicFormBotCheck
+);
+$router->register('GET',  '/api/signup/settings',                   [$workspaceSignupHandler, 'getSettings'],    null, null, CorePermissions::SIGNUP_MANAGE);
+$router->register('PUT',  '/api/signup/settings',                   [$workspaceSignupHandler, 'updateSettings'], null, null, CorePermissions::SIGNUP_MANAGE);
+$router->register('GET',  '/api/signup/requests',                   [$workspaceSignupHandler, 'listRequests'],   null, null, CorePermissions::SIGNUP_MANAGE);
+$router->register('POST', '/api/signup/requests/{id:\d+}/approve',  [$workspaceSignupHandler, 'approve'],        null, null, CorePermissions::SIGNUP_MANAGE);
+$router->register('POST', '/api/signup/requests/{id:\d+}/reject',   [$workspaceSignupHandler, 'reject'],         null, null, CorePermissions::SIGNUP_MANAGE);
+
 // 13c-ter. UI display preferences (#1068) — public GET /api/v1/ui/preferences.
 // Registered here rather than beside the settings routes because it resolves
 // its tenant exactly as branding does (JWT context, else request host, else the
