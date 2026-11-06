@@ -426,10 +426,12 @@ final class ToolsCallHandlerTest extends TestCase
     public function testInvoke_anAgentsCallSaysWhichAgentForWhichPerson(): void
     {
         // SDK 1.59 (WHIT-837): so a tool can record "agent X for person Y".
+        // An authored tool is a write for agents (WHIT-912), so the call runs
+        // as one a person approved.
         $seen = $this->contextFor(new McpPrincipal(
             self::USER_ID, self::USER_ID, self::TENANT_ID, 'ai-agent', ['tools:call'], 'oauth-agent:abc',
             agentName: 'Whity Builder', subject: 'wid-sub-42',
-        ));
+        ), approved: true);
 
         self::assertTrue($seen->isAgent());
         self::assertSame(self::USER_ID, $seen->profileId, 'the person it acts for');
@@ -439,7 +441,7 @@ final class ToolsCallHandlerTest extends TestCase
         self::assertSame('wid-sub-42', $seen->subject);
     }
 
-    private function contextFor(?McpPrincipal $principal): \Whity\Sdk\Mcp\McpToolContext
+    private function contextFor(?McpPrincipal $principal, bool $approved = false): \Whity\Sdk\Mcp\McpToolContext
     {
         $seen     = null;
         $registry = new \Whity\Mcp\Tools\AuthoredToolRegistry();
@@ -461,8 +463,11 @@ final class ToolsCallHandlerTest extends TestCase
         }
         $handler = new ToolsCallHandler($this->toolDeriver, $this->router, $this->roleChecker, $tokens, authoredTools: $registry);
 
-        $result = ($handler)(['name' => 'who_calls', 'arguments' => []], self::BEARER);
+        $result = $approved && $principal !== null
+            ? $handler->runApproved($principal, 'who_calls', [])
+            : ($handler)(['name' => 'who_calls', 'arguments' => []], self::BEARER);
 
+        self::assertIsArray($result);
         self::assertArrayNotHasKey('isError', $result);
         self::assertInstanceOf(\Whity\Sdk\Mcp\McpToolContext::class, $seen);
         return $seen;

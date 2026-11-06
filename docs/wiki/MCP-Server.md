@@ -114,7 +114,7 @@ Every derived tool carries MCP `annotations`, so a client can run reads without 
 ],
 ```
 
-`mcp_annotations` overrides any derived hint, and its `title` replaces the summary. A plugin-authored tool (`PluginMcpToolsInterface`, SDK 1.45) declares `annotations` in its descriptor. Nothing is derived for it, since it has no HTTP method. Unknown keys and non-boolean hints are dropped. Annotations are hints: RBAC, scope and the per-call checks are unchanged.
+`mcp_annotations` overrides any derived hint, and its `title` replaces the summary. A plugin-authored tool (`PluginMcpToolsInterface`, SDK 1.45) declares `annotations` in its descriptor. Nothing is derived for it, since it has no HTTP method. Unknown keys and non-boolean hints are dropped. Annotations are hints: RBAC, scope and the per-call checks are unchanged. Nor do they decide whether an AI agent must ask first: core decides that itself (WHIT-912, SDK 1.71). A core route reads only when core declares it does; a plugin route reads only when its method is GET or HEAD, and a `readOnlyHint: true` on any other method is published as `false`; a plugin-authored tool is a write for agents. Core's decision travels as `_meta["dev.whity/readsOnly"]`.
 
 ### inputSchema construction
 

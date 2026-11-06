@@ -53,7 +53,7 @@ Areas marked **Needs a design** have gaps that could cross workspaces, skip perm
 | [Plugin screens and blocks](#plugin-screens) | Full | Yes | later |
 | [Slots in core screens](#core-screen-slots) | None | Yes | 0.2.28 |
 | [Desktop app](#desktop) | Partial |  | later |
-| [MCP tools](#mcp-tools) | Full | Yes | 0.2.27 |
+| [MCP tools](#mcp-tools) | Full |  | 0.2.27 |
 | [MCP prompts and resources](#mcp-prompts-resources) | Partial | Yes | later |
 | [Agents and presets](#agents) | Full |  | later |
 | [Agent proposals](#agent-proposals) | Partial | Yes | 0.2.28 |
@@ -789,12 +789,11 @@ Planned: later.
 - Tool context (SDK 1.46)
 - Toolsets, visibility, agent policy and undo windows (SDK 1.52)
 - Caller identity: person, agent or system (SDK 1.59)
+- The host decides whether a tool only reads (SDK 1.71)
 
 **Missing**
 
 - Previews of what a proposed tool call would change
-
-**Needs a design.** Whether an agent must ask first has to come from the host's view of the operation, never from a hint the plugin declares.
 
 Planned: 0.2.27.
 

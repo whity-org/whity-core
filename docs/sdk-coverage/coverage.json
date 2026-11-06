@@ -1101,12 +1101,16 @@
                 {
                     "what": "Caller identity: person, agent or system",
                     "since": "1.59"
+                },
+                {
+                    "what": "The host decides whether a tool only reads",
+                    "since": "1.71"
                 }
             ],
             "missing": [
                 "Previews of what a proposed tool call would change"
             ],
-            "security": "Whether an agent must ask first has to come from the host's view of the operation, never from a hint the plugin declares.",
+            "security": null,
             "plan": "0.2.27"
         },
         {

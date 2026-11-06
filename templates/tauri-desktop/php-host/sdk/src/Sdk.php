@@ -999,6 +999,18 @@ namespace Whity\Sdk;
  * Narrows the payload; a listener that read `password` or returned a changed
  * `role_id` or `email` must stop relying on it.)
  *
+ * 1.71 (THE HOST DECIDES WHAT A TOOL WRITES: whether an AI agent may run a tool at
+ * once or must ask a person first starts from whether the tool only reads, and the
+ * host now decides that itself. A plugin route's tool reads only when its method is
+ * GET or HEAD; a `readOnlyHint: true` in its `mcp_annotations` on any other method
+ * is published as `false`. A hand-authored tool ({@see PluginMcpToolsInterface}) is
+ * a write for agents whatever its `annotations` say, so a person approves each
+ * agent call unless the tool declares an `undo` and the grant allows it. Expose a
+ * read an agent should run unasked as a GET route. Annotations stay hints for
+ * clients (WHIT-912).
+ *
+ * No signature changes.)
+ *
  * 1.72 (PLUGIN ROLE GRANTS STAY THE PLUGIN'S OWN: {@see PluginRolesInterface} grants
  * only permissions the plugin declares in {@see PluginInterface::getPermissions()},
  * never a core permission or one under a core resource, and only to a role the plugin
