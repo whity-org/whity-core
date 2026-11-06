@@ -12414,9 +12414,14 @@ export interface components {
             data: components["schemas"]["SignupSettings"];
         };
         SignupSettingsUpdateRequest: {
-            /** @enum {string} */
+            /**
+             * @description Who can sign up: `off` (nobody), `approval` (an admin approves each person) or `open` (people join once they confirm their email).
+             * @enum {string}
+             */
             mode?: "off" | "approval" | "open";
+            /** @description The role people get when they join. Must be one of `eligible_roles` from GET /api/v1/signup/settings. Required unless the mode is `off`. */
             role_id?: number | null;
+            /** @description Email domains that may sign up, like `example-bakery.com`. Empty means any address. */
             allowed_domains?: string[];
         };
         SimpleMessageResponse: {

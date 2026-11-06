@@ -158,6 +158,7 @@ final class CustomerSafeRole
                JOIN permissions p ON p.id = rp.permission_id
               WHERE rp.role_id = :rid'
         );
+        // @tenant-guard-ignore: walks the parent chain of a role already checked assignable to this tenant above; a parent is followed by id exactly as RoleChecker does
         $parent = $this->db->prepare('SELECT parent_id FROM roles WHERE id = :rid');
 
         while ($current !== null && !isset($visited[$current]) && count($visited) < 32) {

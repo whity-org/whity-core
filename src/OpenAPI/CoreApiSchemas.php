@@ -9693,9 +9693,19 @@ final class CoreApiSchemas
             ]),
             'SignupSettingsResponse' => self::dataEnvelope(SchemaBuilder::ref('SignupSettings')),
             'SignupSettingsUpdateRequest' => self::object([
-                'mode' => ['type' => 'string', 'enum' => ['off', 'approval', 'open']],
-                'role_id' => self::int(true),
-                'allowed_domains' => ['type' => 'array', 'items' => ['type' => 'string']],
+                'mode' => [
+                    'type' => 'string',
+                    'enum' => ['off', 'approval', 'open'],
+                    'description' => 'Who can sign up: `off` (nobody), `approval` (an admin approves each person) or `open` (people join once they confirm their email).',
+                ],
+                'role_id' => self::int(true) + [
+                    'description' => 'The role people get when they join. Must be one of `eligible_roles` from GET /api/v1/signup/settings. Required unless the mode is `off`.',
+                ],
+                'allowed_domains' => [
+                    'type' => 'array',
+                    'items' => ['type' => 'string'],
+                    'description' => 'Email domains that may sign up, like `example-bakery.com`. Empty means any address.',
+                ],
             ], []),
             'SignupRequestItem' => self::object([
                 'id' => self::int(),

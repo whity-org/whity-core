@@ -434,7 +434,7 @@ final class ProfileLoginRealEngineTest extends TestCase
         self::assertSame([self::TENANT_A, self::TENANT_B], $tenantIds);
         self::assertArrayHasKey('tenant_name', $body['data']['memberships'][0]);
         self::assertArrayHasKey('role', $body['data']['memberships'][0]);
-        self::assertSame(['tenant_id', 'tenant_name', 'role'], array_keys($body['data']['memberships'][0]));
+        self::assertSame(['tenant_id', 'tenant_name', 'role', 'kind'], array_keys($body['data']['memberships'][0]));
         self::assertNull($this->jwtParser->lastPayloadOfType('access'), 'Reading the choice must not mint a session.');
         // Still usable to complete the choice.
         self::assertSame(200, $this->selectTenant(self::TENANT_B)->getStatusCode());

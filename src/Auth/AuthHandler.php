@@ -1113,10 +1113,10 @@ class AuthHandler
     private function listActiveMemberships(int $profileId): array
     {
         try {
+            // m.* rather than m.kind: schemas from before migration 222 have
+            // no column, and every row there is staff (WHIT-914).
             // @tenant-guard-ignore: login flow — enumerates all tenant memberships for one profile (ADR 0005 §6)
             $stmt = $this->db->prepare(
-                // m.* rather than m.kind: schemas from before migration 222
-                // have no column, and every row there is staff (WHIT-914).
                 "SELECT m.*, t.name AS tenant_name, r.name AS role
                  FROM memberships m
                  JOIN tenants t ON t.id = m.tenant_id
