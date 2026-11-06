@@ -665,13 +665,14 @@ final class HelloWorldPlugin implements PluginInterface, PluginRequirementsInter
     /**
      * Run custom logic before a user is created.
      *
-     * Subscribed to the `user.creating` filter hook. The platform passes the
-     * pending user payload (`email`, `password`, `role_id`); a filter hook may
-     * inspect and mutate it, then MUST return the (possibly modified) array so
-     * downstream listeners and the core see the change.
+     * Subscribed to the `user.creating` hook. The platform passes the pending
+     * user (`email`, `role_id`). Since SDK 1.70 the hook is read-only: the host
+     * ignores what a listener returns, so this cannot change who is created or
+     * with which role. A listener that must refuse a create throws
+     * {@see \Whity\Sdk\Hooks\HookVetoException}. No password is ever passed.
      *
-     * Here we normalise the email to lower-case and stamp the payload so the
-     * effect is observable, without performing any I/O.
+     * Here we normalise the email to lower-case and stamp the returned copy so
+     * the listener's run is observable in tests, without performing any I/O.
      *
      * @param array<string, mixed> $data    The pending user payload.
      * @param array<string, mixed> $context Execution context (tenant_id, timestamp).

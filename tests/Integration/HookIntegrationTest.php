@@ -68,7 +68,6 @@ class HookIntegrationTest extends TestCase
         // Simulate user creation data that would be passed to hook
         $userData = [
             'email' => 'newuser@example.com',
-            'password' => 'plaintext_password',
             'role_id' => 2,
         ];
 
@@ -81,10 +80,9 @@ class HookIntegrationTest extends TestCase
         // Verify hook received correct data
         $this->assertIsArray($capturedData);
         $this->assertArrayHasKey('email', $capturedData);
-        $this->assertArrayHasKey('password', $capturedData);
+        $this->assertArrayNotHasKey('password', $capturedData);
         $this->assertArrayHasKey('role_id', $capturedData);
         $this->assertSame('newuser@example.com', $capturedData['email']);
-        $this->assertSame('plaintext_password', $capturedData['password']);
         $this->assertSame(2, $capturedData['role_id']);
 
         // Verify hook received tenant context
@@ -278,7 +276,6 @@ class HookIntegrationTest extends TestCase
         // Create user data with original email
         $userData = [
             'email' => $originalEmail,
-            'password' => 'test_password',
             'role_id' => 2,
         ];
 
@@ -293,7 +290,6 @@ class HookIntegrationTest extends TestCase
         $this->assertSame($expectedModifiedEmail, $modifiedData['email'], 'Email should be normalized to lowercase');
 
         // Verify other data is unchanged
-        $this->assertSame('test_password', $modifiedData['password']);
         $this->assertSame(2, $modifiedData['role_id']);
 
         // Verify it's the same structure
@@ -311,13 +307,13 @@ class HookIntegrationTest extends TestCase
     public function testHookChainModificationsAccumulate(): void
     {
         // Setup: Create a chain of modifications
-        $this->hookManager->listen('user.creating', function($data, $context) {
+        $this->hookManager->listen('example.creating', function($data, $context) {
             // First hook: normalize email
             $data['email'] = strtolower($data['email']);
             return $data;
         }, 5);
 
-        $this->hookManager->listen('user.creating', function($data, $context) {
+        $this->hookManager->listen('example.creating', function($data, $context) {
             // Second hook: add timestamp if not present
             if (!isset($data['created_at'])) {
                 $data['created_at'] = date('Y-m-d H:i:s');
@@ -325,7 +321,7 @@ class HookIntegrationTest extends TestCase
             return $data;
         }, 10);
 
-        $this->hookManager->listen('user.creating', function($data, $context) {
+        $this->hookManager->listen('example.creating', function($data, $context) {
             // Third hook: remove password, store hash instead (this is normally done in handler)
             if (isset($data['password'])) {
                 unset($data['password']);
@@ -343,7 +339,7 @@ class HookIntegrationTest extends TestCase
         ];
 
         // Fire the hook
-        $result = $this->hookManager->dispatch('user.creating', $userData);
+        $result = $this->hookManager->dispatch('example.creating', $userData);
 
         // Assertions
         // First modification: email normalized
