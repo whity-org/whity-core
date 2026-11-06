@@ -3,5 +3,5 @@
   enforces `list` types. A cold analysis takes about a fifth of the time it did and
   each worker uses about a third of the memory, so CI is back to the 1G limit the
   `composer phpstan` script has always used. Every new finding was fixed rather than
-  added to the baseline, and the baseline lost 38 entries that no longer apply
+  added to the baseline, and the baseline lost 34 entries that no longer apply
   (WHIT-908).
