@@ -155,8 +155,10 @@ jobs:
       - name: Run PHPUnit
         run: vendor/bin/phpunit
 
+      # Same paths and memory limit as every PR (the composer script, #934):
+      # this used to list its own paths, without `ops`.
       - name: Run PHPStan
-        run: vendor/bin/phpstan analyse src tests plugins sdk
+        run: composer phpstan
 
       - name: Plugin-load smoke
         run: php scripts/ci-plugin-smoke.php

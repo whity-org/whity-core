@@ -355,7 +355,8 @@ merging. Rebase only to resolve conflicts.
 - **`declare(strict_types=1);`** at the top of every PHP file.
 - **PSR-12** coding style.
 - **PHPStan at level 8** must pass over the full CI scope —
-  `vendor/bin/phpstan analyse src tests plugins sdk` (config in `phpstan.neon`).
+  `composer phpstan`, which holds the paths and memory limit CI uses (config
+  in `phpstan.neon`).
   Fix the root cause — do not suppress errors with broad ignores.
 - **PHPDoc on public APIs**, especially to document array shapes, generics, and
   `@throws` that the native type system cannot express.
@@ -517,7 +518,7 @@ host). CI uses PHP 8.4, so match that locally:
 docker exec whity_frankenphp vendor/bin/phpunit
 
 # PHPStan static analysis (level 8, same scope as CI)
-docker exec whity_frankenphp vendor/bin/phpstan analyse src tests plugins sdk
+docker exec whity_frankenphp vendor/bin/phpstan analyse src tests plugins sdk ops --memory-limit=1G
 ```
 
 `make test` is a convenience target that runs `php vendor/bin/phpunit
@@ -573,7 +574,7 @@ seeded accounts and shared-database discipline.
 
    - [`automated-tests.yml`](.github/workflows/automated-tests.yml):
      - **Unit, static analysis & plugin smoke (SQLite)** — `phpunit`, the
-       OpenAPI-spec drift check, `phpstan analyse src tests plugins sdk`, the
+       OpenAPI-spec drift check, `composer phpstan`, the
        plugin-load smoke, the tenant-predicate guard, the plugin
        tenant-isolation conformance check, and the vendored-SDK parity guard
        (`scripts/ci-vendored-sdk-parity.php` — the Tauri desktop template
@@ -624,7 +625,7 @@ seeded accounts and shared-database discipline.
    - [ ] Unit + integration tests added/updated and passing locally.
    - [ ] Integration tests cover RBAC route protection and tenant isolation
          where relevant; data-layer logic uses real-engine tests.
-   - [ ] PHPStan (level 8, `src tests plugins sdk`) clean; frontend `tsc` +
+   - [ ] PHPStan (level 8, `composer phpstan`) clean; frontend `tsc` +
          `npm run lint` clean if `web/` changed.
    - [ ] Generated artifacts regenerated and committed if affected:
          `public/openapi.json` (`generate:openapi`) and `web/lib/api/schema.d.ts`
