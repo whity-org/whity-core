@@ -22,6 +22,12 @@ export interface Membership {
   tenant_id: number;
   tenant_name: string;
   role: string;
+  /**
+   * `customer` when the person joined through the workspace's own sign-up
+   * (WHIT-915). The server caps a customer's permissions, so admin screens
+   * and their navigation never reach them; this is for wording only.
+   */
+  kind?: 'member' | 'customer';
 }
 
 interface AuthContextType {
