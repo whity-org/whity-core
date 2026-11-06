@@ -676,8 +676,8 @@ final class DiscoveryTools
     /** @param array<string, mixed> $tool */
     private static function readOnly(array $tool): bool
     {
-        $annotations = is_array($tool['annotations'] ?? null) ? $tool['annotations'] : [];
-        return ($annotations['readOnlyHint'] ?? false) === true;
+        // WHIT-912: core's decision, so what an agent is told matches the check.
+        return ToolSurface::readsOnly($tool);
     }
 
     /** @param array<string, mixed> $tool */

@@ -33,6 +33,12 @@ final class ToolSurface
     public const META_AGENT_POLICY = 'dev.whity/agentPolicy';
     /** WHIT-812: how long an agent's run of it can be undone; absent when it can't. */
     public const META_UNDO_WINDOW  = 'dev.whity/undoWindowSeconds';
+    /**
+     * WHIT-912: present, and true, only when core has decided the tool only
+     * reads. Absent means it may write. Core sets it from what it controls,
+     * never from a plugin's own annotations: see {@see self::readsOnly()}.
+     */
+    public const META_READS_ONLY   = 'dev.whity/readsOnly';
 
     /**
      * What a route schema's `mcp` key declares. `'mcp' => true` is the original
@@ -77,8 +83,8 @@ final class ToolSurface
         return $id === $root || str_starts_with($id, $root . '.');
     }
 
-    /** @return array<string, string|int> */
-    public static function meta(string $toolset, string $visibility, string $agentPolicy, ?int $undoWindowSeconds = null): array
+    /** @return array<string, string|int|bool> */
+    public static function meta(string $toolset, string $visibility, string $agentPolicy, ?int $undoWindowSeconds = null, bool $readsOnly = false): array
     {
         $meta = [
             self::META_TOOLSET      => $toolset,
@@ -88,6 +94,32 @@ final class ToolSurface
         if ($undoWindowSeconds !== null && $undoWindowSeconds > 0) {
             $meta[self::META_UNDO_WINDOW] = $undoWindowSeconds;
         }
+        if ($readsOnly) {
+            $meta[self::META_READS_ONLY] = true;
+        }
         return $meta;
+    }
+
+    /**
+     * Whether core treats a tool as one that only reads (WHIT-912): what an
+     * agent's grant starts from, and whether a write with no undo is held for
+     * a person's approval.
+     *
+     * Read from the `_meta` core built, never from `annotations.readOnlyHint`.
+     * Annotations are hints for clients, and a plugin writes its own, so they
+     * must not decide whether a person is asked first. Core sets the flag:
+     *
+     *   core route            as core's own route declaration says
+     *   plugin route          only for GET and HEAD, whatever it declares
+     *   plugin-authored tool  never (core cannot see what its handler does)
+     *
+     * Fails closed: a tool without the flag is a write.
+     *
+     * @param array<string, mixed> $tool
+     */
+    public static function readsOnly(array $tool): bool
+    {
+        $meta = is_array($tool['_meta'] ?? null) ? $tool['_meta'] : [];
+        return ($meta[self::META_READS_ONLY] ?? false) === true;
     }
 }

@@ -231,10 +231,9 @@ final class AgentGrantView
                 continue;
             }
             $meta         = is_array($tool['_meta'] ?? null) ? $tool['_meta'] : [];
-            $annotations  = is_array($tool['annotations'] ?? null) ? $tool['annotations'] : [];
             $operations[] = [
                 'permission'  => $permission,
-                'readOnly'    => ($annotations['readOnlyHint'] ?? false) === true,
+                'readOnly'    => ToolSurface::readsOnly($tool),
                 'agentPolicy' => is_string($meta[ToolSurface::META_AGENT_POLICY] ?? null) ? $meta[ToolSurface::META_AGENT_POLICY] : ToolSurface::AGENT_ALLOW,
                 'undoWindowSeconds' => is_int($meta[ToolSurface::META_UNDO_WINDOW] ?? null) ? $meta[ToolSurface::META_UNDO_WINDOW] : null,
                 'toolset'     => is_string($meta[ToolSurface::META_TOOLSET] ?? null) ? $meta[ToolSurface::META_TOOLSET] : null,

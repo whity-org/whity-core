@@ -180,7 +180,6 @@ final class ToolsListHandler implements MethodHandler
      */
     public static function agentModeFor(array $tool, array $access, McpPrincipal $principal): string
     {
-        $annotations = is_array($tool['annotations'] ?? null) ? $tool['annotations'] : [];
         $meta        = is_array($tool['_meta'] ?? null) ? $tool['_meta'] : [];
         $permission  = is_string($access['requiredPermission'] ?? null) ? $access['requiredPermission'] : null;
         $policy      = is_string($meta[ToolSurface::META_AGENT_POLICY] ?? null) ? $meta[ToolSurface::META_AGENT_POLICY] : ToolSurface::AGENT_ALLOW;
@@ -189,7 +188,8 @@ final class ToolsListHandler implements MethodHandler
         // 11); one that declares an undo window may be Allowed (WHIT-812).
         return AgentScopeGrant::of($principal)->effectiveMode(
             $permission,
-            ($annotations['readOnlyHint'] ?? false) === true,
+            // WHIT-912: core's decision, never the tool's own readOnlyHint.
+            ToolSurface::readsOnly($tool),
             $policy,
             is_int($meta[ToolSurface::META_UNDO_WINDOW] ?? null) && $meta[ToolSurface::META_UNDO_WINDOW] > 0,
         );
