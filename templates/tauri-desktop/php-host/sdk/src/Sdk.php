@@ -990,7 +990,7 @@ namespace Whity\Sdk;
  *
  * Purely additive.)
  *
- * 1.70 (PLUGIN ROLE GRANTS STAY THE PLUGIN'S OWN: {@see PluginRolesInterface} grants
+ * 1.72 (PLUGIN ROLE GRANTS STAY THE PLUGIN'S OWN: {@see PluginRolesInterface} grants
  * only permissions the plugin declares in {@see PluginInterface::getPermissions()},
  * never a core permission or one under a core resource, and only to a role the plugin
  * created or one the operator approved for it. Uninstall removes only the grants the
@@ -1001,7 +1001,7 @@ namespace Whity\Sdk;
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.70.0';
+    public const VERSION = '1.72.0';
 
     /**
      * Static identity only — never instantiated.

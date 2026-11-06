@@ -37,7 +37,7 @@ namespace Whity\Sdk;
  * Permission slugs must already exist in the `permissions` catalogue; slugs
  * that are absent at seed time are silently skipped. Grants are idempotent.
  *
- * Since SDK 1.70 the host grants a slug only when it is one of the plugin's
+ * Since SDK 1.72 the host grants a slug only when it is one of the plugin's
  * own: declared in {@see PluginInterface::getPermissions()}, not a core
  * permission and not under a core resource (`users:*`, `roles:*`, ...). It
  * grants only to a role this plugin created, or to an existing role the

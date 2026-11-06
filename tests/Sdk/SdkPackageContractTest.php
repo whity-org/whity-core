@@ -242,9 +242,9 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsOneEightForInteractiveBlocks(): void
     {
         $this->assertSame(
-            '1.70.0',
+            '1.72.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.70: PluginRolesInterface grants a plugin only its own declared, non-core permissions, only to roles '
+            'SDK 1.72: PluginRolesInterface grants a plugin only its own declared, non-core permissions, only to roles '
             . 'it created or the operator approved, and uninstall removes only the grants it made. '
             . 'SDK 1.69 ADDS PUBLIC READS: a route declared public => read answers GETs from anybody holding a key, '
             . 'with the tenant from the key, the limits run by the host and the operator switch off by default; '
