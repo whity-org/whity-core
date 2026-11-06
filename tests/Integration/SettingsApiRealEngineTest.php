@@ -148,7 +148,9 @@ final class SettingsApiRealEngineTest extends TestCase
         // 38 since WHIT-742: documents.slot_bindings (read here, written by the slots route).
         // 40 since WHIT-788: three billing.seller_* out, five company.* in.
         // 41 since WHIT-742 slice 3: documents.background_issuing.
-        self::assertCount(41, $data['registry']);
+        // 42 since #1019: labels.resolve_max_ids, each workspace's cap on one
+        // label-resolution request.
+        self::assertCount(42, $data['registry']);
         self::assertArrayNotHasKey('auth.self_registration_enabled', $data['effective']);
         self::assertSame([], $data['overridden']);
     }
