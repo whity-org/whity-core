@@ -5755,6 +5755,14 @@ final class CoreApiSchemas
                     'reason' => self::str(),
                     'fix' => self::str(true),
                 ], ['reason', 'fix']),
+                // WHIT-922: the signatures standing on the current version, on
+                // GET /api/documents/{id} only. A signature on an earlier
+                // version is not carried over.
+                'signatures' => [
+                    'type' => 'array',
+                    'items' => SchemaBuilder::ref('DocumentSignature'),
+                    'description' => 'Who signed the current version, in what capacity and when. Electronic signatures with an audit trail.',
+                ],
             ], ['id', 'tenant_id', 'template_name', 'title', 'created_at', 'artifacts']),
             // Not paginatedListEnvelope: the organizer echoes back WHICH view it
             // ran and what anchor it resolved to, so a client rendering a rail
@@ -5931,6 +5939,10 @@ final class CoreApiSchemas
                 // WHIT-919: whether a person on this step may send it back to the
                 // author for changes.
                 'allow_send_back' => self::bool(),
+                // WHIT-922: on a `sign` step, the capacity the signer signs in and
+                // whom they sign for. Null on every other step.
+                'sign_capacity' => self::str(true),
+                'sign_on_behalf_of' => self::str(true),
                 // #1037. HOW MANY TIMES A REJECTION HAS SENT THE DOCUMENT BACK
                 // FROM HERE. A backwards reject edge - "to the author, to fix" -
                 // is the most common approval design there is, and nothing
@@ -6047,6 +6059,12 @@ final class CoreApiSchemas
                         // WHIT-919: false turns off sending back to the author
                         // at this step. True when absent.
                         'allow_send_back' => self::bool(),
+                        // WHIT-922: `sign` makes the step a signing step, answered
+                        // by signing or declining. Its quorum is `all` (the
+                        // default) or `any`; it takes no edges.
+                        'kind' => ['type' => 'string', 'enum' => ['sign'], 'nullable' => true],
+                        'sign_capacity' => self::str(true) + ['description' => 'On a signing step: the capacity the signer signs in, such as "Director". At most 200 characters.'],
+                        'sign_on_behalf_of' => self::str(true) + ['description' => 'On a signing step: whom the signer signs for, such as the workspace. At most 200 characters.'],
                     ], ['rule_kind']),
                     'description' => 'Ordered steps, at least one. Each names a `rule_kind` (see GET /api/routing-rules) and its `rule_config`, deciding who receives the document at that step. A step with `decision: true` is an approval gate whose `on_approved`/`on_rejected` name 1-based step positions.',
                 ],
@@ -6103,6 +6121,11 @@ final class CoreApiSchemas
                 // resubmits.
                 'resume_from' => ['type' => 'string', 'enum' => ['sender', 'start'], 'nullable' => true],
                 'occurred_at' => self::str(),
+                // WHIT-922, on the audit page only: the hash of the entry before
+                // this one on the document, and this entry's own. Null on
+                // entries written before the chain began.
+                'prev_hash' => self::str(true),
+                'entry_hash' => self::str(true),
             ], ['id', 'document_id', 'route_id', 'action', 'occurred_at']),
             'DocumentTrailListResponse' => self::paginatedListEnvelope('DocumentTrailEvent'),
 
@@ -6143,7 +6166,7 @@ final class CoreApiSchemas
             'DocumentRouteRecipientListResponse' => self::listEnvelope('DocumentRouteRecipient'),
 
             'DocumentRouteActionRequest' => self::object([
-                'action' => ['type' => 'string', 'enum' => ['forwarded', 'acknowledged', 'returned', 'noted', 'sent_back', 'resubmitted'], 'description' => 'What you did with the document: `forwarded`, `acknowledged`, `returned`, `noted`, `sent_back` (to the author for changes, with a note) or `resubmitted` (by the author, after a send-back).'],
+                'action' => ['type' => 'string', 'enum' => ['forwarded', 'acknowledged', 'returned', 'noted', 'sent_back', 'resubmitted', 'declined'], 'description' => 'What you did with the document: `forwarded`, `acknowledged`, `returned`, `noted`, `sent_back` (to the author for changes, with a note), `resubmitted` (by the author, after a send-back) or `declined` (declining to sign, with a reason). Signing has its own endpoint.'],
                 // Required for `noted` (an empty note records nothing), optional
                 // on the other three.
                 'note' => self::str(true) + ['description' => 'Comment for the trail. Required for `noted`.'],
@@ -6167,6 +6190,144 @@ final class CoreApiSchemas
                 // describes what this request did, not a property of the record.
                 'decided' => ['type' => 'string', 'enum' => ['approved', 'rejected'], 'nullable' => true],
             ], ['data', 'resolved', 'delivered']),
+
+            // -- Electronic signatures (WHIT-922, #1726) ----------------------
+            // A drawn signature, as the strokes a person drew inside a box.
+            'SignatureAppearance' => self::object([
+                'width' => self::int(),
+                'height' => self::int(),
+                'strokes' => [
+                    'type' => 'array',
+                    'items' => ['type' => 'array', 'items' => ['type' => 'array', 'items' => ['type' => 'number'], 'minItems' => 2, 'maxItems' => 2]],
+                    'description' => 'Each stroke is a list of [x, y] points inside the box.',
+                ],
+            ], ['width', 'height', 'strokes']),
+            'SavedSignatureRequest' => self::object([
+                'appearance' => SchemaBuilder::ref('SignatureAppearance'),
+            ], ['appearance']),
+            'SavedSignatureResponse' => self::object([
+                'data' => ['nullable' => true, 'allOf' => [SchemaBuilder::ref('SignatureAppearance')]],
+            ], ['data']),
+            // A signature standing on a subject's current version.
+            'DocumentSignature' => self::object([
+                'id' => self::int(),
+                'capacity' => self::str(true),
+                'on_behalf_of' => self::str(true),
+                'by' => self::object(['profile_id' => self::int(), 'name' => self::str()], ['profile_id', 'name']),
+                'at' => self::str() + ['description' => 'Server time, UTC, to the second.'],
+                'subject_version' => self::int(),
+            ], ['id', 'by', 'at', 'subject_version']),
+            'SigningContext' => self::object([
+                'route_id' => self::int(),
+                'can_sign' => self::bool(),
+                'step' => [
+                    'type' => 'object',
+                    'nullable' => true,
+                    'properties' => [
+                        'id' => self::int(),
+                        'position' => self::int(),
+                        'label' => self::str(true),
+                        'capacity' => self::str(true),
+                        'on_behalf_of' => self::str(true),
+                        'quorum' => ['type' => 'string', 'enum' => ['all', 'any']],
+                    ],
+                    'required' => ['id', 'position', 'quorum'],
+                ],
+                'subject' => [
+                    'type' => 'object',
+                    'nullable' => true,
+                    'properties' => [
+                        'type' => self::str(),
+                        'id' => self::int(),
+                        'title' => self::str(true),
+                        'version' => self::int(),
+                        'content_hash' => self::str() + ['description' => 'SHA-256 of the content as it is now. Send it back when signing.'],
+                    ],
+                    'required' => ['type', 'id', 'version', 'content_hash'],
+                ],
+                'consent_version' => self::str(),
+                'second_factor' => self::object([
+                    'method' => ['type' => 'string', 'enum' => ['totp', 'email_code', 'fresh_sign_in']],
+                    'provider_key' => self::str(true),
+                    'email_hint' => self::str(true),
+                    'signed_in_again' => self::bool(),
+                ], ['method', 'signed_in_again']),
+                'saved_signature' => ['nullable' => true, 'allOf' => [SchemaBuilder::ref('SignatureAppearance')]],
+            ], ['route_id', 'can_sign', 'consent_version', 'second_factor']),
+            'SigningContextResponse' => self::dataEnvelope(SchemaBuilder::ref('SigningContext')),
+            'SigningCodeResponse' => self::dataEnvelope(self::object(['email_hint' => self::str(true)], [])),
+            'SignRequest' => self::object([
+                'content_hash' => self::str() + ['description' => 'The `subject.content_hash` the signer was shown. Refused (409) when the content changed since.'],
+                'consent' => self::bool() + ['description' => 'The signer ticked the consent line. Must be true.'],
+                'consent_version' => self::str() + ['description' => 'The version of the consent wording shown, from the signing context.'],
+                'appearance' => ['nullable' => true, 'allOf' => [SchemaBuilder::ref('SignatureAppearance')]],
+                'use_saved_signature' => self::bool(),
+                'save_signature' => self::bool(),
+                'second_factor' => self::object([
+                    'method' => ['type' => 'string', 'enum' => ['totp', 'email_code', 'fresh_sign_in']],
+                    'code' => self::str(true),
+                ], ['method']),
+            ], ['content_hash', 'consent', 'consent_version', 'second_factor']),
+            // A signature record, as the audit page shows it.
+            'SignatureRecord' => self::object([
+                'id' => self::int(),
+                'route_id' => self::int(),
+                'event_id' => self::int(),
+                'step_id' => self::int(),
+                'subject_type' => self::str(),
+                'subject_id' => self::int(),
+                'subject_version' => self::int(),
+                'content_hash' => self::str(),
+                'by' => self::object([
+                    'profile_id' => self::int(),
+                    'name' => self::str(),
+                    'email' => self::str(true),
+                ], ['profile_id', 'name']),
+                'capacity' => self::str(true),
+                'on_behalf_of' => self::str(true),
+                'confirmed_by' => ['type' => 'string', 'enum' => ['totp', 'passkey', 'email_code', 'fresh_sign_in']],
+                'at' => self::str(),
+                'ip_address' => self::str(true),
+                'user_agent' => self::str(true),
+                'consent_version' => self::str(),
+                'consent_wording' => self::str(true),
+                'appearance' => ['nullable' => true, 'allOf' => [SchemaBuilder::ref('SignatureAppearance')]],
+                'record_hash' => self::str(),
+                'seal' => self::str() + ['description' => 'Ed25519 signature, base64, by the published key `seal_key_id`.'],
+                'seal_key_id' => self::str(),
+                'seal_valid' => self::bool(),
+            ], ['id', 'route_id', 'event_id', 'subject_version', 'content_hash', 'by', 'confirmed_by', 'at', 'consent_version', 'record_hash', 'seal', 'seal_key_id']),
+            'SignResponse' => self::object([
+                'data' => SchemaBuilder::ref('SignatureRecord'),
+                'event' => SchemaBuilder::ref('DocumentTrailEvent'),
+                'decided' => ['type' => 'string', 'enum' => ['approved', 'rejected'], 'nullable' => true],
+                'resolved' => self::int(),
+                'delivered' => self::int(),
+            ], ['data', 'event', 'resolved', 'delivered']),
+            'SigningKey' => self::object([
+                'key_id' => self::str(),
+                'algorithm' => ['type' => 'string', 'enum' => ['Ed25519']],
+                'public_key' => self::str() + ['description' => 'Base64.'],
+                'created_at' => self::str(),
+                'retired_at' => self::str(true),
+            ], ['key_id', 'algorithm', 'public_key', 'created_at']),
+            'SigningKeyListResponse' => self::listEnvelope('SigningKey'),
+            'DocumentAudit' => self::object([
+                'document_id' => self::int(),
+                'chain' => self::object([
+                    'intact' => self::bool(),
+                    'entries' => self::int(),
+                    'linked' => self::int(),
+                    'earlier' => self::int() + ['description' => 'Entries written before the chain began; the first linked entry commits to them.'],
+                    'detached' => self::int() + ['description' => 'Linked entries whose person, unit or step was removed later. Not a break.'],
+                    'broken_at_event_id' => self::int(true),
+                    'last_hash' => self::str(true),
+                ], ['intact', 'entries', 'linked', 'earlier', 'detached']),
+                'events' => ['type' => 'array', 'items' => SchemaBuilder::ref('DocumentTrailEvent')],
+                'signatures' => ['type' => 'array', 'items' => SchemaBuilder::ref('SignatureRecord')],
+                'keys' => ['type' => 'array', 'items' => SchemaBuilder::ref('SigningKey')],
+            ], ['document_id', 'chain', 'events', 'signatures', 'keys']),
+            'DocumentAuditResponse' => self::dataEnvelope(SchemaBuilder::ref('DocumentAudit')),
 
             // -- The inbox (#881, first source contributed by #947 item 3) -----
             // Field names are the props the `inbox` block type declares (#868),
@@ -12795,6 +12956,124 @@ final class CoreApiSchemas
                             . 'first, an empty note, or an unknown action'
                         ),
                     ] + self::authErrors(),
+                ],
+            ],
+            // WHIT-922 (#1726): electronic signatures. Session-gated with no
+            // permission, like acting: being the person the step reached is the
+            // authorization. Off the agent surface, except the audit read.
+            [
+                'method' => 'GET',
+                'path' => '/api/documents/{id:\\d+}/routes/{routeId:\\d+}/signing',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'What you see before signing: the step, its capacity, the content hash, the consent version and how you will confirm',
+                    'tags' => ['documents'],
+                    'responses' => [
+                        200 => self::jsonResponse('The signing context', 'SigningContextResponse'),
+                        404 => self::errorResponse('Document or route not found, or not visible to the caller'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'POST',
+                'path' => '/api/documents/{id:\\d+}/routes/{routeId:\\d+}/signing/code',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Email yourself a one-time code to confirm a signature',
+                    'tags' => ['documents'],
+                    'responses' => [
+                        202 => self::jsonResponse('The code was sent', 'SigningCodeResponse'),
+                        404 => self::errorResponse('Document or route not found, or not visible to the caller'),
+                        422 => self::errorResponse('Nothing here waits for your signature, or the account confirms another way'),
+                        429 => self::errorResponse('Too many codes were sent'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'POST',
+                'path' => '/api/documents/{id:\\d+}/routes/{routeId:\\d+}/sign',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Sign your open item on a signing step: electronic signature with audit trail',
+                    'description' => 'Needs the consent line ticked in its current wording, a drawn signature (or your saved one), '
+                        . 'the content hash you were shown, and the second check your account uses. The act and a '
+                        . 'sealed signature record are written together. The record is bound to the hash of this '
+                        . 'version and does not carry over to a new one.',
+                    'tags' => ['documents'],
+                    'request' => 'SignRequest',
+                    'responses' => [
+                        201 => self::jsonResponse('The signature record and the trail entry', 'SignResponse'),
+                        404 => self::errorResponse('Document or route not found, or not visible to the caller'),
+                        409 => self::errorResponse('The content changed since you opened it'),
+                        422 => self::errorResponse('Consent, drawn signature or second check missing or not correct, or nothing here waits for your signature'),
+                        429 => self::errorResponse('Too many tries'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'GET',
+                'path' => '/api/documents/{id:\\d+}/audit',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'The audit of a document: every act and signature, whether each seal checks, and whether the trail is intact',
+                    'tags' => ['documents'],
+                    'mcp' => true,
+                    'responses' => [
+                        200 => self::jsonResponse('The audit', 'DocumentAuditResponse'),
+                        404 => self::errorResponse('Document not found or not visible to the caller'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'GET',
+                'path' => '/api/me/signature',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Your saved drawn signature, or null',
+                    'tags' => ['documents'],
+                    'responses' => [200 => self::jsonResponse('Your saved signature', 'SavedSignatureResponse')] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'PUT',
+                'path' => '/api/me/signature',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Save your drawn signature for reuse',
+                    'tags' => ['documents'],
+                    'request' => 'SavedSignatureRequest',
+                    'responses' => [
+                        200 => self::jsonResponse('The saved signature', 'SavedSignatureResponse'),
+                        422 => self::errorResponse('The drawing could not be used as a signature'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'DELETE',
+                'path' => '/api/me/signature',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Forget your saved drawn signature. Signatures already made keep their own copy.',
+                    'tags' => ['documents'],
+                    'responses' => [204 => ['description' => 'Forgotten']] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'GET',
+                'path' => '/api/signing-keys',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'The public keys that seal signature records on this instance (public)',
+                    'tags' => ['documents'],
+                    'responses' => [200 => self::jsonResponse('The published keys', 'SigningKeyListResponse')],
                 ],
             ],
         ];

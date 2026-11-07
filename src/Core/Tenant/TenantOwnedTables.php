@@ -257,6 +257,10 @@ final class TenantOwnedTables
         'document_route_recipients'  => '112_create_document_routing.php',
         // WHIT-919: the versions of whatever a route travels on.
         'route_subject_versions'     => '226_add_route_send_back_and_versions.php',
+        // WHIT-922: signatures, saved drawn signatures and signing confirmations.
+        'route_signatures'           => '228_add_route_signatures.php',
+        'saved_signatures'           => '228_add_route_signatures.php',
+        'signing_challenges'         => '228_add_route_signatures.php',
 
         // #1014 — where a VERDICT sends a document (migration 119). The
         // branching seam migration 112 named and deliberately left unbuilt, keyed

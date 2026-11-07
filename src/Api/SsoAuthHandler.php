@@ -98,7 +98,83 @@ final class SsoAuthHandler
          */
         private readonly ?\Whity\Core\Signup\CustomerSignupService $signups = null,
         private readonly ?\Whity\Core\Branding\TenantHostRepository $tenantHosts = null,
+        /**
+         * Signing again to confirm a signature (WHIT-922): `/start?reauth=sign`
+         * from a signed-in person. All three null (tests that don't exercise
+         * it) and `reauth` is refused.
+         */
+        private readonly ?\Whity\Auth\TokenValidator $sessions = null,
+        private readonly ?\Whity\Core\Identity\ExternalIdentityRepository $identities = null,
+        private readonly ?\Whity\Core\Document\Signing\SigningChallengeRepository $signingChallenges = null,
     ) {
+    }
+
+    /**
+     * The signed-in person asking to sign in again before signing (WHIT-922),
+     * and the page to come back to. Null when there is no session, the feature
+     * is not wired, or the return path is not a plain path on this app.
+     *
+     * @return array{profile_id: int, tenant_id: int, return_to: string}|null
+     */
+    private function reauthTarget(): ?array
+    {
+        if ($this->sessions === null || $this->identities === null || $this->signingChallenges === null) {
+            return null;
+        }
+        $claims = $this->sessions->validateAccessToken();
+        $profileId = $claims['profile_id'] ?? null;
+        $tenantId = $claims['tenant_id'] ?? null;
+        $returnTo = (string) ($this->query('return_to') ?? '');
+        if (!is_int($profileId) || !is_int($tenantId) || $tenantId <= 0
+            || preg_match('#^/(?!/)[A-Za-z0-9/_\-.~%]{0,500}$#', $returnTo) !== 1
+        ) {
+            return null;
+        }
+
+        return ['profile_id' => $profileId, 'tenant_id' => $tenantId, 'return_to' => $returnTo];
+    }
+
+    /**
+     * Finish a sign-in made to confirm a signature (WHIT-922). No session is
+     * minted or changed: the provider's answer only records that this person
+     * signed in again, now. It must be the same person, and the provider must
+     * say the sign-in happened within the last few minutes.
+     *
+     * @param array<string, mixed> $flow
+     */
+    private function completeReauth(array $flow, int $providerId, int $tenantId, \Whity\Sdk\Auth\ExternalIdentity $identity): Response
+    {
+        $profileId = (int) $flow['reauth_profile_id'];
+        $signingTenantId = (int) ($flow['reauth_tenant_id'] ?? 0);
+        $returnTo = (string) ($flow['reauth_return_to'] ?? '/');
+        $base = rtrim(($this->frontendUrls ?? new \Whity\Core\Http\FrontendUrls(['APP_URL' => $this->appUrl]))->base(), '/');
+        $back = static fn (string $outcome): Response => new Response(302, '', [
+            'Location' => $base . $returnTo . '?signing=' . rawurlencode($outcome),
+        ]);
+
+        if ($this->identities === null || $this->signingChallenges === null || $signingTenantId <= 0) {
+            return $back('sign_in_failed');
+        }
+
+        $link = $tenantId === 0
+            ? $this->identities->findGlobalByIssuerSubject($identity->issuer, $identity->subject)
+            : $this->identities->findByProviderSubject($providerId, $identity->subject);
+        if ($link === null || (int) $link['profile_id'] !== $profileId) {
+            return $back('sign_in_mismatch');
+        }
+
+        $authTime = $identity->claims['auth_time'] ?? null;
+        $now = time();
+        if (!is_int($authTime)
+            || $authTime > $now + 60
+            || $now - $authTime > \Whity\Core\Document\Signing\SigningChallengeRepository::FRESH_SIGN_IN_TTL
+        ) {
+            return $back('sign_in_not_fresh');
+        }
+
+        $this->signingChallenges->recordFreshSignIn($signingTenantId, $profileId);
+
+        return $back('signed_in');
     }
 
     /**
@@ -173,7 +249,17 @@ final class SsoAuthHandler
         // flow cookie, so the callback can't be pointed at another one. Joining
         // uses the operator's global-trust providers: a workspace's own
         // tenant-trust provider only ever signs in its existing members.
-        $joinSlug = strtolower(trim((string) ($this->query('join') ?? '')));
+        // WHIT-922: signing in again to confirm a signature. Who is asking, and
+        // where they come back to, travel only inside the signed flow cookie.
+        $reauth = null;
+        if ($this->query('reauth') === 'sign') {
+            $reauth = $this->reauthTarget();
+            if ($reauth === null) {
+                return $this->fail('reauth_unavailable');
+            }
+        }
+
+        $joinSlug = $reauth === null ? strtolower(trim((string) ($this->query('join') ?? ''))) : '';
         $joinTenantId = null;
         if ($joinSlug !== '') {
             $joinTenantId = $this->joinTenant($request, $joinSlug);
@@ -224,6 +310,9 @@ final class SsoAuthHandler
             'provider_key'  => $providerKey,
             'join_tenant_id' => $joinTenantId,
             'join_slug'     => $joinTenantId !== null ? $joinSlug : null,
+            'reauth_profile_id' => $reauth['profile_id'] ?? null,
+            'reauth_tenant_id'  => $reauth['tenant_id'] ?? null,
+            'reauth_return_to'  => $reauth['return_to'] ?? null,
         ], 600, 'oidc_flow');
         CookieManager::setSsoFlowToken($flowToken, 600);
 
@@ -235,6 +324,9 @@ final class SsoAuthHandler
             $state,
             $nonce,
             $pkce['challenge'],
+            // A fresh sign-in: the provider asks again even when it remembers
+            // the person, and reports when they signed in.
+            $reauth !== null ? ['prompt' => 'login', 'max_age' => '0'] : [],
         );
 
         return new Response(302, '', ['Location' => $authorizeUrl]);
@@ -333,6 +425,12 @@ final class SsoAuthHandler
         );
         if ($identity === null) {
             return $this->fail('failed');
+        }
+
+        // WHIT-922: a sign-in made to confirm a signature. Read from the signed
+        // flow cookie only; it never mints a session.
+        if (isset($flow['reauth_profile_id']) && is_int($flow['reauth_profile_id'])) {
+            return $this->completeReauth($flow, $providerId, $tenantId, $identity);
         }
 
         // WHIT-917: a join started on a workspace's sign-up page. Read from the

@@ -156,6 +156,17 @@ final class DocumentRouter
 {
     private readonly DocumentNumbering $numbering;
 
+    /**
+     * WHIT-922: the signature record to write inside the act that signs, set
+     * only for the length of one {@see sign()} call. A `signed` act made any
+     * other way is refused, so a signature can never be recorded without the
+     * consent, the drawn signature and the second factor the signing service
+     * checks.
+     *
+     * @var (\Closure(array<string, mixed>, array<string, mixed>): void)|null
+     */
+    private ?\Closure $signatureWriter = null;
+
     public function __construct(
         private readonly PDO $db,
         private readonly RouteRepository $routes,
@@ -254,6 +265,9 @@ final class DocumentRouter
                     $step['decision_quorum'],
                     $step['satisfied_by'],
                     $step['allow_send_back'],
+                    $step['kind'],
+                    $step['sign_capacity'],
+                    $step['sign_on_behalf_of'],
                 );
             }
 
@@ -455,7 +469,26 @@ final class DocumentRouter
             throw RoutingRejectedException::because('Only a send-back says where the route resumes.');
         }
 
-        if (!in_array($action, RouteAction::recipientActions(), true)) {
+        // WHIT-922: signing and declining answer a `sign` step. Their verdict is
+        // derived, never given: a signature counts as an approval under the
+        // step's quorum and a decline as a rejection, so the quorum, the route's
+        // ending and final numbering work exactly as on a decision step.
+        $signAct = $action === RouteAction::SIGNED || $action === RouteAction::DECLINED;
+        if ($signAct) {
+            if ($verdict !== null) {
+                throw RoutingRejectedException::because('Signing and declining carry no verdict of their own.');
+            }
+            if ($action === RouteAction::SIGNED && $this->signatureWriter === null) {
+                throw RoutingRejectedException::because(
+                    'A signature is made through signing, with your consent, your drawn signature and a second check.'
+                );
+            }
+            if ($action === RouteAction::DECLINED && ($note === null || trim($note) === '')) {
+                throw RoutingRejectedException::because('Say why you are declining to sign. The reason goes in the trail.');
+            }
+        }
+
+        if (!$signAct && !in_array($action, RouteAction::recipientActions(), true)) {
             // Unreachable through the API, which validates the vocabulary at the
             // boundary, and cheap insurance against an internal caller inventing
             // a verb the CHECK constraint would then refuse mid-write.
@@ -485,6 +518,10 @@ final class DocumentRouter
 
         $this->assertActMatchesStep($step, $action, $verdict);
 
+        if ($signAct) {
+            $verdict = $action === RouteAction::SIGNED ? RouteVerdict::APPROVED : RouteVerdict::REJECTED;
+        }
+
         // WHIT-919: the version this act is made on. Read, never recorded here:
         // only a submit or a resubmit makes a version.
         $version = $this->subjectVersion(
@@ -494,6 +531,11 @@ final class DocumentRouter
             $actorId,
             false,
         );
+        if ($action === RouteAction::SIGNED && ($version['version'] === null || $version['content_hash'] === null)) {
+            // A signature binds to the hash of one version; with none recorded
+            // there is nothing to bind it to.
+            throw RoutingRejectedException::because('This cannot be signed yet: its content has no recorded version.');
+        }
 
         $next = null;
         $returnTo = null;
@@ -662,6 +704,12 @@ final class DocumentRouter
 
             $event = $this->events->findById($eventId, $tenantId);
 
+            // WHIT-922: the signature record, in the same transaction as the act
+            // that signs, so neither can exist without the other.
+            if ($action === RouteAction::SIGNED && $this->signatureWriter !== null && $event !== null) {
+                ($this->signatureWriter)($event, $step);
+            }
+
             // In this transaction: the approval and the number it earned commit together.
             $number = $this->numberOnFinalApproval($tenantId, $documentId, $routeId);
 
@@ -714,6 +762,32 @@ final class DocumentRouter
             'delivered' => $outcome['delivered'],
             'decided' => $decided,
         ];
+    }
+
+    /**
+     * Sign the caller's open item on a `sign` step (WHIT-922, #1726).
+     *
+     * The only way a `signed` act is made. `$writeSignature` is called inside
+     * the act's transaction with the appended trail event and the step, and
+     * writes the signature record; if it throws, the act is rolled back with it.
+     * The checks a signature needs (consent, drawn signature, second factor) are
+     * the caller's: {@see \Whity\Core\Document\Signing\SigningService}.
+     *
+     * @param array<string, mixed> $route
+     * @param \Closure(array<string, mixed>, array<string, mixed>): void $writeSignature
+     *
+     * @return array{event: array<string, mixed>, resolved: int, delivered: int, decided: ?string}
+     *
+     * @throws RoutingRejectedException
+     */
+    public function sign(int $tenantId, int $actorId, array $route, \Closure $writeSignature): array
+    {
+        $this->signatureWriter = $writeSignature;
+        try {
+            return $this->act($tenantId, $actorId, $route, RouteAction::SIGNED, null);
+        } finally {
+            $this->signatureWriter = null;
+        }
     }
 
     /**
@@ -1092,6 +1166,19 @@ final class DocumentRouter
         $position = (int) $step['position'];
         $isDecision = ($step['decision'] ?? false) === true;
 
+        // WHIT-922: a sign step is answered by signing or declining (or a
+        // send-back, handled before this), and nothing else answers it.
+        $isSign = ($step['kind'] ?? null) === RouteStepKind::SIGN;
+        $signAct = $action === RouteAction::SIGNED || $action === RouteAction::DECLINED;
+        if ($isSign !== $signAct) {
+            throw RoutingRejectedException::because($isSign
+                ? sprintf('Step %d is a signing step: sign it, decline to sign, or send it back.', $position)
+                : sprintf('Step %d is not a signing step, so there is nothing to sign or decline here.', $position));
+        }
+        if ($isSign) {
+            return;
+        }
+
         if ($verdict !== null && !RouteVerdict::isValid($verdict)) {
             throw RoutingRejectedException::because(sprintf(
                 "'%s' is not a verdict; expected one of: %s.",
@@ -1325,6 +1412,13 @@ final class DocumentRouter
     private function approvalQuorum(int $tenantId, array $step): string
     {
         $onStep = $step['decision_quorum'] ?? null;
+
+        // WHIT-922: a sign step is `all` or `any`, and never inherits the
+        // tenant's approval setting: who must sign is the route's to say.
+        if (($step['kind'] ?? null) === RouteStepKind::SIGN) {
+            return $onStep === RouteQuorum::ANY ? RouteQuorum::ANY : RouteQuorum::ALL;
+        }
+
         if (is_string($onStep) && RouteQuorum::isValid($onStep)) {
             return $onStep;
         }
@@ -1846,7 +1940,8 @@ final class DocumentRouter
      * @param list<array<string, mixed>> $steps
      * @return list<array{rule_kind: string, rule_config: array<string, mixed>, label: ?string,
      *                    decision: bool, decision_quorum: ?string, satisfied_by: string,
-     *                    allow_send_back: bool, edges: array<string, int>}>
+     *                    allow_send_back: bool, edges: array<string, int>, kind: ?string,
+     *                    sign_capacity: ?string, sign_on_behalf_of: ?string}>
      */
     private function validateSteps(int $tenantId, array $steps): array
     {
@@ -1917,6 +2012,56 @@ final class DocumentRouter
                 );
             }
 
+            // WHIT-922: `kind` is needed only for the kinds the older fields
+            // cannot express. `sign` is the one that can be authored today.
+            $stepKind = $step['kind'] ?? null;
+            if ($stepKind !== null && (!is_string($stepKind) || !RouteStepKind::isValid($stepKind))) {
+                throw RoutingRejectedException::because(sprintf(
+                    "Step %d: 'kind' must be one of: %s.",
+                    $position,
+                    implode(', ', RouteStepKind::all()),
+                ));
+            }
+            if ($stepKind === RouteStepKind::STAMP || $stepKind === RouteStepKind::FINALISE) {
+                throw RoutingRejectedException::because(sprintf(
+                    "Step %d: '%s' steps are not available yet.",
+                    $position,
+                    $stepKind,
+                ));
+            }
+            $isSign = $stepKind === RouteStepKind::SIGN;
+            $signCapacity = null;
+            $signOnBehalfOf = null;
+            if ($isSign) {
+                if ($decision || ($step['satisfied_by'] ?? RouteSatisfaction::ACT) !== RouteSatisfaction::ACT) {
+                    throw RoutingRejectedException::because(sprintf(
+                        'Step %d is a signing step, so it is neither a decision step nor satisfied by delivery: '
+                        . 'its signers answer it by signing.',
+                        $position,
+                    ));
+                }
+                foreach (['on_approved', 'on_rejected'] as $edgeKey) {
+                    if (($step[$edgeKey] ?? null) !== null) {
+                        throw RoutingRejectedException::because(
+                            "Step {$position}: a signing step continues to the next step when signed and ends the "
+                            . "route when declined, so it takes no '{$edgeKey}'."
+                        );
+                    }
+                }
+                $signQuorum = $step['decision_quorum'] ?? null;
+                if ($signQuorum !== null && $signQuorum !== RouteQuorum::ALL && $signQuorum !== RouteQuorum::ANY) {
+                    throw RoutingRejectedException::because(
+                        "Step {$position}: a signing step needs every signer ('all') or any one of them ('any')."
+                    );
+                }
+                $signCapacity = self::signText($step['sign_capacity'] ?? null, $position, 'sign_capacity');
+                $signOnBehalfOf = self::signText($step['sign_on_behalf_of'] ?? null, $position, 'sign_on_behalf_of');
+            } elseif (($step['sign_capacity'] ?? null) !== null || ($step['sign_on_behalf_of'] ?? null) !== null) {
+                throw RoutingRejectedException::because(
+                    "Step {$position}: 'sign_capacity' and 'sign_on_behalf_of' only mean something on a signing step."
+                );
+            }
+
             // #1054. WHAT SETTLES THIS STEP, defaulting to what every step has
             // always meant.
             $satisfiedBy = $step['satisfied_by'] ?? RouteSatisfaction::fallback();
@@ -1957,7 +2102,7 @@ final class DocumentRouter
                         implode(', ', RouteQuorum::all()),
                     ));
                 }
-                if (!$decision) {
+                if (!$decision && !$isSign) {
                     // Refused, not ignored. A quorum on a step that demands no
                     // verdict is a number nothing ever reads, and the author
                     // believes they have configured an approval.
@@ -2030,10 +2175,28 @@ final class DocumentRouter
                 'satisfied_by' => $satisfiedBy,
                 'allow_send_back' => $allowSendBack,
                 'edges' => $edges,
+                'kind' => $isSign ? RouteStepKind::SIGN : null,
+                'sign_capacity' => $signCapacity,
+                'sign_on_behalf_of' => $signOnBehalfOf,
             ];
         }
 
         return $out;
+    }
+
+    /** A sign step's capacity or on-behalf-of: optional, trimmed, at most 200 characters. */
+    private static function signText(mixed $value, int $position, string $field): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+        if (!is_string($value) || mb_strlen(trim($value)) > 200) {
+            throw RoutingRejectedException::because(
+                "Step {$position}: '{$field}' must be text of 200 characters or fewer."
+            );
+        }
+
+        return trim($value) === '' ? null : trim($value);
     }
 
     /**

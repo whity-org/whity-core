@@ -204,6 +204,9 @@ final class DocumentsApiHandler
         // S5: names for the library's "Raised by", from the page being served.
         private readonly ?DocumentPeople $people = null,
         private readonly ?\Whity\Core\Document\Fields\FieldLabels $fieldLabels = null,
+        // WHIT-922: the signatures standing on the document's current version,
+        // published on `GET /api/documents/{id}`. Null publishes none.
+        private readonly ?\Whity\Core\Document\Signing\SignatureRepository $signatures = null,
     ) {
     }
 
@@ -595,6 +598,15 @@ final class DocumentsApiHandler
 
         if (($data['artifacts'] ?? []) === []) {
             $data['pdf_pending'] = $this->pdfPending($tenantId, $callerId);
+        }
+
+        // WHIT-922: who has signed the current version, in what capacity, and
+        // when. A signature on an earlier version is not carried over.
+        if ($this->signatures !== null) {
+            $data['signatures'] = array_map(
+                \Whity\Core\Document\Signing\SigningService::presentCurrent(...),
+                $this->signatures->listCurrent($tenantId, \Whity\Core\Document\Routing\DocumentRouteSubject::TYPE, $documentId),
+            );
         }
 
         return Response::json(['data' => $data]);

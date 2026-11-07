@@ -188,6 +188,14 @@ export interface RouteStep {
    * reports 0 because that is the fact, not a default.
    */
   rejection_count: number;
+  /**
+   * What the step IS (#1722). `sign` is answered by signing or declining
+   * (WHIT-922). Optional because older fixtures and servers omit it.
+   */
+  kind?: 'review' | 'decide' | 'deliver' | 'sign' | 'stamp' | 'finalise';
+  /** On a `sign` step: the capacity the signer signs in, and whom they sign for. */
+  sign_capacity?: string | null;
+  sign_on_behalf_of?: string | null;
 }
 
 /**

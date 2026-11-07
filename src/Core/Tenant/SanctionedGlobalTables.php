@@ -98,6 +98,10 @@ final class SanctionedGlobalTables
         // password_resets above: identity is per-person, not per-tenant.
         'two_factor_recovery_requests' => '2FA-recovery requests for the global profiles identity (WC-password-reset-2fa-recovery); rows join only to profiles — no tenant_id column.',
 
+        // WHIT-922 (migration 228) — the instance's Ed25519 key pairs that seal
+        // signature records. One set per instance, published to every tenant.
+        'instance_signing_keys' => 'The instance key pairs that seal signature records (WHIT-922); one set per instance, the public keys are published — no tenant_id column.',
+
     ];
 
     /**

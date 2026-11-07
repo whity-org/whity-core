@@ -80,6 +80,12 @@ function actionLabel(t: (key: string, fallback?: string) => string, action: stri
       return t('record.trail.action.sentBack', 'Sent back to the author for changes');
     case 'resubmitted':
       return t('record.trail.action.resubmitted', 'Resubmitted by the author');
+    case 'signed':
+      return t('record.trail.action.signed', 'Signed electronically');
+    case 'declined':
+      return t('record.trail.action.declined', 'Declined to sign');
+    case 'stamped':
+      return t('record.trail.action.stamped', 'Stamped');
     default:
       // The raw verb, not a guess and not a blank. A vocabulary this build does
       // not know is still information; inventing a label for it would not be.

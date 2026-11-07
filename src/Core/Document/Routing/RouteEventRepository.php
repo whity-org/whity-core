@@ -60,6 +60,9 @@ use PDO;
  */
 final class RouteEventRepository
 {
+    /** The first key of the advisory lock that serialises one document's chain. */
+    private const CHAIN_LOCK_SPACE = 922001;
+
     public function __construct(private readonly PDO $db)
     {
     }
@@ -85,59 +88,171 @@ final class RouteEventRepository
      */
     public function append(int $tenantId, int $documentId, array $event): int
     {
-        $stmt = $this->db->prepare(
-            'INSERT INTO document_route_events
-                 (tenant_id, document_id, route_id, step_id, actor_profile_id,
-                  action, from_ou_id, to_ou_id, note, verdict,
-                  subject_version, content_hash, to_author, resume_from, occurred_at)
-             VALUES (:tenant_id, :document_id, :route_id, :step_id, :actor_profile_id,
-                     :action, :from_ou_id, :to_ou_id, :note, :verdict,
-                     :subject_version, :content_hash, ' . (($event['to_author'] ?? false) === true ? 'TRUE' : 'FALSE') . ',
-                     :resume_from, NOW())'
-        );
-        $stmt->execute([
-            ':tenant_id' => $tenantId,
-            ':document_id' => $documentId,
-            ':route_id' => $event['route_id'],
-            ':step_id' => $event['step_id'] ?? null,
-            ':actor_profile_id' => $event['actor_profile_id'] ?? null,
-            ':action' => $event['action'],
-            ':from_ou_id' => $event['from_ou_id'] ?? null,
-            ':to_ou_id' => $event['to_ou_id'] ?? null,
-            ':note' => $event['note'] ?? null,
-            ':verdict' => $event['verdict'] ?? null,
+        return $this->insertLinked($tenantId, $documentId, [
+            'route_id' => $event['route_id'],
+            'step_id' => $event['step_id'] ?? null,
+            'actor_profile_id' => $event['actor_profile_id'] ?? null,
+            'action' => $event['action'],
+            'from_ou_id' => $event['from_ou_id'] ?? null,
+            'to_ou_id' => $event['to_ou_id'] ?? null,
+            'note' => $event['note'] ?? null,
+            'verdict' => $event['verdict'] ?? null,
+            'withdrawal' => false,
             // WHIT-919: the subject version this act was made on, and its hash,
             // so the trail shows which version each approval was given on.
-            ':subject_version' => $event['subject_version'] ?? null,
-            ':content_hash' => $event['content_hash'] ?? null,
-            ':resume_from' => $event['resume_from'] ?? null,
+            'subject_version' => $event['subject_version'] ?? null,
+            'content_hash' => $event['content_hash'] ?? null,
+            'to_author' => ($event['to_author'] ?? false) === true,
+            'resume_from' => $event['resume_from'] ?? null,
         ]);
-
-        return (int) $this->db->lastInsertId();
     }
 
     /**
      * The row that closes a route's open items when its document is withdrawn
      * (S5). `noted`, flagged: see migration 201 for why it is not a new action.
-     * TRUE is written in the statement because PDO would bind a PHP bool as an
-     * empty string on PostgreSQL.
      */
     public function appendWithdrawal(int $tenantId, int $documentId, int $routeId, int $actorId): int
     {
-        $stmt = $this->db->prepare(
-            'INSERT INTO document_route_events
-                 (tenant_id, document_id, route_id, actor_profile_id, action, withdrawal, occurred_at)
-             VALUES (:tenant_id, :document_id, :route_id, :actor_profile_id, :action, TRUE, NOW())'
-        );
-        $stmt->execute([
-            ':tenant_id' => $tenantId,
-            ':document_id' => $documentId,
-            ':route_id' => $routeId,
-            ':actor_profile_id' => $actorId,
-            ':action' => RouteAction::NOTED,
+        return $this->insertLinked($tenantId, $documentId, [
+            'route_id' => $routeId,
+            'step_id' => null,
+            'actor_profile_id' => $actorId,
+            'action' => RouteAction::NOTED,
+            'from_ou_id' => null,
+            'to_ou_id' => null,
+            'note' => null,
+            'verdict' => null,
+            'withdrawal' => true,
+            'subject_version' => null,
+            'content_hash' => null,
+            'to_author' => false,
+            'resume_from' => null,
         ]);
+    }
 
-        return (int) $this->db->lastInsertId();
+    /**
+     * Insert one entry linked to the one before it on the same document
+     * (WHIT-922, migration 228; {@see RouteTrailChain}).
+     *
+     * The time is set here, to the second, rather than by the database, so the
+     * hashed body and the stored row say the same instant. On PostgreSQL the
+     * document's chain is held by a transaction-scoped advisory lock, so two
+     * acts on one document link one after the other; the unique index on
+     * `prev_hash` refuses a fork on either engine.
+     *
+     * @param array{route_id: int, step_id: ?int, actor_profile_id: ?int, action: string,
+     *              from_ou_id: ?int, to_ou_id: ?int, note: ?string, verdict: ?string, withdrawal: bool,
+     *              subject_version: ?int, content_hash: ?string, to_author: bool,
+     *              resume_from: ?string} $fields
+     */
+    private function insertLinked(int $tenantId, int $documentId, array $fields): int
+    {
+        $ownTransaction = !$this->db->inTransaction();
+        if ($ownTransaction) {
+            $this->db->beginTransaction();
+        }
+
+        try {
+            if ($this->db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'pgsql') {
+                $lock = $this->db->prepare('SELECT pg_advisory_xact_lock(:space, :document_id)');
+                $lock->execute([':space' => self::CHAIN_LOCK_SPACE, ':document_id' => $documentId]);
+                $lock->closeCursor();
+            }
+
+            $row = $fields + [
+                'tenant_id' => $tenantId,
+                'document_id' => $documentId,
+                'occurred_at' => gmdate('Y-m-d H:i:s'),
+            ];
+            $prevHash = $this->chainHead($tenantId, $documentId);
+            $body = RouteTrailChain::body($row);
+            $entryHash = RouteTrailChain::entryHash($prevHash, $body);
+
+            $stmt = $this->db->prepare(
+                'INSERT INTO document_route_events
+                     (tenant_id, document_id, route_id, step_id, actor_profile_id,
+                      action, from_ou_id, to_ou_id, note, verdict, withdrawal,
+                      subject_version, content_hash, to_author, resume_from, occurred_at,
+                      prev_hash, entry_hash, entry_body)
+                 VALUES (:tenant_id, :document_id, :route_id, :step_id, :actor_profile_id,
+                         :action, :from_ou_id, :to_ou_id, :note, :verdict, :withdrawal,
+                         :subject_version, :content_hash, :to_author, :resume_from, :occurred_at,
+                         :prev_hash, :entry_hash, :entry_body)'
+            );
+            $stmt->execute([
+                ':tenant_id' => $tenantId,
+                ':document_id' => $documentId,
+                ':route_id' => $row['route_id'],
+                ':step_id' => $row['step_id'],
+                ':actor_profile_id' => $row['actor_profile_id'],
+                ':action' => $row['action'],
+                ':from_ou_id' => $row['from_ou_id'],
+                ':to_ou_id' => $row['to_ou_id'],
+                ':note' => $row['note'],
+                ':verdict' => $row['verdict'],
+                // 1/0, never a PHP bool: PDO binds `false` as an empty string,
+                // which PostgreSQL refuses for a BOOLEAN.
+                ':withdrawal' => $row['withdrawal'] ? 1 : 0,
+                ':subject_version' => $row['subject_version'],
+                ':content_hash' => $row['content_hash'],
+                ':to_author' => $row['to_author'] ? 1 : 0,
+                ':resume_from' => $row['resume_from'],
+                ':occurred_at' => $row['occurred_at'],
+                ':prev_hash' => $prevHash,
+                ':entry_hash' => $entryHash,
+                ':entry_body' => $body,
+            ]);
+            $id = (int) $this->db->lastInsertId();
+
+            if ($ownTransaction) {
+                $this->db->commit();
+            }
+        } catch (\Throwable $e) {
+            if ($ownTransaction && $this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $e;
+        }
+
+        return $id;
+    }
+
+    /**
+     * What the next entry on a document links to: the newest entry's hash; the
+     * anchor over the earlier entries when the newest was written before
+     * migration 228; or {@see RouteTrailChain::GENESIS} for a first entry.
+     */
+    private function chainHead(int $tenantId, int $documentId): string
+    {
+        $stmt = $this->db->prepare(
+            'SELECT entry_hash FROM document_route_events
+              WHERE tenant_id = :tenant_id AND document_id = :document_id
+              ORDER BY id DESC LIMIT 1'
+        );
+        $stmt->execute([':tenant_id' => $tenantId, ':document_id' => $documentId]);
+        $head = $stmt->fetch(PDO::FETCH_ASSOC);
+        $stmt->closeCursor();
+
+        if (!is_array($head)) {
+            return RouteTrailChain::GENESIS;
+        }
+        if (isset($head['entry_hash']) && (string) $head['entry_hash'] !== '') {
+            return (string) $head['entry_hash'];
+        }
+
+        $earlier = $this->db->prepare(
+            'SELECT id, tenant_id, document_id, route_id, step_id, actor_profile_id, action,
+                    from_ou_id, to_ou_id, note, verdict, withdrawal, subject_version, content_hash,
+                    to_author, resume_from, occurred_at
+               FROM document_route_events
+              WHERE tenant_id = :tenant_id AND document_id = :document_id AND entry_hash IS NULL
+              ORDER BY id ASC'
+        );
+        $earlier->execute([':tenant_id' => $tenantId, ':document_id' => $documentId]);
+        /** @var list<array<string, mixed>> $rows */
+        $rows = $earlier->fetchAll(PDO::FETCH_ASSOC);
+
+        return RouteTrailChain::legacyAnchor($rows);
     }
 
     /**
@@ -150,7 +265,8 @@ final class RouteEventRepository
         $stmt = $this->db->prepare(
             'SELECT id, tenant_id, document_id, route_id, step_id, actor_profile_id,
                     action, from_ou_id, to_ou_id, note, verdict, withdrawal,
-                    subject_version, content_hash, to_author, resume_from, occurred_at
+                    subject_version, content_hash, to_author, resume_from, occurred_at,
+                    prev_hash, entry_hash
                FROM document_route_events
               WHERE id = :id AND tenant_id = :tenant_id'
         );
@@ -175,7 +291,8 @@ final class RouteEventRepository
         $stmt = $this->db->prepare(
             'SELECT id, tenant_id, document_id, route_id, step_id, actor_profile_id,
                     action, from_ou_id, to_ou_id, note, verdict, withdrawal,
-                    subject_version, content_hash, to_author, resume_from, occurred_at
+                    subject_version, content_hash, to_author, resume_from, occurred_at,
+                    prev_hash, entry_hash
                FROM document_route_events
               WHERE tenant_id = :tenant_id AND document_id = :document_id
               ORDER BY id ASC
@@ -306,6 +423,10 @@ final class RouteEventRepository
             'to_author' => $row['to_author'] ?? false,
             'resume_from' => isset($row['resume_from']) ? (string) $row['resume_from'] : null,
             'occurred_at' => (string) $row['occurred_at'],
+            // WHIT-922: the hash of the entry before this one, and this entry's
+            // own. NULL on entries written before migration 228.
+            'prev_hash' => isset($row['prev_hash']) ? (string) $row['prev_hash'] : null,
+            'entry_hash' => isset($row['entry_hash']) ? (string) $row['entry_hash'] : null,
         ];
     }
 }

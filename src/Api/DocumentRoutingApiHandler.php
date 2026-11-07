@@ -505,7 +505,9 @@ final class DocumentRoutingApiHandler
         // driver error the caller cannot act on.
         $allowed = array_merge(
             RouteAction::recipientActions(),
-            [RouteAction::NOTED, RouteAction::SENT_BACK, RouteAction::RESUBMITTED],
+            // WHIT-922: declining to sign. Signing has its own endpoint, because it
+            // needs consent, a drawn signature and a second check.
+            [RouteAction::NOTED, RouteAction::SENT_BACK, RouteAction::RESUBMITTED, RouteAction::DECLINED],
         );
         if (!in_array($action, $allowed, true)) {
             return Response::error(
