@@ -5234,7 +5234,17 @@ $agentsHandler = new \Whity\Api\AgentsApiHandler(
     $agentTodayFrom,
     $mcpAgentOperations,
     $agentReadableSource,
+    $hookManager,
 );
+// WHIT-990 (SDK 1.75): the workspace's agents and their activity, for plugins,
+// read as the person whose request it is.
+\Whity\register_service(\Whity\Sdk\Agents\Agents::class, new \Whity\Core\Agent\SdkAgents(
+    new \Whity\Core\Agent\AgentRepository($db->getPdo()),
+    $agentAssignments,
+    new \Whity\Core\Agent\AgentActivityRepository($db->getPdo()),
+    $agentProposals,
+    $roleChecker,
+));
 $router->register('GET',   '/api/agents',                      [$agentsHandler, 'list'],    null, null, CorePermissions::AGENTS_MANAGE);
 $router->register('POST',  '/api/agents',                      [$agentsHandler, 'create'],  null, null, CorePermissions::AGENTS_MANAGE);
 $router->register('GET',   '/api/agents/{id:\d+}',             [$agentsHandler, 'get'],     null, null, CorePermissions::AGENTS_MANAGE);

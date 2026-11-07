@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.74).
+ * SDK identity (v1.75).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1034,12 +1034,21 @@ namespace Whity\Sdk;
  * the permission and a plugin-named "every record" permission tenant-wide (#1074).
  *
  * Purely additive.)
+ *
+ * 1.75 (AGENTS FOR PLUGINS: the host service {@see Agents\Agents} lists the workspace's
+ * AI agents and reads their activity, as the person whose request it is: everything for
+ * somebody with `agents:manage`, otherwise only the agents they use and their own
+ * activity, and nothing with no person. Never a call's arguments. Lifecycle events
+ * {@see Hooks\Events::AGENT_CREATED}, `AGENT_UPDATED`, `AGENT_ARCHIVED`, `AGENT_RESTORED`,
+ * `AGENT_PAUSED` and `AGENT_RESUMED`, ids only, after the change (WHIT-990).
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.74.0';
+    public const VERSION = '1.75.0';
 
     /**
      * Static identity only — never instantiated.

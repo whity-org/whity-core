@@ -148,6 +148,19 @@ final class Events
     public const DOCUMENT_REVISED = 'document.revised';
     public const DOCUMENT_REVISED_ASYNC = 'document.revised.async';
 
+    // ---- agents (SDK 1.75, WHIT-990) ----
+    // A workspace's agent changed. Fired after the change is saved, and the
+    // return value is ignored: a listener can't refuse or undo it. Payload:
+    // `tenant_id`, `agent_id`, `actor_profile_id` (the person who made the
+    // change). Ids only: read the agent with {@see \Whity\Sdk\Agents\Agents}.
+    public const AGENT_CREATED = 'agent.created';
+    public const AGENT_UPDATED = 'agent.updated';
+    public const AGENT_ARCHIVED = 'agent.archived';
+    public const AGENT_RESTORED = 'agent.restored';
+    /** Paused: refused on every call, and its waiting proposals can't run, until resumed. */
+    public const AGENT_PAUSED = 'agent.paused';
+    public const AGENT_RESUMED = 'agent.resumed';
+
     // ---- platform ----
     public const NAVIGATION_REGISTER = 'navigation.register';
     public const PERMISSION_REGISTERED = 'permission.registered';
