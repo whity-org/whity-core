@@ -161,6 +161,31 @@ final class Events
     public const AGENT_PAUSED = 'agent.paused';
     public const AGENT_RESUMED = 'agent.resumed';
 
+    // ---- agent proposals (SDK 1.78, WHIT-991) ----
+    // Notifications only: each fires after the change is saved, the return value
+    // is ignored, and a listener can't refuse or change anything. Only the person
+    // who granted the agent decides a proposal, never a plugin. Ids and the
+    // tool's name only, never the call's arguments.
+    /**
+     * An agent asked to do something and it waits for its person. Payload:
+     * `tenant_id`, `proposal_id`, `agent_assignment_id` (null for an agent that
+     * isn't a workspace agent), `on_behalf_of_profile_id`, `tool`.
+     */
+    public const AGENT_PROPOSAL_CREATED = 'agent.proposal.created';
+    /**
+     * A proposal stopped waiting. Payload: `tenant_id`, `proposal_id`,
+     * `decision` (`approved`, `declined` or `expired`), `decided_by_profile_id`
+     * (null when it expired), `on_behalf_of_profile_id`, `tool`, `failed` (it was
+     * approved and a check refused it when it ran, so nothing changed).
+     */
+    public const AGENT_PROPOSAL_DECIDED = 'agent.proposal.decided';
+    /**
+     * A person undid what an agent did for them. Payload: `tenant_id`,
+     * `action_id`, `proposal_id` (null when it ran without asking),
+     * `on_behalf_of_profile_id`, `tool`.
+     */
+    public const AGENT_ACTION_UNDONE = 'agent.action.undone';
+
     // ---- platform ----
     public const NAVIGATION_REGISTER = 'navigation.register';
     public const PERMISSION_REGISTERED = 'permission.registered';

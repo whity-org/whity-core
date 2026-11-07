@@ -37,6 +37,8 @@ final class SmtpMailer implements Mailer
 
     public function send(string $toEmail, string $subject, string $textBody, ?string $htmlBody = null): void
     {
+        // WHIT-991: no mail from a proposal preview.
+        \Whity\Core\Sandbox\SideEffectGuard::assertAllowed('Sending mail');
         // Validate the addresses BEFORE opening the socket / writing any command.
         // A CR/LF in an address would inject SMTP commands into the MAIL FROM /
         // RCPT TO envelope (recipient smuggling), which are written well before

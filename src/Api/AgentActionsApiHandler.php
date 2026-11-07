@@ -123,6 +123,7 @@ final class AgentActionsApiHandler
         if ($action['proposal_id'] !== null) {
             $this->proposals?->markUndone((int) $action['proposal_id'], $tenantId);
         }
+        $this->proposals?->events()?->undone($tenantId, $id, $action['proposal_id'] === null ? null : (int) $action['proposal_id'], $profileId, (string) $action['tool']);
         // Actor: the person who undid it ("Undone by Rana").
         $this->audit?->record('agent.action.undone', [
             'tenant_id'     => $tenantId,

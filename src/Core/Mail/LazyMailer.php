@@ -39,6 +39,8 @@ final class LazyMailer implements Mailer
 
     public function send(string $toEmail, string $subject, string $textBody, ?string $htmlBody = null): void
     {
+        // WHIT-991: no mail from a proposal preview.
+        \Whity\Core\Sandbox\SideEffectGuard::assertAllowed('Sending mail');
         ($this->factory)()->send($toEmail, $subject, $textBody, $htmlBody);
     }
 }

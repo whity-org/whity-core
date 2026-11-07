@@ -125,6 +125,8 @@ class HookManager
      */
     public function dispatch(string $eventName, array $data): array
     {
+        // WHIT-991: no events from a proposal preview.
+        \Whity\Core\Sandbox\SideEffectGuard::assertAllowed('Dispatching ' . $eventName);
         // Build context with tenant_id and timestamp
         $context = [
             'tenant_id' => TenantContext::getTenantId(),
@@ -275,6 +277,7 @@ class HookManager
      */
     public function dispatchAsync(string $eventName, array $payload): void
     {
+        \Whity\Core\Sandbox\SideEffectGuard::assertAllowed('Dispatching ' . $eventName);
         if ($this->eventStore === null) {
             return;
         }

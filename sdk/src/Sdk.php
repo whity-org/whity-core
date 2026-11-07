@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.77).
+ * SDK identity (v1.78).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1059,12 +1059,23 @@ namespace Whity\Sdk;
  * than from a notification's payload (WHIT-1010).
  *
  * Purely additive.)
+ *
+ * 1.78 (PROPOSAL EVENTS AND PREVIEWS: {@see Hooks\Events::AGENT_PROPOSAL_CREATED},
+ * `AGENT_PROPOSAL_DECIDED` (approved, declined or expired) and `AGENT_ACTION_UNDONE`,
+ * ids and the tool's name only, after the change, listeners unable to refuse or change
+ * it. An authored tool's optional `preview` ({@see PluginMcpToolsInterface}) shows the
+ * person deciding an agent's proposal what it would change, as label, before and after
+ * rows; the host runs it in a transaction it always rolls back, refuses mail,
+ * notifications, jobs and events while it runs, and gives it two seconds. Only the
+ * person who granted the agent decides a proposal (WHIT-991).
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.77.0';
+    public const VERSION = '1.78.0';
 
     /**
      * Static identity only — never instantiated.

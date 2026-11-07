@@ -1,6 +1,6 @@
 {
     "$comment": "Plugin SDK coverage matrix: the single source of truth. Edit this file, then run `php scripts/sdk-coverage.php` to regenerate docs/wiki/Plugin-SDK-Coverage.md. CI fails when sdk_version is behind Sdk::VERSION, when an SDK minor in the Sdk.php ledger is not named by any `since`, or when the generated page is stale. Security notes say only that a design is needed; vulnerabilities go through SECURITY.md, never here.",
-    "sdk_version": "1.77.0",
+    "sdk_version": "1.78.0",
     "core_version": "0.2.26",
     "updated": "2026-11-06",
     "ratings": {
@@ -1121,11 +1121,13 @@
                 {
                     "what": "The host decides whether a tool only reads",
                     "since": "1.71"
+                },
+                {
+                    "what": "Previews of what a proposed tool call would change",
+                    "since": "1.78"
                 }
             ],
-            "missing": [
-                "Previews of what a proposed tool call would change"
-            ],
+            "missing": [],
             "security": null,
             "plan": "0.2.27"
         },
@@ -1180,19 +1182,24 @@
             "id": "agent-proposals",
             "group": "agents",
             "name": "Agent proposals",
-            "rating": "partial",
+            "rating": "full",
             "has": [
                 {
                     "what": "agentPolicy propose and suggest-only on plugin tools",
                     "since": "1.52"
+                },
+                {
+                    "what": "Proposal created, decided and undone events",
+                    "since": "1.78"
+                },
+                {
+                    "what": "Plugin-provided previews of a proposal, run read-only",
+                    "since": "1.78"
                 }
             ],
-            "missing": [
-                "Proposal created, decided and undone events",
-                "Plugin-provided previews of a proposal"
-            ],
-            "security": "Only the granting person decides a proposal. Any plugin view must be read-only.",
-            "plan": "0.2.28"
+            "missing": [],
+            "security": null,
+            "plan": "0.2.27"
         },
         {
             "id": "webhooks",

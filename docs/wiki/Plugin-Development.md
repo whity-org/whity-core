@@ -1552,7 +1552,7 @@ Declare `'public' => 'read'` on GET `/api/<your slug>/public/<name>/{key}` for s
 
 See [Public reads](Plugin-Public-Forms.md#public-reads-sdk-169).
 
-## Step 12e — Read the workspace's agents (SDK 1.76)
+## Step 12e — Read the workspace's agents (SDK 1.75)
 
 `Whity\Sdk\Agents\Agents` reads the workspace's AI agents and what they did, as the person whose request it is:
 
@@ -1570,6 +1570,22 @@ The workspace and the person come from the host, so a plugin can't ask about ano
 To react when an agent changes, listen to `Events::AGENT_CREATED`, `AGENT_UPDATED`, `AGENT_ARCHIVED`, `AGENT_RESTORED`, `AGENT_PAUSED` and `AGENT_RESUMED`. The payload is `tenant_id`, `agent_id` and `actor_profile_id`. They fire after the change is saved, and a listener can't refuse or undo it.
 
 Nothing in the SDK creates, changes or grants an agent. People do that on the Agents screen.
+
+### Proposals: events and previews (SDK 1.78)
+
+When an agent's call to one of your tools needs its person's approval, the host files a proposal. Show the person what it would change with a `preview` on the authored tool:
+
+```php
+'preview' => function (array $arguments, McpToolContext $context): ?array {
+    $shelf = $this->shelves->find($context->tenantId, $arguments['sku']);
+
+    return [['label' => 'Count', 'before' => $shelf['count'], 'after' => $arguments['count']]];
+},
+```
+
+The approvals card shows each row's `label`, `before` and `after`. The host runs the preview in a transaction it always rolls back, READ ONLY on PostgreSQL: a preview that writes gets no diff and changes nothing. A preview that throws or returns null leaves the proposal without a diff, and never stops it.
+
+`Events::AGENT_PROPOSAL_CREATED`, `AGENT_PROPOSAL_DECIDED` and `AGENT_ACTION_UNDONE` tell you a proposal was filed, stopped waiting (`decision` is `approved`, `declined` or `expired`) or what an agent did was undone. The payloads carry ids and the tool's name, never the arguments. They fire after the change, and nothing a listener returns or throws changes it. **Only the person who granted the agent decides a proposal.** No plugin can approve or decline one.
 
 ## Step 13 — Declare it in `plugin.json` instead (SDK 1.47)
 
