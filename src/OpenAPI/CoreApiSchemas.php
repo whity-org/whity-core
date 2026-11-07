@@ -6171,7 +6171,7 @@ final class CoreApiSchemas
                         'kind' => ['type' => 'string', 'enum' => ['sign', 'finalise'], 'nullable' => true],
                         'sign_capacity' => self::str(true) + ['description' => 'On a signing step: the capacity the signer signs in, such as "Director". At most 200 characters.'],
                         'sign_on_behalf_of' => self::str(true) + ['description' => 'On a signing step: whom the signer signs for, such as the workspace. At most 200 characters.'],
-                        'final_template_id' => self::int(true) + ['description' => 'On a `finalise` step: the document template to render with. Absent uses the subject's own (a form's final document template, or a document's template).'],
+                        'final_template_id' => self::int(true) + ['description' => 'On a `finalise` step: the document template to render with. Absent uses the template the subject names: the final document template of a form, or the template of a document.'],
                     ], []),
                     'description' => 'Ordered steps, at least one. Each names a `rule_kind` (see GET /api/routing-rules) and its `rule_config`, deciding who receives the document at that step. A step with `decision: true` is an approval gate whose `on_approved`/`on_rejected` name 1-based step positions.',
                 ],
@@ -8860,14 +8860,16 @@ final class CoreApiSchemas
             'RouteFinalisation' => self::object([
                 'step_id' => self::int(),
                 'status' => ['type' => 'string', 'enum' => ['waiting', 'done', 'failed'], 'description' => '`waiting`: being made, or the render service is down and it will be tried again.'],
-                'reason' => self::str(true) + ['description' => 'Why it waits or failed, e.g. `render_unavailable`, `template_missing`.'],
+                'reason' => self::str(true) + ['description' => 'Why it waits or failed. Waiting: `render_unavailable`, `error`. Failed: `pdfs_off`, `limit`, `template_missing`, `template_unpublished`, `render_refused`, `refused_by_plugin`, `document_conflict`, `withdrawn`, `no_subject`, `not_approved`, `gave_up`.'],
                 'subject_version' => self::int(true),
                 'content_hash' => self::str(true) + ['description' => 'SHA-256 of the approved version the final document was made from.'],
                 'document_id' => self::int(true),
                 'has_pdf' => self::bool(),
                 'reached_at' => self::str(),
                 'finalised_at' => self::str(true),
+                'can_retry' => self::bool() + ['description' => 'On GET /api/routes: the caller may ask for another try (POST .../final-document/retry).'],
             ], ['step_id', 'status', 'reason', 'subject_version', 'content_hash', 'document_id', 'has_pdf', 'reached_at', 'finalised_at']),
+            'RouteFinalisationResponse' => self::dataEnvelope(SchemaBuilder::ref('RouteFinalisation')),
             'FormSubmissionWithdrawnResponse' => self::object(['data' => SchemaBuilder::ref('FormSubmission')], ['data']),
             'FormSubmissionCreateResponse' => self::object([
                 'data' => SchemaBuilder::ref('FormSubmission'),
@@ -13261,6 +13263,25 @@ final class CoreApiSchemas
                     'responses' => [
                         200 => self::jsonResponse('The audit', 'DocumentAuditResponse'),
                         404 => self::errorResponse('Document not found or not visible to the caller'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'POST',
+                'path' => '/api/routes/{routeId:\d+}/final-document/retry',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Try again to make the final document of a route',
+                    'description' => 'For a failed or waiting final document. The caller may read the route and either '
+                        . 'started it, or may route documents (a document) or manage forms (a form submission). '
+                        . 'The queue makes it.',
+                    'tags' => ['documents'],
+                    'responses' => [
+                        202 => self::jsonResponse('Queued again', 'RouteFinalisationResponse'),
+                        403 => self::errorResponse('The caller may not manage this route'),
+                        404 => self::errorResponse('Route not found, or not visible to the caller'),
+                        409 => self::errorResponse('There is no final document to try again'),
                     ] + self::authErrors(),
                 ],
             ],

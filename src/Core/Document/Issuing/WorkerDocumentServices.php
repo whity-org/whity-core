@@ -119,7 +119,7 @@ final class WorkerDocumentServices
         \Whity\register_service(TemplateSlotRegistry::class, $slots);
         // WHIT-921: the worker retries a route's final document while the render
         // service was down. Its issuing stack is built on the first attempt.
-        \Whity\register_service(RouteFinaliser::class, self::finaliser($pdo, $hooks, $fields, $parts));
+        \Whity\register_service(RouteFinaliser::class, self::finaliser($pdo, $settings, $hooks, $fields, $parts));
         \Whity\register_service(TemplateIssuing::class, $issuing);
         // SDK 1.83 (WHIT-997): bulk issuing. A plugin's job may start a batch, and
         // the worker runs every batch (IssueBatchJob, registered by queue:work).
@@ -168,6 +168,7 @@ final class WorkerDocumentServices
     /** The route finaliser (WHIT-921) over the worker's document stack. */
     private static function finaliser(
         PDO $pdo,
+        SettingsService $settings,
         HookManager $hooks,
         DocumentFieldRegistry $fields,
         WorkerDocumentParts $parts,
@@ -187,7 +188,7 @@ final class WorkerDocumentServices
             new DocumentSourceRepository($pdo),
             new DocumentRepository($pdo),
             static fn (): DocumentIssuing => $parts->issuing(),
-            static fn (int $tenantId): bool => $parts->flowRenderer()->isEnabled($tenantId),
+            static fn (int $tenantId): bool => RouteFinaliser::pdfsCanBeMade($parts->flowRenderer(), $settings)($tenantId),
             $fields,
             new QueueService(new JobRepository($pdo)),
             $hooks,

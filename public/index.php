@@ -3879,7 +3879,7 @@ $routeFinaliser = new \Whity\Core\Document\Routing\RouteFinaliser(
     $documentSourceRepository,
     $documentRepository,
     $documentIssuing,
-    static fn (int $tenantId): bool => $flowDocumentRenderer->isEnabled($tenantId),
+    \Whity\Core\Document\Routing\RouteFinaliser::pdfsCanBeMade($flowDocumentRenderer, $settingsService),
     $documentFieldRegistry,
     $queueService,
     $hookManager,
@@ -4372,12 +4372,15 @@ $routesHandler = new \Whity\Api\RoutesApiHandler(
     $formSubmissionsHandler,
     $routeFinalisationRepository,
     $routeFinalDocumentFile,
+    $routeFinaliser,
 );
 $router->register('GET',  '/api/routes',                                        [$routesHandler, 'bySubject'], null);
 $router->register('POST', '/api/routes/{routeId:\d+}/actions',                  [$routesHandler, 'act'],       null);
 $router->register('GET',  '/api/routes/{routeId:\d+}/files/{fileId:\d+}',      [$routesHandler, 'file'],      null);
 // WHIT-921: the PDF a route's finalise step made, for somebody who may read the route.
 $router->register('GET',  '/api/routes/{routeId:\d+}/final-document',           [$routesHandler, 'finalDocument'], null);
+// WHIT-921: another try at a final document, for somebody who may manage the route (checked in the handler).
+$router->register('POST', '/api/routes/{routeId:\d+}/final-document/retry',     [$routesHandler, 'retryFinalDocument'], null);
 $formSubmissionWithdrawalHandler = new \Whity\Api\FormSubmissionWithdrawalApiHandler(
     $db->getPdo(),
     $formSubmissionRepository,

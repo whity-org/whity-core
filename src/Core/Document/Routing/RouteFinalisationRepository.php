@@ -14,7 +14,12 @@ use PDO;
  * finalise step; this records the engine's own work: which version the final
  * document was made from (with its SHA-256), the document and the PDF it made,
  * and whether it is still waiting. `status` moves from `waiting` to `done` or
- * `failed` and never back.
+ * `failed`; a person may send a failed one back to `waiting` to try again.
+ *
+ * ONE ATTEMPT AT A TIME. {@see claim()} hands out a token, and only the attempt
+ * holding the current token can finish the row ({@see complete()},
+ * {@see release()}, {@see fail()}). An attempt that ran past its claim and was
+ * overtaken finds its token gone and changes nothing.
  *
  * TENANT-OWNED. Every statement binds a literal `tenant_id` predicate.
  * Stateless apart from the injected handle — worker-safe.
@@ -38,9 +43,10 @@ final class RouteFinalisationRepository
 
     /**
      * Record that a route reached its finalise step, with the version it will be
-     * made from. A route that reaches it again (after a send-back and a
-     * resubmit) updates the version while it is still waiting; a finished one
-     * is left as it is.
+     * made from. Two branches reaching it at once both succeed: the insert is
+     * ignored when the row exists. A route that reaches it again (after a
+     * send-back and a resubmit) updates the version while it is still waiting; a
+     * finished one is left as it is.
      */
     public function reach(
         int $tenantId,
@@ -52,36 +58,15 @@ final class RouteFinalisationRepository
         ?int $subjectVersion,
         ?string $contentHash,
     ): void {
-        $existing = $this->findForRoute($tenantId, $routeId);
-        if ($existing !== null) {
-            if ($existing['status'] !== self::WAITING) {
-                return;
-            }
-            $stmt = $this->db->prepare(
-                'UPDATE route_finalisations
-                    SET subject_version = :version, content_hash = :hash, template_id = :template_id
-                  WHERE id = :id AND tenant_id = :tenant_id AND status = :waiting'
-            );
-            $stmt->execute([
-                ':version' => $subjectVersion,
-                ':hash' => $contentHash,
-                ':template_id' => $templateId,
-                ':id' => $existing['id'],
-                ':tenant_id' => $tenantId,
-                ':waiting' => self::WAITING,
-            ]);
-
-            return;
-        }
-
-        $stmt = $this->db->prepare(
+        $insert = $this->db->prepare(
             'INSERT INTO route_finalisations
                  (tenant_id, route_id, step_id, subject_type, subject_id, template_id,
                   subject_version, content_hash, status, attempts, reached_at)
              VALUES (:tenant_id, :route_id, :step_id, :subject_type, :subject_id, :template_id,
-                     :version, :hash, :status, 0, NOW())'
+                     :version, :hash, :status, 0, NOW())
+             ON CONFLICT (route_id) DO NOTHING'
         );
-        $stmt->execute([
+        $insert->execute([
             ':tenant_id' => $tenantId,
             ':route_id' => $routeId,
             ':step_id' => $stepId,
@@ -91,6 +76,23 @@ final class RouteFinalisationRepository
             ':version' => $subjectVersion,
             ':hash' => $contentHash,
             ':status' => self::WAITING,
+        ]);
+        if ($insert->rowCount() === 1) {
+            return;
+        }
+
+        $update = $this->db->prepare(
+            'UPDATE route_finalisations
+                SET subject_version = :version, content_hash = :hash, template_id = :template_id
+              WHERE tenant_id = :tenant_id AND route_id = :route_id AND status = :waiting'
+        );
+        $update->execute([
+            ':version' => $subjectVersion,
+            ':hash' => $contentHash,
+            ':template_id' => $templateId,
+            ':tenant_id' => $tenantId,
+            ':route_id' => $routeId,
+            ':waiting' => self::WAITING,
         ]);
     }
 
@@ -126,38 +128,42 @@ final class RouteFinalisationRepository
     }
 
     /**
-     * Take the row for one attempt. False when it is finished, or another
-     * attempt took it in the last few minutes, so two attempts never render the
-     * same final document twice.
+     * Take the row for one attempt, and return the token that attempt must
+     * finish it with. Null when it is finished, or another attempt took it in
+     * the last few minutes, so two attempts never render the same final
+     * document twice.
      */
-    public function claim(int $tenantId, int $id): bool
+    public function claim(int $tenantId, int $id): ?string
     {
         $now = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
         $stale = $now->modify('-' . self::CLAIM_SECONDS . ' seconds');
+        $token = bin2hex(random_bytes(16));
         $stmt = $this->db->prepare(
             'UPDATE route_finalisations
-                SET attempt_started_at = :now, attempts = attempts + 1
+                SET attempt_started_at = :now, attempts = attempts + 1, claim_token = :token
               WHERE id = :id AND tenant_id = :tenant_id AND status = :waiting
                 AND (attempt_started_at IS NULL OR attempt_started_at < :stale)'
         );
         $stmt->execute([
             ':now' => $now->format('Y-m-d H:i:s'),
+            ':token' => $token,
             ':id' => $id,
             ':tenant_id' => $tenantId,
             ':waiting' => self::WAITING,
             ':stale' => $stale->format('Y-m-d H:i:s'),
         ]);
 
-        return $stmt->rowCount() === 1;
+        return $stmt->rowCount() === 1 ? $token : null;
     }
 
     /** Let the next attempt take the row at once, recording why this one stopped. */
-    public function release(int $tenantId, int $id, string $reason, ?int $documentId): void
+    public function release(int $tenantId, int $id, string $token, string $reason, ?int $documentId): void
     {
         $stmt = $this->db->prepare(
             'UPDATE route_finalisations
-                SET attempt_started_at = NULL, reason = :reason, document_id = COALESCE(:document_id, document_id)
-              WHERE id = :id AND tenant_id = :tenant_id AND status = :waiting'
+                SET attempt_started_at = NULL, claim_token = NULL, reason = :reason,
+                    document_id = COALESCE(:document_id, document_id)
+              WHERE id = :id AND tenant_id = :tenant_id AND status = :waiting AND claim_token = :token'
         );
         $stmt->execute([
             ':reason' => $reason,
@@ -165,16 +171,18 @@ final class RouteFinalisationRepository
             ':id' => $id,
             ':tenant_id' => $tenantId,
             ':waiting' => self::WAITING,
+            ':token' => $token,
         ]);
     }
 
-    public function complete(int $tenantId, int $id, int $documentId, int $artifactId): void
+    /** False when this attempt was overtaken and finished nothing. */
+    public function complete(int $tenantId, int $id, string $token, int $documentId, int $artifactId): bool
     {
         $stmt = $this->db->prepare(
             'UPDATE route_finalisations
                 SET status = :done, reason = NULL, document_id = :document_id, artifact_id = :artifact_id,
-                    attempt_started_at = NULL, finalised_at = NOW()
-              WHERE id = :id AND tenant_id = :tenant_id AND status = :waiting'
+                    attempt_started_at = NULL, claim_token = NULL, finalised_at = NOW()
+              WHERE id = :id AND tenant_id = :tenant_id AND status = :waiting AND claim_token = :token'
         );
         $stmt->execute([
             ':done' => self::DONE,
@@ -183,16 +191,19 @@ final class RouteFinalisationRepository
             ':id' => $id,
             ':tenant_id' => $tenantId,
             ':waiting' => self::WAITING,
+            ':token' => $token,
         ]);
+
+        return $stmt->rowCount() === 1;
     }
 
-    public function fail(int $tenantId, int $id, string $reason, ?int $documentId): void
+    public function fail(int $tenantId, int $id, string $token, string $reason, ?int $documentId): void
     {
         $stmt = $this->db->prepare(
             'UPDATE route_finalisations
                 SET status = :failed, reason = :reason, document_id = COALESCE(:document_id, document_id),
-                    attempt_started_at = NULL
-              WHERE id = :id AND tenant_id = :tenant_id AND status = :waiting'
+                    attempt_started_at = NULL, claim_token = NULL
+              WHERE id = :id AND tenant_id = :tenant_id AND status = :waiting AND claim_token = :token'
         );
         $stmt->execute([
             ':failed' => self::FAILED,
@@ -201,7 +212,30 @@ final class RouteFinalisationRepository
             ':id' => $id,
             ':tenant_id' => $tenantId,
             ':waiting' => self::WAITING,
+            ':token' => $token,
         ]);
+    }
+
+    /**
+     * Somebody asked for another try: a failed or waiting row goes back to
+     * waiting with its attempts counted from zero. A finished one is left as it
+     * is. False when there was nothing to try again.
+     */
+    public function reopen(int $tenantId, int $routeId): bool
+    {
+        $stmt = $this->db->prepare(
+            'UPDATE route_finalisations
+                SET status = :waiting, reason = NULL, attempts = 0, attempt_started_at = NULL, claim_token = NULL
+              WHERE tenant_id = :tenant_id AND route_id = :route_id AND status <> :done'
+        );
+        $stmt->execute([
+            ':waiting' => self::WAITING,
+            ':tenant_id' => $tenantId,
+            ':route_id' => $routeId,
+            ':done' => self::DONE,
+        ]);
+
+        return $stmt->rowCount() === 1;
     }
 
     /**

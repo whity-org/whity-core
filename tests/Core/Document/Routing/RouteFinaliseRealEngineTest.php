@@ -56,6 +56,11 @@ use Whity\Core\Form\SubmissionProgress;
 use Whity\Core\Group\GroupResolver;
 use Whity\Core\Group\GroupRuleResolver;
 use Whity\Core\Group\UserGroupRepository;
+use Whity\Core\Hooks\HookManager;
+use Whity\Api\RoutesApiHandler;
+use Whity\Core\Request;
+use Whity\Sdk\Hooks\Events;
+use Whity\Sdk\Hooks\HookVetoException;
 use Whity\Core\Queue\JobRepository;
 use Whity\Core\Queue\QueueService;
 use Whity\Core\RBAC\PermissionRegistry;
@@ -104,6 +109,9 @@ final class RouteFinaliseRealEngineTest extends TestCase
     private RoutingRuleRegistry $rules;
     private string $storageRoot;
     private int $letter;
+    private HookManager $hooks;
+    /** @var list<array<string, mixed>> */
+    private array $numbered = [];
 
     protected function setUp(): void
     {
@@ -163,6 +171,12 @@ final class RouteFinaliseRealEngineTest extends TestCase
         $subjects->register(new FormSubmissionRouteSubject($this->pdo));
 
         $flow = new FlowDocumentRenderer($this->settings, $this->render);
+        $this->hooks = new HookManager();
+        $this->hooks->listen(Events::DOCUMENT_NUMBERED, function (array $event): array {
+            $this->numbered[] = $event;
+
+            return $event;
+        });
         $this->finaliser = new RouteFinaliser(
             $this->pdo,
             $this->routes,
@@ -174,9 +188,10 @@ final class RouteFinaliseRealEngineTest extends TestCase
             $this->editor->sourceRepo,
             $this->documents,
             $this->editor->issuing,
-            static fn (int $tenantId): bool => $flow->isEnabled($tenantId),
+            RouteFinaliser::pdfsCanBeMade($flow, $this->settings),
             $this->editor->fields,
             new QueueService(new JobRepository($this->pdo)),
+            $this->hooks,
         );
 
         $this->router = new DocumentRouter(
@@ -323,6 +338,8 @@ final class RouteFinaliseRealEngineTest extends TestCase
         self::assertSame(RouteFinaliser::REASON_RENDER_UNAVAILABLE, $finalisation['reason']);
         self::assertSame(['status' => 'waiting', 'can_open' => false], $this->progress->forSubmission(self::TENANT, $fresh, self::APPLICANT)['final_document']);
         self::assertSame(1, $this->scalar("SELECT COUNT(*) FROM jobs WHERE name = '" . FinaliseRouteJob::NAME . "'"), 'a retry is queued');
+        self::assertCount(1, $this->numbered, 'the number is announced as soon as it is handed out, PDF or not');
+        self::assertSame('SUP-001', $this->numbered[0]['number']);
 
         $job = new FinaliseRouteJob(fn (): RouteFinaliser => $this->finaliser);
 
@@ -455,7 +472,231 @@ final class RouteFinaliseRealEngineTest extends TestCase
         self::assertSame([], $this->render->flowCalls);
     }
 
+
+    public function testAFinaliseReachedInsideACallersTransactionThatRollsBackLeavesNothing(): void
+    {
+        $formId = $this->form($this->clerkThenFinalise(null), $this->letter);
+        $route = $this->routeOf((int) $this->send($formId, ['supplier' => 'Example Mill'])['id']);
+        $jobsBefore = $this->scalar('SELECT COUNT(*) FROM jobs');
+
+        $this->pdo->beginTransaction();
+        $this->router->act(self::TENANT, self::CLERK, $route, RouteAction::ACKNOWLEDGED, null, RouteVerdict::APPROVED);
+        self::assertSame([], $this->render->flowCalls, 'nothing is rendered before the caller commits');
+        self::assertSame([], $this->numbered, 'nothing is announced before the caller commits');
+        $this->pdo->rollBack();
+
+        self::assertSame(0, $this->scalar('SELECT COUNT(*) FROM documents'));
+        self::assertSame(0, $this->scalar('SELECT COUNT(*) FROM document_artifacts'));
+        self::assertNull($this->finalisations->findForRoute(self::TENANT, (int) $route['id']));
+        self::assertSame($jobsBefore, $this->scalar('SELECT COUNT(*) FROM jobs'), 'the deferred request rolled back too');
+
+        // Committed, the same act queues the request inside the transaction, and
+        // the caller makes it after its commit.
+        $this->pdo->beginTransaction();
+        $this->router->act(self::TENANT, self::CLERK, $route, RouteAction::ACKNOWLEDGED, null, RouteVerdict::APPROVED);
+        $this->pdo->commit();
+        self::assertSame($jobsBefore + 1, $this->scalar('SELECT COUNT(*) FROM jobs'));
+        $this->router->finalisePending(self::TENANT, (int) $route['id']);
+        self::assertSame(RouteFinalisationRepository::DONE, $this->finalisations->findForRoute(self::TENANT, (int) $route['id'])['status'] ?? null);
+    }
+
+    public function testWhatARetryCannotMendFailsAtOnceAndAPersonCanTryAgain(): void
+    {
+        // PDFs turned off for the workspace after the route started.
+        $formId = $this->form($this->clerkThenFinalise(null), $this->letter);
+        $route = $this->routeOf((int) $this->send($formId, ['supplier' => 'A'])['id']);
+        $this->settings->setTenant(self::TENANT, SettingsRegistry::DOCUMENTS_PERSIST_ENABLED, 'false');
+        self::assertFalse($this->finaliser->isAvailable(self::TENANT), 'no PDFs stored, no final documents');
+        $this->router->act(self::TENANT, self::CLERK, $route, RouteAction::ACKNOWLEDGED, null, RouteVerdict::APPROVED);
+        $row = $this->finalisations->findForRoute(self::TENANT, (int) $route['id']);
+        self::assertSame(RouteFinalisationRepository::FAILED, $row['status'] ?? null);
+        self::assertSame(RouteFinaliser::REASON_PDFS_OFF, $row['reason'] ?? null);
+        self::assertSame(0, $this->scalar('SELECT COUNT(*) FROM documents'), 'no document without its PDF');
+
+        // Turned back on, somebody tries again: it goes to the queue, which makes it.
+        $this->settings->setTenant(self::TENANT, SettingsRegistry::DOCUMENTS_PERSIST_ENABLED, 'true');
+        self::assertTrue($this->finaliser->retry(self::TENANT, (int) $route['id']));
+        self::assertSame(RouteFinalisationRepository::WAITING, $this->finalisations->findForRoute(self::TENANT, (int) $route['id'])['status'] ?? null);
+        $job = new FinaliseRouteJob(fn (): RouteFinaliser => $this->finaliser);
+        self::assertSame(['outcome' => RouteFinaliser::DONE], $job->handle(['route_id' => (int) $route['id']]));
+        self::assertFalse($this->finaliser->retry(self::TENANT, (int) $route['id']), 'nothing to try again once made');
+
+        // A plugin refusing the document is not something a retry changes.
+        $this->editor->hooks->listen(Events::DOCUMENT_ISSUING, static function (array $event): array {
+            throw new HookVetoException('Not today.');
+        });
+        $formId = $this->form($this->clerkThenFinalise(null), $this->letter, 'second');
+        $route = $this->routeOf((int) $this->send($formId, ['supplier' => 'B'])['id']);
+        $this->router->act(self::TENANT, self::CLERK, $route, RouteAction::ACKNOWLEDGED, null, RouteVerdict::APPROVED);
+        $row = $this->finalisations->findForRoute(self::TENANT, (int) $route['id']);
+        self::assertSame(RouteFinalisationRepository::FAILED, $row['status'] ?? null);
+        self::assertSame(RouteFinaliser::REASON_REFUSED_BY_PLUGIN, $row['reason'] ?? null);
+    }
+
+    public function testWaitingEndsAfterTheLastAttemptAndEachRetryGetsItsOwnJob(): void
+    {
+        $formId = $this->form($this->clerkThenFinalise(null), $this->letter);
+        $route = $this->routeOf((int) $this->send($formId, ['supplier' => 'A'])['id']);
+        $this->render->throwOnRender = true;
+        $this->router->act(self::TENANT, self::CLERK, $route, RouteAction::ACKNOWLEDGED, null, RouteVerdict::APPROVED);
+
+        for ($i = 2; $i < RouteFinaliser::MAX_ATTEMPTS; $i++) {
+            self::assertSame(RouteFinaliser::WAITING, $this->finaliser->finalise(self::TENANT, (int) $route['id']));
+        }
+        self::assertSame(RouteFinaliser::MAX_ATTEMPTS - 1, $this->scalar("SELECT COUNT(*) FROM jobs WHERE name = '" . FinaliseRouteJob::NAME . "'"), 'a dead job never swallows the next retry');
+
+        self::assertSame(RouteFinaliser::FAILED, $this->finaliser->finalise(self::TENANT, (int) $route['id']));
+        $row = $this->finalisations->findForRoute(self::TENANT, (int) $route['id']);
+        self::assertSame(RouteFinaliser::REASON_GAVE_UP, $row['reason'] ?? null);
+    }
+
+    public function testReachingTwiceAtOnceAndAnOvertakenAttemptAreHarmless(): void
+    {
+        $formId = $this->form($this->clerkThenFinalise(null), $this->letter);
+        $route = $this->routeOf((int) $this->send($formId, ['supplier' => 'A'])['id']);
+        $routeId = (int) $route['id'];
+        $stepId = $this->scalar("SELECT id FROM document_route_steps WHERE route_id = {$routeId} AND kind = 'finalise'");
+
+        $this->finalisations->reach(self::TENANT, $routeId, $stepId, FormSubmissionRouteSubject::TYPE, 1, null, 1, 'a');
+        $this->finalisations->reach(self::TENANT, $routeId, $stepId, FormSubmissionRouteSubject::TYPE, 1, null, 2, 'b');
+        self::assertSame(1, $this->scalar("SELECT COUNT(*) FROM route_finalisations WHERE route_id = {$routeId}"));
+        $row = $this->finalisations->findForRoute(self::TENANT, $routeId);
+        self::assertNotNull($row);
+        self::assertSame('b', $row['content_hash']);
+
+        $first = $this->finalisations->claim(self::TENANT, $row['id']);
+        self::assertNotNull($first);
+        $meanwhile = $this->finalisations->claim(self::TENANT, $row['id']);
+        self::assertNull($meanwhile, 'one attempt at a time');
+        // The claim goes stale and a second attempt takes over.
+        $this->pdo->exec("UPDATE route_finalisations SET attempt_started_at = '2000-01-01 00:00:00' WHERE id = " . $row['id']);
+        $second = $this->finalisations->claim(self::TENANT, $row['id']);
+        self::assertNotNull($second);
+        $artifact = $this->seedArtifact();
+        self::assertFalse($this->finalisations->complete(self::TENANT, $row['id'], $first, $artifact[0], $artifact[1]), 'the overtaken attempt finishes nothing');
+        $this->finalisations->release(self::TENANT, $row['id'], $first, 'error', null);
+        self::assertSame(RouteFinalisationRepository::WAITING, $this->finalisations->findForRoute(self::TENANT, $routeId)['status'] ?? null);
+        self::assertTrue($this->finalisations->complete(self::TENANT, $row['id'], $second, $artifact[0], $artifact[1]));
+    }
+
+    public function testADocumentRoutePrintsTheApprovedTemplateVersionAndStillPrintsItsNumberWhenFinalisingFails(): void
+    {
+        $issue = function (string $supplier): int {
+            $source = $this->editor->sourceRepo->findById($this->letter, self::TENANT);
+            self::assertNotNull($source);
+            $version = $this->editor->issuing->published(self::TENANT, $source);
+            self::assertNotNull($version);
+
+            return (int) $this->editor->issuing->issue(
+                new IssueRequest($source, $version, ['submission.supplier' => $supplier], 'Oven letter', render: false),
+                new ActingAs(self::TENANT, self::APPLICANT, static fn (string $p): bool => true),
+            )['document']['id'];
+        };
+        $documentId = $issue('Example Oven');
+
+        // The template moves on after the document was issued.
+        $this->editor->redraft(self::TENANT, $this->letter, ['blocks' => [
+            $this->editor->para('Changed wording: ', $this->editor->field('submission.supplier')),
+            $this->editor->para('Number: ', $this->editor->field('issued_document.number')),
+        ]], self::APPLICANT);
+        $this->editor->publish(self::TENANT, $this->letter, self::APPLICANT);
+
+        $route = $this->router->issue(self::TENANT, self::APPLICANT, ['id' => $documentId], 'Oven letter', [
+            ['rule_kind' => RoutingRuleRegistry::KIND_EXPLICIT, 'rule_config' => ['profile_ids' => [self::CLERK]], 'decision' => true],
+            ['kind' => RouteStepKind::FINALISE],
+        ])['route'];
+        $this->router->act(self::TENANT, self::CLERK, $route, RouteAction::ACKNOWLEDGED, null, RouteVerdict::APPROVED);
+        $texts = EditorTemplateFixture::texts($this->render->flowCalls[0]);
+        self::assertContains('Supplier: Example Oven', $texts, 'the version it was approved with');
+
+        // A second document whose final stage names a template deleted since:
+        // the stage fails, and the number is still printed on the document's own.
+        $documentId = $issue('Example Mill');
+        $other = $this->editor->published(self::TENANT, self::APPLICANT, 'Other letter');
+        $route = $this->router->issue(self::TENANT, self::APPLICANT, ['id' => $documentId], 'Mill letter', [
+            ['rule_kind' => RoutingRuleRegistry::KIND_EXPLICIT, 'rule_config' => ['profile_ids' => [self::CLERK]], 'decision' => true],
+            ['kind' => RouteStepKind::FINALISE, 'final_template_id' => $other],
+        ])['route'];
+        $this->editor->sourceRepo->delete($other, self::TENANT);
+        $calls = count($this->render->flowCalls);
+        $this->router->act(self::TENANT, self::CLERK, $route, RouteAction::ACKNOWLEDGED, null, RouteVerdict::APPROVED);
+
+        $row = $this->finalisations->findForRoute(self::TENANT, (int) $route['id']);
+        self::assertSame(RouteFinaliser::REASON_TEMPLATE_MISSING, $row['reason'] ?? null);
+        self::assertCount($calls + 1, $this->render->flowCalls, 'the reprint the finalise step owed');
+        self::assertContains('Number: SUP-002', EditorTemplateFixture::texts($this->render->flowCalls[$calls]));
+        self::assertCount(1, $this->artifacts->listForDocument($documentId, self::TENANT));
+    }
+
+    public function testTheSenderReadsTheFinalDocumentOnlyWhenTheFormAllowsItEvenAsAReviewer(): void
+    {
+        // The applicant is also the stage's reviewer.
+        $templateId = $this->routeTemplates->create(self::TENANT, 'Self check', null, null);
+        $this->routeTemplates->replaceGraph($templateId, self::TENANT, [
+            ['position' => 1, 'rule_kind' => 'explicit', 'rule_config' => ['profile_ids' => [self::APPLICANT]], 'label' => null,
+             'decision' => true, 'decision_quorum' => null, 'satisfied_by' => 'act', 'canvas_x' => 0, 'canvas_y' => 0],
+            ['position' => 2, 'rule_kind' => RouteStepKind::FINALISE_RULE, 'rule_config' => [], 'label' => null,
+             'decision' => false, 'decision_quorum' => null, 'satisfied_by' => 'act', 'allow_send_back' => false,
+             'kind' => RouteStepKind::FINALISE, 'final_template_id' => null, 'canvas_x' => 0, 'canvas_y' => 0],
+        ], []);
+        $formId = $this->form($templateId, $this->letter);
+        $route = $this->routeOf((int) $this->send($formId, ['supplier' => 'A'])['id']);
+        $this->router->act(self::TENANT, self::APPLICANT, $route, RouteAction::ACKNOWLEDGED, null, RouteVerdict::APPROVED);
+
+        $api = $this->routesApi();
+        $request = new Request('GET', '/api/v1/routes/' . $route['id'] . '/final-document', [], '');
+        $request->user = (object) ['profile_id' => self::APPLICANT];
+        self::assertSame(200, $api->finalDocument($request, ['routeId' => (string) $route['id']])->getStatusCode());
+
+        $this->forms->update(self::TENANT, $formId, ['final_document_to_applicant' => false]);
+        self::assertSame(404, $api->finalDocument($request, ['routeId' => (string) $route['id']])->getStatusCode());
+    }
+
     // -- helpers --------------------------------------------------------------
+
+    private function routesApi(): RoutesApiHandler
+    {
+        $subjects = new RouteSubjectRegistry();
+        $subjects->register(new DocumentRouteSubject($this->pdo));
+        $subjects->register(new FormSubmissionRouteSubject($this->pdo));
+        $roles = $this->createMock(RoleChecker::class);
+        $roles->method('hasPermissionForProfile')->willReturn(false);
+
+        return new RoutesApiHandler(
+            $this->pdo,
+            $this->routes,
+            new RouteStepRepository($this->pdo),
+            $this->events,
+            $this->recipients,
+            new RouteEdgeRepository($this->pdo),
+            $this->router,
+            $subjects,
+            new RouteSubjectVersionRepository($this->pdo),
+            $this->documents,
+            (new \ReflectionClass(DocumentVisibilityPolicy::class))->newInstanceWithoutConstructor(),
+            $roles,
+            null,
+            $this->finalisations,
+            new RouteFinalDocumentFile($this->finalisations, $this->artifacts, $this->store),
+            $this->finaliser,
+        );
+    }
+
+    /** @return array{0: int, 1: int} A document and an artifact on it. */
+    private function seedArtifact(): array
+    {
+        $documentId = $this->plainDocument();
+        $artifact = $this->artifacts->create(self::TENANT, [
+            'document_id' => $documentId,
+            'storage_key' => 'tenants/1/documents/x.pdf',
+            'content_type' => 'application/pdf',
+            'byte_size' => 1,
+            'checksum_sha256' => str_repeat('a', 64),
+            'rendered_by' => null,
+        ]);
+
+        return [$documentId, $artifact];
+    }
 
     private function assertRefused(string $needle, \Closure $call): void
     {

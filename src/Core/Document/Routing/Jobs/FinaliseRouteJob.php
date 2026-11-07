@@ -44,7 +44,8 @@ final class FinaliseRouteJob implements JobInterface
             return ['outcome' => 'ignored'];
         }
 
-        $outcome = ($this->finaliser)()->finalise($tenantId, $routeId);
+        // The queue retries this job itself, so it schedules nothing more.
+        $outcome = ($this->finaliser)()->finalise($tenantId, $routeId, false);
         if ($outcome === RouteFinaliser::WAITING || $outcome === RouteFinaliser::BUSY) {
             throw new \RuntimeException('The final document is still waiting; trying again later.');
         }

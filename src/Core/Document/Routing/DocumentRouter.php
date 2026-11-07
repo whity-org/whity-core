@@ -466,7 +466,7 @@ final class DocumentRouter
             'recipients' => $outcome['recipients'],
         ]);
 
-        $this->finishFinalise($tenantId, $routeId);
+        $this->finishFinalise($tenantId, $routeId, $ownTransaction);
 
         return [
             'route' => $route,
@@ -899,7 +899,7 @@ final class DocumentRouter
             'recipients' => $outcome['recipients'],
         ]);
 
-        $this->finishFinalise($tenantId, $routeId);
+        $this->finishFinalise($tenantId, $routeId, $ownTransaction);
 
         return [
             'event' => $event,
@@ -1229,7 +1229,7 @@ final class DocumentRouter
             'recipients' => $outcome['recipients'],
         ]);
 
-        $this->finishFinalise($tenantId, $routeId);
+        $this->finishFinalise($tenantId, $routeId, $ownTransaction);
 
         return [
             'event' => $event,
@@ -1352,17 +1352,45 @@ final class DocumentRouter
      * After the commit: make the final document if this route is waiting for
      * one and nothing on it is open any more. A failure here is logged, never
      * thrown: the act is already committed.
+     *
+     * When the caller holds the transaction, nothing is committed yet, so
+     * nothing may be rendered, raised or announced: the request goes to the
+     * queue inside that transaction (and rolls back with it), and the caller
+     * may run {@see finalisePending()} itself after its commit.
      */
-    private function finishFinalise(int $tenantId, int $routeId): void
+    private function finishFinalise(int $tenantId, int $routeId, bool $ownTransaction): void
     {
         if ($this->finaliser === null) {
             return;
         }
         try {
+            if (!$ownTransaction) {
+                $row = $this->finalisations->findForRoute($tenantId, $routeId);
+                if ($row !== null && $row['status'] === RouteFinalisationRepository::WAITING) {
+                    $this->finaliser->defer($tenantId, $routeId);
+                }
+
+                return;
+            }
             $this->finaliser->finalise($tenantId, $routeId);
         } catch (Throwable $e) {
             error_log('[DocumentRouter] making the final document of route ' . $routeId . ' failed: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * For a caller that held its own transaction around an act: make the
+     * route's final document now that it has committed. Does nothing when the
+     * route is not waiting for one.
+     */
+    public function finalisePending(int $tenantId, int $routeId): void
+    {
+        if ($this->db->inTransaction()) {
+            // Still not committed: the queued request made inside the
+            // transaction will make it.
+            return;
+        }
+        $this->finishFinalise($tenantId, $routeId, true);
     }
 
     /**

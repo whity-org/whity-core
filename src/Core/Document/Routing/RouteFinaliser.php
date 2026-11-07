@@ -11,12 +11,17 @@ use Whity\Core\Document\DocumentSourceRepository;
 use Whity\Core\Document\Fields\DocumentFieldRegistry;
 use Whity\Core\Document\Issuing\ActingAs;
 use Whity\Core\Document\Issuing\DocumentIssuing;
+use Whity\Core\Document\Issuing\DocumentOriginKeyConflictException;
 use Whity\Core\Document\Issuing\IssueRequest;
 use Whity\Core\Document\Numbering\DocumentNumbering;
 use Whity\Core\Document\Print\PrintLabels;
+use Whity\Core\Document\Render\FlowDocumentRenderer;
 use Whity\Core\Hooks\HookManager;
 use Whity\Core\Queue\QueueService;
+use Whity\Core\Settings\SettingsRegistry;
+use Whity\Core\Settings\SettingsService;
 use Whity\Sdk\Hooks\Events;
+use Whity\Sdk\Hooks\HookVetoException;
 
 /**
  * Makes a route's final document (WHIT-921, #1725): the work of a `finalise`
@@ -24,24 +29,28 @@ use Whity\Sdk\Hooks\Events;
  *
  * When a route reaches its finalise step the engine records it
  * ({@see RouteFinalisationRepository::reach()}), in the same transaction as the
- * act that got there, and calls this after the commit. This then:
+ * act that got there, and calls this after the OUTERMOST commit (a caller
+ * holding its own transaction runs it after committing). This then:
  *
  *  1. raises the document for a subject that has none (a form submission),
  *     from the step's template, under an origin key naming the route, so a
  *     retry finds the same document rather than raising a second one; and
  *     records it on the subject;
  *  2. hands out the document's number, when its template numbers documents
- *     and it has none yet;
+ *     and it has none yet, and announces it at once, whatever happens to the
+ *     PDF;
  *  3. renders the APPROVED version (the subject version current when the route
  *     reached the step) with the template, with the verification QR and a
  *     closing line naming the version and its SHA-256, and stores the PDF on
  *     the document as an immutable artifact.
  *
- * WHEN THE RENDER SERVICE IS DOWN the route is already complete; the step
- * stays "waiting", and a queued job ({@see Jobs\FinaliseRouteJob}) tries again
- * with growing pauses. A failure no retry can mend (the template was deleted,
- * or the render service refuses its content) marks the step failed, with the
- * reason, and stops.
+ * WAITING IS ONLY FOR WHAT A RETRY CAN MEND: the render service or storage
+ * being unreachable. A queued job ({@see Jobs\FinaliseRouteJob}) tries again
+ * with growing pauses, and after {@see self::MAX_ATTEMPTS} the step is marked
+ * failed. Everything a retry cannot change (the template was deleted, PDFs are
+ * turned off, a limit was reached, a plugin refused it, the render service
+ * refused its content) fails at once with the reason. A person who may manage
+ * the route can ask for another try ({@see retry()}).
  *
  * It never throws to its caller: the act that reached the step has already
  * been committed and reported, and a PDF problem must not undo it.
@@ -58,19 +67,24 @@ final class RouteFinaliser implements RouteFinaliseService
 
     /** Reasons recorded on a waiting or failed step. */
     public const REASON_RENDER_UNAVAILABLE = 'render_unavailable';
+    public const REASON_PDFS_OFF = 'pdfs_off';
+    public const REASON_LIMIT = 'limit';
     public const REASON_TEMPLATE_MISSING = 'template_missing';
     public const REASON_TEMPLATE_UNPUBLISHED = 'template_unpublished';
     public const REASON_RENDER_REFUSED = 'render_refused';
+    public const REASON_REFUSED_BY_PLUGIN = 'refused_by_plugin';
+    public const REASON_DOCUMENT_CONFLICT = 'document_conflict';
     public const REASON_WITHDRAWN = 'withdrawn';
     public const REASON_NO_SUBJECT = 'no_subject';
     public const REASON_NOT_APPROVED = 'not_approved';
+    public const REASON_GAVE_UP = 'gave_up';
     public const REASON_ERROR = 'error';
 
     /** How long the first retry waits (seconds); the queue doubles it after each failure. */
     private const RETRY_DELAY = 60;
 
-    /** How many times the queue tries before it gives up (the step stays waiting). */
-    private const RETRY_ATTEMPTS = 20;
+    /** How many attempts in all before the step is marked failed. */
+    public const MAX_ATTEMPTS = 20;
 
     private readonly DocumentNumbering $numbering;
 
@@ -84,7 +98,8 @@ final class RouteFinaliser implements RouteFinaliseService
      * @param DocumentIssuing|\Closure(): DocumentIssuing $issuing built on first
      *        use when a closure: a worker that never finalises needs no render
      *        service or storage
-     * @param \Closure(int): bool $renderAvailable tenant id => whether a PDF can be rendered
+     * @param \Closure(int): bool $renderAvailable tenant id => whether a PDF can be
+     *        rendered AND stored there; see {@see self::pdfsCanBeMade()}
      */
     public function __construct(
         PDO $db,
@@ -108,6 +123,18 @@ final class RouteFinaliser implements RouteFinaliseService
         $this->numbering = new DocumentNumbering($db);
     }
 
+    /**
+     * The one answer to "can a final document be made here": rendering is on
+     * and the render service is configured, and the workspace stores PDFs.
+     *
+     * @return \Closure(int): bool
+     */
+    public static function pdfsCanBeMade(FlowDocumentRenderer $renderer, SettingsService $settings): \Closure
+    {
+        return static fn (int $tenantId): bool => $renderer->isEnabled($tenantId)
+            && ($settings->effective($tenantId)[SettingsRegistry::DOCUMENTS_PERSIST_ENABLED] ?? 'true') === 'true';
+    }
+
     public function isAvailable(int $tenantId): bool
     {
         try {
@@ -119,7 +146,11 @@ final class RouteFinaliser implements RouteFinaliseService
         }
     }
 
-    public function finalise(int $tenantId, int $routeId): string
+    /**
+     * @param bool $scheduleRetry false when a queued job is the caller: the queue
+     *        retries that job itself, so scheduling another would double it.
+     */
+    public function finalise(int $tenantId, int $routeId, bool $scheduleRetry = true): string
     {
         $row = $this->finalisations->findForRoute($tenantId, $routeId);
         if ($row === null) {
@@ -133,13 +164,16 @@ final class RouteFinaliser implements RouteFinaliseService
         if ($this->recipients->hasOpenOnRoute($tenantId, $routeId)) {
             return self::NOT_YET;
         }
-        if (!$this->finalisations->claim($tenantId, (int) $row['id'])) {
+        $token = $this->finalisations->claim($tenantId, (int) $row['id']);
+        if ($token === null) {
             return self::BUSY;
         }
+        $attempt = (int) $row['attempts'] + 1;
+
         // A final document is made from what was approved. A route whose last
         // word was a rejection (another branch ended it) makes none.
         if ($this->events->latestVerdictOnRoute($routeId, $tenantId) === RouteVerdict::REJECTED) {
-            $this->finalisations->fail($tenantId, (int) $row['id'], self::REASON_NOT_APPROVED, null);
+            $this->finalisations->fail($tenantId, (int) $row['id'], $token, self::REASON_NOT_APPROVED, null);
 
             return self::FAILED;
         }
@@ -147,26 +181,64 @@ final class RouteFinaliser implements RouteFinaliseService
         $documentId = null;
         try {
             [$outcome, $reason, $documentId, $artifactId] = $this->attempt($tenantId, $row);
+        } catch (HookVetoException $e) {
+            [$outcome, $reason, $artifactId] = [self::FAILED, self::REASON_REFUSED_BY_PLUGIN, null];
+        } catch (DocumentOriginKeyConflictException $e) {
+            [$outcome, $reason, $artifactId] = [self::FAILED, self::REASON_DOCUMENT_CONFLICT, null];
         } catch (Throwable $e) {
             error_log('[RouteFinaliser] making the final document of route ' . $routeId . ' failed: ' . $e->getMessage());
             [$outcome, $reason, $artifactId] = [self::WAITING, self::REASON_ERROR, null];
         }
 
         if ($outcome === self::DONE && $documentId !== null && $artifactId !== null) {
-            $this->finalisations->complete($tenantId, (int) $row['id'], $documentId, $artifactId);
+            // False when a slower attempt was overtaken: the faster one finished
+            // it, and this one's PDF stays as an extra artifact on the document.
+            $this->finalisations->complete($tenantId, (int) $row['id'], $token, $documentId, $artifactId);
 
             return self::DONE;
         }
+        if ($outcome === self::WAITING && $attempt >= self::MAX_ATTEMPTS) {
+            $outcome = self::FAILED;
+            $reason = self::REASON_GAVE_UP;
+        }
         if ($outcome === self::FAILED) {
-            $this->finalisations->fail($tenantId, (int) $row['id'], $reason, $documentId);
+            $this->finalisations->fail($tenantId, (int) $row['id'], $token, $reason, $documentId);
+            $this->reprintOwedNumber($tenantId, $row);
 
             return self::FAILED;
         }
 
-        $this->finalisations->release($tenantId, (int) $row['id'], $reason, $documentId);
-        $this->scheduleRetry($tenantId, $routeId);
+        $this->finalisations->release($tenantId, (int) $row['id'], $token, $reason, $documentId);
+        if ($scheduleRetry) {
+            $this->schedule($tenantId, $routeId, self::RETRY_DELAY, (string) $attempt);
+        }
 
         return self::WAITING;
+    }
+
+    /**
+     * Ask for the final document to be made later, by the queue: for a caller
+     * still inside a transaction (the job row commits or rolls back with it),
+     * and for a person asking for another try.
+     */
+    public function defer(int $tenantId, int $routeId): void
+    {
+        $this->schedule($tenantId, $routeId, 0, 'deferred-' . bin2hex(random_bytes(4)));
+    }
+
+    /**
+     * Another try, asked for by a person who may manage the route: a failed or
+     * waiting step goes back to waiting, with its attempts counted afresh, and
+     * the queue makes it. False when there was nothing to try again.
+     */
+    public function retry(int $tenantId, int $routeId): bool
+    {
+        if (!$this->finalisations->reopen($tenantId, $routeId)) {
+            return false;
+        }
+        $this->schedule($tenantId, $routeId, 0, 'retry-' . bin2hex(random_bytes(4)));
+
+        return true;
     }
 
     /**
@@ -188,6 +260,7 @@ final class RouteFinaliser implements RouteFinaliseService
             return [self::FAILED, self::REASON_WITHDRAWN, null, null];
         }
         $existingDocumentId = $provider->documentId($tenantId, $subjectId);
+        $existing = $existingDocumentId !== null ? $this->documents->findById($existingDocumentId, $tenantId) : null;
 
         $templateId = $row['template_id'] ?? $provider->finalTemplateId($tenantId, $subjectId);
         $source = is_int($templateId) ? $this->sources->findById($templateId, $tenantId) : null;
@@ -195,15 +268,16 @@ final class RouteFinaliser implements RouteFinaliseService
             return [self::FAILED, self::REASON_TEMPLATE_MISSING, $existingDocumentId, null];
         }
         $issuing = $this->issuing();
-        $templateVersion = $issuing->published($tenantId, $source);
+        $templateVersion = $this->templateVersion($tenantId, $source, $existing, $issuing);
         if ($templateVersion === null) {
             return [self::FAILED, self::REASON_TEMPLATE_UNPUBLISHED, $existingDocumentId, null];
         }
 
         if (!$this->isAvailable($tenantId)) {
-            // Checked before anything is raised, so a waiting submission does not
-            // gain a document with no PDF on it.
-            return [self::WAITING, self::REASON_RENDER_UNAVAILABLE, $existingDocumentId, null];
+            // Checked before anything is raised, so a submission does not gain a
+            // document with no PDF on it. PDFs being turned off is a decision a
+            // retry will not change.
+            return [self::FAILED, self::REASON_PDFS_OFF, $existingDocumentId, null];
         }
 
         $approved = $this->approvedVersion($tenantId, $row);
@@ -226,7 +300,11 @@ final class RouteFinaliser implements RouteFinaliseService
             $provider->attachDocument($tenantId, $subjectId, $existingDocumentId);
         }
 
+        // Announced as soon as it exists, whatever happens to the PDF.
         $number = $this->number($tenantId, $existingDocumentId);
+        if ($number !== null) {
+            $this->announceNumber($tenantId, $existingDocumentId, $number, (int) $row['route_id']);
+        }
         $document = $this->documents->findById($existingDocumentId, $tenantId);
         if ($document === null) {
             return [self::FAILED, self::REASON_NO_SUBJECT, null, null];
@@ -238,17 +316,65 @@ final class RouteFinaliser implements RouteFinaliseService
         [$outcome, $artifact] = $issuing->renderFinal($actor, $source, $templateVersion, $values, $document, $footnote);
 
         if ($artifact !== null) {
-            if ($number !== null) {
-                $this->announceNumber($tenantId, $existingDocumentId, $number, (int) $row['route_id']);
-            }
-
             return [self::DONE, '', $existingDocumentId, (int) $artifact['id']];
         }
 
+        // Only an unreachable render service or storage is worth waiting for.
         return match ($outcome['reason']) {
-            'rejected' => [self::FAILED, self::REASON_RENDER_REFUSED, $existingDocumentId, null],
-            default => [self::WAITING, self::REASON_RENDER_UNAVAILABLE, $existingDocumentId, null],
+            'unavailable', 'storage_unavailable' => [self::WAITING, self::REASON_RENDER_UNAVAILABLE, $existingDocumentId, null],
+            'limit' => [self::FAILED, self::REASON_LIMIT, $existingDocumentId, null],
+            'disabled', 'persist_disabled' => [self::FAILED, self::REASON_PDFS_OFF, $existingDocumentId, null],
+            default => [self::FAILED, self::REASON_RENDER_REFUSED, $existingDocumentId, null],
         };
+    }
+
+    /**
+     * The template version to print. A document's own template prints the
+     * version the document was approved with; any other template (and a form
+     * submission's) prints its published version.
+     *
+     * @param array<string, mixed>      $source
+     * @param array<string, mixed>|null $document
+     * @return array<string, mixed>|null
+     */
+    private function templateVersion(int $tenantId, array $source, ?array $document, DocumentIssuing $issuing): ?array
+    {
+        if ($document !== null
+            && ($document['document_source_id'] ?? null) === (int) $source['id']
+            && isset($document['document_source_version'])) {
+            $own = $issuing->version($tenantId, (int) $source['id'], (int) $document['document_source_version']);
+            if ($own !== null) {
+                return $own;
+            }
+        }
+
+        return $issuing->published($tenantId, $source);
+    }
+
+    /**
+     * A document route numbers its document when it is approved, and leaves the
+     * printing to this step. When this step fails, the number is printed the
+     * way it would have been without one: a reprint of the document as issued.
+     *
+     * @param array<string, mixed> $row
+     */
+    private function reprintOwedNumber(int $tenantId, array $row): void
+    {
+        if ($row['subject_type'] !== DocumentRouteSubject::TYPE) {
+            return;
+        }
+        try {
+            $document = $this->documents->findById((int) $row['subject_id'], $tenantId);
+            if ($document === null || ($document['number'] ?? null) === null || !isset($document['document_source_id'])) {
+                return;
+            }
+            $source = $this->sources->findById((int) $document['document_source_id'], $tenantId);
+            if ($source !== null) {
+                $this->issuing()->reprintNumbered(ActingAs::engine($tenantId), $source, $document);
+            }
+        } catch (Throwable $e) {
+            error_log('[RouteFinaliser] reprinting the number of document ' . (string) $row['subject_id'] . ' failed: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -312,8 +438,8 @@ final class RouteFinaliser implements RouteFinaliseService
             'number' => $number,
             'route_id' => $routeId,
             'actor_profile_id' => null,
-            // The final document already prints it, so nothing should reprint it.
-            'finalised' => true,
+            // The final document prints it, so nothing should reprint it.
+            'finalising' => true,
         ];
         try {
             $this->hooks->dispatch(Events::DOCUMENT_NUMBERED, $payload);
@@ -327,7 +453,12 @@ final class RouteFinaliser implements RouteFinaliseService
         }
     }
 
-    private function scheduleRetry(int $tenantId, int $routeId): void
+    /**
+     * Queue the job. The idempotency key names this request, not just the
+     * route: a dead job keeps its key, and a key per route would drop every
+     * later retry without a word.
+     */
+    private function schedule(int $tenantId, int $routeId, int $delay, string $suffix): void
     {
         if ($this->queue === null) {
             return;
@@ -335,13 +466,12 @@ final class RouteFinaliser implements RouteFinaliseService
         try {
             $this->queue->dispatch(Jobs\FinaliseRouteJob::NAME, ['route_id' => $routeId], [
                 'tenant_id' => $tenantId,
-                'delay' => self::RETRY_DELAY,
-                'max_attempts' => self::RETRY_ATTEMPTS,
-                // One live retry per route; a second request to retry joins it.
-                'idempotency_key' => 'route-finalise:' . $routeId,
+                'delay' => $delay,
+                'max_attempts' => self::MAX_ATTEMPTS,
+                'idempotency_key' => 'route-finalise:' . $routeId . ':' . $suffix,
             ]);
         } catch (Throwable $e) {
-            error_log('[RouteFinaliser] scheduling a retry for route ' . $routeId . ' failed: ' . $e->getMessage());
+            error_log('[RouteFinaliser] queueing the final document of route ' . $routeId . ' failed: ' . $e->getMessage());
         }
     }
 

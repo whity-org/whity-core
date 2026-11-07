@@ -34,7 +34,9 @@ use Whity\Database\Database;
  *    a trail entry: which version it was made from (with its SHA-256), the
  *    document and PDF it made, and whether it is still waiting (for example
  *    because the render service is down; a job tries again). Its status is the
- *    one thing that changes, from `waiting` to `done` or `failed`.
+ *    one thing that changes, from `waiting` to `done` or `failed` (and back to
+ *    `waiting` when somebody asks for another try). `claim_token` names the one
+ *    attempt allowed to finish it, so a slow render cannot be overtaken.
  *
  * Idempotent (IF NOT EXISTS) and reversible via down().
  */
@@ -76,6 +78,7 @@ final class AddRouteFinalise
                 artifact_id     BIGINT       REFERENCES document_artifacts(id) ON DELETE SET NULL,
                 attempts        INTEGER      NOT NULL DEFAULT 0,
                 attempt_started_at TIMESTAMP,
+                claim_token     VARCHAR(64),
                 reached_at      TIMESTAMP    NOT NULL DEFAULT NOW(),
                 finalised_at    TIMESTAMP,
                 UNIQUE (route_id)
