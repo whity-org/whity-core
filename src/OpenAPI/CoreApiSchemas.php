@@ -5819,6 +5819,10 @@ final class CoreApiSchemas
                 // straight on. A client needs this before it renders anything —
                 // on such a step Forward, Acknowledge and Return are all 422s.
                 'satisfied_by' => ['type' => 'string', 'enum' => ['act', 'delivery']],
+                // WHIT-918 (#1722). What the step IS, in one word. `decide` and
+                // `deliver` say what `decision` and `satisfied_by` say; `sign`,
+                // `stamp` and `finalise` arrive with later steps of the plan.
+                'kind' => ['type' => 'string', 'enum' => ['review', 'decide', 'deliver', 'sign', 'stamp', 'finalise']],
                 // #1037. HOW MANY TIMES A REJECTION HAS SENT THE DOCUMENT BACK
                 // FROM HERE. A backwards reject edge - "to the author, to fix" -
                 // is the most common approval design there is, and nothing
@@ -5846,6 +5850,12 @@ final class CoreApiSchemas
             'DocumentRoute' => self::object([
                 'id' => self::int(),
                 'document_id' => self::int(),
+                // WHIT-918 (#1722). What the route travels on: a document today,
+                // form submissions and plugin records later.
+                'subject' => self::object([
+                    'type' => self::str(),
+                    'id' => self::int(),
+                ], ['type', 'id']),
                 'title' => self::str(),
                 'created_by' => self::int(true),
                 // #1031, migration 123. WHICH DESIGN THIS CIRCULATION CAME FROM.

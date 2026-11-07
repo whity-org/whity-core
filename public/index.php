@@ -575,6 +575,13 @@ $routingRuleRegistry->registerCoreRoutingRules(
 );
 \Whity\register_service(\Whity\Core\Document\Routing\RoutingRuleRegistry::class, $routingRuleRegistry); // @phpstan-ignore-line
 
+// WHIT-918 (#1722). WHAT A ROUTE TRAVELS ON. Routes name a subject by type and
+// id (migration 224); the provider for a type answers for it. Core registers
+// `document` here; form submissions (#1724) and plugin records follow.
+$routeSubjectRegistry = new \Whity\Core\Document\Routing\RouteSubjectRegistry();
+$routeSubjectRegistry->register(new \Whity\Core\Document\Routing\DocumentRouteSubject($db->getPdo()));
+\Whity\register_service(\Whity\Core\Document\Routing\RouteSubjectRegistry::class, $routeSubjectRegistry); // @phpstan-ignore-line
+
 // 4b-bis. WHAT A ROUTING STAGE DOES TO THE WORLD (#1032) — the sibling
 // catalogue migration 112 specified, beside the rule registry above.
 //

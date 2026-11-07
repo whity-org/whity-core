@@ -57041,6 +57041,21 @@
                     "document_id": {
                         "type": "integer"
                     },
+                    "subject": {
+                        "type": "object",
+                        "properties": {
+                            "type": {
+                                "type": "string"
+                            },
+                            "id": {
+                                "type": "integer"
+                            }
+                        },
+                        "required": [
+                            "type",
+                            "id"
+                        ]
+                    },
                     "title": {
                         "type": "string"
                     },
@@ -57403,6 +57418,17 @@
                         "enum": [
                             "act",
                             "delivery"
+                        ]
+                    },
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "review",
+                            "decide",
+                            "deliver",
+                            "sign",
+                            "stamp",
+                            "finalise"
                         ]
                     },
                     "rejection_count": {

@@ -73,12 +73,17 @@ final class RouteRepository
     ): int {
         $stmt = $this->db->prepare(
             'INSERT INTO document_routes
-                 (tenant_id, document_id, title, created_by, template_id, template_name, created_at)
-             VALUES (:tenant_id, :document_id, :title, :created_by, :template_id, :template_name, NOW())'
+                 (tenant_id, document_id, subject_type, subject_id, title, created_by,
+                  template_id, template_name, created_at)
+             VALUES (:tenant_id, :document_id, :subject_type, :subject_id, :title, :created_by,
+                     :template_id, :template_name, NOW())'
         );
         $stmt->execute([
             ':tenant_id' => $tenantId,
             ':document_id' => $documentId,
+            // WHIT-918: every route the engine issues today travels on a document.
+            ':subject_type' => DocumentRouteSubject::TYPE,
+            ':subject_id' => $documentId,
             ':title' => $title,
             ':created_by' => $createdBy,
             ':template_id' => $templateId,
@@ -97,7 +102,7 @@ final class RouteRepository
     public function findById(int $id, int $tenantId): ?array
     {
         $stmt = $this->db->prepare(
-            'SELECT id, tenant_id, document_id, title, created_by, template_id, template_name, created_at
+            'SELECT id, tenant_id, document_id, subject_type, subject_id, title, created_by, template_id, template_name, created_at
                FROM document_routes
               WHERE id = :id AND tenant_id = :tenant_id'
         );
@@ -121,12 +126,34 @@ final class RouteRepository
     public function listForDocument(int $documentId, int $tenantId): array
     {
         $stmt = $this->db->prepare(
-            'SELECT id, tenant_id, document_id, title, created_by, template_id, template_name, created_at
+            'SELECT id, tenant_id, document_id, subject_type, subject_id, title, created_by, template_id, template_name, created_at
                FROM document_routes
               WHERE tenant_id = :tenant_id AND document_id = :document_id
               ORDER BY id DESC'
         );
         $stmt->execute([':tenant_id' => $tenantId, ':document_id' => $documentId]);
+
+        /** @var list<array<string, mixed>> $rows */
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return array_map(self::normalize(...), $rows);
+    }
+
+    /**
+     * Every route on one subject, newest first (WHIT-918). For a document this is
+     * the same list as {@see listForDocument()}.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function listForSubject(string $subjectType, int $subjectId, int $tenantId): array
+    {
+        $stmt = $this->db->prepare(
+            'SELECT id, tenant_id, document_id, subject_type, subject_id, title, created_by, template_id, template_name, created_at
+               FROM document_routes
+              WHERE tenant_id = :tenant_id AND subject_type = :subject_type AND subject_id = :subject_id
+              ORDER BY id DESC'
+        );
+        $stmt->execute([':tenant_id' => $tenantId, ':subject_type' => $subjectType, ':subject_id' => $subjectId]);
 
         /** @var list<array<string, mixed>> $rows */
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -146,6 +173,10 @@ final class RouteRepository
             'id' => (int) $row['id'],
             'tenant_id' => (int) $row['tenant_id'],
             'document_id' => (int) $row['document_id'],
+            // WHIT-918. What the route travels on. A row from before migration 224
+            // that somehow escaped its backfill is still a route on its document.
+            'subject_type' => isset($row['subject_type']) ? (string) $row['subject_type'] : DocumentRouteSubject::TYPE,
+            'subject_id' => isset($row['subject_id']) ? (int) $row['subject_id'] : (int) $row['document_id'],
             'title' => (string) $row['title'],
             'created_by' => $row['created_by'] !== null ? (int) $row['created_by'] : null,
             // #1031. Null when the route was composed by hand, and null on
