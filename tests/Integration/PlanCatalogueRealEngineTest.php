@@ -56,6 +56,14 @@ final class PlanCatalogueRealEngineTest extends TestCase
         self::assertNull($this->plans->price(1));
     }
 
+    public function testWhatCanBeBoughtBesideATier(): void
+    {
+        $prices = $this->plans->addonPrices();
+
+        self::assertSame([9003], array_map(static fn ($t): int => $t->priceId, $prices), 'only active prices of active add-on plans');
+        self::assertSame('whity-builder.pro', $prices[0]->planKey);
+    }
+
     public function testAddons(): void
     {
         self::assertTrue($this->plans->isAddon('whity-builder.pro'));

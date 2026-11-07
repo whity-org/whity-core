@@ -61,6 +61,30 @@ final class HostPlanCatalogue implements PlanCatalogue, HostWiredService
         return $value !== false && DbBool::of($value);
     }
 
+    public function addonPrices(): array
+    {
+        $statement = $this->db->prepare(
+            'SELECT pp.id, pp.unit_amount, pp.currency, pp.billing_period, pp.is_per_seat, pp.is_per_device, p.plan_key, p.name
+               FROM plan_prices pp JOIN plans p ON p.id = pp.plan_id
+              WHERE p.is_addon = :addon AND p.is_active = :on AND pp.is_active = :on2
+              ORDER BY p.plan_key ASC, pp.billing_period ASC, pp.currency ASC, pp.id ASC'
+        );
+        $statement->bindValue(':addon', true, PDO::PARAM_BOOL);
+        $statement->bindValue(':on', true, PDO::PARAM_BOOL);
+        $statement->bindValue(':on2', true, PDO::PARAM_BOOL);
+        $statement->execute();
+
+        $out = [];
+        foreach ($statement->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $terms = self::terms($row);
+            if ($terms !== null) {
+                $out[] = $terms;
+            }
+        }
+
+        return $out;
+    }
+
     private static function terms(mixed $row): ?PlanPriceTerms
     {
         if (!is_array($row)) {

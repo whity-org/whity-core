@@ -30,8 +30,9 @@ final class HostLinkedPeople implements LinkedPeople, HostWiredService
     ) {
     }
 
-    public function workspacesFor(ServiceCall $call, string $subject, string $permission): array
+    public function workspacesFor(ServiceCall $call, string $permission): array
     {
+        $subject = (string) $call->onBehalfOf;
         if ($subject === '' || $permission === '') {
             return [];
         }

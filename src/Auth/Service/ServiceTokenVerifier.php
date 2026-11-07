@@ -29,17 +29,24 @@ use Whity\Sdk\Http\ServiceCall;
  *   - lifetime (exp - iat) at most MAX_LIFETIME_SECONDS, so a leaked token is
  *     short-lived;
  *   - `scope` (space-separated, RFC 9068) or `scp` (list) contains the route's
- *     scope.
+ *     scope;
+ *   - `sub_on_behalf`, the person a call acts for, comes ONLY from the issuer's
+ *     own client (SERVICE_TOKEN_ACTING_CLIENT, default `whity-id`). Any other
+ *     client sending it is refused, not just ignored, so a service that tries to
+ *     act for someone is told no rather than quietly served as itself.
  */
 final class ServiceTokenVerifier
 {
     public const MAX_LIFETIME_SECONDS = 600;
+
+    public const DEFAULT_ACTING_CLIENT = 'whity-id';
 
     /** @param list<string> $clients */
     public function __construct(
         private readonly IssuerJwtVerifier $issuer,
         private readonly string $audience,
         private readonly array $clients,
+        private readonly string $actingClient = self::DEFAULT_ACTING_CLIENT,
     ) {
     }
 
@@ -58,6 +65,7 @@ final class ServiceTokenVerifier
             new IssuerJwtVerifier(rtrim($issuer, '/'), $http, $jwks, $jwksUri === '' ? null : $jwksUri),
             $appUrl . '/api/v1',
             $clients,
+            self::env('SERVICE_TOKEN_ACTING_CLIENT') ?: self::DEFAULT_ACTING_CLIENT,
         );
     }
 
@@ -89,7 +97,15 @@ final class ServiceTokenVerifier
             return null;
         }
 
-        return new ServiceCall($this->issuer->issuer(), $client, $scopes);
+        $onBehalf = null;
+        if (array_key_exists('sub_on_behalf', $claims)) {
+            $onBehalf = $claims['sub_on_behalf'];
+            if (!is_string($onBehalf) || $onBehalf === '' || $client !== $this->actingClient) {
+                return null;
+            }
+        }
+
+        return new ServiceCall($this->issuer->issuer(), $client, $scopes, $onBehalf);
     }
 
     /**

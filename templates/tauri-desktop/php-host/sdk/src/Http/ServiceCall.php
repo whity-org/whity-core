@@ -17,11 +17,14 @@ namespace Whity\Sdk\Http;
  * {@see self::from()} reads the result. Nothing in it comes from the request
  * itself, so a handler can trust every field.
  *
- * THERE IS NO PERSON AND NO WORKSPACE. A service call acts for a client, not
- * a signed-in user, and the host sets no tenant context. A handler that acts
- * for a person named in the path resolves that person with
- * {@see \Whity\Sdk\Identity\LinkedPeople}, which only answers through the
- * issuer that signed this call.
+ * THERE IS NO SIGNED-IN USER AND NO WORKSPACE. A service call acts for a
+ * client, and the host sets no tenant context. When the issuer's OWN client
+ * (Whity ID's, `SERVICE_TOKEN_ACTING_CLIENT`, default `whity-id`) acts for a
+ * person, the token's `sub_on_behalf` names them and {@see self::$onBehalfOf}
+ * carries it. Any other client sending `sub_on_behalf` is refused outright, so
+ * no other service can claim to act for somebody. Resolve the person with
+ * {@see \Whity\Sdk\Identity\LinkedPeople}, which takes them from this call
+ * and from nothing a handler passes in.
  */
 final class ServiceCall
 {
@@ -32,6 +35,8 @@ final class ServiceCall
         public readonly string $issuer,
         public readonly string $clientId,
         public readonly array $scopes,
+        /** The person at the issuer this call acts for; only ever set for the issuer's own client. */
+        public readonly ?string $onBehalfOf = null,
     ) {
     }
 

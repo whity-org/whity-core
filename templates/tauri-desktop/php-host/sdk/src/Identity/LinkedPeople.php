@@ -12,11 +12,13 @@ use Whity\Sdk\Http\ServiceCall;
  * Resolve it from the container:
  *
  *     $people = \Whity\app(\Whity\Sdk\Identity\LinkedPeople::class);
- *     $workspaces = $people->workspacesFor($call, $sub, 'billing:view');
+ *     $workspaces = $people->workspacesFor($call, 'billing:view');
  *
- * The subject is looked up through the global sign-in link of the issuer that
- * signed `$call`, and never any other issuer. A plugin cannot ask about a
- * subject at an issuer the deployment does not trust.
+ * The person is the call's {@see ServiceCall::$onBehalfOf}: the `sub_on_behalf`
+ * the issuer's own client put in its signed token. A plugin cannot name a
+ * different person, and a call acting for nobody gets an empty list. The person
+ * is looked up through the global sign-in link of the issuer that signed the
+ * call, and never any other issuer.
  *
  * Only ACTIVE memberships are returned, never the system workspace, and only
  * workspaces where the linked person holds `$permission`. An unlinked subject
@@ -26,5 +28,5 @@ use Whity\Sdk\Http\ServiceCall;
 interface LinkedPeople
 {
     /** @return list<LinkedWorkspace> In workspace id order. */
-    public function workspacesFor(ServiceCall $call, string $subject, string $permission): array;
+    public function workspacesFor(ServiceCall $call, string $permission): array;
 }

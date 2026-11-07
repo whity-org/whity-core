@@ -64,28 +64,33 @@ final class LinkedPeopleRealEngineTest extends TestCase
 
     public function testOnlyActiveNonSystemWorkspacesWithThePermission(): void
     {
-        $workspaces = $this->people->workspacesFor($this->call(), 'sub-a', 'billing:view');
+        $workspaces = $this->people->workspacesFor($this->call('sub-a'), 'billing:view');
 
         self::assertSame([[1, 'Example Bakery']], array_map(static fn ($w): array => [$w->id, $w->name], $workspaces));
     }
 
     public function testATenantScopedLinkDoesNotCount(): void
     {
-        self::assertSame([], $this->people->workspacesFor($this->call(), 'sub-b', 'billing:view'));
+        self::assertSame([], $this->people->workspacesFor($this->call('sub-b'), 'billing:view'));
     }
 
     public function testAnotherIssuersSubjectIsNobody(): void
     {
-        self::assertSame([], $this->people->workspacesFor(new ServiceCall('https://evil.example.test', 'c', []), 'sub-a', 'billing:view'));
+        self::assertSame([], $this->people->workspacesFor(new ServiceCall('https://evil.example.test', 'c', [], 'sub-a'), 'billing:view'));
     }
 
     public function testAnUnknownSubjectIsNobody(): void
     {
-        self::assertSame([], $this->people->workspacesFor($this->call(), 'nobody', 'billing:view'));
+        self::assertSame([], $this->people->workspacesFor($this->call('nobody'), 'billing:view'));
     }
 
-    private function call(): ServiceCall
+    private function call(?string $person): ServiceCall
     {
-        return new ServiceCall(self::ISSUER, 'whity-id-billing', ['billing:read']);
+        return new ServiceCall(self::ISSUER, 'whity-id', ['billing:read'], $person);
+    }
+
+    public function testACallActingForNobodyHasNoWorkspaces(): void
+    {
+        self::assertSame([], $this->people->workspacesFor($this->call(null), 'billing:view'));
     }
 }

@@ -63,7 +63,7 @@ final class Plugin implements PluginInterface
     public function getVersion(): string { return '1.0.0'; }
     public function getRoutes(): array
     {
-        $who = fn (Request $r): Response => Response::json(['client' => ServiceCall::from($r)?->clientId]);
+        $who = fn (Request $r): Response => Response::json(['client' => ServiceCall::from($r)?->clientId, 'for' => ServiceCall::from($r)?->onBehalfOf]);
         return [
             ['method' => 'GET', 'path' => '/api/__SLUG__/customers/{sub}/subscriptions', 'handler' => $who, 'service' => 'billing:read'],
             // Refused: a service route has no person to hold a permission.
@@ -116,7 +116,30 @@ PHP;
         $response = $this->call($this->token());
 
         self::assertSame(200, $response->getStatusCode());
-        self::assertSame(['client' => 'whity-id-billing'], json_decode($response->getBody(), true));
+        self::assertSame(['client' => 'whity-id', 'for' => null], json_decode($response->getBody(), true));
+    }
+
+    public function testWhityIdsOwnClientMayActForAPerson(): void
+    {
+        $response = $this->call($this->token(['sub_on_behalf' => 'person-123']));
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertSame(['client' => 'whity-id', 'for' => 'person-123'], json_decode($response->getBody(), true));
+    }
+
+    public function testNoOtherClientMayActForAPerson(): void
+    {
+        // An allowed client, otherwise valid: claiming to act for somebody is refused, not ignored.
+        $acting = $this->call($this->token(['client_id' => 'reports-svc', 'sub_on_behalf' => 'person-123']));
+        self::assertSame(401, $acting->getStatusCode());
+
+        // The same client without the claim is served as itself.
+        $plain = $this->call($this->token(['client_id' => 'reports-svc']));
+        self::assertSame(['client' => 'reports-svc', 'for' => null], json_decode($plain->getBody(), true));
+
+        // An empty or non-string person is refused even from Whity ID.
+        self::assertSame(401, $this->call($this->token(['sub_on_behalf' => '']))->getStatusCode());
+        self::assertSame(401, $this->call($this->token(['sub_on_behalf' => ['a']]))->getStatusCode());
     }
 
     public function testNothingElseOpensIt(): void
@@ -210,7 +233,7 @@ PHP;
         PluginServiceRoutes::useVerifier(new ServiceTokenVerifier(
             new IssuerJwtVerifier(self::ISSUER, $http, $jwks, self::JWKS),
             self::AUDIENCE,
-            ['whity-id-billing'],
+            ['whity-id', 'reports-svc'],
         ));
     }
 
@@ -233,8 +256,8 @@ PHP;
         return [
             'iss' => self::ISSUER,
             'aud' => self::AUDIENCE,
-            'sub' => 'whity-id-billing',
-            'client_id' => 'whity-id-billing',
+            'sub' => 'whity-id',
+            'client_id' => 'whity-id',
             'scope' => 'billing:read billing:portal',
             'iat' => $now,
             'exp' => $now + 300,

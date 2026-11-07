@@ -29,4 +29,13 @@ interface PlanCatalogue
 
     /** Whether the plan is sold beside a workspace's tier rather than as one. */
     public function isAddon(string $planKey): bool;
+
+    /**
+     * Every active price of every active ADD-ON plan, ordered by plan key,
+     * period and currency: what can be bought beside a tier, such as products
+     * keyed `<product>.<plan>`.
+     *
+     * @return list<PlanPriceTerms>
+     */
+    public function addonPrices(): array;
 }

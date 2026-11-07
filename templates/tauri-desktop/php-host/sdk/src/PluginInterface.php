@@ -123,10 +123,12 @@ interface PluginInterface
      *     - carries the scope.
      *   Anything else gets 401, a person's session included. Read the verified
      *   caller from {@see Http\ServiceCall::from()}. There is no tenant and no
-     *   person: resolve a person the caller names with
-     *   {@see Identity\LinkedPeople}, which answers only through the issuer that
-     *   signed the call and only for workspaces where that person holds the
-     *   permission you ask for. No requiredPermission or requiredRole, and not
+     *   signed-in user. Only the issuer's own client may act for a person
+     *   (`sub_on_behalf` in its token, {@see Http\ServiceCall::$onBehalfOf});
+     *   any other client sending it is refused. Resolve that person with
+     *   {@see Identity\LinkedPeople}, which answers only through the issuer
+     *   that signed the call and only for workspaces where that person holds
+     *   the permission you ask for. No requiredPermission or requiredRole, and not
      *   public: a declaration with either is NOT registered. Service routes
      *   are never MCP tools.
      *
