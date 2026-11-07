@@ -55,10 +55,13 @@ final class WhityStoreConnectorRealEngineTest extends TestCase
                 $this->calls[] = ['GET', $url, $headers];
 
                 return match ($url) {
-                    self::STORE . '/api/v1/plugin-store/auth' => [
-                        'resource' => self::RESOURCE,
-                        'authorization_servers' => [self::ISSUER],
-                        'scopes_supported' => ['store:download'],
+                    self::STORE . '/api/v1/plugin-store/plugins' => [
+                        'data' => [],
+                        'auth' => [
+                            'resource' => self::RESOURCE,
+                            'authorization_servers' => [self::ISSUER],
+                            'scopes_supported' => ['store:download'],
+                        ],
                     ],
                     self::ISSUER . '/.well-known/oauth-authorization-server' => [
                         'issuer' => self::ISSUER,

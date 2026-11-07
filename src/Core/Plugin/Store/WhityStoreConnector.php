@@ -111,7 +111,10 @@ final class WhityStoreConnector
     public function start(string $storeOrigin, ?int $actor): string
     {
         $host = (string) parse_url($storeOrigin, PHP_URL_HOST);
-        $meta = $this->fetchJson($storeOrigin . '/api/v1/plugin-store/auth');
+        // The catalogue carries the store's Whity ID metadata as `auth`: that path passes a store
+        // host's tenant isolation without a session on every core version.
+        $catalogue = $this->fetchJson($storeOrigin . '/api/v1/plugin-store/plugins');
+        $meta = is_array($catalogue['auth'] ?? null) ? $catalogue['auth'] : [];
         $resource = is_string($meta['resource'] ?? null) ? $meta['resource'] : '';
         $servers = is_array($meta['authorization_servers'] ?? null) ? $meta['authorization_servers'] : [];
         $issuer = is_string($servers[0] ?? null) ? rtrim($servers[0], '/') : '';
