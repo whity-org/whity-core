@@ -11697,10 +11697,12 @@ final class CoreApiSchemas
                     . 'receipt shows the outcome later.',
                 'tags' => ['billing'],
                 'request' => self::object([
-                    'tenant_id' => self::int(),
-                    'receipt' => self::str(),
-                    'amount_minor' => self::int(),
+                    'tenant_id' => self::int() + ['description' => 'The workspace whose payment is refunded'],
+                    'receipt' => self::str() + ['description' => 'The receipt\'s `reference` from GET /api/billing/receipts'],
+                    'amount_minor' => self::int() + ['description' => 'For a partial refund, the amount in minor units (fils for JOD). Leave it out to refund what is left'],
                 ], ['tenant_id', 'receipt']),
+                // Money leaves the deployment: a person does this, never an agent.
+                'mcp' => ['expose' => false],
                 'responses' => [
                     202 => self::jsonResponse('The refund was requested', self::object([
                         'requested' => self::bool(),

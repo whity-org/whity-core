@@ -950,6 +950,10 @@
     "en": "Start paying an invoice",
     "ar": "بدء دفع فاتورة"
   },
+  "post_api_billing_portal": {
+    "en": "Open the payment provider's page to manage this workspace's card and invoices",
+    "ar": "فتح صفحة مزوّد الدفع لإدارة بطاقة مساحة العمل وفواتيرها"
+  },
   "post_api_billing_quantity": {
     "ar": "زيادة عدد المقاعد أو تقليلها"
   },
