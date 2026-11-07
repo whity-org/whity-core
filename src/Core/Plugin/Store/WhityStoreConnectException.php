@@ -14,4 +14,10 @@ final class WhityStoreConnectException extends \RuntimeException
     {
         parent::__construct($message);
     }
+
+    /** What the operator is told: always one of this class's own fixed sentences. */
+    public function clientMessage(): string
+    {
+        return $this->getMessage();
+    }
 }

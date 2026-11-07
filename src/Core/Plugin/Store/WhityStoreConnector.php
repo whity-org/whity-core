@@ -611,7 +611,7 @@ final class WhityStoreConnector
         }
         if (is_string($response['error'] ?? null)) {
             error_log('[WhityStore] Whity ID refused: ' . $response['error'] . ' ' . (string) ($response['error_description'] ?? ''));
-            throw new WhityStoreConnectException('Whity ID refused: ' . (string) ($response['error_description'] ?? $response['error']), 502);
+            throw new WhityStoreConnectException('Whity ID refused to connect this installation. Try again, or check the server log.', 502);
         }
 
         return $response;

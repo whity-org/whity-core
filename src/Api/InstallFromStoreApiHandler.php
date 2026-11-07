@@ -842,7 +842,7 @@ final class InstallFromStoreApiHandler
         try {
             $url = $this->connector->start((string) $origin, PluginOperatorGate::actorProfile($request));
         } catch (WhityStoreConnectException $e) {
-            return Response::error($e->getMessage(), $e->status);
+            return Response::error($e->clientMessage(), $e->status);
         }
 
         return Response::json(['data' => ['authorize_url' => $url]]);
@@ -874,7 +874,7 @@ final class InstallFromStoreApiHandler
         try {
             $status = $this->connector->complete($code, $state, PluginOperatorGate::actorProfile($request));
         } catch (WhityStoreConnectException $e) {
-            return Response::error($e->getMessage(), $e->status);
+            return Response::error($e->clientMessage(), $e->status);
         }
 
         $this->auditLogger?->record('plugin_store.connected', [

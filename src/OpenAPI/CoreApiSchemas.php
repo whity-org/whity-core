@@ -4479,8 +4479,12 @@ final class CoreApiSchemas
                 'data' => self::object(['authorize_url' => self::str()], ['authorize_url']),
             ], ['data']),
             'StoreConnectCompleteRequest' => self::object([
-                'code' => self::str(),
-                'state' => self::str(),
+                'code' => array_merge(self::str(), [
+                    'description' => 'The authorization code Whity ID sent back to /admin/plugins/store/connect.',
+                ]),
+                'state' => array_merge(self::str(), [
+                    'description' => 'The state Whity ID sent back with the code; it must match the connect this operator started.',
+                ]),
             ], ['code', 'state']),
 
             // GET /api/plugins/store/catalog — a store's public catalogue entry.

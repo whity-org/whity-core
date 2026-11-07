@@ -12668,7 +12668,9 @@ export interface components {
             count?: number;
         };
         StoreConnectCompleteRequest: {
+            /** @description The authorization code Whity ID sent back to /admin/plugins/store/connect. */
             code: string;
+            /** @description The state Whity ID sent back with the code; it must match the connect this operator started. */
             state: string;
         };
         StoreConnectRequest: {
