@@ -31,7 +31,7 @@ use Whity\Mcp\Resources\ResourcesReadHandler;
 /**
  * Plugin prompts and resources reach AI agents only from plugins the operator
  * granted agent context, and only for callers holding their permission
- * (WHIT-993, SDK 1.78).
+ * (WHIT-993, SDK 1.80).
  *
  * Runs on real Postgres in CI (PHPUNIT_PG_DSN), SQLite locally.
  */

@@ -5162,7 +5162,7 @@ $promptRegistry->setPluginGate(static fn (string $plugin): bool =>
     $globalSettingsRepository->get(\Whity\Core\Settings\SettingsRegistry::PLUGINS_MCP_PROMPTS_REQUIRE_MARK) !== 'true'
     || $storeMarks->isVerified($plugin));
 CorePrompts::register($promptRegistry);
-// WHIT-993 (SDK 1.78): plugin prompts and resources reach AI agents only from
+// WHIT-993 (SDK 1.80): plugin prompts and resources reach AI agents only from
 // plugins the operator granted agent context (`whity-cli plugin agent-context`).
 // Collected from the grants as they stand at boot and on every reload, and asked
 // again on every call, so a revoke applies at once.

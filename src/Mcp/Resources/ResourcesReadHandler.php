@@ -43,7 +43,7 @@ final class ResourcesReadHandler implements MethodHandler
         // opt-in lives in the static schemas, not on the Router). Without it
         // only an opt-in carried on the matched route itself counts.
         private readonly ?ResourceDeriver      $resourceDeriver = null,
-        // SDK 1.78 (WHIT-993): resources from plugins the operator granted agent context.
+        // SDK 1.80 (WHIT-993): resources from plugins the operator granted agent context.
         private readonly ?PluginResourceRegistry $pluginResources = null,
         // Whether a plugin is still granted agent context, asked on every call so
         // a revoke applies at once. Null: trust the registry.
@@ -210,7 +210,7 @@ final class ResourcesReadHandler implements MethodHandler
     }
 
     /**
-     * A plugin's resource (SDK 1.78, WHIT-993): only from a plugin the operator
+     * A plugin's resource (SDK 1.80, WHIT-993): only from a plugin the operator
      * granted agent context (the registry holds nothing else), only to a caller
      * holding its permission in this workspace and whose token allows it, and
      * read with the caller's workspace and identity.

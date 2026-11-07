@@ -7,7 +7,7 @@ namespace Whity\Sdk;
 use Whity\Sdk\Mcp\McpToolContext;
 
 /**
- * Optional (SDK 1.78, WHIT-993): MCP resources this plugin offers to AI agents,
+ * Optional (SDK 1.80, WHIT-993): MCP resources this plugin offers to AI agents,
  * such as a price list or a policy an agent should read before acting.
  *
  * What a resource returns goes straight into an agent's context, so the host

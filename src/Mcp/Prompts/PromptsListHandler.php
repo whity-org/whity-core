@@ -29,7 +29,7 @@ final class PromptsListHandler implements MethodHandler
         private readonly PromptRegistry $registry,
         private readonly RoleChecker    $roleChecker,
         private readonly TokenValidator $tokenValidator,
-        // SDK 1.78 (WHIT-993): whether a plugin is still granted agent context,
+        // SDK 1.80 (WHIT-993): whether a plugin is still granted agent context,
         // asked on every call so a revoke applies at once. Null: trust the registry.
         private readonly ?\Closure $pluginGranted = null,
     ) {}

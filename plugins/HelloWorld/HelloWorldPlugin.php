@@ -736,7 +736,7 @@ final class HelloWorldPlugin implements PluginInterface, PluginRequirementsInter
             [
                 'name'        => 'hello-world-greet',
                 'description' => 'Generate a friendly greeting message via the HelloWorld plugin.',
-                // SDK 1.78: every plugin prompt names a permission, and it reaches
+                // SDK 1.80: every plugin prompt names a permission, and it reaches
                 // agents only once the operator grants HelloWorld agent context.
                 'requiredPermission' => 'hello:view',
                 'messages'    => [

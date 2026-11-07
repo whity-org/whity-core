@@ -30,7 +30,7 @@ final class ResourcesListHandler implements MethodHandler
         private readonly ResourceDeriver $resourceDeriver,
         private readonly RoleChecker     $roleChecker,
         private readonly TokenValidator  $tokenValidator,
-        // SDK 1.78 (WHIT-993): resources from plugins the operator granted agent context.
+        // SDK 1.80 (WHIT-993): resources from plugins the operator granted agent context.
         private readonly ?PluginResourceRegistry $pluginResources = null,
         // Whether a plugin is still granted agent context, asked on every call so
         // a revoke applies at once. Null: trust the registry.

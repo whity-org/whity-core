@@ -1593,7 +1593,7 @@ The approvals card shows each row's `label`, `before` and `after`. The host runs
 
 `Events::MCP_CONNECTION_CREATED`, `MCP_CONNECTION_GRANT_CHANGED` and `MCP_CONNECTION_REVOKED` say a connection was made, its grant changed, or it was disconnected (`by` is `owner`, `admin` or `agent_removed`). Ids only, after the change. Connecting and disconnecting stay with people.
 
-### Prompts and resources for agents (SDK 1.78)
+### Prompts and resources for agents (SDK 1.80)
 
 Prompts (`PluginMcpInterface`) and resources (`PluginMcpResourcesInterface`) put your text straight into an AI agent's context, so the host serves them only from a **Verified** plugin the operator has granted **agent context**:
 

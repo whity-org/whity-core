@@ -240,7 +240,7 @@ class PluginsCommand extends BaseCommand implements CliCommand
     }
 
     /**
-     * Which code plugins' MCP prompts and resources may reach AI agents (SDK 1.78,
+     * Which code plugins' MCP prompts and resources may reach AI agents (SDK 1.80,
      * WHIT-993). An operator action: it runs on the server, against the
      * deployment's own database, and every grant and revoke is audited. A revoke
      * applies to the next call; a new grant once workers reload their plugins

@@ -254,7 +254,7 @@ PHP);
         self::assertSame('Alpha prompt from McpA', $alpha->description);
     }
 
-    /** Every plugin in these fixtures is granted agent context (SDK 1.78). */
+    /** Every plugin in these fixtures is granted agent context (SDK 1.80). */
     private static function granted(): \Closure
     {
         return static fn (string $plugin): bool => true;

@@ -7,7 +7,7 @@ namespace Database\Migrations;
 use Whity\Database\Database;
 
 /**
- * Agent context grants (WHIT-993, SDK 1.78).
+ * Agent context grants (WHIT-993, SDK 1.80).
  *
  * The code plugins whose MCP prompts and resources the operator lets reach AI
  * agents. A row means granted; revoking deletes it, and the audit trail keeps

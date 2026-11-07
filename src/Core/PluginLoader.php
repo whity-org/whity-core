@@ -83,7 +83,7 @@ use Whity\Sdk\Sdk;
  */
 class PluginLoader
 {
-    /** Arguments and messages kept per plugin prompt, and the length of each message (SDK 1.78). */
+    /** Arguments and messages kept per plugin prompt, and the length of each message (SDK 1.80). */
     private const MAX_PROMPT_ITEMS = 20;
     private const MAX_PROMPT_TEXT  = 8000;
 
@@ -1570,7 +1570,7 @@ class PluginLoader
      *   would still be part of the platform's surface, which is not what
      *   disabling one means — and it is what made prompts/list keep advertising
      *   a plugin after it was turned off (#952).
-     * - SDK 1.78 (WHIT-993): only a plugin the operator granted agent context
+     * - SDK 1.80 (WHIT-993): only a plugin the operator granted agent context
      *   contributes, and each prompt must declare `requiredPermission`. With no
      *   $granted, no plugin is granted.
      *
@@ -1685,9 +1685,9 @@ class PluginLoader
         $description        = is_string($descriptor['description'] ?? null) ? $descriptor['description'] : '';
         $requiredRole       = is_string($descriptor['requiredRole'] ?? null) && $descriptor['requiredRole'] !== '' ? $descriptor['requiredRole'] : null;
         $requiredPermission = is_string($descriptor['requiredPermission'] ?? null) && $descriptor['requiredPermission'] !== '' ? $descriptor['requiredPermission'] : null;
-        // SDK 1.78 (WHIT-993): never open to every caller.
+        // SDK 1.80 (WHIT-993): never open to every caller.
         if ($requiredPermission === null) {
-            $this->logWarning("[Plugin:{$pluginKey}] getMcpPrompts() prompt '{$name}' declares no requiredPermission — skipped (SDK 1.78).");
+            $this->logWarning("[Plugin:{$pluginKey}] getMcpPrompts() prompt '{$name}' declares no requiredPermission — skipped (SDK 1.80).");
             return;
         }
 
@@ -1722,7 +1722,7 @@ class PluginLoader
     }
 
     /**
-     * Register the MCP resources plugins offer agents (SDK 1.78, WHIT-993,
+     * Register the MCP resources plugins offer agents (SDK 1.80, WHIT-993,
      * {@see PluginMcpResourcesInterface}). The same rules as
      * {@see collectMcpPrompts()}: active plugins only, and only those the
      * operator granted agent context; with no $granted, none.

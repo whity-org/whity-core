@@ -9,7 +9,7 @@ use Whity\Core\Audit\AuditLoggerInterface;
 
 /**
  * Which code plugins the operator trusts to put text in front of AI agents
- * (SDK 1.78, WHIT-993): their MCP prompts and resources.
+ * (SDK 1.80, WHIT-993): their MCP prompts and resources.
  *
  * Prompt and resource text goes straight into an agent's context, where it can
  * steer what the agent does for the person using it. So it comes only from a

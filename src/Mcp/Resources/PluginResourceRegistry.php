@@ -9,7 +9,7 @@ use Whity\Sdk\PluginNamespace;
 
 /**
  * MCP resources contributed by plugins the operator granted agent context
- * (SDK 1.78, WHIT-993; {@see \Whity\Sdk\PluginMcpResourcesInterface}).
+ * (SDK 1.80, WHIT-993; {@see \Whity\Sdk\PluginMcpResourcesInterface}).
  *
  * Each is published as `whity-plugin://<plugin slug>/<path>`: the host adds the
  * slug, so one plugin can't take another's address. Every entry carries a
