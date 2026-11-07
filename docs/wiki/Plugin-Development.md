@@ -1593,6 +1593,31 @@ The approvals card shows each row's `label`, `before` and `after`. The host runs
 
 `Events::MCP_CONNECTION_CREATED`, `MCP_CONNECTION_GRANT_CHANGED` and `MCP_CONNECTION_REVOKED` say a connection was made, its grant changed, or it was disconnected (`by` is `owner`, `admin` or `agent_removed`). Ids only, after the change. Connecting and disconnecting stay with people.
 
+### Prompts and resources for agents (SDK 1.78)
+
+Prompts (`PluginMcpInterface`) and resources (`PluginMcpResourcesInterface`) put your text straight into an AI agent's context, so the host serves them only from a plugin the operator has granted **agent context**:
+
+```bash
+whity-cli plugin agent-context grant HelloWorld
+```
+
+The grant is install-wide, only the operator can make it, and it's audited. Until then your prompts and resources are not listed. Each prompt and resource must declare `requiredPermission`: one that doesn't is refused at load. The permission is checked for every caller, and a token limited to other permissions doesn't see it.
+
+```php
+public function getMcpResources(): array
+{
+    return [[
+        'path'               => 'prices/current',   // whity-plugin://<your slug>/prices/current
+        'name'               => 'Current prices',
+        'mimeType'           => 'text/csv',
+        'requiredPermission' => 'prices:read',
+        'read'               => fn (McpToolContext $context): string => $this->prices->csv($context->tenantId),
+    ]];
+}
+```
+
+Scope what `read` returns to `$context->tenantId`. At most 1 MB is served. A revoke (`agent-context revoke <name>`) applies to the next call. A new grant applies once workers reload plugins (`plugin reload`) or restart.
+
 ## Step 13 — Declare it in `plugin.json` instead (SDK 1.47)
 
 Everything a plugin only *declares* can live in a JSON file instead of PHP methods: its identity and requirements, permissions, roles, `blocks` screens, owned tables, data types and limits. Put `plugin.json` next to an empty class:

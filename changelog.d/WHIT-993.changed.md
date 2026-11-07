@@ -1,0 +1,1 @@
+- A code plugin's MCP prompts are no longer offered to AI agents until the operator approves the plugin, and a plugin prompt with no `requiredPermission` is ignored (#1744). Prompt text goes straight into an agent's context, so it should only come from plugins the operator trusts.

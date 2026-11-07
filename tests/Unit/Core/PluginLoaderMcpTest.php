@@ -57,8 +57,8 @@ final class Plugin implements PluginInterface, PluginMcpInterface
     public function getMcpPrompts(): array
     {
         return [
-            ['name' => 'prompt-alpha', 'description' => 'Alpha prompt from McpA'],
-            ['name' => 'prompt-beta',  'description' => 'Beta prompt from McpA', 'requiredRole' => 'admin'],
+            ['name' => 'prompt-alpha', 'description' => 'Alpha prompt from McpA', 'requiredPermission' => 'items:read'],
+            ['name' => 'prompt-beta',  'description' => 'Beta prompt from McpA', 'requiredRole' => 'admin', 'requiredPermission' => 'items:read'],
         ];
     }
 }
@@ -87,7 +87,7 @@ final class Plugin implements PluginInterface, PluginMcpInterface
     public function getMcpPrompts(): array
     {
         return [
-            ['name' => 'prompt-alpha',  'description' => 'Alpha from McpB (collides)'],
+            ['name' => 'prompt-alpha',  'description' => 'Alpha from McpB (collides)', 'requiredPermission' => 'items:read'],
             ['name' => 'prompt-gamma',  'description' => 'Gamma prompt from McpB', 'requiredPermission' => 'items:read'],
         ];
     }
@@ -117,9 +117,9 @@ final class Plugin implements PluginInterface, PluginMcpInterface
     public function getMcpPrompts(): array
     {
         return [
-            ['description' => 'No name key at all'],
-            ['name' => '', 'description' => 'Empty name'],
-            ['name' => 'prompt-delta', 'description' => 'Delta is valid'],
+            ['description' => 'No name key at all', 'requiredPermission' => 'items:read'],
+            ['name' => '', 'description' => 'Empty name', 'requiredPermission' => 'items:read'],
+            ['name' => 'prompt-delta', 'description' => 'Delta is valid', 'requiredPermission' => 'items:read'],
         ];
     }
 }
@@ -198,7 +198,7 @@ PHP);
         $loader   = new PluginLoader(sys_get_temp_dir() . '/empty_' . uniqid(), new Router(''), new PermissionRegistry(), new HookManager());
         $registry = new PromptRegistry();
 
-        $loader->collectMcpPrompts($registry);
+        $loader->collectMcpPrompts($registry, self::granted());
 
         self::assertSame([], $registry->all());
     }
@@ -231,7 +231,7 @@ PHP);
         $loader = new PluginLoader($dir, new Router(''), new PermissionRegistry(), new HookManager());
         $loader->load();
         $registry = new PromptRegistry();
-        $loader->collectMcpPrompts($registry);
+        $loader->collectMcpPrompts($registry, self::granted());
 
         self::assertSame([], $registry->all());
 
@@ -247,11 +247,17 @@ PHP);
         $loader   = $this->makeLoader();
         $loader->load();
         $registry = new PromptRegistry();
-        $loader->collectMcpPrompts($registry);
+        $loader->collectMcpPrompts($registry, self::granted());
 
         $alpha = $registry->find('prompt-alpha');
         self::assertInstanceOf(Prompt::class, $alpha);
         self::assertSame('Alpha prompt from McpA', $alpha->description);
+    }
+
+    /** Every plugin in these fixtures is granted agent context (SDK 1.78). */
+    private static function granted(): \Closure
+    {
+        return static fn (string $plugin): bool => true;
     }
 
     public function testCollectMcpPrompts_sets_requiredRole_fromDescriptor(): void
@@ -259,12 +265,12 @@ PHP);
         $loader   = $this->makeLoader();
         $loader->load();
         $registry = new PromptRegistry();
-        $loader->collectMcpPrompts($registry);
+        $loader->collectMcpPrompts($registry, self::granted());
 
         $beta = $registry->find('prompt-beta');
         self::assertNotNull($beta);
         self::assertSame('admin', $beta->requiredRole);
-        self::assertNull($beta->requiredPermission);
+        self::assertSame('items:read', $beta->requiredPermission);
     }
 
     // ── Collision handling ────────────────────────────────────────────────────
@@ -274,7 +280,7 @@ PHP);
         $loader   = $this->makeLoader();
         $loader->load();
         $registry = new PromptRegistry();
-        $loader->collectMcpPrompts($registry);
+        $loader->collectMcpPrompts($registry, self::granted());
 
         // McpA registers 'prompt-alpha' first; McpB also tries 'prompt-alpha'.
         $alphas = array_filter($registry->all(), fn (Prompt $p): bool => $p->name === 'prompt-alpha');
@@ -288,7 +294,7 @@ PHP);
         $loader->load();
         $registry = new PromptRegistry();
         $registry->register(new Prompt('prompt-alpha', 'Core prompt'));
-        $loader->collectMcpPrompts($registry);
+        $loader->collectMcpPrompts($registry, self::granted());
 
         $alphas = array_filter($registry->all(), fn (Prompt $p): bool => $p->name === 'prompt-alpha');
         self::assertCount(1, $alphas);
@@ -302,7 +308,7 @@ PHP);
         $loader   = $this->makeLoader();
         $loader->load();
         $registry = new PromptRegistry();
-        $loader->collectMcpPrompts($registry);
+        $loader->collectMcpPrompts($registry, self::granted());
 
         $gamma = $registry->find('prompt-gamma');
         self::assertNotNull($gamma);
@@ -317,7 +323,7 @@ PHP);
         $loader   = $this->makeLoader();
         $loader->load();
         $registry = new PromptRegistry();
-        $loader->collectMcpPrompts($registry);
+        $loader->collectMcpPrompts($registry, self::granted());
 
         // McpC declares 3 prompts: 2 invalid (no name / empty name), 1 valid.
         self::assertNull($registry->find(''));
@@ -329,7 +335,7 @@ PHP);
         $loader   = $this->makeLoader();
         $loader->load();
         $registry = new PromptRegistry();
-        $loader->collectMcpPrompts($registry);
+        $loader->collectMcpPrompts($registry, self::granted());
 
         $delta = $registry->find('prompt-delta');
         self::assertInstanceOf(Prompt::class, $delta);
@@ -345,7 +351,7 @@ PHP);
         $registry = new PromptRegistry();
 
         // Must not propagate the RuntimeException from McpThrows
-        $loader->collectMcpPrompts($registry);
+        $loader->collectMcpPrompts($registry, self::granted());
 
         // Other plugins' prompts must still be registered
         self::assertNotNull($registry->find('prompt-alpha'));

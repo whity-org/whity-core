@@ -427,6 +427,9 @@ abstract class BaseCommand implements CliCommand, CommandHelp
         // CLI serves no MCP, so nothing files a proposal here, but the registry is
         // host-wired: registered so \Whity\app() never improvises an empty one.
         \Whity\register_service(\Whity\Mcp\Tools\ProposalDiffRegistry::class, new \Whity\Mcp\Tools\ProposalDiffRegistry());
+        // WHIT-993: plugin MCP resources. The CLI serves no MCP, so it stays empty,
+        // but it is host-wired: registered so \Whity\app() never improvises one.
+        \Whity\register_service(\Whity\Mcp\Resources\PluginResourceRegistry::class, new \Whity\Mcp\Resources\PluginResourceRegistry());
 
         // WHIT-990 (SDK 1.75): the workspace's agents for plugins, as in
         // public/index.php. A job has no person, so it reads nothing.

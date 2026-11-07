@@ -1,0 +1,1 @@
+- Plugins can now offer AI agents resources as well as prompts, and prompts now include their messages (SDK 1.78, #1744). Both reach agents only from a plugin the operator has approved with `whity-cli plugin agent-context grant <name>`. Each one needs a permission, which is checked for every caller. Revoking the approval takes effect on the next call.

@@ -1115,6 +1115,16 @@ final class SdkPackageContractTest extends TestCase
         );
     }
 
+    public function testPluginMcpResourcesInterface_existsWithGetMcpResourcesMethod(): void
+    {
+        $methods = array_map(
+            static fn (\ReflectionMethod $m): string => $m->getName(),
+            (new \ReflectionClass(\Whity\Sdk\PluginMcpResourcesInterface::class))->getMethods()
+        );
+        $this->assertSame(['getMcpResources'], $methods);
+        $this->assertSame('array', (string) (new \ReflectionMethod(\Whity\Sdk\PluginMcpResourcesInterface::class, 'getMcpResources'))->getReturnType());
+    }
+
     public function testPluginMcpInterface_existsWithGetMcpPromptsMethod(): void
     {
         $this->assertTrue(interface_exists(\Whity\Sdk\PluginMcpInterface::class));
