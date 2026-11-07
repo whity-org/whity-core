@@ -118,6 +118,10 @@
     "en": "Retire a plan price",
     "ar": "إنهاء سعر باقة"
   },
+  "delete_api_plugins_store_connection": {
+    "en": "Disconnect from the Whity store",
+    "ar": "فصل الربط بمتجر Whity"
+  },
   "delete_api_promotions_id": {
     "en": "Retire a promotion",
     "ar": "إنهاء عرض ترويجي"
@@ -619,6 +623,10 @@
   "get_api_plugins_store_catalog": {
     "en": "Browse and search a trusted plugin store",
     "ar": "تصفح متجر الإضافات والبحث فيه"
+  },
+  "get_api_plugins_store_connection": {
+    "en": "See this installation's Whity store connection",
+    "ar": "عرض ربط هذا التثبيت بمتجر Whity"
   },
   "get_api_profiles_id_relations": {
     "en": "See a user's person record and relationships",
@@ -1264,6 +1272,14 @@
   "post_api_plugins_reload": {
     "en": "Reload the list of plugins",
     "ar": "إعادة تحميل الإضافات"
+  },
+  "post_api_plugins_store_connect": {
+    "en": "Start connecting to the Whity store",
+    "ar": "بدء الربط بمتجر Whity"
+  },
+  "post_api_plugins_store_connect_complete": {
+    "en": "Finish connecting to the Whity store",
+    "ar": "إكمال الربط بمتجر Whity"
   },
   "post_api_plugins_upload": {
     "en": "Upload a plugin package, left switched off",

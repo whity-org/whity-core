@@ -2354,7 +2354,18 @@ $installFromStoreHandler = new \Whity\Api\InstallFromStoreApiHandler(
     new \Whity\Core\Plugin\PluginRecords($db->getPdo()),
     $tenantManifestPublisher,
     $tenantPluginRepository,
-    $pluginTrust
+    $pluginTrust,
+    // WHIT-1003: connected to a store through Whity ID, a fresh token rides every store call.
+    new \Whity\Core\Plugin\Store\WhityStoreConnector(
+        $globalSettingsRepository,
+        $secretStore,
+        \Whity\Core\Plugin\Store\WhityStoreConnector::issuersFromEnv(),
+        $frontendUrls->link(\Whity\Core\Http\FrontendUrls::STORE_CONNECT),
+        'Whity (' . ((string) parse_url($frontendUrls->base(), PHP_URL_HOST) ?: 'installation') . ')',
+        static fn (string $url, array $headers = []): ?array => (new \Whity\Core\Http\HttpFetcher(timeoutSeconds: 10))->getJson($url, $headers),
+        static fn (string $url, array $params): ?array => (new \Whity\Core\Http\HttpFetcher(timeoutSeconds: 10))->postForm($url, $params),
+        static fn (string $url, array $payload): ?array => (new \Whity\Core\Http\HttpFetcher(timeoutSeconds: 10))->postJson($url, $payload),
+    )
 );
 $router->register('POST', '/api/plugins/install-from-store', [$installFromStoreHandler, 'install'], null, null, CorePermissions::PLUGINS_INSTALL);
 // Decision 2: a workspace installs declarative plugins into itself. Data, not code.
@@ -2372,6 +2383,11 @@ $router->register('POST', '/api/plugins/{name}/update/reject', [$installFromStor
 // more than the plugins list itself; installing needs PLUGINS_INSTALL.
 $router->register('GET', '/api/plugins/store/allowed', [$installFromStoreHandler, 'allowedStores'], null, null, CorePermissions::PLUGINS_READ);
 $router->register('GET', '/api/plugins/store/catalog', [$installFromStoreHandler, 'browseCatalog'], null, null, CorePermissions::PLUGINS_READ);
+// WHIT-1003: connect this installation to a store through Whity ID (operator only).
+$router->register('GET', '/api/plugins/store/connection', [$installFromStoreHandler, 'connection'], null, null, CorePermissions::PLUGINS_READ);
+$router->register('POST', '/api/plugins/store/connect', [$installFromStoreHandler, 'connect'], null, null, CorePermissions::PLUGINS_INSTALL);
+$router->register('POST', '/api/plugins/store/connect/complete', [$installFromStoreHandler, 'completeConnect'], null, null, CorePermissions::PLUGINS_INSTALL);
+$router->register('DELETE', '/api/plugins/store/connection', [$installFromStoreHandler, 'disconnect'], null, null, CorePermissions::PLUGINS_INSTALL);
 
 // Desktop plugin release catalog/download (WC-desktop-plugins). Consumed by an
 // already-enrolled desktop device using the SAME bearer access token it uses

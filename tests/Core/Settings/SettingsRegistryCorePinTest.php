@@ -306,7 +306,7 @@ final class SettingsRegistryCorePinTest extends TestCase
             'affiliate.withholding_bp' => '0',
             'dunning.retry_schedule_days' => '1,3,7',
             'dunning.lock_after_days' => '14',
-            'plugins.store_allowed_hosts' => '',
+            'plugins.store_allowed_hosts' => 'app.whity.dev',
             'plugins.store_enabled' => 'true',
             'documents.render_enabled' => 'false',
             // Whity's standard theme until a workspace chooses its own (editor M4d).

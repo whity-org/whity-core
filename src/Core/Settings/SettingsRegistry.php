@@ -352,9 +352,10 @@ final class SettingsRegistry
     public const AFFILIATE_WITHHOLDING_BP = 'affiliate.withholding_bp';
 
     // Plugin marketplace (WC plugin-store): comma-separated allowlist of trusted
-    // store HOSTS the install-from-store endpoint may fetch packages from. EMPTY
-    // (default) = the feature is OFF — no store is trusted. This is the PRIMARY
-    // SSRF control for server-side package fetches.
+    // store HOSTS the install-from-store endpoint may fetch packages from. The
+    // default is Whity's own store, app.whity.dev (WHIT-1003); EMPTY = the feature
+    // is OFF — no store is trusted. This is the PRIMARY SSRF control for
+    // server-side package fetches.
     public const PLUGINS_STORE_ALLOWED_HOSTS = 'plugins.store_allowed_hosts';
 
     // Plugin marketplace MASTER switch (WC-feature-flags-audit). A sovereign
@@ -1079,7 +1080,9 @@ final class SettingsRegistry
         self::DUNNING_RETRY_SCHEDULE_DAYS => '1,3,7',
         self::DUNNING_LOCK_AFTER_DAYS => '14',
         // Empty = install-from-store OFF (no trusted store); operator opts in.
-        self::PLUGINS_STORE_ALLOWED_HOSTS => '',
+        // WHIT-1003: Whity's own store, app.whity.dev, is trusted out of the box. Operators may
+        // remove it or add their own; an empty list still turns the store off.
+        self::PLUGINS_STORE_ALLOWED_HOSTS => 'app.whity.dev',
         // Master switch default TRUE (opt-out): the allowlist above is already
         // the primary off-switch (empty by default), so this only needs to
         // FLIP OFF an already-configured deployment; defaulting it false would

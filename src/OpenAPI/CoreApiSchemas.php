@@ -3505,6 +3505,50 @@ final class CoreApiSchemas
                     502 => self::errorResponse('The store catalogue could not be fetched'),
                 ],
             ]),
+            // WHIT-1003: connect this installation to a store through Whity ID.
+            self::permissionRoute('GET', '/api/plugins/store/connection', 'plugins:read', [
+                'summary' => 'Whether this installation is connected to a store through Whity ID',
+                'description' => 'The connected store, the Whity ID account that connected it, and whether an '
+                    . 'operator must sign in again. Never returns a token.',
+                'tags' => ['platform-ops'],
+                'responses' => [
+                    200 => self::jsonResponse('The store connection', 'StoreConnectionResponse'),
+                ],
+            ]),
+            self::permissionRoute('POST', '/api/plugins/store/connect', 'plugins:install', [
+                'summary' => 'Begin connecting this installation to a store through Whity ID',
+                'description' => 'Operator only. Registers this installation with the Whity ID issuer the store '
+                    . 'names (if it is one this installation trusts, `WHITY_ID_ISSUERS`) and returns the URL to '
+                    . 'send the operator\'s browser to. Whity ID returns them to /admin/plugins/store/connect.',
+                'tags' => ['platform-ops'],
+                'request' => 'StoreConnectRequest',
+                'responses' => [
+                    200 => self::jsonResponse('Where to sign in', 'StoreConnectResponse'),
+                    403 => self::errorResponse('Not the operator, or the store host is not allowed'),
+                    422 => self::errorResponse('The store or this installation cannot use Whity ID sign-in'),
+                    502 => self::errorResponse('The store or Whity ID could not be reached'),
+                ],
+            ]),
+            self::permissionRoute('POST', '/api/plugins/store/connect/complete', 'plugins:install', [
+                'summary' => 'Finish connecting with the code Whity ID sent back',
+                'description' => 'Operator only. Single use; the refresh token is kept encrypted and never returned.',
+                'tags' => ['platform-ops'],
+                'request' => 'StoreConnectCompleteRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The store connection', 'StoreConnectionResponse'),
+                    403 => self::errorResponse('Not the operator who started connecting'),
+                    422 => self::errorResponse('Expired, or not started here'),
+                    502 => self::errorResponse('Whity ID did not connect this installation'),
+                ],
+            ]),
+            self::permissionRoute('DELETE', '/api/plugins/store/connection', 'plugins:install', [
+                'summary' => 'Disconnect this installation from the store',
+                'description' => 'Operator only. Revokes the refresh token at Whity ID (best effort) and forgets it.',
+                'tags' => ['platform-ops'],
+                'responses' => [
+                    200 => self::jsonResponse('Disconnected', 'StoreConnectionResponse'),
+                ],
+            ]),
         ];
     }
 
@@ -4411,8 +4455,42 @@ final class CoreApiSchemas
                     'hosts' => ['type' => 'array', 'items' => ['type' => 'string']],
                     'can_install' => self::bool(),
                     'can_install_declarative' => self::bool(),
+                    'connection' => ['$ref' => '#/components/schemas/StoreConnection'],
                 ], ['enabled', 'hosts', 'can_install', 'can_install_declarative']),
             ], ['data']),
+
+            // WHIT-1003: this installation's Whity ID connection to a store.
+            'StoreConnection' => self::object([
+                'connected' => self::bool(),
+                'store_host' => self::str(),
+                'issuer' => self::str(),
+                'account' => array_merge(self::object([
+                    'sub' => self::str(true),
+                    'name' => self::str(true),
+                    'email' => self::str(true),
+                ], []), ['nullable' => true]),
+                'connected_at' => self::str(),
+                'needs_reconnect' => self::bool(),
+            ], ['connected']),
+            'StoreConnectionResponse' => self::object([
+                'data' => ['$ref' => '#/components/schemas/StoreConnection'],
+            ], ['data']),
+            'StoreConnectRequest' => self::object([
+                'store_url' => array_merge(self::str(), [
+                    'description' => 'A bare https origin on the allowlist. Defaults to the first allowed host.',
+                ]),
+            ], []),
+            'StoreConnectResponse' => self::object([
+                'data' => self::object(['authorize_url' => self::str()], ['authorize_url']),
+            ], ['data']),
+            'StoreConnectCompleteRequest' => self::object([
+                'code' => array_merge(self::str(), [
+                    'description' => 'The authorization code Whity ID sent back to /admin/plugins/store/connect.',
+                ]),
+                'state' => array_merge(self::str(), [
+                    'description' => 'The state Whity ID sent back with the code; it must match the connect this operator started.',
+                ]),
+            ], ['code', 'state']),
 
             // GET /api/plugins/store/catalog — a store's public catalogue entry.
             'StoreCataloguePlugin' => self::object([

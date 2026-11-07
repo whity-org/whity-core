@@ -635,11 +635,12 @@ final class SettingsRegistryTest extends TestCase
         self::assertNotNull(SettingsRegistry::validate('plugins.store_enabled', ''));
     }
 
-    public function testPluginsStoreAllowedHostsIsGlobalOnlyFreeformDefaultEmpty(): void
+    public function testPluginsStoreAllowedHostsIsGlobalOnlyFreeformDefaultWhityStore(): void
     {
         // The allowlist itself is free-form (validated at fetch time by the
-        // handler, not the registry) — empty is the secure-by-default OFF state.
-        self::assertSame('', SettingsRegistry::defaultFor('plugins.store_allowed_hosts'));
+        // handler, not the registry). WHIT-1003: Whity's own store is trusted
+        // out of the box; an operator may still clear it, and empty is OFF.
+        self::assertSame('app.whity.dev', SettingsRegistry::defaultFor('plugins.store_allowed_hosts'));
         self::assertSame('string', SettingsRegistry::typeFor('plugins.store_allowed_hosts'));
         self::assertTrue(SettingsRegistry::isGlobalOnly('plugins.store_allowed_hosts'));
         self::assertNull(SettingsRegistry::validate('plugins.store_allowed_hosts', 'store.example.com'));
