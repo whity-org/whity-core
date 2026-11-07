@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.81).
+ * SDK identity (v1.82).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1096,12 +1096,21 @@ namespace Whity\Sdk;
  * never overwritten; an untouched copy follows the plugin's updates (WHIT-995).
  *
  * Purely additive.)
+ *
+ * 1.82 (TEMPLATE READER: {@see Documents\Templates}, resolved as a host service, lists and
+ * reads the workspace's published templates ({@see Documents\TemplateInfo}) with the merge
+ * fields their published version prints ({@see Documents\TemplateField}: path, label, source
+ * template, record or host, required, sample). It answers for the caller Documents acts for:
+ * the person in a request, or a background plugin's own bound templates where allowed
+ * (WHIT-996).
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.81.0';
+    public const VERSION = '1.82.0';
 
     /**
      * Static identity only — never instantiated.

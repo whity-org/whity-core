@@ -111,6 +111,24 @@ final class DocumentIssuingEntryPointWiringTest extends TestCase
         }
     }
 
+    /** WHIT-996 (SDK 1.82): the template reader, in both entry points and the worker. */
+    public function testEveryEntryPointRegistersTheSdkTemplatesReader(): void
+    {
+        $pattern = '/register_service\(\s*\\\\?Whity\\\\Sdk\\\\Documents\\\\Templates::class,\s*\\\\?(Whity\\\\Core\\\\Document\\\\Issuing\\\\)?SdkTemplates::build\(/';
+        foreach ([...self::ENTRY_POINTS, 'src/Core/Document/Issuing/WorkerDocumentServices.php'] as $relative) {
+            self::assertMatchesRegularExpression(
+                $pattern,
+                $this->read($relative),
+                "{$relative} must register the SDK's Templates, or a plugin resolving it gets an exception."
+            );
+        }
+        self::assertMatchesRegularExpression(
+            '/SdkTemplates::build\(\$pdo, \$roleChecker, \$resourceTypes, \$settings, \$slots, \$jobPlugin\)/',
+            $this->read('src/Core/Document/Issuing/WorkerDocumentServices.php'),
+            'The worker reads templates for the same caller it issues for: the job\'s plugin, from its own registry.'
+        );
+    }
+
     public function testTheWorkerReadsAFreshSetOfPluginsForEachIssue(): void
     {
         // A worker lives for many jobs; a manifest cached from the last job

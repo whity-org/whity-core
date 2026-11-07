@@ -1,6 +1,6 @@
 {
     "$comment": "Plugin SDK coverage matrix: the single source of truth. Edit this file, then run `php scripts/sdk-coverage.php` to regenerate docs/wiki/Plugin-SDK-Coverage.md. CI fails when sdk_version is behind Sdk::VERSION, when an SDK minor in the Sdk.php ledger is not named by any `since`, or when the generated page is stale. Security notes say only that a design is needed; vulnerabilities go through SECURITY.md, never here.",
-    "sdk_version": "1.81.0",
+    "sdk_version": "1.82.0",
     "core_version": "0.2.26",
     "updated": "2026-11-06",
     "ratings": {
@@ -356,12 +356,15 @@
                 {
                     "what": "Starter templates shipped by a plugin, seeded per workspace",
                     "since": "1.81"
+                },
+                {
+                    "what": "Read published templates and their merge fields (Templates)",
+                    "since": "1.82"
                 }
             ],
             "missing": [
                 "Plugin document themes",
                 "Editor blocks, toolbar items and slash-menu entries",
-                "Reading templates",
                 "Template and theme events"
             ],
             "security": "Merge fields and editor blocks end up in printed, immutable documents. Providers must be held to the caller's workspace and permissions by the host, and plugin block markup needs a sandbox and server-side schema checks.",

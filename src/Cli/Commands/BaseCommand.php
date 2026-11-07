@@ -612,6 +612,14 @@ abstract class BaseCommand implements CliCommand, CommandHelp
             new \Whity\Core\Document\Qr\DocumentQrScanRepository($db->getPdo()),
             $settingsService,
         ));
+        // SDK 1.82 (WHIT-996): the template reader, as in public/index.php.
+        \Whity\register_service(\Whity\Sdk\Documents\Templates::class, \Whity\Core\Document\Issuing\SdkTemplates::build(
+            $db->getPdo(),
+            $roleChecker,
+            $resourceTypeRegistry,
+            $settingsService,
+            $templateSlotRegistry,
+        ));
         \Whity\register_service(
             \Whity\Sdk\Documents\Documents::class,
             new \Whity\Core\Document\Issuing\SdkDocuments(

@@ -1505,6 +1505,33 @@ try {
 - `plugins/HelloWorld` declares a `greeting_card` slot for its greetings as a
   worked example.
 
+**Reading templates (SDK 1.82).** `\Whity\app(\Whity\Sdk\Documents\Templates::class)`
+lists and reads the workspace's published templates, so a plugin can offer a
+choice of template or check what a template needs before issuing:
+
+```php
+use Whity\Sdk\Documents\Templates;
+use Whity\Sdk\Documents\TemplateField;
+
+$templates = \Whity\app(Templates::class);
+foreach ($templates->list(recordType: 'Invoicing.invoice') as $t) {
+    // $t->id, $t->title, $t->kind, $t->lang, $t->publishedVersion, $t->slots
+    $ask = $t->requiredValues(); // template.* fields an issue must pass
+}
+$bound = $templates->forSlot('Invoicing.invoice');
+```
+
+- Each `TemplateInfo` describes the **published version**, which is what an
+  issue prints, never the draft. Its `fields` are every merge field it prints,
+  once each, with a `source`: `template` (pass it in `values`), `record` (the
+  record fills it) or `host` (company, today, the number).
+- It answers for the same caller as `Documents`: the person in a request, who
+  sees what the editor shows them; in your jobs, only templates bound to your
+  own slots, where the workspace allowed background issuing. With nobody,
+  `canRead()` is false and it returns nothing.
+- `list()` returns at most 200, newest first, and takes `kind` and
+  `recordType` filters.
+
 
 ## Step 12b — Add a card to the home page (SDK 1.62)
 
