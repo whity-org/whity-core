@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.78).
+ * SDK identity (v1.79).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1070,12 +1070,20 @@ namespace Whity\Sdk;
  * person who granted the agent decides a proposal (WHIT-991).
  *
  * Purely additive.)
+ *
+ * 1.79 (AI CONNECTIONS: the host service {@see Mcp\McpConnections} lists the workspace's
+ * active MCP connections, as the person whose request it is (the whole workspace with
+ * `mcp:tokens:manage`, otherwise their own), never with a token, jti or hash. Events
+ * {@see Hooks\Events::MCP_CONNECTION_CREATED}, `MCP_CONNECTION_GRANT_CHANGED` and
+ * `MCP_CONNECTION_REVOKED`, by connection id, after the change (WHIT-992).
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.78.0';
+    public const VERSION = '1.79.0';
 
     /**
      * Static identity only — never instantiated.

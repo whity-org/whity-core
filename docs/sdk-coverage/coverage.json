@@ -1,6 +1,6 @@
 {
     "$comment": "Plugin SDK coverage matrix: the single source of truth. Edit this file, then run `php scripts/sdk-coverage.php` to regenerate docs/wiki/Plugin-SDK-Coverage.md. CI fails when sdk_version is behind Sdk::VERSION, when an SDK minor in the Sdk.php ledger is not named by any `since`, or when the generated page is stale. Security notes say only that a design is needed; vulnerabilities go through SECURITY.md, never here.",
-    "sdk_version": "1.78.0",
+    "sdk_version": "1.79.0",
     "core_version": "0.2.26",
     "updated": "2026-11-06",
     "ratings": {
@@ -1170,11 +1170,13 @@
                 {
                     "what": "Agent lifecycle events",
                     "since": "1.75"
+                },
+                {
+                    "what": "MCP connections, read without secrets, and connection events",
+                    "since": "1.79"
                 }
             ],
-            "missing": [
-                "MCP connection and token events"
-            ],
+            "missing": [],
             "security": null,
             "plan": "0.2.27"
         },
