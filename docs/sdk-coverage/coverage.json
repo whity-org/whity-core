@@ -853,6 +853,10 @@
                     "since": null
                 },
                 {
+                    "what": "Read-only plan prices (PlanCatalogue)",
+                    "since": "1.84"
+                },
+                {
                     "what": "A plugin can be the deployment's billing portal: checkout, subscriptions, customer portal, refunds and verified provider notifications (PluginBillingPortalInterface)",
                     "since": "1.77"
                 }

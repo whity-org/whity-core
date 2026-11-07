@@ -5650,6 +5650,7 @@ $pluginLoader->setBillingPortals($pluginBillingPortals);
         minRefreshSeconds: 60,
     ),
 ));
+\Whity\register_service(\Whity\Sdk\Billing\PlanCatalogue::class, new \Whity\Core\Plan\HostPlanCatalogue($db->getPdo()));
 \Whity\register_service(\Whity\Sdk\Identity\LinkedPeople::class, new \Whity\Core\Identity\HostLinkedPeople($db->getPdo(), $roleChecker));
 // Code plugins' template slots and record types as merge fields (SDK 1.56, WHIT-742).
 $pluginLoader->setDocumentRegistries($templateSlotRegistry, $documentFieldRegistry);

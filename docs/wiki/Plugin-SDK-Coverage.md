@@ -713,6 +713,7 @@ Planned: later.
 **In the SDK**
 
 - Declared sellable limits in the plan catalogue (PluginEntitlementsInterface) (host)
+- Read-only plan prices (PlanCatalogue) (SDK 1.84)
 - A plugin can be the deployment's billing portal: checkout, subscriptions, customer portal, refunds and verified provider notifications (PluginBillingPortalInterface) (SDK 1.77)
 
 **Missing**
