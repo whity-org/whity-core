@@ -54,7 +54,7 @@ final class SdkAgents implements Agents, HostWiredService
             ));
         }
 
-        return array_values(array_map(self::present(...), $rows));
+        return array_map(self::present(...), $rows);
     }
 
     public function find(int $agentId): ?array
@@ -104,7 +104,7 @@ final class SdkAgents implements Agents, HostWiredService
             $manages ? null : $profileId,
         );
 
-        return array_values(array_map(static fn (array $row): array => [
+        return array_map(static fn (array $row): array => [
             'id'            => $row['kind'] . '-' . $row['id'],
             'kind'          => $row['kind'] === AgentActivityRepository::KIND_ACTION ? 'action' : 'proposal',
             'status'        => (string) $row['status'],
@@ -116,7 +116,7 @@ final class SdkAgents implements Agents, HostWiredService
             'permissions'   => array_values(array_map('strval', (array) $row['permissions'])),
             'undoableUntil' => $row['undoable_until'] !== null ? self::utc((string) $row['undoable_until']) : null,
             'createdAt'     => self::utc((string) $row['created_at']),
-        ], $rows));
+        ], $rows);
     }
 
     /** @return array{0: int, 1: int, 2: bool}|null the tenant, the person, and whether they manage agents */
