@@ -1587,6 +1587,12 @@ The approvals card shows each row's `label`, `before` and `after`. The host runs
 
 `Events::AGENT_PROPOSAL_CREATED`, `AGENT_PROPOSAL_DECIDED` and `AGENT_ACTION_UNDONE` tell you a proposal was filed, stopped waiting (`decision` is `approved`, `declined` or `expired`) or what an agent did was undone. The payloads carry ids and the tool's name, never the arguments. They fire after the change, and nothing a listener returns or throws changes it. **Only the person who granted the agent decides a proposal.** No plugin can approve or decline one.
 
+### AI connections (SDK 1.77)
+
+`Whity\Sdk\Mcp\McpConnections::list()` returns the workspace's active AI connections: the apps and workspace agents people connected over MCP, with their name, kind, person, agent, scope and when each was made, expires and was last used. Somebody with `mcp:tokens:manage` sees the whole workspace; anybody else sees their own. It never returns a token, a token id (jti) or a hash: a connection is named by its row id, which can't be used to call as it.
+
+`Events::MCP_CONNECTION_CREATED`, `MCP_CONNECTION_GRANT_CHANGED` and `MCP_CONNECTION_REVOKED` say a connection was made, its grant changed, or it was disconnected (`by` is `owner`, `admin` or `agent_removed`). Ids only, after the change. Connecting and disconnecting stay with people.
+
 ## Step 13 — Declare it in `plugin.json` instead (SDK 1.47)
 
 Everything a plugin only *declares* can live in a JSON file instead of PHP methods: its identity and requirements, permissions, roles, `blocks` screens, owned tables, data types and limits. Put `plugin.json` next to an empty class:

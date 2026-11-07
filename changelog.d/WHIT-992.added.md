@@ -1,0 +1,1 @@
+- Plugins can now see a workspace's AI connections, and hear when one is made, has its access changed or is disconnected (SDK 1.77, #1743). Someone who manages AI connections sees the whole workspace, and anyone else sees their own. No token or token id is ever shared.

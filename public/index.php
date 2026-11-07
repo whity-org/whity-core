@@ -5090,7 +5090,10 @@ $router->register('DELETE', '/api/relations/{id:\d+}', [$relationsHandler, 'dele
 // permission: each handler acts only on the caller's own tokens, and a token never
 // does more than its owner. mcp:tokens:manage is for the admin routes below, which
 // reach everyone's. Undeclared on purpose, which keeps them off the agent surface.
-$mcpTokenService = new McpTokenService($db->getPdo(), $jwtParser);
+// WHIT-992 (SDK 1.77): connection events, and the connections read for plugins.
+$mcpConnectionEvents = new \Whity\Mcp\Auth\McpConnectionEvents($db->getPdo(), $hookManager);
+\Whity\register_service(\Whity\Sdk\Mcp\McpConnections::class, new \Whity\Mcp\Auth\SdkMcpConnections($db->getPdo(), $roleChecker));
+$mcpTokenService = new McpTokenService($db->getPdo(), $jwtParser, $mcpConnectionEvents);
 // WHIT-832: the grant screen needs the operations an agent could be offered,
 // with their gates; derived once per worker from the same catalogue as tools/list.
 $mcpAgentOperations = null;
@@ -5115,7 +5118,7 @@ $router->register('PATCH',  '/api/mcp/tokens/{jti}/grant', [$mcpTokenHandler, 'u
 // permission can list or revoke any token in their tenant. Mirrors the per-user
 // McpTokenHandler routes but operates across the whole tenant rather than a
 // single user's issued tokens.
-$aiPrincipalsHandler = new AiPrincipalsApiHandler($db->getPdo(), $roleChecker);
+$aiPrincipalsHandler = new AiPrincipalsApiHandler($db->getPdo(), $roleChecker, $mcpConnectionEvents);
 $router->register('GET',    '/api/admin/mcp/tokens',       [$aiPrincipalsHandler, 'list'],   null, null, CorePermissions::MCP_TOKENS_MANAGE);
 $router->register('DELETE', '/api/admin/mcp/tokens/{jti}', [$aiPrincipalsHandler, 'revoke'], null, null, CorePermissions::MCP_TOKENS_MANAGE);
 
@@ -5241,7 +5244,7 @@ $mcpToolsCallHandler = new ToolsCallHandler($toolDeriver, $router, $roleChecker,
 // declines what it asked to do. Session-gated and never on the MCP surface:
 // an agent must not be able to approve its own proposal.
 // WHIT-816: a workspace agent's proposal runs under the person's assignment as it is now.
-$agentAssignments = new \Whity\Core\Agent\AgentAssignmentRepository($db->getPdo());
+$agentAssignments = new \Whity\Core\Agent\AgentAssignmentRepository($db->getPdo(), $mcpConnectionEvents);
 $agentProposalsHandler = new \Whity\Api\AgentProposalsApiHandler($agentProposals, $mcpToolsCallHandler, $auditLogger, $agentAssignments, $agentActions, $mcpToolCatalogue);
 $router->register('GET',  '/api/me/agent-proposals',                    [$agentProposalsHandler, 'list'],    null);
 $router->register('POST', '/api/me/agent-proposals/{id:\d+}/approve',  [$agentProposalsHandler, 'approve'], null);

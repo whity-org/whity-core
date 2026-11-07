@@ -437,6 +437,8 @@ abstract class BaseCommand implements CliCommand, CommandHelp
             new \Whity\Core\Agent\AgentProposalRepository($db->getPdo()),
             $roleChecker,
         ));
+        // WHIT-992 (SDK 1.77): the workspace's AI connections, as in public/index.php.
+        \Whity\register_service(\Whity\Sdk\Mcp\McpConnections::class, new \Whity\Mcp\Auth\SdkMcpConnections($db->getPdo(), $roleChecker));
 
         $baseDir = dirname(__DIR__, 3);
         // The registries are passed HERE, not just constructed above: this loader
