@@ -64,12 +64,12 @@ final class TenantLocalizedNamesRealEngineTest extends TestCase
         $this->assertSame(200, $response->getStatusCode(), $response->getBody());
 
         // The original stays in the column, so every existing query still sees it.
-        $row = $this->pdo->query('SELECT name, name_language FROM tenants WHERE id = 1')->fetch(PDO::FETCH_ASSOC);
+        $row = $this->row('SELECT name, name_language FROM tenants WHERE id = 1');
         $this->assertSame(self::AR, $row['name']);
         $this->assertSame('ar', $row['name_language']);
         $this->assertSame(
             [['language_code' => 'en', 'value' => self::EN]],
-            $this->pdo->query("SELECT language_code, value FROM localized_texts WHERE tenant_id = 1 AND entity_type = 'tenant' AND entity_id = 1")->fetchAll(PDO::FETCH_ASSOC)
+            $this->rows("SELECT language_code, value FROM localized_texts WHERE tenant_id = 1 AND entity_type = 'tenant' AND entity_id = 1")
         );
 
         $tenant = $this->list('/api/tenants')['data'][0];
@@ -98,7 +98,7 @@ final class TenantLocalizedNamesRealEngineTest extends TestCase
         $response = $this->update(1, ['nameLanguage' => 'en']);
         $this->assertSame(200, $response->getStatusCode(), $response->getBody());
 
-        $this->assertSame(self::EN, $this->pdo->query('SELECT name FROM tenants WHERE id = 1')->fetchColumn());
+        $this->assertSame(self::EN, $this->scalar('SELECT name FROM tenants WHERE id = 1'));
         $this->assertSame(['en' => self::EN, 'ar' => self::AR], $this->list('/api/tenants')['data'][0]['names']);
     }
 
@@ -117,7 +117,7 @@ final class TenantLocalizedNamesRealEngineTest extends TestCase
         $response = $this->update(1, ['names' => ['en' => self::EN], 'nameLanguage' => 'ar']);
 
         $this->assertSame(422, $response->getStatusCode());
-        $this->assertSame('Example Bakery', $this->pdo->query('SELECT name FROM tenants WHERE id = 1')->fetchColumn());
+        $this->assertSame('Example Bakery', $this->scalar('SELECT name FROM tenants WHERE id = 1'));
     }
 
     public function testABadLanguageCodeIsRefused(): void
@@ -179,7 +179,7 @@ final class TenantLocalizedNamesRealEngineTest extends TestCase
         $id = (int) $data['id'];
         $this->assertSame(
             self::EN,
-            $this->pdo->query("SELECT value FROM localized_texts WHERE tenant_id = {$id} AND entity_id = {$id} AND language_code = 'en'")->fetchColumn()
+            $this->scalar("SELECT value FROM localized_texts WHERE tenant_id = {$id} AND entity_id = {$id} AND language_code = 'en'")
         );
     }
 
@@ -191,7 +191,7 @@ final class TenantLocalizedNamesRealEngineTest extends TestCase
         $response = $this->handler()->delete(new Request('DELETE', '/api/tenants/2', []), ['id' => 2]);
         $this->assertSame(200, $response->getStatusCode(), $response->getBody());
 
-        $this->assertSame(0, (int) $this->pdo->query('SELECT COUNT(*) FROM localized_texts WHERE tenant_id = 2')->fetchColumn());
+        $this->assertSame(0, (int) $this->scalar('SELECT COUNT(*) FROM localized_texts WHERE tenant_id = 2'));
     }
 
     /** @param array<string, mixed> $body */
@@ -221,5 +221,33 @@ final class TenantLocalizedNamesRealEngineTest extends TestCase
         $hooks->method('dispatchAsync');
 
         return new TenantsApiHandler($this->pdo, $hooks);
+    }
+
+    private function scalar(string $sql): mixed
+    {
+        $stmt = $this->pdo->query($sql);
+        self::assertNotFalse($stmt, 'Query failed: ' . $sql);
+
+        return $stmt->fetchColumn();
+    }
+
+    /** @return array<string, mixed> */
+    private function row(string $sql): array
+    {
+        $stmt = $this->pdo->query($sql);
+        self::assertNotFalse($stmt, 'Query failed: ' . $sql);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        self::assertIsArray($row);
+
+        return $row;
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function rows(string $sql): array
+    {
+        $stmt = $this->pdo->query($sql);
+        self::assertNotFalse($stmt, 'Query failed: ' . $sql);
+
+        return array_values($stmt->fetchAll(PDO::FETCH_ASSOC));
     }
 }

@@ -642,40 +642,20 @@ class TenantsApiHandler
      */
     private function namingFromBody(array $body, string $currentName, string $currentLanguage, array $currentOthers): array|Response
     {
-        $language = $currentLanguage;
-        if (array_key_exists('nameLanguage', $body)) {
-            if (!is_string($body['nameLanguage']) || !LocalizedTexts::isLanguageCode($body['nameLanguage'])) {
-                return Response::error('nameLanguage must be a language code, such as "ar" or "en".', 422);
-            }
-            $language = $body['nameLanguage'];
-        }
-
         try {
-            $names = array_key_exists('names', $body)
-                ? LocalizedTexts::normalize($body['names'], 'names')
-                : LocalizedTexts::merge($currentName, $currentLanguage, $currentOthers);
+            return LocalizedTexts::fromBody(
+                $body,
+                $currentName,
+                $currentLanguage,
+                $currentOthers,
+                InputLimits::NAME_MAX,
+                'name',
+                'names',
+                'nameLanguage'
+            );
         } catch (LocalizedTextRejected $e) {
-            return Response::error($e->getMessage(), 422);
+            return Response::error($e->clientMessage, 422);
         }
-
-        if (isset($body['name'])) {
-            $name = trim((string) $body['name']);
-            if ($name !== '') {
-                $names[$language] = $name;
-            }
-        }
-
-        $original = $names[$language] ?? '';
-        if ($original === '') {
-            return Response::error("The name in the original language ({$language}) is required.", 422);
-        }
-        if (mb_strlen($original) > InputLimits::NAME_MAX) {
-            return Response::error('name must be ' . InputLimits::NAME_MAX . ' characters or fewer.', 422);
-        }
-
-        unset($names[$language]);
-
-        return ['name' => $original, 'language' => $language, 'others' => $names];
     }
 
     /**

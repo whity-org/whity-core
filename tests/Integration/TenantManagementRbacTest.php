@@ -86,6 +86,7 @@ class TenantManagementRbacTest extends TestCase
         $db->method('prepare')->willReturnOnConsecutiveCalls(
             $this->statement(['id' => 7]),       // SELECT target tenant
             $this->statement(['count' => 0]),    // user count
+            $this->statement(),                  // DELETE its localized names (#821)
             $this->statement()                   // DELETE
         );
         $handler = new TenantsApiHandler($db, $this->createMock(HookManager::class));
@@ -115,8 +116,11 @@ class TenantManagementRbacTest extends TestCase
         $db = $this->createMock(PDO::class);
         $db->method('prepare')->willReturnOnConsecutiveCalls(
             $this->statement(['id' => 7, 'name' => 'Old', 'slug' => 'old']), // SELECT
+            $this->statement(),                                               // other-language names (#821)
             $this->statement(false),                                          // name unique
-            $this->statement()                                                // UPDATE
+            $this->statement(),                                               // UPDATE
+            $this->statement(),                                               // UPDATE name_language
+            $this->statement()                                                // DELETE old other-language names
         );
         $handler = new TenantsApiHandler($db, $this->createMock(HookManager::class));
 

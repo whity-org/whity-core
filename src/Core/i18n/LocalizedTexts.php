@@ -187,6 +187,61 @@ final class LocalizedTexts
         return $out;
     }
 
+    /**
+     * Read an entity's names from a request body.
+     *
+     * `$languageKey` holds the original's language, `$namesKey` every language
+     * at once (it replaces them all), and `$nameKey` the original alone. The
+     * original must have text: every other language falls back to it.
+     *
+     * @param array<string, mixed>  $body
+     * @param array<string, string> $currentOthers The other languages stored now.
+     * @return array{name: string, language: string, others: array<string, string>}
+     *
+     * @throws LocalizedTextRejected
+     */
+    public static function fromBody(
+        array $body,
+        string $currentName,
+        string $currentLanguage,
+        array $currentOthers,
+        int $maxLength,
+        string $nameKey = 'name',
+        string $namesKey = 'names',
+        string $languageKey = 'name_language',
+    ): array {
+        $language = $currentLanguage;
+        if (array_key_exists($languageKey, $body)) {
+            if (!is_string($body[$languageKey]) || !self::isLanguageCode($body[$languageKey])) {
+                throw new LocalizedTextRejected("{$languageKey} must be a language code, such as \"ar\" or \"en\".");
+            }
+            $language = $body[$languageKey];
+        }
+
+        $names = array_key_exists($namesKey, $body)
+            ? self::normalize($body[$namesKey], $namesKey)
+            : self::merge($currentName, $currentLanguage, $currentOthers);
+
+        if (isset($body[$nameKey]) && is_scalar($body[$nameKey])) {
+            $name = trim((string) $body[$nameKey]);
+            if ($name !== '') {
+                $names[$language] = $name;
+            }
+        }
+
+        $original = $names[$language] ?? '';
+        if ($original === '') {
+            throw new LocalizedTextRejected("The name in the original language ({$language}) is required.");
+        }
+        if (mb_strlen($original) > $maxLength) {
+            throw new LocalizedTextRejected("{$nameKey} must be {$maxLength} characters or fewer.");
+        }
+
+        unset($names[$language]);
+
+        return ['name' => $original, 'language' => $language, 'others' => $names];
+    }
+
     public static function isLanguageCode(string $code): bool
     {
         return preg_match(self::LANGUAGE_PATTERN, $code) === 1;

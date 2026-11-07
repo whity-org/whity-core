@@ -10721,6 +10721,11 @@ export interface components {
             memberships?: {
                 tenant_id: number;
                 tenant_name: string;
+                tenant_name_language?: string;
+                tenant_names?: {
+                    ar?: string;
+                    en?: string;
+                };
                 role: string;
             }[] | null;
             selection_token?: string;
@@ -10835,6 +10840,11 @@ export interface components {
             memberships: {
                 tenant_id: number;
                 tenant_name: string;
+                tenant_name_language?: string;
+                tenant_names?: {
+                    ar?: string;
+                    en?: string;
+                };
                 role: string;
             }[];
         };
@@ -11452,6 +11462,11 @@ export interface components {
                 memberships: {
                     tenant_id: number;
                     tenant_name: string;
+                    tenant_name_language?: string;
+                    tenant_names?: {
+                        ar?: string;
+                        en?: string;
+                    };
                     role: string;
                 }[];
             };
@@ -12685,7 +12700,15 @@ export interface components {
         };
         Tenant: {
             id: number;
+            /** @description The original name, in `nameLanguage`. */
             name: string;
+            /** @description Language code of the original name. For many institutions this is Arabic, not English. */
+            nameLanguage: string;
+            /** @description The name in every language it has, original included. A reader with no name in their language sees the original. */
+            names: {
+                ar?: string;
+                en?: string;
+            };
             slug: string | null;
             userCount: number;
             createdAt: string | null;
@@ -12700,8 +12723,15 @@ export interface components {
             };
         };
         TenantCreateRequest: {
-            /** @description Display name of the new tenant (workspace). */
-            name: string;
+            /** @description Original name of the new tenant (workspace). Required unless `names` is sent. */
+            name?: string;
+            /** @description The name in every language, for example `{"ar": "...", "en": "..."}`. */
+            names?: {
+                ar?: string;
+                en?: string;
+            };
+            /** @description Language code of the original name. Defaults to `ar` for a name in Arabic letters, `en` otherwise. */
+            nameLanguage?: string;
             /** @description URL-safe identifier: lower-case letters, digits and dashes. Generated from the name when omitted; must be unique. */
             slug?: string;
             /** @description Optional first administrator, created in the same transaction: `{email, password, role?}`. Without it no one can sign in to the new tenant. */
@@ -12825,8 +12855,15 @@ export interface components {
             data: components["schemas"]["Tenant"];
         };
         TenantUpdateRequest: {
-            /** @description New display name. */
+            /** @description New original name, in `nameLanguage`. */
             name?: string;
+            /** @description The name in every language; replaces them all. A blank language is removed. */
+            names?: {
+                ar?: string;
+                en?: string;
+            };
+            /** @description Language code of the original name. The original must have text. */
+            nameLanguage?: string;
             /** @description New URL-safe identifier (lower-case letters, digits, dashes); must be unique. */
             slug?: string;
         };
