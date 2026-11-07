@@ -416,6 +416,61 @@ class DelegationRepository
     }
 
     /**
+     * The live grants for a grantee, each with the person who made it.
+     *
+     * The same match as {@see self::livePermissionsForGrantee()}. Resolution
+     * uses this one: a grant counts only while its grantor still holds the
+     * permission, and that is decided per grantor
+     * ({@see DelegationService::delegatedPermissionsForUser()}).
+     *
+     * @param array<int,int> $inScopeOuIds
+     * @return list<array{permission: string, grantor: int}>
+     */
+    public function liveGrantsForGrantee(
+        int $tenantId,
+        string $granteeType,
+        int $granteeId,
+        array $inScopeOuIds
+    ): array {
+        $sql = 'SELECT DISTINCT permission, grantor_profile_id
+                FROM permission_delegations
+                WHERE tenant_id = :tenant_id
+                  AND grantee_type = :grantee_type
+                  AND grantee_id = :grantee_id
+                  AND revoked_at IS NULL
+                  AND (expires_at IS NULL OR expires_at > :now)';
+        $params = [
+            ':tenant_id'    => $tenantId,
+            ':grantee_type' => $granteeType,
+            ':grantee_id'   => $granteeId,
+            ':now'          => gmdate('Y-m-d H:i:s'),
+        ];
+
+        if ($inScopeOuIds === []) {
+            $sql .= ' AND ou_id IS NULL';
+        } else {
+            $placeholders = [];
+            foreach (array_values($inScopeOuIds) as $i => $ouId) {
+                $key = ':ou' . $i;
+                $placeholders[] = $key;
+                $params[$key] = $ouId;
+            }
+            $sql .= ' AND (ou_id IS NULL OR ou_id IN (' . implode(', ', $placeholders) . '))';
+        }
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+
+        /** @var array<int, array<string, mixed>> $rows */
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return array_values(array_map(
+            static fn (array $row): array => ['permission' => (string) $row['permission'], 'grantor' => (int) $row['grantor_profile_id']],
+            $rows
+        ));
+    }
+
+    /**
      * Mark a delegation revoked (non-destructive: sets `revoked_at`).
      *
      * Tenant-scoped: a non-system tenant may revoke only its own delegations.
