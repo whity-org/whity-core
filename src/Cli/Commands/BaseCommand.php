@@ -528,6 +528,17 @@ abstract class BaseCommand implements CliCommand, CommandHelp
         $templateSlotRegistry = new \Whity\Core\Document\Slots\TemplateSlotRegistry($liveManifests);
         $agentPresetRegistry->useManifests($liveManifests);
         \Whity\register_service(\Whity\Core\Document\Slots\TemplateSlotRegistry::class, $templateSlotRegistry);
+        // #1151: one document stack for this process, shared by issuing and
+        // the SDK's DocumentRenderer, built on first use.
+        $documentParts = new \Whity\Core\Document\Issuing\WorkerDocumentParts(
+            $db->getPdo(),
+            $settingsService,
+            $hookManager,
+            $documentFieldRegistry,
+            $documentEmbedRegistry,
+            $_ENV,
+            getenv('STORAGE_ROOT') ?: ($baseDir . '/storage'),
+        );
         \Whity\register_service(
             \Whity\Core\Document\Issuing\TemplateIssuing::class,
             \Whity\Core\Document\Issuing\WorkerDocumentIssuing::build(
@@ -541,6 +552,15 @@ abstract class BaseCommand implements CliCommand, CommandHelp
                 $templateSlotRegistry,
                 $_ENV,
                 getenv('STORAGE_ROOT') ?: ($baseDir . '/storage'),
+                $documentParts,
+            )
+        );
+        // The SDK rendering seam (#1151), as in public/index.php: a plugin's
+        // command renders and issues flowing documents through the same stack.
+        \Whity\register_service(
+            \Whity\Sdk\Render\DocumentRenderer::class,
+            new \Whity\Core\Document\Render\DeferredSdkDocumentRenderer(
+                static fn (): \Whity\Sdk\Render\DocumentRenderer => $documentParts->sdkRenderer()
             )
         );
         // WHIT-838 (SDK 1.60): plugin secrets, as in public/index.php, so a

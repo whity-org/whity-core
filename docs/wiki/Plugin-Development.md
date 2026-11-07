@@ -1390,13 +1390,12 @@ printed document.
 a `RenderRejectedException` naming the number, because the number is
 configurable and therefore not knowable from your side.
 
-**Where it is available.** The host registers this seam in the **HTTP entry
-point only**. Resolving it from a CLI command or a queue worker throws the
-container's ordinary "not registered" error — issuing a document needs the
-per-tenant storage stack, and building a second copy of that in the CLI kernel
-is the split-backend hazard the storage factory warns about. Until it is wired
-there, render inside the request, or have the job enqueue the document's
-*inputs* and render on the next request that needs them.
+**Where it is available.** In a request, in a queue job and in a CLI command
+(since SDK 1.76, #1151). A job runs in its workspace, so a long document
+assembled from your own queries belongs in a job rather than a request. Each
+process builds one document stack, so a document a job issues is stored where
+the same workspace's request would store it. In a job there may be no person:
+the document is then recorded with no issuer.
 
 ---
 
@@ -1553,7 +1552,7 @@ Declare `'public' => 'read'` on GET `/api/<your slug>/public/<name>/{key}` for s
 
 See [Public reads](Plugin-Public-Forms.md#public-reads-sdk-169).
 
-## Step 12e — Read the workspace's agents (SDK 1.75)
+## Step 12e — Read the workspace's agents (SDK 1.76)
 
 `Whity\Sdk\Agents\Agents` reads the workspace's AI agents and what they did, as the person whose request it is:
 
@@ -1665,8 +1664,8 @@ public function getPermissions(): array
 - [ ] (Optional) Document rendering checks `isAvailable()` before assembling
       anything expensive, handles `RenderRejectedException` and
       `RenderUnavailableException` **separately** (one is permanent, the other
-      is the default state of a fresh install), and is not called from a CLI
-      command or a queue worker (Step 12).
+      is the default state of a fresh install). Long documents are rendered
+      in a job, not a request (Step 12).
 
 See [Architecture.md](./Architecture.md) for how this all fits together.
 

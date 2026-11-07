@@ -1,6 +1,6 @@
 {
     "$comment": "Plugin SDK coverage matrix: the single source of truth. Edit this file, then run `php scripts/sdk-coverage.php` to regenerate docs/wiki/Plugin-SDK-Coverage.md. CI fails when sdk_version is behind Sdk::VERSION, when an SDK minor in the Sdk.php ledger is not named by any `since`, or when the generated page is stale. Security notes say only that a design is needed; vulnerabilities go through SECURITY.md, never here.",
-    "sdk_version": "1.75.0",
+    "sdk_version": "1.76.0",
     "core_version": "0.2.26",
     "updated": "2026-11-06",
     "ratings": {
@@ -377,12 +377,15 @@
                 {
                     "what": "Inline runs in flowing text",
                     "since": "1.44"
+                },
+                {
+                    "what": "Render and issue from queue jobs and CLI commands",
+                    "since": "1.76"
                 }
             ],
             "missing": [
                 "Choosing a theme or brand when rendering",
-                "Rendering from a workspace template outside Documents::issue",
-                "Rendering from a job (the seam is HTTP-only)"
+                "Rendering from a workspace template outside Documents::issue"
             ],
             "security": "HTML or CSS input to the renderer would be an injection and server-side request surface. Keep input structured.",
             "issues": [

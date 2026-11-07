@@ -57,20 +57,14 @@ namespace Whity\Sdk\Render;
  * tenant's storage with drafts; in the other it loses the audit trail for a
  * document somebody acted on.
  *
- * WHERE IT IS AVAILABLE (READ THIS BEFORE CALLING IT FROM A JOB)
- * --------------------------------------------------------------
- * As of SDK 1.41 the host registers this seam in the HTTP entry point only.
- * Resolving it from a CLI command or a queue worker throws the container's
- * ordinary "not registered" error, because issuing a document needs the
- * per-tenant storage stack and building a second copy of that in the CLI kernel
- * would be the split-backend hazard the host's storage factory warns about —
- * two drivers from one set of settings, disagreeing about where a tenant's
- * files live.
- *
- * This is a real limitation and not a permanent one: a long document assembled
- * from a plugin's own queries is exactly the work that belongs in a job. Until
- * it is wired there, render inside the request, or have the job enqueue the
- * document's INPUTS and render on the next request that needs it.
+ * WHERE IT IS AVAILABLE
+ * ---------------------
+ * In a request, a queue job and a CLI command (SDK 1.76, #1151). A long
+ * document assembled from a plugin's own queries is exactly the work that
+ * belongs in a job. A job runs in its tenant's context; each process builds
+ * one per-tenant storage stack, so a job's document is stored where the same
+ * tenant's request would store it. With no person behind a job, an issued
+ * document is recorded with no issuer.
  *
  * FAILURE
  * -------
