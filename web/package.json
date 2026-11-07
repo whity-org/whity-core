@@ -22,7 +22,7 @@
     "tokens:check": "node ../src/design/tokens/generate-tokens.js check"
   },
   "dependencies": {
-    "@hookform/resolvers": "^6.0.1",
+    "@hookform/resolvers": "^7.0.2",
     "@tabler/icons-react": "^3.50.0",
     "@whity/features": "file:../packages/features",
     "@whity/ui": "file:../packages/ui",
