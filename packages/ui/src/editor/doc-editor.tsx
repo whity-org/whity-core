@@ -116,6 +116,11 @@ export interface DocEditorProps {
    * so each edit shows with the record's values as it will print.
    */
   editWhilePreviewing?: boolean
+  /**
+   * Issuing from a template (M4c): nothing in the formatting toolbar works on
+   * the published version, so it isn't shown.
+   */
+  hideToolbar?: boolean
   /** Starts a preview (the screen asks which record) or changes the record. */
   onPreview?: () => void
   /** Show fields: leaves the preview. */
@@ -201,6 +206,7 @@ function DocEditor({
   pageFields,
   preview = null,
   editWhilePreviewing = false,
+  hideToolbar = false,
   onPreview,
   onClosePreview,
   publish,
@@ -922,6 +928,13 @@ function DocEditor({
               {labels.preview}
             </Button>
           )}
+          {/* Preview takes its own button's place, so the way back is where
+              the way in was: the pill's Show fields was easy to miss. */}
+          {preview && onClosePreview && (
+            <Button variant="outline" size="sm" icon="edit" onClick={onClosePreview}>
+              {labels.backToEditing}
+            </Button>
+          )}
           {isLabel && onPrintLabels && (
             <Button variant="outline" size="sm" icon="print" onClick={onPrintLabels}>
               {labels.printLabels}
@@ -941,7 +954,7 @@ function DocEditor({
       </header>
 
       {/* Toolbar (44px) */}
-      {editor ? (
+      {hideToolbar ? null : editor ? (
         <EditorToolbar
           editor={editor}
           labels={labels}
@@ -1020,7 +1033,7 @@ function DocEditor({
               <Icon name="view" size={14} />
               <span>{labels.previewingWith}</span>
               <b>{preview.label}</b>
-              {onPreview && (
+              {onPreview && !preview.noRecord && (
                 <Button variant="ghost" size="sm" onClick={onPreview}>
                   {labels.changeRecord}
                 </Button>

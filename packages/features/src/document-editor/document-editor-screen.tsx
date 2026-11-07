@@ -439,10 +439,29 @@ export function DocumentEditorScreen({
 
   // The own fields' values join the record's in the preview chips as they are typed.
   const shownPreview = React.useMemo(() => {
-    if (!issuingMode || !preview) return preview;
-    const own = Object.fromEntries(Object.entries(filledValues).map(([k, v]) => [`template.${k}`, v]));
-    return { ...preview, values: { ...preview.values, ...own } };
-  }, [issuingMode, preview, filledValues]);
+    if (!preview) return preview;
+    if (issuingMode) {
+      const own = Object.fromEntries(Object.entries(filledValues).map(([k, v]) => [`template.${k}`, v]));
+      // No record type: the sheet shows what is typed above it, so it says that.
+      return recordType
+        ? { ...preview, values: { ...preview.values, ...own } }
+        : { ...preview, label: preview.label || labels.typedValues, values: { ...preview.values, ...own }, noRecord: true };
+    }
+    // Preview with no record to preview with (a template without a record
+    // type): every one of its own fields came back empty and showed on the
+    // error tint, though each has an example. Show the examples, and say so.
+    if (recordType || previewRecord !== null) return preview;
+    const samples: Record<string, string> = {};
+    for (const group of template?.fields ?? []) {
+      for (const field of group.items) if (field.sample) samples[field.path] = field.sample;
+    }
+    for (const field of ownFields) if (field.sample) samples[`template.${field.key}`] = field.sample;
+    const values = { ...preview.values };
+    for (const [path, sample] of Object.entries(samples)) {
+      if (values[path] === null || values[path] === undefined || values[path] === '') values[path] = sample;
+    }
+    return { ...preview, label: preview.label || labels.exampleValues, values, examples: true, noRecord: true };
+  }, [issuingMode, preview, filledValues, recordType, previewRecord, template, ownFields, labels.exampleValues, labels.typedValues]);
 
   /** A field path from a refusal, in the template's own words. */
   const fieldName = React.useCallback(
@@ -590,6 +609,7 @@ export function DocumentEditorScreen({
                 preview: shownPreview,
                 // Issuing a letter: edit with the record's values showing (M4c).
                 editWhilePreviewing: issuingMode && doc.kind !== 'template',
+                hideToolbar: issuingMode && doc.kind === 'template',
                 onPreview: adapter.preview ? () => (recordType ? setPickerFor('preview') : void showPreview(null)) : undefined,
                 // While issuing the preview stays on: it is what will be issued.
                 onClosePreview: issuingMode
