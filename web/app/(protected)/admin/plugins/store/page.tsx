@@ -11,6 +11,7 @@ import { useTranslation } from '@whity/features/i18n';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { PluginsTabs } from '@/components/plugins/plugins-tabs';
 import { InstallPluginDialog } from '@/components/plugins/install-plugin-dialog';
+import { StoreConnectionCard, type StoreConnection } from '@/components/plugins/store-connection-card';
 import { InstallButton, type CataloguePlugin, usePluginAddsLabels, usePriceLabel, useUsageLabel } from '@/components/plugins/plugin-facts';
 import { Button } from '@whity/ui/button';
 import { PluginTile } from '@whity/ui/plugin-card';
@@ -39,6 +40,7 @@ export default function PluginStorePage() {
   const [canInstall, setCanInstall] = useState(false);
   const [canInstallDeclarative, setCanInstallDeclarative] = useState(false);
   const [storeUrl, setStoreUrl] = useState('');
+  const [connection, setConnection] = useState<StoreConnection>({ connected: false });
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState<string | null>(null);
 
@@ -60,6 +62,7 @@ export default function PluginStorePage() {
     setFeatureEnabled(data.data.enabled);
     setCanInstall(data.data.can_install);
     setCanInstallDeclarative(data.data.can_install_declarative);
+    setConnection(data.data.connection ?? { connected: false });
     // Preselect the first store so a one-store deployment needs no click.
     if (data.data.hosts.length > 0) {
       setStoreUrl(`https://${data.data.hosts[0]}`);
@@ -161,6 +164,15 @@ export default function PluginStorePage() {
         />
       ) : (
         <>
+          {storeUrl && (isOperator || connection.connected) ? (
+            <StoreConnectionCard
+              storeUrl={storeUrl}
+              connection={connection}
+              canManage={isOperator && canInstall}
+              onChanged={() => void loadHosts()}
+            />
+          ) : null}
+
           <div className="flex flex-col gap-3 md:flex-row md:items-center">
             <SearchField
               className="flex-1"
@@ -267,6 +279,9 @@ export default function PluginStorePage() {
       <InstallPluginDialog
         plugin={installing}
         storeUrl={storeUrl}
+        connected={
+          connection.connected && !connection.needs_reconnect && `https://${connection.store_host}` === storeUrl
+        }
         onOpenChange={(open) => {
           if (!open) setInstalling(null);
         }}

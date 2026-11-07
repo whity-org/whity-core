@@ -35,14 +35,35 @@ final class HttpFetcher implements HttpClient
     ) {
     }
 
-    public function getJson(string $url): ?array
+    /**
+     * @param array<string, string> $headers Extra request headers (e.g. an `Authorization` bearer).
+     */
+    public function getJson(string $url, #[\SensitiveParameter] array $headers = []): ?array
     {
-        return $this->decode($this->fetch('GET', $url, null));
+        return $this->decode($this->fetch('GET', $url, null, $headers));
     }
 
     public function postForm(string $url, #[\SensitiveParameter] array $params): ?array
     {
         return $this->decode($this->fetch('POST', $url, http_build_query($params)));
+    }
+
+    /**
+     * POST a JSON object (e.g. an RFC 7591 client registration). Like postForm, the body of an
+     * error response is decoded too, so the caller can read an OAuth `error`.
+     *
+     * @param array<string, mixed> $payload
+     * @return array<mixed>|null
+     */
+    public function postJson(string $url, #[\SensitiveParameter] array $payload): ?array
+    {
+        return $this->decode($this->fetch(
+            'POST',
+            $url,
+            (string) json_encode($payload, JSON_UNESCAPED_SLASHES),
+            [],
+            'application/json',
+        ));
     }
 
     /**
@@ -182,7 +203,16 @@ final class HttpFetcher implements HttpClient
         return array_values(array_unique($ips));
     }
 
-    private function fetch(string $method, string $url, #[\SensitiveParameter] ?string $body): ?string
+    /**
+     * @param array<string, string> $extraHeaders
+     */
+    private function fetch(
+        string $method,
+        string $url,
+        #[\SensitiveParameter] ?string $body,
+        #[\SensitiveParameter] array $extraHeaders = [],
+        string $contentType = 'application/x-www-form-urlencoded',
+    ): ?string
     {
         if (!self::isPubliclyRoutableUrl($url)) {
             // A blocked URL is a configuration/security problem, not a transient
@@ -193,7 +223,15 @@ final class HttpFetcher implements HttpClient
 
         $headers = "Accept: application/json\r\n";
         if ($body !== null) {
-            $headers .= "Content-Type: application/x-www-form-urlencoded\r\n";
+            $headers .= 'Content-Type: ' . $contentType . "\r\n";
+        }
+        foreach ($extraHeaders as $name => $value) {
+            // Strip CR/LF so a header name or value cannot split the request.
+            $name = str_replace(["\r", "\n"], '', (string) $name);
+            $value = str_replace(["\r", "\n"], '', (string) $value);
+            if ($name !== '') {
+                $headers .= $name . ': ' . $value . "\r\n";
+            }
         }
 
         $context = stream_context_create([

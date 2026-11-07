@@ -23,6 +23,8 @@ const PLUGINS_ENABLE = 'plugins:enable';
 export interface InstallPluginDialogProps {
   plugin: CataloguePlugin | null;
   storeUrl: string;
+  /** WHIT-1003: this installation is connected to the store, so no token is asked for. */
+  connected?: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
@@ -31,7 +33,7 @@ export interface InstallPluginDialogProps {
  * need price and settings data no API returns yet, so they are left out, and
  * the Stepper counts only the steps shown: Access, then Done.
  */
-export function InstallPluginDialog({ plugin, storeUrl, onOpenChange }: InstallPluginDialogProps) {
+export function InstallPluginDialog({ plugin, storeUrl, connected = false, onOpenChange }: InstallPluginDialogProps) {
   const t = useTranslation('admin');
   const { addToast } = useToast();
   const { hasPermission } = useCapabilities();
@@ -237,6 +239,11 @@ export function InstallPluginDialog({ plugin, storeUrl, onOpenChange }: InstallP
                   ) : null}
                 </TechnicalDetails>
 
+                {connected ? (
+                  <p className="text-sm text-muted-foreground">
+                    {t('pluginStore.connect.usesConnection', 'Installed with this installation\'s Whity store connection.')}
+                  </p>
+                ) : (
                 <div className="space-y-1.5">
                   <label htmlFor="plugin-store-token" className="font-medium">
                     {t('pluginStore.field.token', 'Access token')}
@@ -264,6 +271,7 @@ export function InstallPluginDialog({ plugin, storeUrl, onOpenChange }: InstallP
                     </Button>
                   </div>
                 </div>
+                )}
 
                 {error ? (
                   <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-destructive">

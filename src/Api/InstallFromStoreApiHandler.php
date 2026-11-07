@@ -13,6 +13,8 @@ use Whity\Core\Exception\PluginPackageInvalid;
 use Whity\Core\Http\HttpFetcher;
 use Whity\Core\Plugin\PluginOperatorGate;
 use Whity\Core\Plugin\PluginRecords;
+use Whity\Core\Plugin\Store\WhityStoreConnectException;
+use Whity\Core\Plugin\Store\WhityStoreConnector;
 use Whity\Core\Plugin\StoreCatalogueEntry;
 use Whity\Core\Plugin\Tenant\TenantManifestPublisher;
 use Whity\Core\Plugin\Tenant\TenantPluginRepository;
@@ -57,6 +59,7 @@ final class InstallFromStoreApiHandler
     private \Closure $fetchPackage;
 
     /** @var \Closure(string): ?array<string, mixed> */
+    /** @var \Closure(string, array<string, string>=): ?array<mixed> */
     private \Closure $fetchJson;
 
     /**
@@ -79,12 +82,13 @@ final class InstallFromStoreApiHandler
         private readonly ?TenantManifestPublisher $publisher = null,
         private readonly ?TenantPluginRepository $workspacePlugins = null,
         private readonly ?PluginTrust $trust = null,
+        private readonly ?WhityStoreConnector $connector = null,
     ) {
         $this->fetchPackage = $fetchPackage ?? static fn (string $url, array $headers): ?string
             => (new HttpFetcher(timeoutSeconds: 15, maxBytes: PluginInstaller::MAX_UPLOAD_BYTES))
                 ->getBinary($url, $headers);
-        $this->fetchJson = $fetchJson ?? static fn (string $url): ?array
-            => (new HttpFetcher(timeoutSeconds: 15))->getJson($url);
+        $this->fetchJson = $fetchJson ?? static fn (string $url, array $headers = []): ?array
+            => (new HttpFetcher(timeoutSeconds: 15))->getJson($url, $headers);
     }
 
     /**
@@ -129,10 +133,7 @@ final class InstallFromStoreApiHandler
             . '/api/v1/plugin-store/plugins/' . rawurlencode($slug)
             . '/versions/' . rawurlencode($version) . '/download';
 
-        $headers = [];
-        if ($token !== '') {
-            $headers['Authorization'] = 'Bearer ' . $token;
-        }
+        $headers = $this->authHeaders((string) $origin, $token);
 
         try {
             $bytes = ($this->fetchPackage)($downloadUrl, $headers);
@@ -243,7 +244,7 @@ final class InstallFromStoreApiHandler
         try {
             $bytes = ($this->fetchPackage)(
                 $origin . '/api/v1/plugin-store/plugins/' . rawurlencode($slug) . '/versions/' . rawurlencode($version) . '/manifest',
-                $token !== '' ? ['Authorization' => 'Bearer ' . $token] : []
+                $this->authHeaders($origin, $token)
             );
         } catch (\Throwable $e) {
             error_log('[InstallFromStore] manifest fetch refused/failed: ' . $e->getMessage());
@@ -461,7 +462,7 @@ final class InstallFromStoreApiHandler
 
         $body = json_decode($request->getBody(), true);
         $token = is_array($body) ? (string) ($body['token'] ?? '') : '';
-        $headers = $token !== '' ? ['Authorization' => 'Bearer ' . $token] : [];
+        $headers = $this->authHeaders((string) $origin, $token);
         $downloadUrl = $origin
             . '/api/v1/plugin-store/plugins/' . rawurlencode($install['store_slug'])
             . '/versions/' . rawurlencode($latest) . '/download';
@@ -643,7 +644,7 @@ final class InstallFromStoreApiHandler
     private function catalogue(string $origin): ?array
     {
         try {
-            $payload = ($this->fetchJson)($origin . '/api/v1/plugin-store/plugins');
+            $payload = ($this->fetchJson)($origin . '/api/v1/plugin-store/plugins', $this->authHeaders($origin, ''));
         } catch (\Throwable $e) {
             error_log('[StoreBrowse] catalogue fetch refused/failed: ' . $e->getMessage());
             return null;
@@ -693,6 +694,8 @@ final class InstallFromStoreApiHandler
                 'can_install' => PluginOperatorGate::isOperator(),
                 // A declarative plugin goes into one workspace, so any workspace may.
                 'can_install_declarative' => (TenantContext::getTenantId() ?? 0) > 0,
+                // WHIT-1003: whether this installation is connected to a store through Whity ID.
+                'connection' => $this->connector?->status() ?? ['connected' => false],
             ],
         ]);
     }
@@ -735,7 +738,7 @@ final class InstallFromStoreApiHandler
         }
 
         try {
-            $payload = ($this->fetchJson)($origin . '/api/v1/plugin-store/plugins');
+            $payload = ($this->fetchJson)($origin . '/api/v1/plugin-store/plugins', $this->authHeaders((string) $origin, ''));
         } catch (\Throwable $e) {
             error_log('[StoreBrowse] catalogue fetch refused/failed: ' . $e->getMessage());
             return Response::error('The store catalogue could not be fetched.', 502);
@@ -790,6 +793,145 @@ final class InstallFromStoreApiHandler
         }
 
         return false;
+    }
+
+    // ── Connect to Whity store (WHIT-1003) ───────────────────────────────────
+
+    /**
+     * GET /api/plugins/store/connection — whether this installation is connected to a store
+     * through Whity ID, as which account, and whether it needs signing in again.
+     *
+     * @param array<string, string> $params
+     */
+    public function connection(Request $request, array $params = []): Response
+    {
+        return Response::json(['data' => $this->connector?->status() ?? ['connected' => false]]);
+    }
+
+    /**
+     * POST /api/plugins/store/connect {store_url} — begin connecting. Returns the Whity ID URL
+     * to send the operator's browser to; Whity ID sends them back to the plugin settings.
+     *
+     * @param array<string, string> $params
+     */
+    public function connect(Request $request, array $params = []): Response
+    {
+        $refusal = PluginOperatorGate::refusal();
+        if ($refusal !== null) {
+            return $refusal;
+        }
+        if ($this->connector === null) {
+            return Response::error('Connecting to a store is unavailable.', 503);
+        }
+
+        $body = json_decode($request->getBody(), true);
+        $storeUrl = is_array($body) ? trim((string) ($body['store_url'] ?? '')) : '';
+        if ($storeUrl === '') {
+            $hosts = $this->allowedHosts();
+            $storeUrl = $hosts === [] ? '' : 'https://' . $hosts[0];
+        }
+        if ($storeUrl === '') {
+            return Response::error('store_url is required.', 422);
+        }
+
+        [$origin, $originError] = $this->resolveStoreOrigin($storeUrl);
+        if ($originError !== null) {
+            return $originError;
+        }
+
+        try {
+            $url = $this->connector->start((string) $origin, PluginOperatorGate::actorProfile($request));
+        } catch (WhityStoreConnectException $e) {
+            return Response::error($e->getMessage(), $e->status);
+        }
+
+        return Response::json(['data' => ['authorize_url' => $url]]);
+    }
+
+    /**
+     * POST /api/plugins/store/connect/complete {code, state} — finish connecting with what
+     * Whity ID sent back to the plugin settings page.
+     *
+     * @param array<string, string> $params
+     */
+    public function completeConnect(Request $request, array $params = []): Response
+    {
+        $refusal = PluginOperatorGate::refusal();
+        if ($refusal !== null) {
+            return $refusal;
+        }
+        if ($this->connector === null) {
+            return Response::error('Connecting to a store is unavailable.', 503);
+        }
+
+        $body = json_decode($request->getBody(), true);
+        $code = is_array($body) ? (string) ($body['code'] ?? '') : '';
+        $state = is_array($body) ? (string) ($body['state'] ?? '') : '';
+        if ($code === '' || $state === '' || strlen($code) > 2048 || strlen($state) > 512) {
+            return Response::error('code and state are required.', 422);
+        }
+
+        try {
+            $status = $this->connector->complete($code, $state, PluginOperatorGate::actorProfile($request));
+        } catch (WhityStoreConnectException $e) {
+            return Response::error($e->getMessage(), $e->status);
+        }
+
+        $this->auditLogger?->record('plugin_store.connected', [
+            'target_type' => 'plugin_store',
+            'metadata' => [
+                'store' => $status['store_host'] ?? null,
+                'issuer' => $status['issuer'] ?? null,
+                'account' => $status['account']['email'] ?? null,
+            ],
+        ]);
+
+        return Response::json(['data' => $status]);
+    }
+
+    /**
+     * DELETE /api/plugins/store/connection — disconnect: revoke at Whity ID and forget the tokens.
+     *
+     * @param array<string, string> $params
+     */
+    public function disconnect(Request $request, array $params = []): Response
+    {
+        $refusal = PluginOperatorGate::refusal();
+        if ($refusal !== null) {
+            return $refusal;
+        }
+        if ($this->connector === null) {
+            return Response::error('Connecting to a store is unavailable.', 503);
+        }
+
+        $before = $this->connector->status();
+        $this->connector->disconnect();
+        $this->auditLogger?->record('plugin_store.disconnected', [
+            'target_type' => 'plugin_store',
+            'metadata' => ['store' => $before['store_host'] ?? null],
+        ]);
+
+        return Response::json(['data' => ['connected' => false]]);
+    }
+
+    /**
+     * The Authorization header for a call to this store: the operator's own token when one was
+     * given, else a fresh Whity ID token when this installation is connected to that store.
+     *
+     * @return array<string, string>
+     */
+    private function authHeaders(string $origin, #[\SensitiveParameter] string $token): array
+    {
+        if ($token === '' && $this->connector !== null) {
+            try {
+                $token = $this->connector->accessTokenFor((string) parse_url($origin, PHP_URL_HOST)) ?? '';
+            } catch (\Throwable $e) {
+                error_log('[WhityStore] token unavailable: ' . $e->getMessage());
+                $token = '';
+            }
+        }
+
+        return $token !== '' ? ['Authorization' => 'Bearer ' . $token] : [];
     }
 
     /**

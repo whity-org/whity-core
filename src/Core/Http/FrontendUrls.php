@@ -40,6 +40,8 @@ final class FrontendUrls
     public const DOCUMENT_VERIFY = 'DOCUMENT_VERIFY_URL';
     public const ERROR_DETAILS = 'ERROR_DETAILS_URL';
     public const SIGNUP_CONFIRM = 'SIGNUP_CONFIRM_URL';
+    /** WHIT-1003: where Whity ID returns an operator who connected this installation to a store. */
+    public const STORE_CONNECT = 'STORE_CONNECT_URL';
 
     /**
      * The bundled admin's path for each link — what an override replaces.
@@ -55,6 +57,7 @@ final class FrontendUrls
         self::DOCUMENT_VERIFY => '/verify',
         self::ERROR_DETAILS => '/admin/errors',
         self::SIGNUP_CONFIRM => '/join/confirm',
+        self::STORE_CONNECT => '/admin/plugins/store/connect',
     ];
 
     /**
