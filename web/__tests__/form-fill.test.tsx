@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import type { Answer } from '@/components/forms/form-fields';
 import { FormFill, type FillableField, type FormSectionSpec } from '@/components/forms/form-fill';
@@ -212,7 +212,8 @@ describe('FormFill', () => {
 
     await userEvent.type(box('supplier'), 'Example Mill');
     await userEvent.click(button('Continue'));
-    await userEvent.type(box('crates'), '12');
+    // A number box, set directly: simulated typing into one is not reliable in jsdom.
+    fireEvent.change(box('crates'), { target: { value: '12' } });
     await userEvent.click(button('Back'));
 
     expect((box('supplier') as HTMLInputElement).value).toBe('Example Mill');
