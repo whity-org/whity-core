@@ -104,9 +104,9 @@ final class RouteStepRepository
         $stmt = $this->db->prepare(
             'INSERT INTO document_route_steps
                  (tenant_id, route_id, position, rule_kind, rule_config, label,
-                  decision, decision_quorum, satisfied_by, created_at)
+                  decision, decision_quorum, satisfied_by, kind, created_at)
              VALUES (:tenant_id, :route_id, :position, :rule_kind, :rule_config, :label,
-                     :decision, :decision_quorum, :satisfied_by, NOW())'
+                     :decision, :decision_quorum, :satisfied_by, :kind, NOW())'
         );
         $stmt->execute([
             ':tenant_id' => $tenantId,
@@ -131,6 +131,9 @@ final class RouteStepRepository
             // text on both engines, so execute()'s PARAM_STR binding is already
             // the right one.
             ':satisfied_by' => $satisfiedBy,
+            // WHIT-918: derived from the two columns above on every write, so the
+            // three cannot disagree while the engine still reads the old pair.
+            ':kind' => RouteStepKind::derive($decision, $satisfiedBy),
         ]);
 
         return (int) $this->db->lastInsertId();
@@ -145,7 +148,7 @@ final class RouteStepRepository
     {
         $stmt = $this->db->prepare(
             'SELECT id, tenant_id, route_id, position, rule_kind, rule_config, label,
-                    decision, decision_quorum, satisfied_by, created_at
+                    decision, decision_quorum, satisfied_by, kind, created_at
                FROM document_route_steps
               WHERE id = :id AND tenant_id = :tenant_id'
         );
@@ -164,7 +167,7 @@ final class RouteStepRepository
     {
         $stmt = $this->db->prepare(
             'SELECT id, tenant_id, route_id, position, rule_kind, rule_config, label,
-                    decision, decision_quorum, satisfied_by, created_at
+                    decision, decision_quorum, satisfied_by, kind, created_at
                FROM document_route_steps
               WHERE tenant_id = :tenant_id AND route_id = :route_id
               ORDER BY position ASC'
@@ -206,7 +209,7 @@ final class RouteStepRepository
     {
         $stmt = $this->db->prepare(
             'SELECT id, tenant_id, route_id, position, rule_kind, rule_config, label,
-                    decision, decision_quorum, satisfied_by, created_at
+                    decision, decision_quorum, satisfied_by, kind, created_at
                FROM document_route_steps
               WHERE tenant_id = :tenant_id AND route_id = :route_id AND position > :position
               ORDER BY position ASC
@@ -260,7 +263,30 @@ final class RouteStepRepository
             'satisfied_by' => isset($row['satisfied_by']) && RouteSatisfaction::isValid((string) $row['satisfied_by'])
                 ? (string) $row['satisfied_by']
                 : RouteSatisfaction::fallback(),
+            // WHIT-918. While `decision` and `satisfied_by` still drive the engine,
+            // the three kinds they can express are DERIVED from them, so a row
+            // inserted without `kind` (a fixture, a seeder) cannot read as a
+            // different step than the engine treats it as. Only the kinds the old
+            // columns cannot express are taken from `kind` itself.
+            'kind' => self::kindOf($row),
             'created_at' => (string) $row['created_at'],
         ];
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     */
+    private static function kindOf(array $row): string
+    {
+        $stored = isset($row['kind']) ? (string) $row['kind'] : '';
+        if (in_array($stored, [RouteStepKind::SIGN, RouteStepKind::STAMP, RouteStepKind::FINALISE], true)) {
+            return $stored;
+        }
+
+        $satisfiedBy = isset($row['satisfied_by']) && RouteSatisfaction::isValid((string) $row['satisfied_by'])
+            ? (string) $row['satisfied_by']
+            : RouteSatisfaction::fallback();
+
+        return RouteStepKind::derive(DbBool::of($row['decision'] ?? false), $satisfiedBy);
     }
 }

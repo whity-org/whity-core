@@ -87,6 +87,12 @@ final class RoutingPresenter
         return [
             'id' => (int) $route['id'],
             'document_id' => (int) $route['document_id'],
+            // WHIT-918 (#1722). What the route travels on. Always a document in
+            // this release; form submissions and plugin records follow.
+            'subject' => [
+                'type' => (string) ($route['subject_type'] ?? DocumentRouteSubject::TYPE),
+                'id' => (int) ($route['subject_id'] ?? $route['document_id']),
+            ],
             'title' => (string) $route['title'],
             'created_by' => $route['created_by'],
             'template_id' => $route['template_id'] ?? null,
@@ -187,6 +193,14 @@ final class RoutingPresenter
             'satisfied_by' => is_string($step['satisfied_by'] ?? null)
                 ? (string) $step['satisfied_by']
                 : RouteSatisfaction::fallback(),
+            // WHIT-918 (#1722). What the step IS, in one word. Derived from the
+            // two fields above for the kinds they can express.
+            'kind' => is_string($step['kind'] ?? null) && RouteStepKind::isValid((string) $step['kind'])
+                ? (string) $step['kind']
+                : RouteStepKind::derive(
+                    DbBool::of($step['decision'] ?? false),
+                    is_string($step['satisfied_by'] ?? null) ? (string) $step['satisfied_by'] : RouteSatisfaction::fallback()
+                ),
         ];
     }
 
