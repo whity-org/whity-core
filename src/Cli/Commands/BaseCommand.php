@@ -234,6 +234,11 @@ abstract class BaseCommand implements CliCommand, CommandHelp
         );
         \Whity\register_service(\Whity\Core\Document\Routing\RoutingRuleRegistry::class, $routingRuleRegistry);
 
+        // WHIT-918: what a route travels on, mirroring public/index.php.
+        $routeSubjectRegistry = new \Whity\Core\Document\Routing\RouteSubjectRegistry();
+        $routeSubjectRegistry->register(new \Whity\Core\Document\Routing\DocumentRouteSubject($db->getPdo()));
+        \Whity\register_service(\Whity\Core\Document\Routing\RouteSubjectRegistry::class, $routeSubjectRegistry);
+
         // EFFECT catalogue (#1032), mirroring public/index.php exactly.
         //
         // The CATALOGUE is wired here and the RUNNER is not, and the asymmetry

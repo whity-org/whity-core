@@ -9010,6 +9010,10 @@ export interface components {
         DocumentRoute: {
             id: number;
             document_id: number;
+            subject?: {
+                type: string;
+                id: number;
+            };
             title: string;
             created_by?: number | null;
             template_id?: number | null;
@@ -9113,6 +9117,8 @@ export interface components {
             decision_quorum?: "all" | "any" | "majority" | null;
             /** @enum {string} */
             satisfied_by: "act" | "delivery";
+            /** @enum {string} */
+            kind?: "review" | "decide" | "deliver" | "sign" | "stamp" | "finalise";
             rejection_count: number;
         };
         DocumentSource: {

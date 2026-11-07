@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Whity\Core\Document\Routing;
 
 use InvalidArgumentException;
+use Whity\Core\Container\HostWiredService;
 
 /**
  * The route subject types this install knows (WHIT-918, #1722).
@@ -13,8 +14,11 @@ use InvalidArgumentException;
  * registered here (a plugin's, with the plugin disabled) still reads, because the
  * trail and the recipient rows stand on their own; it simply has no provider to
  * answer for it.
+ *
+ * {@see HostWiredService}: the host fills it at boot (public/index.php and
+ * BaseCommand::setupKernel()), so an improvised empty one must not be handed out.
  */
-final class RouteSubjectRegistry
+final class RouteSubjectRegistry implements HostWiredService
 {
     /** @var array<string, RouteSubjectProviderInterface> */
     private array $providers = [];
