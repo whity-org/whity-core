@@ -86,9 +86,10 @@ final class RoutingPresenter
     ): array {
         return [
             'id' => (int) $route['id'],
-            'document_id' => (int) $route['document_id'],
-            // WHIT-918 (#1722). What the route travels on. Always a document in
-            // this release; form submissions and plugin records follow.
+            // WHIT-920: null on a route whose subject has no document yet.
+            'document_id' => isset($route['document_id']) ? (int) $route['document_id'] : null,
+            // WHIT-918 (#1722). What the route travels on: a document, or a form
+            // submission (WHIT-920); plugin records follow.
             'subject' => [
                 'type' => (string) ($route['subject_type'] ?? DocumentRouteSubject::TYPE),
                 'id' => (int) ($route['subject_id'] ?? $route['document_id']),
@@ -220,7 +221,7 @@ final class RoutingPresenter
     {
         return [
             'id' => (int) $event['id'],
-            'document_id' => (int) $event['document_id'],
+            'document_id' => isset($event['document_id']) ? (int) $event['document_id'] : null,
             'route_id' => (int) $event['route_id'],
             'step_id' => $event['step_id'],
             'actor_profile_id' => $event['actor_profile_id'],
@@ -263,7 +264,7 @@ final class RoutingPresenter
     {
         return [
             'id' => (int) $recipient['id'],
-            'document_id' => (int) $recipient['document_id'],
+            'document_id' => isset($recipient['document_id']) ? (int) $recipient['document_id'] : null,
             'route_id' => (int) $recipient['route_id'],
             'step_id' => (int) $recipient['step_id'],
             'profile_id' => (int) $recipient['profile_id'],

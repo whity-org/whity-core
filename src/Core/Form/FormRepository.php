@@ -57,7 +57,7 @@ final class FormRepository
                              created_by_profile_id, created_at, updated_at,
                              open_to_members, members_opened_at, members_opened_by_profile_id,
                              public_enabled, public_slug, public_opens_at, public_closes_at,
-                             public_enabled_at, public_enabled_by_profile_id,
+                             public_enabled_at, public_enabled_by_profile_id, public_requires_sign_in,
                              ' . self::WINDOW_OPEN_SQL . ' AS public_window_open';
 
     /**
@@ -532,6 +532,10 @@ final class FormRepository
             $sets[] = 'route_template_id = :route_template_id';
             $params[':route_template_id'] = $changes['route_template_id'];
         }
+        if (array_key_exists('public_requires_sign_in', $changes)) {
+            // A literal, not a bound PHP bool: PDO binds `false` as '' on PostgreSQL.
+            $sets[] = 'public_requires_sign_in = ' . ($changes['public_requires_sign_in'] === true ? 'TRUE' : 'FALSE');
+        }
         if (array_key_exists('reference_format', $changes)) {
             $sets[] = 'reference_format = :reference_format';
             $params[':reference_format'] = $changes['reference_format'];
@@ -722,6 +726,8 @@ final class FormRepository
             // would report every form in the install as open to the public. See
             // {@see \Whity\Core\Db\DbBool} and scripts/ci-db-bool-guard.php.
             'public_enabled' => DbBool::of($row['public_enabled'] ?? false),
+            // WHIT-920: the public link asks visitors to sign in first.
+            'public_requires_sign_in' => DbBool::of($row['public_requires_sign_in'] ?? false),
             // The slug is returned to tenant members, and that is a decision
             // rather than an oversight: it is not a secret FROM them. The point
             // of enabling a link is to hand it out, so an author who cannot read

@@ -248,6 +248,8 @@ function RouteFlowBody({
   useLeaveGuard(dirty);
 
   const maxSteps = template.max_steps;
+  // WHIT-920: forms that send anonymous requests through this design.
+  const anonymousForms = template.anonymous_public_forms ?? [];
 
   // ── audience resolution ───────────────────────────────────────────────────
   //
@@ -505,6 +507,18 @@ function RouteFlowBody({
           </>
         )}
       </div>
+
+      {anonymousForms.length > 0 && template.steps.some((step) => step.allow_send_back !== false) && (
+        <Alert>
+          <AlertDescription>
+            {t(
+              'routeTemplates.anonymousSendBack',
+              'Some stages can send a request back for changes, but {forms} takes requests from visitors who do not sign in. Nobody can send those back. Ask visitors to sign in on that form to fix this.',
+              { forms: anonymousForms.map((form) => form.name).join(', ') }
+            )}
+          </AlertDescription>
+        </Alert>
+      )}
 
       {atCeiling && (
         <Alert>

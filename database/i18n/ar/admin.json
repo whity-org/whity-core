@@ -2218,6 +2218,7 @@
         "routeTemplates.action.refresh": "تحديث",
         "routeTemplates.action.rename": "إعادة تسمية",
         "routeTemplates.action.save": "حفظ المخطّط",
+        "routeTemplates.anonymousSendBack": "بعض المراحل يمكنها إعادة الطلب لإجراء تعديلات، لكن {forms} يستقبل طلبات من زوار لا يسجّلون الدخول. لا يمكن إعادة هذه الطلبات إلى أحد. اطلب من الزوار تسجيل الدخول في ذلك النموذج لحل ذلك.",
         "routeTemplates.atCeiling": "بلغ هذا المخطّط أقصى عدد مراحل يسمح به هذا المستأجر ({max}). ارفع القيمة documents.routing_max_steps لإضافة المزيد.",
         "routeTemplates.audience.error": "تعذّر تحديد عدد من تصل إليهم هذه المرحلة.",
         "routeTemplates.audience.forbidden": "لا يمكنك معاينة من تصل إليهم المراحل هنا، لذا لا يُعرَض حجم هذه المرحلة.",

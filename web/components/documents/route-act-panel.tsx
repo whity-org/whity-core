@@ -188,6 +188,11 @@ export interface RouteActPanelProps {
   viewerProfileId: number | null;
   /** Called after a successful act so the host can refetch. */
   onActed: () => void;
+  /**
+   * WHIT-920: where to post the act. A route on a subject with no document (a
+   * form submission) is acted on at `/api/v1/routes/{id}/actions`.
+   */
+  actionsUrl?: string;
 }
 
 export function RouteActPanel({
@@ -196,6 +201,7 @@ export function RouteActPanel({
   recipients,
   viewerProfileId,
   onActed,
+  actionsUrl,
 }: RouteActPanelProps) {
   const t = useTranslation('documents');
   const { apiClient } = useAuth();
@@ -446,7 +452,7 @@ export function RouteActPanel({
     try {
       const trimmed = note.trim();
       const response = await apiClient(
-        `/api/v1/documents/${documentId}/routes/${route.id}/actions`,
+        actionsUrl ?? `/api/v1/documents/${documentId}/routes/${route.id}/actions`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

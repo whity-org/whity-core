@@ -17,8 +17,12 @@ use PDO;
  * statement here binds its OWN `tenant_id` and never infers one from the
  * document it names.
  *
- * NO UPDATE AND NO DELETE, AND THAT IS DELIBERATE
- * ------------------------------------------------
+ * NO DELETE, AND ONE UPDATE
+ * -------------------------
+ * WHIT-920: the one edit is {@see replaceValues()}, made by the author while
+ * the route has sent the submission back to them, and recorded as a new
+ * version on the route. What follows is still why nothing else is edited.
+ *
  * A submission is what somebody declared, at a moment, under their own name.
  * Editing one after the fact is not a correction, it is a rewrite of evidence
  * that other people have already acted on — the document it produced may be
@@ -54,6 +58,11 @@ final class FormSubmissionRepository
     /**
      * Where the paper is now, derived from the routing trail.
      *
+     * WHIT-920: read through the routes on the SUBMISSION (and, for one sent
+     * before migration 227 whose route stayed on a document, on its document).
+     * `sent back` means it is waiting for its author's changes; `not approved`
+     * means the route ended on a rejection.
+     *
      * Derived and not stored: `documents` has no status column by design —
      * state lives in the append-only `document_route_events` — so a copy kept
      * here could only ever drift from it. `current_step` is the label of the
@@ -63,23 +72,43 @@ final class FormSubmissionRepository
     private const ROUTE_STATE = ",
                        CASE
                          WHEN s.withdrawn_at IS NOT NULL THEN 'withdrawn'
-                         WHEN s.document_id IS NULL THEN 'not routed'
                          WHEN NOT EXISTS (
                            SELECT 1 FROM document_routes dr
-                            WHERE dr.document_id = s.document_id AND dr.tenant_id = s.tenant_id
+                            WHERE dr.tenant_id = s.tenant_id
+                              AND ((dr.subject_type = 'form_submission' AND dr.subject_id = s.id)
+                                OR (COALESCE(dr.subject_type, 'document') = 'document' AND s.document_id IS NOT NULL AND dr.document_id = s.document_id))
                          ) THEN 'not routed'
                          WHEN EXISTS (
                            SELECT 1 FROM document_route_recipients rc
-                            WHERE rc.document_id = s.document_id AND rc.tenant_id = s.tenant_id
-                              AND rc.closed_by_event_id IS NULL
+                             JOIN document_routes dr ON dr.id = rc.route_id AND dr.tenant_id = rc.tenant_id
+                            WHERE rc.tenant_id = s.tenant_id AND rc.closed_by_event_id IS NULL AND rc.role = 'author'
+                              AND ((dr.subject_type = 'form_submission' AND dr.subject_id = s.id)
+                                OR (COALESCE(dr.subject_type, 'document') = 'document' AND s.document_id IS NOT NULL AND dr.document_id = s.document_id))
+                         ) THEN 'sent back'
+                         WHEN EXISTS (
+                           SELECT 1 FROM document_route_recipients rc
+                             JOIN document_routes dr ON dr.id = rc.route_id AND dr.tenant_id = rc.tenant_id
+                            WHERE rc.tenant_id = s.tenant_id AND rc.closed_by_event_id IS NULL
+                              AND ((dr.subject_type = 'form_submission' AND dr.subject_id = s.id)
+                                OR (COALESCE(dr.subject_type, 'document') = 'document' AND s.document_id IS NOT NULL AND dr.document_id = s.document_id))
                          ) THEN 'in progress'
+                         WHEN (
+                           SELECT e.verdict FROM document_route_events e
+                             JOIN document_routes dr ON dr.id = e.route_id AND dr.tenant_id = e.tenant_id
+                            WHERE e.tenant_id = s.tenant_id AND e.verdict IS NOT NULL
+                              AND ((dr.subject_type = 'form_submission' AND dr.subject_id = s.id)
+                                OR (COALESCE(dr.subject_type, 'document') = 'document' AND s.document_id IS NOT NULL AND dr.document_id = s.document_id))
+                            ORDER BY e.id DESC LIMIT 1
+                         ) = 'rejected' THEN 'not approved'
                          ELSE 'completed'
                        END AS state,
                        (SELECT st.label
                           FROM document_route_recipients rc
                           JOIN document_route_steps st ON st.id = rc.step_id
-                         WHERE rc.document_id = s.document_id AND rc.tenant_id = s.tenant_id
-                           AND rc.closed_by_event_id IS NULL
+                          JOIN document_routes dr ON dr.id = rc.route_id AND dr.tenant_id = rc.tenant_id
+                         WHERE rc.tenant_id = s.tenant_id AND rc.closed_by_event_id IS NULL AND rc.role = 'step'
+                           AND ((dr.subject_type = 'form_submission' AND dr.subject_id = s.id)
+                                OR (COALESCE(dr.subject_type, 'document') = 'document' AND s.document_id IS NOT NULL AND dr.document_id = s.document_id))
                          ORDER BY rc.id DESC LIMIT 1) AS current_step";
 
     /**
@@ -231,6 +260,26 @@ final class FormSubmissionRepository
     }
 
     /**
+     * Replace the answers of a sent-back submission (WHIT-920).
+     *
+     * The one edit this table allows, and only from
+     * {@see SubmissionIssuer::resubmit()}, inside the transaction that also
+     * records the new version on the route. The answers before the change are
+     * not lost: each version the reviewers saw is kept, with its hash, in
+     * `route_subject_versions`, and every act on the trail names the version it
+     * was made on.
+     *
+     * @param array<string, mixed> $values The validated, normalized answers.
+     */
+    public function replaceValues(int $tenantId, int $id, array $values): void
+    {
+        $stmt = $this->db->prepare(
+            'UPDATE form_submissions SET data = :data WHERE tenant_id = :tenant_id AND id = :id AND withdrawn_at IS NULL'
+        );
+        $stmt->execute([':data' => self::encode($values), ':tenant_id' => $tenantId, ':id' => $id]);
+    }
+
+    /**
      * Take back the author's own submission, unless somebody has already decided on it.
      *
      * One statement, so a review or the last approval can't land between the check and
@@ -251,12 +300,16 @@ final class FormSubmissionRepository
                 AND NOT (
                     EXISTS (
                         SELECT 1 FROM document_routes dr
-                         WHERE dr.document_id = form_submissions.document_id AND dr.tenant_id = form_submissions.tenant_id
+                         WHERE dr.tenant_id = form_submissions.tenant_id
+                           AND ((dr.subject_type = \'form_submission\' AND dr.subject_id = form_submissions.id)
+                                OR (COALESCE(dr.subject_type, \'document\') = \'document\' AND form_submissions.document_id IS NOT NULL AND dr.document_id = form_submissions.document_id))
                     )
                     AND NOT EXISTS (
                         SELECT 1 FROM document_route_recipients rc
-                         WHERE rc.document_id = form_submissions.document_id AND rc.tenant_id = form_submissions.tenant_id
-                           AND rc.closed_by_event_id IS NULL
+                          JOIN document_routes dr ON dr.id = rc.route_id AND dr.tenant_id = rc.tenant_id
+                         WHERE rc.tenant_id = form_submissions.tenant_id AND rc.closed_by_event_id IS NULL
+                           AND ((dr.subject_type = \'form_submission\' AND dr.subject_id = form_submissions.id)
+                                OR (COALESCE(dr.subject_type, \'document\') = \'document\' AND form_submissions.document_id IS NOT NULL AND dr.document_id = form_submissions.document_id))
                     )
                 )'
         );

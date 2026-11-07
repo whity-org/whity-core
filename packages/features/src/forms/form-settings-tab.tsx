@@ -35,6 +35,7 @@ export function FormSettingsTab({
   onPublicLink,
   onCopyLink,
   onMemberAccess,
+  onSignInRequired,
   onUploadBanner,
 }: {
   form: FormRow
@@ -45,6 +46,8 @@ export function FormSettingsTab({
   onPublicLink: (enabled: boolean) => void
   onCopyLink: () => void
   onMemberAccess: (open: boolean) => void
+  /** WHIT-920: ask visitors to sign in before they send the form. */
+  onSignInRequired?: (required: boolean) => void
   /** Uploads a picture as the banner; resolves true when the server kept it. */
   onUploadBanner?: (file: File) => Promise<boolean>
 }) {
@@ -266,6 +269,27 @@ export function FormSettingsTab({
           </div>
           {form.status !== "published" && (
             <p className="text-xs text-muted-foreground">{t("builder.settings.link.publishFirst", "Open the form first to turn its link on.")}</p>
+          )}
+          {form.public_requires_sign_in !== undefined && onSignInRequired !== undefined && (
+            <div className="space-y-1">
+              <div className="flex items-center gap-3">
+                <Switch
+                  id="form-public-sign-in"
+                  checked={form.public_requires_sign_in}
+                  disabled={readOnly || publicBusy}
+                  onCheckedChange={onSignInRequired}
+                />
+                <label htmlFor="form-public-sign-in" className="text-sm font-medium">
+                  {t("builder.settings.link.signIn", "People must sign in to send it")}
+                </label>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {t(
+                  "builder.settings.link.signIn.body",
+                  "Only members and customers of this workspace can send it, under their own name. Then a reviewer can send it back to them for changes."
+                )}
+              </p>
+            </div>
           )}
           {form.public_url !== null && form.public_enabled && (
             <div className="flex flex-wrap items-center gap-2">

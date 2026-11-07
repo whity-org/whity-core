@@ -243,6 +243,11 @@ final class RouteSubjectsAndKindsRealEngineTest extends TestCase
             {
                 return false;
             }
+
+            public function isWithdrawn(int $tenantId, int $subjectId): bool
+            {
+                return false;
+            }
         });
     }
 

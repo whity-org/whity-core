@@ -586,9 +586,11 @@ $routingRuleRegistry->registerCoreRoutingRules(
 
 // WHIT-918 (#1722). WHAT A ROUTE TRAVELS ON. Routes name a subject by type and
 // id (migration 224); the provider for a type answers for it. Core registers
-// `document` here; form submissions (#1724) and plugin records follow.
+// `document` and, since WHIT-920 (#1724), `form_submission`; plugin records follow.
+// Registered here AND in BaseCommand::setupKernel(), so the CLI knows them too.
 $routeSubjectRegistry = new \Whity\Core\Document\Routing\RouteSubjectRegistry();
 $routeSubjectRegistry->register(new \Whity\Core\Document\Routing\DocumentRouteSubject($db->getPdo()));
+$routeSubjectRegistry->register(new \Whity\Core\Form\FormSubmissionRouteSubject($db->getPdo()));
 \Whity\register_service(\Whity\Core\Document\Routing\RouteSubjectRegistry::class, $routeSubjectRegistry); // @phpstan-ignore-line
 
 // 4b-bis. WHAT A ROUTING STAGE DOES TO THE WORLD (#1032) — the sibling
@@ -4236,19 +4238,18 @@ $formUploadsHandler = new \Whity\Api\FormUploadsApiHandler(
 );
 $router->register('POST', '/api/forms/{id:\d+}/uploads', [$formUploadsHandler, 'upload'], null, null, CorePermissions::FORMS_SUBMIT);
 
+// WHIT-920: a submission raises no document; its route travels on the
+// submission. The upload repository CLAIMS each staged upload for it (the check
+// that stops a key from another tenant being attached here), and the route and
+// recipient repositories find a sent-back submission the author may resubmit.
 $submissionIssuer = new \Whity\Core\Form\SubmissionIssuer(
     $db->getPdo(),
     $formSubmissionRepository,
-    $documentIssuer,
     $routeTemplateRepository,
     $documentRouter,
-    // The two collaborators that turn a `file` answer into evidence: the
-    // upload repository CLAIMS the staged upload (the check that stops a key
-    // from another tenant becoming an artifact on this one), and the artifact
-    // repository records the row that makes the bytes reachable through the
-    // ordinary document-artifact download route.
     $formUploadRepository,
-    $documentArtifactRepository
+    $routeRepository,
+    $routeRecipientRepository
 );
 $formSubmissionsHandler = new \Whity\Api\FormSubmissionsApiHandler(
     $formRepository,
@@ -4256,7 +4257,16 @@ $formSubmissionsHandler = new \Whity\Api\FormSubmissionsApiHandler(
     $formSubmissionRepository,
     $submissionIssuer,
     $formUploadRepository,
-    $storageDriver
+    $storageDriver,
+    // WHIT-920: stages, outcomes and notes for the person who sent it.
+    new \Whity\Core\Form\SubmissionProgress(
+        $db->getPdo(),
+        $routeRepository,
+        $routeStepRepository,
+        $routeEventRepository,
+        $routeRecipientRepository,
+        $settingsService
+    )
 );
 $formSubmissionReviewsHandler = new \Whity\Api\FormSubmissionReviewsApiHandler(
     $formFieldRepository,
@@ -4289,12 +4299,44 @@ $router->register('POST', '/api/form-submissions/{id:\d+}/review', [$formSubmiss
 $router->register('GET', '/api/me/form-submissions', [$formSubmissionsHandler, 'listMine'], null);
 $router->register('GET', '/api/me/form-submissions/{id:\d+}', [$formSubmissionsHandler, 'showMine'], null);
 $router->register('GET', '/api/me/form-submissions/{id:\d+}/files/{fileId:\d+}', [$formSubmissionsHandler, 'myFileContent'], null);
+// WHIT-920: the author changes a submission the route sent back to them, and
+// sends it again. No permission, like the reads above: the route decides whose,
+// and the handler refuses unless the route is waiting for this person's changes.
+$router->register('PUT', '/api/me/form-submissions/{id:\d+}', [$formSubmissionsHandler, 'resubmitMine'], null);
+
+// WHIT-920 (#1724). ROUTES BY SUBJECT. A route on a form submission has no
+// document, so the document routes cannot reach it; these read and act on a
+// route whatever it travels on. Session-gated with no permission, like the
+// document routes: being reached by the route is the authorization, and the
+// handler 404s everybody else. The document routes are unchanged.
+$routesHandler = new \Whity\Api\RoutesApiHandler(
+    $db->getPdo(),
+    $routeRepository,
+    $routeStepRepository,
+    $routeEventRepository,
+    $routeRecipientRepository,
+    $routeEdgeRepository,
+    $documentRouter,
+    $routeSubjectRegistry,
+    new \Whity\Core\Document\Routing\RouteSubjectVersionRepository($db->getPdo()),
+    $documentRepository,
+    $documentVisibilityPolicy,
+    $roleChecker,
+    $formSubmissionsHandler
+);
+$router->register('GET',  '/api/routes',                                        [$routesHandler, 'bySubject'], null);
+$router->register('POST', '/api/routes/{routeId:\d+}/actions',                  [$routesHandler, 'act'],       null);
+$router->register('GET',  '/api/routes/{routeId:\d+}/files/{fileId:\d+}',      [$routesHandler, 'file'],      null);
 $formSubmissionWithdrawalHandler = new \Whity\Api\FormSubmissionWithdrawalApiHandler(
     $db->getPdo(),
     $formSubmissionRepository,
     $documentRepository,
     $documentWithdrawal,
-    $auditLogger
+    $auditLogger,
+    // WHIT-920: a submission routed on itself closes its own routes' items.
+    $routeRepository,
+    $routeRecipientRepository,
+    $routeEventRepository
 );
 $router->register('POST', '/api/me/form-submissions/{id:\d+}/withdraw', [$formSubmissionWithdrawalHandler, 'withdraw'], null);
 
@@ -4346,23 +4388,15 @@ $router->register('POST', '/api/me/forms/{id:\d+}/submissions', [$memberFormsHan
 // the class reachable without a session has no collaborator that could.
 //
 // The SAME SubmissionIssuer the authenticated path uses, not a reduced copy: a
-// public submission becomes a document and circulates through the existing
-// routing engine exactly as an internal one does. The caller cannot choose the
+// public submission circulates through the existing routing engine exactly as
+// an internal one does (WHIT-920: on the submission, with no document yet). The caller cannot choose the
 // route template — it lives on the FORM, set only by `forms:manage` — so there
 // is no arbitrary flow for an unauthenticated caller to inject work into. See
 // PublicFormsApiHandler's docblock, point 6.
 $publicFormsHandler = new \Whity\Api\PublicFormsApiHandler(
     $formRepository,
     $formFieldRepository,
-    new \Whity\Core\Form\SubmissionIssuer(
-        $db->getPdo(),
-        $formSubmissionRepository,
-        $documentIssuer,
-        $routeTemplateRepository,
-        $documentRouter,
-        $formUploadRepository,
-        $documentArtifactRepository
-    ),
+    $submissionIssuer,
     new DatabaseSharedStore($db->getPdo()),
     // The SAME store the authenticated path uses. An anonymous upload differs
     // only in its ceiling, its throttle and its null uploader — none of which is

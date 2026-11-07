@@ -333,6 +333,14 @@ final class FormsApiHandler
                 }
                 $changes['route_template_id'] = $routeTemplateId;
             }
+            // WHIT-920: the public link asks visitors to sign in, so only the
+            // workspace's members and customers can send it, under their own name.
+            if (array_key_exists('public_requires_sign_in', $body)) {
+                if (!is_bool($body['public_requires_sign_in'])) {
+                    return Response::error('public_requires_sign_in must be true or false', 422);
+                }
+                $changes['public_requires_sign_in'] = $body['public_requires_sign_in'];
+            }
 
             if ($changes === []) {
                 return Response::error('No updatable fields supplied', 422);

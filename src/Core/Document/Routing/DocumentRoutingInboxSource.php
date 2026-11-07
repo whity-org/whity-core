@@ -123,8 +123,10 @@ final class DocumentRoutingInboxSource implements InboxSourceInterface
                 // that was taken away from them.
                 ? 'Withdrawn'
                 : self::statusFor($arrivedBy, $row['closed_by_event_id'] !== null, $decision, $delivery),
-            resourceType: ResourceTypeRegistry::TYPE_DOCUMENT,
-            resourceId: (string) $row['document_id'],
+            // WHIT-920: a route on a subject without a document (a form
+            // submission) has no resource to scope a grant to.
+            resourceType: $row['document_id'] !== null ? ResourceTypeRegistry::TYPE_DOCUMENT : null,
+            resourceId: $row['document_id'] !== null ? (string) $row['document_id'] : null,
             meta: [
                 // Enough for a client to offer the right actions without a
                 // second request: which route to act on, and whether the item is
@@ -133,7 +135,14 @@ final class DocumentRoutingInboxSource implements InboxSourceInterface
                 // depend on them.
                 'route_id' => (int) $row['route_id'],
                 'step_id' => (int) $row['step_id'],
-                'document_id' => (int) $row['document_id'],
+                // Null on a route whose subject has no document yet (WHIT-920);
+                // the subject then says what to open.
+                'document_id' => $row['document_id'] !== null ? (int) $row['document_id'] : null,
+                'subject_type' => (string) ($row['subject_type'] ?? DocumentRouteSubject::TYPE),
+                'subject_id' => (int) ($row['subject_id'] ?? $row['document_id'] ?? 0),
+                // WHIT-919/920: `author` on the item a send-back opened for the
+                // person who sent it, so a client offers Edit and resubmit.
+                'role' => (string) ($row['role'] ?? RouteRecipientRepository::ROLE_STEP),
                 'open' => $row['closed_by_event_id'] === null,
                 'document_withdrawn' => ($row['document_withdrawn'] ?? false) === true,
                 'arrived_by' => $arrivedBy,

@@ -86,7 +86,7 @@ final class RouteEventRepository
      *              subject_version?: ?int, content_hash?: ?string, to_author?: bool,
      *              resume_from?: ?string} $event
      */
-    public function append(int $tenantId, int $documentId, array $event): int
+    public function append(int $tenantId, ?int $documentId, array $event): int
     {
         return $this->insertLinked($tenantId, $documentId, [
             'route_id' => $event['route_id'],
@@ -111,7 +111,7 @@ final class RouteEventRepository
      * The row that closes a route's open items when its document is withdrawn
      * (S5). `noted`, flagged: see migration 201 for why it is not a new action.
      */
-    public function appendWithdrawal(int $tenantId, int $documentId, int $routeId, int $actorId): int
+    public function appendWithdrawal(int $tenantId, ?int $documentId, int $routeId, int $actorId): int
     {
         return $this->insertLinked($tenantId, $documentId, [
             'route_id' => $routeId,
@@ -315,6 +315,30 @@ final class RouteEventRepository
     }
 
     /**
+     * One route's whole trail, oldest first (WHIT-920). The trail of a route on a
+     * subject without a document is read this way rather than by document.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function listForRoute(int $routeId, int $tenantId): array
+    {
+        $stmt = $this->db->prepare(
+            'SELECT id, tenant_id, document_id, route_id, step_id, actor_profile_id,
+                    action, from_ou_id, to_ou_id, note, verdict, withdrawal,
+                    subject_version, content_hash, to_author, resume_from, occurred_at
+               FROM document_route_events
+              WHERE tenant_id = :tenant_id AND route_id = :route_id
+              ORDER BY id ASC'
+        );
+        $stmt->execute([':tenant_id' => $tenantId, ':route_id' => $routeId]);
+
+        /** @var list<array<string, mixed>> $rows */
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return array_map(self::normalize(...), $rows);
+    }
+
+    /**
      * How many events a document's trail holds, so the pagination envelope
      * reports a total the caller can actually reach.
      */
@@ -406,7 +430,8 @@ final class RouteEventRepository
         return [
             'id' => (int) $row['id'],
             'tenant_id' => (int) $row['tenant_id'],
-            'document_id' => (int) $row['document_id'],
+            // WHIT-920: null on a route whose subject has no document yet.
+            'document_id' => isset($row['document_id']) ? (int) $row['document_id'] : null,
             'route_id' => (int) $row['route_id'],
             'step_id' => $row['step_id'] !== null ? (int) $row['step_id'] : null,
             'actor_profile_id' => $row['actor_profile_id'] !== null ? (int) $row['actor_profile_id'] : null,

@@ -2217,6 +2217,7 @@
         "routeTemplates.action.refresh": "Refresh",
         "routeTemplates.action.rename": "Rename",
         "routeTemplates.action.save": "Save route",
+        "routeTemplates.anonymousSendBack": "Some stages can send a request back for changes, but {forms} takes requests from visitors who do not sign in. Nobody can send those back. Ask visitors to sign in on that form to fix this.",
         "routeTemplates.atCeiling": "This flow has as many stages as this tenant allows ({max}). Raise documents.routing_max_steps to add more.",
         "routeTemplates.audience.error": "Audience size could not be resolved.",
         "routeTemplates.audience.forbidden": "You cannot preview audiences here, so the size of this stage is not shown.",

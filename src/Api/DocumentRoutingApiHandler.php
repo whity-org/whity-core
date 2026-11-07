@@ -493,6 +493,48 @@ final class DocumentRoutingApiHandler
             return Response::error('Route not found', 404);
         }
 
+        $parsed = self::parseAct($request);
+        if ($parsed instanceof Response) {
+            return $parsed;
+        }
+        ['action' => $action, 'note' => $note, 'verdict' => $verdict, 'resume_from' => $resumeFrom, 'to_author' => $toAuthor] = $parsed;
+
+        try {
+            $outcome = $this->router->act(
+                $tenantId,
+                $callerId,
+                $route,
+                $action,
+                $note,
+                $verdict,
+                $resumeFrom,
+                $toAuthor,
+            );
+        } catch (RoutingRejectedException $e) {
+            return Response::error($e->clientMessage, 422);
+        }
+
+        return Response::json([
+            'data' => RoutingPresenter::event($outcome['event']),
+            'resolved' => $outcome['resolved'],
+            'delivered' => $outcome['delivered'],
+            // What the STEP concluded, which is not what the caller said: under a
+            // quorum of `all`, two of three approvals conclude nothing. Null
+            // while the step is still open, and the reason it is on the envelope
+            // rather than on the event is the reason `resolved`/`delivered` are —
+            // it describes what THIS request did, not a property of the record.
+            'decided' => $outcome['decided'],
+        ], 201);
+    }
+
+    /**
+     * Read and shape-check an act's body (shared with the subject-neutral
+     * {@see RoutesApiHandler}, WHIT-920). Shape here, fitness in the engine.
+     *
+     * @return array{action: string, note: ?string, verdict: ?string, resume_from: ?string, to_author: bool}|Response
+     */
+    public static function parseAct(Request $request): array|Response
+    {
         $body = JsonBody::parsed($request);
         $action = $body['action'] ?? null;
         if (!is_string($action) || $action === '') {
@@ -553,32 +595,13 @@ final class DocumentRoutingApiHandler
             return Response::error("'to_author' must be true or false when present", 422);
         }
 
-        try {
-            $outcome = $this->router->act(
-                $tenantId,
-                $callerId,
-                $route,
-                $action,
-                $note,
-                is_string($verdict) ? $verdict : null,
-                is_string($resumeFrom) ? $resumeFrom : null,
-                $toAuthor,
-            );
-        } catch (RoutingRejectedException $e) {
-            return Response::error($e->clientMessage, 422);
-        }
-
-        return Response::json([
-            'data' => RoutingPresenter::event($outcome['event']),
-            'resolved' => $outcome['resolved'],
-            'delivered' => $outcome['delivered'],
-            // What the STEP concluded, which is not what the caller said: under a
-            // quorum of `all`, two of three approvals conclude nothing. Null
-            // while the step is still open, and the reason it is on the envelope
-            // rather than on the event is the reason `resolved`/`delivered` are —
-            // it describes what THIS request did, not a property of the record.
-            'decided' => $outcome['decided'],
-        ], 201);
+        return [
+            'action' => $action,
+            'note' => is_string($note) ? $note : null,
+            'verdict' => is_string($verdict) ? $verdict : null,
+            'resume_from' => is_string($resumeFrom) ? $resumeFrom : null,
+            'to_author' => $toAuthor,
+        ];
     }
 
     /**
@@ -592,7 +615,7 @@ final class DocumentRoutingApiHandler
      * per-tenant limits on an append-only table would make the same trail legal
      * to write and illegal to re-write after a tenant move.
      */
-    private const MAX_NOTE_LENGTH = 4000;
+    public const MAX_NOTE_LENGTH = 4000;
 
     // -- helpers -------------------------------------------------------------
 

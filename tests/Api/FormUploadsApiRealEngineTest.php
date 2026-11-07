@@ -12,7 +12,6 @@ use Whity\Api\FormSubmissionsApiHandler;
 use Whity\Api\FormUploadsApiHandler;
 use Whity\Api\PublicFormsApiHandler;
 use Whity\Core\Audience\ExplicitRuleResolver;
-use Whity\Core\Document\DocumentArtifactRepository;
 use Whity\Core\Document\DocumentArtifactStore;
 use Whity\Core\Document\DocumentIssuer;
 use Whity\Core\Document\DocumentRepository;
@@ -96,7 +95,6 @@ final class FormUploadsApiRealEngineTest extends TestCase
     private FormSubmissionsApiHandler $submissions;
     private PublicFormsApiHandler $public;
     private FormsApiHandler $manage;
-    private DocumentArtifactRepository $artifacts;
     private FormUploadRepository $uploadRows;
     private LocalStorageDriver $storage;
     private string $storageRoot;
@@ -119,7 +117,6 @@ final class FormUploadsApiRealEngineTest extends TestCase
 
         $this->uploadRows = new FormUploadRepository($this->pdo);
         $uploadStore = new FormUploadStore($this->storage, $this->uploadRows);
-        $this->artifacts = new DocumentArtifactRepository($this->pdo);
 
         $settings = new SettingsService(
             new GlobalSettingsRepository($this->pdo),
@@ -141,12 +138,6 @@ final class FormUploadsApiRealEngineTest extends TestCase
         $issuer = new SubmissionIssuer(
             $this->pdo,
             $submissionRepository,
-            new DocumentIssuer(
-                $this->pdo,
-                new DocumentRepository($this->pdo),
-                $this->artifacts,
-                new DocumentArtifactStore($this->storage),
-            ),
             new RouteTemplateRepository($this->pdo),
             new DocumentRouter(
                 $this->pdo,
@@ -160,7 +151,8 @@ final class FormUploadsApiRealEngineTest extends TestCase
                 null
             ),
             $this->uploadRows,
-            $this->artifacts,
+            new RouteRepository($this->pdo),
+            new RouteRecipientRepository($this->pdo),
         );
 
         $this->uploads = new FormUploadsApiHandler(
@@ -218,20 +210,19 @@ final class FormUploadsApiRealEngineTest extends TestCase
         $response = $this->submit($formId, ['title' => 'On sandstone', 'paper' => $reference]);
         self::assertSame(201, $response->getStatusCode(), (string) $response->getBody());
 
-        $documentId = (int) $this->onlySubmission()['document_id'];
-        self::assertGreaterThan(0, $documentId);
+        // WHIT-920: a submission raises no document; the file belongs to the
+        // submission, and the finalise step carries it onto the document it makes.
+        $submission = $this->onlySubmission();
+        self::assertNull($submission['document_id']);
+        self::assertSame(0, $this->countRows('document_artifacts', self::TENANT));
 
-        $rows = $this->artifacts->listForDocument($documentId, self::TENANT);
-        self::assertCount(1, $rows, 'the file answer must have produced exactly one artifact');
-
-        $artifact = $rows[0];
-        self::assertSame($reference, $artifact['storage_key']);
-        self::assertSame('application/pdf', $artifact['content_type']);
-        self::assertSame(strlen(self::PAPER), $artifact['byte_size']);
-        self::assertSame(hash('sha256', self::PAPER), $artifact['checksum_sha256']);
-        // Whoever caused the bytes to exist on this document. For a render that
-        // is the renderer; for an attachment it is the person who attached.
-        self::assertSame(self::APPLICANT, $artifact['rendered_by']);
+        $row = $this->uploadRow($reference);
+        self::assertSame((int) $submission['id'], (int) $row['submission_id']);
+        self::assertNotNull($row['claimed_at']);
+        self::assertSame('application/pdf', $row['content_type']);
+        self::assertSame(strlen(self::PAPER), (int) $row['byte_size']);
+        self::assertSame(hash('sha256', self::PAPER), $row['checksum_sha256']);
+        self::assertSame(self::APPLICANT, (int) $row['uploaded_by_profile_id']);
     }
 
     /**
@@ -249,11 +240,11 @@ final class FormUploadsApiRealEngineTest extends TestCase
         $reference = $this->upload($formId, self::PAPER);
         $this->submit($formId, ['title' => 'On sandstone', 'paper' => $reference]);
 
-        $documentId = (int) $this->onlySubmission()['document_id'];
-        $artifact = $this->artifacts->listForDocument($documentId, self::TENANT)[0];
+        $row = $this->uploadRow($reference);
+        self::assertSame((int) $this->onlySubmission()['id'], (int) $row['submission_id']);
 
         $store = new DocumentArtifactStore($this->storage);
-        self::assertSame(self::PAPER, $store->get((string) $artifact['storage_key']));
+        self::assertSame(self::PAPER, $store->get((string) $row['storage_key']));
     }
 
     /** The answer stored on the submission is the reference, so nothing is lost. */
@@ -282,7 +273,7 @@ final class FormUploadsApiRealEngineTest extends TestCase
         $response = $this->submit($formId, ['title' => 'On sandstone', 'paper' => $paper, 'annexes' => [$first, $second]]);
 
         self::assertSame(201, $response->getStatusCode());
-        self::assertSame(3, $this->countRows('document_artifacts', self::TENANT));
+        self::assertSame(3, $this->claimedUploads());
         /** @var array<string, mixed> $data */
         $data = json_decode((string) $this->onlySubmission()['data'], true);
         self::assertSame([$first, $second], $data['annexes']);
@@ -308,7 +299,7 @@ final class FormUploadsApiRealEngineTest extends TestCase
 
         self::assertSame(422, $response->getStatusCode());
         self::assertSame(0, $this->countRows('form_submissions', self::TENANT));
-        self::assertSame(0, $this->countRows('document_artifacts', self::TENANT));
+        self::assertSame(0, $this->claimedUploads());
     }
 
     // ── a storage key is not a capability ────────────────────────────────────
@@ -335,7 +326,7 @@ final class FormUploadsApiRealEngineTest extends TestCase
         self::assertStringContainsString('could not find the file', (string) $response->getBody());
 
         self::assertSame(0, $this->countRows('form_submissions', self::TENANT));
-        self::assertSame(0, $this->countRows('document_artifacts', self::TENANT));
+        self::assertSame(0, $this->claimedUploads());
         // And the other tenant's upload is untouched — not consumed, not moved.
         self::assertNull($this->uploadRow($foreignReference)['claimed_at']);
     }
@@ -357,7 +348,7 @@ final class FormUploadsApiRealEngineTest extends TestCase
         $response = $this->submit($formId, ['title' => 'Wrong form', 'paper' => $reference]);
 
         self::assertSame(422, $response->getStatusCode());
-        self::assertSame(0, $this->countRows('document_artifacts', self::TENANT));
+        self::assertSame(0, $this->claimedUploads());
     }
 
     /**
@@ -376,7 +367,7 @@ final class FormUploadsApiRealEngineTest extends TestCase
         $response = $this->submit($formId, ['title' => 'Not mine', 'paper' => $reference]);
 
         self::assertSame(422, $response->getStatusCode());
-        self::assertSame(0, $this->countRows('document_artifacts', self::TENANT));
+        self::assertSame(0, $this->claimedUploads());
         self::assertNull($this->uploadRow($reference)['claimed_at']);
     }
 
@@ -396,7 +387,7 @@ final class FormUploadsApiRealEngineTest extends TestCase
         $response = $this->submit($formId, ['title' => 'Invented', 'paper' => $invented]);
 
         self::assertSame(422, $response->getStatusCode());
-        self::assertSame(0, $this->countRows('document_artifacts', self::TENANT));
+        self::assertSame(0, $this->claimedUploads());
     }
 
     /** An upload is spent once. A replayed submission gets nothing. */
@@ -410,7 +401,7 @@ final class FormUploadsApiRealEngineTest extends TestCase
 
         self::assertSame(422, $replay->getStatusCode());
         self::assertSame(1, $this->countRows('form_submissions', self::TENANT));
-        self::assertSame(1, $this->countRows('document_artifacts', self::TENANT));
+        self::assertSame(1, $this->claimedUploads());
     }
 
     // ── nothing survives a rollback ──────────────────────────────────────────
@@ -434,7 +425,7 @@ final class FormUploadsApiRealEngineTest extends TestCase
         $response = $this->submit($formId, ['title' => 'Doomed', 'paper' => $reference]);
         self::assertSame(422, $response->getStatusCode(), (string) $response->getBody());
 
-        self::assertSame(0, $this->countRows('document_artifacts', self::TENANT), 'no artifact may survive');
+        self::assertSame(0, $this->claimedUploads(), 'no artifact may survive');
         self::assertSame(0, $this->countRows('form_submissions', self::TENANT));
         self::assertSame(0, $this->countRows('documents', self::TENANT));
 
@@ -450,7 +441,7 @@ final class FormUploadsApiRealEngineTest extends TestCase
             201,
             $this->submit($formId, ['title' => 'Retried', 'paper' => $reference])->getStatusCode()
         );
-        self::assertSame(1, $this->countRows('document_artifacts', self::TENANT));
+        self::assertSame(1, $this->claimedUploads());
     }
 
     // ── the limits are the application's ─────────────────────────────────────
@@ -720,13 +711,14 @@ final class FormUploadsApiRealEngineTest extends TestCase
         $submission = $this->onlySubmission();
         self::assertNull($submission['submitted_by_profile_id'], 'a public submission names nobody');
 
-        $rows = $this->artifacts->listForDocument((int) $submission['document_id'], self::TENANT);
-        self::assertCount(1, $rows);
-        self::assertSame(hash('sha256', self::PAPER), $rows[0]['checksum_sha256']);
-        self::assertSame(strlen(self::PAPER), $rows[0]['byte_size']);
-        // No submitter, so nobody to name as having produced the bytes — the
-        // same null `documents.created_by` carries on the public path.
-        self::assertNull($rows[0]['rendered_by']);
+        // WHIT-920: claimed by the submission; no document yet.
+        self::assertNull($submission['document_id']);
+        $row = $this->uploadRow($reference);
+        self::assertSame((int) $submission['id'], (int) $row['submission_id']);
+        self::assertSame(hash('sha256', self::PAPER), $row['checksum_sha256']);
+        self::assertSame(strlen(self::PAPER), (int) $row['byte_size']);
+        // No submitter, so nobody to name as having uploaded the bytes.
+        self::assertNull($row['uploaded_by_profile_id']);
     }
 
     /**
@@ -766,7 +758,7 @@ final class FormUploadsApiRealEngineTest extends TestCase
         $response = $this->submit($formId, ['title' => 'Adopted', 'paper' => $reference]);
 
         self::assertSame(422, $response->getStatusCode());
-        self::assertSame(0, $this->countRows('document_artifacts', self::TENANT));
+        self::assertSame(0, $this->claimedUploads());
     }
 
     // ── the orphan sweep ─────────────────────────────────────────────────────
@@ -804,7 +796,7 @@ final class FormUploadsApiRealEngineTest extends TestCase
         self::assertTrue($this->storage->exists($attached), 'the attached object must survive');
 
         self::assertSame(1, $this->countRows('form_uploads', self::TENANT));
-        self::assertSame(1, $this->countRows('document_artifacts', self::TENANT));
+        self::assertSame(1, $this->claimedUploads());
     }
 
     /** A fresh upload is not swept out from under somebody still filling the form in. */
@@ -1065,6 +1057,17 @@ final class FormUploadsApiRealEngineTest extends TestCase
         $when = date('Y-m-d H:i:s', time() - $seconds);
         $statement = $this->pdo->prepare('UPDATE form_uploads SET created_at = :when');
         $statement->execute([':when' => $when]);
+    }
+
+    /** WHIT-920: how many uploads were spent on a submission (the evidence a submission holds). */
+    private function claimedUploads(): int
+    {
+        $statement = $this->pdo->prepare(
+            'SELECT COUNT(*) FROM form_uploads WHERE tenant_id = :tenant_id AND submission_id IS NOT NULL'
+        );
+        $statement->execute([':tenant_id' => self::TENANT]);
+
+        return (int) $statement->fetchColumn();
     }
 
     private function countRows(string $table, int $tenantId): int

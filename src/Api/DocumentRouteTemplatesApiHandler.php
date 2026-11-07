@@ -138,7 +138,12 @@ final class DocumentRouteTemplatesApiHandler
                 $this->templates->edgesFor($id, $tenantId),
                 $this->defaultQuorum($tenantId),
                 $this->maxSteps($tenantId),
-            ),
+            ) + [
+                // WHIT-920: published forms whose public link takes anonymous
+                // submissions through this design. Nobody can send those back,
+                // so the editor warns while any stage allows sending back.
+                'anonymous_public_forms' => $this->templates->anonymousPublicFormsUsing($id, $tenantId),
+            ],
         ]);
     }
 
@@ -287,7 +292,12 @@ final class DocumentRouteTemplatesApiHandler
                 $this->templates->edgesFor($id, $tenantId),
                 $this->defaultQuorum($tenantId),
                 $this->maxSteps($tenantId),
-            ),
+            ) + [
+                // WHIT-920: published forms whose public link takes anonymous
+                // submissions through this design. Nobody can send those back,
+                // so the editor warns while any stage allows sending back.
+                'anonymous_public_forms' => $this->templates->anonymousPublicFormsUsing($id, $tenantId),
+            ],
         ]);
     }
 

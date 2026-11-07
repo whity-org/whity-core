@@ -60,6 +60,8 @@ export interface RouteTemplateStepWire {
    * round trip through the canvas.
    */
   satisfied_by: RouteFlowSatisfaction;
+  /** WHIT-919: false turns off sending back to the author at this stage. True when absent. */
+  allow_send_back?: boolean;
   canvas_x: number;
   canvas_y: number;
 }
@@ -77,6 +79,11 @@ export interface RouteTemplateGraphWire extends RouteTemplateSummary {
   max_steps: number;
   steps: RouteTemplateStepWire[];
   edges: RouteTemplateEdgeWire[];
+  /**
+   * WHIT-920: published forms whose public link takes anonymous submissions
+   * through this design. Nobody can send those back for changes.
+   */
+  anonymous_public_forms?: Array<{ id: number; name: string }>;
 }
 
 /** The wire graph, as the kit editor holds it. */

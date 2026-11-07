@@ -352,6 +352,19 @@ function FormBuilder({ env, formId, canManage }: { env: FormsScreenEnv; formId: 
     }
   }
 
+  /** WHIT-920: the public link asks visitors to sign in, so their submission can be sent back to them. */
+  async function setSignInRequired(required: boolean) {
+    if (loaded === null) return
+    setPublicBusy(true)
+    const result = await api.updateForm(formId, { public_requires_sign_in: required }, t("builder.action.failed", "That did not work. Try again."))
+    setPublicBusy(false)
+    if (!result.ok) {
+      env.notify(result.message, "error")
+      return
+    }
+    setLoaded((current) => (current === null ? current : { ...current, form: { ...current.form, ...result.data } }))
+  }
+
   async function setMemberAccess(open: boolean) {
     if (loaded === null) return
     setPublicBusy(true)
@@ -600,6 +613,7 @@ function FormBuilder({ env, formId, canManage }: { env: FormsScreenEnv; formId: 
             onPublicLink={(enabled) => void setPublicLink(enabled)}
             onCopyLink={copyLink}
             onMemberAccess={(open) => void setMemberAccess(open)}
+            onSignInRequired={(required) => void setSignInRequired(required)}
             onUploadBanner={uploadBanner}
           />
         </TabsContent>

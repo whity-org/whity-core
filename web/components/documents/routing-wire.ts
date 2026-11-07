@@ -227,7 +227,8 @@ export interface RouteEdge {
 /** A route: one circulation of one document. */
 export interface DocumentRoute {
   id: number;
-  document_id: number;
+  /** Null on a route whose subject has no document yet (WHIT-920). */
+  document_id: number | null;
   title: string;
   /** Profile id of whoever raised it; null once that person is deleted. */
   created_by: number | null;
@@ -536,7 +537,11 @@ export interface InboxListResponse {
 export interface RoutingItemMeta {
   route_id: number;
   step_id: number;
-  document_id: number;
+  /** Null on a route whose subject has no document yet (WHIT-920). */
+  document_id: number | null;
+  /** What the route travels on: `document`, or `form_submission` (WHIT-920). */
+  subject_type: string;
+  subject_id: number;
   open: boolean;
   arrived_by: RouteActionName;
   /** The verdict that closed it, so the state can say You approved or You rejected. */
@@ -574,10 +579,16 @@ export function routingMeta(item: InboxItem): RoutingItemMeta | null {
   const open = meta['open'];
   const arrivedBy = meta['arrived_by'];
 
+  // WHIT-920: a route on a subject with no document names the subject instead.
+  // An older server sends no subject, and its routes are all on documents.
+  const subjectType = typeof meta['subject_type'] === 'string' ? meta['subject_type'] : 'document';
+  const subjectId = typeof meta['subject_id'] === 'number' ? meta['subject_id'] : documentId;
+
   if (
     typeof routeId !== 'number' ||
     typeof stepId !== 'number' ||
-    typeof documentId !== 'number' ||
+    !(typeof documentId === 'number' || (documentId === null && subjectType !== 'document')) ||
+    typeof subjectId !== 'number' ||
     typeof open !== 'boolean' ||
     typeof arrivedBy !== 'string' ||
     !(ROUTE_ACTIONS as readonly string[]).includes(arrivedBy)
@@ -588,7 +599,9 @@ export function routingMeta(item: InboxItem): RoutingItemMeta | null {
   return {
     route_id: routeId,
     step_id: stepId,
-    document_id: documentId,
+    document_id: typeof documentId === 'number' ? documentId : null,
+    subject_type: subjectType,
+    subject_id: subjectId,
     open,
     arrived_by: arrivedBy as RouteActionName,
     closed_verdict:
@@ -603,6 +616,17 @@ export function routingMeta(item: InboxItem): RoutingItemMeta | null {
     decision: meta['decision'] === true,
     document_withdrawn: meta['document_withdrawn'] === true,
   };
+}
+
+/**
+ * Where a routing inbox item opens (WHIT-920): a document's routing tab, or the
+ * review page of a subject that has no document yet, such as a form submission.
+ */
+export function routingHref(meta: RoutingItemMeta): string {
+  if (meta.subject_type === 'document' && meta.document_id !== null) {
+    return `/admin/document-library/${meta.document_id}?tab=routing`;
+  }
+  return `/admin/routes/${encodeURIComponent(meta.subject_type)}/${meta.subject_id}`;
 }
 
 /**

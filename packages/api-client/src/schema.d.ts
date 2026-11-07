@@ -4178,7 +4178,11 @@ export interface paths {
          * @description Only the caller's own: anybody else's is a 404. Staff questions and any answers to them are left out, because they have their own permission.
          */
         get: operations["get_api_v1_me_form_submissions_id"];
-        put?: never;
+        /**
+         * Change a submission that was sent back to the caller, and send it again
+         * @description Only while its route is waiting for the caller's changes: otherwise a 409 with `details.reason` `not_sent_back`. The answers are checked as a new submission's are, a new version is recorded for the reviewers to compare, and the route resumes where the reviewer chose. Somebody else's submission is a 404.
+         */
+        put: operations["put_api_v1_me_form_submissions_id"];
         post?: never;
         delete?: never;
         options?: never;
@@ -6481,6 +6485,63 @@ export interface paths {
         post: operations["post_api_v1_roles_id_permissions"];
         /** Revoke permissions from a role (subtractive, idempotent) */
         delete: operations["delete_api_v1_roles_id_permissions"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/routes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A subject and its routes, with their trails, items and what changed
+         * @description For a person a route on the subject reached, or who may otherwise read it (a document they can see; a form submission with `forms:read`). The person who sent a form reads their own through My submissions instead. Everybody else gets a 404.
+         */
+        get: operations["get_api_v1_routes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/routes/{routeId}/actions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Act on a route, whatever it travels on
+         * @description The same body as acting on a document's route. On a form submission a rejection needs its reason, which the person who sent it reads.
+         */
+        post: operations["post_api_v1_routes_routeid_actions"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/routes/{routeId}/files/{fileId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download a file attached to the form submission a route travels on */
+        get: operations["get_api_v1_routes_routeid_files_fileid"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -9348,7 +9409,7 @@ export interface components {
         };
         DocumentRoute: {
             id: number;
-            document_id: number;
+            document_id: number | null;
             subject?: {
                 type: string;
                 id: number;
@@ -9436,7 +9497,7 @@ export interface components {
         };
         DocumentRouteRecipient: {
             id: number;
-            document_id: number;
+            document_id: number | null;
             route_id: number;
             step_id: number;
             profile_id: number;
@@ -10101,7 +10162,7 @@ export interface components {
         };
         DocumentTrailEvent: {
             id: number;
-            document_id: number;
+            document_id: number | null;
             route_id: number;
             step_id?: number | null;
             actor_profile_id?: number | null;
@@ -10271,6 +10332,7 @@ export interface components {
             available_transitions: string[];
             accepts_submissions: boolean;
             public_enabled: boolean;
+            public_requires_sign_in?: boolean;
             public_slug?: string | null;
             public_url?: string | null;
             public_opens_at?: string | null;
@@ -10616,6 +10678,9 @@ export interface components {
                 ar?: string;
                 en?: string;
             };
+            /** @enum {string} */
+            state?: "not routed" | "in progress" | "sent back" | "not approved" | "completed" | "withdrawn";
+            current_step?: string | null;
         };
         FormSubmissionCreateRequest: {
             /** @description Answers keyed by field key, each typed by its field: text, number, boolean, or a list for multiselect. */
@@ -10641,10 +10706,50 @@ export interface components {
                     filename: string | null;
                 }[];
                 form_version_now?: number | null;
+                progress?: components["schemas"]["FormSubmissionProgress"];
             };
         };
         FormSubmissionListResponse: {
             data: components["schemas"]["FormSubmission"][];
+        };
+        FormSubmissionProgress: {
+            state: string;
+            stages: {
+                position: number;
+                label: string | null;
+                /** @enum {string} */
+                status: "done" | "current" | "waiting" | "sent_back" | "not_approved";
+                /** @enum {string|null} */
+                outcome: "approved" | "rejected" | null;
+                reviewers?: string[];
+            }[];
+            notes: {
+                /** @enum {string} */
+                kind: "sent_back" | "not_approved" | "note";
+                note: string;
+                stage: string | null;
+                stage_position?: number | null;
+                at: string;
+                from?: string | null;
+            }[];
+            can_resubmit: boolean;
+            /** @enum {string|null} */
+            resume_from: "sender" | "start" | null;
+            shows_reviewers: boolean;
+        };
+        FormSubmissionResubmitRequest: {
+            /** @description The changed answers, keyed by field key. A file question left unanswered keeps the file already attached. */
+            data: {
+                [key: string]: unknown;
+            };
+            /** @description An optional note for the reviewers. */
+            note?: string | null;
+        };
+        FormSubmissionResubmitResponse: {
+            data: components["schemas"]["FormSubmission"];
+            meta: {
+                ignored_keys: string[];
+            };
         };
         FormSubmissionReview: {
             id: number;
@@ -10697,6 +10802,8 @@ export interface components {
             sections?: components["schemas"]["FormSectionText"][];
             /** @description The reference each new submission is given, e.g. `BAKE-{YYYY}-{SEQ:4}`. Tokens: {YYYY}, {YY}, {MM}, {SEQ}, {SEQ:n}. {SEQ} is required. Dates are UTC. Null gives none. */
             reference_format?: string | null;
+            /** @description The public link asks visitors to sign in: only the workspace's members and customers can send it, under their own name, so it can be sent back to them for changes. */
+            public_requires_sign_in?: boolean;
         };
         FormUploadResponse: {
             data: {
@@ -12362,6 +12469,9 @@ export interface components {
                 accepts_submissions: boolean;
                 opens_at?: string | null;
                 closes_at?: string | null;
+                sign_in_required?: boolean;
+                /** @description Given only when sign-in is required: the form to fill in once signed in. */
+                form_id?: number | null;
             };
         };
         PublicFormSubmissionResponse: {
@@ -12760,6 +12870,10 @@ export interface components {
                 updated_at?: string;
                 steps: components["schemas"]["RouteTemplateStep"][];
                 edges: components["schemas"]["RouteTemplateEdge"][];
+                anonymous_public_forms?: {
+                    id: number;
+                    name: string;
+                }[];
             };
         };
         RouteTemplateListResponse: {
@@ -12787,6 +12901,40 @@ export interface components {
         RouteTemplateUpdateRequest: {
             name?: string;
             description?: string | null;
+        };
+        RoutesBySubjectResponse: {
+            data: {
+                subject: {
+                    type: string;
+                    id: number;
+                    title: string | null;
+                    document_id: number | null;
+                    version: number | null;
+                    content_hash?: string | null;
+                    can_send_back: boolean;
+                    /** @description On a form submission: its questions, its answers and its files. */
+                    form?: {
+                        [key: string]: unknown;
+                    } | null;
+                };
+                routes: (components["schemas"]["DocumentRoute"] & {
+                    trail: components["schemas"]["DocumentTrailEvent"][];
+                    recipients: components["schemas"]["DocumentRouteRecipient"][];
+                    changes: {
+                        seen_version: number | null;
+                        current_version: number | null;
+                        changes: {
+                            key: string;
+                            before?: unknown;
+                            after?: unknown;
+                        }[];
+                    };
+                })[];
+                /** @description Display names by profile id, for the people on these routes. */
+                people: {
+                    [key: string]: string;
+                };
+            };
         };
         RoutingRule: {
             kind: string;
@@ -36195,6 +36343,104 @@ export interface operations {
             };
         };
     };
+    put_api_v1_me_form_submissions_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FormSubmissionResubmitRequest"];
+            };
+        };
+        responses: {
+            /** @description The changed submission */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormSubmissionResubmitResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not one of the caller's submissions */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not waiting for the caller's changes */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description An answer failed validation */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     get_api_v1_me_form_submissions_id_files_fileid: {
         parameters: {
             query?: never;
@@ -47965,6 +48211,251 @@ export interface operations {
             };
             /** @description Internal server error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_routes: {
+        parameters: {
+            query?: {
+                /** @description `document` or `form_submission`. */
+                subject_type?: string;
+                /** @description The subject's id. */
+                subject_id?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The subject and its routes */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoutesBySubjectResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found, or not visible to the caller */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The subject type and id are required */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_routes_routeid_actions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                routeId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DocumentRouteActionRequest"];
+            };
+        };
+        responses: {
+            /** @description The appended trail event */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentRouteActionResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Route not found, or not visible to the caller */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The act is not available to the caller on this route */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_routes_routeid_files_fileid: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                routeId: number;
+                fileId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file, as an attachment */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not a file the caller may read */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The file could not be read from storage */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

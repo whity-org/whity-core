@@ -606,6 +606,14 @@ final class SettingsRegistry
     // is defaulting to the version that cannot leak.
     public const DOCUMENTS_QR_PUBLIC_DETAIL = 'documents.qr_public_detail';
 
+    // WHIT-920 (#1724, A9). Whether the person who sent a form sees WHO reviewed
+    // it, or only the stages and their outcomes. Off: an applicant sees "Head of
+    // department: approved", not the name of the person who approved. A
+    // workspace that wants its applicants to know who is handling their request
+    // turns it on. Tenant-overridable, because it is a decision about how an
+    // organisation speaks to the people it serves.
+    public const FORMS_SHOW_REVIEWER_NAMES = 'forms.show_reviewer_names';
+
     // How many people a USER GROUP preview SHOWS (#999). Not a ceiling on
     // resolution — the count a preview reports is always exact — but the size of
     // the sample beside it.
@@ -878,6 +886,7 @@ final class SettingsRegistry
         self::DOCUMENTS_RENDER_ENABLED,
         self::DOCUMENTS_PERSIST_ENABLED,
         self::DOCUMENTS_QR_ENABLED,
+        self::FORMS_SHOW_REVIEWER_NAMES,
         self::I18N_ENABLED,
         self::UI_HIDE_DATES,
         self::BILLING_TAX_INCLUSIVE,
@@ -1168,6 +1177,8 @@ final class SettingsRegistry
         // The minimum that satisfies verification. See the constant, and
         // VerificationPresenter for what each level does and does not say.
         self::DOCUMENTS_QR_PUBLIC_DETAIL => 'minimal',
+        // Off: applicants see stages and outcomes, not reviewers. See the constant.
+        self::FORMS_SHOW_REVIEWER_NAMES => 'false',
         // Ten faces. Enough to recognise a group at a glance — "yes, those are
         // the instructors" — and small enough that nobody mistakes the sample
         // for the list. The COUNT beside it is exact and unbounded, which is
@@ -1539,6 +1550,7 @@ final class SettingsRegistry
             self::DOCUMENTS_ROUTING_NOTIFICATION_CHANNELS => self::validateRoutingNotificationChannels($value),
             self::DOCUMENTS_QR_ENABLED => self::validateBoolean($value, self::DOCUMENTS_QR_ENABLED),
             self::DOCUMENTS_QR_PUBLIC_DETAIL => self::validateEnum($key, $value),
+            self::FORMS_SHOW_REVIEWER_NAMES => self::validateBoolean($value, self::FORMS_SHOW_REVIEWER_NAMES),
             self::GROUPS_PREVIEW_SAMPLE_SIZE => self::validateGroupsPreviewSampleSize($value),
             self::DATA_TYPES_BULK_MAX_IDS => self::validateBulkMaxIds($value),
             // Error tracking. These five were declared with defaults, types,
