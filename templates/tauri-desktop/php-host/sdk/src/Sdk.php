@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.76).
+ * SDK identity (v1.77).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1048,12 +1048,23 @@ namespace Whity\Sdk;
  * jobs and CLI commands too, not only in requests (#1151). Each process builds one
  * per-tenant storage stack, so a job's document is stored where the same tenant's
  * request would store it. No signature changes.)
+ *
+ * 1.77 (A PLUGIN CAN BE THE DEPLOYMENT'S BILLING PORTAL: {@see PluginBillingPortalInterface}
+ * returns a {@see Billing\BillingPortal}, and the host routes its existing billing
+ * surface through it when no hosted billing service is configured: checkout, the
+ * return page, plan and quantity changes, receipts, the provider's customer portal,
+ * operator refunds, and provider notifications at `POST /api/billing/provider-webhook`.
+ * The plugin translates to one payment provider; the host still owns the subscription
+ * record, the plan and the entitlements, and reads them back from accessFor() rather
+ * than from a notification's payload (WHIT-1010).
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.76.0';
+    public const VERSION = '1.77.0';
 
     /**
      * Static identity only — never instantiated.
