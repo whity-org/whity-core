@@ -373,7 +373,7 @@ final class CommissionAccrualRun
      *
      * @return list<array<string, mixed>>
      *
-     * @tenant-guard-ignore: this sweep has no tenant context by design — it is
+     * This sweep has no tenant context by design — it is
      * the job that finds which referred workspaces to read payments for, exactly
      * as the billing run's dueSubscriptions() does. Every read that follows binds
      * the tenant id this returns.

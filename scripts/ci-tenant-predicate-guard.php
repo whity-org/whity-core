@@ -129,6 +129,62 @@ if ($violations !== []) {
     exit(1);
 }
 
+/**
+ * An exemption must exempt something (#1144, Phase 2).
+ *
+ * Measured on develop in November 2026: 136 of the 248 tag lines in src/
+ * suppressed nothing. Most sat above queries on sanctioned global tables
+ * (`profiles`, `app_settings`, the `tenants` registry), which the scanner
+ * passes anyway. A tag reads as "somebody reviewed this exception", so an
+ * inert one claims a review of a risk that is not there, and doubles the
+ * list an audit has to read. The reasons were kept as plain comments.
+ *
+ * The test is direct: neutralise one tag line, rescan the file, and see
+ * whether anything new is reported. If nothing is, the tag goes. Only src/
+ * is checked: a plugin's handlers are also read by the plugin conformance
+ * kit, whose table list differs, so a tag there can be load-bearing for it.
+ */
+$inert = [];
+foreach ($roots as $root) {
+    $realRoot = realpath($root);
+    if ($realRoot === false || basename($realRoot) !== 'src') {
+        continue;
+    }
+    $files = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($realRoot, FilesystemIterator::SKIP_DOTS));
+    foreach ($files as $file) {
+        $path = (string) $file;
+        if (!str_ends_with($path, '.php') || $isMigrationPath($path)) {
+            continue;
+        }
+        $source = (string) file_get_contents($path);
+        if (!str_contains($source, TenantPredicateGuard::IGNORE_TAG)) {
+            continue;
+        }
+        $baseline = count($guard->scanSource($source, $path));
+        $lines = explode("\n", $source);
+        foreach ($lines as $i => $line) {
+            // A tag, not prose that mentions one: `// @tenant-guard-ignore: …` or ` * @tenant-guard-ignore: …`.
+            if (preg_match('#^\s*(//|\*)\s*' . preg_quote(TenantPredicateGuard::IGNORE_TAG, '#') . '#', $line) !== 1) {
+                continue;
+            }
+            $without = $lines;
+            $without[$i] = str_replace(TenantPredicateGuard::IGNORE_TAG, 'neutralised:', $line);
+            if (count($guard->scanSource(implode("\n", $without), $path)) === $baseline) {
+                $relative = str_replace('\\', '/', str_replace(dirname(__DIR__) . DIRECTORY_SEPARATOR, '', $path));
+                $inert[] = sprintf('  %s:%d  %s', $relative, $i + 1, trim($line));
+            }
+        }
+    }
+}
+if ($inert !== []) {
+    fwrite(STDERR, 'FAIL: ' . count($inert) . " `" . TenantPredicateGuard::IGNORE_TAG . "` tag(s) exempt nothing.\n\n");
+    fwrite(STDERR, "Without the tag the scanner reports nothing new, so it records a review of a\n");
+    fwrite(STDERR, "risk that is not there (usually a query on a sanctioned global table). Keep the\n");
+    fwrite(STDERR, "reason as a plain comment and drop the tag.\n\n");
+    fwrite(STDERR, implode("\n", $inert) . "\n");
+    exit(1);
+}
+
 echo "OK: no unscoped tenant-table queries found in: " . implode(', ', $roots) . ".\n";
 if ($excludedMigrationHits > 0) {
     echo sprintf(

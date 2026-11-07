@@ -179,15 +179,31 @@ final class TranslationRepository implements TranslationRepositoryInterface
     }
 
     /**
-     * Find a single translation row by its id, regardless of tenant scope.
+     * {@inheritDoc}
+     */
+    public function findVisibleTo(int $id, int $tenantId): ?Translation
+    {
+        if ($tenantId === 0) {
+            return $this->findById($id);
+        }
+
+        $stmt = $this->pdo->prepare(
+            'SELECT * FROM translations WHERE id = :id AND (tenant_id = :tenant_id OR tenant_id IS NULL)'
+        );
+        $stmt->execute([':id' => $id, ':tenant_id' => $tenantId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return $row ? Translation::fromRow($row) : null;
+    }
+
+    /**
+     * Find a translation row by id in any workspace.
      *
-     * Unscoped by design — this is the admin guard lookup consumed by
-     * {@see \Whity\Api\TranslationsApiHandler} to decide write-manageability
-     * BEFORE any scoped mutation runs.
+     * Not on the interface: request code uses {@see self::findVisibleTo()}.
+     * This serves the system tenant, and re-reads a row this class has just
+     * written.
      *
-     * @tenant-guard-ignore: unscoped admin guard lookup; the caller checks the
-     * returned row's tenant_id against its own identity before any scoped
-     * UPDATE/DELETE executes (see TranslationsApiHandler::writeAccessFor()).
+     * @tenant-guard-ignore: any-workspace read for the system tenant and for re-reading a row just inserted; request code goes through findVisibleTo()
      */
     public function findById(int $id): ?Translation
     {

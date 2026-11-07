@@ -73,7 +73,7 @@ final class DataTypeSearchSource implements SearchSource
         $subtitle = $search['subtitle'];
 
         $columns = "{$key} AS id, {$title} AS title" . ($subtitle !== null ? ", {$subtitle} AS subtitle" : '');
-        // @tenant-guard-ignore: plugin-declared table and tenant column, validated by DataTypeRegistry; bound to the caller's tenant below
+        // Plugin-declared table and tenant column, validated by DataTypeRegistry; bound to the caller's tenant below
         $sql = "SELECT {$columns} FROM {$table}
                  WHERE {$tenant} = :tenant_id
                    AND " . SearchText::sqlFold($title) . " LIKE :pattern ESCAPE '\\'";

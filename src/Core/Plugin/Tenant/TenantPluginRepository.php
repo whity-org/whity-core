@@ -360,7 +360,7 @@ final class TenantPluginRepository
      */
     public function permissionsOfOtherTenants(int $tenantId): array
     {
-        // @tenant-guard-ignore: returns only other workspaces' permission slugs, so this workspace can be shown fewer, never more
+        // Returns only other workspaces' permission slugs, so this workspace can be shown fewer, never more
         $stmt = $this->db->prepare(
             'SELECT DISTINCT permission FROM tenant_plugin_permissions
               WHERE tenant_id <> :tenant_id

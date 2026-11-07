@@ -138,7 +138,7 @@ final class OAuthWorkspacesHandler
      */
     private function workspaces(int $profileId): array
     {
-        // @tenant-guard-ignore: lists which tenants a profile belongs to before any tenant is chosen, so there is none to scope by; scoped by the profile the issuer-signed assertion resolved to
+        // Lists which tenants a profile belongs to before any tenant is chosen, so there is none to scope by; scoped by the profile the issuer-signed assertion resolved to
         $stmt = $this->db->prepare(
             "SELECT t.id, t.name, t.slug FROM memberships m JOIN tenants t ON t.id = m.tenant_id
              WHERE m.profile_id = ? AND m.status = 'active' AND m.tenant_id <> 0

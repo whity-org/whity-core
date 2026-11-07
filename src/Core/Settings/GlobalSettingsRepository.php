@@ -39,7 +39,7 @@ final class GlobalSettingsRepository
      */
     public function all(): array
     {
-        // @tenant-guard-ignore: app_settings is a sanctioned global table (no tenant_id column); platform-wide defaults by design.
+        // App_settings is a sanctioned global table (no tenant_id column); platform-wide defaults by design.
         $stmt = $this->db->query('SELECT setting_key, value FROM app_settings');
         if ($stmt === false) {
             return [];
@@ -69,7 +69,7 @@ final class GlobalSettingsRepository
      */
     public function get(string $key): ?string
     {
-        // @tenant-guard-ignore: app_settings is a sanctioned global table (no tenant_id column); platform-wide defaults by design.
+        // App_settings is a sanctioned global table (no tenant_id column); platform-wide defaults by design.
         $stmt = $this->db->prepare('SELECT value FROM app_settings WHERE setting_key = :key');
         $stmt->execute([':key' => $key]);
         $value = $stmt->fetchColumn();
@@ -82,7 +82,7 @@ final class GlobalSettingsRepository
      */
     public function set(string $key, string $value): void
     {
-        // @tenant-guard-ignore: app_settings is a sanctioned global table (no tenant_id column); platform-wide defaults by design.
+        // App_settings is a sanctioned global table (no tenant_id column); platform-wide defaults by design.
         $stmt = $this->db->prepare(
             'INSERT INTO app_settings (setting_key, value, updated_at)
              VALUES (:key, :value, NOW())
@@ -97,7 +97,7 @@ final class GlobalSettingsRepository
      */
     public function delete(string $key): int
     {
-        // @tenant-guard-ignore: app_settings is a sanctioned global table (no tenant_id column); platform-wide defaults by design.
+        // App_settings is a sanctioned global table (no tenant_id column); platform-wide defaults by design.
         $stmt = $this->db->prepare('DELETE FROM app_settings WHERE setting_key = :key');
         $stmt->execute([':key' => $key]);
 
@@ -110,7 +110,7 @@ final class GlobalSettingsRepository
      */
     public function compareAndSet(string $key, string $expected, string $value): bool
     {
-        // @tenant-guard-ignore: app_settings is a sanctioned global table (no tenant_id column); platform-wide defaults by design.
+        // App_settings is a sanctioned global table (no tenant_id column); platform-wide defaults by design.
         $stmt = $this->db->prepare(
             'UPDATE app_settings SET value = :value, updated_at = NOW()
               WHERE setting_key = :key AND value = :expected'
@@ -133,7 +133,7 @@ final class GlobalSettingsRepository
     {
         $lease = sprintf('%010d:%s', $now + $ttlSeconds, bin2hex(random_bytes(8)));
 
-        // @tenant-guard-ignore: app_settings is a sanctioned global table (no tenant_id column); platform-wide defaults by design.
+        // App_settings is a sanctioned global table (no tenant_id column); platform-wide defaults by design.
         $stmt = $this->db->prepare(
             'INSERT INTO app_settings (setting_key, value, updated_at)
              VALUES (:key, :value, NOW())
@@ -148,7 +148,7 @@ final class GlobalSettingsRepository
     /** Give back a lease, only if it is still this holder's. */
     public function releaseLease(string $key, string $lease): void
     {
-        // @tenant-guard-ignore: app_settings is a sanctioned global table (no tenant_id column); platform-wide defaults by design.
+        // App_settings is a sanctioned global table (no tenant_id column); platform-wide defaults by design.
         $stmt = $this->db->prepare('DELETE FROM app_settings WHERE setting_key = :key AND value = :lease');
         $stmt->execute([':key' => $key, ':lease' => $lease]);
     }

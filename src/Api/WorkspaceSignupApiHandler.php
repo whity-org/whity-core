@@ -292,7 +292,7 @@ final class WorkspaceSignupApiHandler
     /** The workspace's slug, or null when it has none: its sign-up page lives at /join/<slug>. */
     private function slugOf(int $tenantId): ?string
     {
-        // @tenant-guard-ignore: tenants registry, the caller's own row by id
+        // Tenants registry, the caller's own row by id
         $stmt = $this->db->prepare('SELECT slug FROM tenants WHERE id = :id');
         $stmt->execute([':id' => $tenantId]);
         $slug = $stmt->fetchColumn();

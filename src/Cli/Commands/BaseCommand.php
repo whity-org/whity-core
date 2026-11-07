@@ -762,7 +762,7 @@ abstract class BaseCommand implements CliCommand, CommandHelp
      */
     private static function servicePrincipalId(Database $db): int
     {
-        // @tenant-guard-ignore: profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
+        // Profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
         $stmt = $db->getPdo()->query(
             "SELECT id FROM profiles WHERE auth_method = '" . AuthMethod::SERVICE . "' ORDER BY id ASC LIMIT 1"
         );
