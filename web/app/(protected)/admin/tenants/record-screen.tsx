@@ -36,7 +36,7 @@ import { apiClient } from '@/lib/api-client';
 import { api } from '@/lib/api/client';
 import type { components } from '@/lib/api/schema';
 import { fetchAllPages } from '@/lib/api/fetch-all-pages';
-import { useTranslation } from '@whity/features/i18n';
+import { useLanguageCode, useTranslation } from '@whity/features/i18n';
 import {
   RecordCollectionPanel,
   RecordList,
@@ -54,6 +54,14 @@ import { Button } from '@whity/ui/button';
 import { TechnicalDetails } from '@whity/ui/display-preferences';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
 import { Input } from '@/components/ui/input';
+import { LocalizedNameField } from '@/components/localized-name-field';
+import {
+  cleanNames,
+  localizedName,
+  sameNames,
+  type LocalizedNames,
+  type NameLanguage,
+} from '@/lib/localized-name';
 import { IconBuildingCommunity } from '@tabler/icons-react';
 
 export type Tenant = components['schemas']['Tenant'];
@@ -63,8 +71,16 @@ type Entitlements = components['schemas']['TenantEntitlementsResponse']['data'];
 /** The editable half of the record, stamped with the workspace it belongs to. */
 interface TenantForm {
   id: number;
-  name: string;
+  /** The name in Arabic and English (#821). */
+  names: LocalizedNames;
+  /** Which of them is the original, legal name. */
+  nameLanguage: NameLanguage;
   slug: string;
+}
+
+/** The record's original language, as one the form offers. */
+function formLanguage(code: string | undefined): NameLanguage {
+  return code === 'ar' ? 'ar' : 'en';
 }
 
 /** One entitlement the operator changed for this workspace specifically. */
@@ -100,6 +116,7 @@ const EMPTY_VALUE = '—';
  * in `resolveAccess` below and nowhere else.
  */
 interface TenantRecordFields {
+  /** The name in the reader's language, or the original when it has none (#821). */
   name: string;
   slug: string | null;
   userCount: number;
@@ -180,6 +197,7 @@ export function TenantRecordScreen({
   backLabel,
 }: TenantRecordScreenProps) {
   const t = useTranslation('admin');
+  const currentLanguage = useLanguageCode();
 
   const loaded = useRecordResource<Tenant | 'not-found'>(
     async () => {
@@ -238,6 +256,7 @@ export function TenantRecordScreen({
   /** What the operator has TYPED, or null while the form is untouched. */
   const [draft, setDraft] = useState<TenantForm | null>(null);
   const [slugError, setSlugError] = useState<string | null>(null);
+  const [nameError, setNameError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   const record = loaded.status === 'ready' && loaded.value !== 'not-found' ? loaded.value : null;
@@ -254,11 +273,23 @@ export function TenantRecordScreen({
   // seeding effect is a render behind the record it seeds from, and this page
   // has no moment where the two can disagree.
   const pristine: TenantForm | null =
-    current === null ? null : { id: current.id, name: current.name, slug: current.slug ?? '' };
+    current === null
+      ? null
+      : {
+          id: current.id,
+          // A record from before #821 carries only `name`: it is the original.
+          names:
+            current.names && Object.keys(current.names).length > 0
+              ? { ...current.names }
+              : { [formLanguage(current.nameLanguage)]: current.name },
+          nameLanguage: formLanguage(current.nameLanguage),
+          slug: current.slug ?? '',
+        };
   const form = draft !== null && pristine !== null && draft.id === pristine.id ? draft : pristine;
 
   const discard = useCallback(() => {
     setSlugError(null);
+    setNameError(null);
     setDraft(null);
   }, []);
 
@@ -286,7 +317,9 @@ export function TenantRecordScreen({
   const isDirty =
     form !== null &&
     pristine !== null &&
-    (form.name !== pristine.name || form.slug !== pristine.slug);
+    (!sameNames(form.names, pristine.names) ||
+      form.nameLanguage !== pristine.nameLanguage ||
+      form.slug !== pristine.slug);
 
   const back = { label: backLabel ?? t('tenants.record.back', 'Back to workspaces'), onBack };
 
@@ -294,12 +327,18 @@ export function TenantRecordScreen({
     event.preventDefault();
     if (!current || !form || !access.editable) return;
 
-    const name = form.name.trim();
+    const names = cleanNames(form.names);
+    const nameLanguage = form.nameLanguage;
+    const name = names[nameLanguage] ?? '';
     const slug = form.slug.trim();
     if (name === '') {
-      onNotify(t('tenants.record.name.required', 'A name is required.'), 'error');
+      // The original is what every other language falls back to.
+      setNameError(
+        t('tenants.record.name.originalRequired', 'Fill in the name in the original language.')
+      );
       return;
     }
+    setNameError(null);
     // A workspace created without a slug can still be renamed: an empty slug that
     // was already empty is left alone rather than rejected.
     const leaveSlug = slug === '' && (pristine?.slug ?? '') === '';
@@ -318,7 +357,9 @@ export function TenantRecordScreen({
       setIsSaving(true);
       const response = await apiClient(`/api/v1/tenants/${current.id}`, {
         method: 'PATCH',
-        body: JSON.stringify(leaveSlug ? { name } : { name, slug }),
+        body: JSON.stringify(
+          leaveSlug ? { names, nameLanguage } : { names, nameLanguage, slug }
+        ),
       });
       if (response.status === 409) {
         onNotify(
@@ -341,7 +382,7 @@ export function TenantRecordScreen({
       // persisted, without a refetch nobody asked for. Dropping the draft is
       // what makes the form read from the new record rather than from typing
       // that now matches it.
-      setSaved({ ...current, name, slug });
+      setSaved({ ...current, name, names, nameLanguage, slug });
       setDraft(null);
     } catch (error) {
       onNotify(
@@ -397,7 +438,7 @@ export function TenantRecordScreen({
   }
 
   const fields: TenantRecordFields = {
-    name: current.name,
+    name: localizedName(current.names, currentLanguage, current.nameLanguage, current.name),
     slug: current.slug,
     userCount: current.userCount,
     createdAt: current.createdAt,
@@ -422,21 +463,15 @@ export function TenantRecordScreen({
     <form id="tenant-record-form" onSubmit={handleSubmit}>
       {detailsCard(
         <>
-          <div className="space-y-1.5">
-            <label
-              htmlFor="tenant-record-name"
-              className="block text-sm font-medium text-foreground"
-            >
-              {t('tenants.record.name.label', 'Name')}
-            </label>
-            <Input
-              id="tenant-record-name"
-              data-testid="tenant-record-name"
-              value={form.name}
-              autoComplete="off"
-              onChange={(event) => setDraft({ ...form, name: event.target.value })}
-            />
-          </div>
+          <LocalizedNameField
+            id="tenant-record-name"
+            label={t('tenants.record.name.label', 'Name')}
+            names={form.names}
+            originalLanguage={form.nameLanguage}
+            onNamesChange={(names) => setDraft({ ...form, names })}
+            onOriginalLanguageChange={(nameLanguage) => setDraft({ ...form, nameLanguage })}
+            error={nameError}
+          />
 
           <div className="space-y-1.5">
             <label
@@ -475,7 +510,27 @@ export function TenantRecordScreen({
         <dt className="text-sm font-medium text-foreground">
           {t('tenants.record.name.label', 'Name')}
         </dt>
-        <dd className="text-sm text-foreground">{current.name}</dd>
+        {(['ar', 'en'] as const).map((code) => {
+          const text = current.names?.[code];
+          const original = formLanguage(current.nameLanguage) === code;
+          return (
+            <dd
+              key={code}
+              className="flex flex-wrap items-baseline gap-2 text-sm text-foreground"
+              data-testid={`tenant-record-name-${code}`}
+            >
+              <span className="text-muted-foreground">
+                {code === 'ar'
+                  ? t('tenants.record.name.arabic', 'Arabic')
+                  : t('tenants.record.name.english', 'English')}
+                {original ? ` · ${t('tenants.record.name.original', 'original')}` : ''}
+              </span>
+              <span dir={code === 'ar' ? 'rtl' : 'ltr'} lang={code}>
+                {text && text !== '' ? text : EMPTY_VALUE}
+              </span>
+            </dd>
+          );
+        })}
       </div>
       <div className="space-y-1.5">
         <dt className="text-sm font-medium text-foreground">

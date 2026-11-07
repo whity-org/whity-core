@@ -10,7 +10,8 @@
 
 import { useState } from 'react';
 import { useDateDisplay } from '@whity/features/datetime';
-import { useTranslation } from '@whity/features/i18n';
+import { useLanguageCode, useTranslation } from '@whity/features/i18n';
+import { localizedName } from '@/lib/localized-name';
 import { useAuth } from '@/lib/auth-context';
 import { useCapabilitiesContext } from '@/lib/capabilities-context';
 import { AgentsToday } from './agents-today';
@@ -46,7 +47,11 @@ export default function DashboardPage() {
         evening: t('dashboard.greeting.evening', 'Good evening'),
       }[partOfDay()];
 
-  const workspace = memberships.find((m) => m.tenant_id === user?.tenant_id)?.tenant_name;
+  const currentLanguage = useLanguageCode();
+  const membership = memberships.find((m) => m.tenant_id === user?.tenant_id);
+  const workspace = membership
+    ? localizedName(membership.tenant_names, currentLanguage, membership.tenant_name_language, membership.tenant_name)
+    : undefined;
   // Through the shared date display, so a workspace that hides dates shows none.
   const date = dates.date(new Date().toISOString());
 

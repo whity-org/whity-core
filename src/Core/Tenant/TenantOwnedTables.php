@@ -204,6 +204,9 @@ final class TenantOwnedTables
         // except PublicFormKeyRepository::findLive(), the anonymous lookup that
         // resolves the tenant from a 256-bit key.
         'public_form_keys' => '217_create_public_form_keys.php',
+        // #821: names of workspaces and units in other languages. Every query
+        // binds tenant_id; a workspace's own name is stored under its own id.
+        'localized_texts' => '225_create_localized_texts.php',
         // WHIT-915: workspace customer sign-up (migration 222). Every query binds
         // tenant_id except the token lookup on the public confirm endpoint, where the
         // 256-bit single-use token is the authority and names its own tenant.

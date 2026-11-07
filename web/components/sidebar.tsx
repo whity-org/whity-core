@@ -12,7 +12,8 @@ import { Button } from '@whity/ui/button';
 import { TenantSwitcher as WorkspaceSwitcher } from '@whity/ui/tenant-switcher';
 import { AppSidebar, useForcedRail } from '@whity/ui/app-sidebar';
 import { navGroupsFromServerItems } from '@whity/features/nav';
-import { LanguageSwitcher, useI18nEnabled, useTranslation } from '@whity/features/i18n';
+import { LanguageSwitcher, useLanguageCode, useI18nEnabled, useTranslation } from '@whity/features/i18n';
+import { localizedName } from '@/lib/localized-name';
 import * as TablerIcons from '@tabler/icons-react';
 import {
   IconLogout,
@@ -132,16 +133,18 @@ function TenantSwitcher({ memberships, activeTenantId, collapsed }: TenantSwitch
   const { refresh: refreshNav } = useNavigation();
   const { addToast } = useToast();
   const t = useTranslation('common');
+  const currentLanguage = useLanguageCode();
   const [isSwitching, setIsSwitching] = useState(false);
 
   const workspaces = useMemo(
     () =>
       memberships.map((m) => ({
         id: String(m.tenant_id),
-        name: m.tenant_name,
+        // #821: the reader's language, else the original name.
+        name: localizedName(m.tenant_names, currentLanguage, m.tenant_name_language, m.tenant_name),
         role: m.role ? m.role.charAt(0).toUpperCase() + m.role.slice(1) : undefined,
       })),
-    [memberships],
+    [memberships, currentLanguage],
   );
 
   const handleSwitch = useCallback(

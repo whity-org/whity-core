@@ -20,7 +20,11 @@ interface User {
  */
 export interface Membership {
   tenant_id: number;
+  /** The workspace's original name. */
   tenant_name: string;
+  /** The original name's language, and the name in every language it has (#821). */
+  tenant_name_language?: string;
+  tenant_names?: Record<string, string>;
   role: string;
   /**
    * `customer` when the person joined through the workspace's own sign-up
