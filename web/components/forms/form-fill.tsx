@@ -3,9 +3,12 @@
 /**
  * Asking a form's questions, shared by the two pages it can be filled on (F.2).
  *
- * A form with one section is one page. A form with several shows them as steps, with
- * Back and Continue at the foot and Review as the last step, so a long form is never
- * one long page. Which questions are asked comes from {@link fieldVisibility}: a
+ * A form with one section is one page. A form with several shows one section at a
+ * time, with Back and Continue at the foot and Review as the last step, so a long form
+ * is never one long page. Up to {@link STEPPER_STEPS_MAX} steps are drawn with the
+ * Stepper; a longer form (an ethics application has ten sections) gets a compact "Step
+ * 3 of 11" with a progress bar and a menu of its sections instead, because a Stepper
+ * that long is a list of every section stacked above the questions (WHIT-943). Which questions are asked comes from {@link fieldVisibility}: a
  * hidden question is not drawn, not checked and not sent.
  *
  * The server decides what is acceptable. Continue only checks that required questions
@@ -17,6 +20,13 @@
 import { useMemo, useRef, useState } from 'react';
 import { Button } from '@whity/ui/button';
 import { Stepper } from '@whity/ui/stepper';
+import { Icon } from '@whity/ui/icon';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@whity/ui/dropdown-menu';
 import { useDateDisplay } from '@whity/features/datetime';
 import { useTranslation } from '@whity/features/i18n';
 import {
@@ -41,8 +51,8 @@ export interface FormSectionSpec {
 
 export type FillableField = FormFieldSpec & { visible_when?: FieldConditionRule | null };
 
-/** The Stepper is drawn across the page for up to this many steps, and down it beyond. */
-const HORIZONTAL_STEPS_MAX = 6;
+/** The Stepper is for 3 to 6 steps (register, 2.6); a longer form gets the compact indicator. */
+const STEPPER_STEPS_MAX = 6;
 
 function hasText(value: unknown): boolean {
   if (typeof value === 'string') return value.trim() !== '';
@@ -98,8 +108,11 @@ export function FormFill({
   const t = useTranslation('forms');
   const refusalMessage = useRefusalMessage();
   const top = useRef<HTMLDivElement>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
 
   const [stepIndex, setStepIndex] = useState(initialStep);
+  // The furthest step reached, so the sections menu can go back to any of them.
+  const [reached, setReached] = useState(initialStep);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -148,9 +161,22 @@ export function FormFill({
 
   function goTo(index: number) {
     setStepIndex(index);
+    setReached((was) => Math.max(was, index));
     onStepChange?.(index);
     setFormError(null);
     top.current?.scrollIntoView?.({ block: 'start' });
+    // The new step's heading takes focus, so a screen reader starts at its title.
+    requestAnimationFrame(() => heading.current?.focus({ preventScroll: true }));
+  }
+
+  /** From the sections menu: back freely, forward only past a complete step. */
+  function jumpTo(index: number) {
+    if (index > current) {
+      const errors = requiredErrors(steps[current]?.fields ?? []);
+      setFieldErrors(errors);
+      if (Object.keys(errors).length > 0) return;
+    }
+    goTo(index);
   }
 
   function requiredErrors(toCheck: FillableField[]): Record<string, string> {
@@ -238,17 +264,33 @@ export function FormFill({
     >
       <div ref={top} />
 
-      {stepped && (
+      {stepped && steps.length + 1 > STEPPER_STEPS_MAX && (
+        <StepProgress
+          current={current}
+          reached={reached}
+          labels={[...steps.map((step, index) => stepTitle(step.section, index)), t('step.review', 'Review')]}
+          onJump={jumpTo}
+        />
+      )}
+
+      {stepped && steps.length + 1 <= STEPPER_STEPS_MAX && (
         <Stepper
           label={t('step.label', 'Steps of this form')}
           stepOfLabel={(number, total) => t('step.of', 'Step {number} of {total}', { number, total })}
-          orientation={steps.length + 1 > HORIZONTAL_STEPS_MAX ? 'vertical' : 'horizontal'}
           current={current}
           steps={[
             ...steps.map((step, index) => ({ label: stepTitle(step.section, index) })),
             { label: t('step.review', 'Review') },
           ]}
         />
+      )}
+
+      {stepped && (
+        <h2 ref={heading} tabIndex={-1} className="text-lg font-semibold outline-none" data-testid="step-heading">
+          {onReview
+            ? t('step.review', 'Review')
+            : stepTitle(steps[current]?.section ?? { key: null, field_keys: [] }, current)}
+        </h2>
       )}
 
       {onReview ? (
@@ -332,6 +374,69 @@ export function FormFill({
         )}
       </div>
     </form>
+  );
+}
+
+/**
+ * Where somebody is in a long form: "Step 3 of 11", a bar, and a menu of every
+ * section. Sections already reached can be opened again from the menu; the rest wait
+ * until Continue gets there.
+ */
+function StepProgress({
+  current,
+  reached,
+  labels,
+  onJump,
+}: {
+  current: number;
+  reached: number;
+  labels: string[];
+  onJump: (index: number) => void;
+}) {
+  const t = useTranslation('forms');
+  const total = labels.length;
+
+  return (
+    <nav aria-label={t('step.label', 'Steps of this form')} className="grid gap-2" data-testid="step-progress">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <p className="text-sm text-muted-foreground">
+          {t('step.of', 'Step {number} of {total}', { number: current + 1, total })}
+        </p>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button type="button" variant="outline" size="sm">
+              {t('step.all', 'All sections')}
+              <Icon name="chevron-down" size={16} aria-hidden />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="max-h-[min(28rem,70dvh)] overflow-y-auto">
+            {labels.map((label, index) => (
+              <DropdownMenuItem
+                key={`${index}-${label}`}
+                disabled={index > reached}
+                aria-current={index === current ? 'step' : undefined}
+                className={index === current ? 'font-semibold' : undefined}
+                onSelect={() => {
+                  if (index !== current) onJump(index);
+                }}
+              >
+                <span className="w-6 flex-none tabular-nums text-muted-foreground">{index + 1}</span>
+                <span className="min-w-0 flex-1">{label}</span>
+                {index < reached && index !== current && (
+                  <>
+                    <Icon name="check" size={16} className="text-primary" aria-hidden />
+                    <span className="sr-only">{t('step.done', 'Done')}</span>
+                  </>
+                )}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+      <div aria-hidden className="h-1.5 overflow-hidden rounded-full bg-muted">
+        <div className="h-full rounded-full bg-primary" style={{ width: `${((current + 1) / total) * 100}%` }} />
+      </div>
+    </nav>
   );
 }
 

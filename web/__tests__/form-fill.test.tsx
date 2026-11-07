@@ -207,6 +207,54 @@ describe('FormFill', () => {
     expect(screen.getAllByText('Goods').length).toBeGreaterThan(0);
   });
 
+  it('keeps the answers of a section after Back and Continue', async () => {
+    render(<Harness submit={jest.fn()} />);
+
+    await userEvent.type(box('supplier'), 'Example Mill');
+    await userEvent.click(button('Continue'));
+    await userEvent.type(box('crates'), '12');
+    await userEvent.click(button('Back'));
+
+    expect((box('supplier') as HTMLInputElement).value).toBe('Example Mill');
+    await userEvent.click(button('Continue'));
+    expect((box('crates') as HTMLInputElement).value).toBe('12');
+  });
+
+  describe('a form with more sections than the Stepper holds', () => {
+    // Ten sections and Review, like an ethics application (WHIT-943).
+    const many = Array.from({ length: 10 }, (_, index) => field(`q${index}`, { is_required: index === 0, position: index }));
+    const manySections: FormSectionSpec[] = many.map((one, index) => ({
+      key: `s${index}`,
+      field_keys: [one.field_key],
+      title: { en: `Part title ${index + 1}` },
+    }));
+
+    it('says which step of how many, names the section, and does not stack every section', () => {
+      render(<Harness submit={jest.fn()} fields={many} sections={manySections} />);
+
+      expect(screen.getByText('Step 1 of 11')).toBeTruthy();
+      expect(screen.getByRole('heading', { name: 'Part title 1' })).toBeTruthy();
+      expect(screen.queryByText('Part title 2')).toBeNull();
+      expect(screen.queryByRole('list')).toBeNull();
+    });
+
+    it('opens a section already reached from the menu, and not one ahead of it', async () => {
+      render(<Harness submit={jest.fn()} fields={many} sections={manySections} />);
+
+      await userEvent.type(box('q0'), 'Example Mill');
+      await userEvent.click(button('Continue'));
+      await userEvent.click(button('Continue'));
+      expect(screen.getByText('Step 3 of 11')).toBeTruthy();
+
+      await userEvent.click(button('All sections'));
+      expect(screen.getByRole('menuitem', { name: /Part title 5/ })).toHaveAttribute('aria-disabled', 'true');
+      await userEvent.click(screen.getByRole('menuitem', { name: /Part title 1(?!0)/ }));
+
+      expect(screen.getByText('Step 1 of 11')).toBeTruthy();
+      expect((box('q0') as HTMLInputElement).value).toBe('Example Mill');
+    });
+  });
+
   it('goes back from Review to the step that holds an answer', async () => {
     render(<Harness submit={jest.fn()} />);
 
