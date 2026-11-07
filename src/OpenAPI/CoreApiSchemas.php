@@ -5828,6 +5828,9 @@ final class CoreApiSchemas
                 // `deliver` say what `decision` and `satisfied_by` say; `sign`,
                 // `stamp` and `finalise` arrive with later steps of the plan.
                 'kind' => ['type' => 'string', 'enum' => ['review', 'decide', 'deliver', 'sign', 'stamp', 'finalise']],
+                // WHIT-919: whether a person on this step may send it back to the
+                // author for changes.
+                'allow_send_back' => self::bool(),
                 // #1037. HOW MANY TIMES A REJECTION HAS SENT THE DOCUMENT BACK
                 // FROM HERE. A backwards reject edge - "to the author, to fix" -
                 // is the most common approval design there is, and nothing
@@ -5941,6 +5944,9 @@ final class CoreApiSchemas
                             'type' => 'string',
                             'enum' => ['act', 'delivery'],
                         ],
+                        // WHIT-919: false turns off sending back to the author
+                        // at this step. True when absent.
+                        'allow_send_back' => self::bool(),
                     ], ['rule_kind']),
                     'description' => 'Ordered steps, at least one. Each names a `rule_kind` (see GET /api/routing-rules) and its `rule_config`, deciding who receives the document at that step. A step with `decision: true` is an approval gate whose `on_approved`/`on_rejected` name 1-based step positions.',
                 ],
@@ -5972,7 +5978,7 @@ final class CoreApiSchemas
                 // any one step.
                 'step_id' => self::int(true),
                 'actor_profile_id' => self::int(true),
-                'action' => ['type' => 'string', 'enum' => ['issued', 'forwarded', 'acknowledged', 'returned', 'noted']],
+                'action' => ['type' => 'string', 'enum' => ['issued', 'forwarded', 'acknowledged', 'returned', 'noted', 'sent_back', 'resubmitted', 'signed', 'stamped', 'declined']],
                 'from_ou_id' => self::int(true),
                 // Null whenever the act named no SINGLE unit - a tenant-wide
                 // fan-out has no destination, and naming one would make the
@@ -5987,6 +5993,15 @@ final class CoreApiSchemas
                 'verdict' => ['type' => 'string', 'enum' => ['approved', 'rejected'], 'nullable' => true],
                 // S5: this row closed the route because the document was withdrawn.
                 'withdrawal' => self::bool(),
+                // WHIT-919: the subject version this act was made on, and its
+                // SHA-256. Null on acts recorded before versions were kept.
+                'subject_version' => self::int(true),
+                'content_hash' => self::str(true),
+                // A note meant for the author. Internal notes are false.
+                'to_author' => self::bool(),
+                // On a `sent_back`: where the route resumes when the author
+                // resubmits.
+                'resume_from' => ['type' => 'string', 'enum' => ['sender', 'start'], 'nullable' => true],
                 'occurred_at' => self::str(),
             ], ['id', 'document_id', 'route_id', 'action', 'occurred_at']),
             'DocumentTrailListResponse' => self::paginatedListEnvelope('DocumentTrailEvent'),
@@ -6008,6 +6023,9 @@ final class CoreApiSchemas
                 'parent_recipient_id' => self::int(true),
                 'created_by_event_id' => self::int(),
                 'closed_by_event_id' => self::int(true),
+                // WHIT-919: `author` for the item a send-back opens for the
+                // subject's author; `step` for every other item.
+                'role' => ['type' => 'string', 'enum' => ['step', 'author']],
                 'open' => self::bool(),
                 // #1054. TRUE when this row was closed by the document reaching
                 // the person rather than by their acting — the rows a
@@ -6025,7 +6043,7 @@ final class CoreApiSchemas
             'DocumentRouteRecipientListResponse' => self::listEnvelope('DocumentRouteRecipient'),
 
             'DocumentRouteActionRequest' => self::object([
-                'action' => ['type' => 'string', 'enum' => ['forwarded', 'acknowledged', 'returned', 'noted'], 'description' => 'What you did with the document: `forwarded`, `acknowledged`, `returned` or `noted`.'],
+                'action' => ['type' => 'string', 'enum' => ['forwarded', 'acknowledged', 'returned', 'noted', 'sent_back', 'resubmitted'], 'description' => 'What you did with the document: `forwarded`, `acknowledged`, `returned`, `noted`, `sent_back` (to the author for changes, with a note) or `resubmitted` (by the author, after a send-back).'],
                 // Required for `noted` (an empty note records nothing), optional
                 // on the other three.
                 'note' => self::str(true) + ['description' => 'Comment for the trail. Required for `noted`.'],
@@ -6034,6 +6052,9 @@ final class CoreApiSchemas
                 // where a recorded verdict nothing routes on would read later as
                 // an authorisation that was never asked for.
                 'verdict' => ['type' => 'string', 'enum' => ['approved', 'rejected'], 'nullable' => true, 'description' => '`approved` or `rejected`. Required with `acknowledged` on a decision step; refused anywhere else.'],
+                // WHIT-919.
+                'resume_from' => ['type' => 'string', 'enum' => ['sender', 'start'], 'nullable' => true, 'description' => 'With `sent_back` only: where the route resumes when the author resubmits. `sender` (this step, the default) or `start` (step 1).'],
+                'to_author' => self::bool() + ['description' => 'With `noted`: the note is meant for the author. Notes are internal by default.'],
             ], ['action']),
             'DocumentRouteActionResponse' => self::object([
                 'data' => SchemaBuilder::ref('DocumentTrailEvent'),
@@ -6574,6 +6595,8 @@ final class CoreApiSchemas
                 // silently loses: a delivery stage flattened into a circulation
                 // hands every instructor in a faculty an item nothing can close.
                 'satisfied_by' => ['type' => 'string', 'enum' => ['act', 'delivery']],
+                // WHIT-919: whether people at this stage may send it back to the author.
+                'allow_send_back' => self::bool(),
                 'canvas_x' => self::int(),
                 'canvas_y' => self::int(),
                 // NOT in the required list, unlike `DocumentRouteStep` above.

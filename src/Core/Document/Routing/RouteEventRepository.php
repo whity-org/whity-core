@@ -67,7 +67,7 @@ final class RouteEventRepository
     /**
      * Append one event and return its id. The only write this class has.
      *
-     * The action is CHECK-constrained by the schema (migration 112), so a verb
+     * The action is CHECK-constrained by the schema (migrations 112 and 226), so a verb
      * outside {@see RouteAction::all()} is refused by the database rather than
      * stored as a row nothing renders.
      *
@@ -79,16 +79,21 @@ final class RouteEventRepository
      * circulated. {@see RouteVerdict}.
      *
      * @param array{route_id: int, step_id?: ?int, actor_profile_id?: ?int, action: string,
-     *              from_ou_id?: ?int, to_ou_id?: ?int, note?: ?string, verdict?: ?string} $event
+     *              from_ou_id?: ?int, to_ou_id?: ?int, note?: ?string, verdict?: ?string,
+     *              subject_version?: ?int, content_hash?: ?string, to_author?: bool,
+     *              resume_from?: ?string} $event
      */
     public function append(int $tenantId, int $documentId, array $event): int
     {
         $stmt = $this->db->prepare(
             'INSERT INTO document_route_events
                  (tenant_id, document_id, route_id, step_id, actor_profile_id,
-                  action, from_ou_id, to_ou_id, note, verdict, occurred_at)
+                  action, from_ou_id, to_ou_id, note, verdict,
+                  subject_version, content_hash, to_author, resume_from, occurred_at)
              VALUES (:tenant_id, :document_id, :route_id, :step_id, :actor_profile_id,
-                     :action, :from_ou_id, :to_ou_id, :note, :verdict, NOW())'
+                     :action, :from_ou_id, :to_ou_id, :note, :verdict,
+                     :subject_version, :content_hash, ' . (($event['to_author'] ?? false) === true ? 'TRUE' : 'FALSE') . ',
+                     :resume_from, NOW())'
         );
         $stmt->execute([
             ':tenant_id' => $tenantId,
@@ -101,6 +106,11 @@ final class RouteEventRepository
             ':to_ou_id' => $event['to_ou_id'] ?? null,
             ':note' => $event['note'] ?? null,
             ':verdict' => $event['verdict'] ?? null,
+            // WHIT-919: the subject version this act was made on, and its hash,
+            // so the trail shows which version each approval was given on.
+            ':subject_version' => $event['subject_version'] ?? null,
+            ':content_hash' => $event['content_hash'] ?? null,
+            ':resume_from' => $event['resume_from'] ?? null,
         ]);
 
         return (int) $this->db->lastInsertId();
@@ -139,7 +149,8 @@ final class RouteEventRepository
     {
         $stmt = $this->db->prepare(
             'SELECT id, tenant_id, document_id, route_id, step_id, actor_profile_id,
-                    action, from_ou_id, to_ou_id, note, verdict, occurred_at
+                    action, from_ou_id, to_ou_id, note, verdict, withdrawal,
+                    subject_version, content_hash, to_author, resume_from, occurred_at
                FROM document_route_events
               WHERE id = :id AND tenant_id = :tenant_id'
         );
@@ -163,7 +174,8 @@ final class RouteEventRepository
     {
         $stmt = $this->db->prepare(
             'SELECT id, tenant_id, document_id, route_id, step_id, actor_profile_id,
-                    action, from_ou_id, to_ou_id, note, verdict, withdrawal, occurred_at
+                    action, from_ou_id, to_ou_id, note, verdict, withdrawal,
+                    subject_version, content_hash, to_author, resume_from, occurred_at
                FROM document_route_events
               WHERE tenant_id = :tenant_id AND document_id = :document_id
               ORDER BY id ASC
@@ -289,6 +301,10 @@ final class RouteEventRepository
             // approved". See append().
             'verdict' => isset($row['verdict']) ? (string) $row['verdict'] : null,
             'withdrawal' => $row['withdrawal'] ?? false,
+            'subject_version' => isset($row['subject_version']) ? (int) $row['subject_version'] : null,
+            'content_hash' => isset($row['content_hash']) ? (string) $row['content_hash'] : null,
+            'to_author' => $row['to_author'] ?? false,
+            'resume_from' => isset($row['resume_from']) ? (string) $row['resume_from'] : null,
             'occurred_at' => (string) $row['occurred_at'],
         ];
     }

@@ -108,6 +108,8 @@ final class RouteTemplatePresenter
             // would let an author "correct" it away by saving a graph that never
             // carried it.
             'satisfied_by' => $step['satisfied_by'],
+            // WHIT-919: whether this stage may send the subject back to its author.
+            'allow_send_back' => $step['allow_send_back'] ?? true,
             'canvas_x' => $step['canvas_x'],
             'canvas_y' => $step['canvas_y'],
         ];

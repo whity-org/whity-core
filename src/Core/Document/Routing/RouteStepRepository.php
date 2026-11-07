@@ -100,13 +100,14 @@ final class RouteStepRepository
         bool $decision = false,
         ?string $decisionQuorum = null,
         string $satisfiedBy = RouteSatisfaction::ACT,
+        bool $allowSendBack = true,
     ): int {
         $stmt = $this->db->prepare(
             'INSERT INTO document_route_steps
                  (tenant_id, route_id, position, rule_kind, rule_config, label,
-                  decision, decision_quorum, satisfied_by, kind, created_at)
+                  decision, decision_quorum, satisfied_by, kind, allow_send_back, created_at)
              VALUES (:tenant_id, :route_id, :position, :rule_kind, :rule_config, :label,
-                     :decision, :decision_quorum, :satisfied_by, :kind, NOW())'
+                     :decision, :decision_quorum, :satisfied_by, :kind, :allow_send_back, NOW())'
         );
         $stmt->execute([
             ':tenant_id' => $tenantId,
@@ -134,6 +135,8 @@ final class RouteStepRepository
             // WHIT-918: derived from the two columns above on every write, so the
             // three cannot disagree while the engine still reads the old pair.
             ':kind' => RouteStepKind::derive($decision, $satisfiedBy),
+            // WHIT-919. 1/0 for the reason `decision` gives above.
+            ':allow_send_back' => $allowSendBack ? 1 : 0,
         ]);
 
         return (int) $this->db->lastInsertId();
@@ -148,7 +151,7 @@ final class RouteStepRepository
     {
         $stmt = $this->db->prepare(
             'SELECT id, tenant_id, route_id, position, rule_kind, rule_config, label,
-                    decision, decision_quorum, satisfied_by, kind, created_at
+                    decision, decision_quorum, satisfied_by, kind, allow_send_back, created_at
                FROM document_route_steps
               WHERE id = :id AND tenant_id = :tenant_id'
         );
@@ -167,7 +170,7 @@ final class RouteStepRepository
     {
         $stmt = $this->db->prepare(
             'SELECT id, tenant_id, route_id, position, rule_kind, rule_config, label,
-                    decision, decision_quorum, satisfied_by, kind, created_at
+                    decision, decision_quorum, satisfied_by, kind, allow_send_back, created_at
                FROM document_route_steps
               WHERE tenant_id = :tenant_id AND route_id = :route_id
               ORDER BY position ASC'
@@ -209,7 +212,7 @@ final class RouteStepRepository
     {
         $stmt = $this->db->prepare(
             'SELECT id, tenant_id, route_id, position, rule_kind, rule_config, label,
-                    decision, decision_quorum, satisfied_by, kind, created_at
+                    decision, decision_quorum, satisfied_by, kind, allow_send_back, created_at
                FROM document_route_steps
               WHERE tenant_id = :tenant_id AND route_id = :route_id AND position > :position
               ORDER BY position ASC
@@ -269,6 +272,9 @@ final class RouteStepRepository
             // different step than the engine treats it as. Only the kinds the old
             // columns cannot express are taken from `kind` itself.
             'kind' => self::kindOf($row),
+            // WHIT-919: whether a person on this step may send it back to the
+            // author. TRUE when absent, which is the column's default.
+            'allow_send_back' => DbBool::of($row['allow_send_back'] ?? true),
             'created_at' => (string) $row['created_at'],
         ];
     }

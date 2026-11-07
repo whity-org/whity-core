@@ -9026,10 +9026,10 @@ export interface components {
         };
         DocumentRouteActionRequest: {
             /**
-             * @description What you did with the document: `forwarded`, `acknowledged`, `returned` or `noted`.
+             * @description What you did with the document: `forwarded`, `acknowledged`, `returned`, `noted`, `sent_back` (to the author for changes, with a note) or `resubmitted` (by the author, after a send-back).
              * @enum {string}
              */
-            action: "forwarded" | "acknowledged" | "returned" | "noted";
+            action: "forwarded" | "acknowledged" | "returned" | "noted" | "sent_back" | "resubmitted";
             /** @description Comment for the trail. Required for `noted`. */
             note?: string | null;
             /**
@@ -9037,6 +9037,13 @@ export interface components {
              * @enum {string|null}
              */
             verdict?: "approved" | "rejected" | null;
+            /**
+             * @description With `sent_back` only: where the route resumes when the author resubmits. `sender` (this step, the default) or `start` (step 1).
+             * @enum {string|null}
+             */
+            resume_from?: "sender" | "start" | null;
+            /** @description With `noted`: the note is meant for the author. Notes are internal by default. */
+            to_author?: boolean;
         };
         DocumentRouteActionResponse: {
             data: components["schemas"]["DocumentTrailEvent"];
@@ -9062,6 +9069,7 @@ export interface components {
                 on_rejected?: number | null;
                 /** @enum {string} */
                 satisfied_by?: "act" | "delivery";
+                allow_send_back?: boolean;
             }[];
         };
         DocumentRouteEdge: {
@@ -9091,6 +9099,8 @@ export interface components {
             parent_recipient_id?: number | null;
             created_by_event_id: number;
             closed_by_event_id?: number | null;
+            /** @enum {string} */
+            role?: "step" | "author";
             open: boolean;
             closed_by_delivery: boolean;
             closed_by_withdrawal?: boolean;
@@ -9119,6 +9129,7 @@ export interface components {
             satisfied_by: "act" | "delivery";
             /** @enum {string} */
             kind?: "review" | "decide" | "deliver" | "sign" | "stamp" | "finalise";
+            allow_send_back?: boolean;
             rejection_count: number;
         };
         DocumentSource: {
@@ -9734,13 +9745,18 @@ export interface components {
             step_id?: number | null;
             actor_profile_id?: number | null;
             /** @enum {string} */
-            action: "issued" | "forwarded" | "acknowledged" | "returned" | "noted";
+            action: "issued" | "forwarded" | "acknowledged" | "returned" | "noted" | "sent_back" | "resubmitted" | "signed" | "stamped" | "declined";
             from_ou_id?: number | null;
             to_ou_id?: number | null;
             note?: string | null;
             /** @enum {string|null} */
             verdict?: "approved" | "rejected" | null;
             withdrawal?: boolean;
+            subject_version?: number | null;
+            content_hash?: string | null;
+            to_author?: boolean;
+            /** @enum {string|null} */
+            resume_from?: "sender" | "start" | null;
             occurred_at: string;
         };
         DocumentTrailListResponse: {
@@ -12348,6 +12364,7 @@ export interface components {
             decision_quorum?: string | null;
             /** @enum {string} */
             satisfied_by?: "act" | "delivery";
+            allow_send_back?: boolean;
             canvas_x?: number;
             canvas_y?: number;
         };

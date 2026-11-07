@@ -56,10 +56,10 @@ import { Pagination } from '@/components/ui/pagination';
 import type { Directory, TrailEvent, TrailPagination } from './types';
 
 /**
- * The five verbs, as sentences.
+ * The verbs, as sentences.
  *
- * A lookup rather than a composed key, so the extractor sees five literal keys
- * and a translator sees five whole sentences. `null` for a verb this build has
+ * A lookup rather than a composed key, so the extractor sees literal keys and a
+ * translator sees whole sentences. `null` for a verb this build has
  * never heard of, which renders the server's own value verbatim — a newer server
  * then shows a trail with one unfamiliar word in it rather than a trail with a
  * blank line in it.
@@ -76,6 +76,10 @@ function actionLabel(t: (key: string, fallback?: string) => string, action: stri
       return t('record.trail.action.returned', 'Returned');
     case 'noted':
       return t('record.trail.action.noted', 'Note added');
+    case 'sent_back':
+      return t('record.trail.action.sentBack', 'Sent back to the author for changes');
+    case 'resubmitted':
+      return t('record.trail.action.resubmitted', 'Resubmitted by the author');
     default:
       // The raw verb, not a guess and not a blank. A vocabulary this build does
       // not know is still information; inventing a label for it would not be.

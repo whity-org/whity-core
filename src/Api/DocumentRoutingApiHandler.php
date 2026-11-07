@@ -12,6 +12,7 @@ use Whity\Core\Document\RouteTemplate\RouteTemplateRejectedException;
 use Whity\Core\Document\RouteTemplate\RouteTemplateRepository;
 use Whity\Core\Document\Routing\DocumentRouter;
 use Whity\Core\Document\Routing\RouteAction;
+use Whity\Core\Document\Routing\RouteResume;
 use Whity\Core\Document\Routing\RouteEdgeRepository;
 use Whity\Core\Document\Routing\RouteEventRepository;
 use Whity\Core\Document\Routing\RouteRecipientRepository;
@@ -502,7 +503,10 @@ final class DocumentRoutingApiHandler
         // the schema. Not redundancy: the boundary check produces a message
         // naming the four available verbs, where the constraint would produce a
         // driver error the caller cannot act on.
-        $allowed = array_merge(RouteAction::recipientActions(), [RouteAction::NOTED]);
+        $allowed = array_merge(
+            RouteAction::recipientActions(),
+            [RouteAction::NOTED, RouteAction::SENT_BACK, RouteAction::RESUBMITTED],
+        );
         if (!in_array($action, $allowed, true)) {
             return Response::error(
                 "'action' must be one of: " . implode(', ', $allowed),
@@ -533,6 +537,20 @@ final class DocumentRoutingApiHandler
             );
         }
 
+        // WHIT-919: where a send-back asks the route to resume, and whether a
+        // note is meant for the author. Shape here, fitness in the engine.
+        $resumeFrom = $body['resume_from'] ?? null;
+        if ($resumeFrom !== null && (!is_string($resumeFrom) || !RouteResume::isValid($resumeFrom))) {
+            return Response::error(
+                "'resume_from' must be one of: " . implode(', ', RouteResume::all()),
+                422
+            );
+        }
+        $toAuthor = $body['to_author'] ?? false;
+        if (!is_bool($toAuthor)) {
+            return Response::error("'to_author' must be true or false when present", 422);
+        }
+
         try {
             $outcome = $this->router->act(
                 $tenantId,
@@ -541,6 +559,8 @@ final class DocumentRoutingApiHandler
                 $action,
                 $note,
                 is_string($verdict) ? $verdict : null,
+                is_string($resumeFrom) ? $resumeFrom : null,
+                $toAuthor,
             );
         } catch (RoutingRejectedException $e) {
             return Response::error($e->clientMessage, 422);

@@ -201,6 +201,8 @@ final class RoutingPresenter
                     DbBool::of($step['decision'] ?? false),
                     is_string($step['satisfied_by'] ?? null) ? (string) $step['satisfied_by'] : RouteSatisfaction::fallback()
                 ),
+            // WHIT-919: whether a person on this step may send it back to the author.
+            'allow_send_back' => DbBool::of($step['allow_send_back'] ?? true),
         ];
     }
 
@@ -230,6 +232,13 @@ final class RoutingPresenter
             // S5: this row closed the route because the document was withdrawn.
             // Nobody wrote it as a note, so a screen does not show it as one.
             'withdrawal' => DbBool::of($event['withdrawal'] ?? false),
+            // WHIT-919: the subject version the act was made on (null before
+            // versions were kept), whether a note is meant for the author, and
+            // where a send-back asked the route to resume.
+            'subject_version' => $event['subject_version'] ?? null,
+            'content_hash' => $event['content_hash'] ?? null,
+            'to_author' => DbBool::of($event['to_author'] ?? false),
+            'resume_from' => $event['resume_from'] ?? null,
             'occurred_at' => (string) $event['occurred_at'],
         ];
     }
@@ -258,6 +267,8 @@ final class RoutingPresenter
             'parent_recipient_id' => $recipient['parent_recipient_id'],
             'created_by_event_id' => (int) $recipient['created_by_event_id'],
             'closed_by_event_id' => $recipient['closed_by_event_id'],
+            // WHIT-919: `author` for the item a send-back opened for the author.
+            'role' => $recipient['role'] ?? RouteRecipientRepository::ROLE_STEP,
             'open' => $recipient['closed_by_event_id'] === null,
             // S5: the document was withdrawn while this waited. Like a delivery,
             // this is a closed row nobody acted on, and a screen must not say so.

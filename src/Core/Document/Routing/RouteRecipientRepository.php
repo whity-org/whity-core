@@ -71,6 +71,12 @@ use Whity\Core\Db\DbBool;
  */
 final class RouteRecipientRepository
 {
+    /** An item a route step opened (every item before WHIT-919). */
+    public const ROLE_STEP = 'step';
+
+    /** The one item a send-back opens for the subject's author (WHIT-919). */
+    public const ROLE_AUTHOR = 'author';
+
     public function __construct(private readonly PDO $db)
     {
     }
@@ -86,7 +92,8 @@ final class RouteRecipientRepository
      * can account for.
      *
      * @param array{document_id: int, route_id: int, step_id: int, profile_id: int,
-     *              ou_id?: ?int, parent_recipient_id?: ?int, created_by_event_id: int} $rec
+     *              ou_id?: ?int, parent_recipient_id?: ?int, created_by_event_id: int,
+     *              role?: string} $rec
      *
      * @return int|null The new row's id, or null when an open row already existed.
      */
@@ -105,9 +112,9 @@ final class RouteRecipientRepository
         $stmt = $this->db->prepare(
             'INSERT INTO document_route_recipients
                  (tenant_id, document_id, route_id, step_id, profile_id, ou_id,
-                  parent_recipient_id, created_by_event_id, created_at)
+                  parent_recipient_id, created_by_event_id, role, created_at)
              VALUES (:tenant_id, :document_id, :route_id, :step_id, :profile_id, :ou_id,
-                     :parent_recipient_id, :created_by_event_id, NOW())'
+                     :parent_recipient_id, :created_by_event_id, :role, NOW())'
         );
 
         try {
@@ -120,6 +127,8 @@ final class RouteRecipientRepository
                 ':ou_id' => $rec['ou_id'] ?? null,
                 ':parent_recipient_id' => $rec['parent_recipient_id'] ?? null,
                 ':created_by_event_id' => $rec['created_by_event_id'],
+                // WHIT-919: `author` only for the item a send-back opens.
+                ':role' => $rec['role'] ?? self::ROLE_STEP,
             ]);
         } catch (PDOException $e) {
             // SQLSTATE 23505 on PostgreSQL, 23000 on SQLite: unique violation.
@@ -168,7 +177,7 @@ final class RouteRecipientRepository
     {
         $stmt = $this->db->prepare(
             'SELECT id, tenant_id, document_id, route_id, step_id, profile_id, ou_id,
-                    parent_recipient_id, created_by_event_id, closed_by_event_id, created_at
+                    parent_recipient_id, created_by_event_id, closed_by_event_id, role, created_at
                FROM document_route_recipients
               WHERE id = :id AND tenant_id = :tenant_id'
         );
@@ -193,7 +202,7 @@ final class RouteRecipientRepository
     {
         $stmt = $this->db->prepare(
             'SELECT id, tenant_id, document_id, route_id, step_id, profile_id, ou_id,
-                    parent_recipient_id, created_by_event_id, closed_by_event_id, created_at
+                    parent_recipient_id, created_by_event_id, closed_by_event_id, role, created_at
                FROM document_route_recipients
               WHERE tenant_id = :tenant_id
                 AND route_id = :route_id
@@ -252,7 +261,7 @@ final class RouteRecipientRepository
     {
         $stmt = $this->db->prepare(
             "SELECT r.id, r.tenant_id, r.document_id, r.route_id, r.step_id, r.profile_id, r.ou_id,
-                    r.parent_recipient_id, r.created_by_event_id, r.closed_by_event_id, r.created_at,
+                    r.parent_recipient_id, r.created_by_event_id, r.closed_by_event_id, r.role, r.created_at,
                     ce.action AS closing_action, ce.verdict AS closing_verdict
                FROM document_route_recipients r
                LEFT JOIN document_route_events ce
@@ -430,7 +439,7 @@ final class RouteRecipientRepository
     {
         $stmt = $this->db->prepare(
             'SELECT r.id, r.tenant_id, r.document_id, r.route_id, r.step_id, r.profile_id, r.ou_id,
-                    r.parent_recipient_id, r.created_by_event_id, r.closed_by_event_id, r.created_at,
+                    r.parent_recipient_id, r.created_by_event_id, r.closed_by_event_id, r.role, r.created_at,
                     e.withdrawal AS closed_by_withdrawal
                FROM document_route_recipients r
                LEFT JOIN document_route_events e
@@ -481,7 +490,7 @@ final class RouteRecipientRepository
         if ($openOnly) {
             $stmt = $this->db->prepare(
                 'SELECT r.id, r.tenant_id, r.document_id, r.route_id, r.step_id, r.profile_id, r.ou_id,
-                        r.parent_recipient_id, r.created_by_event_id, r.closed_by_event_id, r.created_at,
+                        r.parent_recipient_id, r.created_by_event_id, r.closed_by_event_id, r.role, r.created_at,
                         d.title AS document_title, d.template_name AS document_template_name,
                         d.withdrawn_at AS document_withdrawn_at,
                         e.action AS arrived_by, e.actor_profile_id AS arrived_from,
@@ -511,7 +520,7 @@ final class RouteRecipientRepository
         } else {
             $stmt = $this->db->prepare(
                 'SELECT r.id, r.tenant_id, r.document_id, r.route_id, r.step_id, r.profile_id, r.ou_id,
-                        r.parent_recipient_id, r.created_by_event_id, r.closed_by_event_id, r.created_at,
+                        r.parent_recipient_id, r.created_by_event_id, r.closed_by_event_id, r.role, r.created_at,
                         d.title AS document_title, d.template_name AS document_template_name,
                         d.withdrawn_at AS document_withdrawn_at,
                         e.action AS arrived_by, e.actor_profile_id AS arrived_from,
@@ -673,6 +682,7 @@ final class RouteRecipientRepository
             'parent_recipient_id' => $row['parent_recipient_id'] !== null ? (int) $row['parent_recipient_id'] : null,
             'created_by_event_id' => (int) $row['created_by_event_id'],
             'closed_by_event_id' => $row['closed_by_event_id'] !== null ? (int) $row['closed_by_event_id'] : null,
+            'role' => ($row['role'] ?? self::ROLE_STEP) === self::ROLE_AUTHOR ? self::ROLE_AUTHOR : self::ROLE_STEP,
             'created_at' => (string) $row['created_at'],
         ];
     }

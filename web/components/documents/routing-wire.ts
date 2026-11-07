@@ -40,7 +40,18 @@
  * `verdict: 'approved'`. The trail keeps the two facts apart: what the person
  * did, and what they decided.
  */
-export const ROUTE_ACTIONS = ['issued', 'forwarded', 'acknowledged', 'returned', 'noted'] as const;
+// WHIT-919 adds `sent_back` (to the author for changes) and `resubmitted` (by the
+// author). `signed`, `stamped` and `declined` are in the server's vocabulary for
+// the signing steps and join this list when those steps are built.
+export const ROUTE_ACTIONS = [
+  'issued',
+  'forwarded',
+  'acknowledged',
+  'returned',
+  'noted',
+  'sent_back',
+  'resubmitted',
+] as const;
 
 export type RouteActionName = (typeof ROUTE_ACTIONS)[number];
 

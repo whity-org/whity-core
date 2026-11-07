@@ -10,8 +10,8 @@ namespace Whity\Core\Document\Routing;
  * A route names a subject by TYPE and ID (migration 224). The provider for a type
  * is the one place that knows what such a subject is. Today there is one type,
  * `document`; form submissions (#1724) and plugin records (#1728) follow, and
- * this contract grows with them: editing and versions arrive with #1723, final
- * values with #1725. It moves to the SDK in #1728, once two core types have
+ * this contract grows with them: authors, versions and editing arrived with
+ * #1723, and final values follow with #1725. It moves to the SDK in #1728, once two core types have
  * proved its shape.
  *
  * A provider reads; it never decides who acts on a route. Recipients still come
@@ -34,4 +34,28 @@ interface RouteSubjectProviderInterface
      * its own; a subject without a document yet answers null.
      */
     public function documentId(int $tenantId, int $subjectId): ?int;
+
+    /**
+     * Who a send-back goes to (WHIT-919): the profile that submitted this
+     * subject, or null when nobody can take it back (the author has left, or
+     * the subject has no author). A send-back is refused when this is null.
+     */
+    public function author(int $tenantId, int $subjectId): ?int;
+
+    /**
+     * The content a version records (WHIT-919): what the reviewers are looking
+     * at, as plain JSON-encodable data. Each submit and resubmit stores it with
+     * its SHA-256, so the trail shows which version each act was made on. Null
+     * when there is no such subject in this tenant.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function snapshot(int $tenantId, int $subjectId): ?array;
+
+    /**
+     * Whether the author can edit this subject while it is sent back
+     * (WHIT-919). A document cannot: it is issued, and a changed document is a
+     * new revision. Form submissions can (#1724).
+     */
+    public function editableWhenSentBack(): bool;
 }

@@ -231,6 +231,8 @@ final class RouteTemplateInstantiation
                 'decision' => $decision,
                 'decision_quorum' => is_string($quorum) ? $quorum : null,
                 'satisfied_by' => $satisfiedBy,
+                // WHIT-919: carried like `decision`; absent reads as allowed.
+                'allow_send_back' => DbBool::of($step['allow_send_back'] ?? true),
             ];
 
             foreach (RouteVerdict::all() as $verdict) {

@@ -166,6 +166,7 @@ final class CoreTables
         'revoked_tokens' => '011_create_revoked_tokens.php',
         'role_permissions' => '002_create_permissions.php',
         'roles' => '001_create_users_roles.php',
+        'route_subject_versions' => '226_add_route_send_back_and_versions.php',
         'scheduled_jobs' => '069_create_scheduled_jobs.php',
         'sequence_counters' => '092_create_sequence_counters.php',
         'sessions' => '045_create_sessions.php',
