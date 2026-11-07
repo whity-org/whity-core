@@ -2495,6 +2495,8 @@
         "settings.localeOption.enUS": "English — United States (en-US)",
         "settings.localeOption.es": "Spanish (es)",
         "settings.localeOption.fr": "French (fr)",
+        "settings.meta.app.installable.help": "Let people add this site to their phone or computer as an app that opens in its own window and shows a page of its own when there is no connection. Off removes the option and uninstalls the app’s offline support from browsers the next time they open a page. Until this is saved here, the PWA_ENABLED setting of the server decides.",
+        "settings.meta.app.installable.label": "Install as an app",
         "settings.meta.auth.registration_approval_required.help": "When sign-up is open, hold each new account as pending until an administrator approves it.",
         "settings.meta.auth.registration_approval_required.label": "Require admin approval",
         "settings.meta.auth.self_2fa_recovery_enabled.help": "Let people who lost their two-step device ask to get back in themselves. Requests still go through the approval gate.",

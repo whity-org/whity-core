@@ -2496,6 +2496,8 @@
         "settings.localeOption.enUS": "الإنجليزية — الولايات المتحدة (en-US)",
         "settings.localeOption.es": "الإسبانية (es)",
         "settings.localeOption.fr": "الفرنسية (fr)",
+        "settings.meta.app.installable.help": "أتِح للناس إضافة هذا الموقع إلى هواتفهم أو حواسيبهم كتطبيق يُفتح في نافذته الخاصة ويعرض صفحة خاصة به عند انقطاع الاتصال. والإيقاف يُزيل هذا الخيار ويُلغي دعم التطبيق دون اتصال من المتصفحات عند فتحها أي صفحة في المرة التالية. وإلى أن يُحفظ هذا الإعداد هنا، يقرّر إعداد PWA_ENABLED في الخادم.",
+        "settings.meta.app.installable.label": "التثبيت كتطبيق",
         "settings.meta.auth.registration_approval_required.help": "عندما يكون التسجيل مفتوحاً، أبقِ كل حساب جديد معلّقاً حتى يوافق عليه أحد المسؤولين.",
         "settings.meta.auth.registration_approval_required.label": "اشتراط موافقة المسؤول",
         "settings.meta.auth.self_2fa_recovery_enabled.help": "يتيح لمن فقدوا جهاز التحقق بخطوتين أن يطلبوا العودة بأنفسهم. وتمرّ الطلبات عبر بوابة الاعتماد.",

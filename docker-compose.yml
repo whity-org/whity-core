@@ -52,6 +52,10 @@ services:
       # Master switch for the /mcp transport. Off by default, as everywhere; the
       # e2e job turns it on to drive the connect wizard end to end (WHIT-697).
       MCP_ENABLED: ${MCP_ENABLED:-false}
+      # Whether the web app can be installed as a phone app (#1733): manifest,
+      # service worker, offline page. Empty leaves it on. The app.installable
+      # system setting, once an operator saves it, wins over this.
+      PWA_ENABLED: ${PWA_ENABLED:-}
       DB_USER: ${DB_USER:-whity}
       DB_PASSWORD: ${DB_PASSWORD:-whity_dev}
       DB_NAME: ${DB_NAME:-whity_core}

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Noto_Sans, Noto_Sans_Arabic, Geist_Mono, Readex_Pro } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
@@ -20,6 +20,9 @@ import { DirectionInitScript } from "@/lib/direction-context";
 import { AppLanguageProvider } from "@/lib/app-language-provider";
 import { getUiPreferences } from "@/lib/ui-preferences";
 import { UiPreferencesProvider } from "@/lib/ui-preferences-context";
+import { getAppInstall } from "@/lib/pwa/app-install";
+import { appIconUrl } from "@/lib/pwa/shared";
+import { AppInstall } from "@/components/pwa/app-install";
 
 // Design-token font families (see src/design/tokens/base.json): Noto Sans
 // (latin) + Noto Sans Arabic together drive --font-sans / --font-heading (see
@@ -54,10 +57,34 @@ const readexPro = Readex_Pro({
 
 export async function generateMetadata(): Promise<Metadata> {
   const b = await getBranding();
+  // #1733: the manifest link and the iOS home-screen tags exist only while the
+  // operator lets the app be installed.
+  const install = await getAppInstall();
+  const installable = install.state === "on";
   return {
     title: b.siteName,
     description: "Authentication and plugin management platform",
-    ...(b.faviconUrl ? { icons: { icon: b.faviconUrl } } : {}),
+    icons: {
+      ...(b.faviconUrl ? { icon: b.faviconUrl } : {}),
+      ...(installable ? { apple: appIconUrl("180", install.version) } : {}),
+    },
+    ...(installable
+      ? {
+          manifest: "/manifest.webmanifest",
+          appleWebApp: { capable: true, title: b.siteName, statusBarStyle: "default" as const },
+        }
+      : {}),
+  };
+}
+
+export async function generateViewport(): Promise<Viewport> {
+  const install = await getAppInstall();
+  return {
+    width: "device-width",
+    initialScale: 1,
+    // #1733: an installed app draws edge to edge; globals.css keeps content
+    // inside the safe area (the notch, the home indicator).
+    ...(install.state === "on" ? { themeColor: install.themeColor, viewportFit: "cover" as const } : {}),
   };
 }
 
@@ -80,6 +107,7 @@ export default async function RootLayout({
   // Decision 2.8: the workspace main colour's light and dark sets, as the HOST
   // resolves them (see BrandingProvider, which takes over in the browser).
   const brandCss = await getBrandThemeCss();
+  const appInstall = await getAppInstall();
   const overrideCss = Object.entries(themeOverrides)
     .map(([key, value]) => `--${key}:${value};`)
     .join("");
@@ -186,6 +214,7 @@ export default async function RootLayout({
                           <PluginFeaturesProvider>
                             {children}
                             <ToastContainerMount />
+                            <AppInstall state={appInstall.state} />
                           </PluginFeaturesProvider>
                         </NavigationProvider>
                       </ToastProvider>

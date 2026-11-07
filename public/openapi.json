@@ -54190,6 +54190,10 @@
                             "light",
                             "dark"
                         ]
+                    },
+                    "installable": {
+                        "type": "boolean",
+                        "description": "Whether the web app offers a manifest and service worker so it can be installed as an app. An instance setting (app.installable, else the PWA_ENABLED environment variable, else on)."
                     }
                 },
                 "required": [
@@ -54198,7 +54202,8 @@
                     "logoSquareUrl",
                     "faviconUrl",
                     "mainColor",
-                    "theme"
+                    "theme",
+                    "installable"
                 ]
             },
             "BrandingHostRequest": {
