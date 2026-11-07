@@ -61,6 +61,7 @@
     "./editor/doc-editor": "./src/editor/doc-editor.tsx",
     "./editor/editor.css": "./src/editor/editor.css",
     "./editor/extensions": "./src/editor/extensions.ts",
+    "./editor/field-bar": "./src/editor/field-bar.tsx",
     "./editor/field-picker": "./src/editor/field-picker.tsx",
     "./editor/fields": "./src/editor/fields.ts",
     "./editor/gutter": "./src/editor/gutter.tsx",
