@@ -40,7 +40,18 @@ export interface FormRow {
   /** Present once the server offers the switch (WHIT-859). */
   open_to_members?: boolean
   submission_count?: number
+  /** The heading the person filling it in reads; null shows the name (WHIT-944). */
+  title?: LocalizedMap | null
+  banner?: FormBannerValue | null
 }
+
+/**
+ * The picture at the top of a form: a pattern drawn from the brand colour, or an
+ * uploaded image. A PATCH sends `{ kind: "image" }` back to keep the uploaded one.
+ */
+export type FormBannerValue =
+  | { kind: "pattern"; style: string; seed: number }
+  | { kind: "image"; image_url?: string }
 
 export type FieldKind =
   | "text"

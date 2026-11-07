@@ -267,6 +267,9 @@ final class PublicFormView
             'description' => $form['description'] ?? null,
             'description_i18n' => $form['description_i18n'] ?? new \stdClass(),
             'submit_label' => $form['submit_label'] ?? null,
+            // The heading and picture written for the person filling it in (WHIT-944).
+            'title' => $form['title'] ?? null,
+            'banner' => $form['banner'] ?? null,
             'fields' => $public,
             'sections' => FormRenderer::sectionsOf($public, FormRenderer::sectionMeta($form)),
             // The single fact a renderer branches on: draw a submit button, or

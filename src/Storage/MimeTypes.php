@@ -35,6 +35,7 @@ final class MimeTypes
         'png'  => 'image/png',
         'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         'webp' => 'image/webp',
+        'jpg'  => 'image/jpeg',
         'svg'  => 'image/svg+xml',
         'ico'  => 'image/x-icon',
     ];

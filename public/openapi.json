@@ -20341,6 +20341,133 @@
                 ]
             }
         },
+        "/api/v1/forms/{id}/banner": {
+            "post": {
+                "operationId": "post_api_v1_forms_id_banner",
+                "summary": "Put an uploaded picture at the top of a form",
+                "tags": [
+                    "forms"
+                ],
+                "description": "MULTIPART, one part named `file`. PNG, JPEG or WebP, decided by the BYTES; SVG is refused because a banner is shown on public pages. MAXIMUM 5 MiB. The banner is set at once and the previous uploaded one deleted. The picture is served by the public branding asset route, so a public form can show it. A drawn pattern or no banner is a PATCH of the form instead.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "file": {
+                                        "type": "string",
+                                        "format": "binary",
+                                        "description": "The picture. PNG, JPEG or WebP, decided by its bytes. Maximum 5 MiB."
+                                    }
+                                },
+                                "required": [
+                                    "file"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The form's banner, with the URL that serves it",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/FormBannerResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "No file part, or the multipart body could not be read",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Form not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Empty, too large, or not a PNG, JPEG or WebP picture",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/forms/{id}/fields": {
             "get": {
                 "operationId": "get_api_v1_forms_id_fields",
@@ -59618,6 +59745,24 @@
                             }
                         }
                     },
+                    "title": {
+                        "type": "object",
+                        "x-whity-localized-text": true,
+                        "properties": {
+                            "ar": {
+                                "type": "string"
+                            },
+                            "en": {
+                                "type": "string"
+                            }
+                        },
+                        "nullable": true,
+                        "description": "The heading the person filling it in reads; null shows the name."
+                    },
+                    "banner": {
+                        "$ref": "#/components/schemas/FormBanner",
+                        "nullable": true
+                    },
                     "submit_label": {
                         "type": "object",
                         "x-whity-localized-text": true,
@@ -59734,6 +59879,92 @@
                     "available_transitions",
                     "accepts_submissions",
                     "public_enabled"
+                ]
+            },
+            "FormBanner": {
+                "type": "object",
+                "properties": {
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "pattern",
+                            "image"
+                        ]
+                    },
+                    "style": {
+                        "type": "string",
+                        "enum": [
+                            "gradient",
+                            "waves",
+                            "dots",
+                            "stripes",
+                            "circles",
+                            "mesh"
+                        ]
+                    },
+                    "seed": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2147483647
+                    },
+                    "image_url": {
+                        "type": "string",
+                        "description": "Where an uploaded picture is served."
+                    }
+                },
+                "required": [
+                    "kind"
+                ]
+            },
+            "FormBannerInput": {
+                "type": "object",
+                "properties": {
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "pattern",
+                            "image"
+                        ]
+                    },
+                    "style": {
+                        "type": "string",
+                        "enum": [
+                            "gradient",
+                            "waves",
+                            "dots",
+                            "stripes",
+                            "circles",
+                            "mesh"
+                        ]
+                    },
+                    "seed": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2147483647
+                    }
+                },
+                "required": [
+                    "kind"
+                ]
+            },
+            "FormBannerResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "banner": {
+                                "$ref": "#/components/schemas/FormBanner",
+                                "nullable": true
+                            }
+                        },
+                        "required": [
+                            "banner"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
                 ]
             },
             "FormBuilderVocabularies": {
@@ -61075,6 +61306,25 @@
                         },
                         "nullable": true,
                         "description": "What the submit button says; null for the default wording."
+                    },
+                    "title": {
+                        "type": "object",
+                        "x-whity-localized-text": true,
+                        "properties": {
+                            "ar": {
+                                "type": "string"
+                            },
+                            "en": {
+                                "type": "string"
+                            }
+                        },
+                        "nullable": true,
+                        "description": "The heading the person filling it in reads; null shows the name."
+                    },
+                    "banner": {
+                        "$ref": "#/components/schemas/FormBannerInput",
+                        "nullable": true,
+                        "description": "A drawn pattern, `{\"kind\": \"image\"}` to keep the uploaded picture, or null for none. Upload a picture with POST /api/v1/forms/{id}/banner."
                     },
                     "sections": {
                         "type": "array",
@@ -63878,6 +64128,24 @@
                                 "type": "string"
                             }
                         }
+                    },
+                    "title": {
+                        "type": "object",
+                        "x-whity-localized-text": true,
+                        "properties": {
+                            "ar": {
+                                "type": "string"
+                            },
+                            "en": {
+                                "type": "string"
+                            }
+                        },
+                        "nullable": true,
+                        "description": "The heading the person filling it in reads; null shows the name."
+                    },
+                    "banner": {
+                        "$ref": "#/components/schemas/FormBanner",
+                        "nullable": true
                     },
                     "submit_label": {
                         "type": "object",
@@ -67183,6 +67451,24 @@
                                         "type": "string"
                                     }
                                 }
+                            },
+                            "title": {
+                                "type": "object",
+                                "x-whity-localized-text": true,
+                                "properties": {
+                                    "ar": {
+                                        "type": "string"
+                                    },
+                                    "en": {
+                                        "type": "string"
+                                    }
+                                },
+                                "nullable": true,
+                                "description": "The heading the person filling it in reads; null shows the name."
+                            },
+                            "banner": {
+                                "$ref": "#/components/schemas/FormBanner",
+                                "nullable": true
                             },
                             "submit_label": {
                                 "type": "object",

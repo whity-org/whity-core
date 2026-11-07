@@ -50,7 +50,7 @@ final class FormRepository
      * Written once and shared by every read, so a column added to the table
      * cannot reach one caller and not another.
      */
-    private const COLUMNS = 'id, tenant_id, form_key, name, description, submit_label, sections, reference_format, status, version,
+    private const COLUMNS = 'id, tenant_id, form_key, name, title, description, submit_label, sections, banner, reference_format, status, version,
                              route_template_id,
                              (SELECT t.name FROM document_route_templates t
                                WHERE t.id = forms.route_template_id AND t.tenant_id = forms.tenant_id) AS route_template_name,
@@ -163,6 +163,21 @@ final class FormRepository
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
         return $row === false ? null : self::normalizeRow($row);
+    }
+
+    /**
+     * The banner as stored, with an uploaded image's file name, which the read
+     * model swaps for its URL. Null when the form has none or doesn't exist.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function storedBanner(int $tenantId, int $id): ?array
+    {
+        $stmt = $this->db->prepare('SELECT banner FROM forms WHERE tenant_id = :tenant_id AND id = :id LIMIT 1');
+        $stmt->execute([':tenant_id' => $tenantId, ':id' => $id]);
+        $stored = $stmt->fetchColumn();
+
+        return FormBanner::fromStorage($stored === false ? null : $stored);
     }
 
     /**
@@ -485,8 +500,8 @@ final class FormRepository
      *
      * Returns false when the form does not exist in this tenant.
      *
-     * @param array<string, mixed> $changes Any of: name, description, route_template_id,
-     *                                     submit_label, sections, reference_format.
+     * @param array<string, mixed> $changes Any of: name, title, description, route_template_id,
+     *                                     submit_label, sections, reference_format, banner.
      */
     public function update(int $tenantId, int $id, array $changes): bool
     {
@@ -498,6 +513,16 @@ final class FormRepository
             $name = $changes['name'];
             $sets[] = 'name = :name';
             $params[':name'] = LocalizedLabel::encode($name);
+        }
+        if (array_key_exists('title', $changes)) {
+            $sets[] = 'title = :title';
+            $params[':title'] = $changes['title'];
+        }
+        if (array_key_exists('banner', $changes)) {
+            $banner = $changes['banner'];
+            $json = $banner === null ? false : json_encode($banner, JSON_UNESCAPED_SLASHES);
+            $sets[] = 'banner = :banner';
+            $params[':banner'] = $json === false ? null : $json;
         }
         if (array_key_exists('description', $changes)) {
             $sets[] = 'description = :description';
@@ -660,6 +685,10 @@ final class FormRepository
             'tenant_id' => (int) $row['tenant_id'],
             'form_key' => (string) $row['form_key'],
             'name' => LocalizedLabel::decode(isset($row['name']) ? (string) $row['name'] : null),
+            // What the person filling it in reads as its heading (migration 223);
+            // null means the name.
+            'title' => isset($row['title']) ? (LocalizedLabel::decode((string) $row['title']) ?: null) : null,
+            'banner' => FormBanner::present(FormBanner::fromStorage($row['banner'] ?? null), (int) $row['tenant_id']),
             // The string stays the one existing clients read, and the map is the
             // whole text: see {@see LocalizedLabel::preferred()}.
             'description' => self::preferredOrNull($row['description'] ?? null),

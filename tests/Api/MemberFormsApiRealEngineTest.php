@@ -263,7 +263,7 @@ final class MemberFormsApiRealEngineTest extends TestCase
         $listed = self::data($this->members->list($this->asCaller(self::MEMBER)));
 
         self::assertSame(
-            ['id', 'name', 'description', 'description_i18n', 'submit_label', 'status'],
+            ['id', 'name', 'description', 'description_i18n', 'submit_label', 'title', 'banner', 'status'],
             array_keys((array) array_values($listed)[0]),
         );
     }

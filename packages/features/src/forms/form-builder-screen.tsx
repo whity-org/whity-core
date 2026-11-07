@@ -47,7 +47,11 @@ interface Loaded {
   kinds: FieldKind[]
 }
 
-function settingsOf(form: FormRow, rendered: Array<{ key: string | null; title?: unknown; description?: unknown }>): FormSettings {
+function settingsOf(
+  form: FormRow,
+  rendered: Array<{ key: string | null; title?: unknown; description?: unknown }>,
+  fields: FieldDraft[] = []
+): FormSettings {
   const sections: FormSectionDef[] = rendered
     .filter((s): s is { key: string; title?: unknown; description?: unknown } => typeof s.key === "string")
     .map((s) => ({
@@ -55,8 +59,21 @@ function settingsOf(form: FormRow, rendered: Array<{ key: string | null; title?:
       title: asMap(s.title as FormSectionDef["title"] | []),
       description: asMap(s.description as FormSectionDef["description"] | []),
     }))
+  // A section can exist only as the key its questions carry, with no title stored
+  // (a form imported through the API, such as an ethics application). It is still a
+  // section: list it, untitled, so it can be named here and so saving the settings
+  // doesn't take every question out of it.
+  const listed = new Set(sections.map((s) => s.key))
+  for (const field of fields) {
+    if (field.section_key !== null && !listed.has(field.section_key)) {
+      listed.add(field.section_key)
+      sections.push({ key: field.section_key, title: {}, description: {} })
+    }
+  }
   return {
     name: asMap(form.name),
+    title: asMap(form.title),
+    banner: form.banner ?? null,
     description: asMap(form.description_i18n),
     submit_label: asMap(form.submit_label),
     reference_format: form.reference_format ?? "",
@@ -132,7 +149,7 @@ function FormBuilder({ env, formId, canManage }: { env: FormsScreenEnv; formId: 
     const kinds = KIND_ORDER.filter((k) => vocabulary.field_types.length === 0 || vocabulary.field_types.includes(k))
     const drafts = draftsOf(rows)
     const form = formResult.data
-    const next = settingsOf(form, form.sections as unknown as Array<{ key: string | null; title?: unknown; description?: unknown }>)
+    const next = settingsOf(form, form.sections as unknown as Array<{ key: string | null; title?: unknown; description?: unknown }>, drafts)
     setLoaded({ form, fields: drafts, savedBodies: snapshot(drafts.map(fieldBody)), settings: next, kinds })
     setFields(drafts)
     setSettings(next)
@@ -212,6 +229,15 @@ function FormBuilder({ env, formId, canManage }: { env: FormsScreenEnv; formId: 
           name: settings.name,
           description: hasText(settings.description) ? settings.description : null,
           submit_label: hasText(settings.submit_label) ? settings.submit_label : null,
+          title: hasText(settings.title) ? settings.title : null,
+          // An uploaded picture goes back as `{ kind: "image" }`, which keeps it; its
+          // URL is the server's to give.
+          banner:
+            settings.banner === null
+              ? null
+              : settings.banner.kind === "image"
+                ? { kind: "image" }
+                : { kind: "pattern", style: settings.banner.style, seed: settings.banner.seed },
           reference_format: settings.reference_format.trim() === "" ? null : settings.reference_format.trim(),
           sections: settings.sections,
         },
@@ -331,6 +357,30 @@ function FormBuilder({ env, formId, canManage }: { env: FormsScreenEnv; formId: 
     setLoaded((current) => (current === null ? current : { ...current, form: { ...current.form, ...result.data } }))
   }
 
+  /**
+   * Upload a picture as the banner. The server keeps it at once, so it is set on
+   * both the saved and the edited settings and doesn't show as an unsaved change.
+   * Resolves true when it was kept.
+   */
+  async function uploadBanner(file: File): Promise<boolean> {
+    const result = await api.uploadBanner(formId, file, t("builder.banner.uploadFailed", "The picture could not be uploaded. Try again."))
+    if (!result.ok) {
+      env.notify(
+        result.status === 422
+          ? t("builder.banner.refused", "Use a PNG, JPEG or WebP picture of 5 MB or less.")
+          : result.message,
+        "error"
+      )
+      return false
+    }
+    const banner = result.data
+    setLoaded((current) =>
+      current === null ? current : { ...current, form: { ...current.form, banner }, settings: { ...current.settings, banner } }
+    )
+    setSettings((current) => (current === null ? current : { ...current, banner }))
+    return true
+  }
+
   function copyLink() {
     const url = loaded?.form.public_url
     if (!url) return
@@ -364,6 +414,8 @@ function FormBuilder({ env, formId, canManage }: { env: FormsScreenEnv; formId: 
   const { form, kinds } = loaded
   const readOnly = !canManage
   const title = pickText(settings.name, currentLanguage) || form.form_key
+  // The canvas shows the form as the person filling it in sees it.
+  const shownTitle = pickText(settings.title, currentLanguage) || title
   const description = pickText(settings.description, currentLanguage)
   const selectedField = selected !== null ? fields[selected] : undefined
 
@@ -471,8 +523,9 @@ function FormBuilder({ env, formId, canManage }: { env: FormsScreenEnv; formId: 
         <TabsContent value="questions" className="pt-4">
           <div className="grid overflow-hidden rounded-card border border-border bg-muted lg:grid-cols-[minmax(0,1fr)_26rem]">
             <BuilderCanvas
-              title={title}
+              title={shownTitle}
               description={description}
+              banner={settings.banner}
               fields={fields}
               sections={settings.sections}
               kinds={kinds}
@@ -525,6 +578,7 @@ function FormBuilder({ env, formId, canManage }: { env: FormsScreenEnv; formId: 
             onPublicLink={(enabled) => void setPublicLink(enabled)}
             onCopyLink={copyLink}
             onMemberAccess={(open) => void setMemberAccess(open)}
+            onUploadBanner={uploadBanner}
           />
         </TabsContent>
       </Tabs>

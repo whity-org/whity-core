@@ -26,6 +26,7 @@
 
 import { use, useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
+import { FormHeader, type FormBannerValue } from '@whity/features/forms';
 import { BuiltOnWhity } from '@whity/ui/built-on-whity';
 import { TenantLogo } from '@whity/ui/tenant-logo';
 import { useBranding } from '@/lib/branding-context';
@@ -47,6 +48,9 @@ interface PublicForm {
   description: string | null;
   description_i18n?: LocalizedText | [] | null;
   submit_label?: LocalizedText | null;
+  /** The heading and picture written for the person filling it in (WHIT-944). */
+  title?: LocalizedText | null;
+  banner?: FormBannerValue | null;
   fields: FillableField[];
   sections: FormSectionSpec[];
   accepts_submissions: boolean;
@@ -220,7 +224,8 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
     );
   }
 
-  const title = localized(form.name, preferArabic) || t('fill.untitled', 'Form');
+  const title =
+    localized(form.title ?? null, preferArabic) || localized(form.name, preferArabic) || t('fill.untitled', 'Form');
   const closedOn = dateTime(form.closes_at);
   const translatedDescription = Array.isArray(form.description_i18n) ? null : form.description_i18n;
   const description = localized(translatedDescription, preferArabic) || form.description;
@@ -243,11 +248,9 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
   }
 
   return shell(
-    <Card className="border-t-4 border-t-primary">
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-        {description !== null && description !== '' && <CardDescription>{description}</CardDescription>}
-      </CardHeader>
+    // A banner leads in place of the brand-coloured top edge.
+    <Card className={form.banner ? undefined : 'border-t-4 border-t-primary'}>
+      <FormHeader title={title} description={description} banner={form.banner} />
 
       <CardContent>
         {!form.accepts_submissions ? (
