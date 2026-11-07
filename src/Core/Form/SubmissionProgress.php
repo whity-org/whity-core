@@ -205,7 +205,10 @@ final class SubmissionProgress
             'state' => $state,
             'stages' => $stages,
             'notes' => $notes,
+            // Only a route with no document: one re-pointed from a document by
+            // migration 233 goes on treating it as a document (WHIT-920).
             'can_resubmit' => $openAuthorItem !== null
+                && $route['document_id'] === null
                 && $viewerProfileId !== null
                 && (int) $openAuthorItem['profile_id'] === $viewerProfileId,
             'resume_from' => $openAuthorItem !== null ? $resumeFrom : null,

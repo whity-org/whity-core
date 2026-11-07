@@ -52,6 +52,8 @@ interface TrailEntry {
 }
 
 interface SubjectRoute extends DocumentRoute {
+  /** Whether this route can send it back to anybody (absent on an older server). */
+  can_send_back?: boolean;
   trail: TrailEntry[];
   recipients: RouteRecipient[];
   changes: {
@@ -262,7 +264,7 @@ export default function RouteSubjectPage({ params }: { params: Promise<{ type: s
             <SendBack
               route={route}
               viewerProfileId={viewerProfileId}
-              canSendBack={view.subject.can_send_back}
+              canSendBack={route.can_send_back ?? view.subject.can_send_back}
               onSent={() => setVersion((current) => current + 1)}
             />
 

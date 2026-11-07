@@ -16,6 +16,7 @@ use Whity\Core\Document\DocumentVisibilityPolicy;
 use Whity\Core\Document\RouteTemplate\RouteTemplateRepository;
 use Whity\Core\Document\Routing\DocumentRouter;
 use Whity\Core\Document\Routing\DocumentRouteSubject;
+use Whity\Core\Document\Routing\DocumentRoutingInboxSource;
 use Whity\Core\Document\Routing\RoleBelowActorRuleResolver;
 use Whity\Core\Document\Routing\RoleRuleResolver;
 use Whity\Core\Document\Routing\RouteAction;
@@ -186,10 +187,97 @@ final class FormSubmissionRoutesRealEngineTest extends TestCase
         self::assertSame(1, $this->recipients->countForProfile(self::TENANT, self::CLERK, true));
     }
 
-    public function testRoutesOnExistingSubmissionDocumentsAreRepointedAndTheDocumentsStay(): void
+    public function testOnlyTheRouteASubmissionStartedIsRepointedAndItsVersionsFollowIt(): void
     {
-        // A submission sent before migration 233: it raised a document, and the
-        // route travels on that document.
+        [$documentId, $submissionId, $routeId] = $this->legacySubmission();
+
+        // Somebody later routed the same document from the library.
+        $library = $this->router->issue(self::TENANT, self::CLERK, ['id' => $documentId], 'Second look', [
+            ['rule_kind' => RoutingRuleRegistry::KIND_EXPLICIT, 'rule_config' => ['profile_ids' => [self::MEMBER_A]]],
+        ])['route'];
+        // A route on a document nobody submitted stays on its document.
+        $plainDocument = $this->seedDocument();
+        $this->router->issue(self::TENANT, self::APPLICANT, ['id' => $plainDocument], 'Letter', [
+            ['rule_kind' => RoutingRuleRegistry::KIND_EXPLICIT, 'rule_config' => ['profile_ids' => [self::CLERK]]],
+        ]);
+        self::assertSame(1, $this->scalar(
+            "SELECT COUNT(*) FROM route_subject_versions WHERE subject_type = 'document' AND subject_id = " . $documentId
+        ));
+
+        $db = $this->database();
+        AddFormSubmissionRouteSubjects::up($db);
+        AddFormSubmissionRouteSubjects::up($db); // idempotent
+
+        $route = $this->routes->findById($routeId, self::TENANT);
+        self::assertNotNull($route);
+        self::assertSame(FormSubmissionRouteSubject::TYPE, $route['subject_type']);
+        self::assertSame($submissionId, $route['subject_id']);
+        self::assertSame($documentId, $route['document_id'], 'the document stays on the route');
+        self::assertSame(1, $this->scalar('SELECT COUNT(*) FROM documents WHERE id = ' . $documentId));
+
+        $later = $this->routes->findById((int) $library['id'], self::TENANT);
+        self::assertNotNull($later);
+        self::assertSame(DocumentRouteSubject::TYPE, $later['subject_type'], 'a library route stays on the document');
+        self::assertCount(1, $this->routes->listForSubject(DocumentRouteSubject::TYPE, $plainDocument, self::TENANT));
+
+        // The document's versions moved with the re-pointed route.
+        $versions = $this->versions->listForSubject(self::TENANT, FormSubmissionRouteSubject::TYPE, $submissionId);
+        self::assertCount(1, $versions);
+        self::assertSame(0, $this->scalar(
+            "SELECT COUNT(*) FROM route_subject_versions WHERE subject_type = 'document' AND subject_id = " . $documentId
+        ));
+
+        // Both routes still answer through the document's routes.
+        self::assertCount(2, $this->routes->listForDocument($documentId, self::TENANT));
+        $this->router->act(self::TENANT, self::CLERK, $route, RouteAction::ACKNOWLEDGED, null);
+        $found = $this->submissions->find(self::TENANT, $submissionId);
+        self::assertNotNull($found);
+        self::assertSame('in progress', $found['state'], 'the library route is still open on its document');
+    }
+
+    public function testARepointedRouteThatStillHasItsDocumentBehavesAsBefore(): void
+    {
+        [$documentId, $submissionId, $routeId] = $this->legacySubmission(decision: true);
+        AddFormSubmissionRouteSubjects::up($this->database());
+        $route = $this->routes->findById($routeId, self::TENANT);
+        self::assertNotNull($route);
+        self::assertSame(FormSubmissionRouteSubject::TYPE, $route['subject_type']);
+
+        // Sent back to the document's author, as a document route always was,
+        // and not editable as a submission: an issued document is not edited.
+        $this->router->act(self::TENANT, self::CLERK, $route, RouteAction::SENT_BACK, 'Please check.', null, RouteResume::SENDER);
+        $item = $this->open($route, self::APPLICANT);
+        self::assertNotNull($item);
+        $found = $this->submissions->find(self::TENANT, $submissionId, self::APPLICANT);
+        self::assertNotNull($found);
+        self::assertFalse($this->progress->forSubmission(self::TENANT, $found, self::APPLICANT)['can_resubmit']);
+        try {
+            $this->issuer->resubmit(self::TENANT, self::APPLICANT, $found, $this->applicantFields(), ['supplier' => 'Changed'], null);
+            self::fail('A submission whose route still has its document is not edited.');
+        } catch (FormRejectedException $e) {
+            self::assertSame('has_document', $e->reason);
+        }
+        self::assertSame('Example Mill', $this->submissions->find(self::TENANT, $submissionId)['data']['supplier'] ?? null);
+
+        // The author resubmits it as it is, as on any document route.
+        $this->router->act(self::TENANT, self::APPLICANT, $route, RouteAction::RESUBMITTED, null);
+
+        // A rejection needs no reason here, is not marked for the author, and
+        // does not end the route by itself.
+        $rejected = $this->router->act(self::TENANT, self::CLERK, $route, RouteAction::ACKNOWLEDGED, null, RouteVerdict::REJECTED);
+        self::assertFalse((bool) $rejected['event']['to_author']);
+        self::assertSame($documentId, $rejected['event']['document_id']);
+    }
+
+    /**
+     * A submission sent before migration 233: it raised a document, and its
+     * route travels on that document, started in the same transaction (so with
+     * the document's own timestamp).
+     *
+     * @return array{0: int, 1: int, 2: int} document, submission, route
+     */
+    private function legacySubmission(bool $decision = false): array
+    {
         $documentId = $this->seedDocument();
         $submissionId = $this->submissions->create(
             self::TENANT,
@@ -200,35 +288,63 @@ final class FormSubmissionRoutesRealEngineTest extends TestCase
             ['supplier' => 'Example Mill'],
         );
         $issued = $this->router->issue(self::TENANT, self::APPLICANT, ['id' => $documentId], 'Supplier request', [
-            ['rule_kind' => RoutingRuleRegistry::KIND_EXPLICIT, 'rule_config' => ['profile_ids' => [self::CLERK]]],
+            ['rule_kind' => RoutingRuleRegistry::KIND_EXPLICIT, 'rule_config' => ['profile_ids' => [self::CLERK]], 'decision' => $decision],
         ])['route'];
         self::assertSame(DocumentRouteSubject::TYPE, $issued['subject_type']);
-        // A route on a document nobody submitted stays on its document.
-        $plainDocument = $this->seedDocument();
-        $this->router->issue(self::TENANT, self::APPLICANT, ['id' => $plainDocument], 'Letter', [
-            ['rule_kind' => RoutingRuleRegistry::KIND_EXPLICIT, 'rule_config' => ['profile_ids' => [self::CLERK]]],
-        ]);
+        $this->pdo->exec(
+            'UPDATE document_routes SET created_at = (SELECT created_at FROM documents WHERE id = ' . $documentId
+            . ') WHERE id = ' . (int) $issued['id']
+        );
 
-        $db = $this->database();
-        AddFormSubmissionRouteSubjects::up($db);
-        AddFormSubmissionRouteSubjects::up($db); // idempotent
+        return [$documentId, $submissionId, (int) $issued['id']];
+    }
 
-        $route = $this->routes->findById((int) $issued['id'], self::TENANT);
-        self::assertNotNull($route);
-        self::assertSame(FormSubmissionRouteSubject::TYPE, $route['subject_type']);
-        self::assertSame($submissionId, $route['subject_id']);
-        self::assertSame($documentId, $route['document_id'], 'the document stays on the route');
-        self::assertSame(1, $this->scalar('SELECT COUNT(*) FROM documents WHERE id = ' . $documentId));
+    public function testTheApplicantsInboxDoesNotNameTheReviewerWhoSentItBack(): void
+    {
+        $submission = $this->send(self::APPLICANT, ['supplier' => 'Example Mill', 'amount' => '100']);
+        $route = $this->routeOf((int) $submission['id']);
+        $this->router->act(self::TENANT, self::CLERK, $route, RouteAction::SENT_BACK, 'Please add the amount with tax.', null, RouteResume::SENDER);
 
-        $plain = $this->routes->listForSubject(DocumentRouteSubject::TYPE, $plainDocument, self::TENANT);
-        self::assertCount(1, $plain);
+        $inbox = new DocumentRoutingInboxSource($this->recipients, $this->settings);
+        $items = $inbox->list(self::TENANT, self::APPLICANT, true, 10, 0);
+        self::assertCount(1, $items);
+        $wire = $items[0]->toArray();
+        self::assertNull($wire['sender']);
+        self::assertNull($wire['meta']['arrived_from_profile_id']);
+        self::assertSame('author', $wire['meta']['role']);
+        self::assertStringNotContainsString('Rana', (string) json_encode($wire));
 
-        // The re-pointed route still answers through its document's routes and acts.
-        self::assertCount(1, $this->routes->listForDocument($documentId, self::TENANT));
-        $this->router->act(self::TENANT, self::CLERK, $route, RouteAction::ACKNOWLEDGED, null);
-        $found = $this->submissions->find(self::TENANT, $submissionId);
-        self::assertNotNull($found);
-        self::assertSame('completed', $found['state']);
+        // With the workspace showing reviewer names: the name, never the e-mail.
+        $this->settings->setTenant(self::TENANT, SettingsRegistry::FORMS_SHOW_REVIEWER_NAMES, 'true');
+        $named = $inbox->list(self::TENANT, self::APPLICANT, true, 10, 0)[0]->toArray();
+        self::assertSame('Clerk Rana', $named['sender']['name']);
+        self::assertStringNotContainsString('@', (string) json_encode($named), 'never an e-mail address');
+    }
+
+    public function testSomebodyWhoOnlyReadsSubmissionsCannotWriteToTheSender(): void
+    {
+        $submission = $this->send(self::APPLICANT, ['supplier' => 'Example Mill', 'amount' => '100']);
+        $routeId = (int) $this->routeOf((int) $submission['id'])['id'];
+        $api = $this->routesApi(readsForms: true);
+
+        $toSender = $api->act(
+            $this->request('POST', '/x', self::OUTSIDER, ['action' => 'noted', 'note' => 'Hello', 'to_author' => true]),
+            ['routeId' => (string) $routeId],
+        );
+        self::assertSame(422, $toSender->getStatusCode(), (string) $toSender->getBody());
+
+        $internal = $api->act(
+            $this->request('POST', '/x', self::OUTSIDER, ['action' => 'noted', 'note' => 'Checked the price list.']),
+            ['routeId' => (string) $routeId],
+        );
+        self::assertSame(201, $internal->getStatusCode(), (string) $internal->getBody());
+
+        // The clerk the route reached may write to the sender.
+        $fromClerk = $api->act(
+            $this->request('POST', '/x', self::CLERK, ['action' => 'noted', 'note' => 'We are on it.', 'to_author' => true]),
+            ['routeId' => (string) $routeId],
+        );
+        self::assertSame(201, $fromClerk->getStatusCode(), (string) $fromClerk->getBody());
     }
 
     public function testTheAuthorEditsASentBackSubmissionAndReviewersSeeWhatChanged(): void
@@ -499,7 +615,7 @@ final class FormSubmissionRoutesRealEngineTest extends TestCase
         return $id;
     }
 
-    private function routesApi(): RoutesApiHandler
+    private function routesApi(bool $readsForms = false): RoutesApiHandler
     {
         return new RoutesApiHandler(
             $this->pdo,
@@ -514,15 +630,15 @@ final class FormSubmissionRoutesRealEngineTest extends TestCase
             new DocumentRepository($this->pdo),
             // Only document subjects ask it, and these are submissions.
             (new \ReflectionClass(DocumentVisibilityPolicy::class))->newInstanceWithoutConstructor(),
-            $this->noPermissions(),
+            $this->noPermissions($readsForms),
         );
     }
 
     /** A role checker that grants nothing, so only being reached opens a subject. */
-    private function noPermissions(): RoleChecker
+    private function noPermissions(bool $readsForms = false): RoleChecker
     {
         $mock = $this->createMock(RoleChecker::class);
-        $mock->method('hasPermissionForProfile')->willReturn(false);
+        $mock->method('hasPermissionForProfile')->willReturn($readsForms);
 
         return $mock;
     }

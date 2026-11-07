@@ -348,7 +348,7 @@ final class FormSubmissionsApiHandler
                 'meta' => ['ignored_keys' => $result['ignored']],
             ]);
         } catch (FormRejectedException $e) {
-            $status = $e->reason === 'not_sent_back' ? 409 : 422;
+            $status = in_array($e->reason, ['not_sent_back', 'has_document'], true) ? 409 : 422;
 
             return Response::error($e->clientMessage, $status, $e->details());
         } catch (\Exception $e) {

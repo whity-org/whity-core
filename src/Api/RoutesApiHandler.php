@@ -10,6 +10,7 @@ use Whity\Core\Document\DocumentRepository;
 use Whity\Core\Document\DocumentVisibilityPolicy;
 use Whity\Core\Document\Routing\DocumentRouter;
 use Whity\Core\Document\Routing\DocumentRouteSubject;
+use Whity\Core\Document\Routing\RouteAction;
 use Whity\Core\Document\Routing\RouteEdgeRepository;
 use Whity\Core\Document\Routing\RouteEventRepository;
 use Whity\Core\Document\Routing\RouteRecipientRepository;
@@ -132,6 +133,12 @@ final class RoutesApiHandler
                 'recipients' => array_map(RoutingPresenter::recipient(...), $items),
                 // What changed since the version the caller last acted on.
                 'changes' => $changes->since($tenantId, $route, $callerId),
+                // Whether this route can send it back to anybody: a route with a
+                // document sends back to the document's author, one without to
+                // the subject's (nobody, for an anonymous submission).
+                'can_send_back' => ($route['document_id'] !== null
+                    ? $this->subjects->get(DocumentRouteSubject::TYPE)?->author($tenantId, (int) $route['document_id'])
+                    : $provider?->author($tenantId, $subjectId)) !== null,
             ];
         }
 
@@ -177,6 +184,20 @@ final class RoutesApiHandler
         $parsed = DocumentRoutingApiHandler::parseAct($request);
         if ($parsed instanceof Response) {
             return $parsed;
+        }
+
+        // A note FOR the person who sent a form reaches them, so on a route
+        // with no document only somebody the route reached may write one.
+        // Reading the submission (`forms:read`) is enough for an internal note.
+        if ($parsed['action'] === RouteAction::NOTED
+            && $parsed['to_author']
+            && $route['document_id'] === null
+            && !$this->recipients->hasStepItemOnRoute($tenantId, (int) $route['id'], $callerId)) {
+            return Response::error(
+                'Only the people this was sent to can write a note for the person who sent it. '
+                . 'Add an internal note instead.',
+                422
+            );
         }
 
         try {

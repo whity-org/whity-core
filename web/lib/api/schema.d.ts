@@ -12929,6 +12929,7 @@ export interface components {
                             after?: unknown;
                         }[];
                     };
+                    can_send_back?: boolean;
                 })[];
                 /** @description Display names by profile id, for the people on these routes. */
                 people: {

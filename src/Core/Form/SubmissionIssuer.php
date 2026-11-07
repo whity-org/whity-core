@@ -189,6 +189,17 @@ final class SubmissionIssuer
     ): array {
         $submissionId = (int) $submission['id'];
         $route = $this->sentBackRoute($tenantId, $submissionId, $authorProfileId);
+        if ($route !== null && $route['document_id'] !== null) {
+            // A submission sent before routes travelled on submissions keeps its
+            // document, and its route goes on treating it as a document: an
+            // issued document is not edited in place.
+            throw new FormRejectedException(
+                'This submission already has its document, so it cannot be changed. Send a new one instead.',
+                '',
+                null,
+                'has_document',
+            );
+        }
         if ($route === null) {
             throw new FormRejectedException(
                 'This submission is not waiting for your changes, so it cannot be edited.',

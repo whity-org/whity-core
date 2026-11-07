@@ -583,11 +583,13 @@ final class DocumentRouter
             $verdict = $action === RouteAction::SIGNED ? RouteVerdict::APPROVED : RouteVerdict::REJECTED;
         }
 
-        // WHIT-920: on a subject that is not a document (a form submission), a
-        // rejection is told to the applicant, so it needs its reason, and the
-        // reason is marked for them.
-        $isDocumentSubject = $subjectType === DocumentRouteSubject::TYPE;
-        if ($verdict === RouteVerdict::REJECTED && !$isDocumentSubject) {
+        // WHIT-920: on a route with NO document (a form submission routed on
+        // itself), a rejection is told to the applicant, so it needs its
+        // reason, and the reason is marked for them. A route that still has a
+        // document — every document route, and a submission route re-pointed by
+        // migration 233 — behaves as it always did.
+        $travelsWithoutDocument = $documentId === null;
+        if ($verdict === RouteVerdict::REJECTED && $travelsWithoutDocument) {
             if ($note === null || trim($note) === '') {
                 throw RoutingRejectedException::because(
                     'Say why it is not approved. The person who sent it sees the reason.'
@@ -681,11 +683,11 @@ final class DocumentRouter
             $this->db->beginTransaction();
         }
 
-        // WHIT-920 (A6): on a subject that is not a document, a rejection that
+        // WHIT-920 (A6): on a route with no document, a rejection that
         // draws no further path ENDS the route. Every item still open on it
         // closes with the rejection, so the applicant reads "Not approved" rather
         // than a route still running somewhere else.
-        $endsRoute = $decided === RouteVerdict::REJECTED && $next === null && !$isDocumentSubject;
+        $endsRoute = $decided === RouteVerdict::REJECTED && $next === null && $travelsWithoutDocument;
 
         try {
             $this->assertOpen($tenantId, $documentId, $subjectType, $subjectId);
@@ -967,8 +969,12 @@ final class DocumentRouter
             );
         }
 
-        $provider = $this->subjects?->get($subjectType);
-        $author = $provider?->author($tenantId, $subjectId);
+        // WHIT-920: a route that has a document sends back to the document's
+        // author, as it always did — including a submission route re-pointed by
+        // migration 233. Only a route with no document asks its subject.
+        $author = $documentId !== null
+            ? $this->subjects?->get(DocumentRouteSubject::TYPE)?->author($tenantId, $documentId)
+            : $this->subjects?->get($subjectType)?->author($tenantId, $subjectId);
         if ($author === null) {
             throw RoutingRejectedException::because(
                 'There is nobody to send this back to: its author is not known. Return it or reject it instead.'

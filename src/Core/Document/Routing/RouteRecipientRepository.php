@@ -653,6 +653,27 @@ final class RouteRecipientRepository
     }
 
     /**
+     * Whether a profile holds or held a STEP item on one route (WHIT-920): the
+     * people a route reached, as opposed to somebody who can merely read it.
+     */
+    public function hasStepItemOnRoute(int $tenantId, int $routeId, int $profileId): bool
+    {
+        $stmt = $this->db->prepare(
+            'SELECT 1 FROM document_route_recipients
+              WHERE tenant_id = :tenant_id AND route_id = :route_id AND profile_id = :profile_id AND role = :role
+              LIMIT 1'
+        );
+        $stmt->execute([
+            ':tenant_id' => $tenantId,
+            ':route_id' => $routeId,
+            ':profile_id' => $profileId,
+            ':role' => self::ROLE_STEP,
+        ]);
+
+        return $stmt->fetchColumn() !== false;
+    }
+
+    /**
      * Every recipient row of one route, oldest first (WHIT-920): who the route
      * reached, read by route for a subject that has no document.
      *

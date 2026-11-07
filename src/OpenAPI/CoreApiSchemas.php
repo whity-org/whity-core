@@ -8800,6 +8800,7 @@ final class CoreApiSchemas
                                     'after' => ['nullable' => true],
                                 ], ['key'])],
                             ], ['seen_version', 'current_version', 'changes']),
+                            'can_send_back' => self::bool(),
                         ], ['trail', 'recipients', 'changes']),
                     ],
                 ]],

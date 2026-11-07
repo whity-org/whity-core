@@ -15,9 +15,11 @@ use Whity\Database\Database;
  * A ROUTE WITHOUT A DOCUMENT
  * --------------------------
  * `document_routes`, `document_route_events` and `document_route_recipients`
- * each carried `document_id NOT NULL` since migration 112. A route on a
- * submission has no document until its finalise step makes one (#1725), so the
- * three columns become nullable. Nothing else about them changes: every row
+ * each carried `document_id NOT NULL` since migration 112, and
+ * `document_route_effect_attempts` since migration 139. A route on a submission
+ * has no document until its finalise step makes one (#1725), so the four
+ * columns become nullable (a stage's effects still run on such a route, and
+ * their attempts are recorded without a document). Nothing else about them changes: every row
  * written so far keeps its document, every route on a document still names it,
  * and the foreign keys (ON DELETE CASCADE) still hold for every row that has
  * one. A route with no document is read through its subject
@@ -32,11 +34,27 @@ use Whity\Database\Database;
  *
  * EXISTING SUBMISSION ROUTES ARE RE-POINTED
  * -----------------------------------------
- * Every route on a document that a form submission produced now names the
- * submission as its subject (`form_submission`). The documents stay, and the
- * routes keep pointing at them, so a document's own routing tab, its trail and
- * its withdrawal behave as before. Only what the route is ABOUT changes, which
- * is what lets the author edit and resubmit a sent-back submission.
+ * The route a submission STARTED now names the submission as its subject
+ * (`form_submission`). Only that one: a route somebody later started on the
+ * same document from the document library stays on the document.
+ *
+ * Which route that is: the submission's route id was never stored, so it is
+ * identified as the FIRST route on the submission's document, created in the
+ * same transaction as the document. The submission issuer raised the document,
+ * the submission and the route in one transaction, so nobody else could route
+ * the document before it; and PostgreSQL's NOW() is the transaction's start, so
+ * that route's `created_at` equals the document's. A document whose form had no
+ * route template has no such route, and a later library route on it fails the
+ * equality and stays where it is.
+ *
+ * The documents stay, and the re-pointed routes keep pointing at them, so a
+ * document's own routing tab, its trail and its withdrawal behave as before.
+ * The engine treats a route that still has a document as it always did (who a
+ * send-back goes to, what a rejection does); only routes with no document get
+ * the submission behaviour.
+ *
+ * The versions recorded for a re-pointed route's document (migration 226) move
+ * with it, to the submission, so its version history follows the route.
  *
  * SIGN-IN ON A PUBLIC FORM
  * ------------------------
@@ -50,8 +68,13 @@ use Whity\Database\Database;
  */
 final class AddFormSubmissionRouteSubjects
 {
-    /** The three tables whose `document_id` becomes nullable. */
-    private const TABLES = ['document_routes', 'document_route_events', 'document_route_recipients'];
+    /** The four tables whose `document_id` becomes nullable. */
+    private const TABLES = [
+        'document_routes',
+        'document_route_events',
+        'document_route_recipients',
+        'document_route_effect_attempts',
+    ];
 
     public static function up(Database $db): void
     {
@@ -59,9 +82,9 @@ final class AddFormSubmissionRouteSubjects
             self::setDocumentRequired($db, $table, false);
         }
 
-        // Re-point the routes on documents a submission produced. Unscoped by
-        // design (migration): every tenant's routes, each matched to a
-        // submission of its own tenant.
+        // Re-point the route each submission started (see the class docblock
+        // for how it is told apart). Unscoped by design (migration): every
+        // tenant's routes, each matched to a submission of its own tenant.
         $db->exec(
             "UPDATE document_routes
                 SET subject_type = 'form_submission',
@@ -76,6 +99,34 @@ final class AddFormSubmissionRouteSubjects
                     SELECT 1 FROM form_submissions s
                      WHERE s.tenant_id = document_routes.tenant_id
                        AND s.document_id = document_routes.document_id
+                )
+                AND id = (
+                    SELECT MIN(r1.id) FROM document_routes r1
+                     WHERE r1.tenant_id = document_routes.tenant_id
+                       AND r1.document_id = document_routes.document_id
+                )
+                AND created_at = (
+                    SELECT d.created_at FROM documents d
+                     WHERE d.id = document_routes.document_id AND d.tenant_id = document_routes.tenant_id
+                )"
+        );
+
+        // Their documents' versions follow them to the submission.
+        $db->exec(
+            "UPDATE route_subject_versions
+                SET subject_type = 'form_submission',
+                    subject_id = (
+                        SELECT MIN(dr.subject_id) FROM document_routes dr
+                         WHERE dr.tenant_id = route_subject_versions.tenant_id
+                           AND dr.document_id = route_subject_versions.subject_id
+                           AND dr.subject_type = 'form_submission'
+                    )
+              WHERE subject_type = 'document'
+                AND EXISTS (
+                    SELECT 1 FROM document_routes dr
+                     WHERE dr.tenant_id = route_subject_versions.tenant_id
+                       AND dr.document_id = route_subject_versions.subject_id
+                       AND dr.subject_type = 'form_submission'
                 )"
         );
 
@@ -103,6 +154,28 @@ final class AddFormSubmissionRouteSubjects
         }
 
         $db->exec('ALTER TABLE forms DROP COLUMN IF EXISTS public_requires_sign_in');
+
+        // Versions back to the documents of the routes being reverted, before
+        // the routes stop saying which document that is.
+        $db->exec(
+            "UPDATE route_subject_versions
+                SET subject_type = 'document',
+                    subject_id = (
+                        SELECT MIN(dr.document_id) FROM document_routes dr
+                         WHERE dr.tenant_id = route_subject_versions.tenant_id
+                           AND dr.subject_type = 'form_submission'
+                           AND dr.subject_id = route_subject_versions.subject_id
+                           AND dr.document_id IS NOT NULL
+                    )
+              WHERE subject_type = 'form_submission'
+                AND EXISTS (
+                    SELECT 1 FROM document_routes dr
+                     WHERE dr.tenant_id = route_subject_versions.tenant_id
+                       AND dr.subject_type = 'form_submission'
+                       AND dr.subject_id = route_subject_versions.subject_id
+                       AND dr.document_id IS NOT NULL
+                )"
+        );
 
         $db->exec(
             "UPDATE document_routes
@@ -154,7 +227,7 @@ final class AddFormSubmissionRouteSubjects
         $canEdit = $required ? $isOptional : $isRequired;
         if (!$canEdit) {
             throw new RuntimeException(
-                "Migration 233: document_id on {$table} is not the column migration 112 wrote, "
+                "Migration 233: document_id on {$table} is not the column migrations 112 and 139 wrote, "
                 . 'so it is not edited automatically.'
             );
         }

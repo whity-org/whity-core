@@ -4439,7 +4439,8 @@ $router->register('POST', '/api/public/forms/{slug}/submissions', [$publicFormsH
 // exists nowhere.
 $inboxSourceRegistry->registerCoreSource(
     \Whity\Core\Inbox\InboxSourceRegistry::CORE_DOCUMENT_ROUTING,
-    new \Whity\Core\Document\Routing\DocumentRoutingInboxSource($routeRecipientRepository)
+    // WHIT-920: the settings say whether a form's sender sees who reviewed it.
+    new \Whity\Core\Document\Routing\DocumentRoutingInboxSource($routeRecipientRepository, $settingsService)
 );
 $meInboxHandler = new \Whity\Api\MeInboxApiHandler($tokenValidator, $inboxSourceRegistry);
 // Session-gated, unpermissioned, like the other /api/me surfaces: an inbox row

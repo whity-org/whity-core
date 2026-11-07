@@ -281,7 +281,12 @@ abstract class BaseCommand implements CliCommand, CommandHelp
         $inboxSourceRegistry->registerCoreSource(
             \Whity\Core\Inbox\InboxSourceRegistry::CORE_DOCUMENT_ROUTING,
             new \Whity\Core\Document\Routing\DocumentRoutingInboxSource(
-                new \Whity\Core\Document\Routing\RouteRecipientRepository($db->getPdo())
+                new \Whity\Core\Document\Routing\RouteRecipientRepository($db->getPdo()),
+                // WHIT-920: whether a form's sender sees who reviewed it.
+                new \Whity\Core\Settings\SettingsService(
+                    new \Whity\Core\Settings\GlobalSettingsRepository($db->getPdo()),
+                    new \Whity\Core\Settings\TenantSettingsRepository($db->getPdo())
+                )
             )
         );
         \Whity\register_service(\Whity\Core\Inbox\InboxSourceRegistry::class, $inboxSourceRegistry);
