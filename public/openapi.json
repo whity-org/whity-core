@@ -62871,6 +62871,21 @@
                                 "tenant_name": {
                                     "type": "string"
                                 },
+                                "tenant_name_language": {
+                                    "type": "string"
+                                },
+                                "tenant_names": {
+                                    "type": "object",
+                                    "x-whity-localized-text": true,
+                                    "properties": {
+                                        "ar": {
+                                            "type": "string"
+                                        },
+                                        "en": {
+                                            "type": "string"
+                                        }
+                                    }
+                                },
                                 "role": {
                                     "type": "string"
                                 }
@@ -63250,6 +63265,21 @@
                                 },
                                 "tenant_name": {
                                     "type": "string"
+                                },
+                                "tenant_name_language": {
+                                    "type": "string"
+                                },
+                                "tenant_names": {
+                                    "type": "object",
+                                    "x-whity-localized-text": true,
+                                    "properties": {
+                                        "ar": {
+                                            "type": "string"
+                                        },
+                                        "en": {
+                                            "type": "string"
+                                        }
+                                    }
                                 },
                                 "role": {
                                     "type": "string"
@@ -65703,6 +65733,21 @@
                                         },
                                         "tenant_name": {
                                             "type": "string"
+                                        },
+                                        "tenant_name_language": {
+                                            "type": "string"
+                                        },
+                                        "tenant_names": {
+                                            "type": "object",
+                                            "x-whity-localized-text": true,
+                                            "properties": {
+                                                "ar": {
+                                                    "type": "string"
+                                                },
+                                                "en": {
+                                                    "type": "string"
+                                                }
+                                            }
                                         },
                                         "role": {
                                             "type": "string"
@@ -70543,7 +70588,25 @@
                         "type": "integer"
                     },
                     "name": {
-                        "type": "string"
+                        "type": "string",
+                        "description": "The original name, in `nameLanguage`."
+                    },
+                    "nameLanguage": {
+                        "type": "string",
+                        "description": "Language code of the original name. For many institutions this is Arabic, not English."
+                    },
+                    "names": {
+                        "type": "object",
+                        "x-whity-localized-text": true,
+                        "properties": {
+                            "ar": {
+                                "type": "string"
+                            },
+                            "en": {
+                                "type": "string"
+                            }
+                        },
+                        "description": "The name in every language it has, original included. A reader with no name in their language sees the original."
                     },
                     "slug": {
                         "type": "string",
@@ -70598,6 +70661,8 @@
                 "required": [
                     "id",
                     "name",
+                    "nameLanguage",
+                    "names",
                     "slug",
                     "userCount",
                     "createdAt",
@@ -70610,7 +70675,24 @@
                 "properties": {
                     "name": {
                         "type": "string",
-                        "description": "Display name of the new tenant (workspace)."
+                        "description": "Original name of the new tenant (workspace). Required unless `names` is sent."
+                    },
+                    "names": {
+                        "type": "object",
+                        "x-whity-localized-text": true,
+                        "properties": {
+                            "ar": {
+                                "type": "string"
+                            },
+                            "en": {
+                                "type": "string"
+                            }
+                        },
+                        "description": "The name in every language, for example `{\"ar\": \"...\", \"en\": \"...\"}`."
+                    },
+                    "nameLanguage": {
+                        "type": "string",
+                        "description": "Language code of the original name. Defaults to `ar` for a name in Arabic letters, `en` otherwise."
                     },
                     "slug": {
                         "type": "string",
@@ -70621,10 +70703,7 @@
                         "$ref": "#/components/schemas/TenantInitialAdmin",
                         "description": "Optional first administrator, created in the same transaction: `{email, password, role?}`. Without it no one can sign in to the new tenant."
                     }
-                },
-                "required": [
-                    "name"
-                ]
+                }
             },
             "TenantCreatedResponse": {
                 "type": "object",
@@ -71070,7 +71149,24 @@
                 "properties": {
                     "name": {
                         "type": "string",
-                        "description": "New display name."
+                        "description": "New original name, in `nameLanguage`."
+                    },
+                    "names": {
+                        "type": "object",
+                        "x-whity-localized-text": true,
+                        "properties": {
+                            "ar": {
+                                "type": "string"
+                            },
+                            "en": {
+                                "type": "string"
+                            }
+                        },
+                        "description": "The name in every language; replaces them all. A blank language is removed."
+                    },
+                    "nameLanguage": {
+                        "type": "string",
+                        "description": "Language code of the original name. The original must have text."
                     },
                     "slug": {
                         "type": "string",

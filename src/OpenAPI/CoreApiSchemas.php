@@ -4212,7 +4212,10 @@ final class CoreApiSchemas
 
         $tenant = self::object([
             'id' => self::int(),
-            'name' => self::str(),
+            'name' => self::str() + ['description' => 'The original name, in `nameLanguage`.'],
+            // #821: the original name's language, and every language the name has.
+            'nameLanguage' => self::str() + ['description' => 'Language code of the original name. For many institutions this is Arabic, not English.'],
+            'names' => self::localizedText() + ['description' => 'The name in every language it has, original included. A reader with no name in their language sees the original.'],
             'slug' => self::str(true),
             'userCount' => self::int(),
             'createdAt' => self::str(true),
@@ -4224,7 +4227,7 @@ final class CoreApiSchemas
                 'state' => ['type' => 'string', 'enum' => ['active', 'trial', 'overdue', 'suspended']],
                 'daysLeft' => self::int(true),
             ], ['state', 'daysLeft']),
-        ], ['id', 'name', 'slug', 'userCount', 'createdAt', 'plan', 'status']);
+        ], ['id', 'name', 'nameLanguage', 'names', 'slug', 'userCount', 'createdAt', 'plan', 'status']);
 
         // #822: a unit's KIND travels with it as both the per-tenant id and the
         // stable key a consumer's rule is written against. All three are nullable
@@ -4351,6 +4354,8 @@ final class CoreApiSchemas
         $membershipEntry = self::object([
             'tenant_id' => self::int(),
             'tenant_name' => self::str(),
+            'tenant_name_language' => self::str(),
+            'tenant_names' => self::localizedText(),
             'role' => self::str(),
         ], ['tenant_id', 'tenant_name', 'role']);
 
@@ -7576,10 +7581,12 @@ final class CoreApiSchemas
             // a user targets the caller's tenant, and switching to the new one
             // requires the very membership that cannot yet be made.
             'TenantCreateRequest' => self::object([
-                'name' => self::str() + ['description' => 'Display name of the new tenant (workspace).'],
+                'name' => self::str() + ['description' => 'Original name of the new tenant (workspace). Required unless `names` is sent.'],
+                'names' => self::localizedText() + ['description' => 'The name in every language, for example `{"ar": "...", "en": "..."}`.'],
+                'nameLanguage' => self::str() + ['description' => 'Language code of the original name. Defaults to `ar` for a name in Arabic letters, `en` otherwise.'],
                 'slug' => ['type' => 'string', 'pattern' => '^[a-z0-9-]+$', 'description' => 'URL-safe identifier: lower-case letters, digits and dashes. Generated from the name when omitted; must be unique.'],
                 'admin' => SchemaBuilder::ref('TenantInitialAdmin') + ['description' => 'Optional first administrator, created in the same transaction: `{email, password, role?}`. Without it no one can sign in to the new tenant.'],
-            ], ['name']),
+            ], []),
             // `role` names a role the new tenant can see: one it owns (seeded by
             // a tenant.created listener) or a global one. Defaults to `admin`.
             'TenantInitialAdmin' => self::object([
@@ -7588,7 +7595,9 @@ final class CoreApiSchemas
                 'role' => self::str(),
             ], ['email', 'password']),
             'TenantUpdateRequest' => self::object([
-                'name' => self::str() + ['description' => 'New display name.'],
+                'name' => self::str() + ['description' => 'New original name, in `nameLanguage`.'],
+                'names' => self::localizedText() + ['description' => 'The name in every language; replaces them all. A blank language is removed.'],
+                'nameLanguage' => self::str() + ['description' => 'Language code of the original name. The original must have text.'],
                 'slug' => ['type' => 'string', 'pattern' => '^[a-z0-9-]+$', 'description' => 'New URL-safe identifier (lower-case letters, digits, dashes); must be unique.'],
             ], []),
 

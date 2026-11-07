@@ -14,6 +14,7 @@ use Whity\Core\Settings\SettingsRegistry;
 use Whity\Core\Settings\SettingsService;
 use Whity\Http\JsonBody;
 use PDO;
+use Whity\Core\i18n\LocalizedTexts;
 use Whity\Core\Db\DbBool;
 use PDOStatement;
 
@@ -1108,7 +1109,7 @@ class AuthHandler
      * @tenant-guard-ignore: login flow — enumerates all tenant memberships for one profile (ADR 0005 §6)
      *
      * @param int $profileId The profile whose memberships to query.
-     * @return list<array{tenant_id:int, tenant_name:string, role:string}>
+     * @return list<array{tenant_id:int, tenant_name:string, tenant_name_language:string, tenant_names:array<string, string>|\stdClass, role:string, kind:string}>
      */
     private function listActiveMemberships(int $profileId): array
     {
@@ -1117,7 +1118,7 @@ class AuthHandler
             // no column, and every row there is staff (WHIT-915).
             // @tenant-guard-ignore: login flow — enumerates all tenant memberships for one profile (ADR 0005 §6)
             $stmt = $this->db->prepare(
-                "SELECT m.*, t.name AS tenant_name, r.name AS role
+                "SELECT m.*, t.name AS tenant_name, t.name_language AS tenant_name_language, r.name AS role
                  FROM memberships m
                  JOIN tenants t ON t.id = m.tenant_id
                  LEFT JOIN roles r ON r.id = m.role_id
@@ -1127,11 +1128,28 @@ class AuthHandler
             $stmt->execute([$profileId]);
             $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+            // Each workspace's name in every language it has, so the switcher
+            // can show the reader's language (#821). `tenant_name` stays the
+            // original.
+            // A failed read costs the other languages, never the sign-in.
+            try {
+                $others = (new LocalizedTexts($this->db))->forTenants(
+                    array_map(static fn (array $row): int => (int) $row['tenant_id'], $rows)
+                );
+            } catch (\Exception) {
+                $others = [];
+            }
+
             $out = [];
             foreach ($rows as $row) {
+                $tenantName = (string) ($row['tenant_name'] ?? '');
+                $nameLanguage = (string) ($row['tenant_name_language'] ?? '') !== '' ? (string) $row['tenant_name_language'] : 'en';
+                $names = LocalizedTexts::merge($tenantName, $nameLanguage, $others[(int) $row['tenant_id']] ?? []);
                 $out[] = [
                     'tenant_id'   => (int) $row['tenant_id'],
-                    'tenant_name' => (string) ($row['tenant_name'] ?? ''),
+                    'tenant_name' => $tenantName,
+                    'tenant_name_language' => $nameLanguage,
+                    'tenant_names' => $names === [] ? new \stdClass() : $names,
                     'role'        => (string) ($row['role'] ?? ''),
                     // `customer` for a membership from the workspace's own
                     // sign-up: the app hides admin and create-workspace
