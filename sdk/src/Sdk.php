@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.75).
+ * SDK identity (v1.76).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1043,12 +1043,17 @@ namespace Whity\Sdk;
  * `AGENT_PAUSED` and `AGENT_RESUMED`, ids only, after the change (WHIT-990).
  *
  * Purely additive.)
+ *
+ * 1.76 (DOCUMENT RENDERING IN JOBS: {@see Render\DocumentRenderer} resolves in queue
+ * jobs and CLI commands too, not only in requests (#1151). Each process builds one
+ * per-tenant storage stack, so a job's document is stored where the same tenant's
+ * request would store it. No signature changes.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.75.0';
+    public const VERSION = '1.76.0';
 
     /**
      * Static identity only — never instantiated.

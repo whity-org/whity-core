@@ -242,9 +242,10 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsOneEightForInteractiveBlocks(): void
     {
         $this->assertSame(
-            '1.75.0',
+            '1.76.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.75 ADDS Agents\Agents: the workspace\'s agents and their activity, read as the calling person, and agent lifecycle events (WHIT-990). '
+            'SDK 1.76: DocumentRenderer resolves in queue jobs and CLI commands, over one storage stack per process (#1151). No signature changes. '
+            . 'SDK 1.75 ADDS Agents\Agents: the workspace\'s agents and their activity, read as the calling person, and agent lifecycle events (WHIT-990). '
             . 'SDK 1.74 ADDS Rbac\\ResourceScope and Rbac\\ResourceReach: which records of a plugin resource type a caller '
             . 'may act on, narrowing only (#1074). '
             . 'SDK 1.73 ADDS membership.customer_joined: a customer joined a workspace through its own sign-up (WHIT-915). '

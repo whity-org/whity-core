@@ -39,7 +39,7 @@ use Whity\Sdk\Documents\Documents;
  * The worker isn't a {@see \Whity\Cli\Commands\BaseCommand}, so the kernel's
  * registrations never reach it: this builds and registers the same services
  * for it, {@see TemplateIssuing}, the SDK's {@see Documents}, the slot
- * registry and the field registry, and returns the two registries for the
+ * registry, the field registry and the SDK's DocumentRenderer (#1151), and returns the two registries for the
  * worker's plugin loader to fill. The render, storage and QR parts are built
  * on the first issue.
  */
@@ -97,12 +97,22 @@ final class WorkerDocumentServices
         ));
         $slots = new TemplateSlotRegistry($liveManifests);
 
-        $issuing = WorkerDocumentIssuing::build($pdo, $settings, $hooks, $roleChecker, $resourceTypes, $fields, $embeds, $slots, $env, $storageRoot);
+        // One document stack for the worker (#1151): issuing and the SDK's
+        // DocumentRenderer share its storage driver, issuer and renderer.
+        $parts = new WorkerDocumentParts($pdo, $settings, $hooks, $fields, $embeds, $env, $storageRoot);
+        $issuing = WorkerDocumentIssuing::build($pdo, $settings, $hooks, $roleChecker, $resourceTypes, $fields, $embeds, $slots, $env, $storageRoot, $parts);
 
         \Whity\register_service(DocumentFieldRegistry::class, $fields);
         \Whity\register_service(TemplateSlotRegistry::class, $slots);
         \Whity\register_service(TemplateIssuing::class, $issuing);
         \Whity\register_service(Documents::class, new SdkDocuments($issuing, $roleChecker, $jobPlugin, $slots));
+        // #1151: a plugin's job renders and issues flowing documents too.
+        \Whity\register_service(
+            \Whity\Sdk\Render\DocumentRenderer::class,
+            new \Whity\Core\Document\Render\DeferredSdkDocumentRenderer(
+                static fn (): \Whity\Sdk\Render\DocumentRenderer => $parts->sdkRenderer()
+            ),
+        );
 
         // SDK 1.63 (WHIT-886): a plugin's job reaches the same plugin files and
         // plugin documents as its routes do. Both are built on first use, so a
