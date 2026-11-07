@@ -7,7 +7,7 @@ namespace Whity\Core\Document\Signing;
 use PDO;
 
 /**
- * One-time confirmations for signing (WHIT-922, #1726, migration 228).
+ * One-time confirmations for signing (WHIT-922, #1726, migration 232).
  *
  *  - `email_code`: a six-digit code sent to the signer's address for one
  *    route and one content hash. Valid for {@see EMAIL_CODE_TTL} seconds and

@@ -10,7 +10,7 @@ use Whity\Core\Security\EncryptedSecretStore;
 
 /**
  * The instance's Ed25519 key pairs that seal signature records (WHIT-922,
- * #1726, migration 228).
+ * #1726, migration 232).
  *
  * One current key per instance, made the first time something is sealed. The
  * private key is stored encrypted with the platform encryption key

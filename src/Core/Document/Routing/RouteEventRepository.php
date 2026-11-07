@@ -132,7 +132,7 @@ final class RouteEventRepository
 
     /**
      * Insert one entry linked to the one before it on the same document
-     * (WHIT-922, migration 228; {@see RouteTrailChain}).
+     * (WHIT-922, migration 232; {@see RouteTrailChain}).
      *
      * The time is set here, to the second, rather than by the database, so the
      * hashed body and the stored row say the same instant. On PostgreSQL the
@@ -220,7 +220,7 @@ final class RouteEventRepository
     /**
      * What the next entry on a document links to: the newest entry's hash; the
      * anchor over the earlier entries when the newest was written before
-     * migration 228; or {@see RouteTrailChain::GENESIS} for a first entry.
+     * migration 232; or {@see RouteTrailChain::GENESIS} for a first entry.
      */
     private function chainHead(int $tenantId, int $documentId): string
     {
@@ -424,7 +424,7 @@ final class RouteEventRepository
             'resume_from' => isset($row['resume_from']) ? (string) $row['resume_from'] : null,
             'occurred_at' => (string) $row['occurred_at'],
             // WHIT-922: the hash of the entry before this one, and this entry's
-            // own. NULL on entries written before migration 228.
+            // own. NULL on entries written before migration 232.
             'prev_hash' => isset($row['prev_hash']) ? (string) $row['prev_hash'] : null,
             'entry_hash' => isset($row['entry_hash']) ? (string) $row['entry_hash'] : null,
         ];

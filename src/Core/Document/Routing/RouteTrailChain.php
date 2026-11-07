@@ -8,15 +8,15 @@ use PDO;
 use Whity\Core\Db\DbBool;
 
 /**
- * The hash chain over a document's trail (WHIT-922, #1726, migration 228).
+ * The hash chain over a document's trail (WHIT-922, #1726, migration 232).
  *
- * Every trail entry written since migration 228 stores:
+ * Every trail entry written since migration 232 stores:
  *  - `entry_body`: the entry's own facts as canonical JSON (keys sorted);
  *  - `prev_hash`: the `entry_hash` of the entry before it on the same document;
  *  - `entry_hash`: SHA-256 of `prev_hash`, a newline and `entry_body`.
  *
  * The first entry of a document links to {@see GENESIS}. The first new entry of
- * a document that already had entries before migration 228 links to an ANCHOR
+ * a document that already had entries before migration 232 links to an ANCHOR
  * computed over those earlier entries ({@see legacyAnchor()}), so the chain
  * commits to the history before it without rewriting a single old row.
  *
@@ -93,7 +93,7 @@ final class RouteTrailChain
 
     /**
      * The anchor the first chained entry links to when a document already had
-     * entries written before migration 228: a running SHA-256 over each earlier
+     * entries written before migration 232: a running SHA-256 over each earlier
      * entry's id and its facts, leaving out the four detachable columns so a
      * later removal does not move it.
      *

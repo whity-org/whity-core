@@ -7,7 +7,7 @@ namespace Whity\Core\Document\Signing;
 use PDO;
 
 /**
- * A person's drawn signature, saved for reuse (WHIT-922, #1726, migration 228).
+ * A person's drawn signature, saved for reuse (WHIT-922, #1726, migration 232).
  *
  * A preference, not evidence: each signature record keeps its own copy of the
  * drawing it was signed with, so replacing or removing the saved one changes

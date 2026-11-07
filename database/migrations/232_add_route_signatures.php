@@ -178,7 +178,7 @@ final class AddRouteSignatures
 
         if ($signatures > 0 || $chained > 0) {
             throw new RuntimeException(
-                'Cannot roll back migration 228: signatures or linked trail entries already exist, '
+                'Cannot roll back migration 232: signatures or linked trail entries already exist, '
                 . 'and they are kept as evidence.'
             );
         }

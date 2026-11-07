@@ -7,7 +7,7 @@ namespace Whity\Core\Document\Signing;
 use PDO;
 
 /**
- * Data access for `route_signatures` (WHIT-922, #1726, migration 228).
+ * Data access for `route_signatures` (WHIT-922, #1726, migration 232).
  *
  * APPEND-ONLY, BY OMISSION, like the trail: there is `append()` and there are
  * reads. A signature is never edited; it is bound to the hash of one subject
