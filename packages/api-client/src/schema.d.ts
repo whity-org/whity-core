@@ -11455,6 +11455,13 @@ export interface components {
             tenant_id: number;
             parent_id: number | null;
             name: string;
+            /** @description Language code of the original name (`name`). For many institutions this is Arabic. */
+            name_language: string;
+            /** @description The name in every language it has, original included. A reader with no name in their language sees the original. */
+            names: {
+                ar?: string;
+                en?: string;
+            };
             slug: string;
             description: string | null;
             created_at: string | null;
@@ -11464,8 +11471,15 @@ export interface components {
             member_count: number;
         };
         OuCreateRequest: {
-            /** @description Name of the organizational unit. */
+            /** @description Original name of the organizational unit, in `name_language`. */
             name: string;
+            /** @description The name in every language, for example `{"ar": "...", "en": "..."}`. */
+            names?: {
+                ar?: string;
+                en?: string;
+            };
+            /** @description Language code of the original name. Defaults to `ar` for a name in Arabic letters, `en` otherwise. */
+            name_language?: string;
             /** @description What the unit is. */
             description?: string;
             /** @description Parent unit (see GET /api/ous). Omitted or null creates a root unit. */
@@ -11480,6 +11494,13 @@ export interface components {
             tenant_id: number;
             parent_id: number | null;
             name: string;
+            /** @description Language code of the original name (`name`). For many institutions this is Arabic. */
+            name_language: string;
+            /** @description The name in every language it has, original included. A reader with no name in their language sees the original. */
+            names: {
+                ar?: string;
+                en?: string;
+            };
             slug: string;
             description: string | null;
             created_at: string | null;
@@ -11550,8 +11571,15 @@ export interface components {
             sort_order?: number;
         };
         OuUpdateRequest: {
-            /** @description New name. */
+            /** @description New original name, in `name_language`. */
             name?: string;
+            /** @description The name in every language; replaces them all. A blank language is removed. */
+            names?: {
+                ar?: string;
+                en?: string;
+            };
+            /** @description Language code of the original name. The original must have text. */
+            name_language?: string;
             /** @description New description. */
             description?: string;
             /** @description New parent unit. An explicit null makes this a root unit. */
