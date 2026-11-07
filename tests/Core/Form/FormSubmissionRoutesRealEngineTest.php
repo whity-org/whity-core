@@ -54,7 +54,7 @@ use Whity\Database\Database;
  * WHIT-920 (#1724): form submissions as route subjects, with edit and resubmit.
  *
  * Runs on SQLite, and on real PostgreSQL when PHPUNIT_PG_DSN is set
- * ({@see SchemaFromMigrations::make()}), so migration 227's nullable document
+ * ({@see SchemaFromMigrations::make()}), so migration 233's nullable document
  * columns and its re-pointing are exercised on both engines.
  */
 final class FormSubmissionRoutesRealEngineTest extends TestCase
@@ -188,7 +188,7 @@ final class FormSubmissionRoutesRealEngineTest extends TestCase
 
     public function testRoutesOnExistingSubmissionDocumentsAreRepointedAndTheDocumentsStay(): void
     {
-        // A submission sent before migration 227: it raised a document, and the
+        // A submission sent before migration 233: it raised a document, and the
         // route travels on that document.
         $documentId = $this->seedDocument();
         $submissionId = $this->submissions->create(

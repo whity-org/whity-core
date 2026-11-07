@@ -96,7 +96,7 @@ final class AddFormSubmissionRouteSubjects
             }
             if ($missing > 0) {
                 throw new RuntimeException(
-                    'Cannot roll back migration 227: some routes travel on a form submission that has no '
+                    'Cannot roll back migration 233: some routes travel on a form submission that has no '
                     . 'document yet, and the routing trail is never rewritten.'
                 );
             }
@@ -131,7 +131,7 @@ final class AddFormSubmissionRouteSubjects
         }
 
         if ($driver !== 'sqlite') {
-            throw new RuntimeException("Migration 227 does not know how to change a column on '{$driver}'.");
+            throw new RuntimeException("Migration 233 does not know how to change a column on '{$driver}'.");
         }
 
         $stmt = $pdo->prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = :name");
@@ -139,7 +139,7 @@ final class AddFormSubmissionRouteSubjects
         $sql = $stmt->fetchColumn();
         $stmt->closeCursor();
         if (!is_string($sql)) {
-            throw new RuntimeException("Migration 227: {$table} does not exist.");
+            throw new RuntimeException("Migration 233: {$table} does not exist.");
         }
 
         $requiredPattern = '/\bdocument_id(\s+)BIGINT(\s+)NOT\s+NULL(\s+)REFERENCES\s+documents\(id\)/i';
@@ -154,7 +154,7 @@ final class AddFormSubmissionRouteSubjects
         $canEdit = $required ? $isOptional : $isRequired;
         if (!$canEdit) {
             throw new RuntimeException(
-                "Migration 227: document_id on {$table} is not the column migration 112 wrote, "
+                "Migration 233: document_id on {$table} is not the column migration 112 wrote, "
                 . 'so it is not edited automatically.'
             );
         }
@@ -163,7 +163,7 @@ final class AddFormSubmissionRouteSubjects
             ? preg_replace($optionalPattern, 'document_id$1BIGINT$2NOT NULL REFERENCES documents(id)', $sql, 1)
             : preg_replace($requiredPattern, 'document_id$1BIGINT$2REFERENCES documents(id)', $sql, 1);
         if (!is_string($edited)) {
-            throw new RuntimeException("Migration 227: could not edit the definition of {$table}.");
+            throw new RuntimeException("Migration 233: could not edit the definition of {$table}.");
         }
 
         $version = $pdo->query('PRAGMA schema_version');
@@ -189,7 +189,7 @@ final class AddFormSubmissionRouteSubjects
             $check->closeCursor();
         }
         if ($result !== 'ok') {
-            throw new RuntimeException("Migration 227: SQLite integrity check failed after editing {$table}.");
+            throw new RuntimeException("Migration 233: SQLite integrity check failed after editing {$table}.");
         }
     }
 }

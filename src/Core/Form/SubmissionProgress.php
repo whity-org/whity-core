@@ -26,7 +26,7 @@ use Whity\Core\Settings\SettingsService;
  * a name. `forms.show_reviewer_names` lets a workspace show the names.
  *
  * Built from the newest route on the submission (or, for a submission sent
- * before migration 227 whose route stayed on its document, that route). A read,
+ * before migration 233 whose route stayed on its document, that route). A read,
  * and nothing here decides anything: the trail and the open items are the
  * record.
  *
@@ -225,7 +225,7 @@ final class SubmissionProgress
 
     /**
      * The newest route on the submission, or on its document for one routed
-     * before migration 227 whose route was not re-pointed.
+     * before migration 233 whose route was not re-pointed.
      *
      * @param array<string, mixed> $submission
      * @return array<string, mixed>|null

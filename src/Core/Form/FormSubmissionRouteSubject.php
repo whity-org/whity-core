@@ -12,7 +12,7 @@ use Whity\Core\Document\Routing\RouteSubjectProviderInterface;
  *
  * A submission travels on its route as itself: sending a form raises no
  * document, and the finalise step (#1725) makes one. Routes on submissions sent
- * before this were re-pointed here by migration 227 and keep their documents.
+ * before this were re-pointed here by migration 233 and keep their documents.
  *
  *  - The AUTHOR is the person who sent it, while they are still an active member
  *    or customer of the workspace. An anonymous public submission has none, so

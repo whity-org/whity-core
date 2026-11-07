@@ -59,7 +59,7 @@ final class FormSubmissionRepository
      * Where the paper is now, derived from the routing trail.
      *
      * WHIT-920: read through the routes on the SUBMISSION (and, for one sent
-     * before migration 227 whose route stayed on a document, on its document).
+     * before migration 233 whose route stayed on a document, on its document).
      * `sent back` means it is waiting for its author's changes; `not approved`
      * means the route ended on a rejection.
      *
