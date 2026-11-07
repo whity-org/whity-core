@@ -370,6 +370,8 @@ function RouteFlowBody({
         // its people to act; that is the ordinary case and the one an author
         // means when they drop a node without touching anything.
         satisfiedBy: 'act',
+        // WHIT-920: a new stage can send a request back for changes.
+        allowSendBack: true,
       },
       orientation,
       dir
@@ -508,7 +510,8 @@ function RouteFlowBody({
         )}
       </div>
 
-      {anonymousForms.length > 0 && template.steps.some((step) => step.allow_send_back !== false) && (
+      {anonymousForms.length > 0 &&
+        graph.steps.some((step) => step.allowSendBack !== false && step.satisfiedBy !== 'delivery') && (
         <Alert>
           <AlertDescription>
             {t(
@@ -888,6 +891,19 @@ function StageInspector({
           onCheckedChange={(checked) =>
             onChange({ satisfiedBy: checked ? 'delivery' : 'act' })
           }
+        />
+      </label>
+
+      {/* WHIT-920: whether a person here may send it back to the applicant for
+          changes. Meaningless on a stage that asks nobody anything. */}
+      <label className="flex items-center justify-between gap-2">
+        <span className="text-sm font-medium">
+          {t('routeTemplates.inspector.allowSendBack', 'Can be sent back to the applicant')}
+        </span>
+        <Switch
+          checked={step.allowSendBack !== false}
+          disabled={readOnly || step.satisfiedBy === 'delivery'}
+          onCheckedChange={(checked) => onChange({ allowSendBack: checked })}
         />
       </label>
 

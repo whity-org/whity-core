@@ -109,6 +109,13 @@ export interface RouteFlowStep {
    * an ordinary one the first time anybody moved a node.
    */
   satisfiedBy: RouteFlowSatisfaction;
+  /**
+   * Whether a person at this stage may send it back to the applicant for
+   * changes (WHIT-919/920). Held for the same reason {@link satisfiedBy} is: a
+   * field the model does not carry is one a save resets, and the server reads a
+   * missing value as `true`. Absent means on.
+   */
+  allowSendBack?: boolean;
   canvasX: number;
   canvasY: number;
 }

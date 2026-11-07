@@ -2259,6 +2259,7 @@
         "routeTemplates.error.loadOne": "This route template could not be loaded",
         "routeTemplates.error.rename": "The route could not be renamed",
         "routeTemplates.error.save": "The flow could not be saved",
+        "routeTemplates.inspector.allowSendBack": "Can be sent back to the applicant",
         "routeTemplates.inspector.decision": "Requires a decision",
         "routeTemplates.inspector.decisionExcludesDelivery": "A decision needs somebody holding the item to answer it, so this stage cannot also send without asking.",
         "routeTemplates.inspector.delivery": "Sends without asking",

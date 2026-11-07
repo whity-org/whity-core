@@ -2260,6 +2260,7 @@
         "routeTemplates.error.loadOne": "تعذّر تحميل قالب المسار هذا",
         "routeTemplates.error.rename": "تعذّرت إعادة تسمية المسار",
         "routeTemplates.error.save": "تعذّر حفظ المخطّط",
+        "routeTemplates.inspector.allowSendBack": "يمكن إعادتها إلى مقدّم الطلب",
         "routeTemplates.inspector.decision": "يتطلّب قراراً",
         "routeTemplates.inspector.decisionExcludesDelivery": "القرار يحتاج إلى شخص يحمل العنصر ليُجيب عليه، ولذلك لا يمكن لهذه المرحلة أن تُرسِل دون طلب أيضاً.",
         "routeTemplates.inspector.delivery": "يُرسِل دون أن يطلب",

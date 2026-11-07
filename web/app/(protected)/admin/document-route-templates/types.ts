@@ -101,6 +101,9 @@ export function toFlowGraph(wire: RouteTemplateGraphWire): RouteFlowGraph {
         // Defaulted rather than assumed present, so a graph read from a server
         // that predates #1054 draws as `act` instead of `undefined`.
         satisfiedBy: s.satisfied_by ?? 'act',
+        // WHIT-920: on unless the design turned it off; a server that predates
+        // #1723 sends nothing, which meant on.
+        allowSendBack: s.allow_send_back !== false,
         canvasX: s.canvas_x,
         canvasY: s.canvas_y,
       })
@@ -134,6 +137,9 @@ export function toGraphRequest(graph: RouteFlowGraph): {
       // every recipient of that stage, silently, with the trail showing a
       // perfectly ordinary graph save.
       satisfied_by: s.satisfiedBy,
+      // WHIT-920: always sent, so a save never turns a stage that has it off
+      // back on (the server reads a missing value as on).
+      allow_send_back: s.allowSendBack !== false,
       canvas_x: s.canvasX,
       canvas_y: s.canvasY,
     })),
