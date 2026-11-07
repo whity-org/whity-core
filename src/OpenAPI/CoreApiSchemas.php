@@ -3552,6 +3552,33 @@ final class CoreApiSchemas
                     502 => self::errorResponse('Whity ID did not connect this installation'),
                 ],
             ]),
+            // PR-4: buy a paid store plugin or start its trial; this installation's licence.
+            self::permissionRoute('POST', '/api/plugins/store/checkout', 'plugins:install', [
+                'summary' => 'Buy a paid store plugin, or start its trial, for this installation',
+                'description' => 'Operator only, and only while connected to the store through Whity ID. Buying returns '
+                    . 'the Whity Pay checkout to send the operator to; a trial starts at once.',
+                'tags' => ['platform-ops'],
+                'request' => 'StoreCheckoutRequest',
+                'responses' => [
+                    200 => self::jsonResponse('Checkout URL, or the trial started', 'StoreCheckoutResponse'),
+                    403 => self::errorResponse('Not the operator, or the store host is not allowed'),
+                    409 => self::errorResponse('Not connected to the store'),
+                    422 => self::errorResponse('Invalid slug'),
+                    502 => self::errorResponse('The store could not start the purchase'),
+                ],
+            ]),
+            self::permissionRoute('GET', '/api/plugins/store/licences/{slug}', 'plugins:read', [
+                'summary' => "This installation's licence for a store plugin",
+                'description' => 'licensed, grace (with an until date) or unlicensed, from the store\'s signed statement '
+                    . 'or, when the store cannot be reached, from the last one within the offline window.',
+                'tags' => ['platform-ops'],
+                'parameters' => [
+                    ['name' => 'slug', 'in' => 'path', 'required' => true, 'schema' => ['type' => 'string'], 'description' => 'The plugin\'s slug in the store.'],
+                ],
+                'responses' => [
+                    200 => self::jsonResponse('The licence state', 'StoreLicenceResponse'),
+                ],
+            ]),
             self::permissionRoute('DELETE', '/api/plugins/store/connection', 'plugins:install', [
                 'summary' => 'Disconnect this installation from the store',
                 'description' => 'Operator only. Revokes the refresh token at Whity ID (best effort) and forgets it.',
@@ -4496,6 +4523,29 @@ final class CoreApiSchemas
             'StoreConnectResponse' => self::object([
                 'data' => self::object(['authorize_url' => self::str()], ['authorize_url']),
             ], ['data']),
+            'StoreCheckoutRequest' => self::object([
+                'store_url' => array_merge(self::str(), ['description' => 'The store, a bare https origin on the allowlist.']),
+                'slug' => array_merge(self::str(), ['description' => 'The plugin to buy.']),
+                'plan' => array_merge(self::str(), ['description' => 'The plan; standard when left out.']),
+                'period' => array_merge(self::str(), ['description' => 'month, year or once.']),
+                'currency' => array_merge(self::str(), ['description' => 'A 3-letter currency the store sells in; optional.']),
+                'trial' => array_merge(self::bool(), ['description' => 'Start the free trial instead of paying.']),
+            ], ['store_url', 'slug', 'period']),
+            'StoreCheckoutResponse' => self::object([
+                'data' => self::object([
+                    'checkout_url' => self::str(),
+                    'status' => self::str(),
+                ], []),
+            ], ['data']),
+            'StoreLicenceResponse' => self::object([
+                'data' => self::object([
+                    'state' => ['type' => 'string', 'enum' => ['licensed', 'grace', 'unlicensed']],
+                    'until' => self::str(true),
+                    'message' => self::str(),
+                    'offline' => self::bool(),
+                    'checked_at' => self::str(true),
+                ], ['state', 'message']),
+            ], ['data']),
             'StoreConnectCompleteRequest' => self::object([
                 'code' => array_merge(self::str(), [
                     'description' => 'The authorization code Whity ID sent back to /admin/plugins/store/connect.',
@@ -4516,6 +4566,14 @@ final class CoreApiSchemas
                 // S.4. Always `unverified` until the Verified design is approved; a store can't set it.
                 'trust' => ['type' => 'string', 'enum' => ['unverified']],
                 'kind' => ['type' => 'string', 'enum' => ['declarative', 'code']],
+                'paid' => self::bool(),
+                'prices' => ['type' => 'array', 'items' => self::object([
+                    'plan' => self::str(),
+                    'period' => ['type' => 'string', 'enum' => ['month', 'year', 'once']],
+                    'currency' => self::str(),
+                    'amount' => self::str(),
+                    'trial_days' => ['type' => 'integer', 'nullable' => true],
+                ], ['plan', 'period', 'currency', 'amount'])],
                 'price' => array_merge(self::object([
                     'amount' => self::str(),
                     'currency' => self::str(),

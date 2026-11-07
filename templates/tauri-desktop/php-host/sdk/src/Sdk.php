@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.84).
+ * SDK identity (v1.85).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1126,12 +1126,21 @@ namespace Whity\Sdk;
  * as the host does without reading its tables (WHIT-1011).
  *
  * Purely additive.)
+ *
+ * 1.85 (STORE LICENCES: the host service {@see Licensing\StoreLicence} answers whether a paid
+ * plugin from the Whity store is licensed on this installation, as a {@see Licensing\LicenceState}:
+ * `licensed`, `grace` with an until date, or `unlicensed`. The host fetches the store's signed
+ * statement over the installation's Whity ID connection, verifies it against the store's pinned
+ * key, caches it, and keeps answering through a 7-day offline window. A plugin never sees a token
+ * or a key (store licensing, PR-4).
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.84.0';
+    public const VERSION = '1.85.0';
 
     /**
      * Static identity only — never instantiated.

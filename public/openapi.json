@@ -36887,6 +36887,133 @@
                 ]
             }
         },
+        "/api/v1/plugins/store/checkout": {
+            "post": {
+                "operationId": "post_api_v1_plugins_store_checkout",
+                "summary": "Buy a paid store plugin, or start its trial, for this installation",
+                "tags": [
+                    "platform-ops"
+                ],
+                "description": "Operator only, and only while connected to the store through Whity ID. Buying returns the Whity Pay checkout to send the operator to; a trial starts at once.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StoreCheckoutRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Checkout URL, or the trial started",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/StoreCheckoutResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Not the operator, or the store host is not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Not connected to the store",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid slug",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "The store could not start the purchase",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/plugins/store/connect": {
             "post": {
                 "operationId": "post_api_v1_plugins_store_connect",
@@ -37211,6 +37338,102 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/StoreConnectionResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/plugins/store/licences/{slug}": {
+            "get": {
+                "operationId": "get_api_v1_plugins_store_licences_slug",
+                "summary": "This installation's licence for a store plugin",
+                "tags": [
+                    "platform-ops"
+                ],
+                "description": "licensed, grace (with an until date) or unlicensed, from the store's signed statement or, when the store cannot be reached, from the last one within the offline window.",
+                "parameters": [
+                    {
+                        "name": "slug",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "slug",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "The plugin's slug in the store."
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The licence state",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/StoreLicenceResponse"
                                 }
                             }
                         }
@@ -71239,6 +71462,44 @@
                             "code"
                         ]
                     },
+                    "paid": {
+                        "type": "boolean"
+                    },
+                    "prices": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "plan": {
+                                    "type": "string"
+                                },
+                                "period": {
+                                    "type": "string",
+                                    "enum": [
+                                        "month",
+                                        "year",
+                                        "once"
+                                    ]
+                                },
+                                "currency": {
+                                    "type": "string"
+                                },
+                                "amount": {
+                                    "type": "string"
+                                },
+                                "trial_days": {
+                                    "type": "integer",
+                                    "nullable": true
+                                }
+                            },
+                            "required": [
+                                "plan",
+                                "period",
+                                "currency",
+                                "amount"
+                            ]
+                        }
+                    },
                     "price": {
                         "type": "object",
                         "properties": {
@@ -71361,6 +71622,59 @@
                     "data"
                 ]
             },
+            "StoreCheckoutRequest": {
+                "type": "object",
+                "properties": {
+                    "store_url": {
+                        "type": "string",
+                        "description": "The store, a bare https origin on the allowlist."
+                    },
+                    "slug": {
+                        "type": "string",
+                        "description": "The plugin to buy."
+                    },
+                    "plan": {
+                        "type": "string",
+                        "description": "The plan; standard when left out."
+                    },
+                    "period": {
+                        "type": "string",
+                        "description": "month, year or once."
+                    },
+                    "currency": {
+                        "type": "string",
+                        "description": "A 3-letter currency the store sells in; optional."
+                    },
+                    "trial": {
+                        "type": "boolean",
+                        "description": "Start the free trial instead of paying."
+                    }
+                },
+                "required": [
+                    "store_url",
+                    "slug",
+                    "period"
+                ]
+            },
+            "StoreCheckoutResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "checkout_url": {
+                                "type": "string"
+                            },
+                            "status": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
             "StoreConnectCompleteRequest": {
                 "type": "object",
                 "properties": {
@@ -71452,6 +71766,45 @@
                 "properties": {
                     "data": {
                         "$ref": "#/components/schemas/StoreConnection"
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "StoreLicenceResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "state": {
+                                "type": "string",
+                                "enum": [
+                                    "licensed",
+                                    "grace",
+                                    "unlicensed"
+                                ]
+                            },
+                            "until": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "message": {
+                                "type": "string"
+                            },
+                            "offline": {
+                                "type": "boolean"
+                            },
+                            "checked_at": {
+                                "type": "string",
+                                "nullable": true
+                            }
+                        },
+                        "required": [
+                            "state",
+                            "message"
+                        ]
                     }
                 },
                 "required": [
