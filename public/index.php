@@ -5214,11 +5214,18 @@ $router->register('GET', '/api/admin/mcp/tools', [$mcpToolsAdminHandler, 'list']
 $mcpToolsListHandler = new ToolsListHandler($toolDeriver, $roleChecker, $tokenValidator, $authoredMcpTools);
 $mcpServerEnabled = (bool) filter_var($_ENV['MCP_ENABLED'] ?? 'false', FILTER_VALIDATE_BOOLEAN);
 // WHIT-784: an agent's Ask-first call is stored for its person to approve.
-$agentProposals = new \Whity\Core\Agent\AgentProposalRepository($db->getPdo());
+$agentProposals = new \Whity\Core\Agent\AgentProposalRepository(
+    $db->getPdo(),
+    // WHIT-991: created, decided and undone, for plugins.
+    new \Whity\Core\Agent\AgentProposalEvents($hookManager),
+);
 // WHIT-833: previews of what a proposed call would change. Register one with
 // $proposalDiffs->register('<tool name>', fn (array $arguments, int $tenantId): ?array => ...).
 $proposalDiffs = new \Whity\Mcp\Tools\ProposalDiffRegistry();
 \Whity\register_service(\Whity\Mcp\Tools\ProposalDiffRegistry::class, $proposalDiffs); // @phpstan-ignore-line
+// WHIT-991 (SDK 1.76): a plugin's authored tool may declare a `preview`. The host
+// runs it in a transaction it always rolls back, read-only where the engine can.
+$proposalDiffs->useAuthoredTools($authoredMcpTools, new \Whity\Mcp\Tools\ReadOnlyRun($db->getPdo()));
 // An agent's proposal to publish or roll back a workspace plugin (Whity
 // Builder) shows the person its impact plan, and for a publish its tests.
 (new \Whity\Core\Plugin\Tenant\WorkspacePluginProposalDiffs(

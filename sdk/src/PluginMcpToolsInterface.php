@@ -96,6 +96,19 @@ namespace Whity\Sdk;
  *   reverses it>']`, or `'handler' => callable` instead of `operation`. A
  *   write with no undo is always Ask first for agents, whatever the grant.
  *
+ * SDK 1.76 (WHIT-991), optional:
+ *
+ * - `preview` (callable): `fn(array $arguments, McpToolContext $context): ?array`.
+ *   When an agent's call becomes a proposal, the host runs it to show the
+ *   person deciding what the call would change: a list of rows, each
+ *   `['label' => string, 'before' => mixed (optional), 'after' => mixed]`. The
+ *   host keeps only those keys, as text of at most 500 characters, and at most
+ *   50 rows. It runs in a transaction the host always rolls back, READ ONLY on
+ *   PostgreSQL, so a preview that writes gets no diff and changes nothing.
+ *   Throwing or returning null leaves the proposal without a diff; it never
+ *   blocks the proposal. A preview informs the person and nothing else: no
+ *   plugin can approve, decline or change a proposal.
+ *
  * Budgets, REFUSED at load: `name` must match `[A-Za-z0-9_-]{1,64}` (some
  * model APIs refuse anything else) and `description` is at most 500
  * characters. New names should start with the plugin's slug and an

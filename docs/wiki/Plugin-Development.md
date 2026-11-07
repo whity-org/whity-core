@@ -1571,6 +1571,22 @@ To react when an agent changes, listen to `Events::AGENT_CREATED`, `AGENT_UPDATE
 
 Nothing in the SDK creates, changes or grants an agent. People do that on the Agents screen.
 
+### Proposals: events and previews (SDK 1.76)
+
+When an agent's call to one of your tools needs its person's approval, the host files a proposal. Show the person what it would change with a `preview` on the authored tool:
+
+```php
+'preview' => function (array $arguments, McpToolContext $context): ?array {
+    $shelf = $this->shelves->find($context->tenantId, $arguments['sku']);
+
+    return [['label' => 'Count', 'before' => $shelf['count'], 'after' => $arguments['count']]];
+},
+```
+
+The approvals card shows each row's `label`, `before` and `after`. The host runs the preview in a transaction it always rolls back, READ ONLY on PostgreSQL: a preview that writes gets no diff and changes nothing. A preview that throws or returns null leaves the proposal without a diff, and never stops it.
+
+`Events::AGENT_PROPOSAL_CREATED`, `AGENT_PROPOSAL_DECIDED` and `AGENT_ACTION_UNDONE` tell you a proposal was filed, stopped waiting (`decision` is `approved`, `declined` or `expired`) or what an agent did was undone. The payloads carry ids and the tool's name, never the arguments. They fire after the change, and nothing a listener returns or throws changes it. **Only the person who granted the agent decides a proposal.** No plugin can approve or decline one.
+
 ## Step 13 — Declare it in `plugin.json` instead (SDK 1.47)
 
 Everything a plugin only *declares* can live in a JSON file instead of PHP methods: its identity and requirements, permissions, roles, `blocks` screens, owned tables, data types and limits. Put `plugin.json` next to an empty class:

@@ -55,7 +55,8 @@ final class AuthoredToolRegistry implements HostWiredService
      *     toolset: string,
      *     visibility: string,
      *     agentPolicy: string,
-     *     undo: array{windowSeconds: int, operation: ?string, handler: ?callable, arguments: array<string, mixed>, read: ?array<string, mixed>}|null
+     *     undo: array{windowSeconds: int, operation: ?string, handler: ?callable, arguments: array<string, mixed>, read: ?array<string, mixed>}|null,
+     *     preview: ?callable
      * }>
      */
     private array $tools = [];
@@ -178,6 +179,12 @@ final class AuthoredToolRegistry implements HostWiredService
         if ($undo === false) {
             return "tool '{$name}' has a malformed undo; use ['windowSeconds' => int > 0, 'operation' => string] or 'handler' => callable";
         }
+        // SDK 1.76 (WHIT-991): what an agent's proposal of this tool would change,
+        // for the person deciding it. Run by the host read-only and rolled back.
+        $preview = $descriptor['preview'] ?? null;
+        if ($preview !== null && !is_callable($preview)) {
+            return "tool '{$name}' has a non-callable `preview`; use fn(array \$arguments, McpToolContext \$context): ?array";
+        }
 
         $this->tools[$name] = [
             'name'               => $name,
@@ -195,6 +202,7 @@ final class AuthoredToolRegistry implements HostWiredService
             'visibility'         => $visibility,
             'agentPolicy'        => $agentPolicy,
             'undo'               => $undo,
+            'preview'            => $preview,
         ];
 
         return null;
@@ -455,7 +463,8 @@ final class AuthoredToolRegistry implements HostWiredService
      *     toolset: string,
      *     visibility: string,
      *     agentPolicy: string,
-     *     undo: array{windowSeconds: int, operation: ?string, handler: ?callable, arguments: array<string, mixed>, read: ?array<string, mixed>}|null
+     *     undo: array{windowSeconds: int, operation: ?string, handler: ?callable, arguments: array<string, mixed>, read: ?array<string, mixed>}|null,
+     *     preview: ?callable
      * }|null
      */
     public function get(string $name): ?array
