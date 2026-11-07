@@ -3795,7 +3795,11 @@ $documentRouter = new \Whity\Core\Document\Routing\DocumentRouter(
     $routeEdgeRepository,
     $routingRuleRegistry,
     $settingsService,
-    $hookManager
+    $hookManager,
+    // WHIT-919: send back to the author and resubmit need to know who the
+    // author is and record each version of what was reviewed.
+    $routeSubjectRegistry,
+    new \Whity\Core\Document\Routing\RouteSubjectVersionRepository($db->getPdo()),
 );
 // WHIT-684: a number handed out at final approval goes on the PDF, printed for the
 // approver, when the template prints it. Listening after the commit, so a failed

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Whity\Core\Document\RouteTemplate;
 
 use PDO;
+use Whity\Core\Db\DbBool;
 use Whity\Core\Document\Routing\RouteSatisfaction;
 
 /**
@@ -184,7 +185,7 @@ final class RouteTemplateRepository
     {
         $stmt = $this->db->prepare(
             'SELECT id, tenant_id, template_id, position, rule_kind, rule_config, label,
-                    decision, decision_quorum, satisfied_by, canvas_x, canvas_y
+                    decision, decision_quorum, satisfied_by, allow_send_back, canvas_x, canvas_y
                FROM document_route_template_steps
               WHERE tenant_id = :tenant_id AND template_id = :template_id
               ORDER BY position ASC'
@@ -311,7 +312,7 @@ final class RouteTemplateRepository
      * refused BEFORE this is reached — {@see RouteTemplateGraph::validate()} is
      * where that happens, so the transaction here cannot half-apply a graph.
      *
-     * @param list<array{position: int, rule_kind: string, rule_config: array<string, mixed>, label: ?string, decision: bool, decision_quorum: ?string, satisfied_by: string, canvas_x: int, canvas_y: int}> $steps
+     * @param list<array{position: int, rule_kind: string, rule_config: array<string, mixed>, label: ?string, decision: bool, decision_quorum: ?string, satisfied_by: string, allow_send_back?: bool, canvas_x: int, canvas_y: int}> $steps
      * @param list<array{from: int, to: int, verdict: string}> $edges
      */
     public function replaceGraph(int $templateId, int $tenantId, array $steps, array $edges): void
@@ -333,9 +334,9 @@ final class RouteTemplateRepository
             $insertStep = $this->db->prepare(
                 'INSERT INTO document_route_template_steps
                      (tenant_id, template_id, position, rule_kind, rule_config, label,
-                      decision, decision_quorum, satisfied_by, canvas_x, canvas_y, created_at)
+                      decision, decision_quorum, satisfied_by, allow_send_back, canvas_x, canvas_y, created_at)
                  VALUES (:tenant_id, :template_id, :position, :rule_kind, :rule_config, :label,
-                         :decision, :decision_quorum, :satisfied_by, :canvas_x, :canvas_y, NOW())'
+                         :decision, :decision_quorum, :satisfied_by, :allow_send_back, :canvas_x, :canvas_y, NOW())'
             );
 
             /** @var array<int, int> $idByPosition */
@@ -364,6 +365,8 @@ final class RouteTemplateRepository
                     // #1054. A plain string on both engines, so no int-binding
                     // dance like `decision` above needs.
                     ':satisfied_by' => $step['satisfied_by'],
+                    // WHIT-919. An int for the reason `decision` gives above.
+                    ':allow_send_back' => ($step['allow_send_back'] ?? true) ? 1 : 0,
                     ':canvas_x' => $step['canvas_x'],
                     ':canvas_y' => $step['canvas_y'],
                 ]);
@@ -465,6 +468,8 @@ final class RouteTemplateRepository
                 && RouteSatisfaction::isValid((string) $row['satisfied_by'])
                     ? (string) $row['satisfied_by']
                     : RouteSatisfaction::fallback(),
+            // WHIT-919: TRUE when absent, the column's default.
+            'allow_send_back' => DbBool::of($row['allow_send_back'] ?? true),
             'canvas_x' => (int) $row['canvas_x'],
             'canvas_y' => (int) $row['canvas_y'],
         ];

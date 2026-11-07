@@ -228,6 +228,21 @@ final class RouteSubjectsAndKindsRealEngineTest extends TestCase
             {
                 return null;
             }
+
+            public function author(int $tenantId, int $subjectId): ?int
+            {
+                return null;
+            }
+
+            public function snapshot(int $tenantId, int $subjectId): ?array
+            {
+                return null;
+            }
+
+            public function editableWhenSentBack(): bool
+            {
+                return false;
+            }
         });
     }
 

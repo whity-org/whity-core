@@ -166,6 +166,11 @@ final class DocumentRouter
         private readonly RoutingRuleRegistry $rules,
         private readonly SettingsService $settings,
         private readonly ?HookManager $hooks = null,
+        // WHIT-919: optional so every existing construction keeps working. Without
+        // them a route still runs; it simply cannot be sent back to an author and
+        // records no subject versions.
+        private readonly ?RouteSubjectRegistry $subjects = null,
+        private readonly ?RouteSubjectVersionRepository $versions = null,
     ) {
         $this->numbering = new DocumentNumbering($db);
     }
@@ -232,6 +237,10 @@ final class DocumentRouter
 
             $routeId = $this->routes->create($tenantId, $documentId, $title, $actorId, $templateId, $templateName);
 
+            // WHIT-919: issuing is the subject's submit, so it records a version
+            // (or reuses the current one when nothing changed since).
+            $version = $this->subjectVersion($tenantId, DocumentRouteSubject::TYPE, $documentId, $actorId, true);
+
             $stepIds = [];
             foreach ($declared as $i => $step) {
                 $stepIds[] = $this->steps->create(
@@ -244,6 +253,7 @@ final class DocumentRouter
                     $step['decision'],
                     $step['decision_quorum'],
                     $step['satisfied_by'],
+                    $step['allow_send_back'],
                 );
             }
 
@@ -302,6 +312,8 @@ final class DocumentRouter
                 // An `issued` is the engine's own act, not a person's answer, so
                 // it never carries one.
                 'verdict' => null,
+                'subject_version' => $version['version'],
+                'content_hash' => $version['content_hash'],
             ]);
 
             $outcome = $this->openChain(
@@ -409,6 +421,8 @@ final class DocumentRouter
         string $action,
         ?string $note,
         ?string $verdict = null,
+        ?string $resumeFrom = null,
+        bool $toAuthor = false,
     ): array {
         $routeId = (int) $route['id'];
         $documentId = (int) $route['document_id'];
@@ -423,7 +437,22 @@ final class DocumentRouter
                 );
             }
 
-            return $this->appendNote($tenantId, $actorId, $routeId, $documentId, (string) $route['title'], $note);
+            return $this->appendNote($tenantId, $actorId, $route, $note, $toAuthor);
+        }
+
+        if ($verdict !== null && ($action === RouteAction::SENT_BACK || $action === RouteAction::RESUBMITTED)) {
+            throw RoutingRejectedException::because(
+                'Sending back and resubmitting carry no verdict. Approve or reject by answering the step itself.'
+            );
+        }
+        if ($action === RouteAction::SENT_BACK) {
+            return $this->sendBack($tenantId, $actorId, $route, $note, $resumeFrom ?? RouteResume::SENDER);
+        }
+        if ($action === RouteAction::RESUBMITTED) {
+            return $this->resubmit($tenantId, $actorId, $route, $note);
+        }
+        if ($resumeFrom !== null) {
+            throw RoutingRejectedException::because('Only a send-back says where the route resumes.');
         }
 
         if (!in_array($action, RouteAction::recipientActions(), true)) {
@@ -443,6 +472,11 @@ final class DocumentRouter
                 . 'again — add a note instead, which appends to the trail without changing what happened.'
             );
         }
+        if ($recipient['role'] === RouteRecipientRepository::ROLE_AUTHOR) {
+            throw RoutingRejectedException::because(
+                'This was sent back to you for changes. Resubmit it when it is ready.'
+            );
+        }
 
         $step = $this->steps->findById((int) $recipient['step_id'], $tenantId);
         if ($step === null) {
@@ -450,6 +484,16 @@ final class DocumentRouter
         }
 
         $this->assertActMatchesStep($step, $action, $verdict);
+
+        // WHIT-919: the version this act is made on. Read, never recorded here:
+        // only a submit or a resubmit makes a version.
+        $version = $this->subjectVersion(
+            $tenantId,
+            (string) ($route['subject_type'] ?? DocumentRouteSubject::TYPE),
+            (int) ($route['subject_id'] ?? $documentId),
+            $actorId,
+            false,
+        );
 
         $next = null;
         $returnTo = null;
@@ -549,6 +593,8 @@ final class DocumentRouter
                 // the engine then did about it. Null on every act that decided
                 // nothing. {@see RouteVerdict}.
                 'verdict' => $verdict,
+                'subject_version' => $version['version'],
+                'content_hash' => $version['content_hash'],
             ]);
 
             $this->recipients->close($tenantId, (int) $recipient['id'], $eventId);
@@ -669,6 +715,323 @@ final class DocumentRouter
             'decided' => $decided,
         ];
     }
+
+    /**
+     * Send the subject back to its AUTHOR for changes (WHIT-919, #1723).
+     *
+     * Available to any person holding an open item on a step where people act,
+     * unless the route design turned it off for that step. It needs a note for
+     * the author, and the note always reaches them.
+     *
+     * It closes EVERY open item on the route, not only the sender's: on a
+     * committee step one member's send-back goes at once, without a vote, and
+     * nobody should go on acting on a version the author is about to change. It
+     * then opens one item for the author. Earlier approvals stay in the trail;
+     * nothing is undone.
+     *
+     * `$resumeFrom` is the sender's choice of where the route resumes when the
+     * author resubmits: {@see RouteResume::SENDER} (this step, with its people
+     * resolved again) or {@see RouteResume::START} (step 1).
+     *
+     * `returned` (one hop back to a colleague) is unchanged by any of this.
+     *
+     * @param array<string, mixed> $route
+     *
+     * @return array{event: array<string, mixed>, resolved: int, delivered: int, decided: null}
+     *
+     * @throws RoutingRejectedException
+     */
+    public function sendBack(int $tenantId, int $actorId, array $route, ?string $note, string $resumeFrom): array
+    {
+        $routeId = (int) $route['id'];
+        $documentId = (int) $route['document_id'];
+        $subjectType = (string) ($route['subject_type'] ?? DocumentRouteSubject::TYPE);
+        $subjectId = (int) ($route['subject_id'] ?? $documentId);
+
+        $this->assertNotWithdrawn($tenantId, $documentId);
+
+        if ($note === null || trim($note) === '') {
+            throw RoutingRejectedException::because(
+                'Say what needs to change. The note goes to the author with the item.'
+            );
+        }
+        if (!RouteResume::isValid($resumeFrom)) {
+            throw RoutingRejectedException::because(
+                "'resume_from' must be one of: " . implode(', ', RouteResume::all())
+            );
+        }
+
+        $recipient = $this->recipients->findOpenForProfile($tenantId, $routeId, $actorId);
+        if ($recipient === null || $recipient['role'] === RouteRecipientRepository::ROLE_AUTHOR) {
+            throw RoutingRejectedException::because(
+                'Only a person with an open item on this route can send it back.'
+            );
+        }
+
+        $step = $this->steps->findById((int) $recipient['step_id'], $tenantId);
+        if ($step === null) {
+            throw new \RuntimeException('Recipient row names a step that could not be read.');
+        }
+        if (($step['allow_send_back'] ?? true) !== true) {
+            throw RoutingRejectedException::because(
+                'This step cannot be sent back to the author. Return it to the previous person, or reject it.'
+            );
+        }
+
+        $provider = $this->subjects?->get($subjectType);
+        $author = $provider?->author($tenantId, $subjectId);
+        if ($author === null) {
+            throw RoutingRejectedException::because(
+                'There is nobody to send this back to: its author is not known. Return it or reject it instead.'
+            );
+        }
+
+        $version = $this->subjectVersion($tenantId, $subjectType, $subjectId, $actorId, false);
+
+        $ownTransaction = !$this->db->inTransaction();
+        if ($ownTransaction) {
+            $this->db->beginTransaction();
+        }
+
+        try {
+            $this->assertNotWithdrawn($tenantId, $documentId);
+
+            $eventId = $this->events->append($tenantId, $documentId, [
+                'route_id' => $routeId,
+                // The step it was sent back FROM. A resubmit back to the sender
+                // resumes here.
+                'step_id' => (int) $step['id'],
+                'actor_profile_id' => $actorId,
+                'action' => RouteAction::SENT_BACK,
+                'from_ou_id' => $recipient['ou_id'],
+                'to_ou_id' => null,
+                'note' => $note,
+                'verdict' => null,
+                'to_author' => true,
+                'resume_from' => $resumeFrom,
+                'subject_version' => $version['version'],
+                'content_hash' => $version['content_hash'],
+            ]);
+
+            $this->recipients->closeOpenOnRoute($tenantId, $routeId, $eventId);
+
+            $authorRowId = $this->recipients->create($tenantId, [
+                'document_id' => $documentId,
+                'route_id' => $routeId,
+                'step_id' => (int) $step['id'],
+                'profile_id' => $author,
+                'ou_id' => null,
+                'parent_recipient_id' => (int) $recipient['id'],
+                'created_by_event_id' => $eventId,
+                'role' => RouteRecipientRepository::ROLE_AUTHOR,
+            ]);
+            if ($authorRowId === null) {
+                // Every open row on the route was closed a line above, so the
+                // open-item index cannot have refused this one.
+                throw new \RuntimeException('The author item could not be opened.');
+            }
+
+            $event = $this->events->findById($eventId, $tenantId);
+
+            if ($ownTransaction) {
+                $this->db->commit();
+            }
+        } catch (Throwable $e) {
+            if ($ownTransaction && $this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $e;
+        }
+
+        if ($event === null) {
+            throw new \RuntimeException('Routing event was appended but could not be read back.');
+        }
+
+        $recipients = [[
+            'recipient_id' => $authorRowId,
+            'profile_id' => $author,
+            'step_id' => (int) $step['id'],
+            'satisfied_by' => RouteSatisfaction::ACT,
+        ]];
+
+        $this->broadcast('document.route_acted', $tenantId, $documentId, [
+            'route_id' => $routeId,
+            'title' => (string) $route['title'],
+            'action' => RouteAction::SENT_BACK,
+            'actor_profile_id' => $actorId,
+            'event_id' => $eventId,
+            'step_id' => (int) $step['id'],
+            'delivered' => 1,
+            'verdict' => null,
+            'decided' => null,
+            'resume_from' => $resumeFrom,
+            'recipients' => $recipients,
+        ]);
+
+        return ['event' => $event, 'resolved' => 1, 'delivered' => 1, 'decided' => null];
+    }
+
+    /**
+     * The author resubmits after a send-back (WHIT-919, #1723).
+     *
+     * Records a new version of the subject (or keeps the current one when the
+     * author changed nothing), closes the author's item and resumes the route
+     * where the sender chose: the sending step, with its people resolved again,
+     * or step 1. People are resolved from the author, as when the route was
+     * first issued. Earlier approvals stand, and the trail shows the version
+     * each was given on.
+     *
+     * @param array<string, mixed> $route
+     *
+     * @return array{event: array<string, mixed>, resolved: int, delivered: int, decided: null}
+     *
+     * @throws RoutingRejectedException
+     */
+    public function resubmit(int $tenantId, int $actorId, array $route, ?string $note): array
+    {
+        $routeId = (int) $route['id'];
+        $documentId = (int) $route['document_id'];
+        $subjectType = (string) ($route['subject_type'] ?? DocumentRouteSubject::TYPE);
+        $subjectId = (int) ($route['subject_id'] ?? $documentId);
+
+        $this->assertNotWithdrawn($tenantId, $documentId);
+
+        $item = $this->recipients->findOpenForProfile($tenantId, $routeId, $actorId);
+        if ($item === null || $item['role'] !== RouteRecipientRepository::ROLE_AUTHOR) {
+            throw RoutingRejectedException::because(
+                'Nothing on this route was sent back to you, so there is nothing to resubmit.'
+            );
+        }
+
+        $sentBack = $this->events->findById((int) $item['created_by_event_id'], $tenantId);
+        if ($sentBack === null || $sentBack['action'] !== RouteAction::SENT_BACK) {
+            throw new \RuntimeException('An author item names an event that is not a send-back.');
+        }
+
+        $target = null;
+        if (($sentBack['resume_from'] ?? RouteResume::SENDER) === RouteResume::START) {
+            foreach ($this->steps->listForRoute($routeId, $tenantId) as $candidate) {
+                if ((int) $candidate['position'] === 1) {
+                    $target = $candidate;
+                    break;
+                }
+            }
+        } elseif ($sentBack['step_id'] !== null) {
+            $target = $this->steps->findById((int) $sentBack['step_id'], $tenantId);
+        }
+        if ($target === null) {
+            throw new \RuntimeException('The step this route resumes at could not be read.');
+        }
+
+        $actorOuId = PrimaryMembershipOu::forProfile($this->db, $tenantId, $actorId);
+        $plan = $this->planChain($tenantId, $documentId, $routeId, $target, $actorId, $actorOuId);
+
+        $ownTransaction = !$this->db->inTransaction();
+        if ($ownTransaction) {
+            $this->db->beginTransaction();
+        }
+
+        try {
+            $this->assertNotWithdrawn($tenantId, $documentId);
+
+            // Inside the transaction, so the version and the act that made it
+            // commit together.
+            $version = $this->subjectVersion($tenantId, $subjectType, $subjectId, $actorId, true);
+
+            $eventId = $this->events->append($tenantId, $documentId, [
+                'route_id' => $routeId,
+                // The step the route resumes at.
+                'step_id' => (int) $target['id'],
+                'actor_profile_id' => $actorId,
+                'action' => RouteAction::RESUBMITTED,
+                'from_ou_id' => $actorOuId,
+                'to_ou_id' => $plan['destinationOuId'],
+                'note' => $note !== null && trim($note) !== '' ? $note : null,
+                'verdict' => null,
+                'subject_version' => $version['version'],
+                'content_hash' => $version['content_hash'],
+            ]);
+
+            $this->recipients->close($tenantId, (int) $item['id'], $eventId);
+
+            $outcome = $this->openChain(
+                $tenantId,
+                $documentId,
+                $routeId,
+                $plan['stops'],
+                parentRecipientId: (int) $item['id'],
+                eventId: $eventId,
+            );
+
+            $event = $this->events->findById($eventId, $tenantId);
+
+            if ($ownTransaction) {
+                $this->db->commit();
+            }
+        } catch (Throwable $e) {
+            if ($ownTransaction && $this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $e;
+        }
+
+        if ($event === null) {
+            throw new \RuntimeException('Routing event was appended but could not be read back.');
+        }
+
+        $this->broadcast('document.route_acted', $tenantId, $documentId, [
+            'route_id' => $routeId,
+            'title' => (string) $route['title'],
+            'action' => RouteAction::RESUBMITTED,
+            'actor_profile_id' => $actorId,
+            'event_id' => $eventId,
+            'step_id' => (int) $target['id'],
+            'delivered' => $outcome['delivered'],
+            'verdict' => null,
+            'decided' => null,
+            'recipients' => $outcome['recipients'],
+        ]);
+
+        return [
+            'event' => $event,
+            'resolved' => $outcome['resolved'],
+            'delivered' => $outcome['delivered'],
+            'decided' => null,
+        ];
+    }
+
+    /**
+     * The subject version an act is made on (WHIT-919): recorded afresh on a
+     * submit or resubmit, read otherwise. Both null when versions are not
+     * wired, the subject type has no provider, or (when reading) no version has
+     * been recorded yet, as for every route issued before migration 226.
+     *
+     * @return array{version: ?int, content_hash: ?string}
+     */
+    private function subjectVersion(
+        int $tenantId,
+        string $subjectType,
+        int $subjectId,
+        ?int $actorId,
+        bool $record,
+    ): array {
+        $none = ['version' => null, 'content_hash' => null];
+        if ($this->versions === null) {
+            return $none;
+        }
+
+        if (!$record) {
+            return $this->versions->latest($tenantId, $subjectType, $subjectId) ?? $none;
+        }
+
+        $snapshot = $this->subjects?->get($subjectType)?->snapshot($tenantId, $subjectId);
+        if ($snapshot === null) {
+            return $none;
+        }
+
+        return $this->versions->record($tenantId, $subjectType, $subjectId, $snapshot, $actorId);
+    }
+
 
     // -- internals ----------------------------------------------------------
 
@@ -1031,19 +1394,32 @@ final class DocumentRouter
      * beside it. Both rows survive, which is more useful as well as safer —
      * "this was corrected on the 14th" is itself a fact somebody may need.
      *
+     * @param array<string, mixed> $route
+     *
      * @return array{event: array<string, mixed>, resolved: int, delivered: int, decided: null}
      */
     private function appendNote(
         int $tenantId,
         int $actorId,
-        int $routeId,
-        int $documentId,
-        string $title,
+        array $route,
         ?string $note,
+        bool $toAuthor,
     ): array {
+        $routeId = (int) $route['id'];
+        $documentId = (int) $route['document_id'];
+        $title = (string) $route['title'];
+
         if ($note === null || trim($note) === '') {
             throw RoutingRejectedException::because('A note needs some text — an empty note records nothing.');
         }
+
+        $version = $this->subjectVersion(
+            $tenantId,
+            (string) ($route['subject_type'] ?? DocumentRouteSubject::TYPE),
+            (int) ($route['subject_id'] ?? $documentId),
+            $actorId,
+            false,
+        );
 
         // The note is attributed to the unit the author is acting from. Their
         // OPEN recipient row is preferred when they have one, because that is
@@ -1064,6 +1440,10 @@ final class DocumentRouter
             'to_ou_id' => null,
             'note' => $note,
             'verdict' => null,
+            // WHIT-919: FALSE keeps the note internal; it never reaches the author.
+            'to_author' => $toAuthor,
+            'subject_version' => $version['version'],
+            'content_hash' => $version['content_hash'],
         ]);
 
         $event = $this->events->findById($eventId, $tenantId);
@@ -1466,7 +1846,7 @@ final class DocumentRouter
      * @param list<array<string, mixed>> $steps
      * @return list<array{rule_kind: string, rule_config: array<string, mixed>, label: ?string,
      *                    decision: bool, decision_quorum: ?string, satisfied_by: string,
-     *                    edges: array<string, int>}>
+     *                    allow_send_back: bool, edges: array<string, int>}>
      */
     private function validateSteps(int $tenantId, array $steps): array
     {
@@ -1630,6 +2010,16 @@ final class DocumentRouter
                 $edges[$verdict] = $target;
             }
 
+            // WHIT-919: a route design can turn send-back off for a step. On
+            // unless the design says otherwise.
+            $allowSendBack = $step['allow_send_back'] ?? true;
+            if (!is_bool($allowSendBack)) {
+                throw RoutingRejectedException::because(sprintf(
+                    "Step %d: 'allow_send_back' must be true or false.",
+                    $position,
+                ));
+            }
+
             /** @var array<string, mixed> $config */
             $out[] = [
                 'rule_kind' => $kind,
@@ -1638,6 +2028,7 @@ final class DocumentRouter
                 'decision' => $decision,
                 'decision_quorum' => is_string($quorum) ? $quorum : null,
                 'satisfied_by' => $satisfiedBy,
+                'allow_send_back' => $allowSendBack,
                 'edges' => $edges,
             ];
         }

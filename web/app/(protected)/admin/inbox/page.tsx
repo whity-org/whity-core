@@ -159,6 +159,9 @@ export default function InboxPage() {
     if (meta.arrived_by === 'returned') {
       return { label: t('inbox.state.returned', 'Returned to you'), done: false };
     }
+    if (meta.arrived_by === 'sent_back') {
+      return { label: t('inbox.state.sentBack', 'Sent back to you for changes'), done: false };
+    }
     if (meta.arrived_by === 'noted' || meta.arrived_by === 'acknowledged') {
       return { label: t('inbox.state.info', 'For your information'), done: false };
     }

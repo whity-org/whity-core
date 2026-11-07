@@ -57903,9 +57903,11 @@
                             "forwarded",
                             "acknowledged",
                             "returned",
-                            "noted"
+                            "noted",
+                            "sent_back",
+                            "resubmitted"
                         ],
-                        "description": "What you did with the document: `forwarded`, `acknowledged`, `returned` or `noted`."
+                        "description": "What you did with the document: `forwarded`, `acknowledged`, `returned`, `noted`, `sent_back` (to the author for changes, with a note) or `resubmitted` (by the author, after a send-back)."
                     },
                     "note": {
                         "type": "string",
@@ -57920,6 +57922,19 @@
                         ],
                         "nullable": true,
                         "description": "`approved` or `rejected`. Required with `acknowledged` on a decision step; refused anywhere else."
+                    },
+                    "resume_from": {
+                        "type": "string",
+                        "enum": [
+                            "sender",
+                            "start"
+                        ],
+                        "nullable": true,
+                        "description": "With `sent_back` only: where the route resumes when the author resubmits. `sender` (this step, the default) or `start` (step 1)."
+                    },
+                    "to_author": {
+                        "type": "boolean",
+                        "description": "With `noted`: the note is meant for the author. Notes are internal by default."
                     }
                 },
                 "required": [
@@ -58004,6 +58019,9 @@
                                         "act",
                                         "delivery"
                                     ]
+                                },
+                                "allow_send_back": {
+                                    "type": "boolean"
                                 }
                             },
                             "required": [
@@ -58112,6 +58130,13 @@
                         "type": "integer",
                         "nullable": true
                     },
+                    "role": {
+                        "type": "string",
+                        "enum": [
+                            "step",
+                            "author"
+                        ]
+                    },
                     "open": {
                         "type": "boolean"
                     },
@@ -58219,6 +58244,9 @@
                             "stamp",
                             "finalise"
                         ]
+                    },
+                    "allow_send_back": {
+                        "type": "boolean"
                     },
                     "rejection_count": {
                         "type": "integer"
@@ -60050,7 +60078,12 @@
                             "forwarded",
                             "acknowledged",
                             "returned",
-                            "noted"
+                            "noted",
+                            "sent_back",
+                            "resubmitted",
+                            "signed",
+                            "stamped",
+                            "declined"
                         ]
                     },
                     "from_ou_id": {
@@ -60075,6 +60108,25 @@
                     },
                     "withdrawal": {
                         "type": "boolean"
+                    },
+                    "subject_version": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "content_hash": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "to_author": {
+                        "type": "boolean"
+                    },
+                    "resume_from": {
+                        "type": "string",
+                        "enum": [
+                            "sender",
+                            "start"
+                        ],
+                        "nullable": true
                     },
                     "occurred_at": {
                         "type": "string"
@@ -69962,6 +70014,9 @@
                             "act",
                             "delivery"
                         ]
+                    },
+                    "allow_send_back": {
+                        "type": "boolean"
                     },
                     "canvas_x": {
                         "type": "integer"

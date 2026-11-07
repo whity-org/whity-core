@@ -34,10 +34,30 @@ final class RouteActionVocabularyTest extends TestCase
 {
     private const MIGRATION = __DIR__ . '/../../../../database/migrations/112_create_document_routing.php';
 
+    /** WHIT-919: the one migration that widens the trail's CHECK, for the whole routes plan. */
+    private const WIDENING = __DIR__ . '/../../../../database/migrations/226_add_route_send_back_and_versions.php';
+
     public function testThePhpVocabularyAndTheSchemaCheckConstraintAgree(): void
     {
-        $source = file_get_contents(self::MIGRATION);
-        self::assertIsString($source, 'migration 112 must be readable');
+        // The CHECK in force is the one migration 226 installs. Its WIDE list
+        // must start with migration 112's verbs, in order, so widening only ever
+        // adds; the pin below compares PHP against that widened list.
+        $original = file_get_contents(self::MIGRATION);
+        self::assertIsString($original, 'migration 112 must be readable');
+        self::assertSame(1, preg_match("/CHECK \(action IN \(([^)]*)\)\)/", $original, $narrow));
+        $narrowList = $narrow[1] ?? '';
+
+        $widening = file_get_contents(self::WIDENING);
+        self::assertIsString($widening, 'migration 226 must be readable');
+        self::assertStringContainsString(
+            'private const NARROW = "CHECK (action IN (' . $narrowList . '))";',
+            $widening,
+            'migration 226 must widen exactly the CHECK migration 112 wrote'
+        );
+        self::assertSame(1, preg_match('/private const WIDE = (.*?);/s', $widening, $wide));
+        // Join the PHP string concatenation (`"..." . "..."`) back into one list.
+        $source = preg_replace('/"\s*\.\s*"/', '', $wide[1] ?? '') ?? '';
+        self::assertStringStartsWith('"CHECK (action IN (' . $narrowList . ', ', $source);
 
         $matched = preg_match(
             "/CHECK \(action IN \(([^)]*)\)\)/",
@@ -47,7 +67,7 @@ final class RouteActionVocabularyTest extends TestCase
         self::assertSame(
             1,
             $matched,
-            'migration 112 must still CHECK-constrain `action`. A trail whose action column accepts '
+            'migration 226 must still CHECK-constrain `action`. A trail whose action column accepts '
             . 'any string is a trail whose readers must handle any string, and the first typo becomes '
             . 'a permanent row nothing renders.'
         );
@@ -104,6 +124,10 @@ final class RouteActionVocabularyTest extends TestCase
             [RouteAction::FORWARDED, RouteAction::ACKNOWLEDGED, RouteAction::RETURNED],
             RouteAction::recipientActions()
         );
+        // WHIT-919: sending back and resubmitting are their own entry points,
+        // not answers to an ordinary item, so they are not in this list.
+        self::assertNotContains(RouteAction::SENT_BACK, RouteAction::recipientActions());
+        self::assertNotContains(RouteAction::RESUBMITTED, RouteAction::recipientActions());
     }
 
     public function testOnlyTheThreeAnsweringActsCloseAnInboxRow(): void

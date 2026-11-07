@@ -95,7 +95,7 @@ final class RouteTemplateGraph
      * @param mixed $steps    The raw `steps` value from the request body.
      * @param mixed $edges    The raw `edges` value from the request body.
      * @param int   $maxSteps The tenant's effective `documents.routing_max_steps`.
-     * @return array{steps: list<array{position: int, rule_kind: string, rule_config: array<string, mixed>, label: ?string, decision: bool, decision_quorum: ?string, satisfied_by: string, canvas_x: int, canvas_y: int}>, edges: list<array{from: int, to: int, verdict: string}>}
+     * @return array{steps: list<array{position: int, rule_kind: string, rule_config: array<string, mixed>, label: ?string, decision: bool, decision_quorum: ?string, satisfied_by: string, allow_send_back?: bool, canvas_x: int, canvas_y: int}>, edges: list<array{from: int, to: int, verdict: string}>}
      */
     public function validate(mixed $steps, mixed $edges, int $maxSteps): array
     {
@@ -114,7 +114,7 @@ final class RouteTemplateGraph
     }
 
     /**
-     * @return list<array{position: int, rule_kind: string, rule_config: array<string, mixed>, label: ?string, decision: bool, decision_quorum: ?string, satisfied_by: string, canvas_x: int, canvas_y: int}>
+     * @return list<array{position: int, rule_kind: string, rule_config: array<string, mixed>, label: ?string, decision: bool, decision_quorum: ?string, satisfied_by: string, allow_send_back?: bool, canvas_x: int, canvas_y: int}>
      */
     private function validateSteps(mixed $steps, int $maxSteps): array
     {
@@ -252,6 +252,15 @@ final class RouteTemplateGraph
                 ));
             }
 
+            // WHIT-919: whether people at this stage may send it back to the
+            // author for changes. On unless the design turns it off.
+            $allowSendBack = $step['allow_send_back'] ?? true;
+            if (!is_bool($allowSendBack)) {
+                throw RouteTemplateRejectedException::because(
+                    "Step {$position}: 'allow_send_back' must be true or false."
+                );
+            }
+
             $quorum = $step['decision_quorum'] ?? null;
             if ($quorum !== null) {
                 if (!is_string($quorum) || !RouteQuorum::isValid($quorum)) {
@@ -282,6 +291,7 @@ final class RouteTemplateGraph
                 'decision' => $decision,
                 'decision_quorum' => is_string($quorum) ? $quorum : null,
                 'satisfied_by' => $satisfiedBy,
+                'allow_send_back' => $allowSendBack,
                 'canvas_x' => self::coordinate($step['canvas_x'] ?? 0, $position, 'canvas_x'),
                 'canvas_y' => self::coordinate($step['canvas_y'] ?? 0, $position, 'canvas_y'),
             ];

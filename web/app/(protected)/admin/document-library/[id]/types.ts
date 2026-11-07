@@ -66,7 +66,14 @@ export interface DocumentRecord {
  * produces a compile error at the one place this page turns a verb into a
  * sentence — rather than silently rendering the raw enum to a reader.
  */
-export type TrailAction = 'issued' | 'forwarded' | 'acknowledged' | 'returned' | 'noted';
+export type TrailAction =
+  | 'issued'
+  | 'forwarded'
+  | 'acknowledged'
+  | 'returned'
+  | 'noted'
+  | 'sent_back'
+  | 'resubmitted';
 
 /**
  * One entry in the append-only trail, as `RoutingPresenter::event()` sends it.
