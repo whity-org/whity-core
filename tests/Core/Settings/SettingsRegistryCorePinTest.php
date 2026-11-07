@@ -176,6 +176,8 @@ final class SettingsRegistryCorePinTest extends TestCase
             'ui.hide_dates',
             // #1019. The cap on one label-resolution request.
             'labels.resolve_max_ids',
+            // #1733. Whether the web app can be installed (instance-wide).
+            'app.installable',
         ];
     }
 
@@ -374,6 +376,9 @@ final class SettingsRegistryCorePinTest extends TestCase
             // argument i18n.enabled won above, pointing the other way.
             'ui.hide_dates' => 'false',
             'labels.resolve_max_ids' => '100',
+            // #1733: on, which is what app.whity.dev wants; an operator turns
+            // it off here or with PWA_ENABLED.
+            'app.installable' => 'true',
         ];
     }
 
@@ -526,6 +531,8 @@ final class SettingsRegistryCorePinTest extends TestCase
             ['labels.resolve_max_ids', '500', true],
             ['labels.resolve_max_ids', '501', false],
             ['labels.resolve_max_ids', '0', false],
+            ['app.installable', 'false', true],
+            ['app.installable', '1', false],
             ['branding_favicon', 'anything', false],
             ['not_a_setting_at_all', 'x', false],
         ];
