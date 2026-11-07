@@ -22,14 +22,15 @@
     "tokens:check": "node ../src/design/tokens/generate-tokens.js check"
   },
   "dependencies": {
-    "@whity/features": "file:../packages/features",
-    "@whity/ui": "file:../packages/ui",
     "@hookform/resolvers": "^6.0.1",
     "@tabler/icons-react": "^3.50.0",
+    "@whity/features": "file:../packages/features",
+    "@whity/ui": "file:../packages/ui",
     "@xyflow/react": "^12.12.0",
     "bwip-js": "^4.11.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "jsqr": "1.4.0",
     "katex": "^0.19.1",
     "next": "16.4.3",
     "openapi-fetch": "^0.17.0",

@@ -18,6 +18,19 @@ jest.mock('@/components/sso-login-buttons', () => ({
   SsoLoginButtons: () => null,
 }));
 
+// The language switcher in the sign-in shell needs the LanguageProvider the
+// root layout supplies; this suite renders the page on its own.
+jest.mock('@whity/features/i18n', () => ({
+  ...jest.requireActual('@whity/features/i18n'),
+  LanguageSwitcher: () => null,
+}));
+
+// The brand panel's "Verify a document" would match this suite's /verify/i
+// queries for the 2FA button; it has its own suite (verify-document-dialog).
+jest.mock('@/components/auth/sign-in-brand-panel', () => ({
+  SignInBrandPanel: () => null,
+}));
+
 // Mock global fetch
 global.fetch = jest.fn();
 

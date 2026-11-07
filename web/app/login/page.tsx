@@ -10,6 +10,7 @@ import { Button } from '@whity/ui/button';
 import { Input } from '@/components/ui/input';
 import { OtpInput } from '@whity/ui/otp-input';
 import { AuthShell } from '@/components/auth-shell';
+import { SignInBrandPanel } from '@/components/auth/sign-in-brand-panel';
 import { Alert, AlertDescription } from '@whity/ui/alert';
 import { SsoLoginButtons } from '@/components/sso-login-buttons';
 import { TwoFactorSetupWizard } from '@/components/TwoFactorSettings';
@@ -470,6 +471,7 @@ export default function LoginPage() {
     <AuthShell
       title={t('login.welcome', 'Sign in to {site}', { site: branding.siteName })}
       subtitle={subtitle}
+      aside={<SignInBrandPanel />}
     >
       {/* MANDATORY 2FA ENROLLMENT (WC-525): the account has no device
           enrolled and the grace period has already expired, so login
