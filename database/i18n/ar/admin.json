@@ -1715,6 +1715,7 @@
         "pluginStore.connect.confirmTitle": "فصل الربط بـ {host}؟",
         "pluginStore.connect.connected": "مربوط بـ {host}.",
         "pluginStore.connect.connectedAs": "مربوط بـ {host} باسم {account} منذ {date}.",
+        "pluginStore.connect.connectedAsNoDate": "مربوط بـ {host} باسم {account}.",
         "pluginStore.connect.denied": "أُلغي الربط في Whity ID.",
         "pluginStore.connect.description": "سجّل الدخول باستخدام Whity ID مرة واحدة لتثبيت الإضافات وتحديثها من {host} دون رمز وصول.",
         "pluginStore.connect.disconnect": "فصل الربط",

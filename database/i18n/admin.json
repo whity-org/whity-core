@@ -1714,6 +1714,7 @@
         "pluginStore.connect.confirmTitle": "Disconnect from {host}?",
         "pluginStore.connect.connected": "Connected to {host}.",
         "pluginStore.connect.connectedAs": "Connected to {host} as {account}, since {date}.",
+        "pluginStore.connect.connectedAsNoDate": "Connected to {host} as {account}.",
         "pluginStore.connect.denied": "Connecting was cancelled in Whity ID.",
         "pluginStore.connect.description": "Sign in with Whity ID once to install and update plugins from {host} without an access token.",
         "pluginStore.connect.disconnect": "Disconnect",

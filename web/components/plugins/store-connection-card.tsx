@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import { useTranslation } from '@whity/features/i18n';
+import { useDateDisplay } from '@whity/features/datetime';
 import { Button } from '@whity/ui/button';
 import { ConfirmAction } from '@whity/ui/confirm-action';
 
@@ -33,6 +34,7 @@ interface StoreConnectionCardProps {
 export function StoreConnectionCard({ storeUrl, connection, canManage, onChanged }: StoreConnectionCardProps) {
   const t = useTranslation('admin');
   const { addToast } = useToast();
+  const { date } = useDateDisplay();
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const host = connection.store_host ?? storeUrl.replace(/^https:\/\//, '');
@@ -63,7 +65,7 @@ export function StoreConnectionCard({ storeUrl, connection, canManage, onChanged
   };
 
   const account = connection.account?.name || connection.account?.email || null;
-  const since = connection.connected_at ? new Date(connection.connected_at).toLocaleDateString() : null;
+  const since = date(connection.connected_at);
 
   return (
     <section
@@ -76,13 +78,15 @@ export function StoreConnectionCard({ storeUrl, connection, canManage, onChanged
         </h2>
         {connectedHere && !connection.needs_reconnect ? (
           <p className="text-sm text-muted-foreground">
-            {account
+            {account && since
               ? t('pluginStore.connect.connectedAs', 'Connected to {host} as {account}, since {date}.', {
                   host,
                   account,
-                  date: since ?? '',
+                  date: since,
                 })
-              : t('pluginStore.connect.connected', 'Connected to {host}.', { host })}
+              : account
+                ? t('pluginStore.connect.connectedAsNoDate', 'Connected to {host} as {account}.', { host, account })
+                : t('pluginStore.connect.connected', 'Connected to {host}.', { host })}
             {connection.account?.name && connection.account?.email ? (
               <span className="block" dir="ltr">
                 {connection.account.email}
