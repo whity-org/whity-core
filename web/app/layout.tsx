@@ -12,7 +12,7 @@ import { ToastContainerMount } from "@/components/ui/toast-container-mount";
 import { PluginScreenRegistrations } from "@/lib/plugin-screens";
 import { ReferralCapture } from "@/components/referral-capture";
 import { getBranding, getBrandThemeCss } from "@/lib/branding";
-import { BrandingProvider } from "@/lib/branding-context";
+import { BrandingProvider, BrandingSync } from "@/lib/branding-context";
 import { getThemeOverrides } from "@/lib/theme";
 import { ThemeModeProvider, ThemeModeInitScript } from "@/lib/theme-mode-context";
 import { DisplayPreferencesProvider, DisplayPreferencesInitScript } from "@/lib/display-preferences-context";
@@ -77,8 +77,8 @@ export default async function RootLayout({
   // and values to strict '#rrggbb' hex, so building this CSS string by plain
   // concatenation is safe — neither component can contain quotes or braces.
   const themeOverrides = await getThemeOverrides();
-  // Decision 2.8: the workspace main colour's light and dark sets. Emitted
-  // before the plugin overrides in the JSX below, so a plugin's colours still win.
+  // Decision 2.8: the workspace main colour's light and dark sets, as the HOST
+  // resolves them (see BrandingProvider, which takes over in the browser).
   const brandCss = await getBrandThemeCss();
   const overrideCss = Object.entries(themeOverrides)
     .map(([key, value]) => `--${key}:${value};`)
@@ -151,12 +151,17 @@ export default async function RootLayout({
           customers who did not stop to think. Renders nothing.
         */}
         <ReferralCapture />
-        {/* React 19 hoists <style> into <head> regardless of nesting position. */}
-        {brandCss !== "" && <style>{brandCss}</style>}
-        {overrideCss !== "" && <style>{`:root{${overrideCss}}`}</style>}
-        <BrandingProvider initial={branding}>
+        {/*
+          Decision 2.8: the main colour's <style> is rendered by BrandingProvider,
+          not here, because only the browser knows the signed-in tenant (the
+          session cookies are Path=/api, so this server render resolves branding
+          by host alone). The provider starts from this server CSS and replaces
+          it once it has asked as the reader (#1716).
+        */}
+        <BrandingProvider initial={branding} initialThemeCss={brandCss}>
           <ThemeModeProvider>
             <AuthProvider>
+              <BrandingSync />
               {/*
                 Inside AuthProvider for the reason the language provider below
                 is: `ui.hide_dates` resolves per TENANT, and a tenant switch
@@ -192,6 +197,8 @@ export default async function RootLayout({
             </AuthProvider>
           </ThemeModeProvider>
         </BrandingProvider>
+        {/* After the brand <style> above, so a plugin's colours still win. */}
+        {overrideCss !== "" && <style>{`:root{${overrideCss}}`}</style>}
       </body>
     </html>
   );

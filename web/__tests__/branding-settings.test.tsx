@@ -34,10 +34,12 @@ jest.mock('@/lib/api/client', () => ({
   },
 }));
 
-// The main colour refreshes the server layout after a save (decision 2.8).
-const mockRefresh = jest.fn();
-jest.mock('next/navigation', () => ({
-  useRouter: () => ({ refresh: mockRefresh }),
+// After a save the app's branding (and so the theme) is re-read in the
+// browser, not by a router refresh: the server render cannot see the session
+// (cookies are Path=/api) and would theme by host (#1716).
+const mockRefresh = jest.fn(() => Promise.resolve());
+jest.mock('@/lib/branding-context', () => ({
+  useRefreshBranding: () => mockRefresh,
 }));
 
 // Mock useAuth so the component can read user?.tenant_id without an AuthProvider.
@@ -292,6 +294,40 @@ describe('BrandingSettings — main colour', () => {
     );
     await waitFor(() => expect(mockRefresh).toHaveBeenCalled());
     expect(addToast).toHaveBeenCalledWith('Main colour saved.', 'success');
+  });
+
+  it('saves twice in a row: the card follows the saved colour and the second save goes out (#1716)', async () => {
+    grant('settings:write');
+    let current: Branding = BRANDING_ORANGE;
+    mockApiGet.mockImplementation(() => brandingResponse(current));
+    mockApiPatch.mockImplementation((_path: string, init: { body: { settings: { branding_main_color: string } } }) => {
+      current = { ...BRANDING_NO_ASSETS, mainColor: init.body.settings.branding_main_color };
+      return Promise.resolve({ data: { data: {} }, error: undefined });
+    });
+    render(<BrandingSettings tenantOverridable={true} />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('branding-colour-value-tenant')).toHaveTextContent('#b74c05')
+    );
+    fireEvent.click(screen.getByTestId('branding-colour-swatch-00792f'));
+    fireEvent.click(screen.getByTestId('branding-colour-save-tenant'));
+    await waitFor(() =>
+      expect(screen.getByTestId('branding-colour-swatch-00792f')).toHaveAttribute('aria-pressed', 'true')
+    );
+    await waitFor(() => expect(screen.getByTestId('branding-colour-save-tenant')).toBeDisabled());
+
+    fireEvent.click(screen.getByTestId('branding-colour-swatch-643b9a'));
+    fireEvent.click(screen.getByTestId('branding-colour-save-tenant'));
+    await waitFor(() =>
+      expect(mockApiPatch).toHaveBeenLastCalledWith('/api/v1/settings', {
+        body: { settings: { branding_main_color: '#643b9a' } },
+      })
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId('branding-colour-value-tenant')).toHaveTextContent('#643b9a')
+    );
+    expect(mockApiPatch).toHaveBeenCalledTimes(2);
+    expect(mockRefresh).toHaveBeenCalledTimes(2);
   });
 
   it('takes a custom colour from the picker', async () => {

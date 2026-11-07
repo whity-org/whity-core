@@ -4791,7 +4791,8 @@ $brandingHandler = new \Whity\Api\BrandingApiHandler(
     $hostResolver,
     $roleChecker,
     $brandingHostRepo,
-    $storageDriver
+    $storageDriver,
+    $jwtParser
 );
 $router->register('GET',    '/api/branding',                        [$brandingHandler, 'get'],          null, null, null);
 $router->register('GET',    '/api/branding/asset/{tenantId}/{name}', [$brandingHandler, 'serveAsset'],   null, null, null);

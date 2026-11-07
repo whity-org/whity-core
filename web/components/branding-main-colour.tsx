@@ -4,14 +4,14 @@
  * The workspace main colour (decision 2.8, TplAdminBranding card): a row of
  * swatches plus a custom picker, saved as the `branding_main_color` setting.
  * The server derives the light and dark token sets from it (TenantTheme) and
- * the root layout applies them, so after a save a router refresh re-themes the
- * whole app — that is the preview. Reset clears the setting, which falls back
+ * BrandingProvider applies them, so after a save a branding refresh re-themes
+ * the whole app, light and dark, without a reload — that is the preview. Reset clears the setting, which falls back
  * to the global default, then to Whity Blue.
  */
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api/client';
+import { useRefreshBranding } from '@/lib/branding-context';
 import { Button } from '@whity/ui/button';
 import { useTranslation } from '@whity/features/i18n';
 import { IconCheck, IconRotate } from '@tabler/icons-react';
@@ -39,7 +39,7 @@ export interface BrandingMainColourProps {
 
 export function BrandingMainColour({ scope, current, disabled, onSaved, onError, onSuccess }: BrandingMainColourProps) {
   const t = useTranslation('admin');
-  const router = useRouter();
+  const refreshBranding = useRefreshBranding();
   const [draft, setDraft] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -64,7 +64,9 @@ export function BrandingMainColour({ scope, current, disabled, onSaved, onError,
       }
       setDraft(null);
       onSaved();
-      router.refresh();
+      // A router refresh would not do: the server render cannot see the
+      // session (cookies are Path=/api) and themes by host (#1716).
+      void refreshBranding();
       onSuccess(
         value === ''
           ? t('branding.colour.reset.success', 'Main colour reset.')
