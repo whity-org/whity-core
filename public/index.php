@@ -5534,9 +5534,10 @@ $router->register('POST', '/api/mcp/connect/preview', [$mcpConnectHandler, 'prev
 // shadowed by a plugin claiming the same path.
 // Code plugins' agent presets (SDK 1.61, WHIT-818).
 $pluginLoader->setAgentPresetRegistry($agentPresetRegistry);
+// A plugin's billing portal goes into its slot (SDK 1.77, WHIT-1010).
+$pluginLoader->setBillingPortals($pluginBillingPortals);
 // Code plugins' template slots and record types as merge fields (SDK 1.56, WHIT-742).
 $pluginLoader->setDocumentRegistries($templateSlotRegistry, $documentFieldRegistry);
-$pluginLoader->setBillingPortals($pluginBillingPortals);
 $pluginLoader->load();
 $pluginLoader->collectMcpPrompts($promptRegistry);
 // SDK 1.43. Collect FIRST, then hand the deriver the suppressions: a plugin

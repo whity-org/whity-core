@@ -211,7 +211,9 @@ final class ProviderBillingPortalRealEngineTest extends TestCase
 
         self::assertSame(200, $response->getStatusCode());
         self::assertSame(1, $this->plugin->accessCalls);
-        $row = $this->pdo->query('SELECT status, external_ref, plan_id FROM tenant_plan WHERE tenant_id = 1')->fetch(PDO::FETCH_ASSOC);
+        $statement = $this->pdo->query('SELECT status, external_ref, plan_id FROM tenant_plan WHERE tenant_id = 1');
+        self::assertNotFalse($statement);
+        $row = $statement->fetch(PDO::FETCH_ASSOC);
         self::assertIsArray($row);
         self::assertSame('active', $row['status']);
         self::assertSame('sub_1', $row['external_ref']);
@@ -441,7 +443,7 @@ final class FakeProviderPortal implements BillingPortal, HostedCheckoutPage
             : null;
     }
 
-    public function verifyNotification(string $rawBody, array $headers): ?BillingNotice
+    public function verifyNotification(string $rawBody, array $headers): BillingNotice
     {
         if (!$this->verifies) {
             throw BillingPortalException::unverified('bad signature');
