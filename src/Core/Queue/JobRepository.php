@@ -43,6 +43,8 @@ final class JobRepository
      */
     public function enqueue(int $tenantId, string $name, array $payload, array $opts = []): ?int
     {
+        // WHIT-991: no jobs from a proposal preview.
+        \Whity\Core\Sandbox\SideEffectGuard::assertAllowed('Queueing a job');
         $queue = (string) ($opts['queue'] ?? 'default');
         $priority = (int) ($opts['priority'] ?? 0);
         $maxAttempts = max(1, (int) ($opts['max_attempts'] ?? 3));

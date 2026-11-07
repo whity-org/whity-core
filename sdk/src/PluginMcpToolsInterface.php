@@ -105,6 +105,9 @@ namespace Whity\Sdk;
  *   host keeps only those keys, as text of at most 500 characters, and at most
  *   50 rows. It runs in a transaction the host always rolls back, READ ONLY on
  *   PostgreSQL, so a preview that writes gets no diff and changes nothing.
+ *   Sending mail or notifications, queueing jobs and dispatching events are
+ *   refused while it runs, and it has two seconds: a slower preview is
+ *   discarded.
  *   Throwing or returning null leaves the proposal without a diff; it never
  *   blocks the proposal. A preview informs the person and nothing else: no
  *   plugin can approve, decline or change a proposal.

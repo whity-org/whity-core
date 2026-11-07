@@ -107,6 +107,30 @@ final class ProposalEventsAndPluginPreviewRealEngineTest extends TestCase
             'preview'            => static fn (): array => throw new \RuntimeException('no preview today'),
         ], 'Stock'));
         self::assertNull($authored->register([
+            'name'               => 'stock_noisy',
+            'description'        => 'A tool whose preview tries to tell other plugins.',
+            'inputSchema'        => $body,
+            'handler'            => fn (): array => ['ran' => $this->ran[] = 'noisy'],
+            'requiredPermission' => 'stock:write',
+            'preview'            => function (): array {
+                $this->hooks->dispatch('stock:recount.previewed', ['sku' => 'BREAD-1']);
+
+                return [['label' => 'Count', 'after' => '7']];
+            },
+        ], 'Stock'));
+        self::assertNull($authored->register([
+            'name'               => 'stock_slow',
+            'description'        => 'A tool whose preview takes too long.',
+            'inputSchema'        => $body,
+            'handler'            => fn (): array => ['ran' => $this->ran[] = 'slow'],
+            'requiredPermission' => 'stock:write',
+            'preview'            => static function (): array {
+                usleep(150_000);
+
+                return [['label' => 'Count', 'after' => '7']];
+            },
+        ], 'Stock'));
+        self::assertNull($authored->register([
             'name'               => 'stock_sneaky',
             'description'        => 'A tool whose preview writes.',
             'inputSchema'        => $body,
@@ -124,7 +148,7 @@ final class ProposalEventsAndPluginPreviewRealEngineTest extends TestCase
         );
 
         $diffs = new ProposalDiffRegistry();
-        $diffs->useAuthoredTools($authored, new ReadOnlyRun($this->pdo));
+        $diffs->useAuthoredTools($authored, new ReadOnlyRun($this->pdo, limitMs: 100));
 
         $roles = $this->createMock(RoleChecker::class);
         $roles->method('hasPermissionForProfile')->willReturn(true);
@@ -172,6 +196,24 @@ final class ProposalEventsAndPluginPreviewRealEngineTest extends TestCase
         self::assertSame('Rana', $name->fetchColumn());
         self::assertFalse($this->pdo->inTransaction());
         self::assertSame('waiting', $this->proposals->find($id, self::TENANT)['status'] ?? null);
+        self::assertSame([], $this->ran);
+    }
+
+    public function testAPreviewCannotDispatchEventsAndASlowOneIsDiscarded(): void
+    {
+        $heard = 0;
+        $this->hooks->listen('stock:recount.previewed', static function (array $p) use (&$heard): array {
+            $heard++;
+            return $p;
+        });
+
+        $noisy = $this->ask('stock_noisy');
+        self::assertSame(0, $heard, 'the event never left the preview');
+        self::assertNull($this->proposals->find($noisy, self::TENANT)['diff'] ?? null);
+
+        $slow = $this->ask('stock_slow');
+        self::assertNull($this->proposals->find($slow, self::TENANT)['diff'] ?? null, 'over the time limit: discarded');
+        self::assertSame('waiting', $this->proposals->find($slow, self::TENANT)['status'] ?? null);
         self::assertSame([], $this->ran);
     }
 

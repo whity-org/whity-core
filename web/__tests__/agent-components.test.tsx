@@ -23,6 +23,18 @@ const changes = [
 ];
 
 describe('ActionProposal', () => {
+  it('shows a plugin preview as text, never as markup (WHIT-991)', () => {
+    const { container } = render(
+      <ActionProposal
+        agent="Stock clerk"
+        title="Recount a shelf"
+        changes={[{ label: '<b>Count</b>', before: '<img src=x onerror="alert(1)">', after: '<script>alert(1)</script>' }]}
+      />,
+    );
+    expect(container.querySelector('img, script, b')).toBeNull();
+    expect(screen.getByText('<script>alert(1)</script>')).toBeInTheDocument();
+  });
+
   it('shows two changes, then Show all past three', async () => {
     render(<ActionProposal agent="Billing assistant" title="Send 12 reminders" changes={changes} />);
     expect(screen.queryByText('Next reminder')).not.toBeInTheDocument();

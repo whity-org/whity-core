@@ -85,6 +85,8 @@ final class NotificationDispatcher
      */
     public function dispatch(int $tenantId, ?int $recipientProfileId, string $type, array $options = []): int
     {
+        // WHIT-991: no notifications from a proposal preview.
+        \Whity\Core\Sandbox\SideEffectGuard::assertAllowed('Sending a notification');
         $channels = self::resolveChannels($options['channels'] ?? null);
         $data = $options['data'] ?? [];
         $locale = isset($options['locale']) ? (string) $options['locale'] : null;
