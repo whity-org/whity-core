@@ -139,6 +139,12 @@ final class QueueWorkCommand implements CliCommand
                 $jobPlugin,
             );
             $loaded->loader = PluginJobs::register($registry, null, $this->logger, $hookManager, $auditLogger, $documentRegistries);
+            // WHIT-997 (SDK 1.83): runs the bulk issues Documents::issueMany() queued. Internal.
+            $registry->register(
+                \Whity\Core\Document\Issuing\IssueBatchJob::NAME,
+                new \Whity\Core\Document\Issuing\IssueBatchJob(\Whity\app(\Whity\Core\Document\Issuing\BulkIssuing::class)),
+                false
+            );
             // S.7: ends the 30-day keep on uninstalled plugins. Internal: never API-submittable.
             $registry->register(
                 \Whity\Core\Queue\Jobs\PurgeRemovedPluginsJob::NAME,

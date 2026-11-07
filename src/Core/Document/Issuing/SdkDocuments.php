@@ -10,6 +10,8 @@ use Whity\Core\Audit\AuditContext;
 use Whity\Core\Container\HostWiredService;
 use Whity\Core\Document\DocumentPresenter;
 use Whity\Core\Document\Slots\TemplateSlotRegistry;
+use Whity\Sdk\Documents\BulkIssueRequest;
+use Whity\Sdk\Documents\BulkIssueStatus;
 use Whity\Sdk\Documents\DocumentNotIssuedException;
 use Whity\Sdk\Documents\Documents;
 use Whity\Sdk\Documents\IssueRequest;
@@ -49,6 +51,8 @@ final class SdkDocuments implements Documents, HostWiredService
         private readonly RoleChecker $roleChecker,
         ?\Closure $jobPlugin = null,
         private readonly ?TemplateSlotRegistry $slots = null,
+        // SDK 1.83 (WHIT-997): bulk issuing. Null where it isn't wired (older tests).
+        private readonly ?BulkIssuing $bulk = null,
     ) {
         $this->issuing = $issuing;
         $this->jobPlugin = $jobPlugin;
@@ -124,6 +128,39 @@ final class SdkDocuments implements Documents, HostWiredService
         ));
 
         return new PreflightResult($answer['ok'], $answer['checks'], $answer['missing_fields'], $answer['replays_document_id']);
+    }
+
+    public function issueMany(BulkIssueRequest $request): BulkIssueStatus
+    {
+        $actor = $this->actor();
+        if ($actor === null) {
+            throw new DocumentNotIssuedException(
+                DocumentNotIssuedException::NO_ACTOR,
+                'There is no person to issue these documents for; plugins issue in a request, as the person making it',
+            );
+        }
+        if ($this->bulk === null) {
+            throw new DocumentNotIssuedException(DocumentNotIssuedException::INVALID_REQUEST, 'Bulk issuing is not available here');
+        }
+        try {
+            return $this->bulk->submit($actor, $request);
+        } catch (DocumentIssueRefused $e) {
+            throw new DocumentNotIssuedException($e->reason, $e->clientMessage, $e->details);
+        }
+    }
+
+    public function batch(int $batchId): ?BulkIssueStatus
+    {
+        $actor = $this->actor();
+
+        return $actor === null || $this->bulk === null ? null : $this->bulk->status($actor, $batchId);
+    }
+
+    public function cancelBatch(int $batchId): ?BulkIssueStatus
+    {
+        $actor = $this->actor();
+
+        return $actor === null || $this->bulk === null ? null : $this->bulk->cancel($actor, $batchId);
     }
 
     private function actor(): ?ActingAs

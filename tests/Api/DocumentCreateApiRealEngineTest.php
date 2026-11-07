@@ -4,6 +4,13 @@ declare(strict_types=1);
 
 namespace Tests\Api;
 
+use Whity\Core\Document\Issuing\BulkIssuing;
+use Whity\Core\Document\Issuing\IssueBatchJob;
+use Whity\Core\Queue\JobRepository;
+use Whity\Sdk\Documents\BulkIssueItem;
+use Whity\Sdk\Documents\BulkIssueItemResult;
+use Whity\Sdk\Documents\BulkIssueRequest;
+use Whity\Sdk\Documents\BulkIssueStatus;
 use PDO;
 use PHPUnit\Framework\TestCase;
 use Tests\Sdk\Manifest\DocumentSlotValidatorTest;
@@ -1248,6 +1255,313 @@ final class DocumentCreateApiRealEngineTest extends TestCase
 
         self::assertTrue($result->ok);
         self::assertSame([], $result->missingFields);
+    }
+
+    // ── bulk issuing (WHIT-997, SDK 1.83) ───────────────────────────────────
+
+    /**
+     * Documents::issueMany() records a batch and queues it; nothing is issued
+     * in the call. The worker issues it a chunk at a time, as the submitter,
+     * with a result per item, and a refused item writes nothing.
+     */
+    public function testABatchIsQueuedThenIssuedAChunkAtATimeWithAResultPerItem(): void
+    {
+        [$documents, $bulk] = $this->bulkFacade();
+        $template = $this->circular('Payslip');
+        $request = new BulkIssueRequest(TemplateRef::source($template), [
+            new BulkIssueItem(values: ['template.reference' => 'PAY-1'], title: 'Payslip 1'),
+            new BulkIssueItem(values: ['template.reference' => 'PAY-2'], originKey: 'payslip:2'),
+            new BulkIssueItem(values: ['template.nowhere' => 'x']),
+        ], 'payroll:2026-11');
+
+        $status = $this->asPerson(self::RAISER, fn () => $documents->issueMany($request));
+        self::assertSame(BulkIssueStatus::QUEUED, $status->status);
+        self::assertSame(3, $status->total);
+        self::assertFalse($status->resubmitted);
+        self::assertSame(0, $this->countDocuments(), 'nothing is issued in the call');
+        self::assertSame(1, $this->queuedBatchJobs(), 'the batch is queued for the worker');
+        $owner = 'person:' . self::RAISER;
+        self::assertSame(
+            [BulkIssuing::originKey($owner, 'payroll:2026-11', 0), 'payslip:2', BulkIssuing::originKey($owner, 'payroll:2026-11', 2)],
+            array_map(static fn ($i) => $i->originKey, $status->items),
+        );
+
+        self::assertSame(['done' => false, 'remaining' => 1, 'delay' => 60], $bulk->run(self::TENANT, $status->batchId, 2), 'a rendering batch is paced');
+        self::assertSame(['done' => true, 'remaining' => 0, 'delay' => 0], $bulk->run(self::TENANT, $status->batchId, 2));
+
+        $done = $this->asPerson(self::RAISER, fn () => $documents->batch($status->batchId));
+        self::assertNotNull($done);
+        self::assertTrue($done->isDone());
+        self::assertSame([2, 0, 1, 0], [$done->issued, $done->replayed, $done->refused, $done->failed]);
+        self::assertSame([BulkIssueItemResult::ISSUED, BulkIssueItemResult::ISSUED, BulkIssueItemResult::REFUSED], array_map(static fn ($i) => $i->status, $done->items));
+        self::assertSame('invalid_request', $done->items[2]->reason);
+        self::assertNull($done->items[2]->documentId);
+        self::assertSame(2, $this->countDocuments(), 'a refused item writes nothing');
+
+        $first = $this->documents->findById((int) $done->items[0]->documentId, self::TENANT);
+        self::assertNotNull($first);
+        self::assertSame('Payslip 1', $first['title']);
+        self::assertSame(self::RAISER, (int) $first['created_by'], 'issued as the person who sent the batch');
+        self::assertSame('PAY-1', $this->storedValues((int) $done->items[0]->documentId)['template.reference']);
+    }
+
+    /** The batch key makes a resend safe, and refuses a different batch under it. */
+    public function testTheBatchKeyMakesAResendReturnTheSameBatch(): void
+    {
+        [$documents, $bulk] = $this->bulkFacade();
+        $template = $this->circular('Payslip');
+        $items = [new BulkIssueItem(values: ['template.reference' => 'PAY-1'])];
+
+        $first = $this->asPerson(self::RAISER, fn () => $documents->issueMany(new BulkIssueRequest(TemplateRef::source($template), $items, 'payroll:2026-11')));
+        $again = $this->asPerson(self::RAISER, fn () => $documents->issueMany(new BulkIssueRequest(TemplateRef::source($template), $items, 'payroll:2026-11')));
+        self::assertTrue($again->resubmitted);
+        self::assertSame($first->batchId, $again->batchId);
+        self::assertSame(1, $this->queuedBatchJobs(), 'a resend queues nothing new');
+
+        $conflict = $this->asPerson(self::RAISER, fn () => $this->reasonOf(fn () => $documents->issueMany(new BulkIssueRequest(
+            TemplateRef::source($template),
+            [new BulkIssueItem(values: ['template.reference' => 'PAY-9'])],
+            'payroll:2026-11',
+        ))));
+        self::assertSame(DocumentNotIssuedException::BATCH_KEY_CONFLICT, $conflict);
+        $bulk->run(self::TENANT, $first->batchId);
+        self::assertSame(1, $this->countDocuments());
+    }
+
+    /**
+     * Resuming after a crash between issuing an item and recording it replays
+     * that item's document rather than issuing a second.
+     */
+    public function testAResumedBatchReplaysRatherThanIssuingTwice(): void
+    {
+        [$documents, $bulk] = $this->bulkFacade();
+        $template = $this->circular('Payslip');
+        $status = $this->asPerson(self::RAISER, fn () => $documents->issueMany(new BulkIssueRequest(
+            TemplateRef::source($template),
+            [new BulkIssueItem(values: ['template.reference' => 'PAY-1'])],
+            'payroll:2026-12',
+        )));
+        $bulk->run(self::TENANT, $status->batchId);
+        self::assertSame(1, $this->countDocuments());
+
+        // The worker died after issuing and before recording it.
+        $this->pdo->exec("UPDATE document_issue_batch_items SET status = 'pending', document_id = NULL");
+        $this->pdo->exec("UPDATE document_issue_batches SET status = 'running', issued = 0");
+        $bulk->run(self::TENANT, $status->batchId);
+
+        $done = $this->asPerson(self::RAISER, fn () => $documents->batch($status->batchId));
+        self::assertNotNull($done);
+        self::assertSame(BulkIssueItemResult::REPLAYED, $done->items[0]->status);
+        self::assertSame(1, $this->countDocuments(), 'the origin key replayed the document');
+    }
+
+    /** Each item is checked as the person when it runs; a batch is only theirs to read. */
+    public function testEachItemIsCheckedAsThePersonAndTheBatchIsTheirs(): void
+    {
+        [$documents, $bulk] = $this->bulkFacade();
+        $template = $this->circular('Payslip');
+        $items = [new BulkIssueItem(values: ['template.reference' => 'PAY-1'])];
+
+        self::assertSame(
+            DocumentNotIssuedException::FORBIDDEN,
+            $this->asPerson(self::SECRETARY, fn () => $this->reasonOf(fn () => $documents->issueMany(new BulkIssueRequest(TemplateRef::source($template), $items, 'k1')))),
+            'documents:issue is needed to send a batch',
+        );
+
+        $status = $this->asPerson(self::RAISER, fn () => $documents->issueMany(new BulkIssueRequest(TemplateRef::source($template), $items, 'k2')));
+        self::assertNull($this->asPerson(self::SECRETARY, fn () => $documents->batch($status->batchId)), "someone else's batch");
+
+        // Access taken away before the worker reached the item.
+        $this->pdo->exec('UPDATE memberships SET role_id = 101 WHERE profile_id = ' . self::RAISER);
+        RoleChecker::clearCache();
+        $bulk->run(self::TENANT, $status->batchId);
+        $done = $this->asPerson(self::RAISER, fn () => $documents->batch($status->batchId));
+        self::assertNotNull($done);
+        self::assertSame(BulkIssueItemResult::REFUSED, $done->items[0]->status);
+        self::assertSame('forbidden', $done->items[0]->reason);
+        self::assertSame(0, $this->countDocuments());
+
+        TenantContext::reset();
+        AuditContext::reset();
+        self::assertSame(DocumentNotIssuedException::NO_ACTOR, $this->reasonOf(fn () => $documents->issueMany(new BulkIssueRequest(TemplateRef::source($template), $items, 'k3'))));
+    }
+
+    /**
+     * A batch belongs to its workspace and its sender: another person, another
+     * plugin or another workspace gets nothing, and may reuse the key freely.
+     */
+    public function testABatchAndItsKeyAreScopedToTheSenderAndTheWorkspace(): void
+    {
+        [$documents, $bulk] = $this->bulkFacade();
+        $template = $this->circular('Payslip');
+        $items = [new BulkIssueItem(values: ['template.reference' => 'PAY-1'])];
+        $mine = $this->asPerson(self::RAISER, fn () => $documents->issueMany(new BulkIssueRequest(TemplateRef::source($template), $items, 'shared-key')));
+
+        // Another workspace: the id names nothing there.
+        TenantContext::reset();
+        TenantContext::setTenantId(self::OTHER_TENANT);
+        AuditContext::set(self::OTHER_TENANT_ADMIN, null);
+        try {
+            self::assertNull($documents->batch($mine->batchId));
+            self::assertNull($documents->cancelBatch($mine->batchId));
+        } finally {
+            AuditContext::reset();
+        }
+
+        // Plugins in the background: each its own namespace of keys and batches.
+        $courier = ActingAs::background(self::TENANT, 'Courier', ['courier:read']);
+        $billing = ActingAs::background(self::TENANT, 'Billing', []);
+        $a = $bulk->submit($courier, new BulkIssueRequest(TemplateRef::source($template), $items, 'shared-key'));
+        $b = $bulk->submit($billing, new BulkIssueRequest(TemplateRef::source($template), [new BulkIssueItem(values: ['template.reference' => 'X'])], 'shared-key'));
+        self::assertFalse($a->resubmitted);
+        self::assertFalse($b->resubmitted, "another plugin's key is not a conflict");
+        self::assertNotSame($a->batchId, $b->batchId);
+        self::assertNotSame($mine->batchId, $a->batchId);
+        self::assertNull($bulk->status($billing, $a->batchId), "another plugin's batch");
+        self::assertNull($bulk->cancel($billing, $a->batchId));
+        self::assertNull($bulk->status($courier, $mine->batchId), "a person's batch is not a plugin's");
+        self::assertNotNull($bulk->status($courier, $a->batchId));
+        self::assertNotSame($a->items[0]->originKey, $b->items[0]->originKey, 'origin keys never collide across senders');
+    }
+
+    /** Cancelling stops the pending items and keeps the ones already issued. */
+    public function testCancellingStopsPendingItemsAndKeepsIssuedOnes(): void
+    {
+        [$documents, $bulk] = $this->bulkFacade();
+        $template = $this->circular('Payslip');
+        $status = $this->asPerson(self::RAISER, fn () => $documents->issueMany(new BulkIssueRequest(TemplateRef::source($template), [
+            new BulkIssueItem(values: ['template.reference' => 'PAY-1']),
+            new BulkIssueItem(values: ['template.reference' => 'PAY-2']),
+            new BulkIssueItem(values: ['template.reference' => 'PAY-3']),
+        ], 'payroll:cancel')));
+        $bulk->run(self::TENANT, $status->batchId, 1);
+
+        $cancelled = $this->asPerson(self::RAISER, fn () => $documents->cancelBatch($status->batchId));
+        self::assertNotNull($cancelled);
+        self::assertSame(BulkIssueStatus::CANCELLED, $cancelled->status);
+        self::assertTrue($cancelled->isDone());
+        self::assertSame([1, 2], [$cancelled->issued, $cancelled->cancelled]);
+        self::assertSame([BulkIssueItemResult::ISSUED, BulkIssueItemResult::CANCELLED, BulkIssueItemResult::CANCELLED], array_map(static fn ($i) => $i->status, $cancelled->items));
+
+        self::assertSame(['done' => true, 'remaining' => 0, 'delay' => 0], $bulk->run(self::TENANT, $status->batchId), 'a cancelled batch issues nothing more');
+        self::assertSame(1, $this->countDocuments());
+    }
+
+    /** A batch that renders takes half the render tier's limit a run, a minute apart. */
+    public function testARenderingBatchIsPacedUnderTheRenderLimit(): void
+    {
+        self::assertSame(15, BulkIssuing::rendersPerMinuteFrom(['RENDER_RATE_LIMIT_MAX' => '30']));
+        self::assertSame(1, BulkIssuing::rendersPerMinuteFrom(['RENDER_RATE_LIMIT_MAX' => '1']));
+
+        $roleChecker = new RoleChecker($this->wrapSqlite($this->pdo), new PermissionRegistry());
+        $issuing = new TemplateIssuing(
+            $this->editor->issuing,
+            $this->editor->fields,
+            $this->settings,
+            fn (int $id, int $tenantId, int $callerId): ?array => $this->editor->sources->visibleRow($id, $tenantId, $callerId),
+            $this->slots,
+        );
+        $jobs = new JobRepository($this->pdo);
+        $bulk = new BulkIssuing($this->pdo, $roleChecker, static fn (): TemplateIssuing => $issuing, $jobs, null, 2);
+        $template = $this->circular('Payslip');
+        $items = array_map(static fn (int $n) => new BulkIssueItem(values: ['template.reference' => "PAY-{$n}"]), range(1, 5));
+        $actor = new ActingAs(self::TENANT, self::RAISER, ScopedPermissionSet::forProfile($roleChecker, self::RAISER, self::TENANT));
+
+        $rendering = $bulk->submit($actor, new BulkIssueRequest(TemplateRef::source($template), $items, 'paced'));
+        self::assertSame(['done' => false, 'remaining' => 3, 'delay' => 60], $bulk->run(self::TENANT, $rendering->batchId));
+
+        $silent = $bulk->submit($actor, new BulkIssueRequest(TemplateRef::source($template), $items, 'not-rendered', render: false));
+        self::assertSame(['done' => true, 'remaining' => 0, 'delay' => 0], $bulk->run(self::TENANT, $silent->batchId), 'nothing to render, nothing to pace');
+
+        $priority = $this->pdo->query("SELECT DISTINCT priority FROM jobs WHERE name = '" . IssueBatchJob::NAME . "'");
+        self::assertNotFalse($priority);
+        self::assertSame([BulkIssuing::PRIORITY], array_map('intval', $priority->fetchAll(PDO::FETCH_COLUMN)), 'batches queue below interactive work');
+    }
+
+    /** A sender who leaves the workspace mid-batch stops issuing. */
+    public function testASenderWhoLeavesTheWorkspaceStopsTheRest(): void
+    {
+        [$documents, $bulk] = $this->bulkFacade();
+        $template = $this->circular('Payslip');
+        $status = $this->asPerson(self::RAISER, fn () => $documents->issueMany(new BulkIssueRequest(TemplateRef::source($template), [
+            new BulkIssueItem(values: ['template.reference' => 'PAY-1']),
+            new BulkIssueItem(values: ['template.reference' => 'PAY-2']),
+        ], 'payroll:leaver')));
+        $bulk->run(self::TENANT, $status->batchId, 1);
+
+        $this->pdo->exec("UPDATE memberships SET status = 'suspended' WHERE profile_id = " . self::RAISER);
+        RoleChecker::clearCache();
+        $bulk->run(self::TENANT, $status->batchId);
+
+        $stmt = $this->pdo->prepare('SELECT status, reason FROM document_issue_batch_items WHERE batch_id = ? ORDER BY position');
+        $stmt->execute([$status->batchId]);
+        self::assertSame([['issued', null], ['refused', 'forbidden']], array_map(static fn (array $r): array => [$r['status'], $r['reason']], $stmt->fetchAll(PDO::FETCH_ASSOC)));
+        self::assertSame(1, $this->countDocuments());
+    }
+
+    public function testAnItemsValuesAreCapped(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        new BulkIssueRequest(TemplateRef::source(1), [new BulkIssueItem(values: ['template.note' => str_repeat('x', BulkIssueRequest::MAX_ITEM_BYTES)])], 'too-long');
+    }
+
+    public function testABatchIsCapped(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        new BulkIssueRequest(TemplateRef::source(1), array_fill(0, BulkIssueRequest::MAX_ITEMS + 1, new BulkIssueItem()), 'too-big');
+    }
+
+    /** @return array{0: SdkDocuments, 1: BulkIssuing} */
+    private function bulkFacade(): array
+    {
+        $roleChecker = new RoleChecker($this->wrapSqlite($this->pdo), new PermissionRegistry());
+        $issuing = new TemplateIssuing(
+            $this->editor->issuing,
+            $this->editor->fields,
+            $this->settings,
+            fn (int $id, int $tenantId, int $callerId): ?array => $this->editor->sources->visibleRow($id, $tenantId, $callerId),
+            $this->slots,
+        );
+        $bulk = new BulkIssuing($this->pdo, $roleChecker, static fn (): TemplateIssuing => $issuing, new JobRepository($this->pdo));
+
+        return [new SdkDocuments($issuing, $roleChecker, null, $this->slots, $bulk), $bulk];
+    }
+
+    /**
+     * @template T
+     * @param callable(): T $call
+     * @return T
+     */
+    private function asPerson(int $profileId, callable $call): mixed
+    {
+        TenantContext::reset();
+        TenantContext::setTenantId(self::TENANT);
+        AuditContext::reset();
+        AuditContext::set($profileId, null);
+        try {
+            return $call();
+        } finally {
+            AuditContext::reset();
+        }
+    }
+
+    private function reasonOf(callable $call): ?string
+    {
+        try {
+            $call();
+        } catch (DocumentNotIssuedException $e) {
+            return $e->reason;
+        }
+
+        return null;
+    }
+
+    private function queuedBatchJobs(): int
+    {
+        $stmt = $this->pdo->prepare('SELECT COUNT(*) FROM jobs WHERE name = ?');
+        $stmt->execute([IssueBatchJob::NAME]);
+
+        return (int) $stmt->fetchColumn();
     }
 
     /**

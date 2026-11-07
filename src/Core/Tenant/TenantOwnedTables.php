@@ -214,6 +214,9 @@ final class TenantOwnedTables
         'customer_signups' => '222_create_workspace_signup.php',
         // WHIT-995: which plugin starter templates a workspace was seeded with (migration 228).
         'plugin_starter_seeds' => '228_create_plugin_starter_seeds.php',
+        // WHIT-997: bulk issuing batches and their items (migration 229).
+        'document_issue_batches' => '229_create_document_issue_batches.php',
+        'document_issue_batch_items' => '229_create_document_issue_batches.php',
         // WHIT-815: the workspace's agent definitions (migration 180).
         'agents' => '180_create_agents.php',
         // WHIT-816: a person's use of a workspace agent, with their grant (migration 181).

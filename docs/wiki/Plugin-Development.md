@@ -1532,6 +1532,42 @@ $bound = $templates->forSlot('Invoicing.invoice');
 - `list()` returns at most 200, newest first, and takes `kind` and
   `recordType` filters.
 
+**Issuing in bulk (SDK 1.83).** `Documents::issueMany()` issues many documents
+from one template as a background job, and `Documents::batch()` reads where it
+is:
+
+```php
+use Whity\Sdk\Documents\BulkIssueItem;
+use Whity\Sdk\Documents\BulkIssueRequest;
+use Whity\Sdk\Documents\TemplateRef;
+
+$documents = \Whity\app(\Whity\Sdk\Documents\Documents::class);
+$batch = $documents->issueMany(new BulkIssueRequest(
+    TemplateRef::slot('Payroll.payslip'),
+    array_map(fn ($p) => new BulkIssueItem(record: "Payroll.payslip:{$p->id}"), $payslips),
+    batchKey: 'payroll:2026-11',
+));
+// later
+$status = $documents->batch($batch->batchId); // status, counts, a result per item
+```
+
+- **Nothing is issued in the call.** The batch is recorded and queued, and
+  `queue:work` issues it a chunk at a time. `status` is `queued`, `running`,
+  then `done`; `done` means every item has a result, so count `refused` and
+  `failed` or read `items`.
+- **Each item is checked when it runs**, as the caller who sent the batch:
+  a person needs `documents:issue` and is read with the permissions they hold
+  then; a background plugin issues only from its own slots, where allowed.
+  Each item is preflighted first, and a refusal (`reason`, `message`) writes
+  nothing.
+- **Safe to retry.** The same `batchKey` returns the batch already started
+  (`resubmitted: true`); the same key with different items is
+  `batch_key_conflict`. Every item has an origin key (yours, or
+  `batch:<batchKey>:<index>`), so a resumed batch replays instead of issuing
+  twice.
+- At most 500 items per batch; split larger runs into several batches. Only
+  the person or plugin that sent a batch can read it.
+
 
 ## Step 12b — Add a card to the home page (SDK 1.62)
 

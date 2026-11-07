@@ -104,6 +104,8 @@ final class CoreTables
         'customer_signups' => '222_create_workspace_signup.php',
         'localized_texts' => '225_create_localized_texts.php',
         'plugin_starter_seeds' => '228_create_plugin_starter_seeds.php',
+        'document_issue_batches' => '229_create_document_issue_batches.php',
+        'document_issue_batch_items' => '229_create_document_issue_batches.php',
         'agents' => '180_create_agents.php',
         'agent_assignments' => '181_create_agent_assignments.php',
         'agent_actions' => '182_create_agent_actions.php',
