@@ -66,6 +66,8 @@ use Whity\Core\Entitlement\PluginEntitlements;
 use Whity\Sdk\PluginEntitlementsInterface;
 use Whity\Sdk\PluginRolesInterface;
 use Whity\Sdk\PluginThemeInterface;
+use Whity\Sdk\PluginBillingPortalInterface;
+use Whity\Core\Billing\External\PluginBillingPortals;
 use Whity\Sdk\Sdk;
 
 /**
@@ -145,6 +147,9 @@ class PluginLoader
      * here has.
      */
     private ?WindowTypeRegistry $windowTypeRegistry = null;
+
+    /** Where a plugin-provided billing portal goes (SDK 1.77); null means plugins cannot sell. */
+    private ?PluginBillingPortals $billingPortals = null;
 
     /**
      * Optional catalogue of plugin-contributed status-page probes.
@@ -457,6 +462,18 @@ class PluginLoader
         $this->roleSeeder = $roleSeeder;
 
         $this->registerAutoloader();
+    }
+
+    /**
+     * Accept a plugin's billing portal (SDK 1.77, WHIT-1010).
+     *
+     * A setter rather than another constructor argument: the portal slot is
+     * built beside the billing handler, and the constructor's positional list
+     * is already long enough that one more is a merge hazard for every lane.
+     */
+    public function setBillingPortals(PluginBillingPortals $billingPortals): void
+    {
+        $this->billingPortals = $billingPortals;
     }
 
     /**
@@ -3462,6 +3479,24 @@ class PluginLoader
                 );
             } catch (Throwable $e) {
                 $this->handlePluginThrowable($pluginKey, $e, 'getHealthProbes');
+            }
+        }
+
+        // 2a-quater. Accept a plugin BILLING PORTAL (SDK 1.77, WHIT-1010). One
+        //     per deployment: the slot refuses a second and says so, because two
+        //     plugins both taking a deployment's subscription money would make
+        //     "which provider holds this customer" a question with two answers.
+        if ($this->billingPortals !== null && $plugin instanceof PluginBillingPortalInterface) {
+            try {
+                if (!$this->billingPortals->offer($plugin->getName(), $plugin->getBillingPortal())) {
+                    $this->logWarning(
+                        "Plugin {$pluginKey} offers a billing portal, but "
+                        . ($this->billingPortals->ownerName() ?? 'another plugin')
+                        . ' already provides one; it was not used.'
+                    );
+                }
+            } catch (Throwable $e) {
+                $this->handlePluginThrowable($pluginKey, $e, 'getBillingPortal');
             }
         }
 

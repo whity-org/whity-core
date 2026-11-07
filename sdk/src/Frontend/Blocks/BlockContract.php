@@ -909,6 +909,8 @@ final class BlockContract
                 'required'    => ['type' => 'bool',      'required' => false],
                 'default'     => ['type' => 'string',    'required' => false],
                 'defaultFrom' => ['type' => 'contextPath', 'required' => false],
+                // Rendered as a password field; for secrets an operator types in once (SDK 1.77).
+                'sensitive'   => ['type' => 'bool',      'required' => false],
             ]],
             'textArea' => ['container' => false, 'props' => [
                 'name'        => ['type' => 'inputName', 'required' => true],

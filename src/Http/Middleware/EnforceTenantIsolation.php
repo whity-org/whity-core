@@ -299,6 +299,17 @@ class EnforceTenantIsolation
         // path; a parametrised form would make the next route added under
         // `/billing/` public by default, on the surface where that is worst.
         '#^/api/v1/billing/webhook$#',
+        // The payment-provider twin of the entry above (WHIT-1010): a provider
+        // such as Stripe, Paddle or Polar, through the billing plugin. Same
+        // reasoning and the same safety: the plugin verifies the provider's
+        // signature over the raw bytes, and the payload only names a subject to
+        // go and ask about. One fixed path, no parameter, for the same reason.
+        '#^/api/v1/billing/provider-webhook$#',
+        // The page a payment provider's link opens (Paddle runs its checkout on
+        // the seller's own page). The payer has no session there. The plugin
+        // checks the transaction in the query with its provider before showing
+        // anything, and the page carries no tenant data of its own.
+        '#^/api/v1/billing/checkout-page$#',
         // Migration 132: an OPT-IN public form. The person filling in an
         // external application has no account and, in the case this exists for,
         // never will — so there is nothing here for this middleware to resolve.

@@ -36,6 +36,12 @@ final class BillingPortalException extends RuntimeException
     /** No billing service is configured on this deployment. */
     public const REASON_NOT_CONFIGURED = 'not_configured';
 
+    /** The provider has no such operation, a refund or a quantity (WHIT-1010). */
+    public const REASON_UNSUPPORTED = 'unsupported';
+
+    /** A provider notification whose signature did not verify (WHIT-1010). */
+    public const REASON_UNVERIFIED = 'unverified';
+
     private function __construct(
         public readonly string $reason,
         string $message,
@@ -61,6 +67,16 @@ final class BillingPortalException extends RuntimeException
     public static function refused(string $detail): self
     {
         return new self(self::REASON_REFUSED, $detail);
+    }
+
+    public static function unsupported(string $detail): self
+    {
+        return new self(self::REASON_UNSUPPORTED, $detail);
+    }
+
+    public static function unverified(string $detail): self
+    {
+        return new self(self::REASON_UNVERIFIED, $detail);
     }
 
     public static function notConfigured(): self

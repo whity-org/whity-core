@@ -11625,6 +11625,92 @@ final class CoreApiSchemas
                     ],
                 ],
             ],
+            [
+                'method' => 'POST',
+                'path' => '/api/billing/provider-webhook',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Payment provider notifications through the billing plugin (signed, not user-authenticated)',
+                    'description' =>
+                        'For a deployment that sells through a payment-provider plugin (Stripe, Paddle, '
+                        . 'Polar) instead of the hosted billing service. Point the provider\'s webhook '
+                        . 'here. The plugin verifies the provider\'s own signature over the RAW bytes '
+                        . 'before anything is decoded and returns only the delivery id and which '
+                        . 'workspace changed; the delivery id is recorded so a replay is acted on once, '
+                        . 'and what is true is then read back from the provider. The body is never a '
+                        . 'write path. 404 when no billing plugin is in use.',
+                    'tags' => ['billing'],
+                    'responses' => [
+                        200 => self::jsonResponse('Received, or deliberately ignored', self::object([
+                            'received' => self::bool(),
+                        ], ['received'])),
+                        401 => self::errorResponse('The signature did not verify'),
+                        404 => self::errorResponse('No billing plugin is in use'),
+                        503 => self::errorResponse('Temporarily could not be acted on — retry'),
+                    ],
+                ],
+            ],
+            [
+                'method' => 'GET',
+                'path' => '/api/billing/checkout-page',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'The page a payment provider link opens, for checkouts that run on the seller page',
+                    'description' =>
+                        'Public: the payer arrives from the provider (Paddle) with only the query string. '
+                        . 'The billing plugin writes the HTML and its Content-Security-Policy and checks the '
+                        . 'transaction in the query with its provider first. Answers HTML, uncached; 404 when '
+                        . 'no billing plugin is in use or the reference is not valid.',
+                    'tags' => ['billing'],
+                    'responses' => [
+                        200 => ['description' => 'The checkout page (text/html)'],
+                        404 => self::errorResponse('No such checkout'),
+                        503 => self::errorResponse('The payment provider is temporarily unreachable'),
+                    ],
+                ],
+            ],
+            self::permissionRoute('POST', '/api/billing/portal', 'billing:pay', [
+                'summary' => 'A link to the payment provider\'s self-service page for this workspace',
+                'description' =>
+                    'Where the workspace updates its card, downloads invoices or cancels, on the '
+                    . 'payment provider\'s own page. Short-lived. Only a payment-provider plugin has '
+                    . 'one; the hosted billing service answers 404.',
+                'tags' => ['billing'],
+                'responses' => [
+                    200 => self::jsonResponse('Where to send the customer', self::object([
+                        'url' => self::str(),
+                    ], ['url'])),
+                    404 => self::errorResponse('This deployment has no self-service billing page'),
+                    409 => self::errorResponse('This workspace has not bought anything yet'),
+                    502 => self::errorResponse('The payment provider refused the request'),
+                    503 => self::errorResponse('The payment provider is temporarily unreachable'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/billing/refunds', 'plans:manage', [
+                'summary' => 'Refund a workspace\'s payment (operator only)',
+                'description' =>
+                    'System workspace only. Names the workspace (`tenant_id`), the receipt\'s '
+                    . '`reference`, and optionally `amount_minor` for a partial refund in minor units. '
+                    . 'Some providers review a refund before it happens, so the answer is 202 and the '
+                    . 'receipt shows the outcome later.',
+                'tags' => ['billing'],
+                'request' => self::object([
+                    'tenant_id' => self::int(),
+                    'receipt' => self::str(),
+                    'amount_minor' => self::int(),
+                ], ['tenant_id', 'receipt']),
+                'responses' => [
+                    202 => self::jsonResponse('The refund was requested', self::object([
+                        'requested' => self::bool(),
+                    ], ['requested'])),
+                    404 => self::errorResponse('This deployment cannot refund through its payment provider'),
+                    422 => self::errorResponse('Validation failed, or the provider refused the refund'),
+                    502 => self::errorResponse('The payment provider refused the request'),
+                    503 => self::errorResponse('The payment provider is temporarily unreachable'),
+                ] + self::authErrors(),
+            ]),
         ];
     }
 

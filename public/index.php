@@ -2905,7 +2905,16 @@ $router->register('POST', '/api/payments/webhook/{provider}', [$paymentWebhookHa
 // misconfiguration. See NullBillingPortal for why that walls nobody.
 $payWebhookSecret = (string) ($_ENV['PAY_WEBHOOK_SECRET'] ?? getenv('PAY_WEBHOOK_SECRET') ?: '');
 
-$billingPortal = \Whity\Core\Billing\External\BillingPortalFactory::fromEnvironment();
+// A payment-provider PLUGIN (SDK 1.75, WHIT-1010) can sell subscriptions too.
+// Plugins load long after this point, so the slot is created empty here,
+// handed to the PluginLoader below, and read at call time. The hosted service in
+// the environment still wins when it is configured.
+$pluginBillingPortals = new \Whity\Core\Billing\External\PluginBillingPortals();
+\Whity\register_service(\Whity\Core\Billing\External\PluginBillingPortals::class, $pluginBillingPortals);
+$billingPortal = new \Whity\Core\Billing\External\ResolvingBillingPortal(
+    \Whity\Core\Billing\External\BillingPortalFactory::fromEnvironment(),
+    $pluginBillingPortals,
+);
 
 $billingAccessRecorder = new \Whity\Core\Billing\External\AccessRecorder(
     new \Whity\Core\Subscription\SubscriptionService(
@@ -2956,6 +2965,17 @@ $router->register('POST', '/api/billing/change-plan', [$externalBillingHandler, 
 // Registering it here is only half the job — EnforceTenantIsolation must also
 // list the path, or this 401s before it is ever routed. See the entry there.
 $router->register('POST', '/api/billing/webhook', [$externalBillingHandler, 'webhook'], null);
+// The same, from a payment provider through the billing plugin (WHIT-1010). Also
+// unauthenticated and also listed in EnforceTenantIsolation; the plugin verifies
+// the provider's signature over the raw bytes, and the payload is never a write path.
+$router->register('POST', '/api/billing/provider-webhook', [$externalBillingHandler, 'providerWebhook'], null);
+// The provider's self-service page (card, invoices, cancelling), for this tenant only.
+// A provider whose checkout runs on the seller's own page (Paddle) opens it here.
+// Public like the provider webhook, and listed in EnforceTenantIsolation too.
+$router->register('GET', '/api/billing/checkout-page', [$externalBillingHandler, 'checkoutPage'], null);
+$router->register('POST', '/api/billing/portal', [$externalBillingHandler, 'customerPortal'], null, null, CorePermissions::BILLING_PAY);
+// Refunds are the operator's: plans:manage in the system workspace, re-checked in the handler.
+$router->register('POST', '/api/billing/refunds', [$externalBillingHandler, 'refund'], null, null, CorePermissions::PLANS_MANAGE);
 
 // Early birds, offers and promo codes — one object, three ways of being found.
 // A promotion carrying a `code` is typed by the customer; one without applies
@@ -5516,6 +5536,7 @@ $router->register('POST', '/api/mcp/connect/preview', [$mcpConnectHandler, 'prev
 $pluginLoader->setAgentPresetRegistry($agentPresetRegistry);
 // Code plugins' template slots and record types as merge fields (SDK 1.56, WHIT-742).
 $pluginLoader->setDocumentRegistries($templateSlotRegistry, $documentFieldRegistry);
+$pluginLoader->setBillingPortals($pluginBillingPortals);
 $pluginLoader->load();
 $pluginLoader->collectMcpPrompts($promptRegistry);
 // SDK 1.43. Collect FIRST, then hand the deriver the suppressions: a plugin

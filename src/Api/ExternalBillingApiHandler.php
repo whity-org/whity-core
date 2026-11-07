@@ -16,6 +16,10 @@ use Whity\Core\Billing\External\BillingPortalException;
 use Whity\Core\Billing\External\BillingSubject;
 use Whity\Core\Billing\External\EventLedger;
 use Whity\Core\Billing\External\Receipt;
+use Whity\Core\Billing\External\ResolvingBillingPortal;
+use Whity\Core\Billing\External\SdkBillingPortalBridge;
+use Whity\Core\Plan\PlanService;
+use Whity\Sdk\Billing\PlanPriceTerms;
 use Whity\Core\Billing\External\WebhookVerifier;
 use Whity\Core\Db\DbBool;
 use Whity\Core\RBAC\CorePermissions;
@@ -141,7 +145,15 @@ final class ExternalBillingApiHandler
         $interval = $body['billing_period'] ?? 'month';
         $interval = is_string($interval) && $interval !== '' ? $interval : 'month';
 
-        $priceRef = $this->externalPriceRef($tenantId, trim($planKey), $interval);
+        try {
+
+            $priceRef = $this->externalPriceRef($tenantId, trim($planKey), $interval);
+
+        } catch (BillingPortalException $e) {
+
+            return $this->portalFailure($e, 'find the price', ['tenant_id' => $tenantId]);
+
+        }
         if ($priceRef === null) {
             return Response::error('That plan cannot be bought on these terms.', 422);
         }
@@ -291,6 +303,17 @@ final class ExternalBillingApiHandler
             return Response::json(self::ACK);
         }
 
+        return $this->reread($eventId, $subjectRef);
+    }
+
+    /**
+     * Go and ask what is true for a subject a verified notification named, and
+     * record it. Shared by the hosted service's notification and a provider
+     * plugin's, so both stay one path: the payload names a subject, the answer
+     * comes from the portal.
+     */
+    private function reread(string $eventId, string $subjectRef): Response
+    {
         $tenantId = BillingSubject::tenantIdFrom($subjectRef);
         if ($tenantId === null) {
             // A subject that is not a tenant of this deployment. Once seats or a
@@ -461,7 +484,15 @@ final class ExternalBillingApiHandler
         $interval = $body['billing_period'] ?? 'month';
         $interval = is_string($interval) && $interval !== '' ? $interval : 'month';
 
-        $priceRef = $this->externalPriceRef($tenantId, $planKey, $interval);
+        try {
+
+            $priceRef = $this->externalPriceRef($tenantId, $planKey, $interval);
+
+        } catch (BillingPortalException $e) {
+
+            return $this->portalFailure($e, 'find the price', ['tenant_id' => $tenantId]);
+
+        }
         if ($priceRef === null) {
             return Response::error('That plan cannot be bought on these terms.', 422);
         }
@@ -514,6 +545,260 @@ final class ExternalBillingApiHandler
         }
 
         return Response::json(['data' => ['plan_key' => $planKey, 'takes_effect' => $isUpgrade ? 'now' : 'renewal']]);
+    }
+
+    /**
+     * POST /api/v1/billing/provider-webhook — a payment provider's notification,
+     * through the billing plugin (SDK 1.77, WHIT-1010).
+     *
+     * Same rules as {@see self::webhook()}: unauthenticated because the sender
+     * holds no session, verified over the RAW bytes before anything is decoded
+     * (inside the plugin's verifyNotification, which cannot hand back a subject
+     * without verifying), and never a write path. The plugin returns only the
+     * delivery id and the subject; what is true comes from accessFor().
+     *
+     * 404 when no plugin portal is in use: there is nobody here to verify the
+     * signature, so the payload cannot even be judged.
+     */
+    public function providerWebhook(Request $request): Response
+    {
+        $bridge = $this->pluginBridge();
+        if ($bridge === null) {
+            return Response::error('Not found', 404);
+        }
+
+        $raw = $request->getBody();
+
+        try {
+            $notice = $bridge->call(fn () => $bridge->sdk()->verifyNotification($raw, $request->getHeaders()));
+        } catch (BillingPortalException $e) {
+            if ($e->reason === BillingPortalException::REASON_UNVERIFIED) {
+                $this->logger->warning('Rejected an unverified payment provider notification', ['bytes' => strlen($raw)]);
+
+                return Response::error('Unauthorized', 401);
+            }
+
+            if ($e->isTransient()) {
+                return Response::error('Try again shortly.', 503);
+            }
+
+            $this->logger->error('A payment provider notification could not be read', ['reason' => $e->reason]);
+
+            // Authentic but unreadable is our problem, and a retry will not fix it.
+            return Response::json(self::ACK);
+        }
+
+        if ($notice === null) {
+            return Response::json(self::ACK);
+        }
+
+        // Namespaced by the portal, so a provider event id can never collide
+        // with one the hosted service sent.
+        $eventId = $bridge->sdk()->name() . ':' . $notice->eventId;
+        if (!$this->ledger->claim($eventId)) {
+            return Response::json(self::ACK);
+        }
+
+        return $this->reread($eventId, $notice->subjectRef);
+    }
+
+    /**
+     * POST /api/v1/billing/portal — a short-lived link to the provider's own
+     * self-service page: card, invoices, cancelling (WHIT-1010).
+     *
+     * Only a plugin portal has one. The link is made for THIS tenant's subject,
+     * never one the caller names.
+     */
+    public function customerPortal(Request $request): Response
+    {
+        $tenantId = $this->requireTenant($request, CorePermissions::BILLING_PAY);
+        if ($tenantId instanceof Response) {
+            return $tenantId;
+        }
+
+        $bridge = $this->pluginBridge();
+        if ($bridge === null || !$bridge->sdk()->capabilities()->customerPortal) {
+            return Response::error('This deployment has no self-service billing page.', 404);
+        }
+
+        try {
+            $url = $bridge->call(fn () => $bridge->sdk()->customerPortalUrl(
+                BillingSubject::forTenant($tenantId),
+                $this->appUrl . '/billing',
+            ));
+        } catch (BillingPortalException $e) {
+            if ($e->reason === BillingPortalException::REASON_REFUSED) {
+                return Response::error('This workspace has not bought anything yet.', 409);
+            }
+
+            return $this->portalFailure($e, 'open the customer portal', ['tenant_id' => $tenantId]);
+        }
+
+        return Response::json(['data' => ['url' => $url]]);
+    }
+
+    /**
+     * POST /api/v1/billing/refunds — refund one of a workspace's payments
+     * (WHIT-1010). OPERATOR ONLY: `plans:manage` in the system workspace. A
+     * workspace refunding itself would be taking its money back and keeping
+     * what it bought.
+     *
+     * Body: `tenant_id`, `receipt` (the receipt's `reference`), optional
+     * `amount_minor` for a partial refund. Some providers review a refund
+     * first; the receipt shows the outcome when it lands.
+     */
+    public function refund(Request $request): Response
+    {
+        $operatorTenant = $this->requireTenant($request, CorePermissions::PLANS_MANAGE);
+        if ($operatorTenant instanceof Response) {
+            return $operatorTenant;
+        }
+        if ($operatorTenant !== PlanService::systemTenantId()) {
+            return Response::error('Refunds are made by the system workspace only', 403);
+        }
+
+        $bridge = $this->pluginBridge();
+        if ($bridge === null || !$bridge->sdk()->capabilities()->refunds) {
+            return Response::error('This deployment cannot refund through its payment provider.', 404);
+        }
+
+        $body = JsonBody::parsed($request);
+        $tenantId = $body['tenant_id'] ?? null;
+        $receipt = $body['receipt'] ?? null;
+        $amount = $body['amount_minor'] ?? null;
+
+        $errors = [];
+        if (!is_int($tenantId) || $tenantId < 1) {
+            $errors['tenant_id'] = 'name the workspace';
+        }
+        if (!is_string($receipt) || trim($receipt) === '') {
+            $errors['receipt'] = 'name the payment to refund';
+        }
+        if ($amount !== null && (!is_int($amount) || $amount < 1)) {
+            $errors['amount_minor'] = 'a positive whole number of minor units, or leave it out to refund the rest';
+        }
+        if (!is_int($tenantId) || !is_string($receipt) || ($amount !== null && !is_int($amount)) || $errors !== []) {
+            return Response::error('Validation failed', 422, $errors);
+        }
+
+        $receipt = trim($receipt);
+        $actor = $this->actorFor($request)->value;
+
+        try {
+            $bridge->call(function () use ($bridge, $actor, $tenantId, $receipt, $amount): null {
+                $bridge->sdk()->refund($actor, BillingSubject::forTenant($tenantId), $receipt, $amount);
+
+                return null;
+            });
+        } catch (BillingPortalException $e) {
+            if ($e->reason === BillingPortalException::REASON_REFUSED) {
+                return Response::error('The payment provider refused this refund.', 422);
+            }
+
+            return $this->portalFailure($e, 'refund a payment', ['tenant_id' => $tenantId]);
+        }
+
+        $this->audit?->record('billing.refunded', [
+            'tenant_id' => $tenantId,
+            'target_type' => 'tenant',
+            'target_id' => $tenantId,
+            'metadata' => ['receipt' => $receipt, 'amount_minor' => $amount],
+        ]);
+
+        return Response::json(['data' => ['requested' => true]], 202);
+    }
+
+    /**
+     * GET /api/v1/billing/checkout-page — the page a provider's payment link
+     * opens, for a provider whose checkout runs on the seller's own page
+     * (Paddle). Public, because the payer arrives from the provider holding
+     * nothing but the query string (WHIT-1010).
+     *
+     * The plugin writes the page and its Content-Security-Policy and checks
+     * whatever reference the query carries with its provider; this only serves
+     * it, uncached. 404 for a portal with no such page.
+     */
+    public function checkoutPage(Request $request): Response
+    {
+        $bridge = $this->pluginBridge();
+        $sdk = $bridge?->sdk();
+        if ($bridge === null || !$sdk instanceof \Whity\Sdk\Billing\HostedCheckoutPage) {
+            return Response::error('Not found', 404);
+        }
+
+        try {
+            $page = $bridge->call(fn () => $sdk->checkoutPage(self::queryParams($request)));
+        } catch (BillingPortalException $e) {
+            $this->logger->warning('A checkout page could not be built', ['reason' => $e->reason]);
+
+            return Response::error('This payment link is not valid.', $e->isTransient() ? 503 : 404);
+        }
+
+        if ($page === null) {
+            return Response::error('This payment link is not valid.', 404);
+        }
+
+        return new Response(200, $page->html, [
+            'Content-Type' => 'text/html; charset=utf-8',
+            'Content-Security-Policy' => $page->contentSecurityPolicy,
+            'Cache-Control' => 'no-store',
+        ]);
+    }
+
+    /** The plugin portal's bridge, only when a plugin portal is the one in use. */
+    private function pluginBridge(): ?SdkBillingPortalBridge
+    {
+        return $this->portal instanceof ResolvingBillingPortal ? $this->portal->pluginBridge() : null;
+    }
+
+    /**
+     * The plugin's provider price for a plan, created at the provider on first
+     * use (WHIT-1010). Core sends its own price row, never a price the caller
+     * named, so the amount charged is always the one in plan_prices.
+     */
+    private function pluginPriceRef(SdkBillingPortalBridge $bridge, string $planKey, string $currency, string $interval): ?string
+    {
+        $statement = $this->pdo->prepare(
+            'SELECT pp.id, pp.unit_amount, pp.currency, pp.billing_period, pp.is_per_seat, pp.is_per_device,
+                    p.plan_key, p.name
+               FROM plan_prices pp
+               JOIN plans p ON p.id = pp.plan_id
+              WHERE p.plan_key = :plan_key
+                AND pp.currency = :currency
+                AND pp.billing_period = :billing_period
+                AND pp.is_active = :on
+              ORDER BY pp.id ASC
+              LIMIT 1'
+        );
+        $statement->bindValue(':plan_key', $planKey);
+        $statement->bindValue(':currency', $currency);
+        $statement->bindValue(':billing_period', $interval);
+        $statement->bindValue(':on', true, PDO::PARAM_BOOL);
+        $statement->execute();
+        $row = $statement->fetch(PDO::FETCH_ASSOC);
+        if (!is_array($row)) {
+            return null;
+        }
+
+        $terms = new PlanPriceTerms(
+            (int) $row['id'],
+            (string) $row['plan_key'],
+            (string) $row['name'],
+            (string) $row['currency'],
+            (int) $row['unit_amount'],
+            (string) $row['billing_period'],
+            DbBool::of($row['is_per_seat']),
+            DbBool::of($row['is_per_device'] ?? false),
+        );
+
+        try {
+            return $bridge->call(fn () => $bridge->sdk()->priceRefFor($terms));
+        } catch (BillingPortalException $e) {
+            if ($e->reason === BillingPortalException::REASON_REFUSED) {
+                return null;
+            }
+            throw $e;
+        }
     }
 
     private function currentPlanKey(int $tenantId): ?string
@@ -620,12 +905,17 @@ final class ExternalBillingApiHandler
               WHERE p.is_active = :plan_on
                 AND pp.is_active = :price_on
                 AND pp.currency = :currency
-                AND pp.external_ref IS NOT NULL
+                AND (pp.external_ref IS NOT NULL OR :plugin_resolves = 1)
               ORDER BY p.is_addon ASC, pp.unit_amount ASC, p.plan_key ASC'
         );
         $statement->bindValue(':plan_on', true, PDO::PARAM_BOOL);
         $statement->bindValue(':price_on', true, PDO::PARAM_BOOL);
         $statement->bindValue(':currency', $currency);
+        // A provider plugin creates its price on first checkout, so a plan
+        // price needs no external_ref to be sold, only a currency it takes.
+        $bridge = $this->pluginBridge();
+        $pluginResolves = $bridge !== null && $bridge->sdk()->capabilities()->takesCurrency($currency);
+        $statement->bindValue(':plugin_resolves', $pluginResolves ? 1 : 0, PDO::PARAM_INT);
         $statement->execute();
 
         $current = $this->currentPlanKey($tenantId);
@@ -668,6 +958,11 @@ final class ExternalBillingApiHandler
             SettingsRegistry::BILLING_DEFAULT_CURRENCY,
             'JOD'
         ));
+
+        $bridge = $this->pluginBridge();
+        if ($bridge !== null) {
+            return $this->pluginPriceRef($bridge, $planKey, $currency, $interval);
+        }
 
         $statement = $this->pdo->prepare(
             'SELECT pp.external_ref
