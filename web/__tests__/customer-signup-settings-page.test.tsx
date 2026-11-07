@@ -109,6 +109,34 @@ test('a bad domain is explained in the page’s own words, naming the line', asy
   expect(screen.queryByText('Enter domain names such as example.com.')).not.toBeInTheDocument();
 });
 
+test('choosing Open with no bot check on the instance warns, with a link for the operator (WHIT-917)', async () => {
+  routes({
+    'GET /api/v1/signup/settings': () => json(settings({ email_signup_ready: false, join_providers: [] })),
+    'GET /api/v1/signup/requests': () => json({ data: [], pagination: {} }),
+  });
+
+  render(<CustomerSignupSettingsPage />);
+  await screen.findByLabelText('[t] Allowed email domains');
+  expect(screen.queryByTestId('customer-signup-no-bot-check')).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByLabelText(/\[t\] Open/));
+
+  const warning = await screen.findByTestId('customer-signup-no-bot-check');
+  expect(warning).toHaveTextContent('won’t work until the operator sets up a bot check');
+  expect(screen.getByTestId('customer-signup-bot-check-link').getAttribute('href')).toBe('/admin/settings/public-forms');
+});
+
+test('with a sign-in provider available, the warning says people can still join with it', async () => {
+  routes({
+    'GET /api/v1/signup/settings': () =>
+      json(settings({ mode: 'open', email_signup_ready: false, join_providers: [{ provider_key: 'whity_id', display_name: 'Whity ID' }] })),
+    'GET /api/v1/signup/requests': () => json({ data: [], pagination: {} }),
+  });
+
+  render(<CustomerSignupSettingsPage />);
+  expect(await screen.findByTestId('customer-signup-no-bot-check')).toHaveTextContent('People can still join with Whity ID');
+});
+
 test('a workspace with no slug is told its sign-up page can’t be reached', async () => {
   routes({
     'GET /api/v1/signup/settings': () => json(settings({ workspace_slug: null })),

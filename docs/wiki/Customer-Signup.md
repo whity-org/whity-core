@@ -52,6 +52,23 @@ Profiles stay global (ADR 0005). The same email can be a customer in one workspa
 
 A rejected person, or one whose membership is suspended, can't get in by signing up again. Reject asks first. A rejected request stays under **Turned away** in the queue, and can still be approved from there.
 
+## Joining with a sign-in provider
+
+The sign-up page also offers **Continue with <provider>** for the operator's enabled, global sign-in providers (Settings → Single sign-on in the system workspace; on app.whity.dev that is Whity ID). A workspace's own provider is not offered: it signs in that workspace's existing members only.
+
+- The link is `/api/v1/auth/sso/<provider>/start?join=<workspace slug>`. The workspace is checked when the visitor leaves and then travels only inside the signed sign-in flow cookie, so the return trip can't be pointed at another workspace.
+- On return, the ordinary federated sign-in finds or creates the profile. A new one has no password (`auth_method` `idp`), and a verified email links to the existing account, as at sign-in.
+- Then the same rules as the email path apply: the mode, the domain list checked against the email the provider verified, the customer-safe starting role, and the person's existing membership, suspension, invitation or rejection. Open signs them straight into the workspace. Approval required puts them in the queue and sends them back to the sign-up page.
+- The provider round trip stands in for the bot check and the emailed link. A provider email that isn't verified can't join.
+- No workspace is ever created on this path, even when the operator lets federated sign-ins create one.
+
+## When sign-up can't work yet
+
+Email sign-up needs the instance's bot check (Settings → Public forms), unless the operator allowed going without. Until then:
+
+- Settings → Sign-up warns as soon as Open or Approval required is chosen, and links to the bot check settings for the operator. If a sign-in provider is available, it says people can still join with it.
+- The sign-up page learns this up front (`email_signup: false`, `email_signup_reason: bot_check_unavailable`) and shows only the provider buttons. With no provider either, it says the workspace isn't taking sign-ups yet. Sending the form anyway is refused with 409 `email_signup_unavailable`. A 503 means only that the bot check provider couldn't be reached.
+
 ## Safety
 
 - **Which workspace.** The slug in the path names it. When the request's host also names a workspace (its custom domain or slug subdomain, the same resolution branding uses), the two must agree. After the request, the workspace is read only from the stored row. A sign-up for workspace A can't create a membership in workspace B.

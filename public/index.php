@@ -4816,6 +4816,10 @@ $customerSignupService = new \Whity\Core\Signup\CustomerSignupService(
     $customerSafeRoles,
     $hookManager
 );
+$joinProviders = new \Whity\Core\Signup\JoinProviders(
+    new \Whity\Core\Identity\IdentityProviderRepository($db->getPdo()),
+    $settingsService
+);
 $publicSignupHandler = new \Whity\Api\PublicSignupApiHandler(
     $customerSignupService,
     $signupSettings,
@@ -4829,7 +4833,9 @@ $publicSignupHandler = new \Whity\Api\PublicSignupApiHandler(
         $settingsService
     ),
     new DatabaseSharedStore($db->getPdo()),
-    $auditLogger
+    $auditLogger,
+    // WHIT-917: the sign-in providers a visitor may join with, listed up front.
+    $joinProviders
 );
 // The confirm pair first, so it can never be read as a workspace slug.
 $router->register('GET',  '/api/public/signup/confirm',               [$publicSignupHandler, 'preview'], null);
@@ -4843,7 +4849,8 @@ $workspaceSignupHandler = new \Whity\Api\WorkspaceSignupApiHandler(
     $customerSafeRoles,
     $customerSignupService,
     $auditLogger,
-    $publicFormBotCheck
+    $publicFormBotCheck,
+    $joinProviders
 );
 $router->register('GET',  '/api/signup/settings',                   [$workspaceSignupHandler, 'getSettings'],    null, null, CorePermissions::SIGNUP_MANAGE);
 $router->register('PUT',  '/api/signup/settings',                   [$workspaceSignupHandler, 'updateSettings'], null, null, CorePermissions::SIGNUP_MANAGE);
@@ -4952,6 +4959,9 @@ $ssoAuthHandler = new \Whity\Api\SsoAuthHandler(
     $hookManager,
     // Post-login redirects go to the frontend; the callback above stays on APP_URL.
     $frontendUrls,
+    // WHIT-917: "Continue with …" on a workspace's sign-up page joins it as a customer.
+    $customerSignupService,
+    $brandingHostRepo,
 );
 // Public list of ENABLED providers for the current tenant, so the login page can
 // render "Sign in with …" buttons (display-safe fields only; no secrets).

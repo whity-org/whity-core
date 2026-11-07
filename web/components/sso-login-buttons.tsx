@@ -25,7 +25,7 @@ function startUrl(providerKey: string): string {
   return `/api/v1/auth/sso/${encodeURIComponent(providerKey)}/start`;
 }
 
-function ProviderIcon({ providerKey }: { providerKey: string }) {
+export function ProviderIcon({ providerKey }: { providerKey: string }) {
   if (providerKey === 'google') return <IconBrandGoogle className="h-4 w-4" aria-hidden="true" />;
   // Whity ID, the Whity identity service, keyed whity_id (SSO provider keys are [a-z0-9_]+).
   if (providerKey === 'whity_id') return <Mark size={16} label="" />;

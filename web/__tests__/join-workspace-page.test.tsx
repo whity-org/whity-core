@@ -143,6 +143,72 @@ test('an existing account is asked for nothing, and a refusal is shown as such',
   await waitFor(() => expect(screen.getByTestId('join-confirm-refused')).toBeInTheDocument());
 });
 
+test('with no bot check and no provider, the page says up front it isn’t taking sign-ups yet (WHIT-917)', async () => {
+  (global.fetch as jest.Mock).mockResolvedValueOnce(
+    json(200, { data: { ...OPEN_INFO.data, email_signup: false, email_signup_reason: 'bot_check_unavailable', providers: [] } })
+  );
+
+  await renderJoin();
+
+  expect(await screen.findByTestId('join-not-ready')).toHaveTextContent('isn’t taking sign-ups yet');
+  expect(screen.queryByTestId('join-form')).not.toBeInTheDocument();
+});
+
+test('a provider is offered to join with, and is the only way in when email sign-up can’t work', async () => {
+  (global.fetch as jest.Mock).mockResolvedValueOnce(
+    json(200, {
+      data: {
+        ...OPEN_INFO.data,
+        email_signup: false,
+        email_signup_reason: 'bot_check_unavailable',
+        providers: [{ provider_key: 'whity_id', display_name: 'Whity ID' }],
+      },
+    })
+  );
+
+  await renderJoin();
+
+  const link = (await screen.findByTestId('join-provider-whity_id')) as HTMLAnchorElement;
+  expect(link).toHaveTextContent('Continue with Whity ID');
+  expect(link.getAttribute('href')).toBe('/api/v1/auth/sso/whity_id/start?join=example-bakery');
+  expect(screen.queryByTestId('join-form')).not.toBeInTheDocument();
+});
+
+test('coming back from the provider shows what happened', async () => {
+  window.history.pushState({}, '', '/join/example-bakery?sso=pending');
+  (global.fetch as jest.Mock).mockResolvedValueOnce(
+    json(200, { data: { ...OPEN_INFO.data, providers: [{ provider_key: 'whity_id', display_name: 'Whity ID' }] } })
+  );
+  await renderJoin();
+  expect(await screen.findByTestId('join-sso-pending')).toBeInTheDocument();
+  window.history.pushState({}, '', '/');
+});
+
+test('a refusal from the provider round trip is explained on the form', async () => {
+  window.history.pushState({}, '', '/join/example-bakery?sso=domain');
+  (global.fetch as jest.Mock).mockResolvedValueOnce(
+    json(200, { data: { ...OPEN_INFO.data, providers: [{ provider_key: 'whity_id', display_name: 'Whity ID' }] } })
+  );
+  await renderJoin();
+  expect(await screen.findByTestId('join-sso-outcome')).toHaveTextContent('only accepts sign-ups from some email domains');
+  expect(screen.getByTestId('join-form')).toBeInTheDocument();
+  window.history.pushState({}, '', '/');
+});
+
+test('a 409 from the email form means not taking sign-ups yet, not "try later"', async () => {
+  (global.fetch as jest.Mock)
+    .mockResolvedValueOnce(json(200, OPEN_INFO))
+    .mockResolvedValueOnce(json(409, { error: 'x', details: { code: 'email_signup_unavailable' } }));
+
+  await renderJoin();
+  await screen.findByText('Join Example Bakery');
+  fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'Layla' } });
+  fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'layla@example-bakery.com' } });
+  fireEvent.click(screen.getByTestId('join-submit'));
+
+  expect(await screen.findByTestId('join-not-ready')).toBeInTheDocument();
+});
+
 test('a missing or bad link says so', async () => {
   render(<JoinConfirmPage />);
   expect(await screen.findByTestId('join-confirm-invalid')).toBeInTheDocument();

@@ -67,7 +67,25 @@ final class PublicSignupApiHandler
         private readonly CustomerSignupMailer $mailer,
         private readonly SharedStoreInterface $store,
         private readonly AuditLogger $audit,
+        /** The sign-in providers a visitor may join with (WHIT-917); null lists none. */
+        private readonly ?\Whity\Core\Signup\JoinProviders $joinProviders = null,
     ) {
+    }
+
+    /**
+     * Whether the email form can work on this instance: a bot check is set up,
+     * or the operator chose to go without. Answered up front so a visitor is
+     * not asked to fill the form in first (WHIT-917).
+     */
+    private function emailSignupReady(): bool
+    {
+        return $this->bot->isRequired() ? $this->bot->isReady() : $this->bot->allowsNoBotCheck();
+    }
+
+    /** @return list<array{provider_key: string, display_name: string}> */
+    private function joinProviders(): array
+    {
+        return $this->joinProviders?->list() ?? [];
     }
 
     /** @param array<string, mixed> $params */
@@ -90,6 +108,10 @@ final class PublicSignupApiHandler
             'bot_check' => $this->bot->provider() !== null
                 ? ['provider' => $this->bot->provider(), 'site_key' => $this->bot->siteKey()]
                 : null,
+            // WHIT-917: whether the email form can work here, said up front.
+            'email_signup' => $this->emailSignupReady(),
+            'email_signup_reason' => $this->emailSignupReady() ? null : 'bot_check_unavailable',
+            'providers' => $this->joinProviders(),
         ]], 200);
     }
 
@@ -123,13 +145,16 @@ final class PublicSignupApiHandler
             return Response::error('Enter your name (up to 120 characters)', 422, ['display_name' => 'invalid']);
         }
 
-        // Bot check before anything is written or mailed.
-        if ($this->bot->isRequired()) {
-            if (!$this->bot->isReady()) {
-                error_log('[customer-signup] bot check is configured but not ready; sign-up refused');
+        // Bot check before anything is written or mailed. A bot check that is
+        // not set up is a configuration state, not an outage: 409 with a code
+        // the page shows as "not taking sign-ups yet" (WHIT-917). Only a
+        // provider that can't be reached is a 503 "try later".
+        if (!$this->emailSignupReady()) {
+            error_log('[customer-signup] no bot check is set up and the operator has not allowed going without; email sign-up refused');
 
-                return Response::error('Sign-up is unavailable right now. Try again later.', 503);
-            }
+            return Response::error('This workspace is not taking sign-ups yet', 409, ['code' => 'email_signup_unavailable']);
+        }
+        if ($this->bot->isRequired()) {
             $verdict = $this->bot->verify($botToken, $ip);
             if ($verdict === BotCheck::UNREACHABLE) {
                 return Response::error('Sign-up is unavailable right now. Try again later.', 503);
@@ -137,10 +162,6 @@ final class PublicSignupApiHandler
             if ($verdict !== BotCheck::PASSED) {
                 return Response::error('We couldn\'t confirm you are a person. Try again.', 422, ['bot_token' => 'failed']);
             }
-        } elseif (!$this->bot->allowsNoBotCheck()) {
-            error_log('[customer-signup] no bot check is configured and the operator has not allowed going without; sign-up refused');
-
-            return Response::error('Sign-up is unavailable right now. Try again later.', 503);
         }
 
         // Says nothing about the address beyond what the workspace publishes:
