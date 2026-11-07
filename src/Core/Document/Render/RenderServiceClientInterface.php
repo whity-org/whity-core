@@ -24,6 +24,18 @@ interface RenderServiceClientInterface
     public function isConfigured(): bool;
 
     /**
+     * Whether the render service can print for this app right now, and if
+     * not, why not and what fixes it (WHIT-1001): configured, reachable,
+     * built for this core release, and accepting this app's secret.
+     *
+     * Cheap enough for a hot path: an implementation caches the answer and
+     * only asks the service again after a short while, or when `$fresh` is
+     * set (the admin status line and `whity-cli render:check` set it). It
+     * never throws; every failure is a {@see RenderReadiness} state.
+     */
+    public function readiness(bool $fresh = false): RenderReadiness;
+
+    /**
      * The service's OTHER mode: a content tree with no positions, paginated by
      * the renderer.
      *

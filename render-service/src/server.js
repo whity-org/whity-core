@@ -19,6 +19,11 @@
  *   POST /render/flow   — a flowing document (a content tree) -> raw PDF
  *                         bytes, paginated in the browser (src/flow/).
  *   POST /render/labels — a label sheet (records or CSV rows) -> raw PDF bytes.
+ *   GET  /auth-check    — 204 when the `X-Render-Secret` header is accepted,
+ *                         401 when not (WHIT-1001). Renders nothing, so core
+ *                         can check its secret without spending a render
+ *                         from the rate limit; it has a looser limiter of its
+ *                         own.
  *
  * Both POST routes require the `X-Render-Secret` header to match
  * RENDER_SHARED_SECRET (>= 32 chars) exactly, and share one rate limiter.
@@ -81,6 +86,16 @@ const renderRateLimiter = rateLimit({
   message: { error: 'Too many render requests; try again shortly' },
 });
 
+// /auth-check's own limiter: generous, because core asks it at most once a
+// minute per worker, but bounded, so it is not a free secret-guessing oracle.
+const authCheckRateLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: Number(process.env.RENDER_AUTH_CHECK_RATE_LIMIT_MAX || 120),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many auth checks; try again shortly' },
+});
+
 if (SHARED_SECRET.length < 32) {
   // Not fatal — /health must still work so `docker compose` healthchecks and
   // manual troubleshooting are possible — but every render route refuses
@@ -120,6 +135,17 @@ const BUILD_INFO = (() => {
     return { core_version: null, commit: null };
   }
 })();
+
+// Every answer names the core release this image was built for (WHIT-1001),
+// so core can refuse a PDF from a renderer that was swapped for another
+// version between its readiness checks rather than store the other release's
+// layout. Not a secret: GET /health already says the same.
+if (BUILD_INFO.core_version) {
+  app.use((_req, res, next) => {
+    res.set('X-Render-Core-Version', BUILD_INFO.core_version);
+    next();
+  });
+}
 
 /**
  * The BROWSER this image was built around, frozen at build time by
@@ -242,6 +268,37 @@ function isAuthorized(req) {
 }
 
 /**
+ * The 401 body. It says which side to fix, and nothing about the secret
+ * itself: "this service has none" and "yours does not match" are both
+ * operator mistakes with different fixes, and neither helps a guesser, since
+ * an unconfigured service refuses every value alike.
+ */
+function refuse(res) {
+  const error =
+    SHARED_SECRET.length < 32
+      ? 'RENDER_SHARED_SECRET is unset or shorter than 32 characters on the render service; set the same value on the app and the render service'
+      : 'X-Render-Secret does not match this render service\'s RENDER_SHARED_SECRET; set the same value on the app and the render service';
+  res.status(401).json({ error });
+}
+
+/**
+ * Whether the caller's secret is accepted (WHIT-1001), without rendering.
+ * Core asks this to tell an operator "the secrets differ" before any print
+ * fails, and to keep that check off the render rate limit.
+ *
+ * It answers only accepted (204) or refused (401, `{"error":"refused"}`):
+ * unlike the render routes it does not say which side to fix, so a caller
+ * with no secret learns nothing about the service's own configuration.
+ */
+app.get('/auth-check', authCheckRateLimiter, (req, res) => {
+  if (!isAuthorized(req)) {
+    res.status(401).json({ error: 'refused' });
+    return;
+  }
+  res.status(204).end();
+});
+
+/**
  * The FLOWING render mode (#1072, first half).
  *
  * Takes a CONTENT TREE with no positions and decides for itself how many
@@ -260,7 +317,7 @@ function isAuthorized(req) {
  */
 app.post('/render/flow', renderRateLimiter, async (req, res) => {
   if (!isAuthorized(req)) {
-    res.status(401).json({ error: 'Unauthorized' });
+    refuse(res);
     return;
   }
 
@@ -335,7 +392,7 @@ app.post('/render/flow', renderRateLimiter, async (req, res) => {
  */
 app.post('/render/labels', renderRateLimiter, async (req, res) => {
   if (!isAuthorized(req)) {
-    res.status(401).json({ error: 'Unauthorized' });
+    refuse(res);
     return;
   }
   const validationError = validateLabelsPayload(req.body);

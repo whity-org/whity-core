@@ -15900,7 +15900,7 @@
                 "tags": [
                     "documents"
                 ],
-                "description": "The record is the deliverable and the rendered artifact is opportunistic. `documents.render_enabled` defaults to FALSE, so on a default install this returns a document with no artifact and `content_url: null` \u2014 which is a complete, routable document, not a degraded one: the values it was raised with are stored on the record, and POST /api/documents/{id}/render mints the artifact from them if the tier is later switched on. The `render` block says what happened. Sending `render: true` turns \"could not render\" into a 503 instead, for a caller who genuinely requires the bytes. The template's published version is issued, with the verification QR when the tenant has it on. A template the caller cannot SEE is a 404, never a 403, and the check is the editor's own visibility policy \u2014 creating from a gated template must not be a way to read it.",
+                "description": "The record is the deliverable and the rendered artifact is opportunistic. An instance without a ready render service (one reachable, at this release, accepting the shared secret) or with `documents.render_enabled` switched off returns a document with no artifact and `content_url: null` \u2014 which is a complete, routable document, not a degraded one: the values it was raised with are stored on the record, and POST /api/documents/{id}/render mints the artifact from them if the tier is later switched on. The `render` block says what happened. Sending `render: true` turns \"could not render\" into a 503 instead, for a caller who genuinely requires the bytes. The template's published version is issued, with the verification QR when the tenant has it on. A template the caller cannot SEE is a 404, never a 403, and the check is the editor's own visibility policy \u2014 creating from a gated template must not be a way to read it.",
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -35990,6 +35990,82 @@
                     },
                     "404": {
                         "description": "Plan not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/platform/renderer": {
+            "get": {
+                "operationId": "get_api_v1_platform_renderer",
+                "summary": "Whether the document renderer is connected, the same version and accepting the shared secret (system tenant only)",
+                "tags": [
+                    "platform-ops"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The renderer state, with a plain sentence and the exact fix when it is not ready",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PlatformRendererResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -56478,6 +56554,22 @@
                         "additionalProperties": {
                             "$ref": "#/components/schemas/RecordSectionVerdict"
                         }
+                    },
+                    "pdf_pending": {
+                        "type": "object",
+                        "properties": {
+                            "reason": {
+                                "type": "string"
+                            },
+                            "fix": {
+                                "type": "string",
+                                "nullable": true
+                            }
+                        },
+                        "required": [
+                            "reason",
+                            "fix"
+                        ]
                     }
                 },
                 "required": [
@@ -67426,6 +67518,54 @@
                     "update_available",
                     "repository",
                     "current_version"
+                ]
+            },
+            "PlatformRendererResponse": {
+                "type": "object",
+                "properties": {
+                    "state": {
+                        "type": "string",
+                        "enum": [
+                            "ready",
+                            "not_configured",
+                            "secret_missing",
+                            "unreachable",
+                            "secret_mismatch",
+                            "version_mismatch"
+                        ]
+                    },
+                    "ready": {
+                        "type": "boolean"
+                    },
+                    "app_version": {
+                        "type": "string"
+                    },
+                    "render_version": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "message": {
+                        "type": "string"
+                    },
+                    "fix": {
+                        "type": "string"
+                    },
+                    "switched_on": {
+                        "type": "boolean"
+                    },
+                    "printing": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "state",
+                    "ready",
+                    "app_version",
+                    "render_version",
+                    "message",
+                    "fix",
+                    "switched_on",
+                    "printing"
                 ]
             },
             "PlatformVersionResponse": {

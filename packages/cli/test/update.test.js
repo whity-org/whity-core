@@ -40,6 +40,27 @@ test('a good update runs its steps in the safe order and finishes clean', async 
   assert.equal(existsSync(join(dir, 'docker-compose.next.yml')), false);
 });
 
+test('an install running the renderer without a secret gets one, so it can print (WHIT-1001)', async (t) => {
+  const { dir, cleanup } = installFolder();
+  t.after(cleanup);
+  const envPath = join(dir, '.env');
+  writeFileSync(envPath, readFileSync(envPath, 'utf8').replace(/^RENDER_SHARED_SECRET=.*$/m, 'RENDER_SHARED_SECRET='));
+  await runUpdate(fakeDeps(), dir);
+
+  const secret = /^RENDER_SHARED_SECRET=(.*)$/m.exec(readFileSync(envPath, 'utf8'))[1];
+  assert.match(secret, /^[0-9a-f]{64}$/);
+});
+
+test('an install with a render secret keeps it', async (t) => {
+  const { dir, cleanup } = installFolder();
+  t.after(cleanup);
+  const envPath = join(dir, '.env');
+  const before = /^RENDER_SHARED_SECRET=(.*)$/m.exec(readFileSync(envPath, 'utf8'))[1];
+  await runUpdate(fakeDeps(), dir);
+
+  assert.equal(/^RENDER_SHARED_SECRET=(.*)$/m.exec(readFileSync(envPath, 'utf8'))[1], before);
+});
+
 test('the backup keeps the old config beside the dump', async (t) => {
   const { dir, cleanup } = installFolder();
   t.after(cleanup);

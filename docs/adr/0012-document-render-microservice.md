@@ -91,6 +91,24 @@ so the core image stays lean and the render tier scales horizontally on its own.
 - Render limits (max batch rows / page count / template size) are **settings**, not
   hardcoded (per-tenant ?? global default ?? registry default).
 
+## Amendment (WHIT-1001, 0.2.27): one opt-in, not three
+
+Setting the tier up took three separate steps (the Compose profile, the
+`documents.render_enabled` setting, and a shared secret on both sides), and a
+render image at another tag printed the old layout without a word. Now:
+
+- Running the service with a shared secret is the opt-in. Core asks it
+  (`GET /health`, then the new `GET /auth-check`, which renders nothing) whether
+  it is reachable, the same release, and accepting the secret, caches the
+  answer briefly, and prints only when all three hold.
+- `documents.render_enabled` defaults to `true` and is the operator's off switch.
+- A mismatched version or secret is a named `503` and an admin status line with
+  the fix, not a silent wrong print or a bare `401`.
+- The published compose files take one `WHITY_VERSION` for all three images.
+
+The security boundary is unchanged: the shared secret, the compose-network-only
+service, and the render rate limit (the secret check has its own).
+
 ## References
 
 - Task 58cdd88a (Document/label designer backend) — canonical brief; Track 1

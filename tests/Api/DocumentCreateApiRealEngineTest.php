@@ -12,6 +12,7 @@ use Tests\Support\FakeRenderServiceClient;
 use Tests\Support\SchemaFromMigrations;
 use Whity\Api\DocumentsApiHandler;
 use Whity\Auth\RoleChecker;
+use Whity\Core\CoreVersion;
 use Whity\Core\Document\DocumentArtifactRepository;
 use Whity\Core\Document\DocumentArtifactStore;
 use Whity\Core\Document\DocumentCollectionRepository;
@@ -24,6 +25,7 @@ use Whity\Core\Document\Issuing\IssueInput;
 use Whity\Core\Document\Issuing\TemplateIssuing;
 use Whity\Core\Document\Issuing\WorkerDocumentIssuing;
 use Whity\Core\Document\Embed\DocumentEmbedRegistry;
+use Whity\Core\Document\Render\RenderReadiness;
 use Whity\Core\RBAC\ScopedPermissionSet;
 use Whity\Core\Document\Issuing\WorkerDocumentServices;
 use Whity\Core\Document\Fields\DocumentFieldRegistry;
@@ -151,6 +153,10 @@ final class DocumentCreateApiRealEngineTest extends TestCase
         $this->documents = new DocumentRepository($this->pdo);
         $this->artifacts = new DocumentArtifactRepository($this->pdo);
         $this->fakeRender = new FakeRenderServiceClient();
+        // A fresh install has no renderer (WHIT-1001): printing needs a ready
+        // one, so the double starts as "not set up" and turning rendering on is
+        // what running one looks like.
+        $this->fakeRender->readiness = RenderReadiness::notConfigured(CoreVersion::VERSION);
         $this->settings = new SettingsService(
             new GlobalSettingsRepository($this->pdo),
             new TenantSettingsRepository($this->pdo)
@@ -263,6 +269,7 @@ final class DocumentCreateApiRealEngineTest extends TestCase
         // Weeks later the operator switches the render tier on and the document
         // is rendered with no values in the request — there is no body any more.
         $this->settings->setGlobal(SettingsRegistry::DOCUMENTS_RENDER_ENABLED, 'true');
+        $this->fakeRender->readiness = null;
         $rendered = $this->call('rerender', self::RAISER, ['id' => (string) $documentId]);
         self::assertSame(201, $rendered->getStatusCode(), $rendered->getBody());
 
@@ -639,6 +646,7 @@ final class DocumentCreateApiRealEngineTest extends TestCase
     public function testWithRenderingEnabledTheCreateStoresAnArtifact(): void
     {
         $this->settings->setGlobal(SettingsRegistry::DOCUMENTS_RENDER_ENABLED, 'true');
+        $this->fakeRender->readiness = null;
         $this->fakeRender->pdfBytes = "%PDF-1.4\nraised\n%%EOF";
         $templateId = $this->circular('Faculty circular');
 
@@ -672,6 +680,7 @@ final class DocumentCreateApiRealEngineTest extends TestCase
     public function testRenderFalseDeclinesTheArtifactOnACapableInstance(): void
     {
         $this->settings->setGlobal(SettingsRegistry::DOCUMENTS_RENDER_ENABLED, 'true');
+        $this->fakeRender->readiness = null;
         $templateId = $this->circular('Faculty circular');
 
         $res = $this->create(self::RAISER, ['document_source_id' => $templateId, 'render' => false]);
@@ -712,6 +721,7 @@ final class DocumentCreateApiRealEngineTest extends TestCase
     public function testRequiringARenderWithPersistenceOffIsRefusedAndWritesNothing(): void
     {
         $this->settings->setGlobal(SettingsRegistry::DOCUMENTS_RENDER_ENABLED, 'true');
+        $this->fakeRender->readiness = null;
         $this->settings->setGlobal(SettingsRegistry::DOCUMENTS_PERSIST_ENABLED, 'false');
         $templateId = $this->circular('Faculty circular');
 
@@ -734,6 +744,7 @@ final class DocumentCreateApiRealEngineTest extends TestCase
     public function testRequiringARenderOnACapableInstanceSucceedsAndStores(): void
     {
         $this->settings->setGlobal(SettingsRegistry::DOCUMENTS_RENDER_ENABLED, 'true');
+        $this->fakeRender->readiness = null;
         $this->fakeRender->pdfBytes = "%PDF-1.4\nrequired\n%%EOF";
         $templateId = $this->circular('Faculty circular');
 
@@ -756,6 +767,7 @@ final class DocumentCreateApiRealEngineTest extends TestCase
     public function testPersistenceOffIsReportedSeparatelyFromRenderingOff(): void
     {
         $this->settings->setGlobal(SettingsRegistry::DOCUMENTS_RENDER_ENABLED, 'true');
+        $this->fakeRender->readiness = null;
         $this->settings->setGlobal(SettingsRegistry::DOCUMENTS_PERSIST_ENABLED, 'false');
         $templateId = $this->circular('Faculty circular');
 
@@ -779,6 +791,7 @@ final class DocumentCreateApiRealEngineTest extends TestCase
     public function testARenderServiceFailureLeavesTheDocumentStanding(): void
     {
         $this->settings->setGlobal(SettingsRegistry::DOCUMENTS_RENDER_ENABLED, 'true');
+        $this->fakeRender->readiness = null;
         $this->fakeRender->throwOnRender = true;
         $templateId = $this->circular('Faculty circular');
 
@@ -805,6 +818,7 @@ final class DocumentCreateApiRealEngineTest extends TestCase
     public function testARejectedRenderIsReportedAsRejectedAndLeavesTheDocument(): void
     {
         $this->settings->setGlobal(SettingsRegistry::DOCUMENTS_RENDER_ENABLED, 'true');
+        $this->fakeRender->readiness = null;
         $this->fakeRender->rejectWith = 'The page is too small for this content';
         $templateId = $this->circular('Faculty circular');
 
@@ -829,6 +843,7 @@ final class DocumentCreateApiRealEngineTest extends TestCase
     public function testWithQrOnTheMintedCodeIsAppendedToTheFlow(): void
     {
         $this->settings->setGlobal(SettingsRegistry::DOCUMENTS_RENDER_ENABLED, 'true');
+        $this->fakeRender->readiness = null;
         $this->settings->setTenant(self::TENANT, SettingsRegistry::DOCUMENTS_QR_ENABLED, 'true');
         $templateId = $this->circular('Faculty circular');
 
@@ -853,6 +868,7 @@ final class DocumentCreateApiRealEngineTest extends TestCase
     public function testWithQrOffNothingIsMintedOrAppended(): void
     {
         $this->settings->setGlobal(SettingsRegistry::DOCUMENTS_RENDER_ENABLED, 'true');
+        $this->fakeRender->readiness = null;
         $templateId = $this->circular('Faculty circular');
 
         $res = $this->create(self::RAISER, ['document_source_id' => $templateId]);
@@ -940,6 +956,7 @@ final class DocumentCreateApiRealEngineTest extends TestCase
     public function testARequiredFieldWithNoValueIsRefusedByName(): void
     {
         $this->settings->setGlobal(SettingsRegistry::DOCUMENTS_RENDER_ENABLED, 'true');
+        $this->fakeRender->readiness = null;
         $templateId = $this->editor->published(self::TENANT, self::RAISER, 'Tax invoice', [
             $this->editor->para('Tax no. ', $this->editor->field('company.tax_number')),
         ]);
@@ -1441,6 +1458,7 @@ final class DocumentCreateApiRealEngineTest extends TestCase
         TenantContext::reset();
         TenantContext::setTenantId(self::TENANT);
         $this->settings->setGlobal(SettingsRegistry::DOCUMENTS_RENDER_ENABLED, 'true');
+        $this->fakeRender->readiness = null;
         $req = new Request('POST', "/api/documents/{$original}/render", [], '');
         $req->user = (object) ['profile_id' => self::RAISER, 'active_tenant_id' => self::TENANT];
         self::assertSame(409, $this->handler->rerender($req, ['id' => (string) $original])->getStatusCode());

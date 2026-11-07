@@ -209,6 +209,14 @@ if ($isCli && isset($argv[1])) {
         exit($sweepCommand->execute($argv));
     }
 
+    // WHIT-1001: can this deployment print documents, and if not, the fix.
+    if ($command === 'render:check') {
+        $renderCheckCommand = new \Whity\Cli\Commands\RenderCheckCommand();
+        array_shift($argv); // Remove script name
+        array_shift($argv); // Remove 'render:check' command
+        exit($renderCheckCommand->execute($argv));
+    }
+
     if ($command === 'update:check') {
         $updateCheckCommand = new \Whity\Cli\Commands\UpdateCheckCommand();
         array_shift($argv); // Remove script name
@@ -251,6 +259,7 @@ if ($isCli && isset($argv[1])) {
     echo "  billing:sync-device-quantity  Bill per-device subscriptions for the devices in service\n";
     echo "  affiliate:accrue-commissions  Turn referred customers' payments into affiliate commissions\n";
     echo "  update:check               Compare the core version against the latest GitHub release\n";
+    echo "  render:check               Check the document renderer: connected, same version, shared secret\n";
     echo "  queue:work                 Run the durable async job worker loop\n";
     echo "  schedule:run               Run the cron-tick scheduler (exactly-once per minute)\n";
     echo "  health:watch               Sample service health for the public /status page\n";
@@ -2307,12 +2316,23 @@ $router->registerUnversioned('GET', '/api/version', static function () use ($rou
 // source checkout as for an immutable container image.
 $platformVersionHandler = new \Whity\Api\PlatformVersionApiHandler(
     $roleChecker,
-    new \Whity\Core\Update\LatestReleaseCheck()
+    new \Whity\Core\Update\LatestReleaseCheck(),
+    // The same env the document renderer is built from further down; the
+    // readiness cache is per process, so both see one answer.
+    new \Whity\Core\Document\Render\RenderServiceClient(
+        (string) ($_ENV['RENDER_SERVICE_URL'] ?? 'http://render:8130'),
+        (string) ($_ENV['RENDER_SHARED_SECRET'] ?? ''),
+        (int) ($_ENV['RENDER_TIMEOUT_SECONDS'] ?? 30)
+    ),
+    $settingsService
 );
 $router->register('GET', '/api/platform/version',        [$platformVersionHandler, 'version'], null, null, CorePermissions::SETTINGS_MANAGE);
 // Separate route because it reaches out to the release stream: the local
 // snapshot above must stay instant and offline-safe.
 $router->register('GET', '/api/platform/version/latest', [$platformVersionHandler, 'latest'],  null, null, CorePermissions::SETTINGS_MANAGE);
+// WHIT-1001: is the document renderer connected, the same release, and
+// accepting the shared secret — and if not, the exact fix.
+$router->register('GET', '/api/platform/renderer',       [$platformVersionHandler, 'renderer'], null, null, CorePermissions::SETTINGS_MANAGE);
 
 // WC-209: dynamic OpenAPI document. Regenerates the spec from the LIVE router
 // at request time, so a plugin installed/uninstalled/reloaded after the last
