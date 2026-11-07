@@ -3075,6 +3075,19 @@ $resourceRoleAssignmentRepository = new \Whity\Core\RBAC\ResourceRoleAssignmentR
     $logger
 );
 
+// #1074: the narrowing half of record-level access for plugin resource types.
+// \Whity\Sdk\Rbac\PermissionResolver only ever widens at a record, so "these
+// records and not those" needs a second check ANDed with it. Built over the
+// same $permissionResolver, so a reach can never contain a record that
+// hasPermission() would refuse.
+$resourceScope = new \Whity\Core\RBAC\GrantResourceScope(
+    $permissionResolver,
+    $resourceRoleAssignmentRepository,
+    $resourceTypeRegistry,
+    $permissionRegistry
+);
+\Whity\register_service(\Whity\Sdk\Rbac\ResourceScope::class, $resourceScope); // @phpstan-ignore-line
+
 // 13a-sexies. Who may see a document template (DocumentAccessPolicy: scope +
 // required_permission) and where it is filed. Tenant-scoped, RBAC-gated; the
 // handlers ADDITIONALLY row-filter by scope + required_permission (server-side,

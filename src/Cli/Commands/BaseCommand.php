@@ -177,6 +177,18 @@ abstract class BaseCommand implements CliCommand, CommandHelp
         $resourceTypeRegistry->registerCoreResourceTypes();
         \Whity\register_service(\Whity\Core\RBAC\ResourceTypeRegistry::class, $resourceTypeRegistry);
 
+        // #1074: the narrowing check for plugin resource types, as public/index.php
+        // registers it, over the same delegation-aware checker registered above.
+        \Whity\register_service(
+            \Whity\Sdk\Rbac\ResourceScope::class,
+            new \Whity\Core\RBAC\GrantResourceScope(
+                new RoleCheckerPermissionResolver($roleChecker, $permissionRegistry),
+                new \Whity\Core\RBAC\ResourceRoleAssignmentRepository($db->getPdo(), $resourceTypeRegistry),
+                $resourceTypeRegistry,
+                $permissionRegistry
+            )
+        );
+
         // OU-type catalogue (#822), registered as a service for exactly the same
         // reason: a plugin's contributed types must be adoptable whether the
         // request arrived over HTTP or through a command, and a CLI-only empty

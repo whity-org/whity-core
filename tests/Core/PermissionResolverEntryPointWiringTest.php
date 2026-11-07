@@ -90,6 +90,31 @@ final class PermissionResolverEntryPointWiringTest extends TestCase
         );
     }
 
+    /**
+     * #1074: the narrowing ResourceScope must be registered by both entry
+     * points, over the same resolver the plugin's permission checks use, or a
+     * reach could hold a record that hasPermission() refuses.
+     */
+    public function testBothEntryPointsRegisterTheResourceScope(): void
+    {
+        $http = $this->read(__DIR__ . '/../../public/index.php');
+        self::assertMatchesRegularExpression(
+            '/new\s+\\\\Whity\\\\Core\\\\RBAC\\\\GrantResourceScope\(\s*\$permissionResolver\s*,/',
+            $http
+        );
+        self::assertMatchesRegularExpression(
+            '/register_service\(\s*\\\\Whity\\\\Sdk\\\\Rbac\\\\ResourceScope::class/',
+            $http
+        );
+
+        $cli = $this->read(__DIR__ . '/../../src/Cli/Commands/BaseCommand.php');
+        self::assertMatchesRegularExpression(
+            '/\\\\Whity\\\\Sdk\\\\Rbac\\\\ResourceScope::class,\s*new\s+\\\\Whity\\\\Core\\\\RBAC\\\\GrantResourceScope\(\s*'
+            . 'new\s+RoleCheckerPermissionResolver\(\s*\$roleChecker\s*,/',
+            $cli
+        );
+    }
+
     private function read(string $path): string
     {
         $source = file_get_contents($path);
