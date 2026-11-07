@@ -38960,6 +38960,16 @@
                             }
                         }
                     },
+                    "409": {
+                        "description": "Email sign-up can't work on this instance yet: no bot check is set up (`details.code`: `email_signup_unavailable`)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
                     "422": {
                         "description": "Invalid email or name, failed bot check, or an email domain the workspace does not accept",
                         "content": {
@@ -38991,7 +39001,7 @@
                         }
                     },
                     "503": {
-                        "description": "The bot check is not available",
+                        "description": "The bot check provider could not be reached; try again later",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -67373,6 +67383,22 @@
                                     "provider",
                                     "site_key"
                                 ]
+                            },
+                            "email_signup": {
+                                "type": "boolean"
+                            },
+                            "email_signup_reason": {
+                                "type": "string",
+                                "enum": [
+                                    "bot_check_unavailable"
+                                ],
+                                "nullable": true
+                            },
+                            "providers": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/SignupJoinProvider"
+                                }
                             }
                         },
                         "required": [
@@ -67380,7 +67406,10 @@
                             "workspace_slug",
                             "approval_required",
                             "allowed_domains",
-                            "bot_check"
+                            "bot_check",
+                            "email_signup",
+                            "email_signup_reason",
+                            "providers"
                         ]
                     }
                 },
@@ -69295,6 +69324,21 @@
                     "global"
                 ]
             },
+            "SignupJoinProvider": {
+                "type": "object",
+                "properties": {
+                    "provider_key": {
+                        "type": "string"
+                    },
+                    "display_name": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "provider_key",
+                    "display_name"
+                ]
+            },
             "SignupRequestItem": {
                 "type": "object",
                 "properties": {
@@ -69405,6 +69449,15 @@
                     "bot_check_ready": {
                         "type": "boolean"
                     },
+                    "email_signup_ready": {
+                        "type": "boolean"
+                    },
+                    "join_providers": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/SignupJoinProvider"
+                        }
+                    },
                     "updated_at": {
                         "type": "string",
                         "nullable": true
@@ -69420,6 +69473,8 @@
                     "pending_count",
                     "workspace_slug",
                     "bot_check_ready",
+                    "email_signup_ready",
+                    "join_providers",
                     "updated_at"
                 ]
             },

@@ -11882,6 +11882,10 @@ export interface components {
                     provider: string;
                     site_key: string;
                 } | null;
+                email_signup: boolean;
+                /** @enum {string|null} */
+                email_signup_reason: "bot_check_unavailable" | null;
+                providers: components["schemas"]["SignupJoinProvider"][];
             };
         };
         PublicSignupPreviewResponse: {
@@ -12382,6 +12386,10 @@ export interface components {
             description: string;
             global: boolean;
         };
+        SignupJoinProvider: {
+            provider_key: string;
+            display_name: string;
+        };
         SignupRequestItem: {
             id: number;
             email: string;
@@ -12408,6 +12416,8 @@ export interface components {
             pending_count: number;
             workspace_slug: string | null;
             bot_check_ready: boolean;
+            email_signup_ready: boolean;
+            join_providers: components["schemas"]["SignupJoinProvider"][];
             updated_at: string | null;
         };
         SignupSettingsResponse: {
@@ -44144,6 +44154,15 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            /** @description Email sign-up can't work on this instance yet: no bot check is set up (`details.code`: `email_signup_unavailable`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Invalid email or name, failed bot check, or an email domain the workspace does not accept */
             422: {
                 headers: {
@@ -44171,7 +44190,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description The bot check is not available */
+            /** @description The bot check provider could not be reached; try again later */
             503: {
                 headers: {
                     [name: string]: unknown;

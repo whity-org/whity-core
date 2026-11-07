@@ -9647,7 +9647,21 @@ final class CoreApiSchemas
                     'properties' => ['provider' => self::str(), 'site_key' => self::str()],
                     'required' => ['provider', 'site_key'],
                 ],
-            ], ['workspace_name', 'workspace_slug', 'approval_required', 'allowed_domains', 'bot_check'])),
+                // WHIT-917: whether the email form can work here (a bot check is
+                // set up, or the operator chose to go without), said up front.
+                'email_signup' => self::bool(),
+                'email_signup_reason' => ['type' => 'string', 'enum' => ['bot_check_unavailable'], 'nullable' => true],
+                // The operator's sign-in providers a visitor may join with: link
+                // to GET /api/v1/auth/sso/{provider_key}/start?join={workspace_slug}.
+                'providers' => ['type' => 'array', 'items' => SchemaBuilder::ref('SignupJoinProvider')],
+            ], [
+                'workspace_name', 'workspace_slug', 'approval_required', 'allowed_domains', 'bot_check',
+                'email_signup', 'email_signup_reason', 'providers',
+            ])),
+            'SignupJoinProvider' => self::object([
+                'provider_key' => self::str(),
+                'display_name' => self::str(),
+            ], ['provider_key', 'display_name']),
             'PublicSignupRequest' => self::object([
                 'email' => self::str(),
                 'display_name' => self::str(),
@@ -9686,10 +9700,13 @@ final class CoreApiSchemas
                 'pending_count' => self::int(),
                 'workspace_slug' => self::str(true),
                 'bot_check_ready' => self::bool(),
+                'email_signup_ready' => self::bool(),
+                'join_providers' => ['type' => 'array', 'items' => SchemaBuilder::ref('SignupJoinProvider')],
                 'updated_at' => self::str(true),
             ], [
                 'mode', 'role_id', 'role_name', 'role_customer_safe', 'allowed_domains',
-                'eligible_roles', 'pending_count', 'workspace_slug', 'bot_check_ready', 'updated_at',
+                'eligible_roles', 'pending_count', 'workspace_slug', 'bot_check_ready',
+                'email_signup_ready', 'join_providers', 'updated_at',
             ]),
             'SignupSettingsResponse' => self::dataEnvelope(SchemaBuilder::ref('SignupSettings')),
             'SignupSettingsUpdateRequest' => self::object([
@@ -10807,9 +10824,10 @@ final class CoreApiSchemas
                     'responses' => [
                         202 => self::jsonResponse('Check your email', 'PublicSignupAcceptedResponse'),
                         404 => self::errorResponse('Sign-up is not open for this workspace'),
+                        409 => self::errorResponse('Email sign-up can\'t work on this instance yet: no bot check is set up (`details.code`: `email_signup_unavailable`)'),
                         422 => self::errorResponse('Invalid email or name, failed bot check, or an email domain the workspace does not accept'),
                         429 => self::errorResponse('Too many attempts'),
-                        503 => self::errorResponse('The bot check is not available'),
+                        503 => self::errorResponse('The bot check provider could not be reached; try again later'),
                     ],
                 ],
             ],

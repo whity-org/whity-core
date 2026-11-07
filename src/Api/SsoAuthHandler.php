@@ -91,7 +91,51 @@ final class SsoAuthHandler
          * both from `$appUrl`, the pre-headless behaviour.
          */
         private readonly ?\Whity\Core\Http\FrontendUrls $frontendUrls = null,
+        /**
+         * Joining a workspace as a customer through a sign-in provider
+         * (WHIT-917): `/start?join=<slug>`. Both null (tests that don't
+         * exercise it) and the `join` parameter is refused.
+         */
+        private readonly ?\Whity\Core\Signup\CustomerSignupService $signups = null,
+        private readonly ?\Whity\Core\Branding\TenantHostRepository $tenantHosts = null,
     ) {
+    }
+
+    /**
+     * The workspace a `?join=<slug>` names, when it takes sign-ups and the
+     * request's host does not name a different workspace. Null otherwise; the
+     * caller answers every case the same way, so slugs can't be probed.
+     */
+    private function joinTenant(Request $request, string $slug): ?int
+    {
+        if ($this->signups === null || $this->tenantHosts === null
+            || preg_match('/^[a-z0-9][a-z0-9-]{0,254}$/', $slug) !== 1
+        ) {
+            return null;
+        }
+
+        $tenantId = $this->tenantHosts->findIdBySlug($slug);
+        if ($tenantId === null || $tenantId === 0) {
+            return null;
+        }
+
+        $host = $request->getHeader('X-Forwarded-Host') ?? $request->getHeader('Host') ?? '';
+        $hostTenant = $this->hostResolver->resolveTenantIdByHost($host);
+        if ($hostTenant !== null && $hostTenant !== $tenantId) {
+            return null;
+        }
+
+        return $this->signups->isOpen($tenantId) ? $tenantId : null;
+    }
+
+    /** Back to the workspace's sign-up page with an outcome the page explains. */
+    private function joinOutcome(string $slug, string $outcome): Response
+    {
+        $base = $this->frontendLink(\Whity\Core\Http\FrontendUrls::SIGNUP_CONFIRM);
+        // SIGNUP_CONFIRM is /join/confirm by default; its parent is /join.
+        $join = (string) preg_replace('#/confirm/?$#', '', $base);
+
+        return new Response(302, '', ['Location' => rtrim($join, '/') . '/' . rawurlencode($slug) . '?sso=' . rawurlencode($outcome)]);
     }
 
     private function frontendLink(string $link): string
@@ -124,16 +168,41 @@ final class SsoAuthHandler
             return $this->fail('unknown_provider');
         }
 
-        $tenantId = $this->resolveTenantId($request);
+        // WHIT-917: "Continue with …" on a workspace's sign-up page. The
+        // workspace is checked here and then travels ONLY inside the signed
+        // flow cookie, so the callback can't be pointed at another one. Joining
+        // uses the operator's global-trust providers: a workspace's own
+        // tenant-trust provider only ever signs in its existing members.
+        $joinSlug = strtolower(trim((string) ($this->query('join') ?? '')));
+        $joinTenantId = null;
+        if ($joinSlug !== '') {
+            $joinTenantId = $this->joinTenant($request, $joinSlug);
+            if ($joinTenantId === null) {
+                return $this->joinOutcome($joinSlug, 'closed');
+            }
+        }
+
+        $tenantId = $joinTenantId !== null ? 0 : $this->resolveTenantId($request);
         $config = $this->providers->findEnabledByProviderKey($tenantId, $providerKey);
         if ($config === null) {
             // Not configured for this tenant → generic bounce (no enumeration).
-            return $this->fail('provider_unavailable');
+            return $joinTenantId !== null
+                ? $this->joinOutcome($joinSlug, 'provider_unavailable')
+                : $this->fail('provider_unavailable');
         }
 
-        $discovery = $this->engine->discover($this->discoveryUrl($config));
+        // A refused or unreachable issuer can throw rather than return null;
+        // either way the visitor is told the provider is unavailable, not a 500.
+        try {
+            $discovery = $this->engine->discover($this->discoveryUrl($config));
+        } catch (\Throwable $e) {
+            error_log('[sso] discovery failed for provider ' . (int) $config['id'] . ': ' . $e->getMessage());
+            $discovery = null;
+        }
         if ($discovery === null) {
-            return $this->fail('provider_unavailable');
+            return $joinTenantId !== null
+                ? $this->joinOutcome($joinSlug, 'provider_unavailable')
+                : $this->fail('provider_unavailable');
         }
 
         $provider = $this->providerFor($config);
@@ -153,6 +222,8 @@ final class SsoAuthHandler
             'provider_id'   => (int) $config['id'],
             'tenant_id'     => $tenantId,
             'provider_key'  => $providerKey,
+            'join_tenant_id' => $joinTenantId,
+            'join_slug'     => $joinTenantId !== null ? $joinSlug : null,
         ], 600, 'oidc_flow');
         CookieManager::setSsoFlowToken($flowToken, 600);
 
@@ -264,6 +335,21 @@ final class SsoAuthHandler
             return $this->fail('failed');
         }
 
+        // WHIT-917: a join started on a workspace's sign-up page. Read from the
+        // signed flow cookie only, never from this request.
+        $joinTenantId = isset($flow['join_tenant_id']) && is_int($flow['join_tenant_id']) ? $flow['join_tenant_id'] : null;
+        $joinSlug = isset($flow['join_slug']) && is_string($flow['join_slug']) ? $flow['join_slug'] : '';
+        if ($joinTenantId !== null) {
+            if ($this->signups === null || $tenantId !== 0) {
+                return $this->joinOutcome($joinSlug, 'closed');
+            }
+            // The provider's verified address is what the workspace's domain
+            // list is checked against, and what stands in for the emailed link.
+            if (!$identity->hasVerifiedEmail()) {
+                return $this->joinOutcome($joinSlug, 'email_unverified');
+            }
+        }
+
         // Resolve the verified identity to a local profile (WC-f3b17bd2), applying
         // the provider's TRUST TIER: a system-tenant (operator) provider is
         // global-trust; any other tenant's provider is tenant-trust and may only
@@ -276,9 +362,9 @@ final class SsoAuthHandler
         $resolution = $this->linker->resolveForLogin($identity, $ctx);
         switch ($resolution['status']) {
             case 'refused_unverified':
-                return $this->fail('email_unverified');
+                return $joinTenantId !== null ? $this->joinOutcome($joinSlug, 'email_unverified') : $this->fail('email_unverified');
             case 'refused_conflict':
-                return $this->fail('link_conflict');
+                return $joinTenantId !== null ? $this->joinOutcome($joinSlug, 'link_conflict') : $this->fail('link_conflict');
             case 'refused_no_account':
                 // Tenant-trust IdP with no reachable local account in this tenant.
                 return $this->fail('no_account');
@@ -287,7 +373,11 @@ final class SsoAuthHandler
         // Non-refused statuses (existing/linked/provisioned) always carry a profile_id.
         $profileId = $resolution['profile_id'] ?? null;
         if ($profileId === null) {
-            return $this->fail('failed');
+            return $joinTenantId !== null ? $this->joinOutcome($joinSlug, 'failed') : $this->fail('failed');
+        }
+
+        if ($joinTenantId !== null) {
+            return $this->completeJoin($request, $joinTenantId, $joinSlug, $profileId, $identity, $ctx, $providerKey);
         }
         // last_login_at is stamped inside the linker on the resolved link.
         //
@@ -346,6 +436,78 @@ final class SsoAuthHandler
             $ctx->isGlobalTrust() ? null : $tenantId,
         );
         return $this->redirectForLoginResult($result);
+    }
+
+    /**
+     * Finish a join started on a workspace's sign-up page (WHIT-917): apply the
+     * workspace's sign-up rules to the person the provider just verified, then
+     * either sign them into that workspace or send them back to its sign-up
+     * page to say what happened. Never creates a workspace: the self-service
+     * workspace step of an ordinary sign-in does not run here.
+     */
+    private function completeJoin(
+        Request $request,
+        int $joinTenantId,
+        string $joinSlug,
+        int $profileId,
+        \Whity\Sdk\Auth\ExternalIdentity $identity,
+        FederatedProviderContext $ctx,
+        string $providerKey,
+    ): Response {
+        if ($this->signups === null) {
+            return $this->joinOutcome($joinSlug, 'closed');
+        }
+
+        try {
+            $joined = $this->signups->joinVerified(
+                $joinTenantId,
+                $profileId,
+                (string) $identity->normalizedEmail(),
+                (string) ($identity->displayName ?? ''),
+            );
+        } catch (\Throwable $e) {
+            error_log('[sso] join failed for profile ' . $profileId . ': ' . $e->getMessage());
+
+            return $this->joinOutcome($joinSlug, 'failed');
+        }
+
+        $result = $joined['result'];
+        if ($result !== \Whity\Core\Signup\CustomerSignupService::CONFIRM_JOINED
+            && $result !== \Whity\Core\Signup\CustomerSignupService::CONFIRM_ALREADY_MEMBER
+        ) {
+            return $this->joinOutcome($joinSlug, match ($result) {
+                \Whity\Core\Signup\CustomerSignupService::CONFIRM_PENDING => 'pending',
+                \Whity\Core\Signup\CustomerSignupService::CONFIRM_DOMAIN => 'domain',
+                \Whity\Core\Signup\CustomerSignupService::CONFIRM_REFUSED => 'refused',
+                default => 'closed',
+            });
+        }
+
+        $email = $this->loginEmailFor($profileId, $identity->normalizedEmail());
+
+        if ($this->hooks !== null) {
+            try {
+                $this->hooks->dispatch(self::SIGNED_IN_EVENT, [
+                    'profile_id'            => $profileId,
+                    'email'                 => $email,
+                    'provider_key'          => $providerKey,
+                    'issuer'                => $identity->issuer,
+                    'subject'               => $identity->subject,
+                    'global_trust'          => $ctx->isGlobalTrust(),
+                    'provider_tenant_id'    => $ctx->tenantId,
+                    'provisioned_tenant_id' => null,
+                ]);
+            } catch (\Throwable $e) {
+                error_log('[sso] ' . self::SIGNED_IN_EVENT . ' listener failed for profile ' . $profileId . ': ' . $e->getMessage());
+            }
+        }
+
+        // Straight into the workspace they joined.
+        $session = $this->auth->completeFederatedLogin($profileId, $email, $request, $joinTenantId);
+
+        return $session->getStatusCode() === 200
+            ? new Response(302, '', ['Location' => $this->frontendLink(\Whity\Core\Http\FrontendUrls::SSO_SUCCESS)])
+            : $this->joinOutcome($joinSlug, 'failed');
     }
 
     /**
