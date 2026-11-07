@@ -5223,7 +5223,7 @@ $agentProposals = new \Whity\Core\Agent\AgentProposalRepository(
 // $proposalDiffs->register('<tool name>', fn (array $arguments, int $tenantId): ?array => ...).
 $proposalDiffs = new \Whity\Mcp\Tools\ProposalDiffRegistry();
 \Whity\register_service(\Whity\Mcp\Tools\ProposalDiffRegistry::class, $proposalDiffs); // @phpstan-ignore-line
-// WHIT-991 (SDK 1.76): a plugin's authored tool may declare a `preview`. The host
+// WHIT-991 (SDK 1.78): a plugin's authored tool may declare a `preview`. The host
 // runs it in a transaction it always rolls back, read-only where the engine can.
 $proposalDiffs->useAuthoredTools($authoredMcpTools, new \Whity\Mcp\Tools\ReadOnlyRun($db->getPdo()));
 // An agent's proposal to publish or roll back a workspace plugin (Whity

@@ -17,7 +17,7 @@ use Whity\Sdk\Mcp\McpToolContext;
  * person sees the effect before approving. A tool without one stores only its
  * arguments.
  *
- * A plugin's authored tool declares its own `preview` (SDK 1.76, WHIT-991). The
+ * A plugin's authored tool declares its own `preview` (SDK 1.78, WHIT-991). The
  * host runs it through {@see ReadOnlyRun}, so nothing it writes survives, and
  * keeps only the rows the approvals card shows: `label`, `before` and `after`,
  * as short text. A plugin's preview only informs the person: it can't approve,

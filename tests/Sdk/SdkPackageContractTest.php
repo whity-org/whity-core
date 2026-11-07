@@ -242,9 +242,10 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsOneEightForInteractiveBlocks(): void
     {
         $this->assertSame(
-            '1.77.0',
+            '1.78.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.77 ADDS PluginBillingPortalInterface and Billing\\BillingPortal: a plugin can be the deployment\'s '
+            'SDK 1.78 ADDS proposal created, decided and undone events and a read-only preview on authored tools (WHIT-991). '
+            . 'SDK 1.77 ADDS PluginBillingPortalInterface and Billing\\BillingPortal: a plugin can be the deployment\'s '
             . 'billing portal through one payment provider (WHIT-1010). '
             . 'SDK 1.76: DocumentRenderer resolves in queue jobs and CLI commands, over one storage stack per process (#1151). No signature changes. '
             . 'SDK 1.75 ADDS Agents\Agents: the workspace\'s agents and their activity, read as the calling person, and agent lifecycle events (WHIT-990). '

@@ -179,7 +179,7 @@ final class AuthoredToolRegistry implements HostWiredService
         if ($undo === false) {
             return "tool '{$name}' has a malformed undo; use ['windowSeconds' => int > 0, 'operation' => string] or 'handler' => callable";
         }
-        // SDK 1.76 (WHIT-991): what an agent's proposal of this tool would change,
+        // SDK 1.78 (WHIT-991): what an agent's proposal of this tool would change,
         // for the person deciding it. Run by the host read-only and rolled back.
         $preview = $descriptor['preview'] ?? null;
         if ($preview !== null && !is_callable($preview)) {

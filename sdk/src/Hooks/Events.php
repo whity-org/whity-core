@@ -161,7 +161,7 @@ final class Events
     public const AGENT_PAUSED = 'agent.paused';
     public const AGENT_RESUMED = 'agent.resumed';
 
-    // ---- agent proposals (SDK 1.76, WHIT-991) ----
+    // ---- agent proposals (SDK 1.78, WHIT-991) ----
     // Notifications only: each fires after the change is saved, the return value
     // is ignored, and a listener can't refuse or change anything. Only the person
     // who granted the agent decides a proposal, never a plugin. Ids and the

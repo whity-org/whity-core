@@ -96,7 +96,7 @@ namespace Whity\Sdk;
  *   reverses it>']`, or `'handler' => callable` instead of `operation`. A
  *   write with no undo is always Ask first for agents, whatever the grant.
  *
- * SDK 1.76 (WHIT-991), optional:
+ * SDK 1.78 (WHIT-991), optional:
  *
  * - `preview` (callable): `fn(array $arguments, McpToolContext $context): ?array`.
  *   When an agent's call becomes a proposal, the host runs it to show the

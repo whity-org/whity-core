@@ -1552,7 +1552,7 @@ Declare `'public' => 'read'` on GET `/api/<your slug>/public/<name>/{key}` for s
 
 See [Public reads](Plugin-Public-Forms.md#public-reads-sdk-169).
 
-## Step 12e — Read the workspace's agents (SDK 1.76)
+## Step 12e — Read the workspace's agents (SDK 1.75)
 
 `Whity\Sdk\Agents\Agents` reads the workspace's AI agents and what they did, as the person whose request it is:
 
@@ -1571,7 +1571,7 @@ To react when an agent changes, listen to `Events::AGENT_CREATED`, `AGENT_UPDATE
 
 Nothing in the SDK creates, changes or grants an agent. People do that on the Agents screen.
 
-### Proposals: events and previews (SDK 1.76)
+### Proposals: events and previews (SDK 1.78)
 
 When an agent's call to one of your tools needs its person's approval, the host files a proposal. Show the person what it would change with a `preview` on the authored tool:
 
