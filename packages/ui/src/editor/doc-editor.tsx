@@ -30,6 +30,7 @@ import { SlashCommand, type SlashState } from "./slash"
 import { EditorToolbar, insertField, type EditorView, type PageZoom } from "./toolbar"
 import { UnknownBlock } from "./schema"
 import { BlockToolbar } from "./block-toolbar"
+import { FieldBar } from "./field-bar"
 import { EditorServicesProvider, type EditorServices, type FieldPreview } from "./services"
 import { FieldTrigger, filterFields, type FieldDef, type FieldGroup, type FieldTriggerState } from "./fields"
 import { FieldPicker, flatFields } from "./field-picker"
@@ -1039,6 +1040,7 @@ function DocEditor({
                 {editor && (
                   <>
                     <BlockToolbar editor={editor} labels={labels} container={contentRef} />
+                    <FieldBar editor={editor} labels={labels} groups={allFields} container={contentRef} />
                     <BlockGutter editor={editor} labels={labels} container={contentRef} menuAt={menuAt} onMenuAtChange={setMenuAt} blockUrl={blockUrl} />
                     <SelectionBubble
                       editor={editor}
@@ -1206,7 +1208,11 @@ function DocEditor({
         <span>
           {preview
             ? fill(editable ? labels.previewEditingStatus : labels.previewStatus, { record: preview.label })
-            : fill(labels.lastEdited, { name: actorName(doc.updatedBy), time: formatTime(doc.updatedAt) })}
+            : actorName(doc.updatedBy)
+              ? fill(labels.lastEdited, { name: actorName(doc.updatedBy), time: formatTime(doc.updatedAt) })
+              : // No name yet (the people lookup isn't wired for every screen):
+                // "Last edited at 21:51", not "Last edited by  at".
+                fill(labels.lastEditedAt, { time: formatTime(doc.updatedAt) })}
         </span>
       </footer>
       {publish && (
@@ -1278,7 +1284,10 @@ function LetterheadField({ field, preview, labels }: { field: FieldDef; preview:
 
 /** 24-hour times in Western digits (stage 5). */
 function formatTime(iso: string): string {
-  const d = new Date(iso)
+  // The server writes UTC without a zone ("2026-11-07 18:51:02"), which
+  // Date reads as local time: the bar said 18:51 beside "Draft saved 21:51".
+  const zoned = /(Z|[+-]\d{2}:?\d{2})$/.test(iso) ? iso : `${iso.replace(" ", "T")}Z`
+  const d = new Date(zoned)
   if (Number.isNaN(d.getTime())) return iso
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`
 }

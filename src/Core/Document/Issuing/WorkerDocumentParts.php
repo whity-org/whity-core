@@ -16,6 +16,7 @@ use Whity\Core\Document\Fields\DocumentFieldRegistry;
 use Whity\Core\Document\Print\LetterheadLogo;
 use Whity\Core\Document\Print\PrintLabels;
 use Whity\Core\Document\Print\SourceDocumentPrinter;
+use Whity\Core\Document\Print\WorkspaceName;
 use Whity\Core\Document\Qr\DocumentQrScanRepository;
 use Whity\Core\Document\Qr\DocumentQrService;
 use Whity\Core\Document\Qr\DocumentQrTokenRepository;
@@ -142,6 +143,7 @@ final class WorkerDocumentParts
                     new PrintLabels(),
                     new LetterheadLogo($this->settings, $storage),
                     new DocumentThemeRepository($this->pdo),
+                    new WorkspaceName($this->pdo),
                 ),
                 new DocumentSourceVersionRepository($this->pdo),
                 $this->issuer(),

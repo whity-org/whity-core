@@ -20,6 +20,7 @@ use Whity\Core\Document\Print\LabelCsv;
 use Whity\Core\Document\Print\LetterheadLogo;
 use Whity\Core\Document\Print\PrintLabels;
 use Whity\Core\Document\Print\SourceDocumentPrinter;
+use Whity\Core\Document\Print\WorkspaceName;
 use Whity\Core\Document\Qr\DocumentQrService;
 use Whity\Core\Document\Render\DocumentRenderRejectedException;
 use Whity\Core\Document\Render\FlowDocumentRenderer;
@@ -87,8 +88,10 @@ final class DocumentPublishingApiHandler
         ?DocumentThemeRepository $themes = null,
         // Open suggestions block publishing (editor M5, E.37).
         private readonly ?DocumentCollab $collab = null,
+        // The workspace's own name for a letterhead with none set (WHIT-999).
+        ?WorkspaceName $workspace = null,
     ) {
-        $this->print = new SourceDocumentPrinter($fields, $embeds, $settings, $files, $printLabels, $logo, $themes);
+        $this->print = new SourceDocumentPrinter($fields, $embeds, $settings, $files, $printLabels, $logo, $themes, $workspace);
         $this->issuing = $issuing ?? ($issuer !== null
             ? new DocumentIssuing($this->print, $versions, $issuer, $settings, $renderer, $qr, $meters)
             : null);
