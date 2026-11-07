@@ -5639,6 +5639,18 @@ $router->register('POST', '/api/mcp/connect/preview', [$mcpConnectHandler, 'prev
 $pluginLoader->setAgentPresetRegistry($agentPresetRegistry);
 // A plugin's billing portal goes into its slot (SDK 1.77, WHIT-1010).
 $pluginLoader->setBillingPortals($pluginBillingPortals);
+// WHIT-1011: plugin SERVICE routes accept a client-credentials token from the
+// trusted issuer (SERVICE_TOKEN_ISSUER, else MCP_OAUTH_ISSUER) for a client on
+// SERVICE_TOKEN_CLIENTS. Off, so no service route opens, until both are set.
+\Whity\Core\Plugin\PluginServiceRoutes::useVerifier(\Whity\Auth\Service\ServiceTokenVerifier::fromEnv(
+    (string) ($_ENV['APP_URL'] ?? getenv('APP_URL') ?: ''),
+    new \Whity\Core\Http\HttpFetcher(),
+    new \Whity\Auth\Oidc\JwksProvider(
+        static fn(string $uri): array => (new \Whity\Core\Http\HttpFetcher())->getJson($uri) ?? [],
+        minRefreshSeconds: 60,
+    ),
+));
+\Whity\register_service(\Whity\Sdk\Identity\LinkedPeople::class, new \Whity\Core\Identity\HostLinkedPeople($db->getPdo(), $roleChecker));
 // Code plugins' template slots and record types as merge fields (SDK 1.56, WHIT-742).
 $pluginLoader->setDocumentRegistries($templateSlotRegistry, $documentFieldRegistry);
 $pluginLoader->load();

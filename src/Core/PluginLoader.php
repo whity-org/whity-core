@@ -900,6 +900,7 @@ class PluginLoader
             $this->documentFieldRegistry?->removeOwner($info['plugin']->getName());
             // A reload must not leave a removed plugin's webhook public (WHIT-671).
             \Whity\Core\Plugin\PluginPublicRoutes::removeOwner($info['namespacePrefix']);
+        \Whity\Core\Plugin\PluginServiceRoutes::removeOwner($info['namespacePrefix']);
 
             if ($this->hookManager !== null) {
                 foreach ($info['hooks'] as $hook) {
@@ -2180,6 +2181,7 @@ class PluginLoader
         // ...and its public webhook paths with them (WHIT-671), so a disabled
         // plugin leaves nothing reachable without tenant resolution.
         \Whity\Core\Plugin\PluginPublicRoutes::removeOwner($info['namespacePrefix']);
+        \Whity\Core\Plugin\PluginServiceRoutes::removeOwner($info['namespacePrefix']);
 
         if ($this->hookManager !== null) {
             foreach ($info['hooks'] as $hook) {
@@ -3292,6 +3294,26 @@ class PluginLoader
             $wantsPublicForm = $wantsPublic && $declared['public'] === 'form';
             // A public READ (WHIT-704): `'public' => 'read'` on a keyed GET.
             $wantsPublicRead = $wantsPublic && $declared['public'] === 'read';
+            // A SERVICE route (SDK 1.84, WHIT-1011): called server to server with
+            // the trusted issuer's token for this scope, never by a person.
+            $wantsService = array_key_exists('service', $declared);
+            $serviceScope = $wantsService && is_string($declared['service']) ? $declared['service'] : null;
+            if ($wantsService) {
+                $refusal = \Whity\Core\Plugin\PluginServiceRoutes::refusal(
+                    $declared['service'],
+                    $requiredPermission,
+                    $requiredRole,
+                    $declared['public'] ?? null,
+                );
+                if ($refusal !== null) {
+                    $this->logWarning(
+                        "Plugin {$pluginKey} route {$method} {$path} asks to be a service route: {$refusal}; "
+                        . 'the route was NOT registered (fail-closed).'
+                    );
+                    continue;
+                }
+            }
+
             if ($wantsPublic) {
                 $refusal = match (true) {
                     $declared['public'] === true => \Whity\Core\Plugin\PluginPublicRoutes::refusal(
@@ -3331,7 +3353,7 @@ class PluginLoader
                 // OpenAPI declaration through to the router/generator.
                 $schema = isset($route['schema']) && is_array($route['schema']) ? $route['schema'] : null;
 
-                $wrappedHandler = $this->wrapHandler($pluginKey, $handler, $wantsPublic, $wantsPublicForm, $wantsPublicRead);
+                $wrappedHandler = $this->wrapHandler($pluginKey, $handler, $wantsPublic, $wantsPublicForm, $wantsPublicRead, $wantsService);
                 $accepted = $this->router->register(
                     $method,
                     $path,
@@ -3353,6 +3375,21 @@ class PluginLoader
                         . 'route and was NOT registered (first registration wins).'
                     );
                     continue;
+                }
+
+                if ($serviceScope !== null) {
+                    $served = $this->router->versionedPath((string) $path);
+                    // A value every parameter pattern accepts, digits included.
+                    $probe = (string) preg_replace('/\{[^}]+\}/', '1', $served);
+                    $resolved = $this->router->match(new \Whity\Core\Request(strtoupper((string) $method), $probe, [], ''));
+                    if ($resolved !== null && ($resolved['namespacePrefix'] ?? null) === $namespacePrefix) {
+                        \Whity\Core\Plugin\PluginServiceRoutes::add($namespacePrefix, (string) $method, (string) $resolved['path'], $serviceScope);
+                    } else {
+                        $this->logWarning(
+                            "Plugin {$pluginKey} service route {$method} {$path} could not be resolved to itself; "
+                            . 'it stays registered but no token can open it.'
+                        );
+                    }
                 }
 
                 if ($wantsPublic) {
@@ -4994,9 +5031,14 @@ class PluginLoader
      * @param callable $handler The raw plugin route handler.
      * @return callable(Request, array<string, string>): Response
      */
-    private function wrapHandler(string $pluginKey, callable $handler, bool $public = false, bool $publicForm = false, bool $publicRead = false): callable
+    private function wrapHandler(string $pluginKey, callable $handler, bool $public = false, bool $publicForm = false, bool $publicRead = false, bool $service = false): callable
     {
-        return function (Request $request, array $params = []) use ($pluginKey, $handler, $public, $publicForm, $publicRead): Response {
+        return function (Request $request, array $params = []) use ($pluginKey, $handler, $public, $publicForm, $publicRead, $service): Response {
+            // Defence in depth: a service route runs only once the tenant
+            // isolation middleware has verified a service token and attached the call.
+            if ($service && \Whity\Sdk\Http\ServiceCall::from($request) === null) {
+                return Response::error('Not Found', 404);
+            }
             // A public form's handler never runs on a request the gate didn't pass,
             // however that request got here (WHIT-906).
             if ($publicForm && \Whity\Sdk\Http\PublicForm::from($request) === null) {
