@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Badge } from "@whity/ui/badge"
 import { Button } from "@whity/ui/button"
 import { Icon } from "@whity/ui/icon"
@@ -10,6 +10,7 @@ import { ConfirmAction } from "@whity/ui/confirm-action"
 import { SaveBar } from "@whity/ui/save-bar"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@whity/ui/sheet"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@whity/ui/tabs"
+import { cn } from "@whity/ui/utils"
 
 import { useTranslation } from "../i18n"
 import { useCurrentLanguage } from "./language"
@@ -165,6 +166,12 @@ function FormBuilder({ env, formId, canManage }: { env: FormsScreenEnv; formId: 
     query.addEventListener("change", update)
     return () => query.removeEventListener("change", update)
   }, [])
+  // The side panel keeps its own scroll (WHIT-1713); a newly chosen question
+  // starts at the top of its settings, not wherever the last one was left.
+  const panelScroll = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (panelScroll.current !== null) panelScroll.current.scrollTop = 0
+  }, [selected])
 
   const { enabled: enabledLanguages } = useFormLanguages()
   const problems = useMemo(() => problemsOf(fields, settings?.name ?? {}, enabledLanguages), [fields, settings, enabledLanguages])
@@ -469,7 +476,10 @@ function FormBuilder({ env, formId, canManage }: { env: FormsScreenEnv; formId: 
         </TabsList>
 
         <TabsContent value="questions" className="pt-4">
-          <div className="grid overflow-hidden rounded-card border border-border bg-muted lg:grid-cols-[minmax(0,1fr)_26rem]">
+          {/* `overflow-clip`, not `overflow-hidden`: hidden makes this box a scroll
+              container, and then the panel's `sticky` sticks to it instead of the
+              page and scrolls away with the questions (WHIT-1713). */}
+          <div className="grid overflow-clip rounded-card border border-border bg-muted lg:grid-cols-[minmax(0,1fr)_26rem]">
             <BuilderCanvas
               title={title}
               description={description}
@@ -504,8 +514,20 @@ function FormBuilder({ env, formId, canManage }: { env: FormsScreenEnv; formId: 
               }}
             />
             {wide && (
-              <aside className="border-t border-border bg-card p-5 lg:border-s lg:border-t-0">
-                <div className="lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto lg:pe-1">{panel}</div>
+              <aside aria-label={t("builder.panel.title", "Question settings")} className="border-t border-border bg-card lg:border-s lg:border-t-0">
+                {/* Sticks below the top bar while the questions scroll, and scrolls
+                    by itself when the settings are taller than the window. While
+                    the save bar shows, it stops above it. */}
+                <div
+                  ref={panelScroll}
+                  data-testid="question-panel-scroll"
+                  className={cn(
+                    "p-5 lg:sticky lg:top-20 lg:overflow-y-auto lg:overscroll-contain",
+                    dirty ? "lg:max-h-[calc(100dvh-10rem)]" : "lg:max-h-[calc(100dvh-6rem)]",
+                  )}
+                >
+                  {panel}
+                </div>
               </aside>
             )}
           </div>
