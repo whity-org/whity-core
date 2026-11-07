@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.73).
+ * SDK identity (v1.74).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1024,12 +1024,22 @@ namespace Whity\Sdk;
  * Ids only, after commit, and the return value is ignored (WHIT-915).
  *
  * Purely additive.)
+ *
+ * 1.74 (NARROWING SCOPE FOR PLUGIN RESOURCE TYPES: {@see Rbac\ResourceScope} answers
+ * which records of a plugin's resource type a caller may act on, as a
+ * {@see Rbac\ResourceReach}. Record-level permission checks only ever widen, so a
+ * plugin that filtered a list with `hasPermission()` and a resource let every row
+ * through; the reach is the second check ANDed with the permission. It is always a
+ * subset of what `hasPermission()` allows, and unrestricted only when the caller holds
+ * the permission and a plugin-named "every record" permission tenant-wide (#1074).
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.73.0';
+    public const VERSION = '1.74.0';
 
     /**
      * Static identity only — never instantiated.
