@@ -307,6 +307,14 @@ class DelegationService implements DelegatedPermissionResolver
      * Unions the live delegated permissions targeting the user DIRECTLY with
      * those targeting any of the user's effective roles, filtered to the user's
      * OU scope. Tenant scoped throughout.
+     *
+     * A grant counts only while its grantor still holds the permission in this
+     * workspace, through their own roles: the same bound {@see self::delegate()}
+     * applies when the grant is made, applied again every time it is used. A
+     * grantor who is moved to a smaller role, or whose membership ends, stops
+     * granting at once; nobody has to find and revoke what they gave out.
+     * The grantor's set comes from the base RoleChecker, which is not
+     * delegation-aware, so a grant can never be propped up by another grant.
      */
     public function delegatedPermissionsForUser(
         int $userId,
@@ -314,31 +322,31 @@ class DelegationService implements DelegatedPermissionResolver
         array $effectiveRoleIds,
         array $inScopeOuIds
     ): array {
-        $permissions = [];
-
-        // Delegations made to the profile directly (grantee_type = 'profile').
-        // The $userId argument is now a profile_id (WC-bc07b6de).
-        foreach (
-            $this->repository->livePermissionsForGrantee(
+        // Delegations made to the profile directly (grantee_type = 'profile'),
+        // then to any of the user's effective roles.
+        $grants = $this->repository->liveGrantsForGrantee(
+            $tenantId,
+            DelegationRepository::GRANTEE_PROFILE,
+            $userId,
+            $inScopeOuIds
+        );
+        foreach ($effectiveRoleIds as $roleId) {
+            array_push($grants, ...$this->repository->liveGrantsForGrantee(
                 $tenantId,
-                DelegationRepository::GRANTEE_PROFILE,
-                $userId,
+                DelegationRepository::GRANTEE_ROLE,
+                $roleId,
                 $inScopeOuIds
-            ) as $permission
-        ) {
-            $permissions[$permission] = true;
+            ));
         }
 
-        // Delegations made to any of the user's effective roles.
-        foreach ($effectiveRoleIds as $roleId) {
-            foreach (
-                $this->repository->livePermissionsForGrantee(
-                    $tenantId,
-                    DelegationRepository::GRANTEE_ROLE,
-                    $roleId,
-                    $inScopeOuIds
-                ) as $permission
-            ) {
+        $heldBy = [];
+        $permissions = [];
+        foreach ($grants as ['permission' => $permission, 'grantor' => $grantor]) {
+            $heldBy[$grantor] ??= array_fill_keys(
+                $this->roleChecker->getEffectivePermissionsForProfile($grantor, $tenantId),
+                true
+            );
+            if (isset($heldBy[$grantor][$permission])) {
                 $permissions[$permission] = true;
             }
         }

@@ -184,6 +184,89 @@ final class DelegationServiceRealEngineTest extends TestCase
         );
     }
 
+    // ==================== The grantor's bound, at use time ====================
+
+    /**
+     * A grant counts only while its grantor still holds the permission (#1144,
+     * Phase 4). Checking it when the grant is made is not enough: roles change
+     * after. Moving the grantor to a smaller role ends what they gave out.
+     */
+    public function testAGrantStopsWhenItsGrantorNoLongerHoldsThePermission(): void
+    {
+        $this->grant('admin', 'users:read');
+        $grantorId = $this->seedUser('admin@example.com', 'admin', 1);
+        $granteeId = $this->seedUser('grantee@example.com', 'user', 1);
+        $checker = $this->delegationAwareChecker();
+
+        $this->service()->delegate(1, $grantorId, DelegationRepository::GRANTEE_USER, $granteeId, ['users:read'], null);
+        RoleChecker::clearCache();
+        $this->assertTrue($checker->hasPermissionForProfile($granteeId, 'users:read', 1));
+
+        $this->pdo->prepare("UPDATE memberships SET role_id = (SELECT id FROM roles WHERE name = 'user') WHERE profile_id = ? AND tenant_id = 1")
+            ->execute([$grantorId]);
+        RoleChecker::clearCache();
+
+        $this->assertFalse(
+            $checker->hasPermissionForProfile($granteeId, 'users:read', 1),
+            'A grant must not outlast its grantor holding the permission.'
+        );
+    }
+
+    /** The same when the grantor leaves the workspace. */
+    public function testAGrantStopsWhenItsGrantorLeavesTheWorkspace(): void
+    {
+        $this->grant('admin', 'users:read');
+        $grantorId = $this->seedUser('admin@example.com', 'admin', 1);
+        $granteeId = $this->seedUser('grantee@example.com', 'user', 1);
+        $checker = $this->delegationAwareChecker();
+
+        $this->service()->delegate(1, $grantorId, DelegationRepository::GRANTEE_ROLE, 2, ['users:read'], null);
+        RoleChecker::clearCache();
+        $this->assertTrue($checker->hasPermissionForProfile($granteeId, 'users:read', 1));
+
+        $this->pdo->prepare("UPDATE memberships SET status = 'suspended' WHERE profile_id = ? AND tenant_id = 1")
+            ->execute([$grantorId]);
+        RoleChecker::clearCache();
+
+        $this->assertFalse(
+            $checker->hasPermissionForProfile($granteeId, 'users:read', 1),
+            'A grant must not outlast its grantor belonging to the workspace.'
+        );
+    }
+
+    /**
+     * And it comes back when the grantor holds it again: the grant was never
+     * revoked, only out of reach. Another grantor's grant of the same
+     * permission keeps working throughout.
+     */
+    public function testEachGrantIsBoundedByItsOwnGrantor(): void
+    {
+        $this->grant('admin', 'users:read');
+        $first = $this->seedUser('first@example.com', 'admin', 1);
+        $second = $this->seedUser('second@example.com', 'admin', 1);
+        $granteeId = $this->seedUser('grantee@example.com', 'user', 1);
+        $checker = $this->delegationAwareChecker();
+        $service = $this->service();
+
+        $service->delegate(1, $first, DelegationRepository::GRANTEE_USER, $granteeId, ['users:read'], null);
+        $service->delegate(1, $second, DelegationRepository::GRANTEE_USER, $granteeId, ['users:read'], null);
+
+        $this->pdo->prepare("UPDATE memberships SET status = 'suspended' WHERE profile_id = ? AND tenant_id = 1")
+            ->execute([$first]);
+        RoleChecker::clearCache();
+        $this->assertTrue($checker->hasPermissionForProfile($granteeId, 'users:read', 1), 'The second grantor still holds it.');
+
+        $this->pdo->prepare("UPDATE memberships SET status = 'suspended' WHERE profile_id = ? AND tenant_id = 1")
+            ->execute([$second]);
+        RoleChecker::clearCache();
+        $this->assertFalse($checker->hasPermissionForProfile($granteeId, 'users:read', 1));
+
+        $this->pdo->prepare("UPDATE memberships SET status = 'active' WHERE profile_id = ? AND tenant_id = 1")
+            ->execute([$first]);
+        RoleChecker::clearCache();
+        $this->assertTrue($checker->hasPermissionForProfile($granteeId, 'users:read', 1), 'Back with the first grantor.');
+    }
+
     // ==================== Tenant isolation ====================
 
     public function testDelegationIsTenantIsolated(): void

@@ -6,6 +6,7 @@ namespace Whity\Http;
 
 use Whity\Sdk\Http\Request;
 use Whity\Sdk\Http\Response;
+use Whity\Auth\RoleChecker;
 use Whity\Core\Audit\AuditContext;
 use Whity\Core\Observability\ErrorReference;
 use Whity\Core\Router;
@@ -76,6 +77,14 @@ class HttpKernel
             // scalar identity data; previously cleared ONLY by the reflection
             // sweep inside the kernel, so it must be reset explicitly now.
             AuditContext::reset(...),
+            // Effective permissions, cached per process (WC-15). A role, grant or
+            // membership changed by a request on ANOTHER worker cannot clear this
+            // worker's copy, so it is dropped after every request here, in the
+            // kernel, rather than relying on each host loop to remember: the
+            // FrankenPHP loop in public/index.php does, but a host that only
+            // calls handle() would otherwise keep serving a revoked permission
+            // for as long as the process lives (#1144, Phase 4).
+            RoleChecker::clearCache(...),
         ];
     }
 

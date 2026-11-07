@@ -494,9 +494,11 @@ final class PermissionResolverTest extends TestCase
         $this->grantPermission('admin', 'users:delete');
         $this->grantPermission('viewer', 'users:read');
 
-        // A delegation that lives ONLY in tenant A.
+        // A delegation that lives ONLY in tenant A, from a grantor who holds the
+        // permission there (a grant counts only while its grantor does).
         $grantor = $this->seedProfile('iso-grantor@example.com');
-        $this->addMembership($grantor, self::TENANT_A, 'admin');
+        $this->addMembership($grantor, self::TENANT_A, 'editor');
+        $this->grantPermission('editor', 'tenants:manage');
         $this->delegate($grantor, $profileId, 'tenants:manage', self::TENANT_A);
 
         RoleChecker::clearCache();
