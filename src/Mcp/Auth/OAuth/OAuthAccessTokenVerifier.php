@@ -285,7 +285,7 @@ final class OAuthAccessTokenVerifier
             return $tenantId;
         }
 
-        // @tenant-guard-ignore: resolves which tenant a signed-in profile acts in, so there is no tenant yet to scope by; the result is re-checked by ActiveTenantMembershipGuard
+        // Resolves which tenant a signed-in profile acts in, so there is no tenant yet to scope by; the result is re-checked by ActiveTenantMembershipGuard
         $stmt = $this->db->prepare(
             "SELECT tenant_id FROM memberships WHERE profile_id = ? AND status = 'active' AND tenant_id <> 0 LIMIT 2"
         );

@@ -122,7 +122,7 @@ final class DomainEventStore
     public function reserve(): ?array
     {
         if ($this->driver() === 'pgsql') {
-            // @tenant-guard-ignore: the relay claims the next pending event ACROSS all tenants
+            // The relay claims the next pending event ACROSS all tenants
             // (system infra); the event's origin tenant travels on event_outbox.tenant_id and is
             // restored into TenantContext before any tenant-scoped relay handler runs.
             $sql = "UPDATE event_outbox

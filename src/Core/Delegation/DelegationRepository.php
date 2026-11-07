@@ -560,7 +560,7 @@ class DelegationRepository
 
         $list = array_keys($slugs);
         $slugIn = implode(', ', array_fill(0, count($list), '?'));
-        // @tenant-guard-ignore: permissions is a global catalogue
+        // Permissions is a global catalogue
         $stmt = $this->db->prepare("SELECT name, description FROM permissions WHERE name IN ({$slugIn})");
         $stmt->execute($list);
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {

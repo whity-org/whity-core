@@ -45,18 +45,23 @@ interface TranslationRepositoryInterface
     public function findAllTenantOverrides(int $languageId, int $tenantId): array;
 
     /**
-     * Find a single translation row by its id, regardless of tenant scope.
+     * Find a translation row by id, if the caller's workspace may see it.
      *
-     * This is the UNSCOPED admin guard lookup: the caller determines whether
-     * the row's `tenant_id` is writable by them (see the write-access rule in
-     * {@see \Whity\Api\TranslationsApiHandler}) before issuing any scoped
-     * mutation — the same pattern as {@see \Whity\Api\RolesApiHandler}'s
-     * global-vs-tenant guard.
+     * A workspace sees the global rows and its own overrides; the system tenant
+     * (0) sees every row. Another workspace's override comes back as null, the
+     * same as a row that does not exist, so a caller cannot learn that it does.
      *
-     * @param int $id The translation id.
-     * @return Translation|null The row, or null when no row matches.
+     * The scope is in the statement, not left to the caller: this interface is
+     * reachable from anywhere the container is, and an unscoped by-id read here
+     * was one forgotten check away from reading another workspace's text
+     * (#1144). The write rules (who may change which row) still belong to the
+     * caller, see {@see \Whity\Api\TranslationsApiHandler}.
+     *
+     * @param int $id       The translation id.
+     * @param int $tenantId The caller's workspace (0 = system tenant).
+     * @return Translation|null The row, or null when absent or not visible.
      */
-    public function findById(int $id): ?Translation;
+    public function findVisibleTo(int $id, int $tenantId): ?Translation;
 
     /**
      * Create a translation row.

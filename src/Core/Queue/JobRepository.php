@@ -98,7 +98,7 @@ final class JobRepository
         // SQLite has no such clause but serialises writes, so the plain form is
         // already race-free there.
         if ($this->driver() === 'pgsql') {
-            // @tenant-guard-ignore: the queue worker claims the next runnable job ACROSS all
+            // The queue worker claims the next runnable job ACROSS all
             // tenants (system infra); the job's origin tenant is restored per-handler via
             // TenantContext before user code runs.
             $sql = "UPDATE jobs

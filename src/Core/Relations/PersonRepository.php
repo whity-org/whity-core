@@ -74,9 +74,12 @@ class PersonRepository
     /**
      * Fetch a single person by id, scoped to the tenant.
      *
-     * The system tenant (id 0) may read a person in any tenant; any other tenant
-     * reads only its own. Returns null when not visible/absent so callers surface
-     * a 404 without disclosing cross-tenant existence.
+     * Passing 0 reads a person in any tenant. The system tenant does that, and so
+     * do two non-system callers on purpose: {@see RelationResolver::resolvePerson()}
+     * and {@see \Whity\Api\RelationsApiHandler::create()} look a person up
+     * unscoped to tell "does not exist" from "belongs to another tenant", and then
+     * compare `tenant_id` with the acting tenant themselves. Any other caller passes
+     * its own tenant and reads only its own people. Returns null when absent.
      *
      * @param int $id       The person id.
      * @param int $tenantId The acting tenant (0 = system).
@@ -85,7 +88,7 @@ class PersonRepository
     public function findById(int $id, int $tenantId): ?array
     {
         if ($tenantId === 0) {
-            // @tenant-guard-ignore: system-tenant (id 0) branch; scoped else-branch binds tenant_id
+            // @tenant-guard-ignore: any-tenant read, entered by the system tenant AND by RelationResolver::resolvePerson and RelationsApiHandler::create, which pass 0 to tell a missing person from another tenant's and then compare tenant_id themselves
             $stmt = $this->db->prepare('SELECT * FROM persons WHERE id = :id');
             $stmt->execute([':id' => $id]);
         } else {

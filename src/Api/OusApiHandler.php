@@ -122,7 +122,7 @@ class OusApiHandler
             $bindType = $typeKey !== null && $typeKey !== OuTypeRegistry::UNTYPED;
 
             if ($tenantId === 0) {
-                // @tenant-guard-ignore: system-tenant (id 0) lists OUs across all tenants; scoped else-branch binds tenant_id
+                // System-tenant (id 0) lists OUs across all tenants; scoped else-branch binds tenant_id
                 $countSql = 'SELECT COUNT(*) AS cnt FROM organizational_units ou'
                     . ' LEFT JOIN ou_types t ON t.id = ou.ou_type_id AND t.tenant_id = ou.tenant_id'
                     . ' WHERE 1 = 1' . $filters;
@@ -145,7 +145,7 @@ class OusApiHandler
             $total = $countRow !== false ? (int)($countRow['cnt'] ?? 0) : 0;
 
             if ($tenantId === 0) {
-                // @tenant-guard-ignore: system-tenant (id 0) lists all OUs; scoped else-branch binds tenant_id
+                // System-tenant (id 0) lists all OUs; scoped else-branch binds tenant_id
                 $sql = self::LIST_COLUMNS . ' FROM organizational_units ou'
                     . ' LEFT JOIN ou_types t ON t.id = ou.ou_type_id AND t.tenant_id = ou.tenant_id'
                     . ' WHERE 1 = 1' . $filters

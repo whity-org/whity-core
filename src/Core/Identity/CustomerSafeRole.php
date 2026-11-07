@@ -116,7 +116,7 @@ final class CustomerSafeRole
      */
     public function listForTenant(int $tenantId): array
     {
-        // @tenant-guard-ignore: own-or-global is the predicate, as in AssignableRole
+        // Own-or-global is the predicate, as in AssignableRole
         $stmt = $this->db->prepare(
             'SELECT id, name, description, tenant_id FROM roles
               WHERE tenant_id = :tid OR tenant_id IS NULL

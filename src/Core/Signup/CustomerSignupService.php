@@ -604,7 +604,7 @@ final class CustomerSignupService
         // `local`, stated rather than left to migration 104's default: this
         // path only creates a profile when the person chose a password (an
         // address that already has one keeps its own profile).
-        // @tenant-guard-ignore: profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
+        // Profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
         $this->db->prepare(
             "INSERT INTO profiles
                  (display_name, password_hash, auth_method, two_factor_enabled,
@@ -614,7 +614,7 @@ final class CustomerSignupService
         $profileId = (int) $this->db->lastInsertId();
 
         // Verified: the person reached this point by following the mailed link.
-        // @tenant-guard-ignore: profile_emails is a sanctioned GLOBAL identity table (ADR 0005 §2)
+        // Profile_emails is a sanctioned GLOBAL identity table (ADR 0005 §2)
         $this->db->prepare(
             'INSERT INTO profile_emails (profile_id, email, verified, is_primary, created_at)
              VALUES (?, ?, true, true, NOW())'
@@ -625,7 +625,7 @@ final class CustomerSignupService
 
     private function profileIdForEmail(string $email): ?int
     {
-        // @tenant-guard-ignore: profile_emails is a sanctioned GLOBAL identity table (ADR 0005 §2); UNIQUE(email)
+        // Profile_emails is a sanctioned GLOBAL identity table (ADR 0005 §2); UNIQUE(email)
         $stmt = $this->db->prepare('SELECT profile_id FROM profile_emails WHERE email = :email LIMIT 1');
         $stmt->execute([':email' => $email]);
         $id = $stmt->fetchColumn();

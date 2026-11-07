@@ -273,7 +273,7 @@ final class SubscriptionBillingRun
      *
      * @return list<array<string, mixed>>
      *
-     * @tenant-guard-ignore: the billing run has no tenant context by design —
+     * The billing run has no tenant context by design —
      * it is the job that FINDS which tenants are due. Every write that follows
      * binds the tenant this returns.
      */

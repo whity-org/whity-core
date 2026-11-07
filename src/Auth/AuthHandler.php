@@ -260,7 +260,7 @@ class AuthHandler
         }
 
         // ── Step 1: resolve profile from the globally-unique verified email ────
-        // @tenant-guard-ignore: profile_emails is a sanctioned GLOBAL identity table (ADR 0005 §2); UNIQUE(email) makes this unambiguous across all tenants — this is the structural fix for #181
+        // Profile_emails is a sanctioned GLOBAL identity table (ADR 0005 §2); UNIQUE(email) makes this unambiguous across all tenants — this is the structural fix for #181
         $peStmt = $this->db->prepare(
             'SELECT pe.profile_id, pe.verified
              FROM profile_emails pe
@@ -325,7 +325,7 @@ class AuthHandler
         }
 
         // ── Step 2: load the profile and verify credentials ──────────────────
-        // @tenant-guard-ignore: profiles is a sanctioned GLOBAL identity table (ADR 0005 §1), not tenant-owned
+        // Profiles is a sanctioned GLOBAL identity table (ADR 0005 §1), not tenant-owned
         $profStmt = $this->db->prepare(
             'SELECT id, password_hash, two_factor_enabled, two_factor_secret,
                     two_factor_backup_codes_version, token_epoch, status
@@ -847,7 +847,7 @@ class AuthHandler
     ): Response
     {
         // Resolve role from the active membership (post-cutover: no legacy users row).
-        // @tenant-guard-ignore: memberships is the canonical role store (ADR 0005 §6)
+        // Memberships is the canonical role store (ADR 0005 §6)
         $roleName = '';
         $membershipStmt = $this->db->prepare(
             "SELECT r.name AS role, m.ou_id AS ou_id
@@ -1106,7 +1106,7 @@ class AuthHandler
      * belongs at membership CREATION — see the follow-up note on
      * MembershipRepository::insert.
      *
-     * @tenant-guard-ignore: login flow — enumerates all tenant memberships for one profile (ADR 0005 §6)
+     * Login flow — enumerates all tenant memberships for one profile (ADR 0005 §6)
      *
      * @param int $profileId The profile whose memberships to query.
      * @return list<array{tenant_id:int, tenant_name:string, tenant_name_language:string, tenant_names:array<string, string>|\stdClass, role:string, kind:string}>
@@ -1171,12 +1171,12 @@ class AuthHandler
      * §6 completion). The multi-membership escalation is prevented by requiring an
      * explicit selection, not by hiding tenant 0.
      *
-     * @tenant-guard-ignore: login flow — membership existence check for one profile (ADR 0005 §6)
+     * Login flow — membership existence check for one profile (ADR 0005 §6)
      */
     private function hasActiveMembershipInTenant(int $profileId, int $tenantId): bool
     {
         try {
-            // @tenant-guard-ignore: login flow — membership existence check (ADR 0005 §6)
+            // Login flow — membership existence check (ADR 0005 §6)
             $stmt = $this->db->prepare(
                 "SELECT 1 FROM memberships
                  WHERE profile_id = ? AND tenant_id = ? AND status = 'active'
@@ -1269,7 +1269,7 @@ class AuthHandler
 
     private function profileDisplayName(int $profileId): ?string
     {
-        // @tenant-guard-ignore: profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
+        // Profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
         $stmt = $this->db->prepare('SELECT display_name FROM profiles WHERE id = ?');
         $stmt->execute([$profileId]);
         $name = $stmt->fetchColumn();
@@ -1437,7 +1437,7 @@ class AuthHandler
         }
 
         // Load the profile row (global identity table).
-        // @tenant-guard-ignore: profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
+        // Profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
         $profStmt = $this->db->prepare(
             'SELECT id, password_hash, token_epoch FROM profiles WHERE id = ? LIMIT 1'
         );
@@ -1448,7 +1448,7 @@ class AuthHandler
         }
 
         // Load the primary profile_email row.
-        // @tenant-guard-ignore: profile_emails is a sanctioned GLOBAL identity table (ADR 0005 §2)
+        // Profile_emails is a sanctioned GLOBAL identity table (ADR 0005 §2)
         $peStmt = $this->db->prepare(
             'SELECT id, email FROM profile_emails WHERE profile_id = ? AND is_primary = TRUE LIMIT 1'
         );
@@ -1495,7 +1495,7 @@ class AuthHandler
 
             if ($email !== (string) $profileEmail['email']) {
                 // Uniqueness: profile_emails.email is globally UNIQUE.
-                // @tenant-guard-ignore: profile_emails is a sanctioned GLOBAL identity table (ADR 0005 §2)
+                // Profile_emails is a sanctioned GLOBAL identity table (ADR 0005 §2)
                 $checkStmt = $this->db->prepare(
                     'SELECT id FROM profile_emails WHERE email = ? AND profile_id != ? LIMIT 1'
                 );
@@ -1505,7 +1505,7 @@ class AuthHandler
                 }
 
                 // Update the primary profile_email row.
-                // @tenant-guard-ignore: profile_emails is a sanctioned GLOBAL identity table (ADR 0005 §2)
+                // Profile_emails is a sanctioned GLOBAL identity table (ADR 0005 §2)
                 $this->db->prepare(
                     'UPDATE profile_emails SET email = ? WHERE id = ?'
                 )->execute([$email, $profileEmail['id']]);
@@ -1673,7 +1673,7 @@ class AuthHandler
 
         // Bump the epoch → every OTHER token for this profile (access/refresh/device)
         // is now epoch-stale and rejected on next use.
-        // @tenant-guard-ignore: profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
+        // Profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
         $this->db->prepare(
             'UPDATE profiles SET token_epoch = token_epoch + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
         )->execute([$profileId]);
@@ -1765,7 +1765,7 @@ class AuthHandler
         }
 
         try {
-            // @tenant-guard-ignore: profiles is a global identity table (ADR 0005 §1), not tenant-owned.
+            // Profiles is a global identity table (ADR 0005 §1), not tenant-owned.
             $stmt = $this->db->prepare(
                 'SELECT token_epoch FROM profiles WHERE id = ? LIMIT 1'
             );
@@ -1817,7 +1817,7 @@ class AuthHandler
         }
 
         try {
-            // @tenant-guard-ignore: profiles is a global identity table (ADR 0005 §1), not tenant-owned.
+            // Profiles is a global identity table (ADR 0005 §1), not tenant-owned.
             $stmt = $this->db->prepare('SELECT status FROM profiles WHERE id = ? LIMIT 1');
             $stmt->execute([$profileId]);
             $status = $stmt->fetchColumn();
@@ -2399,7 +2399,7 @@ class AuthHandler
         $auditTenantId  = $activeTenantId;
         $auditActorId   = $profileId;
 
-        // @tenant-guard-ignore: profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
+        // Profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
         $profStmt = $this->db->prepare(
             'SELECT two_factor_secret, two_factor_backup_codes_version
              FROM profiles WHERE id = ? LIMIT 1'

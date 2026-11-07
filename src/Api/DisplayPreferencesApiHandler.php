@@ -72,12 +72,12 @@ final class DisplayPreferencesApiHandler
             return Response::error('showTechnicalDetails must be true or false', 422);
         }
 
-        // @tenant-guard-ignore: profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
+        // Profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
         if ($textSize !== null) {
             $stmt = $this->db->prepare('UPDATE profiles SET text_size = ? WHERE id = ?');
             $stmt->execute([$textSize, $profileId]);
         }
-        // @tenant-guard-ignore: profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
+        // Profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
         if ($technical !== null) {
             $stmt = $this->db->prepare('UPDATE profiles SET show_technical_details = ? WHERE id = ?');
             $stmt->bindValue(1, $technical, PDO::PARAM_BOOL);
@@ -93,7 +93,7 @@ final class DisplayPreferencesApiHandler
      */
     private function read(int $profileId): ?array
     {
-        // @tenant-guard-ignore: profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
+        // Profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
         $stmt = $this->db->prepare('SELECT text_size, show_technical_details FROM profiles WHERE id = ? LIMIT 1');
         $stmt->execute([$profileId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);

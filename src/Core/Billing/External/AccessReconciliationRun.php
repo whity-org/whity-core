@@ -153,7 +153,7 @@ final class AccessReconciliationRun
      *
      * @return list<array<string, mixed>>
      *
-     * @tenant-guard-ignore: this sweep has no tenant context by design — it is
+     * This sweep has no tenant context by design — it is
      * the job that FINDS which tenants to re-check, exactly as the billing run's
      * dueSubscriptions() does. Every read and write that follows binds the
      * tenant id this returns.

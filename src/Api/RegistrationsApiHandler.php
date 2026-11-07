@@ -75,7 +75,7 @@ final class RegistrationsApiHandler
             // tenant invitations.
             $p = PaginationParams::fromPath($request->getPath());
 
-            // @tenant-guard-ignore: system-tenant platform operation — counts pending registrations across all tenants (WC-235)
+            // System-tenant platform operation — counts pending registrations across all tenants (WC-235)
             $count = $this->db->query(
                 "SELECT COUNT(*) FROM memberships m
                  WHERE m.status = 'invited'
@@ -86,7 +86,7 @@ final class RegistrationsApiHandler
             );
             $total = $count === false ? 0 : (int) $count->fetchColumn();
 
-            // @tenant-guard-ignore: system-tenant platform operation — lists pending registrations across all tenants (WC-235)
+            // System-tenant platform operation — lists pending registrations across all tenants (WC-235)
             $stmt = $this->db->prepare(
                 "SELECT m.id AS membership_id, m.tenant_id, m.created_at,
                         t.name AS tenant_name, t.slug AS tenant_slug,
@@ -180,7 +180,7 @@ final class RegistrationsApiHandler
             // lives in the newly-created tenant, not the acting system tenant.
             // The guard restricts the write to a whole-workspace-pending row, so
             // an ordinary tenant invitation can never be transitioned here.
-            // @tenant-guard-ignore: system-tenant platform operation — approves/rejects a pending registration in another tenant (WC-235)
+            // System-tenant platform operation — approves/rejects a pending registration in another tenant (WC-235)
             $stmt = $this->db->prepare(
                 "UPDATE memberships
                     SET status = :new_status
