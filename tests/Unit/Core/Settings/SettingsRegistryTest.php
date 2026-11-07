@@ -117,7 +117,8 @@ final class SettingsRegistryTest extends TestCase
              // namespace, and appending keeps the diff to one line.
              'ui.hide_dates',
              // #1019: how many ids one label-resolution request may name.
-             'labels.resolve_max_ids'],
+             'labels.resolve_max_ids',
+             'app.installable'],
             SettingsRegistry::keys()
         );
     }
@@ -438,7 +439,8 @@ final class SettingsRegistryTest extends TestCase
         // 96 since WHIT-873: maintenance.active and maintenance.until.
         // 100 since WHIT-901: mail.smtp.auth_mode and three mail.oauth.* keys.
         // 101 since #1019: labels.resolve_max_ids.
-        self::assertCount(101, $describe);
+        // 102 since #1733: app.installable, the instance's install switch.
+        self::assertCount(102, $describe);
         self::assertSame(
             ['key' => 'site_name', 'type' => 'string', 'default' => 'Whity'],
             $describe[0]

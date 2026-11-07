@@ -725,6 +725,20 @@ final class SettingsRegistry
     public const LABELS_RESOLVE_MAX_IDS = 'labels.resolve_max_ids';
 
     /**
+     * Whether the web app offers itself as an installable app (#1733): the web
+     * manifest, the service worker and the offline page. GLOBAL-ONLY — it is
+     * a question about the whole installation, not one workspace.
+     *
+     * On by default, which is what app.whity.dev wants. A self-hosted operator
+     * turns it off here, or with the `PWA_ENABLED` environment variable, which
+     * decides only while nobody has stored a value here (an explicit choice on
+     * the settings screen wins). Off removes the manifest link, serves no
+     * service worker, and unregisters a worker a browser installed earlier.
+     * See {@see \Whity\Core\Branding\BrandingService::installableFrom()}.
+     */
+    public const APP_INSTALLABLE = 'app.installable';
+
+    /**
      * The asset-kind keys (Tenant Branding). Their stored value is a storage
      * key (or '' when unset). They are NEVER writable via the text PATCH path —
      * uploads go through BrandingService and the binary endpoints.
@@ -813,6 +827,9 @@ final class SettingsRegistry
         // "does this instance offer more than one language" is an instance
         // question, not a tenant one.
         self::I18N_ENABLED,
+        // Installing the web app is a property of the installation, and the
+        // service worker it controls is per origin, not per workspace.
+        self::APP_INSTALLABLE,
     ];
 
     /**
@@ -850,6 +867,7 @@ final class SettingsRegistry
         self::BILLING_TAX_INCLUSIVE,
         self::PAYMENTS_MOCK_ENABLED,
         self::AFFILIATE_CLAWBACK_ON_REFUND,
+        self::APP_INSTALLABLE,
     ];
 
     /**
@@ -905,6 +923,7 @@ final class SettingsRegistry
         self::PLUGINS_STORE_ENABLED,
         self::DOCUMENTS_RENDER_ENABLED,
         self::I18N_ENABLED,
+        self::APP_INSTALLABLE,
     ];
 
     /**
@@ -1158,6 +1177,8 @@ final class SettingsRegistry
         // most of them have not expressed.
         self::UI_HIDE_DATES => 'false',
         self::LABELS_RESOLVE_MAX_IDS => '100',
+        // On: app.whity.dev installs as a phone app. See APP_INSTALLABLE.
+        self::APP_INSTALLABLE => 'true',
     ];
 
     /**
@@ -1517,6 +1538,7 @@ final class SettingsRegistry
             self::INVITATION_TTL_DAYS => self::validateInvitationTtlDays($value),
             self::UI_HIDE_DATES => self::validateBoolean($value, self::UI_HIDE_DATES),
             self::LABELS_RESOLVE_MAX_IDS => self::validateLabelsResolveMaxIds($value),
+            self::APP_INSTALLABLE => self::validateBoolean($value, self::APP_INSTALLABLE),
             // #billing free-text. Declared with defaults and no validate() arm,
             // these fell straight through to `default` below — so six keys the
             // registry plainly knows were refused as "Unknown setting key" and

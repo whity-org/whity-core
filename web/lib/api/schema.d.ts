@@ -8228,6 +8228,8 @@ export interface components {
                     [key: string]: string;
                 };
             } | null;
+            /** @description Whether the web app offers a manifest and service worker so it can be installed as an app. An instance setting (app.installable, else the PWA_ENABLED environment variable, else on). */
+            installable: boolean;
         };
         BrandingHostRequest: {
             host?: string | null;

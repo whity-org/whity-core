@@ -422,6 +422,13 @@ export function fieldMeta(t: TranslateFn): Record<string, FieldMeta> {
         'Let people choose the language the interface is shown in, and mirror it for right-to-left languages. Off means everyone sees the default language, left-to-right, with no language control anywhere — stored preferences and translations are kept, so turning it back on restores them.'
       ),
     },
+    'app.installable': {
+      label: t('settings.meta.app.installable.label', 'Install as an app'),
+      help: t(
+        'settings.meta.app.installable.help',
+        'Let people add this site to their phone or computer as an app that opens in its own window and shows a page of its own when there is no connection. Off removes the option and uninstalls the app’s offline support from browsers the next time they open a page. Until this is saved here, the PWA_ENABLED setting of the server decides.'
+      ),
+    },
     'plugins.store_allowed_hosts': {
       label: t('settings.meta.plugins.store_allowed_hosts.label', 'Trusted plugin stores'),
       help: t(
