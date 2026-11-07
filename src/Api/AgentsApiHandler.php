@@ -10,10 +10,12 @@ use Whity\Core\Agent\AgentPresetRegistry;
 use Whity\Core\Agent\AgentRepository;
 use Whity\Core\Agent\AgentStatsRepository;
 use Whity\Core\Audit\AuditLoggerInterface;
+use Whity\Core\Hooks\HookManager;
 use Whity\Core\Request;
 use Whity\Core\Response;
 use Whity\Core\Tenant\TenantContext;
 use Whity\Mcp\Auth\AgentGrantView;
+use Whity\Sdk\Hooks\Events;
 
 /**
  * Workspace agents and the presets they start from (WHIT-815;
@@ -48,6 +50,8 @@ final class AgentsApiHandler
         private readonly ?\Closure $agentOperations = null,
         // The row when this person can read that document, else null.
         private readonly ?\Closure $readableSource = null,
+        // WHIT-990: agent lifecycle events for plugins, after each change.
+        private readonly ?HookManager $hooks = null,
     ) {
     }
 
@@ -144,6 +148,7 @@ final class AgentsApiHandler
             'target_id'   => $id,
             'metadata'    => ['slug' => $fields['slug'], 'preset' => $preset['key'] ?? null],
         ]);
+        $this->announce(Events::AGENT_CREATED, $tenantId, $id, $profileId);
 
         if (($fields['may_read'] ?? []) !== []) {
             $this->agents->update($id, $tenantId, ['may_read' => $fields['may_read']], $profileId);
@@ -193,6 +198,7 @@ final class AgentsApiHandler
             'target_id'   => $id,
             'metadata'    => ['fields' => array_keys($fields)],
         ]);
+        $this->announce(Events::AGENT_UPDATED, $tenantId, $id, $profileId);
 
         return Response::json(['data' => $this->presentAll([$this->agents->find($id, $tenantId) ?? $existing], $tenantId, $profileId)[0]], 200);
     }
@@ -264,6 +270,7 @@ final class AgentsApiHandler
             return Response::error('Agent not found', 404);
         }
         $this->audit?->record($event, ['tenant_id' => $tenantId, 'target_type' => 'agent', 'target_id' => $id]);
+        $this->announce($event, $tenantId, $id, $profileId);
 
         $agent = $this->agents->find($id, $tenantId);
         return Response::json(['data' => $agent !== null ? $this->presentAll([$agent], $tenantId, $profileId)[0] : null], 200);
@@ -354,6 +361,7 @@ final class AgentsApiHandler
             return Response::error('Agent not found', 404);
         }
         $this->audit?->record($event, ['tenant_id' => $tenantId, 'target_type' => 'agent', 'target_id' => $id]);
+        $this->announce($event, $tenantId, $id, $profileId);
 
         $agent = $this->agents->find($id, $tenantId);
         return Response::json(['data' => $agent !== null ? $this->presentAll([$agent], $tenantId, $profileId)[0] : null], 200);
@@ -442,5 +450,21 @@ final class AgentsApiHandler
             // The plugin it comes with; null when it works with Whity alone.
             'needs'          => $preset['needs'],
         ];
+    }
+
+    /**
+     * Tell plugins an agent changed (WHIT-990). Ids only, after the change is
+     * saved; a listener that throws is logged and changes nothing.
+     */
+    private function announce(string $event, int $tenantId, int $agentId, int $profileId): void
+    {
+        if ($this->hooks === null) {
+            return;
+        }
+        try {
+            $this->hooks->dispatch($event, ['tenant_id' => $tenantId, 'agent_id' => $agentId, 'actor_profile_id' => $profileId]);
+        } catch (\Throwable $e) {
+            error_log('[agents] a listener on ' . $event . ' failed: ' . $e->getMessage());
+        }
     }
 }

@@ -1553,6 +1553,25 @@ Declare `'public' => 'read'` on GET `/api/<your slug>/public/<name>/{key}` for s
 
 See [Public reads](Plugin-Public-Forms.md#public-reads-sdk-169).
 
+## Step 12e — Read the workspace's agents (SDK 1.75)
+
+`Whity\Sdk\Agents\Agents` reads the workspace's AI agents and what they did, as the person whose request it is:
+
+```php
+$agents = \Whity\app(\Whity\Sdk\Agents\Agents::class);
+
+foreach ($agents->list() as $agent) {
+    // ['id' => 4, 'slug' => 'collections-clerk', 'name' => ['en' => ..., 'ar' => ...], 'paused' => false, ...]
+}
+$waiting = $agents->activity(agentId: 4, status: 'waiting', limit: 20);
+```
+
+The workspace and the person come from the host, so a plugin can't ask about another workspace or see more than that person could. Somebody with `agents:manage` sees every agent and the workspace's whole activity. Anybody else sees only the agents they use and what agents did on their own behalf. In a job there is no person, and every method returns nothing. Activity never includes a call's arguments.
+
+To react when an agent changes, listen to `Events::AGENT_CREATED`, `AGENT_UPDATED`, `AGENT_ARCHIVED`, `AGENT_RESTORED`, `AGENT_PAUSED` and `AGENT_RESUMED`. The payload is `tenant_id`, `agent_id` and `actor_profile_id`. They fire after the change is saved, and a listener can't refuse or undo it.
+
+Nothing in the SDK creates, changes or grants an agent. People do that on the Agents screen.
+
 ## Step 13 — Declare it in `plugin.json` instead (SDK 1.47)
 
 Everything a plugin only *declares* can live in a JSON file instead of PHP methods: its identity and requirements, permissions, roles, `blocks` screens, owned tables, data types and limits. Put `plugin.json` next to an empty class:

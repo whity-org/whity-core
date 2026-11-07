@@ -428,6 +428,16 @@ abstract class BaseCommand implements CliCommand, CommandHelp
         // host-wired: registered so \Whity\app() never improvises an empty one.
         \Whity\register_service(\Whity\Mcp\Tools\ProposalDiffRegistry::class, new \Whity\Mcp\Tools\ProposalDiffRegistry());
 
+        // WHIT-990 (SDK 1.75): the workspace's agents for plugins, as in
+        // public/index.php. A job has no person, so it reads nothing.
+        \Whity\register_service(\Whity\Sdk\Agents\Agents::class, new \Whity\Core\Agent\SdkAgents(
+            new \Whity\Core\Agent\AgentRepository($db->getPdo()),
+            new \Whity\Core\Agent\AgentAssignmentRepository($db->getPdo()),
+            new \Whity\Core\Agent\AgentActivityRepository($db->getPdo()),
+            new \Whity\Core\Agent\AgentProposalRepository($db->getPdo()),
+            $roleChecker,
+        ));
+
         $baseDir = dirname(__DIR__, 3);
         // The registries are passed HERE, not just constructed above: this loader
         // previously received neither, so plugin-declared permissions were never
