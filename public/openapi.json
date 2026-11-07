@@ -4991,6 +4991,61 @@
                 ]
             }
         },
+        "/api/v1/billing/checkout-page": {
+            "get": {
+                "operationId": "get_api_v1_billing_checkout_page",
+                "summary": "The page a payment provider link opens, for checkouts that run on the seller page",
+                "tags": [
+                    "billing"
+                ],
+                "description": "Public: the payer arrives from the provider (Paddle) with only the query string. The billing plugin writes the HTML and its Content-Security-Policy and checks the transaction in the query with its provider first. Answers HTML, uncached; 404 when no billing plugin is in use or the reference is not valid.",
+                "responses": {
+                    "200": {
+                        "description": "The checkout page (text/html)"
+                    },
+                    "404": {
+                        "description": "No such checkout",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "The payment provider is temporarily unreachable",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/billing/invoices": {
             "get": {
                 "operationId": "get_api_v1_billing_invoices",
@@ -5446,6 +5501,201 @@
                 ]
             }
         },
+        "/api/v1/billing/portal": {
+            "post": {
+                "operationId": "post_api_v1_billing_portal",
+                "summary": "A link to the payment provider's self-service page for this workspace",
+                "tags": [
+                    "billing"
+                ],
+                "description": "Where the workspace updates its card, downloads invoices or cancels, on the payment provider's own page. Short-lived. Only a payment-provider plugin has one; the hosted billing service answers 404.",
+                "responses": {
+                    "200": {
+                        "description": "Where to send the customer",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "url": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "url"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "This deployment has no self-service billing page",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "This workspace has not bought anything yet",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "The payment provider refused the request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "The payment provider is temporarily unreachable",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/billing/provider-webhook": {
+            "post": {
+                "operationId": "post_api_v1_billing_provider_webhook",
+                "summary": "Payment provider notifications through the billing plugin (signed, not user-authenticated)",
+                "tags": [
+                    "billing"
+                ],
+                "description": "For a deployment that sells through a payment-provider plugin (Stripe, Paddle, Polar) instead of the hosted billing service. Point the provider's webhook here. The plugin verifies the provider's own signature over the RAW bytes before anything is decoded and returns only the delivery id and which workspace changed; the delivery id is recorded so a replay is acted on once, and what is true is then read back from the provider. The body is never a write path. 404 when no billing plugin is in use.",
+                "responses": {
+                    "200": {
+                        "description": "Received, or deliberately ignored",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "received": {
+                                            "type": "boolean"
+                                        }
+                                    },
+                                    "required": [
+                                        "received"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "The signature did not verify",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No billing plugin is in use",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "Temporarily could not be acted on \u2014 retry",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/billing/quantity": {
             "post": {
                 "operationId": "post_api_v1_billing_quantity",
@@ -5664,6 +5914,159 @@
                     },
                     "503": {
                         "description": "The billing service is temporarily unreachable",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/billing/refunds": {
+            "post": {
+                "operationId": "post_api_v1_billing_refunds",
+                "summary": "Refund a workspace's payment (operator only)",
+                "tags": [
+                    "billing"
+                ],
+                "description": "System workspace only. Names the workspace (`tenant_id`), the receipt's `reference`, and optionally `amount_minor` for a partial refund in minor units. Some providers review a refund before it happens, so the answer is 202 and the receipt shows the outcome later.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "tenant_id": {
+                                        "type": "integer",
+                                        "description": "The workspace whose payment is refunded"
+                                    },
+                                    "receipt": {
+                                        "type": "string",
+                                        "description": "The receipt's `reference` from GET /api/billing/receipts"
+                                    },
+                                    "amount_minor": {
+                                        "type": "integer",
+                                        "description": "For a partial refund, the amount in minor units (fils for JOD). Leave it out to refund what is left"
+                                    }
+                                },
+                                "required": [
+                                    "tenant_id",
+                                    "receipt"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "202": {
+                        "description": "The refund was requested",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "requested": {
+                                            "type": "boolean"
+                                        }
+                                    },
+                                    "required": [
+                                        "requested"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "This deployment cannot refund through its payment provider",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation failed, or the provider refused the refund",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "The payment provider refused the request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "The payment provider is temporarily unreachable",
                         "content": {
                             "application/json": {
                                 "schema": {
