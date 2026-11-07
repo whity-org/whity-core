@@ -11,6 +11,8 @@ use Whity\Auth\TokenValidator;
 use Whity\Core\Audit\AuditLoggerInterface;
 use Whity\Core\Hooks\HookManager;
 use Whity\Core\Plugin\Trust\AgentContextGrants;
+use Whity\Core\Plugin\Trust\CodePluginVerification;
+use Whity\Core\Plugin\Trust\NotVerifiedException;
 use Whity\Core\PluginLoader;
 use Whity\Core\RBAC\PermissionRegistry;
 use Whity\Core\Router;
@@ -132,7 +134,8 @@ PHP);
         $audit->method('record')->willReturnCallback(function (string $event): void {
             $this->audited[] = $event;
         });
-        $this->grants = new AgentContextGrants($this->pdo, $audit);
+        $this->grants = new AgentContextGrants($this->pdo, new CodePluginVerification($this->pdo), $audit);
+        $this->installVerified('PriceBook', '1.0.0');
 
         $this->loader = new PluginLoader(self::$pluginDir, new Router(''), new PermissionRegistry(), new HookManager());
         $this->loader->load();
@@ -206,6 +209,54 @@ PHP);
         self::assertSame([], $this->listResources());
         $this->assertRefused(fn () => $this->read('whity-plugin://pricebook/prices/current'));
         $this->assertRefused(fn () => $this->getPrompt('price-book-quote', ['item' => 'bread']));
+    }
+
+    public function testAnUnverifiedPluginCannotBeGrantedEvenByTheOperator(): void
+    {
+        // Installed, but its package carries no Whity mark.
+        $this->pdo->prepare("INSERT INTO plugin_installs (plugin_name, source, version, package_sha256) VALUES ('Unmarked', 'upload', '1.0.0', ?)")
+            ->execute([str_repeat('b', 64)]);
+
+        foreach (['Unmarked', 'NotInstalled'] as $plugin) {
+            try {
+                $this->grants->grant($plugin, self::OPERATOR);
+                self::fail("{$plugin} was granted");
+            } catch (NotVerifiedException $e) {
+                self::assertSame($plugin, $e->plugin);
+            }
+        }
+        self::assertSame(['plugin.agent_context.refused', 'plugin.agent_context.refused'], $this->audited);
+        self::assertSame([], $this->grants->granted());
+    }
+
+    public function testAGrantStopsCountingWhenItsMarkIsRevoked(): void
+    {
+        $this->grants->grant('PriceBook', self::OPERATOR);
+        $this->collect();
+        self::assertNotSame([], $this->listResources());
+
+        $this->pdo->exec("UPDATE plugin_version_marks SET revoked_at = CURRENT_TIMESTAMP, revoke_reason = 'test' WHERE plugin_name = 'PriceBook'");
+
+        self::assertFalse($this->grants->isGranted('PriceBook'));
+        self::assertSame([], $this->listResources());
+        self::assertSame([], $this->listPrompts());
+        $this->assertRefused(fn () => $this->read('whity-plugin://pricebook/prices/current'));
+    }
+
+    public function testAnUpdateToAnUnmarkedVersionStopsIt(): void
+    {
+        $this->grants->grant('PriceBook', self::OPERATOR);
+        $this->pdo->exec("UPDATE plugin_installs SET version = '1.1.0', package_sha256 = '" . str_repeat('c', 64) . "' WHERE plugin_name = 'PriceBook'");
+
+        self::assertFalse($this->grants->isGranted('PriceBook'), 'the mark was for 1.0.0\'s package');
+    }
+
+    private function installVerified(string $plugin, string $version): void
+    {
+        $sha = str_repeat('a', 64);
+        $this->pdo->prepare("INSERT INTO plugin_installs (plugin_name, source, version, package_sha256) VALUES (?, 'store', ?, ?)")->execute([$plugin, $version, $sha]);
+        $this->pdo->prepare("INSERT INTO plugin_version_marks (plugin_name, version, package_sha256, manifest_hash, source, attestation) VALUES (?, ?, ?, ?, 'whity', 'test')")
+            ->execute([$plugin, $version, $sha, str_repeat('d', 64)]);
     }
 
     private function collect(): void

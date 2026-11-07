@@ -1595,7 +1595,7 @@ The approvals card shows each row's `label`, `before` and `after`. The host runs
 
 ### Prompts and resources for agents (SDK 1.78)
 
-Prompts (`PluginMcpInterface`) and resources (`PluginMcpResourcesInterface`) put your text straight into an AI agent's context, so the host serves them only from a plugin the operator has granted **agent context**:
+Prompts (`PluginMcpInterface`) and resources (`PluginMcpResourcesInterface`) put your text straight into an AI agent's context, so the host serves them only from a **Verified** plugin the operator has granted **agent context**:
 
 ```bash
 whity-cli plugin agent-context grant HelloWorld

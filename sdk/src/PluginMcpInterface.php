@@ -37,7 +37,7 @@ namespace Whity\Sdk;
  * Agent context (SDK 1.78, WHIT-993)
  * ---------------------------------
  * Prompt text goes straight into an agent's context. From SDK 1.78 the host
- * serves a plugin's prompts only when the operator has granted the plugin
+ * serves a plugin's prompts only from a Verified plugin the operator has granted
  * **agent context** (install-wide, system tenant only, audited, revocable),
  * the same grant {@see PluginMcpResourcesInterface} resources need. Until then
  * they are neither listed nor served. And every prompt must declare

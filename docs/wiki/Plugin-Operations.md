@@ -103,7 +103,7 @@ pool.
 
 ## Agent context: prompts and resources (WHIT-993)
 
-A code plugin's MCP prompts and resources go straight into AI agents' context, so they are served only from plugins the operator grants, on the server:
+A code plugin's MCP prompts and resources go straight into AI agents' context, so they are served only from Verified plugins the operator grants, on the server. Verified means a live Whity mark on the exact package that was installed. An unverified plugin can't be granted, and a grant stops counting the moment its mark is revoked:
 
 ```bash
 whity-cli plugin agent-context list
@@ -111,7 +111,7 @@ whity-cli plugin agent-context grant PriceBook
 whity-cli plugin agent-context revoke PriceBook
 ```
 
-The grant is install-wide, and each grant and revoke is in the audit log. A revoke applies to the next call. A grant applies once workers reload plugins (`plugin reload`) or restart. Grant only plugins you would let speak to every agent in every workspace. Even then, each prompt and resource still needs its own permission for each caller.
+**Upgrade note:** before this, plugin prompts reached agents without a grant. After upgrading they stop until you grant the plugin. The grant is install-wide, and each grant, refusal and revoke is in the audit log. A revoke applies to the next call. A grant applies once workers reload plugins (`plugin reload`) or restart. Grant only plugins you would let speak to every agent in every workspace. Even then, each prompt and resource still needs its own permission for each caller.
 
 ## Who changes plugins, and uninstalling (S7, WHIT-869, WHIT-870)
 

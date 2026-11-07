@@ -252,9 +252,11 @@ class PluginsCommand extends BaseCommand implements CliCommand
     {
         $action = array_shift($argv);
         $action = is_string($action) ? $action : 'list';
+        $pdo    = \Whity\Database\Database::connect()->getPdo();
         $grants = new \Whity\Core\Plugin\Trust\AgentContextGrants(
-            \Whity\Database\Database::connect()->getPdo(),
-            new \Whity\Core\Audit\AuditLogger(\Whity\Database\Database::connect()->getPdo()),
+            $pdo,
+            new \Whity\Core\Plugin\Trust\CodePluginVerification($pdo),
+            new \Whity\Core\Audit\AuditLogger($pdo),
         );
         if ($action === 'list') {
             $rows = array_map(static fn (array $g): array => [$g['plugin'], $g['grantedAt']], $grants->list());
@@ -271,7 +273,13 @@ class PluginsCommand extends BaseCommand implements CliCommand
             return 1;
         }
         if ($action === 'grant') {
-            echo $grants->grant($name, null)
+            try {
+                $granted = $grants->grant($name, null);
+            } catch (\Whity\Core\Plugin\Trust\NotVerifiedException $e) {
+                echo 'Refused: ' . $e->getMessage() . ".\n";
+                return 1;
+            }
+            echo $granted
                 ? "Granted: {$name}'s MCP prompts and resources can reach AI agents once workers reload plugins.\n"
                 : "{$name} was already granted.\n";
             return 0;
@@ -293,7 +301,7 @@ class PluginsCommand extends BaseCommand implements CliCommand
         echo "  reload                                Reload discovered plugins\n";
         echo "  uninstall <id> [--dry-run] [--now] [--force]  Uninstall a plugin, kept 30 days unless --now\n";
         echo "  agent-context [list]                  Plugins whose MCP prompts and resources may reach AI agents\n";
-        echo "  agent-context grant <name>            Let this plugin's prompts and resources reach AI agents\n";
+        echo "  agent-context grant <name>            Let this Verified plugin's prompts and resources reach AI agents\n";
         echo "  agent-context revoke <name>           Stop them, at once\n";
         return 0;
     }

@@ -18,26 +18,34 @@ use Whity\Core\Audit\AuditLoggerInterface;
  * on the server). Verified status is operator-granted only
  * (owner decision), and this is that grant for agent context.
  *
+ * Only a Verified plugin can be granted, whoever asks, and the grant only counts
+ * while it stays Verified ({@see CodePluginVerification}).
+ *
  * Only this class writes `plugin_agent_context_grants`.
  */
 final class AgentContextGrants
 {
     public function __construct(
         private readonly PDO $db,
+        private readonly CodePluginVerification $verification,
         private readonly ?AuditLoggerInterface $audit = null,
     ) {
     }
 
-    /** Whether the plugin of this name is granted now: asked on every read, so a revoke applies at once. */
+    /**
+     * Whether the plugin of this name may reach agents now: granted, and still
+     * Verified. Asked on every read, so a revoke, or a mark taken away, applies
+     * at once.
+     */
     public function isGranted(string $plugin): bool
     {
         $stmt = $this->db->prepare('SELECT 1 FROM plugin_agent_context_grants WHERE plugin_name = ?');
         $stmt->execute([$plugin]);
 
-        return $stmt->fetchColumn() !== false;
+        return $stmt->fetchColumn() !== false && $this->verification->isVerified($plugin);
     }
 
-    /** @return list<string> the granted plugins' names */
+    /** @return list<string> the plugins that may reach agents now: granted and still Verified */
     public function granted(): array
     {
         $rows = $this->db->query('SELECT plugin_name FROM plugin_agent_context_grants ORDER BY plugin_name');
@@ -45,7 +53,10 @@ final class AgentContextGrants
             return [];
         }
 
-        return array_values(array_map('strval', $rows->fetchAll(PDO::FETCH_COLUMN)));
+        return array_values(array_filter(
+            array_map('strval', $rows->fetchAll(PDO::FETCH_COLUMN)),
+            $this->verification->isVerified(...),
+        ));
     }
 
     /** @return list<array{plugin: string, grantedBy: int|null, grantedAt: string}> */
@@ -63,9 +74,23 @@ final class AgentContextGrants
         ], $rows->fetchAll(PDO::FETCH_ASSOC)));
     }
 
-    /** Grant it; true when it was not granted before. */
+    /**
+     * Grant it; true when it was not granted before.
+     *
+     * @throws NotVerifiedException when the installed plugin is not Verified: only a
+     *         Verified plugin may be granted, whoever asks, the operator included
+     */
     public function grant(string $plugin, ?int $profileId): bool
     {
+        if (!$this->verification->isVerified($plugin)) {
+            $this->audit?->record('plugin.agent_context.refused', [
+                'tenant_id'     => 0,
+                'actor_user_id' => $profileId,
+                'target_type'   => 'plugin',
+                'metadata'      => ['plugin' => $plugin, 'reason' => 'not_verified'],
+            ]);
+            throw new NotVerifiedException($plugin);
+        }
         $stmt = $this->db->prepare(
             'INSERT INTO plugin_agent_context_grants (plugin_name, granted_by_profile_id, granted_at)
              VALUES (?, ?, CURRENT_TIMESTAMP) ON CONFLICT (plugin_name) DO NOTHING'
