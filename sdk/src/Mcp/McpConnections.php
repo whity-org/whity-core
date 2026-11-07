@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk\Mcp;
 
 /**
- * The workspace's AI connections (SDK 1.77, WHIT-992): the apps and agents
+ * The workspace's AI connections (SDK 1.79, WHIT-992): the apps and agents
  * people connected to Whity over MCP. Resolve it with
  * `\Whity\app(\Whity\Sdk\Mcp\McpConnections::class)` in a route handler or an
  * MCP tool handler.

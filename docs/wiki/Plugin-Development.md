@@ -1587,7 +1587,7 @@ The approvals card shows each row's `label`, `before` and `after`. The host runs
 
 `Events::AGENT_PROPOSAL_CREATED`, `AGENT_PROPOSAL_DECIDED` and `AGENT_ACTION_UNDONE` tell you a proposal was filed, stopped waiting (`decision` is `approved`, `declined` or `expired`) or what an agent did was undone. The payloads carry ids and the tool's name, never the arguments. They fire after the change, and nothing a listener returns or throws changes it. **Only the person who granted the agent decides a proposal.** No plugin can approve or decline one.
 
-### AI connections (SDK 1.77)
+### AI connections (SDK 1.79)
 
 `Whity\Sdk\Mcp\McpConnections::list()` returns the workspace's active AI connections: the apps and workspace agents people connected over MCP, with their name, kind, person, agent, scope and when each was made, expires and was last used. Somebody with `mcp:tokens:manage` sees the whole workspace; anybody else sees their own. It never returns a token, a token id (jti) or a hash: a connection is named by its row id, which can't be used to call as it.
 

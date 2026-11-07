@@ -186,7 +186,7 @@ final class Events
      */
     public const AGENT_ACTION_UNDONE = 'agent.action.undone';
 
-    // ---- AI connections (SDK 1.77, WHIT-992) ----
+    // ---- AI connections (SDK 1.79, WHIT-992) ----
     // An app or agent connected over MCP. Fired after the change, the return
     // value ignored. Payload: `tenant_id`, `connection_id` (as
     // {@see \Whity\Sdk\Mcp\McpConnections} lists it), `profile_id` (whose

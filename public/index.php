@@ -5090,7 +5090,7 @@ $router->register('DELETE', '/api/relations/{id:\d+}', [$relationsHandler, 'dele
 // permission: each handler acts only on the caller's own tokens, and a token never
 // does more than its owner. mcp:tokens:manage is for the admin routes below, which
 // reach everyone's. Undeclared on purpose, which keeps them off the agent surface.
-// WHIT-992 (SDK 1.77): connection events, and the connections read for plugins.
+// WHIT-992 (SDK 1.79): connection events, and the connections read for plugins.
 $mcpConnectionEvents = new \Whity\Mcp\Auth\McpConnectionEvents($db->getPdo(), $hookManager);
 \Whity\register_service(\Whity\Sdk\Mcp\McpConnections::class, new \Whity\Mcp\Auth\SdkMcpConnections($db->getPdo(), $roleChecker));
 $mcpTokenService = new McpTokenService($db->getPdo(), $jwtParser, $mcpConnectionEvents);
