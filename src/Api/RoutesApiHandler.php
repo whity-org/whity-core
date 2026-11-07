@@ -13,6 +13,8 @@ use Whity\Core\Document\Routing\DocumentRouteSubject;
 use Whity\Core\Document\Routing\RouteAction;
 use Whity\Core\Document\Routing\RouteEdgeRepository;
 use Whity\Core\Document\Routing\RouteEventRepository;
+use Whity\Core\Document\Routing\RouteFinalDocumentFile;
+use Whity\Core\Document\Routing\RouteFinalisationRepository;
 use Whity\Core\Document\Routing\RouteRecipientRepository;
 use Whity\Core\Document\Routing\RouteRepository;
 use Whity\Core\Document\Routing\RouteStepRepository;
@@ -36,6 +38,7 @@ use Whity\Core\Tenant\TenantContext;
  *                                                      their trails and items
  *   POST /api/v1/routes/{routeId}/actions              act on a route
  *   GET  /api/v1/routes/{routeId}/files/{fileId}       a file on the subject
+ *   GET  /api/v1/routes/{routeId}/final-document       the PDF its finalise step made (WHIT-921)
  *
  * A route on a form submission has no document, so the document routes
  * (`/api/v1/documents/{id}/routes/…`) cannot reach it. These do, for any
@@ -69,6 +72,9 @@ final class RoutesApiHandler
         private readonly DocumentVisibilityPolicy $visibility,
         private readonly RoleChecker $roleChecker,
         private readonly ?FormSubmissionsApiHandler $submissions = null,
+        // WHIT-921: what each route's finalise step did, and its PDF.
+        private readonly ?RouteFinalisationRepository $finalisations = null,
+        private readonly ?RouteFinalDocumentFile $finalFile = null,
     ) {
     }
 
@@ -139,6 +145,8 @@ final class RoutesApiHandler
                 'can_send_back' => ($route['document_id'] !== null
                     ? $this->subjects->get(DocumentRouteSubject::TYPE)?->author($tenantId, (int) $route['document_id'])
                     : $provider?->author($tenantId, $subjectId)) !== null,
+                // WHIT-921: what the finalise step did, the engine's own act.
+                'finalisation' => RoutingPresenter::finalisation($this->finalisations?->findForRoute($tenantId, $routeId)),
             ];
         }
 
@@ -242,6 +250,28 @@ final class RoutesApiHandler
         }
 
         return $this->submissions->fileForReviewer($tenantId, (int) $route['subject_id'], (int) ($params['fileId'] ?? 0));
+    }
+
+    /**
+     * GET /api/v1/routes/{routeId}/final-document — the PDF the route's finalise
+     * step made (WHIT-921), for somebody who may read the route. A 404 while it
+     * is still waiting.
+     *
+     * @param array<string, string> $params
+     */
+    public function finalDocument(Request $request, array $params): Response
+    {
+        $resolved = $this->visibleRoute($request, $params);
+        if ($resolved instanceof Response) {
+            return $resolved;
+        }
+        [$tenantId, , $route] = $resolved;
+
+        if ($this->finalFile === null) {
+            return Response::error('There is no final document yet', 404);
+        }
+
+        return $this->finalFile->forRoute($tenantId, (int) $route['id'], (string) $route['title']);
     }
 
     /**

@@ -5,6 +5,7 @@ import { Button } from "@whity/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@whity/ui/card"
 import { IconButton } from "@whity/ui/icon-button"
 import { Input } from "@whity/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@whity/ui/select"
 import { Switch } from "@whity/ui/switch"
 
 import { useTranslation } from "../i18n"
@@ -12,7 +13,7 @@ import { useFormLanguages } from "./form-languages"
 import { BannerPicker } from "./banner-picker"
 import { useCurrentLanguage } from "./language"
 import { pickText } from "./text"
-import type { FormBannerValue, FormRow, FormSectionDef, LocalizedMap } from "./types"
+import type { FinalTemplateOption, FormBannerValue, FormRow, FormSectionDef, LocalizedMap } from "./types"
 
 /** The parts of a form the Settings tab edits, held together so one save bar covers them. */
 export interface FormSettings {
@@ -37,6 +38,8 @@ export function FormSettingsTab({
   onMemberAccess,
   onSignInRequired,
   onUploadBanner,
+  finalTemplates,
+  onFinalDocument,
 }: {
   form: FormRow
   settings: FormSettings
@@ -50,6 +53,10 @@ export function FormSettingsTab({
   onSignInRequired?: (required: boolean) => void
   /** Uploads a picture as the banner; resolves true when the server kept it. */
   onUploadBanner?: (file: File) => Promise<boolean>
+  /** WHIT-921: published templates the final document can be made with. */
+  finalTemplates?: FinalTemplateOption[]
+  /** WHIT-921: change the final document template, or whether the applicant gets the final document. */
+  onFinalDocument?: (changes: { final_template_id?: number | null; final_document_to_applicant?: boolean }) => void
 }) {
   const t = useTranslation("forms")
   const { enabled, setEnabled } = useFormLanguages()
@@ -220,6 +227,67 @@ export function FormSettingsTab({
           )}
         </CardContent>
       </Card>
+
+      {form.final_template_id !== undefined && onFinalDocument !== undefined && (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("builder.settings.final", "Final document")}</CardTitle>
+            <CardDescription>
+              {t(
+                "builder.settings.final.body",
+                "When this form's route ends with a final document, Whity makes the PDF from the approved answers with this template, unless the route chooses its own."
+              )}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-1">
+              <label htmlFor="form-final-template" className="text-sm font-medium">
+                {t("builder.settings.final.template", "Final document template")}
+              </label>
+              <Select
+                value={form.final_template_id === null ? "none" : String(form.final_template_id)}
+                disabled={readOnly || publicBusy}
+                onValueChange={(value) => onFinalDocument({ final_template_id: value === "none" ? null : Number(value) })}
+              >
+                <SelectTrigger id="form-final-template">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">{t("builder.settings.final.none", "None chosen")}</SelectItem>
+                  {form.final_template_id !== null && !(finalTemplates ?? []).some((tpl) => tpl.id === form.final_template_id) && (
+                    <SelectItem value={String(form.final_template_id)}>
+                      {t("builder.settings.final.hidden", "A template you can't see")}
+                    </SelectItem>
+                  )}
+                  {(finalTemplates ?? []).map((tpl) => (
+                    <SelectItem key={tpl.id} value={String(tpl.id)}>
+                      {tpl.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {form.final_document_to_applicant !== undefined && (
+              <div className="space-y-1">
+                <div className="flex items-center gap-3">
+                  <Switch
+                    id="form-final-applicant"
+                    checked={form.final_document_to_applicant}
+                    disabled={readOnly || publicBusy}
+                    onCheckedChange={(checked) => onFinalDocument({ final_document_to_applicant: checked })}
+                  />
+                  <label htmlFor="form-final-applicant" className="text-sm font-medium">
+                    {t("builder.settings.final.applicant", "The person who sent it can open the final document")}
+                  </label>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {t("builder.settings.final.applicant.body", "They find it in My submissions once it is made.")}
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {form.open_to_members !== undefined && (
         <Card>

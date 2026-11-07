@@ -51,9 +51,22 @@ interface TrailEntry {
   occurred_at: string;
 }
 
+/** WHIT-921: what the route's final document stage did — the engine's act, not a person's. */
+interface RouteFinalisation {
+  status: 'waiting' | 'done' | 'failed';
+  reason: string | null;
+  subject_version: number | null;
+  content_hash: string | null;
+  has_pdf: boolean;
+  reached_at: string;
+  finalised_at: string | null;
+}
+
 interface SubjectRoute extends DocumentRoute {
   /** Whether this route can send it back to anybody (absent on an older server). */
   can_send_back?: boolean;
+  /** WHIT-921: null until the route reaches its final document stage. */
+  finalisation?: RouteFinalisation | null;
   trail: TrailEntry[];
   recipients: RouteRecipient[];
   changes: {
@@ -288,7 +301,46 @@ export default function RouteSubjectPage({ params }: { params: Promise<{ type: s
                     detail={entry.note ?? undefined}
                   />
                 ))}
+                {/* WHIT-921: the final document, made by Whity and attributed
+                    to nobody, because nobody acted at that stage. */}
+                {route.finalisation != null && (
+                  <RecordTimelineItem
+                    key="final-document"
+                    title={
+                      <span className="font-sans">
+                        {route.finalisation.status === 'done'
+                          ? t('subject.final.done', 'Final document made')
+                          : route.finalisation.status === 'failed'
+                            ? t('subject.final.failed', 'The final document could not be made')
+                            : t('subject.final.waiting', 'Final document waiting')}
+                      </span>
+                    }
+                    meta={`${t('subject.final.by', 'Whity')} · ${
+                      dateTime(route.finalisation.finalised_at ?? route.finalisation.reached_at) ?? ''
+                    }`}
+                    detail={
+                      route.finalisation.subject_version !== null && route.finalisation.content_hash !== null
+                        ? t('subject.final.version', 'From version {version} · SHA-256 {hash}', {
+                            version: String(route.finalisation.subject_version),
+                            hash: route.finalisation.content_hash,
+                          })
+                        : undefined
+                    }
+                  />
+                )}
               </RecordTimeline>
+              {route.finalisation?.has_pdf === true && (
+                <p className="text-sm">
+                  <a
+                    href={`/api/v1/routes/${route.id}/final-document`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-primary underline-offset-4 hover:underline"
+                  >
+                    {t('subject.final.open', 'Open the final document')}
+                  </a>
+                </p>
+              )}
             </section>
           </CardContent>
         </Card>

@@ -261,6 +261,8 @@ final class TenantOwnedTables
         'route_signatures'           => '232_add_route_signatures.php',
         'saved_signatures'           => '232_add_route_signatures.php',
         'signing_challenges'         => '232_add_route_signatures.php',
+        // WHIT-921: what the engine did when a route reached its finalise step.
+        'route_finalisations'        => '234_add_route_finalise.php',
 
         // #1014 — where a VERDICT sends a document (migration 119). The
         // branching seam migration 112 named and deliberately left unbuilt, keyed

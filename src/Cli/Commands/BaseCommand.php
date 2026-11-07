@@ -537,6 +537,10 @@ abstract class BaseCommand implements CliCommand, CommandHelp
                 static fn (int $tenant, int $profileId): ?string => $tenantRecordRepository->memberName($tenant, $profileId),
             )
         );
+        // WHIT-921: each form's submissions as a record type, as in public/index.php.
+        $documentFieldRegistry->addTenantSource(
+            static fn (int $tenantId): array => \Whity\Core\Form\FormSubmissionFieldProvider::forTenant($db->getPdo(), $tenantId)
+        );
         $templateSlotRegistry = new \Whity\Core\Document\Slots\TemplateSlotRegistry($liveManifests);
         $agentPresetRegistry->useManifests($liveManifests);
         \Whity\register_service(\Whity\Core\Document\Slots\TemplateSlotRegistry::class, $templateSlotRegistry);

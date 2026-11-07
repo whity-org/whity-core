@@ -203,7 +203,7 @@ export function ResponseDialog({ env, submissionId, mine = false, onClose }: { e
             ))}
           </dl>
         )}
-        {mine && detail?.progress && <SubmissionProgressView progress={detail.progress} />}
+        {mine && detail?.progress && <SubmissionProgressView progress={detail.progress} submissionId={submissionId} />}
         <div className="flex flex-wrap justify-end gap-2">
           <Button variant="outline" onClick={onClose}>
             {t("builder.close", "Close")}
@@ -227,12 +227,18 @@ export function ResponseDialog({ env, submissionId, mine = false, onClose }: { e
  * and the notes written for them. Who reviewed it shows only when the workspace
  * shows reviewer names.
  */
-function SubmissionProgressView({ progress }: { progress: SubmissionProgress }) {
+function SubmissionProgressView({ progress, submissionId }: { progress: SubmissionProgress; submissionId: number }) {
   const t = useTranslation("forms")
   const { dateTime } = useDateDisplay()
   if (progress.stages.length === 0) return null
 
   const statusWord = (stage: SubmissionProgress["stages"][number]): string => {
+    // WHIT-921: nobody reviews the final document stage; it is made.
+    if (stage.kind === "finalise") {
+      if (stage.status === "done") return t("progress.final.ready", "Final document ready")
+      if (stage.status === "current") return t("progress.final.waiting", "Final document waiting")
+      return t("progress.waiting", "Not reached yet")
+    }
     switch (stage.status) {
       case "not_approved":
         return t("progress.notApproved", "Not approved")
@@ -253,7 +259,12 @@ function SubmissionProgressView({ progress }: { progress: SubmissionProgress }) 
       <ol className="space-y-2">
         {progress.stages.map((stage) => (
           <li key={stage.position} className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
-            <span>{stage.label ?? t("progress.stage", "Stage {number}", { number: stage.position })}</span>
+            <span>
+              {stage.label ??
+                (stage.kind === "finalise"
+                  ? t("progress.final.stage", "Final document")
+                  : t("progress.stage", "Stage {number}", { number: stage.position }))}
+            </span>
             <span className="text-muted-foreground">
               {statusWord(stage)}
               {stage.reviewers && stage.reviewers.length > 0 ? ` · ${stage.reviewers.join(", ")}` : ""}
@@ -261,6 +272,18 @@ function SubmissionProgressView({ progress }: { progress: SubmissionProgress }) 
           </li>
         ))}
       </ol>
+      {progress.final_document?.can_open === true && (
+        <p className="text-sm">
+          <a href={`/api/v1/me/form-submissions/${submissionId}/final-document`} target="_blank" rel="noreferrer" className="text-primary underline-offset-4 hover:underline">
+            {t("progress.final.open", "Open the final document")}
+          </a>
+        </p>
+      )}
+      {progress.final_document?.status === "waiting" && (
+        <p className="text-xs text-muted-foreground">
+          {t("progress.final.waitingBody", "It has been approved. The final document is being made and will appear here.")}
+        </p>
+      )}
       {progress.notes.length > 0 && (
         <div className="space-y-2">
           <h4 className="text-sm font-medium">{t("progress.notes", "Notes for you")}</h4>

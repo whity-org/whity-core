@@ -172,6 +172,7 @@ final class CoreTables
         'role_permissions' => '002_create_permissions.php',
         'roles' => '001_create_users_roles.php',
         'route_signatures' => '232_add_route_signatures.php',
+        'route_finalisations' => '234_add_route_finalise.php',
         'route_subject_versions' => '226_add_route_send_back_and_versions.php',
         'saved_signatures' => '232_add_route_signatures.php',
         'scheduled_jobs' => '069_create_scheduled_jobs.php',

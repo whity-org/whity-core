@@ -37,7 +37,7 @@ import { useStatusLabel } from "./forms-list-screen"
 import { QuestionPanel } from "./question-panel"
 import { ResponsesTab } from "./responses-tab"
 import { asMap, pickText, statusVariant } from "./text"
-import type { FieldDraft, FieldKind, FormRow, FormSectionDef, FormsScreenEnv } from "./types"
+import type { FieldDraft, FieldKind, FinalTemplateOption, FormRow, FormSectionDef, FormsScreenEnv } from "./types"
 
 interface Loaded {
   form: FormRow
@@ -352,6 +352,31 @@ function FormBuilder({ env, formId, canManage }: { env: FormsScreenEnv; formId: 
     }
   }
 
+  // WHIT-921: the templates a form's final document can be made with.
+  const [finalTemplates, setFinalTemplates] = useState<FinalTemplateOption[]>([])
+  useEffect(() => {
+    let live = true
+    void api.listFinalTemplates(t("builder.action.failed", "That did not work. Try again.")).then((result) => {
+      if (live && result.ok) setFinalTemplates(result.data)
+    })
+    return () => {
+      live = false
+    }
+  }, [api, t])
+
+  /** WHIT-921: the form's final document template, and whether the applicant gets the final document. */
+  async function setFinalDocument(changes: { final_template_id?: number | null; final_document_to_applicant?: boolean }) {
+    if (loaded === null) return
+    setPublicBusy(true)
+    const result = await api.updateForm(formId, changes, t("builder.action.failed", "That did not work. Try again."))
+    setPublicBusy(false)
+    if (!result.ok) {
+      env.notify(result.message, "error")
+      return
+    }
+    setLoaded((current) => (current === null ? current : { ...current, form: { ...current.form, ...result.data } }))
+  }
+
   /** WHIT-920: the public link asks visitors to sign in, so their submission can be sent back to them. */
   async function setSignInRequired(required: boolean) {
     if (loaded === null) return
@@ -615,6 +640,8 @@ function FormBuilder({ env, formId, canManage }: { env: FormsScreenEnv; formId: 
             onMemberAccess={(open) => void setMemberAccess(open)}
             onSignInRequired={(required) => void setSignInRequired(required)}
             onUploadBanner={uploadBanner}
+            finalTemplates={finalTemplates}
+            onFinalDocument={(changes) => void setFinalDocument(changes)}
           />
         </TabsContent>
       </Tabs>

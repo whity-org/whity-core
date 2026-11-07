@@ -28,6 +28,8 @@ final class ActingAs
         public readonly ?string $plugin = null,
         /** @var list<string> What a background plugin declares (its whole permission set). */
         public readonly array $declared = [],
+        // WHIT-921: the routing engine itself, making a route's final document.
+        public readonly bool $engine = false,
     ) {
         $this->hasPermission = $hasPermission;
     }
@@ -38,9 +40,19 @@ final class ActingAs
         return new self($tenantId, 0, static fn (string $permission): bool => in_array($permission, $permissions, true), $plugin, $permissions);
     }
 
-    /** The profile to record as the issuer: none for a plugin in the background. */
+    /**
+     * The routing engine making a route's final document (WHIT-921): no person,
+     * no plugin, and no permissions, so a record or chart embedded in the
+     * template prints as one nobody may see rather than as somebody's view of it.
+     */
+    public static function engine(int $tenantId): self
+    {
+        return new self($tenantId, 0, static fn (string $permission): bool => false, null, true);
+    }
+
+    /** The profile to record as the issuer: none for a plugin in the background, or for the engine. */
     public function issuerId(): ?int
     {
-        return $this->plugin === null ? $this->profileId : null;
+        return $this->plugin === null && !$this->engine ? $this->profileId : null;
     }
 }

@@ -3441,6 +3441,11 @@ $documentFieldRegistry->addTenantSource(
         static fn (int $tenant, int $profileId): ?string => $tenantRecordRepository->memberName($tenant, $profileId),
     )
 );
+// WHIT-921: each form's submissions as a record type (`form.<key>`), so a
+// template can print a submission's answers: what a route's final document is.
+$documentFieldRegistry->addTenantSource(
+    static fn (int $tenantId): array => \Whity\Core\Form\FormSubmissionFieldProvider::forTenant($db->getPdo(), $tenantId, $documentFieldLabels)
+);
 \Whity\register_service(\Whity\Core\Document\Fields\DocumentFieldRegistry::class, $documentFieldRegistry);
 // 13a-nonies-quinquies. QR VERIFICATION ON DOCUMENTS (#1036). A code printed on
 // a document that anybody can scan to confirm it is genuine, and that a
@@ -3861,6 +3866,25 @@ $router->register('GET', '/api/document-verifications/{token}', [$documentVerifi
 // HookManager::dispatchAsync, AFTER its own commit — #947 notes documents emit
 // nothing into `domain_events` today. One trail, one broadcast derived from it;
 // the broadcast is never read as authoritative.
+// WHIT-921: makes a route's final document when it reaches its finalise step,
+// and retries through the queue while the render service is down.
+$routeFinaliser = new \Whity\Core\Document\Routing\RouteFinaliser(
+    $db->getPdo(),
+    $routeRepository,
+    $routeRecipientRepository,
+    $routeEventRepository,
+    new \Whity\Core\Document\Routing\RouteFinalisationRepository($db->getPdo()),
+    $routeSubjectRegistry,
+    new \Whity\Core\Document\Routing\RouteSubjectVersionRepository($db->getPdo()),
+    $documentSourceRepository,
+    $documentRepository,
+    $documentIssuing,
+    static fn (int $tenantId): bool => $flowDocumentRenderer->isEnabled($tenantId),
+    $documentFieldRegistry,
+    $queueService,
+    $hookManager,
+    new \Whity\Core\Document\Print\PrintLabels($serverLabels),
+);
 $documentRouter = new \Whity\Core\Document\Routing\DocumentRouter(
     $db->getPdo(),
     $routeRepository,
@@ -3875,11 +3899,17 @@ $documentRouter = new \Whity\Core\Document\Routing\DocumentRouter(
     // author is and record each version of what was reviewed.
     $routeSubjectRegistry,
     new \Whity\Core\Document\Routing\RouteSubjectVersionRepository($db->getPdo()),
+    $routeFinaliser,
 );
 // WHIT-684: a number handed out at final approval goes on the PDF, printed for the
 // approver, when the template prints it. Listening after the commit, so a failed
 // render costs the PDF, never the approval or the number.
 $hookManager->listen(\Whity\Sdk\Hooks\Events::DOCUMENT_NUMBERED, static function (array $event) use ($documentRepository, $documentSourceRepository, $documentIssuing, $roleChecker): void {
+    // WHIT-921: a route with a finalise step prints the number on its final
+    // document, so it is not reprinted here as well.
+    if (($event['finalising'] ?? false) === true || ($event['finalised'] ?? false) === true) {
+        return;
+    }
     $tenantId = (int) $event['tenant_id'];
     $actorId = (int) $event['actor_profile_id'];
     $document = $documentRepository->findById((int) $event['id'], $tenantId);
@@ -4085,11 +4115,16 @@ $router->register('DELETE', '/api/user-groups/{id:\d+}',           [$userGroupsH
 // `/preview` is above — the router matches in registration order.
 // $routeTemplateRepository is constructed above, beside the routing handler that
 // also needs it (#1031).
-$routeTemplateGraph = new \Whity\Core\Document\RouteTemplate\RouteTemplateGraph($routingRuleRegistry);
+$routeTemplateGraph = new \Whity\Core\Document\RouteTemplate\RouteTemplateGraph(
+    $routingRuleRegistry,
+    // WHIT-921: a design may end with a final document only where PDFs can be made.
+    static fn (int $tenantId): bool => $routeFinaliser->isAvailable($tenantId),
+);
 $routeTemplatesHandler = new \Whity\Api\DocumentRouteTemplatesApiHandler(
     $routeTemplateRepository,
     $routeTemplateGraph,
-    $settingsService
+    $settingsService,
+    static fn (int $tenantId): bool => $routeFinaliser->isAvailable($tenantId),
 );
 $router->register('GET',    '/api/document-route-templates',                  [$routeTemplatesHandler, 'index'],         null, null, CorePermissions::ROUTE_TEMPLATES_READ);
 $router->register('POST',   '/api/document-route-templates',                  [$routeTemplatesHandler, 'create'],        null, null, CorePermissions::ROUTE_TEMPLATES_WRITE);
@@ -4251,6 +4286,13 @@ $submissionIssuer = new \Whity\Core\Form\SubmissionIssuer(
     $routeRepository,
     $routeRecipientRepository
 );
+// WHIT-921: what each route's finalise step did, and the PDF it made.
+$routeFinalisationRepository = new \Whity\Core\Document\Routing\RouteFinalisationRepository($db->getPdo());
+$routeFinalDocumentFile = new \Whity\Core\Document\Routing\RouteFinalDocumentFile(
+    $routeFinalisationRepository,
+    new \Whity\Core\Document\DocumentArtifactRepository($db->getPdo()),
+    $documentArtifactStore,
+);
 $formSubmissionsHandler = new \Whity\Api\FormSubmissionsApiHandler(
     $formRepository,
     $formFieldRepository,
@@ -4265,8 +4307,11 @@ $formSubmissionsHandler = new \Whity\Api\FormSubmissionsApiHandler(
         $routeStepRepository,
         $routeEventRepository,
         $routeRecipientRepository,
-        $settingsService
-    )
+        $settingsService,
+        $routeFinalisationRepository,
+    ),
+    $routeFinalisationRepository,
+    $routeFinalDocumentFile,
 );
 $formSubmissionReviewsHandler = new \Whity\Api\FormSubmissionReviewsApiHandler(
     $formFieldRepository,
@@ -4299,6 +4344,8 @@ $router->register('POST', '/api/form-submissions/{id:\d+}/review', [$formSubmiss
 $router->register('GET', '/api/me/form-submissions', [$formSubmissionsHandler, 'listMine'], null);
 $router->register('GET', '/api/me/form-submissions/{id:\d+}', [$formSubmissionsHandler, 'showMine'], null);
 $router->register('GET', '/api/me/form-submissions/{id:\d+}/files/{fileId:\d+}', [$formSubmissionsHandler, 'myFileContent'], null);
+// WHIT-921: the final document a submission's route made, when the form lets the applicant have it.
+$router->register('GET', '/api/me/form-submissions/{id:\d+}/final-document', [$formSubmissionsHandler, 'myFinalDocument'], null);
 // WHIT-920: the author changes a submission the route sent back to them, and
 // sends it again. No permission, like the reads above: the route decides whose,
 // and the handler refuses unless the route is waiting for this person's changes.
@@ -4322,11 +4369,15 @@ $routesHandler = new \Whity\Api\RoutesApiHandler(
     $documentRepository,
     $documentVisibilityPolicy,
     $roleChecker,
-    $formSubmissionsHandler
+    $formSubmissionsHandler,
+    $routeFinalisationRepository,
+    $routeFinalDocumentFile,
 );
 $router->register('GET',  '/api/routes',                                        [$routesHandler, 'bySubject'], null);
 $router->register('POST', '/api/routes/{routeId:\d+}/actions',                  [$routesHandler, 'act'],       null);
 $router->register('GET',  '/api/routes/{routeId:\d+}/files/{fileId:\d+}',      [$routesHandler, 'file'],      null);
+// WHIT-921: the PDF a route's finalise step made, for somebody who may read the route.
+$router->register('GET',  '/api/routes/{routeId:\d+}/final-document',           [$routesHandler, 'finalDocument'], null);
 $formSubmissionWithdrawalHandler = new \Whity\Api\FormSubmissionWithdrawalApiHandler(
     $db->getPdo(),
     $formSubmissionRepository,

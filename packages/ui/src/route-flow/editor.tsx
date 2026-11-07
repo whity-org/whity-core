@@ -119,6 +119,11 @@ export interface RouteFlowEditorLabels {
    * printed it would make an author guess whether it meant postage.
    */
   delivery: string;
+  /**
+   * Badge on the stage that makes the final document (WHIT-921). Optional so a
+   * host that offers no such stage need not translate it.
+   */
+  finalise?: string;
   /** Prefix for the resolved audience, e.g. "reaches 1,043 people". */
   reaches: string;
   people: string;
@@ -419,6 +424,7 @@ function RouteFlowNodeCard({ data }: NodeProps<Node<RouteFlowNodeData>>) {
       data-position={step.position}
       data-decision={step.decision ? 'true' : 'false'}
       data-satisfied-by={step.satisfiedBy}
+      data-kind={step.kind ?? undefined}
     >
       <Handle type="target" position={targetFace} className={HANDLE_CLASS} />
 
@@ -450,6 +456,16 @@ function RouteFlowNodeCard({ data }: NodeProps<Node<RouteFlowNodeData>>) {
               data-slot="route-flow-node-delivery-badge"
             >
               {labels.delivery}
+            </span>
+          )}
+          {/* WHIT-921: never a decision and never a delivery, so this badge
+              cannot share the row with either. */}
+          {step.kind === 'finalise' && labels.finalise !== undefined && (
+            <span
+              className="shrink-0 rounded bg-muted px-1 text-xs font-medium uppercase text-muted-foreground"
+              data-slot="route-flow-node-finalise-badge"
+            >
+              {labels.finalise}
             </span>
           )}
         </span>
@@ -1039,9 +1055,28 @@ export function appendStep(
 ): RouteFlowGraph {
   const positions = graph.steps.map((s) => s.position);
   const position = positions.length === 0 ? 1 : Math.max(...positions) + 1;
+  const slot = nextSlot(graph, orientation, direction);
+
+  // WHIT-921: the final document stage is always last, so a stage added after
+  // it takes its place and it moves down one. Edges name positions, so the
+  // ones arriving at it follow it.
+  const last = graph.steps.find((s) => s.position === position - 1);
+  if (step.kind !== 'finalise' && last !== undefined && last.kind === 'finalise') {
+    const moved = last.position;
+    return {
+      ...graph,
+      steps: [
+        ...graph.steps.map((s) =>
+          s.position === moved ? { ...s, position, canvasX: slot.canvasX, canvasY: slot.canvasY } : s
+        ),
+        { ...step, position: moved, canvasX: last.canvasX, canvasY: last.canvasY },
+      ],
+      edges: graph.edges.map((e) => (e.to === moved ? { ...e, to: position } : e)),
+    };
+  }
 
   return {
     ...graph,
-    steps: [...graph.steps, { ...step, position, ...nextSlot(graph, orientation, direction) }],
+    steps: [...graph.steps, { ...step, position, ...slot }],
   };
 }

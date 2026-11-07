@@ -2236,6 +2236,23 @@ final class CoreApiSchemas
                 ],
             ],
             [
+                'method' => 'GET',
+                'path' => '/api/me/form-submissions/{id:\d+}/final-document',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'The final document of the caller\'s own submission',
+                    'description' => 'When its route made one and the form lets the person who sent it have it. '
+                        . 'Anybody else\'s submission, and a document still waiting, is a 404.',
+                    'tags' => ['forms'],
+                    'responses' => [
+                        200 => ['description' => 'The PDF', 'content' => ['application/pdf' => ['schema' => ['type' => 'string', 'format' => 'binary']]]],
+                        404 => self::errorResponse('No final document the caller may open'),
+                        503 => self::errorResponse('The file could not be read from storage'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
                 'method' => 'POST',
                 'path' => '/api/me/form-submissions/{id:\d+}/withdraw',
                 'requiredRole' => null,
@@ -6025,6 +6042,9 @@ final class CoreApiSchemas
                 // whom they sign for. Null on every other step.
                 'sign_capacity' => self::str(true),
                 'sign_on_behalf_of' => self::str(true),
+                // WHIT-921: the template a `finalise` step renders the final
+                // document with. Null on every other step.
+                'final_template_id' => self::int(true),
                 // #1037. HOW MANY TIMES A REJECTION HAS SENT THE DOCUMENT BACK
                 // FROM HERE. A backwards reject edge - "to the author, to fix" -
                 // is the most common approval design there is, and nothing
@@ -6145,10 +6165,14 @@ final class CoreApiSchemas
                         // WHIT-922: `sign` makes the step a signing step, answered
                         // by signing or declining. Its quorum is `all` (the
                         // default) or `any`; it takes no edges.
-                        'kind' => ['type' => 'string', 'enum' => ['sign'], 'nullable' => true],
+                        // WHIT-921: `finalise` makes the final document. It
+                        // must be the last step, at most one, and needs a render
+                        // service; it names no rule and nobody acts on it.
+                        'kind' => ['type' => 'string', 'enum' => ['sign', 'finalise'], 'nullable' => true],
                         'sign_capacity' => self::str(true) + ['description' => 'On a signing step: the capacity the signer signs in, such as "Director". At most 200 characters.'],
                         'sign_on_behalf_of' => self::str(true) + ['description' => 'On a signing step: whom the signer signs for, such as the workspace. At most 200 characters.'],
-                    ], ['rule_kind']),
+                        'final_template_id' => self::int(true) + ['description' => 'On a `finalise` step: the document template to render with. Absent uses the subject's own (a form's final document template, or a document's template).'],
+                    ], []),
                     'description' => 'Ordered steps, at least one. Each names a `rule_kind` (see GET /api/routing-rules) and its `rule_config`, deciding who receives the document at that step. A step with `decision: true` is an approval gate whose `on_approved`/`on_rejected` name 1-based step positions.',
                 ],
             ], ['steps']),
@@ -6943,6 +6967,10 @@ final class CoreApiSchemas
                 'satisfied_by' => ['type' => 'string', 'enum' => ['act', 'delivery']],
                 // WHIT-919: whether people at this stage may send it back to the author.
                 'allow_send_back' => self::bool(),
+                // WHIT-921: `finalise` on the stage that makes the final document
+                // (last, at most one, no rule); null on every other stage.
+                'kind' => ['type' => 'string', 'enum' => ['finalise'], 'nullable' => true],
+                'final_template_id' => self::int(true),
                 'canvas_x' => self::int(),
                 'canvas_y' => self::int(),
                 // NOT in the required list, unlike `DocumentRouteStep` above.
@@ -6995,6 +7023,9 @@ final class CoreApiSchemas
                     'id' => self::int(),
                     'name' => self::str(),
                 ], ['id', 'name'])],
+                // WHIT-921: whether a stage may make the final document here (a
+                // render service is configured).
+                'can_finalise' => self::bool(),
             ], ['id', 'name', 'default_quorum', 'max_steps', 'steps', 'edges'])),
             'RouteTemplateCreateRequest' => self::object([
                 'name' => self::str(),
@@ -8151,6 +8182,11 @@ final class CoreApiSchemas
                 // WHIT-920: the public link asks visitors to sign in, so only the
                 // workspace's members and customers send it, under their own name.
                 'public_requires_sign_in' => self::bool(),
+                // WHIT-921: the "Final document template" a route's finalise
+                // stage uses when it names none, and whether the person who sent
+                // the form can open the final document.
+                'final_template_id' => self::int(true),
+                'final_document_to_applicant' => self::bool(),
                 // 64 hex characters — 256 bits from a CSPRNG. It is the ONLY
                 // credential the public endpoints have, so treat it as one: it is
                 // returned to tenant members (who must be able to hand the link
@@ -8420,6 +8456,8 @@ final class CoreApiSchemas
                 'sections' => ['type' => 'array', 'maxItems' => 100, 'items' => SchemaBuilder::ref('FormSectionText'), 'description' => 'The title and description of each section, by `section_key`.'],
                 'reference_format' => ['type' => 'string', 'maxLength' => 64, 'nullable' => true, 'description' => 'The reference each new submission is given, e.g. `BAKE-{YYYY}-{SEQ:4}`. Tokens: {YYYY}, {YY}, {MM}, {SEQ}, {SEQ:n}. {SEQ} is required. Dates are UTC. Null gives none.'],
                 'public_requires_sign_in' => self::bool() + ['description' => 'The public link asks visitors to sign in: only the workspace\'s members and customers can send it, under their own name, so it can be sent back to them for changes.'],
+                'final_template_id' => self::int(true) + ['description' => 'The document template a route\'s final document stage uses when it names none; null for none.'],
+                'final_document_to_applicant' => self::bool() + ['description' => 'Whether the person who sent the form can open its final document from My submissions.'],
             ], []) + ['minProperties' => 1],
             'FormFieldCreateRequest' => self::object([
                 'field_key' => [
@@ -8750,6 +8788,8 @@ final class CoreApiSchemas
                     'status' => ['type' => 'string', 'enum' => ['done', 'current', 'waiting', 'sent_back', 'not_approved']],
                     'outcome' => ['type' => 'string', 'enum' => ['approved', 'rejected'], 'nullable' => true],
                     'reviewers' => ['type' => 'array', 'items' => ['type' => 'string']],
+                    // WHIT-921: `finalise` on the stage that makes the final document.
+                    'kind' => ['type' => 'string', 'enum' => ['finalise']],
                 ], ['position', 'label', 'status', 'outcome'])],
                 'notes' => ['type' => 'array', 'items' => self::object([
                     'kind' => ['type' => 'string', 'enum' => ['sent_back', 'not_approved', 'note']],
@@ -8762,6 +8802,13 @@ final class CoreApiSchemas
                 'can_resubmit' => self::bool(),
                 'resume_from' => ['type' => 'string', 'enum' => ['sender', 'start'], 'nullable' => true],
                 'shows_reviewers' => self::bool(),
+                // WHIT-921: the route's final document, when it has a finalise
+                // stage that was reached. `can_open`: the PDF exists and the form
+                // lets the applicant have it (GET .../final-document).
+                'final_document' => self::object([
+                    'status' => ['type' => 'string', 'enum' => ['waiting', 'ready', 'failed']],
+                    'can_open' => self::bool(),
+                ], ['status', 'can_open']) + ['nullable' => true],
             ], ['state', 'stages', 'notes', 'can_resubmit', 'resume_from', 'shows_reviewers']),
             'FormSubmissionResubmitRequest' => self::object([
                 'data' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'The changed answers, keyed by field key. A file question left unanswered keeps the file already attached.'],
@@ -8801,11 +8848,26 @@ final class CoreApiSchemas
                                 ], ['key'])],
                             ], ['seen_version', 'current_version', 'changes']),
                             'can_send_back' => self::bool(),
+                            // WHIT-921: what the finalise step did - the engine's
+                            // own act, so not a trail entry. Null until reached.
+                            'finalisation' => SchemaBuilder::ref('RouteFinalisation') + ['nullable' => true],
                         ], ['trail', 'recipients', 'changes']),
                     ],
                 ]],
                 'people' => ['type' => 'object', 'additionalProperties' => ['type' => 'string'], 'description' => 'Display names by profile id, for the people on these routes.'],
             ], ['subject', 'routes', 'people'])),
+            // WHIT-921: what a route's finalise step did.
+            'RouteFinalisation' => self::object([
+                'step_id' => self::int(),
+                'status' => ['type' => 'string', 'enum' => ['waiting', 'done', 'failed'], 'description' => '`waiting`: being made, or the render service is down and it will be tried again.'],
+                'reason' => self::str(true) + ['description' => 'Why it waits or failed, e.g. `render_unavailable`, `template_missing`.'],
+                'subject_version' => self::int(true),
+                'content_hash' => self::str(true) + ['description' => 'SHA-256 of the approved version the final document was made from.'],
+                'document_id' => self::int(true),
+                'has_pdf' => self::bool(),
+                'reached_at' => self::str(),
+                'finalised_at' => self::str(true),
+            ], ['step_id', 'status', 'reason', 'subject_version', 'content_hash', 'document_id', 'has_pdf', 'reached_at', 'finalised_at']),
             'FormSubmissionWithdrawnResponse' => self::object(['data' => SchemaBuilder::ref('FormSubmission')], ['data']),
             'FormSubmissionCreateResponse' => self::object([
                 'data' => SchemaBuilder::ref('FormSubmission'),
@@ -13711,6 +13773,22 @@ final class CoreApiSchemas
                     'responses' => [
                         200 => ['description' => 'The file, as an attachment', 'content' => ['application/octet-stream' => ['schema' => ['type' => 'string', 'format' => 'binary']]]],
                         404 => self::errorResponse('Not a file the caller may read'),
+                        503 => self::errorResponse('The file could not be read from storage'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'GET',
+                'path' => '/api/routes/{routeId:\d+}/final-document',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'The final document a route\'s finalise step made',
+                    'description' => 'For a person who may read the route. A 404 while the final document is still waiting.',
+                    'tags' => ['documents'],
+                    'responses' => [
+                        200 => ['description' => 'The PDF', 'content' => ['application/pdf' => ['schema' => ['type' => 'string', 'format' => 'binary']]]],
+                        404 => self::errorResponse('No final document yet, or the route is not visible to the caller'),
                         503 => self::errorResponse('The file could not be read from storage'),
                     ] + self::authErrors(),
                 ],

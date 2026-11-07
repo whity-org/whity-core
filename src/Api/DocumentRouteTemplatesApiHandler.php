@@ -88,11 +88,20 @@ final class DocumentRouteTemplatesApiHandler
     /** Bounded for the reason the routing note is: a description is a sentence. */
     private const DESCRIPTION_MAX = 2000;
 
+    /** @var (\Closure(int): bool)|null */
+    private ?\Closure $finaliseAvailable;
+
+    /**
+     * @param (\Closure(int): bool)|null $finaliseAvailable WHIT-921: tenant id =>
+     *        whether a route may end with a final document here
+     */
     public function __construct(
         private readonly RouteTemplateRepository $templates,
         private readonly RouteTemplateGraph $graph,
         private readonly SettingsService $settings,
+        ?\Closure $finaliseAvailable = null,
     ) {
+        $this->finaliseAvailable = $finaliseAvailable;
     }
 
     /**
@@ -143,6 +152,9 @@ final class DocumentRouteTemplatesApiHandler
                 // submissions through this design. Nobody can send those back,
                 // so the editor warns while any stage allows sending back.
                 'anonymous_public_forms' => $this->templates->anonymousPublicFormsUsing($id, $tenantId),
+                // WHIT-921: whether a stage may make the final document here
+                // (a render service is configured).
+                'can_finalise' => $this->finaliseAvailable !== null && ($this->finaliseAvailable)($tenantId),
             ],
         ]);
     }
@@ -268,6 +280,7 @@ final class DocumentRouteTemplatesApiHandler
                 $body['steps'],
                 $body['edges'] ?? [],
                 $this->maxSteps($tenantId),
+                $tenantId,
             );
         } catch (RouteTemplateRejectedException $e) {
             // The message is the one this class's own validator wrote for this
@@ -297,6 +310,9 @@ final class DocumentRouteTemplatesApiHandler
                 // submissions through this design. Nobody can send those back,
                 // so the editor warns while any stage allows sending back.
                 'anonymous_public_forms' => $this->templates->anonymousPublicFormsUsing($id, $tenantId),
+                // WHIT-921: whether a stage may make the final document here
+                // (a render service is configured).
+                'can_finalise' => $this->finaliseAvailable !== null && ($this->finaliseAvailable)($tenantId),
             ],
         ]);
     }

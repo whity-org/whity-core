@@ -9,8 +9,10 @@ use Whity\Core\Db\DbBool;
 use Whity\Core\Document\Routing\DocumentRouteSubject;
 use Whity\Core\Document\Routing\RouteAction;
 use Whity\Core\Document\Routing\RouteEventRepository;
+use Whity\Core\Document\Routing\RouteFinalisationRepository;
 use Whity\Core\Document\Routing\RouteRecipientRepository;
 use Whity\Core\Document\Routing\RouteRepository;
+use Whity\Core\Document\Routing\RouteStepKind;
 use Whity\Core\Document\Routing\RouteStepRepository;
 use Whity\Core\Document\Routing\RouteVerdict;
 use Whity\Core\Settings\SettingsRegistry;
@@ -30,6 +32,11 @@ use Whity\Core\Settings\SettingsService;
  * and nothing here decides anything: the trail and the open items are the
  * record.
  *
+ * WHIT-921: a route that ends with a final document shows it as its last
+ * stage. While the PDF is being made (or waits for the render service) it reads
+ * "Final document waiting"; once it exists, `final_document.can_open` says
+ * whether the applicant may open it, which the form decides.
+ *
  * Stateless apart from injected handles — worker-safe.
  */
 final class SubmissionProgress
@@ -47,6 +54,8 @@ final class SubmissionProgress
         private readonly RouteEventRepository $events,
         private readonly RouteRecipientRepository $recipients,
         private readonly SettingsService $settings,
+        // WHIT-921: what the route's finalise step did, if it has one.
+        private readonly ?RouteFinalisationRepository $finalisations = null,
     ) {
     }
 
@@ -54,7 +63,8 @@ final class SubmissionProgress
      * @param array<string, mixed> $submission A row from {@see FormSubmissionRepository::find()}.
      *
      * @return array{state: string, stages: list<array<string, mixed>>, notes: list<array<string, mixed>>,
-     *               can_resubmit: bool, resume_from: ?string, shows_reviewers: bool}
+     *               can_resubmit: bool, resume_from: ?string, shows_reviewers: bool,
+     *               final_document: array{status: string, can_open: bool}|null}
      */
     public function forSubmission(int $tenantId, array $submission, ?int $viewerProfileId): array
     {
@@ -70,6 +80,7 @@ final class SubmissionProgress
                 'can_resubmit' => false,
                 'resume_from' => null,
                 'shows_reviewers' => $showNames,
+                'final_document' => null,
             ];
         }
 
@@ -146,9 +157,40 @@ final class SubmissionProgress
         }
         $names = $showNames ? $this->names($tenantId, $actorIds) : [];
 
+        $finalisation = $this->finalisations?->findForRoute($tenantId, $routeId);
+        $finalDocument = null;
+        if ($finalisation !== null && $finalisation['step_id'] !== null) {
+            $finalDocument = [
+                // `waiting` while it is being made or the render service is down;
+                // `ready` once the PDF exists; `failed` when it could not be made.
+                'status' => match ($finalisation['status']) {
+                    RouteFinalisationRepository::DONE => 'ready',
+                    RouteFinalisationRepository::FAILED => 'failed',
+                    default => 'waiting',
+                },
+                'can_open' => $finalisation['status'] === RouteFinalisationRepository::DONE
+                    && $this->applicantGetsFinalDocument($tenantId, (int) $submission['form_id']),
+            ];
+        }
+
         $stages = [];
         foreach ($steps as $step) {
             $stepId = (int) $step['id'];
+            if (($step['kind'] ?? null) === RouteStepKind::FINALISE) {
+                // Nobody acts here: its status is what the engine has done.
+                $stages[] = [
+                    'position' => (int) $step['position'],
+                    'label' => is_string($step['label'] ?? null) && $step['label'] !== '' ? (string) $step['label'] : null,
+                    'kind' => RouteStepKind::FINALISE,
+                    'status' => match ($finalDocument['status'] ?? null) {
+                        'ready' => self::STAGE_DONE,
+                        'waiting', 'failed' => self::STAGE_CURRENT,
+                        default => self::STAGE_WAITING,
+                    },
+                    'outcome' => null,
+                ];
+                continue;
+            }
             $status = match (true) {
                 $stepId === $notApproved => self::STAGE_NOT_APPROVED,
                 $openAuthorItem !== null && $stepId === $sentBackFrom => self::STAGE_SENT_BACK,
@@ -213,7 +255,20 @@ final class SubmissionProgress
                 && (int) $openAuthorItem['profile_id'] === $viewerProfileId,
             'resume_from' => $openAuthorItem !== null ? $resumeFrom : null,
             'shows_reviewers' => $showNames,
+            'final_document' => $finalDocument,
         ];
+    }
+
+    /** WHIT-921: whether the form lets the person who sent it open its final document. */
+    private function applicantGetsFinalDocument(int $tenantId, int $formId): bool
+    {
+        $stmt = $this->db->prepare(
+            'SELECT final_document_to_applicant FROM forms WHERE id = :id AND tenant_id = :tenant_id'
+        );
+        $stmt->execute([':id' => $formId, ':tenant_id' => $tenantId]);
+        $value = $stmt->fetchColumn();
+
+        return $value !== false && DbBool::of($value);
     }
 
     public function showsReviewerNames(int $tenantId): bool
