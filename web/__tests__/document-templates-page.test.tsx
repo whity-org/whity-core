@@ -291,20 +291,36 @@ describe('row actions', () => {
   it('uses a copy: asks for a title, copies, and opens the copy', async () => {
     const user = userEvent.setup();
     render(<DocumentTemplatesPage />);
+    await waitFor(() => expect(screen.getByText('Example Bakery works order')).toBeInTheDocument());
+
+    await openRowMenu(user, 'Example Bakery works order');
+    await user.click(screen.getByRole('menuitem', { name: 'Make a copy…' }));
+
+    const input = await screen.findByLabelText('Title of the copy');
+    expect(input).toHaveValue('Example Bakery works order (copy)');
+    await user.clear(input);
+    await user.type(input, 'Example Bakery works order, kitchen');
+    await user.click(dialog().getByRole('button', { name: 'Make a copy' }));
+
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/admin/document-sources/77'));
+    const [, init] = callsTo('/api/v1/document-sources/6/copy', 'POST')[0];
+    expect(JSON.parse((init as RequestInit).body as string)).toEqual({ title: 'Example Bakery works order, kitchen' });
+  });
+
+  it('starts from a starter under its own name, since the title prints on every document', async () => {
+    const user = userEvent.setup();
+    render(<DocumentTemplatesPage />);
     await waitFor(() => expect(screen.getByText('Example Bakery invoice')).toBeInTheDocument());
 
     await openRowMenu(user, 'Example Bakery invoice');
     await user.click(screen.getByRole('menuitem', { name: 'Make a copy…' }));
 
-    const input = await screen.findByLabelText('Title of the copy');
-    expect(input).toHaveValue('Example Bakery invoice (copy)');
-    await user.clear(input);
-    await user.type(input, 'Example Bakery invoice, kitchen');
-    await user.click(dialog().getByRole('button', { name: 'Make a copy' }));
+    expect(await screen.findByLabelText('Title')).toHaveValue('Example Bakery invoice');
+    await user.click(dialog().getByRole('button', { name: 'Create template' }));
 
     await waitFor(() => expect(push).toHaveBeenCalledWith('/admin/document-sources/77'));
     const [, init] = callsTo('/api/v1/document-sources/1/copy', 'POST')[0];
-    expect(JSON.parse((init as RequestInit).body as string)).toEqual({ title: 'Example Bakery invoice, kitchen' });
+    expect(JSON.parse((init as RequestInit).body as string)).toEqual({ title: 'Example Bakery invoice' });
   });
 
   it('deletes after confirming, and says issued documents are kept', async () => {
@@ -336,6 +352,58 @@ describe('row actions', () => {
     await user.click(screen.getByRole('menuitem', { name: 'Delete…' }));
 
     expect(await screen.findByText('This is a Whity starter')).toBeInTheDocument();
+  });
+});
+
+describe('Whity starters (WHIT-998)', () => {
+  const untouched = (id: number, key: string, lang: 'en' | 'ar', title: string) => ({
+    ...base,
+    id,
+    kind: 'template',
+    title,
+    lang,
+    record_type: null,
+    published_version: null,
+    draft_version: 1,
+    scope: 'tenant',
+    created_by: null,
+    starter_key: key,
+  });
+
+  it('leaves untouched starters out of the list and offers them under New template, one card per starter', async () => {
+    routeApi({
+      templates: [
+        STARTER,
+        CONVERTED,
+        untouched(30, 'editor.receipt', 'en', 'Receipt'),
+        untouched(31, 'editor.receipt.ar', 'ar', 'سند قبض'),
+      ],
+    });
+    const user = userEvent.setup();
+    render(<DocumentTemplatesPage />);
+    await waitFor(() => expect(screen.getByText('Example Bakery works order')).toBeInTheDocument());
+    // Published starters stay listed; the untouched pair doesn't.
+    expect(screen.getByText('Example Bakery invoice')).toBeInTheDocument();
+    expect(screen.queryByText('Receipt')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'New template' }));
+    await user.click(await dialog().findByRole('button', { name: 'Use سند قبض in Arabic' }));
+
+    expect(await screen.findByLabelText('Title')).toHaveValue('سند قبض');
+  });
+
+  it('filters by published and drafts', async () => {
+    const user = userEvent.setup();
+    render(<DocumentTemplatesPage />);
+    await waitFor(() => expect(screen.getByText('Example Bakery works order')).toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: 'Published' }));
+    expect(screen.queryByText('Example Bakery works order')).not.toBeInTheDocument();
+    expect(screen.getByText('Example Bakery invoice')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Drafts' }));
+    expect(screen.getByText('Example Bakery works order')).toBeInTheDocument();
+    expect(screen.queryByText('Example Bakery invoice')).not.toBeInTheDocument();
   });
 });
 
