@@ -247,7 +247,8 @@
 /* Table (E.15): a document table, hairlines, numbers end-aligned. */
 .wy-doc table[data-type="table"] { width: 100%; border-collapse: collapse; font-size: 0.875rem; margin-block: 3px; }
 .wy-doc table[data-type="table"] td { border: 1px solid var(--border); padding: 6px 10px; vertical-align: top; text-align: start; unicode-bidi: plaintext; }
-.wy-doc table[data-type="table"] td[data-align="end"] { text-align: end; font-variant-numeric: tabular-nums; }
+/* E.15: end-aligned columns, named on the table (node-views.tsx TableWithAlign); up to 12 columns. */
+.wy-doc table[data-end-columns~="1"] tr > td:nth-child(1), .wy-doc table[data-end-columns~="2"] tr > td:nth-child(2), .wy-doc table[data-end-columns~="3"] tr > td:nth-child(3), .wy-doc table[data-end-columns~="4"] tr > td:nth-child(4), .wy-doc table[data-end-columns~="5"] tr > td:nth-child(5), .wy-doc table[data-end-columns~="6"] tr > td:nth-child(6), .wy-doc table[data-end-columns~="7"] tr > td:nth-child(7), .wy-doc table[data-end-columns~="8"] tr > td:nth-child(8), .wy-doc table[data-end-columns~="9"] tr > td:nth-child(9), .wy-doc table[data-end-columns~="10"] tr > td:nth-child(10), .wy-doc table[data-end-columns~="11"] tr > td:nth-child(11), .wy-doc table[data-end-columns~="12"] tr > td:nth-child(12) { text-align: end; font-variant-numeric: tabular-nums; }
 .wy-doc table[data-type="table"][data-header-row="true"] tr:first-child td { background: var(--muted); font-weight: 500; }
 .wy-doc table[data-type="table"] .selectedCell { background: var(--primary-tint); }
 

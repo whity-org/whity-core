@@ -3423,6 +3423,7 @@ $documentPublishingHandler = new \Whity\Api\DocumentPublishingApiHandler(
     $documentIssuing,
     $documentThemeRepository,
     $documentCollab,
+    new \Whity\Core\Document\Print\WorkspaceName($db->getPdo()),
 );
 $router->register('GET',  '/api/document-fields',                         [$documentPublishingHandler, 'fields'],       null, null, CorePermissions::DOCUMENTS_READ);
 $router->register('GET',  '/api/document-fields/records',                 [$documentPublishingHandler, 'records'],      null, null, CorePermissions::DOCUMENTS_READ);
