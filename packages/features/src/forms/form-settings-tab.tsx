@@ -9,11 +9,17 @@ import { Switch } from "@whity/ui/switch"
 
 import { useTranslation } from "../i18n"
 import { useFormLanguages } from "./form-languages"
-import type { FormRow, FormSectionDef, LocalizedMap } from "./types"
+import { BannerPicker } from "./banner-picker"
+import { useCurrentLanguage } from "./language"
+import { pickText } from "./text"
+import type { FormBannerValue, FormRow, FormSectionDef, LocalizedMap } from "./types"
 
 /** The parts of a form the Settings tab edits, held together so one save bar covers them. */
 export interface FormSettings {
   name: LocalizedMap
+  /** What the person filling it in reads as its heading; empty shows the name. */
+  title: LocalizedMap
+  banner: FormBannerValue | null
   description: LocalizedMap
   submit_label: LocalizedMap
   reference_format: string
@@ -29,6 +35,7 @@ export function FormSettingsTab({
   onPublicLink,
   onCopyLink,
   onMemberAccess,
+  onUploadBanner,
 }: {
   form: FormRow
   settings: FormSettings
@@ -38,9 +45,14 @@ export function FormSettingsTab({
   onPublicLink: (enabled: boolean) => void
   onCopyLink: () => void
   onMemberAccess: (open: boolean) => void
+  /** Uploads a picture as the banner; resolves true when the server kept it. */
+  onUploadBanner?: (file: File) => Promise<boolean>
 }) {
   const t = useTranslation("forms")
   const { enabled, setEnabled } = useFormLanguages()
+  const { currentLanguage } = useCurrentLanguage()
+  const shownTitle =
+    pickText(settings.title, currentLanguage) || pickText(settings.name, currentLanguage) || t("builder.untitled", "Untitled form")
 
   function setSection(index: number, patch: Partial<FormSectionDef>) {
     onChange({ ...settings, sections: settings.sections.map((s, i) => (i === index ? { ...s, ...patch } : s)) })
@@ -84,16 +96,27 @@ export function FormSettingsTab({
 
       <Card>
         <CardHeader>
-          <CardTitle>{t("builder.settings.about", "About this form")}</CardTitle>
+          <CardTitle>{t("builder.settings.shown", "What people filling it in see")}</CardTitle>
+          <CardDescription>
+            {t("builder.settings.shown.body", "The top of the form, on the signed-in page and on its public link.")}
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
+          <BannerPicker
+            value={settings.banner}
+            title={shownTitle}
+            description={pickText(settings.description, currentLanguage)}
+            readOnly={readOnly}
+            onChange={(banner) => onChange({ ...settings, banner })}
+            onUpload={onUploadBanner}
+          />
           <BilingualField
-            id="form-name"
-            label={t("builder.settings.name", "Form name")}
-            value={settings.name}
-            onChange={(name) => onChange({ ...settings, name })}
+            id="form-title"
+            label={t("builder.settings.title", "Title")}
+            description={t("builder.settings.title.hint", "The heading people read. Leave it empty to show the form name.")}
+            value={settings.title}
+            onChange={(title) => onChange({ ...settings, title })}
             disabled={readOnly}
-            
           />
           <BilingualField
             id="form-description"
@@ -102,7 +125,6 @@ export function FormSettingsTab({
             value={settings.description}
             onChange={(description) => onChange({ ...settings, description })}
             disabled={readOnly}
-            
           />
           <BilingualField
             id="form-submit"
@@ -111,7 +133,22 @@ export function FormSettingsTab({
             value={settings.submit_label}
             onChange={(submit_label) => onChange({ ...settings, submit_label })}
             disabled={readOnly}
-            
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("builder.settings.about", "About this form")}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <BilingualField
+            id="form-name"
+            label={t("builder.settings.name", "Form name")}
+            description={t("builder.settings.name.hint", "What your team calls it in lists and the inbox.")}
+            value={settings.name}
+            onChange={(name) => onChange({ ...settings, name })}
+            disabled={readOnly}
           />
           <div className="space-y-1.5">
             <label htmlFor="form-reference" className="text-sm font-medium">

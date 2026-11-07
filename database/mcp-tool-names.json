@@ -1113,6 +1113,9 @@
     "en": "Archive a form so it stops taking answers",
     "ar": "أرشفة نموذج وإيقاف استقبال إجاباته"
   },
+  "post_api_forms_id_banner": {
+    "ar": "رفع صورة لأعلى نموذج"
+  },
   "post_api_forms_id_fields": {
     "ar": "إضافة حقل إلى نموذج"
   },

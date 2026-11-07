@@ -228,6 +228,9 @@ final class MemberFormsApiHandler
             'description' => $form['description'] ?? null,
             'description_i18n' => $form['description_i18n'] ?? new \stdClass(),
             'submit_label' => $form['submit_label'] ?? null,
+            // The heading and picture written for the person filling it in (WHIT-944).
+            'title' => $form['title'] ?? null,
+            'banner' => $form['banner'] ?? null,
             'status' => (string) ($form['status'] ?? ''),
         ];
     }

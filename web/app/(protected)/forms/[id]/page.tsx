@@ -22,6 +22,7 @@ import { use, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Icon } from '@whity/ui/icon';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
+import { FormHeader, type FormBannerValue } from '@whity/features/forms';
 import { Button } from '@whity/ui/button';
 import { useDirection } from '@/lib/direction-context';
 import { apiClient } from '@/lib/api-client';
@@ -46,6 +47,9 @@ interface RenderedForm {
     description: string | null;
     description_i18n?: LocalizedText | [] | null;
     submit_label?: LocalizedText | null;
+    /** The heading and picture written for the person filling it in (WHIT-944). */
+    title?: LocalizedText | null;
+    banner?: FormBannerValue | null;
     status: string;
     public_enabled?: boolean;
     public_url?: string | null;
@@ -321,7 +325,8 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
     );
   }
 
-  const title = localized(rendered.form.name, preferArabic) || t('fill.untitled', 'Form');
+  const title =
+    localized(rendered.form.title ?? null, preferArabic) || localized(rendered.form.name, preferArabic) || t('fill.untitled', 'Form');
   const translatedDescription = Array.isArray(rendered.form.description_i18n) ? null : rendered.form.description_i18n;
   const description = localized(translatedDescription, preferArabic) || rendered.form.description;
   const submitLabel = localized(rendered.form.submit_label, preferArabic) || t('fill.send', 'Send');
@@ -350,10 +355,7 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
   return (
     <div className="mx-auto w-full max-w-2xl space-y-4">
       <Card>
-        <CardHeader>
-          <CardTitle>{title}</CardTitle>
-          {description !== null && description !== '' && <CardDescription>{description}</CardDescription>}
-        </CardHeader>
+        <FormHeader title={title} description={description} banner={rendered.form.banner} />
 
         <CardContent>
           {!rendered.accepts_submissions ? (

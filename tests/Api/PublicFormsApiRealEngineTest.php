@@ -442,7 +442,8 @@ final class PublicFormsApiRealEngineTest extends TestCase
 
         self::assertSame(
             [
-                'slug', 'name', 'description', 'description_i18n', 'submit_label', 'fields', 'sections',
+                // `title` and `banner` (WHIT-944) are written for this very reader.
+                'slug', 'name', 'description', 'description_i18n', 'submit_label', 'title', 'banner', 'fields', 'sections',
                 'accepts_submissions', 'opens_at', 'closes_at',
             ],
             array_keys($data)

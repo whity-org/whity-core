@@ -1368,6 +1368,7 @@ final class CoreApiSchemas
                         'id' => '/arguments/id',
                         'name' => '/before/data/name',
                         'description' => '/before/data/description_i18n',
+                        'title' => '/before/data/title',
                         'submit_label' => '/before/data/submit_label',
                         'reference_format' => '/before/data/reference_format',
                         'sections' => '/before/data/sections',
@@ -1689,6 +1690,22 @@ final class CoreApiSchemas
                     ] + self::authErrors(),
                 ],
             ],
+            self::permissionRoute('POST', '/api/forms/{id:\d+}/banner', 'forms:manage', array_merge([
+                'summary' => 'Put an uploaded picture at the top of a form',
+                'description' =>
+                    'MULTIPART, one part named `file`. PNG, JPEG or WebP, decided by the BYTES; SVG is '
+                    . 'refused because a banner is shown on public pages. MAXIMUM 5 MiB. The banner is '
+                    . 'set at once and the previous uploaded one deleted. The picture is served by the '
+                    . 'public branding asset route, so a public form can show it. A drawn pattern or no '
+                    . 'banner is a PATCH of the form instead.',
+                'tags' => ['forms'],
+                'responses' => [
+                    200 => self::jsonResponse('The form\'s banner, with the URL that serves it', 'FormBannerResponse'),
+                    400 => self::errorResponse('No file part, or the multipart body could not be read'),
+                    404 => self::errorResponse('Form not found'),
+                    422 => self::errorResponse('Empty, too large, or not a PNG, JPEG or WebP picture'),
+                ] + self::authErrors(),
+            ], self::formUploadMultipartBody('The picture. PNG, JPEG or WebP, decided by its bytes. Maximum 5 MiB.'))),
             self::permissionRoute('POST', '/api/forms/{id:\d+}/uploads', 'forms:submit', array_merge([
                 'summary' => 'Attach a file to a form you are filling in',
                 'description' =>
@@ -7700,6 +7717,8 @@ final class CoreApiSchemas
                 'name' => self::localizedText(),
                 'description' => self::str(true),
                 'description_i18n' => self::localizedText(),
+                'title' => self::localizedText() + ['nullable' => true, 'description' => 'The heading the person filling it in reads; null shows the name.'],
+                'banner' => SchemaBuilder::ref('FormBanner') + ['nullable' => true],
                 'submit_label' => self::localizedText() + ['nullable' => true],
                 'reference_format' => self::str(true),
                 // Off on every form until somebody with `forms:manage` opens it.
@@ -7968,11 +7987,29 @@ final class CoreApiSchemas
             // `form_key` and `status` are absent because both are REFUSED with a
             // 422 rather than ignored — a caller who sent one meant something, and
             // dropping it silently would leave them believing a change happened.
+            // The picture at the top of a form (WHIT-944). A pattern is drawn in the
+            // browser from the workspace's main colour; an image was uploaded.
+            'FormBanner' => self::object([
+                'kind' => ['type' => 'string', 'enum' => ['pattern', 'image']],
+                'style' => ['type' => 'string', 'enum' => \Whity\Core\Form\FormBanner::STYLES],
+                'seed' => ['type' => 'integer', 'minimum' => 0, 'maximum' => \Whity\Core\Form\FormBanner::SEED_MAX],
+                'image_url' => self::str() + ['description' => 'Where an uploaded picture is served.'],
+            ], ['kind']),
+            'FormBannerInput' => self::object([
+                'kind' => ['type' => 'string', 'enum' => ['pattern', 'image']],
+                'style' => ['type' => 'string', 'enum' => \Whity\Core\Form\FormBanner::STYLES],
+                'seed' => ['type' => 'integer', 'minimum' => 0, 'maximum' => \Whity\Core\Form\FormBanner::SEED_MAX],
+            ], ['kind']),
+            'FormBannerResponse' => self::dataEnvelope(self::object([
+                'banner' => SchemaBuilder::ref('FormBanner') + ['nullable' => true],
+            ], ['banner'])),
             'FormUpdateRequest' => self::object([
                 'name' => self::localizedText() + ['description' => 'New name as `{"en": ..., "ar": ...}`; a plain string is read as English.'],
                 'description' => ['description' => 'New description: text, or `{"en": ..., "ar": ...}`. Plain text sets the English and keeps the Arabic.'],
                 'route_template_id' => self::int(true) + ['description' => 'Route template for approving submissions; null removes it.'],
                 'submit_label' => self::localizedText() + ['nullable' => true, 'description' => 'What the submit button says; null for the default wording.'],
+                'title' => self::localizedText() + ['nullable' => true, 'description' => 'The heading the person filling it in reads; null shows the name.'],
+                'banner' => SchemaBuilder::ref('FormBannerInput') + ['nullable' => true, 'description' => 'A drawn pattern, `{"kind": "image"}` to keep the uploaded picture, or null for none. Upload a picture with POST /api/v1/forms/{id}/banner.'],
                 'sections' => ['type' => 'array', 'maxItems' => 100, 'items' => SchemaBuilder::ref('FormSectionText'), 'description' => 'The title and description of each section, by `section_key`.'],
                 'reference_format' => ['type' => 'string', 'maxLength' => 64, 'nullable' => true, 'description' => 'The reference each new submission is given, e.g. `BAKE-{YYYY}-{SEQ:4}`. Tokens: {YYYY}, {YY}, {MM}, {SEQ}, {SEQ:n}. {SEQ} is required. Dates are UTC. Null gives none.'],
             ], []) + ['minProperties' => 1],
@@ -8097,6 +8134,8 @@ final class CoreApiSchemas
                 'name' => self::localizedText(),
                 'description' => self::str(true),
                 'description_i18n' => self::localizedText(),
+                'title' => self::localizedText() + ['nullable' => true, 'description' => 'The heading the person filling it in reads; null shows the name.'],
+                'banner' => SchemaBuilder::ref('FormBanner') + ['nullable' => true],
                 'submit_label' => self::localizedText() + ['nullable' => true],
                 'fields' => ['type' => 'array', 'items' => SchemaBuilder::ref('PublicFormField')],
                 'sections' => ['type' => 'array', 'items' => SchemaBuilder::ref('FormSection')],
@@ -8218,6 +8257,8 @@ final class CoreApiSchemas
                 'name' => self::localizedText(),
                 'description' => self::str(true),
                 'description_i18n' => self::localizedText(),
+                'title' => self::localizedText() + ['nullable' => true, 'description' => 'The heading the person filling it in reads; null shows the name.'],
+                'banner' => SchemaBuilder::ref('FormBanner') + ['nullable' => true],
                 'submit_label' => self::localizedText() + ['nullable' => true],
                 'status' => self::str(),
             ], ['id', 'name', 'status']),

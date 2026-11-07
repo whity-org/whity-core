@@ -3997,7 +3997,8 @@ $formsHandler = new \Whity\Api\FormsApiHandler(
     $formFieldRepository,
     $formRenderer,
     $formSubmissionRepository,
-    $publicFormLink
+    $publicFormLink,
+    $storageDriver
 );
 $router->register('GET', '/api/forms', [$formsHandler, 'list'], null, null, CorePermissions::FORMS_READ);
 $router->register('POST', '/api/forms', [$formsHandler, 'create'], null, null, CorePermissions::FORMS_MANAGE);
@@ -4021,6 +4022,10 @@ $router->register('DELETE', '/api/forms/{id:\d+}/public-link', [$formsHandler, '
 // Opening a form to the workspace's members is authoring, for the same reason.
 $router->register('POST', '/api/forms/{id:\d+}/member-access', [$formsHandler, 'openToMembers'], null, null, CorePermissions::FORMS_MANAGE);
 $router->register('DELETE', '/api/forms/{id:\d+}/member-access', [$formsHandler, 'closeToMembers'], null, null, CorePermissions::FORMS_MANAGE);
+// The picture at the top of a form (WHIT-944): an upload is authoring, so
+// `forms:manage`. A drawn pattern or no banner is a PATCH of the form instead.
+$formBannerHandler = new \Whity\Api\FormBannerApiHandler($formRepository, $storageDriver);
+$router->register('POST', '/api/forms/{id:\d+}/banner', [$formBannerHandler, 'upload'], null, null, CorePermissions::FORMS_MANAGE);
 
 $formFieldsHandler = new \Whity\Api\FormFieldsApiHandler($formRepository, $formFieldRepository);
 $router->register('GET', '/api/form-fields', [$formFieldsHandler, 'listByQuery'], null, null, CorePermissions::FORMS_READ);

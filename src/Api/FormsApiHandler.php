@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Whity\Api;
 
+use Whity\Core\Form\FormBanner;
 use Whity\Core\Form\FormFieldRepository;
 use Whity\Core\Form\FormReferenceFormat;
 use Whity\Core\Form\FormRejectedException;
@@ -19,6 +20,7 @@ use Whity\Core\Response;
 use Whity\Core\Tenant\TenantContext;
 use Whity\Http\InputLimits;
 use Whity\Http\JsonBody;
+use Whity\Storage\StorageDriverInterface;
 
 /**
  * The forms themselves: listing, creating, editing, publishing, archiving, and
@@ -71,6 +73,9 @@ final class FormsApiHandler
     /** What a button or a step title can sensibly say, in characters. */
     private const SUBMIT_LABEL_MAX = 200;
 
+    /** The heading a person filling in the form reads (WHIT-944). */
+    private const TITLE_MAX = 200;
+
     /** Bounds `forms.sections`: more steps than this is not a form anyone finishes. */
     private const SECTIONS_MAX = 100;
 
@@ -80,6 +85,9 @@ final class FormsApiHandler
         private readonly FormRenderer $renderer,
         private readonly FormSubmissionRepository $submissions,
         private readonly PublicFormLink $links,
+        // Deletes an uploaded banner a PATCH replaces (WHIT-944). Optional so a
+        // handler built without storage still edits everything else.
+        private readonly ?StorageDriverInterface $storage = null,
     ) {
     }
 
@@ -294,6 +302,17 @@ final class FormsApiHandler
                     $existingDescription,
                 );
             }
+            if (array_key_exists('title', $body)) {
+                $changes['title'] = LocalizedLabel::optionalForStorage($body['title'], 'title', self::TITLE_MAX);
+            }
+            $replacedBanner = null;
+            if (array_key_exists('banner', $body)) {
+                $storedBanner = $this->forms->storedBanner($tenantId, $id);
+                $changes['banner'] = FormBanner::fromInput($body['banner'], $storedBanner);
+                if ($changes['banner'] !== $storedBanner) {
+                    $replacedBanner = $storedBanner;
+                }
+            }
             if (array_key_exists('submit_label', $body)) {
                 $changes['submit_label'] = LocalizedLabel::optionalForStorage(
                     $body['submit_label'],
@@ -320,6 +339,7 @@ final class FormsApiHandler
             }
 
             $this->forms->update($tenantId, $id, $changes);
+            FormBannerApiHandler::forget($this->storage, $tenantId, $replacedBanner);
 
             return Response::json(['data' => $this->presentFresh($tenantId, $id)]);
         } catch (FormRejectedException $e) {

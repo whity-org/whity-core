@@ -2986,6 +2986,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/forms/{id}/banner": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Put an uploaded picture at the top of a form
+         * @description MULTIPART, one part named `file`. PNG, JPEG or WebP, decided by the BYTES; SVG is refused because a banner is shown on public pages. MAXIMUM 5 MiB. The banner is set at once and the previous uploaded one deleted. The picture is served by the public branding asset route, so a public form can show it. A drawn pattern or no banner is a PATCH of the form instead.
+         */
+        post: operations["post_api_v1_forms_id_banner"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/forms/{id}/fields": {
         parameters: {
             query?: never;
@@ -9837,6 +9857,12 @@ export interface components {
                 ar?: string;
                 en?: string;
             };
+            /** @description The heading the person filling it in reads; null shows the name. */
+            title?: {
+                ar?: string;
+                en?: string;
+            } | null;
+            banner?: components["schemas"]["FormBanner"];
             submit_label?: {
                 ar?: string;
                 en?: string;
@@ -9865,6 +9891,27 @@ export interface components {
             public_enabled_at?: string | null;
             public_enabled_by_profile_id?: number | null;
             public_window_open?: boolean;
+        };
+        FormBanner: {
+            /** @enum {string} */
+            kind: "pattern" | "image";
+            /** @enum {string} */
+            style?: "gradient" | "waves" | "dots" | "stripes" | "circles" | "mesh";
+            seed?: number;
+            /** @description Where an uploaded picture is served. */
+            image_url?: string;
+        };
+        FormBannerInput: {
+            /** @enum {string} */
+            kind: "pattern" | "image";
+            /** @enum {string} */
+            style?: "gradient" | "waves" | "dots" | "stripes" | "circles" | "mesh";
+            seed?: number;
+        };
+        FormBannerResponse: {
+            data: {
+                banner: components["schemas"]["FormBanner"];
+            };
         };
         FormBuilderVocabularies: {
             field_types: string[];
@@ -10252,6 +10299,13 @@ export interface components {
                 ar?: string;
                 en?: string;
             } | null;
+            /** @description The heading the person filling it in reads; null shows the name. */
+            title?: {
+                ar?: string;
+                en?: string;
+            } | null;
+            /** @description A drawn pattern, `{"kind": "image"}` to keep the uploaded picture, or null for none. Upload a picture with POST /api/v1/forms/{id}/banner. */
+            banner?: components["schemas"]["FormBannerInput"];
             /** @description The title and description of each section, by `section_key`. */
             sections?: components["schemas"]["FormSectionText"][];
             /** @description The reference each new submission is given, e.g. `BAKE-{YYYY}-{SEQ:4}`. Tokens: {YYYY}, {YY}, {MM}, {SEQ}, {SEQ:n}. {SEQ} is required. Dates are UTC. Null gives none. */
@@ -11002,6 +11056,12 @@ export interface components {
                 ar?: string;
                 en?: string;
             };
+            /** @description The heading the person filling it in reads; null shows the name. */
+            title?: {
+                ar?: string;
+                en?: string;
+            } | null;
+            banner?: components["schemas"]["FormBanner"];
             submit_label?: {
                 ar?: string;
                 en?: string;
@@ -11832,6 +11892,12 @@ export interface components {
                     ar?: string;
                     en?: string;
                 };
+                /** @description The heading the person filling it in reads; null shows the name. */
+                title?: {
+                    ar?: string;
+                    en?: string;
+                } | null;
+                banner?: components["schemas"]["FormBanner"];
                 submit_label?: {
                     ar?: string;
                     en?: string;
@@ -29192,6 +29258,101 @@ export interface operations {
                 };
             };
             /** @description The transition is not allowed from here */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_forms_id_banner: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /**
+                     * Format: binary
+                     * @description The picture. PNG, JPEG or WebP, decided by its bytes. Maximum 5 MiB.
+                     */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The form's banner, with the URL that serves it */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormBannerResponse"];
+                };
+            };
+            /** @description No file part, or the multipart body could not be read */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Form not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Empty, too large, or not a PNG, JPEG or WebP picture */
             422: {
                 headers: {
                     [name: string]: unknown;

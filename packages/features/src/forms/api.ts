@@ -1,4 +1,5 @@
 import type {
+  FormBannerValue,
   FieldDraft,
   FieldOption,
   FieldValidation,
@@ -80,6 +81,12 @@ export function createFormsApi(transport: Transport) {
       call(transport, "DELETE", `/api/v1/forms/${id}/public-link`, undefined, fallback, () => true),
     deleteForm: (id: number, fallback: string) =>
       call(transport, "DELETE", `/api/v1/forms/${id}`, undefined, fallback, () => true),
+    /** Multipart: a transport sends a `FormData` body as it is (WHIT-944). */
+    uploadBanner: (id: number, file: File, fallback: string) => {
+      const body = new FormData()
+      body.append("file", file)
+      return call(transport, "POST", `/api/v1/forms/${id}/banner`, body, fallback, (b) => data<{ banner: FormBannerValue | null }>(b).banner)
+    },
     openToMembers: (id: number, open: boolean, fallback: string) =>
       call(transport, open ? "POST" : "DELETE", `/api/v1/forms/${id}/member-access`, open ? {} : undefined, fallback, (b) => data<FormRow>(b)),
     listMyForms: (fallback: string) =>

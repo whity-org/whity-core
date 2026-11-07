@@ -6,6 +6,8 @@ import { Button } from "@whity/ui/button"
 import { Icon } from "@whity/ui/icon"
 import { IconButton } from "@whity/ui/icon-button"
 import { cn } from "@whity/ui/utils"
+import { Card } from "@whity/ui/card"
+import { FormHeader } from "./form-header"
 
 import { useTranslation } from "../i18n"
 import { useCurrentLanguage } from "./language"
@@ -13,7 +15,7 @@ import { groupBySection } from "./builder-model"
 import { ChoiceSelect } from "./choice-select"
 import { useKindLabel } from "./kind-labels"
 import { pickText } from "./text"
-import type { FieldCondition, FieldDraft, FieldKind, FormSectionDef } from "./types"
+import type { FieldCondition, FieldDraft, FieldKind, FormBannerValue, FormSectionDef } from "./types"
 
 /** What an answer will look like, drawn quietly so the author sees the shape. */
 function AnswerPreview({ field }: { field: FieldDraft }) {
@@ -128,6 +130,7 @@ export function AddQuestion({ kinds, onAdd, disabled }: { kinds: readonly FieldK
 export function BuilderCanvas({
   title,
   description,
+  banner = null,
   fields,
   sections,
   kinds,
@@ -143,6 +146,8 @@ export function BuilderCanvas({
 }: {
   title: string
   description: string
+  /** The picture at the top, as the person filling it in sees it (WHIT-944). */
+  banner?: FormBannerValue | null
   fields: readonly FieldDraft[]
   sections: readonly FormSectionDef[]
   kinds: readonly FieldKind[]
@@ -179,10 +184,9 @@ export function BuilderCanvas({
 
   return (
     <div className="space-y-4 p-4 md:p-6">
-      <div className="rounded-card border border-border bg-card p-5">
-        <h2 className="text-lg font-semibold">{title || t("builder.untitled", "Untitled form")}</h2>
-        {description !== "" && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
-      </div>
+      <Card>
+        <FormHeader title={title || t("builder.untitled", "Untitled form")} description={description} banner={banner} titleAs="h2" />
+      </Card>
 
       {sections.length > 0 && (
         <div className="flex gap-2">
