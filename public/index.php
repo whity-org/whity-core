@@ -3956,14 +3956,9 @@ $signingService = new \Whity\Core\Document\Signing\SigningService(
         $db->getPdo(),
         $signingChallengeRepository,
         $totpService,
-        // Wrong signing checks count on their own, with the login limits.
-        new LoginThrottleService(
-            new DatabaseSharedStore($db->getPdo()),
-            (int) ($_ENV['LOGIN_THROTTLE_USER_THRESHOLD']  ?? getenv('LOGIN_THROTTLE_USER_THRESHOLD')  ?: LoginThrottleService::DEFAULT_USER_THRESHOLD),
-            (int) ($_ENV['LOGIN_THROTTLE_IP_THRESHOLD']    ?? getenv('LOGIN_THROTTLE_IP_THRESHOLD')    ?: LoginThrottleService::DEFAULT_IP_THRESHOLD),
-            (int) ($_ENV['LOGIN_THROTTLE_WINDOW_SECONDS']  ?? getenv('LOGIN_THROTTLE_WINDOW_SECONDS')  ?: LoginThrottleService::DEFAULT_WINDOW_SECONDS),
-            'signing_proof',
-        ),
+        // Signing checks count on their own: a try takes a slot before it is
+        // checked, and a check that passes gives it back.
+        new \Whity\Core\Document\Signing\SigningAttemptLimiter(new DatabaseSharedStore($db->getPdo())),
     ),
     $signingChallengeRepository,
     $instanceSealKeys,

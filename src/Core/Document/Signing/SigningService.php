@@ -14,6 +14,7 @@ use Whity\Core\Document\Routing\RouteStepRepository;
 use Whity\Core\Document\Routing\RouteSubjectRegistry;
 use Whity\Core\Document\Routing\RouteSubjectVersionRepository;
 use Whity\Core\Document\Routing\RouteTrailChain;
+use Whity\Core\Document\Routing\RouteVersionChangedException;
 use Whity\Core\Document\Routing\RoutingRejectedException;
 
 /**
@@ -88,7 +89,7 @@ final class SigningService
                     ? self::maskEmail($this->signer($actorId)['email'])
                     : null,
                 'signed_in_again' => $factor['method'] === SigningSecondFactor::FRESH_SIGN_IN
-                    && $this->challenges->hasFreshSignIn($tenantId, $actorId),
+                    && $this->challenges->hasFreshSignIn($tenantId, $actorId, (int) $route['id']),
             ],
             'saved_signature' => $this->saved->find($tenantId, $actorId),
         ];
@@ -124,7 +125,13 @@ final class SigningService
             );
         }
 
-        $code = $this->challenges->issueEmailCode($tenantId, $actorId);
+        // The code is good for this route and for the content as it is now.
+        $content = $this->currentContent($tenantId, $route);
+        if ($content === null) {
+            throw RoutingRejectedException::because('This cannot be signed: its content could not be read.');
+        }
+
+        $code = $this->challenges->issueEmailCode($tenantId, $actorId, (int) $route['id'], $content['content_hash']);
         if ($code === null) {
             throw new SigningRefusedException(
                 SigningRefusedException::THROTTLED,
@@ -200,57 +207,72 @@ final class SigningService
         $factor = is_array($input['second_factor'] ?? null) ? $input['second_factor'] : [];
         $method = is_string($factor['method'] ?? null) ? $factor['method'] : '';
         $code = is_string($factor['code'] ?? null) ? $factor['code'] : null;
-        $confirmedBy = $this->secondFactor->confirm($tenantId, $actorId, $method, $code, $ip);
+        $confirmedBy = $this->secondFactor->confirm($tenantId, $actorId, $method, $code, $ip, (int) $route['id'], $expected);
 
-        $this->versions->record($tenantId, $subjectType, $subjectId, $snapshot, $actorId);
+        // The version the signer saw. The router checks it is still the current
+        // one inside the act's transaction.
+        $seen = $this->versions->record($tenantId, $subjectType, $subjectId, $snapshot, $actorId);
 
         $signer = $this->signer($actorId);
         $documentId = (int) $route['document_id'];
         $encodedAppearance = SignatureAppearance::encode($appearance);
         $written = null;
 
-        $outcome = $this->router->sign(
-            $tenantId,
-            $actorId,
-            $route,
-            function (array $event, array $actStep) use (
-                $tenantId, $documentId, $route, $subjectType, $subjectId, $signer, $actorId,
-                $confirmedBy, $ip, $userAgent, $encodedAppearance, &$written
-            ): void {
-                $record = [
-                    'tenant_id' => $tenantId,
-                    'document_id' => $documentId,
-                    'route_id' => (int) $route['id'],
-                    'event_id' => (int) $event['id'],
-                    'step_id' => (int) $actStep['id'],
-                    'subject_type' => $subjectType,
-                    'subject_id' => $subjectId,
-                    'subject_version' => (int) $event['subject_version'],
-                    'content_hash' => (string) $event['content_hash'],
-                    'signer_profile_id' => $actorId,
-                    'signer_name' => $signer['name'],
-                    'signer_email' => $signer['email'],
-                    'capacity' => $actStep['sign_capacity'] ?? null,
-                    'on_behalf_of' => $actStep['sign_on_behalf_of'] ?? null,
-                    'confirmed_by' => $confirmedBy,
-                    // The trail entry's own time, to the second: one instant for
-                    // the act and the signature.
-                    'signed_at' => RouteTrailChain::second((string) $event['occurred_at']),
-                    'ip_address' => $ip === null ? null : mb_substr($ip, 0, 64),
-                    'user_agent' => $userAgent === null ? null : mb_substr($userAgent, 0, 512),
-                    'consent_version' => SigningConsent::CURRENT,
-                    'appearance_hash' => hash('sha256', $encodedAppearance),
-                    'appearance' => $encodedAppearance,
-                ];
-                $message = SignatureRepository::sealedMessage($record, $event['entry_hash'] ?? null);
-                $seal = $this->keys->seal($message);
-                $record['record_hash'] = hash('sha256', $message);
-                $record['seal'] = $seal['seal'];
-                $record['seal_key_id'] = $seal['key_id'];
-                $record['id'] = $this->signatures->append($record);
-                $written = $record;
-            },
-        );
+        try {
+            $outcome = $this->router->sign(
+                $tenantId,
+                $actorId,
+                $route,
+                function (array $event, array $actStep) use (
+                    $tenantId, $documentId, $route, $subjectType, $subjectId, $signer, $actorId,
+                    $confirmedBy, $ip, $userAgent, $encodedAppearance, $expected, &$written
+                ): void {
+                    if (!hash_equals($expected, (string) ($event['content_hash'] ?? ''))) {
+                        throw new RouteVersionChangedException('The content changed since you opened it.');
+                    }
+                    $record = [
+                        'tenant_id' => $tenantId,
+                        'document_id' => $documentId,
+                        'route_id' => (int) $route['id'],
+                        'event_id' => (int) $event['id'],
+                        'step_id' => (int) $actStep['id'],
+                        'subject_type' => $subjectType,
+                        'subject_id' => $subjectId,
+                        'subject_version' => (int) $event['subject_version'],
+                        'content_hash' => (string) $event['content_hash'],
+                        'signer_profile_id' => $actorId,
+                        'signer_name' => $signer['name'],
+                        'signer_email' => $signer['email'],
+                        'capacity' => $actStep['sign_capacity'] ?? null,
+                        'on_behalf_of' => $actStep['sign_on_behalf_of'] ?? null,
+                        'confirmed_by' => $confirmedBy,
+                        // The trail entry's own time, to the second: one instant for
+                        // the act and the signature.
+                        'signed_at' => RouteTrailChain::second((string) $event['occurred_at']),
+                        'ip_address' => $ip === null ? null : mb_substr($ip, 0, 64),
+                        'user_agent' => $userAgent === null ? null : mb_substr($userAgent, 0, 512),
+                        'consent_version' => SigningConsent::CURRENT,
+                        'appearance_hash' => hash('sha256', $encodedAppearance),
+                        'appearance' => $encodedAppearance,
+                    ];
+                    $message = SignatureRepository::sealedMessage($record, $event['entry_hash'] ?? null);
+                    $seal = $this->keys->seal($message);
+                    $record['record_hash'] = hash('sha256', $message);
+                    $record['seal'] = $seal['seal'];
+                    $record['seal_key_id'] = $seal['key_id'];
+                    $record['id'] = $this->signatures->append($record);
+                    $written = $record;
+                },
+                $seen['version'],
+                $seen['content_hash'],
+            );
+        } catch (RouteVersionChangedException) {
+            throw new SigningRefusedException(
+                SigningRefusedException::CONTENT_CHANGED,
+                'The content changed since you opened it. Read it again before signing.',
+                409,
+            );
+        }
 
         if (($input['save_signature'] ?? false) === true) {
             $this->saved->save($tenantId, $actorId, $appearance);
@@ -273,17 +295,51 @@ final class SigningService
      * The audit of a document: every act, every signature with whether its seal
      * checks, and whether the trail's chain is intact.
      *
+     * A `signed` trail entry with no signature record is reported, and counts
+     * as a break: every signature is written with its act.
+     *
+     * `$withDetails` adds each signer's email address, IP address and browser;
+     * the caller decides who may see them.
+     *
      * @return array{chain: array<string, mixed>, signatures: list<array<string, mixed>>}
      */
-    public function audit(int $tenantId, int $documentId): array
+    public function audit(int $tenantId, int $documentId, bool $withDetails = false): array
     {
         $chain = RouteTrailChain::verify($this->db, $tenantId, $documentId);
         $out = [];
+        $recorded = [];
         foreach ($this->signatures->listForDocument($tenantId, $documentId) as $row) {
-            $out[] = self::present($row) + $this->check($row);
+            $out[] = self::present($row, $withDetails) + $this->check($row);
+            $recorded[(int) $row['event_id']] = true;
+        }
+
+        $missing = [];
+        foreach ($this->signedEventIds($tenantId, $documentId) as $eventId) {
+            if (!isset($recorded[$eventId])) {
+                $missing[] = $eventId;
+            }
+        }
+        $chain['signed_without_record'] = $missing;
+        if ($missing !== []) {
+            $chain['intact'] = false;
+            $brokenAt = $chain['broken_at_event_id'];
+            $chain['broken_at_event_id'] = is_int($brokenAt) ? min($brokenAt, $missing[0]) : $missing[0];
         }
 
         return ['chain' => $chain, 'signatures' => $out];
+    }
+
+    /** @return list<int> The document's `signed` trail entries, oldest first. */
+    private function signedEventIds(int $tenantId, int $documentId): array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT id FROM document_route_events
+              WHERE tenant_id = :tenant_id AND document_id = :document_id AND action = 'signed'
+              ORDER BY id ASC"
+        );
+        $stmt->execute([':tenant_id' => $tenantId, ':document_id' => $documentId]);
+
+        return array_values(array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN)));
     }
 
     /**
@@ -303,14 +359,24 @@ final class SigningService
     }
 
     /**
-     * The signatures standing on a subject's current version, for `GET` on a
-     * document: capacity, on behalf of, who and when.
+     * The signatures standing on a subject as it is now, for `GET` on a
+     * document: capacity, on behalf of, who and when. Matched on the hash of
+     * the subject's current content, not on the newest recorded version, so a
+     * subject changed since it was signed shows no signatures.
      *
      * @return list<array<string, mixed>>
      */
     public function current(int $tenantId, string $subjectType, int $subjectId): array
     {
-        return array_map(self::presentCurrent(...), $this->signatures->listCurrent($tenantId, $subjectType, $subjectId));
+        $snapshot = $this->subjects->get($subjectType)?->snapshot($tenantId, $subjectId);
+        if ($snapshot === null) {
+            return [];
+        }
+
+        return array_map(
+            self::presentCurrent(...),
+            $this->signatures->listForContent($tenantId, $subjectType, $subjectId, RouteSubjectVersionRepository::hash($snapshot)),
+        );
     }
 
     /**
@@ -338,7 +404,7 @@ final class SigningService
      * @param array<string, mixed> $row
      * @return array<string, mixed>
      */
-    public static function present(array $row): array
+    public static function present(array $row, bool $withDetails = true): array
     {
         $appearance = json_decode((string) ($row['appearance'] ?? ''), true);
 
@@ -354,14 +420,16 @@ final class SigningService
             'by' => [
                 'profile_id' => (int) $row['signer_profile_id'],
                 'name' => (string) $row['signer_name'],
-                'email' => $row['signer_email'],
+                'email' => $withDetails ? $row['signer_email'] : null,
             ],
             'capacity' => $row['capacity'],
             'on_behalf_of' => $row['on_behalf_of'],
             'confirmed_by' => (string) $row['confirmed_by'],
             'at' => (string) $row['signed_at'],
-            'ip_address' => $row['ip_address'],
-            'user_agent' => $row['user_agent'],
+            'ip_address' => $withDetails ? $row['ip_address'] : null,
+            'user_agent' => $withDetails ? $row['user_agent'] : null,
+            // True when the email, IP address and browser were left out for this reader.
+            'details_withheld' => !$withDetails,
             'consent_version' => (string) $row['consent_version'],
             'consent_wording' => SigningConsent::wording((string) $row['consent_version']),
             'appearance' => is_array($appearance) ? $appearance : null,

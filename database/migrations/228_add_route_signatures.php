@@ -28,6 +28,8 @@ use Whity\Database\Database;
  *    preference, not evidence: the signature record keeps its own copy.
  *  - `signing_challenges`: the one-time codes sent by email for signing, and
  *    the record of a fresh sign-in through the workspace's sign-in provider.
+ *    Each is bound to the route it was asked for (and a code to the content
+ *    hash it was sent for), and is used only there.
  *  - `instance_signing_keys`: the instance's Ed25519 key pairs. The private key
  *    is stored encrypted with the platform encryption key; the public key is
  *    published.
@@ -62,6 +64,10 @@ final class AddRouteSignatures
         $db->exec('ALTER TABLE document_route_steps ADD COLUMN IF NOT EXISTS sign_capacity VARCHAR(200)');
         $db->exec('ALTER TABLE document_route_steps ADD COLUMN IF NOT EXISTS sign_on_behalf_of VARCHAR(200)');
 
+        // `event_id` has no ON DELETE action: a trail entry that carries a
+        // signature record cannot be removed on its own. Removing the whole
+        // document removes both in the same statement.
+        //
         // The signer is kept by id AND by name and address as they were at
         // signing. No foreign key on the signer: a sealed record must not be
         // changed by a later cascade.
@@ -71,7 +77,7 @@ final class AddRouteSignatures
                 tenant_id         INTEGER      NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
                 document_id       BIGINT       NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
                 route_id          BIGINT       NOT NULL REFERENCES document_routes(id) ON DELETE CASCADE,
-                event_id          BIGINT       NOT NULL REFERENCES document_route_events(id) ON DELETE CASCADE,
+                event_id          BIGINT       NOT NULL REFERENCES document_route_events(id),
                 step_id           BIGINT       NOT NULL,
                 subject_type      VARCHAR(64)  NOT NULL,
                 subject_id        BIGINT       NOT NULL,
@@ -123,6 +129,8 @@ final class AddRouteSignatures
                 tenant_id   INTEGER     NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
                 profile_id  INTEGER     NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
                 method      VARCHAR(32) NOT NULL CHECK (method IN ('email_code', 'fresh_sign_in')),
+                route_id    BIGINT,
+                content_hash VARCHAR(64),
                 code_hash   VARCHAR(128),
                 attempts    INTEGER     NOT NULL DEFAULT 0,
                 expires_at  TIMESTAMP   NOT NULL,

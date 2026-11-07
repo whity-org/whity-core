@@ -600,12 +600,19 @@ final class DocumentsApiHandler
             $data['pdf_pending'] = $this->pdfPending($tenantId, $callerId);
         }
 
-        // WHIT-922: who has signed the current version, in what capacity, and
-        // when. A signature on an earlier version is not carried over.
+        // WHIT-922: who has signed the document as it is now, in what capacity,
+        // and when. Matched on the hash of its current content, so a signature
+        // on other content is not carried over.
         if ($this->signatures !== null) {
-            $data['signatures'] = array_map(
+            $snapshot = (new \Whity\Core\Document\Routing\DocumentRouteSubject($this->db))->snapshot($tenantId, $documentId);
+            $data['signatures'] = $snapshot === null ? [] : array_map(
                 \Whity\Core\Document\Signing\SigningService::presentCurrent(...),
-                $this->signatures->listCurrent($tenantId, \Whity\Core\Document\Routing\DocumentRouteSubject::TYPE, $documentId),
+                $this->signatures->listForContent(
+                    $tenantId,
+                    \Whity\Core\Document\Routing\DocumentRouteSubject::TYPE,
+                    $documentId,
+                    \Whity\Core\Document\Routing\RouteSubjectVersionRepository::hash($snapshot),
+                ),
             );
         }
 

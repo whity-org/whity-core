@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Whity\Core\Document\Signing;
 
 use PDO;
-use Whity\Auth\LoginThrottleService;
 use Whity\Auth\TotpService;
 use Whity\Auth\TotpStepFloor;
 use Whity\Core\Db\DbBool;
@@ -39,7 +38,7 @@ final class SigningSecondFactor
         private readonly PDO $db,
         private readonly SigningChallengeRepository $challenges,
         private readonly ?TotpService $totp = null,
-        private readonly ?LoginThrottleService $throttle = null,
+        private readonly ?SigningAttemptLimiter $limiter = null,
     ) {
     }
 
@@ -83,12 +82,21 @@ final class SigningSecondFactor
     }
 
     /**
-     * Make the check, using up whatever it used.
+     * Make the check, using up whatever it used. An email code and a fresh
+     * sign-in count only on the route (and, for a code, the content) they were
+     * made for.
      *
      * @throws SigningRefusedException
      */
-    public function confirm(int $tenantId, int $profileId, string $method, ?string $code, ?string $ip): string
-    {
+    public function confirm(
+        int $tenantId,
+        int $profileId,
+        string $method,
+        ?string $code,
+        ?string $ip,
+        int $routeId,
+        string $contentHash,
+    ): string {
         $expected = $this->methodFor($profileId)['method'];
         if ($method !== $expected) {
             throw new SigningRefusedException(
@@ -97,7 +105,7 @@ final class SigningSecondFactor
             );
         }
 
-        if ($this->throttle?->isThrottled($profileId, $ip) === true) {
+        if ($this->limiter !== null && !$this->limiter->reserve($profileId, $ip)) {
             throw new SigningRefusedException(
                 SigningRefusedException::THROTTLED,
                 'Too many tries. Wait a few minutes and try again.',
@@ -109,13 +117,14 @@ final class SigningSecondFactor
 
         $ok = match ($method) {
             self::TOTP => $code !== '' && $this->totpProves($profileId, $code),
-            self::EMAIL_CODE => $code !== '' && $this->challenges->consumeEmailCode($tenantId, $profileId, $code),
-            self::FRESH_SIGN_IN => $this->challenges->consumeFreshSignIn($tenantId, $profileId),
+            self::EMAIL_CODE => $code !== ''
+                && $this->challenges->consumeEmailCode($tenantId, $profileId, $code, $routeId, $contentHash),
+            self::FRESH_SIGN_IN => $this->challenges->consumeFreshSignIn($tenantId, $profileId, $routeId),
             default => false,
         };
 
         if (!$ok) {
-            $this->throttle?->recordFailure($profileId, $ip);
+            // The slot taken above stays taken: a failed check counts.
 
             throw new SigningRefusedException(
                 SigningRefusedException::SECOND_FACTOR_INVALID,
@@ -124,6 +133,8 @@ final class SigningSecondFactor
                     : 'That code is not correct or has expired.',
             );
         }
+
+        $this->limiter?->release($profileId, $ip);
 
         return $method;
     }

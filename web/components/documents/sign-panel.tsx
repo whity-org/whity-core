@@ -152,7 +152,7 @@ export function SignPanel({ documentId, route, onActed }: SignPanelProps) {
     if (factor.provider_key === null) return;
     const returnTo = window.location.pathname;
     window.location.href =
-      `/api/v1/auth/sso/${encodeURIComponent(factor.provider_key)}/start?reauth=sign&return_to=` +
+      `/api/v1/auth/sso/${encodeURIComponent(factor.provider_key)}/start?reauth=sign&route_id=${route.id}&return_to=` +
       encodeURIComponent(returnTo);
   };
 

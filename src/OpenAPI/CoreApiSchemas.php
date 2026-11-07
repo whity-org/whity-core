@@ -6296,6 +6296,7 @@ final class CoreApiSchemas
                 'seal' => self::str() + ['description' => 'Ed25519 signature, base64, by the published key `seal_key_id`.'],
                 'seal_key_id' => self::str(),
                 'seal_valid' => self::bool(),
+                'details_withheld' => self::bool() + ['description' => 'True when the email address, IP address and browser are left out because the reader does not hold audit:read.'],
             ], ['id', 'route_id', 'event_id', 'subject_version', 'content_hash', 'by', 'confirmed_by', 'at', 'consent_version', 'record_hash', 'seal', 'seal_key_id']),
             'SignResponse' => self::object([
                 'data' => SchemaBuilder::ref('SignatureRecord'),
@@ -6322,7 +6323,8 @@ final class CoreApiSchemas
                     'detached' => self::int() + ['description' => 'Linked entries whose person, unit or step was removed later. Not a break.'],
                     'broken_at_event_id' => self::int(true),
                     'last_hash' => self::str(true),
-                ], ['intact', 'entries', 'linked', 'earlier', 'detached']),
+                    'signed_without_record' => ['type' => 'array', 'items' => self::int(), 'description' => 'Signing entries with no signature record. Any here means the trail is not intact.'],
+                ], ['intact', 'entries', 'linked', 'earlier', 'detached', 'signed_without_record']),
                 'events' => ['type' => 'array', 'items' => SchemaBuilder::ref('DocumentTrailEvent')],
                 'signatures' => ['type' => 'array', 'items' => SchemaBuilder::ref('SignatureRecord')],
                 'keys' => ['type' => 'array', 'items' => SchemaBuilder::ref('SigningKey')],
@@ -13020,6 +13022,7 @@ final class CoreApiSchemas
                 'requiredPermission' => null,
                 'schema' => [
                     'summary' => 'The audit of a document: every act and signature, whether each seal checks, and whether the trail is intact',
+                    'description' => 'Email addresses, IP addresses and browsers of signers are included only for callers holding audit:read.',
                     'tags' => ['documents'],
                     'mcp' => true,
                     'responses' => [

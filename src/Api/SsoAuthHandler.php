@@ -114,7 +114,7 @@ final class SsoAuthHandler
      * and the page to come back to. Null when there is no session, the feature
      * is not wired, or the return path is not a plain path on this app.
      *
-     * @return array{profile_id: int, tenant_id: int, return_to: string}|null
+     * @return array{profile_id: int, tenant_id: int, route_id: int, return_to: string}|null
      */
     private function reauthTarget(): ?array
     {
@@ -125,13 +125,16 @@ final class SsoAuthHandler
         $profileId = $claims['profile_id'] ?? null;
         $tenantId = $claims['tenant_id'] ?? null;
         $returnTo = (string) ($this->query('return_to') ?? '');
+        // The route the signer is signing on: the sign-in counts only there.
+        $routeId = (string) ($this->query('route_id') ?? '');
         if (!is_int($profileId) || !is_int($tenantId) || $tenantId <= 0
+            || preg_match('/^[1-9]\d{0,18}$/', $routeId) !== 1
             || preg_match('#^/(?!/)[A-Za-z0-9/_\-.~%]{0,500}$#', $returnTo) !== 1
         ) {
             return null;
         }
 
-        return ['profile_id' => $profileId, 'tenant_id' => $tenantId, 'return_to' => $returnTo];
+        return ['profile_id' => $profileId, 'tenant_id' => $tenantId, 'route_id' => (int) $routeId, 'return_to' => $returnTo];
     }
 
     /**
@@ -146,13 +149,14 @@ final class SsoAuthHandler
     {
         $profileId = (int) $flow['reauth_profile_id'];
         $signingTenantId = (int) ($flow['reauth_tenant_id'] ?? 0);
+        $routeId = (int) ($flow['reauth_route_id'] ?? 0);
         $returnTo = (string) ($flow['reauth_return_to'] ?? '/');
         $base = rtrim(($this->frontendUrls ?? new \Whity\Core\Http\FrontendUrls(['APP_URL' => $this->appUrl]))->base(), '/');
         $back = static fn (string $outcome): Response => new Response(302, '', [
             'Location' => $base . $returnTo . '?signing=' . rawurlencode($outcome),
         ]);
 
-        if ($this->identities === null || $this->signingChallenges === null || $signingTenantId <= 0) {
+        if ($this->identities === null || $this->signingChallenges === null || $signingTenantId <= 0 || $routeId <= 0) {
             return $back('sign_in_failed');
         }
 
@@ -172,7 +176,7 @@ final class SsoAuthHandler
             return $back('sign_in_not_fresh');
         }
 
-        $this->signingChallenges->recordFreshSignIn($signingTenantId, $profileId);
+        $this->signingChallenges->recordFreshSignIn($signingTenantId, $profileId, $routeId);
 
         return $back('signed_in');
     }
@@ -313,6 +317,7 @@ final class SsoAuthHandler
             'reauth_profile_id' => $reauth['profile_id'] ?? null,
             'reauth_tenant_id'  => $reauth['tenant_id'] ?? null,
             'reauth_return_to'  => $reauth['return_to'] ?? null,
+            'reauth_route_id'   => $reauth['route_id'] ?? null,
         ], 600, 'oidc_flow');
         CookieManager::setSsoFlowToken($flowToken, 600);
 

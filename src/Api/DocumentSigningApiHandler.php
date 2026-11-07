@@ -17,6 +17,7 @@ use Whity\Core\Document\Signing\SignatureAppearance;
 use Whity\Core\Document\Signing\SigningRefusedException;
 use Whity\Core\Document\Signing\SigningService;
 use Whity\Core\RateLimit\ClientIp;
+use Whity\Core\RBAC\CorePermissions;
 use Whity\Core\RBAC\ScopedPermissionSet;
 use Whity\Core\Request;
 use Whity\Core\Response;
@@ -132,6 +133,7 @@ final class DocumentSigningApiHandler
         }
 
         return Response::json([
+            // The signer's own record, so their own details are included.
             'data' => SigningService::present($outcome['signature']),
             'event' => RoutingPresenter::event($outcome['event']),
             'decided' => $outcome['decided'],
@@ -152,10 +154,14 @@ final class DocumentSigningApiHandler
         if ($resolved instanceof Response) {
             return $resolved;
         }
-        [$tenantId, , $document] = $resolved;
+        [$tenantId, $callerId, $document] = $resolved;
         $documentId = (int) $document['id'];
 
-        $audit = $this->signing->audit($tenantId, $documentId);
+        // Anyone who may see the document sees who signed, in what capacity,
+        // when, how they confirmed, and the drawing. Each signer's email, IP
+        // address and browser are shown only to holders of `audit:read`.
+        $withDetails = $this->roleChecker->hasPermissionForProfile($callerId, CorePermissions::AUDIT_READ, $tenantId);
+        $audit = $this->signing->audit($tenantId, $documentId, $withDetails);
         $total = $this->events->countForDocument($documentId, $tenantId);
         $events = $this->events->listForDocument($documentId, $tenantId, max(1, $total), 0);
 

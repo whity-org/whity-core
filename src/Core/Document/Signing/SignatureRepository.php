@@ -122,33 +122,27 @@ final class SignatureRepository
     }
 
     /**
-     * The signatures that stand on the subject's CURRENT version: those bound to
-     * its latest recorded hash. A signature on an earlier version is not
-     * carried over.
+     * The signatures that stand on the subject's content as it is now: those
+     * bound to `$contentHash`, the hash of its current snapshot. A signature
+     * on other content is not carried over.
      *
      * @return list<array<string, mixed>>
      */
-    public function listCurrent(int $tenantId, string $subjectType, int $subjectId): array
+    public function listForContent(int $tenantId, string $subjectType, int $subjectId, string $contentHash): array
     {
         $stmt = $this->db->prepare(
             'SELECT ' . self::COLUMNS . '
                FROM route_signatures s
                JOIN document_route_events e ON e.id = s.event_id AND e.tenant_id = s.tenant_id
               WHERE s.tenant_id = :tenant_id AND s.subject_type = :subject_type AND s.subject_id = :subject_id
-                AND s.subject_version = (
-                    SELECT MAX(v.version) FROM route_subject_versions v
-                     WHERE v.tenant_id = :tenant_id2 AND v.subject_type = :subject_type2
-                       AND v.subject_id = :subject_id2
-                )
+                AND s.content_hash = :content_hash
               ORDER BY s.id ASC'
         );
         $stmt->execute([
             ':tenant_id' => $tenantId,
             ':subject_type' => $subjectType,
             ':subject_id' => $subjectId,
-            ':tenant_id2' => $tenantId,
-            ':subject_type2' => $subjectType,
-            ':subject_id2' => $subjectId,
+            ':content_hash' => $contentHash,
         ]);
 
         /** @var list<array<string, mixed>> $rows */

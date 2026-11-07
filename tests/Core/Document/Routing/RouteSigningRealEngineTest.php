@@ -25,6 +25,7 @@ use Whity\Core\Document\Routing\RouteSubjectRegistry;
 use Whity\Core\Document\Routing\RouteSubjectVersionRepository;
 use Whity\Core\Document\Routing\RouteTrailChain;
 use Whity\Core\Document\Routing\RouteVerdict;
+use Whity\Core\Document\Routing\RouteVersionChangedException;
 use Whity\Core\Document\Routing\RoutingPresenter;
 use Whity\Core\Document\Routing\RoutingRejectedException;
 use Whity\Core\Document\Routing\RoutingRuleRegistry;
@@ -231,7 +232,7 @@ final class RouteSigningRealEngineTest extends TestCase
         $this->assertRefused(SigningRefusedException::SECOND_FACTOR_INVALID, $route, ['second_factor' => ['method' => 'email_code']]);
         $this->assertRefused(SigningRefusedException::SECOND_FACTOR_REQUIRED, $route, ['second_factor' => ['method' => 'totp', 'code' => '123456']]);
 
-        $code = $this->challenges->issueEmailCode(self::TENANT, self::SIGNER_A);
+        $code = $this->codeFor(self::SIGNER_A, $route);
         self::assertNotNull($code);
         $wrong = $code === '000000' ? '111111' : '000000';
         $this->assertRefused(SigningRefusedException::SECOND_FACTOR_INVALID, $route, ['second_factor' => ['method' => 'email_code', 'code' => $wrong]]);
@@ -241,9 +242,9 @@ final class RouteSigningRealEngineTest extends TestCase
         $this->assertRefused(SigningRefusedException::SECOND_FACTOR_INVALID, $route, ['second_factor' => ['method' => 'email_code', 'code' => $code]]);
 
         // A code works once.
-        $fresh = (string) $this->challenges->issueEmailCode(self::TENANT, self::SIGNER_A);
+        $fresh = (string) $this->codeFor(self::SIGNER_A, $route);
         $this->sign(self::SIGNER_A, $route, ['second_factor' => ['method' => 'email_code', 'code' => $fresh]]);
-        self::assertFalse($this->challenges->consumeEmailCode(self::TENANT, self::SIGNER_A, $fresh));
+        self::assertFalse($this->challenges->consumeEmailCode(self::TENANT, self::SIGNER_A, $fresh, (int) $route['id'], $this->hashOf($route)));
     }
 
     public function testAnAuthenticatorUserSignsWithACurrentCodeOnce(): void
@@ -257,7 +258,7 @@ final class RouteSigningRealEngineTest extends TestCase
         $route = $this->issueSignStep($this->seedDocument(), 'all');
 
         // An email code is not accepted from someone who has an authenticator.
-        $email = (string) $this->challenges->issueEmailCode(self::TENANT, self::SIGNER_A);
+        $email = (string) $this->codeFor(self::SIGNER_A, $route);
         $this->assertRefused(SigningRefusedException::SECOND_FACTOR_REQUIRED, $route, ['second_factor' => ['method' => 'email_code', 'code' => $email]]);
 
         $code = TOTP::createFromSecret($secret)->now();
@@ -284,11 +285,11 @@ final class RouteSigningRealEngineTest extends TestCase
 
         $this->assertRefused(SigningRefusedException::SECOND_FACTOR_INVALID, $route, ['second_factor' => ['method' => 'fresh_sign_in']]);
 
-        $this->challenges->recordFreshSignIn(self::TENANT, self::SIGNER_A);
+        $this->challenges->recordFreshSignIn(self::TENANT, self::SIGNER_A, (int) $route['id']);
         $this->pdo->exec("UPDATE signing_challenges SET expires_at = '2000-01-01 00:00:00'");
         $this->assertRefused(SigningRefusedException::SECOND_FACTOR_INVALID, $route, ['second_factor' => ['method' => 'fresh_sign_in']]);
 
-        $this->challenges->recordFreshSignIn(self::TENANT, self::SIGNER_A);
+        $this->challenges->recordFreshSignIn(self::TENANT, self::SIGNER_A, (int) $route['id']);
         $signed = $this->sign(self::SIGNER_A, $route, ['second_factor' => ['method' => 'fresh_sign_in']]);
         self::assertSame('fresh_sign_in', $signed['signature']['confirmed_by']);
     }
@@ -414,6 +415,151 @@ final class RouteSigningRealEngineTest extends TestCase
         }
     }
 
+    public function testAVersionRecordedBetweenTheCheckAndTheWriteIsRefused(): void
+    {
+        $documentId = $this->seedDocument();
+        $route = $this->issueSignStep($documentId, 'all');
+        $seen = $this->versions->latest(self::TENANT, 'document', $documentId);
+        self::assertNotNull($seen);
+
+        // Someone records a newer version after the signer's check passed.
+        $this->versions->record(self::TENANT, 'document', $documentId, ['title' => 'Changed meanwhile'], self::AUTHOR);
+
+        $written = false;
+        try {
+            $this->router->sign(
+                self::TENANT,
+                self::SIGNER_A,
+                $route,
+                static function () use (&$written): void {
+                    $written = true;
+                },
+                $seen['version'],
+                $seen['content_hash'],
+            );
+            self::fail('A signature must not bind to a version the signer did not see.');
+        } catch (RouteVersionChangedException) {
+        }
+
+        self::assertFalse($written);
+        self::assertSame([], $this->column("SELECT id FROM document_route_events WHERE action = 'signed'"));
+        self::assertNotNull($this->open(self::SIGNER_A, $route), 'Nothing changed.');
+    }
+
+    public function testAnEmailCodeCountsOnlyOnTheRouteAndContentItWasSentFor(): void
+    {
+        $routeA = $this->issueSignStep($this->seedDocument(), 'all');
+        $routeB = $this->issueSignStep($this->seedDocument(), 'all');
+
+        $codeForA = (string) $this->codeFor(self::SIGNER_A, $routeA);
+        $this->assertRefused(SigningRefusedException::SECOND_FACTOR_INVALID, $routeB, ['second_factor' => ['method' => 'email_code', 'code' => $codeForA]]);
+
+        // Nor for other content on the same route.
+        self::assertFalse($this->challenges->consumeEmailCode(self::TENANT, self::SIGNER_A, $codeForA, (int) $routeA['id'], str_repeat('0', 64)));
+
+        $signed = $this->sign(self::SIGNER_A, $routeA, ['second_factor' => ['method' => 'email_code', 'code' => $codeForA]]);
+        self::assertSame('email_code', $signed['signature']['confirmed_by']);
+    }
+
+    public function testAFreshSignInCountsOnlyOnItsRoute(): void
+    {
+        $this->pdo->exec("UPDATE profiles SET auth_method = 'idp' WHERE id = " . self::SIGNER_A);
+        $this->pdo->exec(
+            "INSERT INTO external_identities (profile_id, provider_key, issuer, subject) VALUES ("
+            . self::SIGNER_A . ", 'whity_id', 'https://id.example.test', 'sub-a')"
+        );
+        $routeA = $this->issueSignStep($this->seedDocument(), 'all');
+        $routeB = $this->issueSignStep($this->seedDocument(), 'all');
+
+        $this->challenges->recordFreshSignIn(self::TENANT, self::SIGNER_A, (int) $routeA['id']);
+        $this->assertRefused(SigningRefusedException::SECOND_FACTOR_INVALID, $routeB, ['second_factor' => ['method' => 'fresh_sign_in']]);
+        self::assertFalse($this->signing->context(self::TENANT, self::SIGNER_A, $routeB)['second_factor']['signed_in_again']);
+
+        $this->sign(self::SIGNER_A, $routeA, ['second_factor' => ['method' => 'fresh_sign_in']]);
+    }
+
+    public function testACodeIsRefusedAfterItsTriesAreUsed(): void
+    {
+        $route = $this->issueSignStep($this->seedDocument(), 'all');
+        $code = (string) $this->codeFor(self::SIGNER_A, $route);
+        $wrong = $code === '000000' ? '111111' : '000000';
+        for ($i = 0; $i < SigningChallengeRepository::MAX_ATTEMPTS; $i++) {
+            self::assertFalse($this->challenges->consumeEmailCode(self::TENANT, self::SIGNER_A, $wrong, (int) $route['id'], $this->hashOf($route)));
+        }
+        self::assertFalse($this->challenges->consumeEmailCode(self::TENANT, self::SIGNER_A, $code, (int) $route['id'], $this->hashOf($route)));
+    }
+
+    public function testASignedEntryWithoutARecordIsABreakAndASignedEntryCannotBeRemoved(): void
+    {
+        $documentId = $this->seedDocument();
+        $route = $this->issueSignStep($documentId, 'any');
+        $signed = $this->sign(self::SIGNER_A, $route);
+        $eventId = (int) $signed['event']['id'];
+
+        // The record is kept: its trail entry cannot be removed on its own.
+        if ($this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite') {
+            $this->pdo->exec('PRAGMA foreign_keys = ON');
+        }
+        try {
+            $this->pdo->exec('DELETE FROM document_route_events WHERE id = ' . $eventId);
+            self::fail('A signed trail entry must not be removable while its record exists.');
+        } catch (\PDOException) {
+        }
+        if ($this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite') {
+            $this->pdo->exec('PRAGMA foreign_keys = OFF');
+        }
+
+        self::assertTrue($this->audit($documentId)['chain']['intact']);
+
+        $this->pdo->exec('DELETE FROM route_signatures WHERE event_id = ' . $eventId);
+        $chain = $this->audit($documentId)['chain'];
+        self::assertFalse($chain['intact']);
+        self::assertSame([$eventId], $chain['signed_without_record']);
+        self::assertSame($eventId, $chain['broken_at_event_id']);
+    }
+
+    public function testTheAuditWithholdsContactDetailsUnlessAsked(): void
+    {
+        $documentId = $this->seedDocument();
+        $route = $this->issueSignStep($documentId, 'any');
+        $this->sign(self::SIGNER_A, $route);
+
+        $plain = $this->signing->audit(self::TENANT, $documentId)['signatures'][0];
+        self::assertNull($plain['ip_address']);
+        self::assertNull($plain['user_agent']);
+        self::assertNull($plain['by']['email']);
+        self::assertTrue($plain['details_withheld']);
+        self::assertSame('signer a', $plain['by']['name']);
+        self::assertSame('Director', $plain['capacity']);
+        self::assertTrue($plain['seal_valid']);
+
+        $full = $this->signing->audit(self::TENANT, $documentId, true)['signatures'][0];
+        self::assertSame('203.0.113.7', $full['ip_address']);
+        self::assertSame('signer.a@example.test', $full['by']['email']);
+    }
+
+    public function testSignaturesFollowTheContentAsItIsNow(): void
+    {
+        $documentId = $this->seedDocument();
+        $route = $this->issueSignStep($documentId, 'any');
+        $this->sign(self::SIGNER_A, $route);
+        self::assertCount(1, $this->signing->current(self::TENANT, 'document', $documentId));
+
+        // Changed without a new version being recorded: the signature no
+        // longer stands on what is there.
+        $this->pdo->exec("UPDATE documents SET title = 'Edited' WHERE id = " . $documentId);
+        self::assertSame([], $this->signing->current(self::TENANT, 'document', $documentId));
+    }
+
+    /** @return list<mixed> */
+    private function column(string $sql): array
+    {
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute();
+
+        return array_values($stmt->fetchAll(PDO::FETCH_COLUMN));
+    }
+
     // -- helpers ------------------------------------------------------------
 
     /**
@@ -432,11 +578,23 @@ final class RouteSigningRealEngineTest extends TestCase
         if (!array_key_exists('second_factor', $overrides)) {
             $input['second_factor'] = [
                 'method' => 'email_code',
-                'code' => $this->challenges->issueEmailCode(self::TENANT, $signer),
+                'code' => $this->codeFor($signer, $route),
             ];
         }
 
         return $this->signing->sign(self::TENANT, $signer, $route, $input, '203.0.113.7', 'TestBrowser/1.0');
+    }
+
+    /** @param array<string, mixed> $route */
+    private function hashOf(array $route): string
+    {
+        return (string) ($this->signing->context(self::TENANT, self::SIGNER_A, $route)['subject']['content_hash'] ?? '');
+    }
+
+    /** @param array<string, mixed> $route */
+    private function codeFor(int $signer, array $route): ?string
+    {
+        return $this->challenges->issueEmailCode(self::TENANT, $signer, (int) $route['id'], $this->hashOf($route));
     }
 
     /**

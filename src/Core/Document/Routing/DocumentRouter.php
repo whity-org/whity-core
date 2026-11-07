@@ -167,6 +167,14 @@ final class DocumentRouter
      */
     private ?\Closure $signatureWriter = null;
 
+    /**
+     * WHIT-922: the version and hash the signer was shown, for the length of
+     * one {@see sign()} call. Checked again inside the act's transaction.
+     *
+     * @var array{version: int, content_hash: string}|null
+     */
+    private ?array $expectedSignVersion = null;
+
     public function __construct(
         private readonly PDO $db,
         private readonly RouteRepository $routes,
@@ -427,6 +435,8 @@ final class DocumentRouter
      *
      * @throws RoutingRejectedException When the act is not available to this
      *         caller on this route (422).
+     * @throws RouteVersionChangedException On a signature, when the current
+     *         version is not the one the signer was shown (WHIT-922).
      */
     public function act(
         int $tenantId,
@@ -616,6 +626,29 @@ final class DocumentRouter
         try {
             $this->assertNotWithdrawn($tenantId, $documentId);
 
+            if ($action === RouteAction::SIGNED) {
+                // WHIT-922: read the version again inside the transaction, and
+                // refuse unless it is the one the signer was shown. The event
+                // and the signature record both carry what is read here.
+                $version = $this->subjectVersion(
+                    $tenantId,
+                    (string) ($route['subject_type'] ?? DocumentRouteSubject::TYPE),
+                    (int) ($route['subject_id'] ?? $documentId),
+                    $actorId,
+                    false,
+                );
+                $expected = $this->expectedSignVersion;
+                if ($expected === null
+                    || $version['version'] !== $expected['version']
+                    || $version['content_hash'] === null
+                    || !hash_equals($expected['content_hash'], $version['content_hash'])
+                ) {
+                    throw new RouteVersionChangedException(
+                        'The content changed since you opened it. Read it again before signing.'
+                    );
+                }
+            }
+
             $eventId = $this->events->append($tenantId, $documentId, [
                 'route_id' => $routeId,
                 // The step the actor was acting AT, not the one they are sending
@@ -773,20 +806,33 @@ final class DocumentRouter
      * The checks a signature needs (consent, drawn signature, second factor) are
      * the caller's: {@see \Whity\Core\Document\Signing\SigningService}.
      *
+     * `$expectedVersion` and `$expectedContentHash` are the version the signer
+     * was shown. They are checked inside the transaction, and a different
+     * current version refuses the act ({@see RouteVersionChangedException}).
+     *
      * @param array<string, mixed> $route
      * @param \Closure(array<string, mixed>, array<string, mixed>): void $writeSignature
      *
      * @return array{event: array<string, mixed>, resolved: int, delivered: int, decided: ?string}
      *
      * @throws RoutingRejectedException
+     * @throws RouteVersionChangedException
      */
-    public function sign(int $tenantId, int $actorId, array $route, \Closure $writeSignature): array
-    {
+    public function sign(
+        int $tenantId,
+        int $actorId,
+        array $route,
+        \Closure $writeSignature,
+        int $expectedVersion,
+        string $expectedContentHash,
+    ): array {
         $this->signatureWriter = $writeSignature;
+        $this->expectedSignVersion = ['version' => $expectedVersion, 'content_hash' => $expectedContentHash];
         try {
             return $this->act($tenantId, $actorId, $route, RouteAction::SIGNED, null);
         } finally {
             $this->signatureWriter = null;
+            $this->expectedSignVersion = null;
         }
     }
 

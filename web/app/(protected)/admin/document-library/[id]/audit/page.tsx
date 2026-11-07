@@ -58,6 +58,7 @@ interface AuditSignature {
   record_hash: string;
   seal_key_id: string;
   seal_valid: boolean;
+  details_withheld: boolean;
 }
 
 interface AuditData {
@@ -69,6 +70,7 @@ interface AuditData {
     earlier: number;
     detached: number;
     broken_at_event_id: number | null;
+    signed_without_record: number[];
   };
   events: AuditEvent[];
   signatures: AuditSignature[];
@@ -210,6 +212,12 @@ export default function Page() {
             'Every act on this document and every electronic signature, with the checks that show nothing was changed afterwards.'
           )}
         </p>
+        <p className="text-sm text-muted-foreground">
+          {t(
+            'audit.chain.scope',
+            'Each entry is linked to the one before it, so the check shows any change to the entries the links cover.'
+          )}
+        </p>
       </div>
 
       <Alert variant={data.chain.intact ? 'success' : 'destructive'} data-testid="audit-chain" data-intact={data.chain.intact ? 'true' : 'false'}>
@@ -225,6 +233,11 @@ export default function Page() {
             ' ' +
               t('audit.chain.earlier', '{count} earlier entries were written before entries were linked; the first linked entry covers them.', {
                 count: data.chain.earlier,
+              })}
+          {data.chain.signed_without_record.length > 0 &&
+            ' ' +
+              t('audit.chain.missingRecord', '{count} signing entries have no signature record.', {
+                count: data.chain.signed_without_record.length,
               })}
           {data.chain.detached > 0 &&
             ' ' +
@@ -280,9 +293,15 @@ export default function Page() {
                   </div>
                   <div>
                     <dt className="text-xs text-muted-foreground">{t('audit.address', 'Address and browser')}</dt>
-                    <dd className="break-all text-xs" dir="ltr">
-                      {s.ip_address ?? '—'} · {s.user_agent ?? '—'}
-                    </dd>
+                    {s.details_withheld ? (
+                      <dd className="text-xs text-muted-foreground">
+                        {t('audit.address.withheld', 'Shown to people who can read the audit log.')}
+                      </dd>
+                    ) : (
+                      <dd className="break-all text-xs" dir="ltr">
+                        {s.ip_address ?? '—'} · {s.user_agent ?? '—'}
+                      </dd>
+                    )}
                   </div>
                   <div className="sm:col-span-2">
                     <dt className="text-xs text-muted-foreground">
