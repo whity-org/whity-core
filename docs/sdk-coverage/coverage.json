@@ -1,6 +1,6 @@
 {
     "$comment": "Plugin SDK coverage matrix: the single source of truth. Edit this file, then run `php scripts/sdk-coverage.php` to regenerate docs/wiki/Plugin-SDK-Coverage.md. CI fails when sdk_version is behind Sdk::VERSION, when an SDK minor in the Sdk.php ledger is not named by any `since`, or when the generated page is stale. Security notes say only that a design is needed; vulnerabilities go through SECURITY.md, never here.",
-    "sdk_version": "1.86.0",
+    "sdk_version": "1.87.0",
     "core_version": "0.2.26",
     "updated": "2026-11-06",
     "ratings": {
@@ -715,12 +715,15 @@
                 {
                     "what": "English and Arabic labels on settings, data types, manifest screens and agents",
                     "since": "1.21"
+                },
+                {
+                    "what": "The request's language on the SDK Request",
+                    "since": "1.87"
                 }
             ],
             "missing": [
                 "Shipping a translation catalogue",
-                "Arabic labels on frontend features, navigation and block text",
-                "The request's language in the SDK Request"
+                "Arabic labels on frontend features, navigation and block text"
             ],
             "security": null,
             "issues": [
@@ -987,13 +990,16 @@
                 {
                     "what": "Route schemas in the OpenAPI document",
                     "since": null
+                },
+                {
+                    "what": "Workspace, language and actor kind on Request",
+                    "since": "1.87"
                 }
             ],
             "missing": [
-                "Workspace, language and actor kind on Request",
                 "Per-route rate limits and entitlements"
             ],
-            "security": "Routes cannot tell an agent from a person today, so they cannot apply stricter rules to agents.",
+            "security": null,
             "plan": "0.2.27"
         },
         {

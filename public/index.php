@@ -2666,6 +2666,9 @@ $kernel->use(new \Whity\Http\Middleware\ResolveLanguage(
     new \Whity\Core\i18n\RequestLanguageResolver($db->getPdo(), $languageRegistry, $settingsService),
     $languageRegistry,
 ));
+// WHIT-1015: right after the language, because it reports what isolation and
+// the language step decided to the SDK Request a plugin's route handler reads.
+$kernel->use(new \Whity\Http\Middleware\StampRequestContext($languageRegistry));
 
 // Registered versioned (bare paths) so the router prepends /v1 itself —
 // writing '/api/v1/...' here would double-prefix to '/api/v1/v1/...'.
@@ -5430,7 +5433,7 @@ $proposalDiffs->useAuthoredTools($authoredMcpTools, new \Whity\Mcp\Tools\ReadOnl
 ))->registerOn($proposalDiffs);
 // WHIT-812: what an agent did that its person can still undo.
 $agentActions = new \Whity\Core\Agent\AgentActionRepository($db->getPdo());
-$mcpToolsCallHandler = new ToolsCallHandler($toolDeriver, $router, $roleChecker, $tokenValidator, auditLogger: $auditLogger, authoredTools: $authoredMcpTools, proposals: $agentProposals, proposalDiffs: $proposalDiffs, actions: $agentActions);
+$mcpToolsCallHandler = new ToolsCallHandler($toolDeriver, $router, $roleChecker, $tokenValidator, auditLogger: $auditLogger, authoredTools: $authoredMcpTools, proposals: $agentProposals, proposalDiffs: $proposalDiffs, actions: $agentActions, languages: new \Whity\Core\i18n\RequestLanguageResolver($db->getPdo(), $languageRegistry, $settingsService));
 // The approvals inbox: the person an agent acts for approves, edits or
 // declines what it asked to do. Session-gated and never on the MCP surface:
 // an agent must not be able to approve its own proposal.
@@ -5540,7 +5543,7 @@ $mcpHandlers = [
     'tools/list'              => $mcpToolsListHandler,
     'tools/call'              => $mcpToolsCallHandler,
     'resources/list'          => new ResourcesListHandler($resourceDeriver, $roleChecker, $tokenValidator, $pluginResources, $agentContextGranted),
-    'resources/read'          => new ResourcesReadHandler($router, $roleChecker, $tokenValidator, auditLogger: $auditLogger, resourceDeriver: $resourceDeriver, pluginResources: $pluginResources, pluginGranted: $agentContextGranted),
+    'resources/read'          => new ResourcesReadHandler($router, $roleChecker, $tokenValidator, auditLogger: $auditLogger, resourceDeriver: $resourceDeriver, pluginResources: $pluginResources, pluginGranted: $agentContextGranted, languages: new \Whity\Core\i18n\RequestLanguageResolver($db->getPdo(), $languageRegistry, $settingsService)),
     'prompts/list'            => new PromptsListHandler($promptRegistry, $roleChecker, $tokenValidator, $agentContextGranted),
     'prompts/get'             => new PromptsGetHandler($promptRegistry, $roleChecker, $tokenValidator, $agentContextGranted),
 ];

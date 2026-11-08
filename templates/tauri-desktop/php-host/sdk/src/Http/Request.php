@@ -23,6 +23,26 @@ class Request
      */
     public const ATTR_JWT_CLAIMS = 'jwt.claims';
 
+    /**
+     * Attributes the host stamps before a handler runs. Read them through
+     * {@see self::getWorkspaceId()}, {@see self::getLanguage()} and
+     * {@see self::getActorKind()}. A plugin's own unit test may set them to
+     * stand in for the host.
+     */
+    public const ATTR_WORKSPACE_ID = 'whity.workspace_id';
+    public const ATTR_LANGUAGE = 'whity.language';
+    public const ATTR_ACTOR_KIND = 'whity.actor_kind';
+
+    /** A person, through their own session or client. */
+    public const ACTOR_PERSON = 'person';
+    /** An AI agent acting for a person. */
+    public const ACTOR_AGENT = 'agent';
+    /** The host itself: signed in, but with no person or agent behind it. */
+    public const ACTOR_SYSTEM = 'system';
+
+    /** The language of a request the host has not given one. */
+    public const DEFAULT_LANGUAGE = 'en';
+
     private string $method;
     private string $path;
     /** @var array<string, string> */
@@ -276,6 +296,49 @@ class Request
     public function hasAttribute(string $name): bool
     {
         return array_key_exists($name, $this->attributes);
+    }
+
+    /**
+     * The workspace this request runs in, as the host authorized it.
+     *
+     * Use this, never a workspace id from the path, query or body. Null when
+     * the request has no workspace: a public route with no workspace of its
+     * own, or a caller in the platform's own system workspace.
+     */
+    public function getWorkspaceId(): ?int
+    {
+        $id = $this->getAttribute(self::ATTR_WORKSPACE_ID);
+        return is_int($id) && $id > 0 ? $id : null;
+    }
+
+    /**
+     * The language to answer in: the signed-in person's choice when the
+     * deployment still offers it, otherwise {@see self::DEFAULT_LANGUAGE}.
+     * An AI agent gets the language of the person it acts for.
+     */
+    public function getLanguage(): string
+    {
+        $language = $this->getAttribute(self::ATTR_LANGUAGE);
+        return is_string($language) && $language !== '' ? $language : self::DEFAULT_LANGUAGE;
+    }
+
+    /**
+     * Who is calling: {@see self::ACTOR_PERSON}, {@see self::ACTOR_AGENT} or
+     * {@see self::ACTOR_SYSTEM}.
+     *
+     * Null when nobody is signed in, such as a public form or a webhook. Do
+     * not treat null as trusted: it is an anonymous caller, not the host.
+     */
+    public function getActorKind(): ?string
+    {
+        $kind = $this->getAttribute(self::ATTR_ACTOR_KIND);
+        return in_array($kind, [self::ACTOR_PERSON, self::ACTOR_AGENT, self::ACTOR_SYSTEM], true) ? $kind : null;
+    }
+
+    /** Whether an AI agent, acting for a person, made this request. */
+    public function isAgent(): bool
+    {
+        return $this->getActorKind() === self::ACTOR_AGENT;
     }
 
     /**
