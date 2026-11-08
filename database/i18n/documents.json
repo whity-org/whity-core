@@ -35,7 +35,7 @@
         "audit.seal.valid": "Seal checks",
         "audit.signatures.heading": "Signatures",
         "audit.signatures.none": "Nobody has signed this document.",
-        "audit.signedAt": "Signed at (UTC)",
+        "audit.signedAt": "Signed at",
         "audit.title": "Audit trail and signatures",
         "audit.version": "Version {version}, content fingerprint",
         "blockEditor.accept": "Accept",

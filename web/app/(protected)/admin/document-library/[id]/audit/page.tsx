@@ -18,6 +18,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { Alert, AlertDescription } from '@whity/ui/alert';
 import { Badge } from '@whity/ui/badge';
+import { useDateDisplay } from '@whity/features/datetime';
 import { useTranslation } from '@whity/features/i18n';
 import { useAuth } from '@/lib/auth-context';
 import {
@@ -84,6 +85,7 @@ export default function Page() {
   const rawId = Array.isArray(params.id) ? params.id[0] : params.id;
   const documentId = Number(rawId);
   const t = useTranslation('documents');
+  const { hidden, dateTime } = useDateDisplay();
   const { apiClient } = useAuth();
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [people, setPeople] = useState<Record<string, string>>({});
@@ -116,6 +118,7 @@ export default function Page() {
   }, [apiClient, documentId]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loads once per document
     void load();
   }, [load]);
 
@@ -277,10 +280,12 @@ export default function Page() {
                     <dt className="text-xs text-muted-foreground">{t('signing.onBehalfOf', 'On behalf of')}</dt>
                     <dd>{s.on_behalf_of ?? t('signing.onBehalfOf.self', 'Yourself')}</dd>
                   </div>
-                  <div>
-                    <dt className="text-xs text-muted-foreground">{t('audit.signedAt', 'Signed at (UTC)')}</dt>
-                    <dd dir="ltr">{s.at}</dd>
-                  </div>
+                  {!hidden && (
+                    <div>
+                      <dt className="text-xs text-muted-foreground">{t('audit.signedAt', 'Signed at')}</dt>
+                      <dd dir="ltr">{dateTime(s.at) ?? '—'}</dd>
+                    </div>
+                  )}
                   <div>
                     <dt className="text-xs text-muted-foreground">{t('audit.confirmedBy', 'Confirmed with')}</dt>
                     <dd>{confirmedLabel(s.confirmed_by)}</dd>
@@ -345,7 +350,7 @@ export default function Page() {
               >
                 <span className="font-medium text-foreground">{actionLabel(e.action, e.withdrawal)}</span>
                 <span className="text-muted-foreground">{who(e.actor_profile_id)}</span>
-                <span className="text-muted-foreground" dir="ltr">{e.occurred_at}</span>
+                {!hidden && <span className="text-muted-foreground" dir="ltr">{dateTime(e.occurred_at) ?? '—'}</span>}
                 {e.subject_version !== null && (
                   <span className="text-muted-foreground">
                     {t('audit.event.version', 'Version {version}', { version: e.subject_version })}

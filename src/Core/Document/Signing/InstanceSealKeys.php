@@ -89,7 +89,7 @@ final class InstanceSealKeys
     /** The base64 public key with this id, or null. */
     public function publicKey(string $keyId): ?string
     {
-        // @tenant-guard-ignore: instance_signing_keys is a sanctioned global table (WHIT-922)
+        // instance_signing_keys is a sanctioned global table (WHIT-922)
         $stmt = $this->db->prepare('SELECT public_key FROM instance_signing_keys WHERE key_id = :key_id');
         $stmt->execute([':key_id' => $keyId]);
         $value = $stmt->fetchColumn();
@@ -104,7 +104,7 @@ final class InstanceSealKeys
      */
     public function published(): array
     {
-        // @tenant-guard-ignore: instance_signing_keys is a sanctioned global table (WHIT-922)
+        // instance_signing_keys is a sanctioned global table (WHIT-922)
         $stmt = $this->db->query(
             'SELECT key_id, algorithm, public_key, created_at, retired_at FROM instance_signing_keys ORDER BY id ASC'
         );
@@ -157,7 +157,7 @@ final class InstanceSealKeys
     /** @return array{key_id: string, secret_key: string}|null */
     private function readCurrent(): ?array
     {
-        // @tenant-guard-ignore: instance_signing_keys is a sanctioned global table (WHIT-922)
+        // instance_signing_keys is a sanctioned global table (WHIT-922)
         $stmt = $this->db->query(
             'SELECT key_id, secret_key FROM instance_signing_keys WHERE retired_at IS NULL ORDER BY id ASC LIMIT 1'
         );
@@ -183,7 +183,7 @@ final class InstanceSealKeys
         $encrypted = $this->secrets->encrypt(sodium_bin2base64($secret, SODIUM_BASE64_VARIANT_ORIGINAL));
         sodium_memzero($secret);
 
-        // @tenant-guard-ignore: instance_signing_keys is a sanctioned global table (WHIT-922)
+        // instance_signing_keys is a sanctioned global table (WHIT-922)
         $stmt = $this->db->prepare(
             'INSERT INTO instance_signing_keys (key_id, algorithm, public_key, secret_key, created_at)
              VALUES (:key_id, :algorithm, :public_key, :secret_key, NOW())'

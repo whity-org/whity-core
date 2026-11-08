@@ -36,7 +36,7 @@
         "audit.seal.valid": "الختم مطابق",
         "audit.signatures.heading": "التواقيع",
         "audit.signatures.none": "لم يوقّع أحد على هذا المستند.",
-        "audit.signedAt": "وقت التوقيع (UTC)",
+        "audit.signedAt": "وقت التوقيع",
         "audit.title": "سجل التدقيق والتواقيع",
         "audit.version": "الإصدار {version}، بصمة المحتوى",
         "blockEditor.accept": "قبول",

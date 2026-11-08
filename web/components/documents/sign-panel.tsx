@@ -105,6 +105,7 @@ export function SignPanel({ documentId, route, onActed }: SignPanelProps) {
   }, [apiClient, base]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loads once per route
     void load();
     // Back from signing in again through the provider: say how it went.
     if (typeof window !== 'undefined') {

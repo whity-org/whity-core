@@ -518,7 +518,7 @@ final class SigningService
     /** @return array{name: string, email: ?string} */
     private function signer(int $profileId): array
     {
-        // @tenant-guard-ignore: profiles / profile_emails are sanctioned GLOBAL identity tables (ADR 0005 §1-2)
+        // profiles / profile_emails are sanctioned GLOBAL identity tables (ADR 0005 §1-2)
         $stmt = $this->db->prepare(
             'SELECT p.display_name, pe.email
                FROM profiles p

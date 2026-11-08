@@ -50,7 +50,7 @@ final class SigningSecondFactor
      */
     public function methodFor(int $profileId): array
     {
-        // @tenant-guard-ignore: profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
+        // profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
         $stmt = $this->db->prepare(
             'SELECT two_factor_enabled, two_factor_secret, auth_method FROM profiles WHERE id = :id'
         );
@@ -66,7 +66,7 @@ final class SigningSecondFactor
         }
 
         if ((string) ($row['auth_method'] ?? '') === AuthMethod::IDP) {
-            // @tenant-guard-ignore: external_identities is a sanctioned GLOBAL identity table (WC-7ad4)
+            // external_identities is a sanctioned GLOBAL identity table (WC-7ad4)
             $link = $this->db->prepare(
                 'SELECT provider_key FROM external_identities WHERE profile_id = :id ORDER BY last_login_at DESC, id DESC LIMIT 1'
             );
@@ -144,7 +144,7 @@ final class SigningSecondFactor
         if ($this->totp === null) {
             return false;
         }
-        // @tenant-guard-ignore: profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
+        // profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
         $stmt = $this->db->prepare('SELECT two_factor_secret FROM profiles WHERE id = :id');
         $stmt->execute([':id' => $profileId]);
         $secret = $stmt->fetchColumn();
