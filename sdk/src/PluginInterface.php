@@ -155,9 +155,12 @@ interface PluginInterface
      * - An array containing:
      *   - 'callback' (callable): The callback function
      *   - 'priority' (int, optional): Execution priority (default 10)
+     *   - 'observe' (bool, optional, SDK 1.89): true makes the listener
+     *     observe-only: its return value is ignored, it cannot change the
+     *     payload and it cannot veto
      * - An array of callables or arrays as described above
      *
-     * @return array<string, callable|array{callback: callable, priority?: int}|array<callable|array{callback: callable, priority?: int}>>
+     * @return array<string, callable|array{callback: callable, priority?: int, observe?: bool}|array<callable|array{callback: callable, priority?: int, observe?: bool}>>
      */
     public function getHooks(): array;
 

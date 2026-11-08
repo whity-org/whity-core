@@ -1,6 +1,6 @@
 {
     "$comment": "Plugin SDK coverage matrix: the single source of truth. Edit this file, then run `php scripts/sdk-coverage.php` to regenerate docs/wiki/Plugin-SDK-Coverage.md. CI fails when sdk_version is behind Sdk::VERSION, when an SDK minor in the Sdk.php ledger is not named by any `since`, or when the generated page is stale. Security notes say only that a design is needed; vulnerabilities go through SECURITY.md, never here.",
-    "sdk_version": "1.88.0",
+    "sdk_version": "1.89.0",
     "core_version": "0.2.26",
     "updated": "2026-11-06",
     "ratings": {
@@ -246,10 +246,13 @@
                 {
                     "what": "membership.customer_joined when somebody joins a workspace through its own customer sign-up",
                     "since": "1.73"
+                },
+                {
+                    "what": "Constants for registration.completed, registration.approved and registration.rejected",
+                    "since": "1.89"
                 }
             ],
             "missing": [
-                "Published constants for registration.completed, registration.approved and registration.rejected (fired today, not in Events)",
                 "Invitation events",
                 "Custom registration fields",
                 "An accept-or-reject check on registration"
@@ -1020,14 +1023,17 @@
                 {
                     "what": "Veto exception",
                     "since": "1.15"
+                },
+                {
+                    "what": "Observe-only listeners, a list of what each event lets a listener change, and constants for events core already fired",
+                    "since": "1.89"
                 }
             ],
             "missing": [
-                "Constants for events core already fires (membership, registration, federated sign-in, resource grants, routing, close report)",
-                "Observe-only listeners that cannot change the payload",
+                "Published constants for document.routed and document.route_acted",
                 "Events for settings, plugins, plans, notifications, files and jobs"
             ],
-            "security": "Every listener can rewrite the payload today. Observe-only listeners, and a per-event list of what may change, are needed before more events are published.",
+            "security": null,
             "plan": "0.2.27"
         },
         {

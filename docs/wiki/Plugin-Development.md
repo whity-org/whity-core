@@ -380,6 +380,53 @@ Lower `priority` numbers run first (default `10`). See the
 [Hooks section](#step-4--add-a-hook-that-runs-before-user-creation) below for
 the full walkthrough.
 
+### Observe-only listeners
+
+Add `'observe' => true` when a listener only needs to know that something happened
+(since SDK 1.89):
+
+```php
+public function getHooks(): array
+{
+    return [
+        Events::USER_MEMBERSHIP_ADDED => [
+            'callback' => [$this, 'onMemberAdded'],
+            'observe' => true,
+        ],
+    ];
+}
+
+public function onMemberAdded(array $data, array $context): void
+{
+    // Sync your own records. Nothing you return or change reaches the host.
+}
+```
+
+The host ignores what the listener returns, and changes to its copy of the payload
+reach nobody. It cannot refuse the operation either: a `HookVetoException` thrown from
+it is logged and the operation carries on. Any other exception is handled as for every
+listener. Priority still applies, so give an observer a high number to run after the
+listeners that can change the payload.
+
+### What a listener may change
+
+Most events ignore what a listener returns. Only these use it, and only these fields:
+
+| Event | Fields the host reads back |
+|---|---|
+| `tenant.creating` | `name`, `slug` |
+| `role.creating` | `name`, `description`, `permissions` |
+| `ou.creating` | `name`, `parent_id`, `description`, `slug`, `ou_type_id` |
+| `navigation.register` | `items` |
+| `document.issuing`, in a pre-issue check (`check_only` is true) | `checks` |
+| `time_window.close_report` | `unfinished` |
+| `rbac.resource_grant.verify_resource` | `exists` |
+
+A listener on these events can still be observe-only, but then it contributes nothing.
+Every other event treats a returned payload as if nothing was returned. Refusing an
+operation with `HookVetoException` is a separate mechanism, documented on the events
+that honour it.
+
 ### Migrations
 
 `getMigrations()` returns an array of migration **class names (FQCNs)**. See
