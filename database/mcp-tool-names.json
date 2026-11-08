@@ -447,6 +447,10 @@
   "get_api_forms_id": {
     "ar": "عرض نموذج وحقوله"
   },
+  "get_api_forms_id_document_fit": {
+    "en": "Check how a form fits its document template",
+    "ar": "فحص توافق نموذج مع قالب مستنده"
+  },
   "get_api_forms_id_fields": {
     "en": "See a form's fields in order",
     "ar": "عرض حقول نموذج بترتيبها"
@@ -1135,6 +1139,14 @@
   },
   "post_api_forms_id_banner": {
     "ar": "رفع صورة لأعلى نموذج"
+  },
+  "post_api_forms_id_document_fit_template_fields": {
+    "en": "Add a form's questions to its template draft",
+    "ar": "إضافة أسئلة نموذج إلى مسودة قالبه"
+  },
+  "post_api_forms_id_document_template": {
+    "en": "Make a document template from a form",
+    "ar": "إنشاء قالب مستند من نموذج"
   },
   "post_api_forms_id_fields": {
     "ar": "إضافة حقل إلى نموذج"
