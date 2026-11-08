@@ -21,5 +21,6 @@ final class HostPluginServices
 
     public static function register(PDO $pdo, AuditLoggerInterface $audit, ?LoggerInterface $logger = null): void
     {
+        \Whity\register_service(\Whity\Sdk\Jobs\PluginJobQueue::class, new \Whity\Core\Queue\HostPluginJobQueue(new \Whity\Core\Queue\JobRepository($pdo)));
     }
 }

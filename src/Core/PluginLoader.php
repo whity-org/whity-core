@@ -1535,6 +1535,44 @@ class PluginLoader
     }
 
     /**
+     * What active plugins declare to run on a schedule (WHIT-1031). A declaration
+     * that throws or is malformed is logged and reported under `unreadable`, so
+     * the plugin's existing schedules are left alone.
+     *
+     * @return array{schedules: array<string, string>, unreadable: list<string>}
+     */
+    public function collectSchedules(): array
+    {
+        $schedules = [];
+        $unreadable = [];
+        foreach ($this->registeredPlugins as $pluginKey => $info) {
+            $plugin = $info['plugin'];
+            $lifecycle = $this->lifecycles[$pluginKey] ?? null;
+            if (
+                !$plugin instanceof \Whity\Sdk\Jobs\PluginScheduledJobsInterface
+                || isset($this->administrativelyDisabled[$pluginKey])
+                || $lifecycle === null
+                || !$lifecycle->isActive()
+            ) {
+                continue;
+            }
+            try {
+                $slug = \Whity\Core\Plugin\PluginIdentity::slugOf($plugin);
+            } catch (Throwable) {
+                continue;
+            }
+            try {
+                $schedules += \Whity\Core\Scheduler\PluginSchedules::of($plugin, $slug);
+            } catch (Throwable $e) {
+                $unreadable[] = $slug;
+                $this->logWarning("Plugin {$pluginKey} declares invalid schedules: " . $e->getMessage());
+            }
+        }
+
+        return ['schedules' => $schedules, 'unreadable' => $unreadable];
+    }
+
+    /**
      * Get all registered plugins
      *
      * @return array<PluginInterface> Array of registered plugin instances
