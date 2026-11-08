@@ -70,8 +70,8 @@ final class RouteEffectRunner
      */
     public function subscribe(HookManager $hooks): void
     {
-        $hooks->listen('document.routed', [$this, 'onRoutingEvent']);
-        $hooks->listen('document.route_acted', [$this, 'onRoutingEvent']);
+        $hooks->listen(\Whity\Sdk\Hooks\Events::DOCUMENT_ROUTED, [$this, 'onRoutingEvent']);
+        $hooks->listen(\Whity\Sdk\Hooks\Events::DOCUMENT_ROUTE_ACTED, [$this, 'onRoutingEvent']);
     }
 
     /**

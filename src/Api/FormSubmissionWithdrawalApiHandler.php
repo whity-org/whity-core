@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Whity\Api;
 
+use Whity\Core\Form\SubmissionEvents;
+use Whity\Core\Hooks\HookManager;
+use Whity\Sdk\Hooks\Events;
 use PDO;
 use Whity\Core\Audit\AuditLogger;
 use Whity\Core\Document\DocumentRepository;
@@ -42,6 +45,7 @@ final class FormSubmissionWithdrawalApiHandler
         private readonly ?RouteRepository $routes = null,
         private readonly ?RouteRecipientRepository $recipients = null,
         private readonly ?RouteEventRepository $events = null,
+        private readonly ?HookManager $hooks = null,
     ) {
     }
 
@@ -90,6 +94,10 @@ final class FormSubmissionWithdrawalApiHandler
             ]);
 
             $this->db->commit();
+
+            if ($submission !== null) {
+                SubmissionEvents::announce($this->hooks, Events::SUBMISSION_WITHDRAWN, $tenantId, $id, (int) $submission['form_id'], $profileId);
+            }
 
             return Response::json(['data' => $this->submissions->find($tenantId, $id, $profileId)]);
         } catch (\Throwable $e) {

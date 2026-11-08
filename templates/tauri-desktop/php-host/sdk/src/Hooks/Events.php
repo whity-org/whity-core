@@ -209,6 +209,59 @@ final class Events
     public const DOCUMENT_REVISED = 'document.revised';
     public const DOCUMENT_REVISED_ASYNC = 'document.revised.async';
 
+    // ---- routes and forms (SDK 1.94, WHIT-923) ----
+    // Fired after the change is saved. Payloads carry ids, never content: read
+    // what you need through the API, as the person or plugin you act for.
+    // Every route payload has `route_id`, `subject_type`, `subject_id`,
+    // `document_id` (null for a form submission with no document yet),
+    // `tenant_id`, `actor_profile_id` and `event_id`.
+
+    /** A route was started on a document or a form submission. Payload also has `action`, `recipients`. */
+    public const DOCUMENT_ROUTED = 'document.routed';
+    public const DOCUMENT_ROUTED_ASYNC = 'document.routed.async';
+
+    /** Somebody acted on a route. Payload also has `action`, `verdict`, `decided`, `step_id`, `recipients`. */
+    public const DOCUMENT_ROUTE_ACTED = 'document.route_acted';
+    public const DOCUMENT_ROUTE_ACTED_ASYNC = 'document.route_acted.async';
+
+    /** A route was sent back to its author for changes. Payload also has `step_id`, `resume_from`. */
+    public const ROUTE_SENT_BACK = 'route.sent_back';
+    public const ROUTE_SENT_BACK_ASYNC = 'route.sent_back.async';
+
+    /** The author sent the changes back in, and the route went on. Payload also has `step_id`. */
+    public const ROUTE_RESUBMITTED = 'route.resubmitted';
+    public const ROUTE_RESUBMITTED_ASYNC = 'route.resubmitted.async';
+
+    /** Nothing is left open on a route. Payload also has `outcome`: `approved`, `rejected` or null. */
+    public const ROUTE_COMPLETED = 'route.completed';
+    public const ROUTE_COMPLETED_ASYNC = 'route.completed.async';
+
+    /** Somebody signed on a signing step. Payload also has `step_id`. */
+    public const ROUTE_SIGNED = 'route.signed';
+    public const ROUTE_SIGNED_ASYNC = 'route.signed.async';
+
+    /**
+     * A route's finalise step made its final document. Payload: `id` (the document),
+     * `document_id`, `route_id`, `subject_type`, `subject_id`, `artifact_id`, `tenant_id`.
+     */
+    public const DOCUMENT_FINALISED = 'document.finalised';
+    public const DOCUMENT_FINALISED_ASYNC = 'document.finalised.async';
+
+    /**
+     * Somebody sent a form. Payload: `id` (the submission), `form_id`, `tenant_id`,
+     * `actor_profile_id` (null when it was anonymous), `route_id` (null when it has none).
+     */
+    public const FORM_SUBMITTED = 'form.submitted';
+    public const FORM_SUBMITTED_ASYNC = 'form.submitted.async';
+
+    /** The office recorded its answers on a submission. Payload: `id`, `form_id`, `tenant_id`, `actor_profile_id`. */
+    public const SUBMISSION_REVIEWED = 'submission.reviewed';
+    public const SUBMISSION_REVIEWED_ASYNC = 'submission.reviewed.async';
+
+    /** The person who sent a submission withdrew it. Payload: `id`, `form_id`, `tenant_id`, `actor_profile_id`. */
+    public const SUBMISSION_WITHDRAWN = 'submission.withdrawn';
+    public const SUBMISSION_WITHDRAWN_ASYNC = 'submission.withdrawn.async';
+
     // ---- agents (SDK 1.75, WHIT-990) ----
     // A workspace's agent changed. Fired after the change is saved, and the
     // return value is ignored: a listener can't refuse or undo it. Payload:

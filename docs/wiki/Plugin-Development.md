@@ -1788,6 +1788,9 @@ $notice = new Notice(
 - A single send reaches at most 1000 people, and notifications are in-app only for now.
 
 Declared types and their labels are listed in `GET /api/me/notification-preferences` as `plugin_types`.
+
+To react to routes and forms (SDK 1.94), listen to `Events::DOCUMENT_ROUTED`, `DOCUMENT_ROUTE_ACTED`, `ROUTE_SENT_BACK`, `ROUTE_RESUBMITTED`, `ROUTE_SIGNED`, `ROUTE_COMPLETED` (with `outcome`: `approved`, `rejected` or null) and `DOCUMENT_FINALISED`, and to `Events::FORM_SUBMITTED`, `SUBMISSION_REVIEWED` and `SUBMISSION_WITHDRAWN`. They fire after the change is saved and carry ids only, because a submission holds personal data and may be anonymous. A route payload names its `subject_type` and `subject_id`; `document_id` is null for a form submission with no document yet. A form submission's final document also fires `document.issuing` and `document.issued` with `origin: route`, so a listener can refuse it or read its id.
+
 ### Prompts and resources for agents (SDK 1.80)
 
 Prompts (`PluginMcpInterface`) and resources (`PluginMcpResourcesInterface`) put your text straight into an AI agent's context, so the host serves them only from a **Verified** plugin the operator has granted **agent context**:

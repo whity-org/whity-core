@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Core\Form;
 
+use Whity\Core\Hooks\HookManager;
+use Whity\Sdk\Hooks\Events;
 use Database\Migrations\AddFormSubmissionRouteSubjects;
 use PDO;
 use PHPUnit\Framework\TestCase;
@@ -83,6 +85,11 @@ final class FormSubmissionRoutesRealEngineTest extends TestCase
     private RouteSubjectRegistry $subjects;
     private int $formId;
 
+    /** @var list<array{0: string, 1: array<string, mixed>}> */
+    private array $fired = [];
+
+    private HookManager $hooks;
+
     protected function setUp(): void
     {
         $this->pdo = $this->makeSchema();
@@ -114,6 +121,16 @@ final class FormSubmissionRoutesRealEngineTest extends TestCase
             new TenantSettingsRepository($this->pdo)
         );
 
+        $this->hooks = new HookManager();
+        $this->recordOn(
+            $this->hooks,
+            Events::FORM_SUBMITTED,
+            Events::DOCUMENT_ROUTED,
+            Events::ROUTE_SENT_BACK,
+            Events::ROUTE_RESUBMITTED,
+            Events::ROUTE_COMPLETED,
+        );
+
         $this->router = new DocumentRouter(
             $this->pdo,
             $this->routes,
@@ -123,7 +140,7 @@ final class FormSubmissionRoutesRealEngineTest extends TestCase
             new RouteEdgeRepository($this->pdo),
             $rules,
             $this->settings,
-            null,
+            $this->hooks,
             $this->subjects,
             $this->versions,
         );
@@ -139,6 +156,7 @@ final class FormSubmissionRoutesRealEngineTest extends TestCase
             new FormUploadRepository($this->pdo),
             $this->routes,
             $this->recipients,
+            $this->hooks,
         );
         $this->progress = new SubmissionProgress(
             $this->pdo,
@@ -472,6 +490,49 @@ final class FormSubmissionRoutesRealEngineTest extends TestCase
         );
     }
 
+    public function testASubmissionsEventsCarryIdsAndNoAnswers(): void
+    {
+        $submission = $this->send(self::APPLICANT, ['supplier' => 'Example Mill', 'amount' => '100']);
+        $id = (int) $submission['id'];
+        $route = $this->routeOf($id);
+
+        $sent = $this->firedOf(Events::FORM_SUBMITTED);
+        self::assertCount(1, $sent);
+        self::assertSame($id, $sent[0]['id']);
+        self::assertSame($this->formId, $sent[0]['form_id']);
+        self::assertSame(self::APPLICANT, $sent[0]['actor_profile_id']);
+        self::assertSame((int) $route['id'], $sent[0]['route_id']);
+        self::assertStringNotContainsString('Example Mill', (string) json_encode($this->fired), 'ids only');
+
+        $routed = $this->firedOf(Events::DOCUMENT_ROUTED);
+        self::assertCount(1, $routed);
+        self::assertSame('form_submission', $routed[0]['subject_type']);
+        self::assertSame($id, $routed[0]['subject_id']);
+        self::assertNull($routed[0]['document_id']);
+
+        $this->router->act(self::TENANT, self::CLERK, $route, RouteAction::ACKNOWLEDGED, null, RouteVerdict::APPROVED);
+        $this->router->act(self::TENANT, self::MEMBER_A, $route, RouteAction::SENT_BACK, 'Please add tax.', null, RouteResume::SENDER);
+        self::assertCount(1, $this->firedOf(Events::ROUTE_SENT_BACK));
+        self::assertSame($id, $this->firedOf(Events::ROUTE_SENT_BACK)[0]['subject_id']);
+        self::assertSame([], $this->firedOf(Events::ROUTE_COMPLETED), 'an item is open with the author');
+
+        $this->resubmit($id, ['supplier' => 'Example Mill', 'amount' => '150']);
+        self::assertCount(1, $this->firedOf(Events::ROUTE_RESUBMITTED));
+    }
+
+    public function testARejectedSubmissionsRouteCompletesAsRejected(): void
+    {
+        $submission = $this->send(self::APPLICANT, ['supplier' => 'Example Mill', 'amount' => '100']);
+        $route = $this->routeOf((int) $submission['id']);
+
+        $this->router->act(self::TENANT, self::CLERK, $route, RouteAction::ACKNOWLEDGED, 'Not this supplier.', RouteVerdict::REJECTED);
+
+        $completed = $this->firedOf(Events::ROUTE_COMPLETED);
+        self::assertCount(1, $completed);
+        self::assertSame((int) $route['id'], $completed[0]['route_id']);
+        self::assertSame(RouteVerdict::REJECTED, $completed[0]['outcome']);
+    }
+
     public function testARejectionEndsTheRouteAndTellsTheApplicantWhy(): void
     {
         $submission = $this->send(self::APPLICANT, ['supplier' => 'Example Mill', 'amount' => '100']);
@@ -593,7 +654,9 @@ final class FormSubmissionRoutesRealEngineTest extends TestCase
         return $this->issuer->resubmit(self::TENANT, self::APPLICANT, $submission, $this->applicantFields(), $answers, $note);
     }
 
-    /** @return list<array<string, mixed>> */
+    /**
+     * @return list<array<string, mixed>>
+     */
     private function applicantFields(): array
     {
         return FormFieldRepository::applicantFields($this->fields->listForForm(self::TENANT, $this->formId));
@@ -753,5 +816,28 @@ final class FormSubmissionRoutesRealEngineTest extends TestCase
         }
 
         return $pdo;
+    }
+
+    private function recordOn(HookManager $hooks, string ...$events): void
+    {
+        foreach ($events as $event) {
+            $hooks->listen($event, function (array $payload) use ($event): array {
+                $this->fired[] = [$event, $payload];
+
+                return $payload;
+            });
+        }
+    }
+
+    /**
+     * @phpstan-impure
+     * @return list<array<string, mixed>>
+     */
+    private function firedOf(string $event): array
+    {
+        return array_values(array_map(
+            static fn (array $f): array => $f[1],
+            array_filter($this->fired, static fn (array $f): bool => $f[0] === $event)
+        ));
     }
 }

@@ -438,7 +438,7 @@ final class DocumentRouter
             throw new \RuntimeException('Route was issued but could not be read back.');
         }
 
-        $this->broadcast('document.routed', $tenantId, $documentId, [
+        $this->broadcast(Events::DOCUMENT_ROUTED, $tenantId, $documentId, [
             'subject_type' => $subjectType,
             'subject_id' => $subjectId,
             'route_id' => $routeId,
@@ -465,6 +465,8 @@ final class DocumentRouter
             // and announce nothing to the very people the step existed to tell.
             'recipients' => $outcome['recipients'],
         ]);
+
+        $this->announceIfCompleted($tenantId, $documentId, $subjectType, $subjectId, $routeId, $actorId, $eventId);
 
         $this->finishFinalise($tenantId, $routeId, $ownTransaction);
 
@@ -876,7 +878,7 @@ final class DocumentRouter
             ]);
         }
 
-        $this->broadcast('document.route_acted', $tenantId, $documentId, [
+        $this->broadcast(Events::DOCUMENT_ROUTE_ACTED, $tenantId, $documentId, [
             'subject_type' => $subjectType,
             'subject_id' => $subjectId,
             'route_id' => $routeId,
@@ -898,6 +900,13 @@ final class DocumentRouter
             // being asked for anything.
             'recipients' => $outcome['recipients'],
         ]);
+
+        if ($action === RouteAction::SIGNED) {
+            $this->broadcastRoute(Events::ROUTE_SIGNED, $tenantId, $documentId, $subjectType, $subjectId, $routeId, $actorId, $eventId, [
+                'step_id' => (int) $step['id'],
+            ]);
+        }
+        $this->announceIfCompleted($tenantId, $documentId, $subjectType, $subjectId, $routeId, $actorId, $eventId);
 
         $this->finishFinalise($tenantId, $routeId, $ownTransaction);
 
@@ -1088,7 +1097,7 @@ final class DocumentRouter
             'satisfied_by' => RouteSatisfaction::ACT,
         ]];
 
-        $this->broadcast('document.route_acted', $tenantId, $documentId, [
+        $this->broadcast(Events::DOCUMENT_ROUTE_ACTED, $tenantId, $documentId, [
             'subject_type' => $subjectType,
             'subject_id' => $subjectId,
             'route_id' => $routeId,
@@ -1102,6 +1111,11 @@ final class DocumentRouter
             'decided' => null,
             'resume_from' => $resumeFrom,
             'recipients' => $recipients,
+        ]);
+
+        $this->broadcastRoute(Events::ROUTE_SENT_BACK, $tenantId, $documentId, $subjectType, $subjectId, $routeId, $actorId, $eventId, [
+            'step_id' => (int) $step['id'],
+            'resume_from' => $resumeFrom,
         ]);
 
         return ['event' => $event, 'resolved' => 1, 'delivered' => 1, 'decided' => null];
@@ -1214,7 +1228,7 @@ final class DocumentRouter
             throw new \RuntimeException('Routing event was appended but could not be read back.');
         }
 
-        $this->broadcast('document.route_acted', $tenantId, $documentId, [
+        $this->broadcast(Events::DOCUMENT_ROUTE_ACTED, $tenantId, $documentId, [
             'subject_type' => $subjectType,
             'subject_id' => $subjectId,
             'route_id' => $routeId,
@@ -1228,6 +1242,11 @@ final class DocumentRouter
             'decided' => null,
             'recipients' => $outcome['recipients'],
         ]);
+
+        $this->broadcastRoute(Events::ROUTE_RESUBMITTED, $tenantId, $documentId, $subjectType, $subjectId, $routeId, $actorId, $eventId, [
+            'step_id' => (int) $target['id'],
+        ]);
+        $this->announceIfCompleted($tenantId, $documentId, $subjectType, $subjectId, $routeId, $actorId, $eventId);
 
         $this->finishFinalise($tenantId, $routeId, $ownTransaction);
 
@@ -1880,7 +1899,7 @@ final class DocumentRouter
             throw new \RuntimeException('Routing note was appended but could not be read back.');
         }
 
-        $this->broadcast('document.route_acted', $tenantId, $documentId, [
+        $this->broadcast(Events::DOCUMENT_ROUTE_ACTED, $tenantId, $documentId, [
             'subject_type' => $subjectType,
             'subject_id' => $subjectId,
             'route_id' => $routeId,
@@ -2681,6 +2700,50 @@ final class DocumentRouter
         $default = SettingsRegistry::defaults()[$key] ?? '1';
 
         return max(1, (int) $default);
+    }
+
+    /**
+     * One of the route events plugins read (SDK 1.94): ids only, after the commit.
+     *
+     * @param array<string, mixed> $extra
+     */
+    private function broadcastRoute(
+        string $event,
+        int $tenantId,
+        ?int $documentId,
+        string $subjectType,
+        int $subjectId,
+        int $routeId,
+        ?int $actorId,
+        int $eventId,
+        array $extra = [],
+    ): void {
+        $this->broadcast($event, $tenantId, $documentId, [
+            'subject_type' => $subjectType,
+            'subject_id' => $subjectId,
+            'route_id' => $routeId,
+            'actor_profile_id' => $actorId,
+            'event_id' => $eventId,
+        ] + $extra);
+    }
+
+    /** `route.completed`, when the act just committed left nothing open on the route. */
+    private function announceIfCompleted(
+        int $tenantId,
+        ?int $documentId,
+        string $subjectType,
+        int $subjectId,
+        int $routeId,
+        ?int $actorId,
+        int $eventId,
+    ): void {
+        if ($this->hooks === null || $this->recipients->hasOpenOnRoute($tenantId, $routeId)) {
+            return;
+        }
+
+        $this->broadcastRoute(Events::ROUTE_COMPLETED, $tenantId, $documentId, $subjectType, $subjectId, $routeId, $actorId, $eventId, [
+            'outcome' => $this->events->latestVerdictOnRoute($routeId, $tenantId),
+        ]);
     }
 
     /**

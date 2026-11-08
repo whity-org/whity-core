@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Whity\Api;
 
+use Whity\Core\Form\SubmissionEvents;
+use Whity\Core\Hooks\HookManager;
+use Whity\Sdk\Hooks\Events;
 use Whity\Core\Form\FormFieldRepository;
 use Whity\Core\Form\FormRejectedException;
 use Whity\Core\Form\FormSubmissionRepository;
@@ -35,6 +38,7 @@ final class FormSubmissionReviewsApiHandler
         private readonly FormSubmissionRepository $submissions,
         private readonly FormSubmissionReviewRepository $reviews,
         private readonly SubmissionIssuer $issuer,
+        private readonly ?HookManager $hooks = null,
     ) {
     }
 
@@ -129,6 +133,8 @@ final class FormSubmissionReviewsApiHandler
                 : null;
 
             $this->reviews->record($tenantId, (int) $submission['id'], $checked['values'], $actorProfileId);
+
+            SubmissionEvents::announce($this->hooks, Events::SUBMISSION_REVIEWED, $tenantId, (int) $submission['id'], (int) $submission['form_id'], $actorProfileId);
 
             return Response::json([
                 'data' => $this->reviews->listForSubmission($tenantId, (int) $submission['id'])[0],

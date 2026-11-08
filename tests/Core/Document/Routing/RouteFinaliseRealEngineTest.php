@@ -113,6 +113,9 @@ final class RouteFinaliseRealEngineTest extends TestCase
     /** @var list<array<string, mixed>> */
     private array $numbered = [];
 
+    /** @var list<array{0: string, 1: array<string, mixed>}> */
+    private array $fired = [];
+
     protected function setUp(): void
     {
         RoleChecker::clearCache();
@@ -177,6 +180,8 @@ final class RouteFinaliseRealEngineTest extends TestCase
 
             return $event;
         });
+        $this->recordOn($this->hooks, Events::DOCUMENT_FINALISED, Events::ROUTE_COMPLETED);
+        $this->recordOn($this->editor->hooks, Events::DOCUMENT_ISSUING, Events::DOCUMENT_ISSUED);
         $this->finaliser = new RouteFinaliser(
             $this->pdo,
             $this->routes,
@@ -203,7 +208,7 @@ final class RouteFinaliseRealEngineTest extends TestCase
             new RouteEdgeRepository($this->pdo),
             $this->rules,
             $this->settings,
-            null,
+            $this->hooks,
             $subjects,
             $versions,
             $this->finaliser,
@@ -429,6 +434,63 @@ final class RouteFinaliseRealEngineTest extends TestCase
             self::assertStringContainsString('no template is chosen', $e->clientMessage);
         }
         self::assertSame($before, $this->scalar('SELECT COUNT(*) FROM form_submissions'));
+    }
+
+    public function testAFormSubmissionsFinalDocumentFiresTheIssueEvents(): void
+    {
+        $formId = $this->form($this->clerkThenFinalise(null), $this->letter);
+        $submission = $this->send($formId, ['supplier' => 'Example Mill']);
+        self::assertSame([], $this->firedOf(Events::DOCUMENT_ISSUED), 'nothing is issued at submit');
+
+        $route = $this->routeOf((int) $submission['id']);
+        $this->router->act(self::TENANT, self::CLERK, $route, RouteAction::ACKNOWLEDGED, null, RouteVerdict::APPROVED);
+
+        $fresh = $this->submissions->find(self::TENANT, (int) $submission['id']);
+        self::assertNotNull($fresh);
+        $documentId = $fresh['document_id'];
+        self::assertIsInt($documentId);
+
+        self::assertCount(1, $this->firedOf(Events::DOCUMENT_ISSUING), 'a listener can refuse it');
+        self::assertSame('route', $this->firedOf(Events::DOCUMENT_ISSUING)[0]['origin']);
+        $issued = $this->firedOf(Events::DOCUMENT_ISSUED);
+        self::assertCount(1, $issued);
+        self::assertSame($documentId, $issued[0]['id']);
+        self::assertSame('route', $issued[0]['origin']);
+
+        $finalised = $this->firedOf(Events::DOCUMENT_FINALISED);
+        self::assertCount(1, $finalised);
+        self::assertSame($documentId, $finalised[0]['id']);
+        self::assertSame((int) $route['id'], $finalised[0]['route_id']);
+        self::assertSame('form_submission', $finalised[0]['subject_type']);
+        self::assertSame((int) $submission['id'], $finalised[0]['subject_id']);
+
+        $completed = $this->firedOf(Events::ROUTE_COMPLETED);
+        self::assertCount(1, $completed);
+        self::assertSame(RouteVerdict::APPROVED, $completed[0]['outcome']);
+    }
+
+    public function testADocumentThatAlreadyExistsIsNotIssuedAgainByItsFinaliseStep(): void
+    {
+        $source = $this->editor->sourceRepo->findById($this->letter, self::TENANT);
+        self::assertNotNull($source);
+        $version = $this->editor->issuing->published(self::TENANT, $source);
+        self::assertNotNull($version);
+        $issued = $this->editor->issuing->issue(
+            new IssueRequest($source, $version, ['submission.supplier' => 'Example Oven'], 'Oven letter', render: false),
+            new ActingAs(self::TENANT, self::APPLICANT, static fn (string $p): bool => true),
+        );
+        $documentId = (int) $issued['document']['id'];
+        self::assertCount(1, $this->firedOf(Events::DOCUMENT_ISSUED));
+
+        $route = $this->router->issue(self::TENANT, self::APPLICANT, ['id' => $documentId], 'Oven letter', [
+            ['rule_kind' => RoutingRuleRegistry::KIND_EXPLICIT, 'rule_config' => ['profile_ids' => [self::CLERK]], 'decision' => true],
+            ['kind' => RouteStepKind::FINALISE],
+        ])['route'];
+        $this->router->act(self::TENANT, self::CLERK, $route, RouteAction::ACKNOWLEDGED, null, RouteVerdict::APPROVED);
+
+        self::assertCount(1, $this->firedOf(Events::DOCUMENT_ISSUED), 'still only its own issue');
+        self::assertCount(1, $this->firedOf(Events::DOCUMENT_FINALISED));
+        self::assertSame($documentId, $this->firedOf(Events::DOCUMENT_FINALISED)[0]['id']);
     }
 
     public function testADocumentRouteWithAFinaliseStepUsesTheExistingDocument(): void
@@ -832,5 +894,28 @@ final class RouteFinaliseRealEngineTest extends TestCase
         }
 
         return $pdo;
+    }
+
+    private function recordOn(HookManager $hooks, string ...$events): void
+    {
+        foreach ($events as $event) {
+            $hooks->listen($event, function (array $payload) use ($event): array {
+                $this->fired[] = [$event, $payload];
+
+                return $payload;
+            });
+        }
+    }
+
+    /**
+     * @phpstan-impure
+     * @return list<array<string, mixed>>
+     */
+    private function firedOf(string $event): array
+    {
+        return array_values(array_map(
+            static fn (array $f): array => $f[1],
+            array_filter($this->fired, static fn (array $f): bool => $f[0] === $event)
+        ));
     }
 }
