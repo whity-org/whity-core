@@ -62,6 +62,9 @@ final class InstallFromStoreApiHandler
     /** @var \Closure(string, array<string, string>=): ?array<mixed> */
     private \Closure $fetchJson;
 
+    /** @var \Closure(string, array<string, mixed>, array<string, string>): ?array<mixed> */
+    private \Closure $postStoreJson;
+
     /**
      * @param \Closure(string, array<string, string>): ?string|null $fetchPackage
      *   Injectable package fetcher (url, headers) => raw bytes|null. Defaults to a
@@ -83,7 +86,12 @@ final class InstallFromStoreApiHandler
         private readonly ?TenantPluginRepository $workspacePlugins = null,
         private readonly ?PluginTrust $trust = null,
         private readonly ?WhityStoreConnector $connector = null,
+        private readonly ?\Whity\Sdk\Licensing\StoreLicence $licence = null,
+        ?\Closure $postStoreJson = null,
+        private readonly string $returnUrl = '',
     ) {
+        $this->postStoreJson = $postStoreJson ?? static fn (string $url, array $payload, array $headers): ?array
+            => (new HttpFetcher(timeoutSeconds: 20))->postJson($url, $payload, $headers);
         $this->fetchPackage = $fetchPackage ?? static fn (string $url, array $headers): ?string
             => (new HttpFetcher(timeoutSeconds: 15, maxBytes: PluginInstaller::MAX_UPLOAD_BYTES))
                 ->getBinary($url, $headers);
@@ -286,6 +294,9 @@ final class InstallFromStoreApiHandler
             );
             if ($verified) {
                 $enabled = $this->workspacePlugins->setEnabled($tenantId, $published['plugin'], true);
+                if ($enabled) {
+                    $this->publisher->seedStarters($tenantId, $published['plugin']);
+                }
             }
         }
 
@@ -793,6 +804,98 @@ final class InstallFromStoreApiHandler
         }
 
         return false;
+    }
+
+    // ── Store licensing (PR-4) ────────────────────────────────────────────────
+
+    /**
+     * POST /api/plugins/store/checkout {store_url, slug, plan, period, currency?, trial?} — buy a
+     * paid plugin, or start its trial, for this installation. Buying returns the Whity Pay
+     * checkout to send the operator to; it comes back to the store page.
+     *
+     * @param array<string, string> $params
+     */
+    public function checkout(Request $request, array $params = []): Response
+    {
+        $refusal = PluginOperatorGate::refusal();
+        if ($refusal !== null) {
+            return $refusal;
+        }
+        if ($this->connector === null) {
+            return Response::error('Buying from a store is unavailable.', 503);
+        }
+        $body = json_decode($request->getBody(), true);
+        if (!is_array($body)) {
+            return Response::error('A JSON body is required.', 400);
+        }
+        $slug = trim((string) ($body['slug'] ?? ''));
+        if (preg_match('/^[a-z0-9][a-z0-9._-]{0,127}$/', $slug) !== 1) {
+            return Response::error('Invalid slug.', 422);
+        }
+        [$origin, $originError] = $this->resolveStoreOrigin(trim((string) ($body['store_url'] ?? '')));
+        if ($originError !== null) {
+            return $originError;
+        }
+        $host = (string) parse_url((string) $origin, PHP_URL_HOST);
+        $token = $this->connector->accessTokenFor($host);
+        if ($token === null) {
+            return Response::error('Connect this installation to the store first.', 409);
+        }
+
+        $period = (string) ($body['period'] ?? '');
+        $plan = (string) ($body['plan'] ?? 'standard');
+        $payload = array_filter([
+            'plan' => preg_match('/^[a-z0-9][a-z0-9_-]{0,63}$/', $plan) === 1 ? $plan : 'standard',
+            'period' => in_array($period, ['month', 'year', 'once'], true) ? $period : 'month',
+            'currency' => is_string($body['currency'] ?? null) && preg_match('/^[A-Z]{3}$/', $body['currency']) === 1 ? $body['currency'] : null,
+            'trial' => ($body['trial'] ?? false) === true ? true : null,
+            'return_url' => $this->returnUrl !== '' ? $this->returnUrl . '?bought=' . rawurlencode($slug) : null,
+            'name' => (string) ($this->connector->status()['account']['name'] ?? ''),
+            'email' => $this->connector->accountEmail(),
+        ], static fn ($value): bool => $value !== null && $value !== '');
+
+        try {
+            $response = ($this->postStoreJson)(
+                $origin . '/api/v1/plugin-store/plugins/' . rawurlencode($slug) . '/checkout',
+                $payload,
+                ['Authorization' => 'Bearer ' . $token],
+            );
+        } catch (\Throwable $e) {
+            error_log('[StoreCheckout] refused/failed: ' . $e->getMessage());
+            $response = null;
+        }
+        $data = is_array($response) && is_array($response['data'] ?? null) ? $response['data'] : null;
+        if ($data === null) {
+            // The store's own sentence when it gave one (a closed set of plain messages).
+            $reason = is_array($response) && is_string($response['error'] ?? null) ? mb_substr($response['error'], 0, 200) : null;
+
+            return Response::error($reason ?? 'The store could not start the purchase.', 502);
+        }
+
+        $this->auditLogger?->record('plugin_store.checkout', [
+            'target_type' => 'plugin_store',
+            'metadata' => ['store' => $host, 'slug' => $slug, 'trial' => ($body['trial'] ?? false) === true],
+        ]);
+
+        if (is_string($data['checkout_url'] ?? null) && str_starts_with($data['checkout_url'], 'https://')) {
+            return Response::json(['data' => ['checkout_url' => $data['checkout_url']]]);
+        }
+
+        return Response::json(['data' => ['status' => (string) ($data['status'] ?? 'trialing')]]);
+    }
+
+    /**
+     * GET /api/plugins/store/licences/{slug} — this installation's licence for a store plugin.
+     *
+     * @param array<string, string> $params
+     */
+    public function licenceStatus(Request $request, array $params = []): Response
+    {
+        if ($this->licence === null) {
+            return Response::json(['data' => \Whity\Sdk\Licensing\LicenceState::unlicensed('Licences are unavailable.')->toArray()]);
+        }
+
+        return Response::json(['data' => $this->licence->status((string) ($params['slug'] ?? ''))->toArray()]);
     }
 
     // ── Connect to Whity store (WHIT-1003) ───────────────────────────────────

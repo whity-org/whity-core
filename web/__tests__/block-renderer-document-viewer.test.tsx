@@ -386,12 +386,30 @@ describe('when the document cannot be shown', () => {
     expect(await screen.findByText(/Version 1 of 1/)).toBeInTheDocument();
   });
 
-  it('says a record with no stored file has no stored file', async () => {
+  it('says a record with no PDF is not available yet', async () => {
     serve({ ...documentWith(1), artifacts: [] });
     renderTree(viewerTree(), '7');
 
-    expect(await screen.findByText('This document has no stored file.')).toBeInTheDocument();
+    expect(await screen.findByText('PDF not available yet')).toBeInTheDocument();
+    expect(await screen.findByText('The record is saved. Its PDF has not been made yet.')).toBeInTheDocument();
     expect(document.querySelector('[data-slot="document-viewer-frame"]')).toBeNull();
+  });
+
+  it('gives the server reason, and the fix only when the server sends one (WHIT-1001)', async () => {
+    serve({
+      ...documentWith(1),
+      artifacts: [],
+      pdf_pending: {
+        reason: 'The document renderer is not reachable',
+        fix: 'Start the render service.',
+      },
+    });
+    renderTree(viewerTree(), '7');
+
+    expect(
+      await screen.findByText('The document renderer is not reachable. Start the render service.')
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
   });
 
   it('keeps the record on screen when only the bytes fail', async () => {

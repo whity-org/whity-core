@@ -34,6 +34,8 @@ final class TenantManifestPublisher
     public const AUDIT_ACTION = 'tenant_plugin.published';
     public const AUDIT_ACTIVATED = 'tenant_plugin.activated';
 
+    private ?\Whity\Core\Document\PluginStarterTemplates $starters = null;
+
     /**
      * @param list<string> $installedPluginNames Install-wide plugin names, which
      *        a workspace plugin may not reuse.
@@ -45,6 +47,42 @@ final class TenantManifestPublisher
         private readonly array $installedPluginNames,
         private readonly ?AuditLogger $audit = null,
     ) {
+    }
+
+    /**
+     * Seed the starter templates of plugins as they go live (SDK 1.76,
+     * WHIT-995). Wired by the entry points; without it nothing is seeded.
+     */
+    public function useStarterTemplates(\Whity\Core\Document\PluginStarterTemplates $starters): void
+    {
+        $this->starters = $starters;
+    }
+
+    /**
+     * Seed the live version's starter templates into the workspace, when the
+     * plugin is switched on there (WHIT-995). Called after a publish, an
+     * activation and switching a plugin on. Never throws: a starter that
+     * can't be seeded is logged and the plugin stays live.
+     */
+    public function seedStarters(int $tenantId, string $pluginKey): void
+    {
+        if ($this->starters === null || $this->db->inTransaction()) {
+            return;
+        }
+        try {
+            $enabled = false;
+            foreach ($this->repository->plugins($tenantId) as $row) {
+                if ($row['plugin'] === $pluginKey) {
+                    $enabled = $row['enabled'];
+                }
+            }
+            $manifest = $enabled ? $this->repository->liveManifest($tenantId, $pluginKey) : null;
+            if ($manifest !== null && $manifest->documentStarters() !== []) {
+                $this->starters->seed($tenantId, $manifest);
+            }
+        } catch (Throwable $e) {
+            error_log('[TenantManifestPublisher] seeding starter templates failed: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -113,6 +151,8 @@ final class TenantManifestPublisher
                 'approved_by' => $approvedBy,
             ],
         ]);
+
+        $this->seedStarters($tenantId, $parsed->name());
 
         return ['version_id' => $versionId, 'plugin' => $parsed->name(), 'version' => $parsed->version(), 'hash' => $hash];
     }
@@ -218,6 +258,8 @@ final class TenantManifestPublisher
             'target_id' => $versionId,
             'metadata' => ['plugin' => $pluginKey, 'version' => $parsed->version(), 'hash' => $hash],
         ]);
+
+        $this->seedStarters($tenantId, $pluginKey);
 
         return ['version_id' => $versionId, 'plugin' => $pluginKey, 'version' => $parsed->version(), 'hash' => $hash];
     }

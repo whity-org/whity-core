@@ -97,6 +97,48 @@ final class RouteEffectRunnerRealEngineTest extends TestCase
         self::assertSame('acme:post_to_ledger', $attempt['effect_kind']);
     }
 
+    /**
+     * WHIT-920: a route on a form submission has no document, and its stage
+     * effects still run. The effect is told what the route travels on, and its
+     * attempt is recorded without a document.
+     */
+    public function testAnEffectOnARouteWithoutADocumentStillRunsAndIsRecorded(): void
+    {
+        $watch = new class () implements RouteEffectInterface {
+            /** @var list<mixed>|null */
+            public ?array $seen = null;
+
+            public function plan(RouteEffectContext $context): RouteEffectPlan
+            {
+                $this->seen = [$context->documentId, $context->subjectType, $context->subjectId];
+
+                return RouteEffectPlan::notify([901], 'document.routing.stage_reached');
+            }
+
+            public function skipReason(RouteEffectContext $context): string
+            {
+                return '';
+            }
+        };
+        $this->registry->register(self::PLUGIN_SOURCE, ['watch' => $watch]);
+        $this->declare('watch');
+
+        $this->runner->onRoutingEvent($this->payload([
+            'document_id' => null,
+            'subject_type' => 'form_submission',
+            'subject_id' => 12,
+        ]), []);
+
+        self::assertSame([null, 'form_submission', 12], $watch->seen);
+        $statement = $this->pdo->query('SELECT document_id, status, effect_kind FROM document_route_effect_attempts');
+        self::assertNotFalse($statement);
+        $rows = $statement->fetchAll(PDO::FETCH_ASSOC);
+        self::assertCount(1, $rows);
+        self::assertNull($rows[0]['document_id']);
+        self::assertSame(RouteEffectStatus::SUCCEEDED, $rows[0]['status']);
+        self::assertSame(self::PLUGIN_SOURCE . ':watch', $rows[0]['effect_kind']);
+    }
+
     public function testAnEffectThatDeclinesIsRecordedWithItsOwnReason(): void
     {
         // "Nobody to notify" is an ordinary outcome, not a failure — and not

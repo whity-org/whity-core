@@ -156,4 +156,5 @@ Whity is now on ${to}.
   serviceRestarting: (service) => `${service} keeps restarting`,
   renderNoAnswer: (detail) => `The render service did not answer: ${detail}`,
   renderVersion: (reported, expected) => `The render service reports ${reported}, expected ${expected}`,
+  renderSecretAdded: () => '      Added RENDER_SHARED_SECRET to .env, so documents can print (the render service had none)',
 };

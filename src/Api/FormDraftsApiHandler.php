@@ -191,7 +191,7 @@ final class FormDraftsApiHandler
         }
 
         $mayFill = $this->roles->hasPermissionForProfile($profileId, CorePermissions::FORMS_SUBMIT, $tenantId)
-            || (($form['open_to_members'] ?? false) === true && $this->isActiveMember($tenantId, $profileId));
+            || (MemberFormsApiHandler::openToSignedIn($form) && $this->isActiveMember($tenantId, $profileId));
 
         return $mayFill ? [$tenantId, $profileId, $formId] : null;
     }

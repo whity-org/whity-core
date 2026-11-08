@@ -32,6 +32,22 @@ function hex(bytes) {
   return randomBytes(bytes).toString('hex');
 }
 
+/** A new RENDER_SHARED_SECRET: 64 hex characters, twice the minimum both sides enforce. */
+export function newRenderSecret() {
+  return hex(32);
+}
+
+/**
+ * Whether this install runs the renderer without a usable secret: the render
+ * profile is on and RENDER_SHARED_SECRET is unset or under 32 characters. The
+ * renderer then refuses every print. Installs from before the CLI wrote the
+ * secret can be in this state (WHIT-1001).
+ */
+export function renderNeedsSecret(env) {
+  const profiles = (env.COMPOSE_PROFILES ?? '').split(',').map((p) => p.trim());
+  return profiles.includes('render') && (env.RENDER_SHARED_SECRET ?? '').length < 32;
+}
+
 /** The text of a new install's .env. All generated values are hex, so nothing in them needs quoting. */
 export function newEnvFile({ version, project, url, webPort, apiPort, bind, adminEmail }) {
   return `# Whity settings and secrets. Keep this file private and never commit it.
@@ -54,7 +70,7 @@ DB_PASSWORD=${hex(24)}
 
 JWT_SECRET=${hex(32)}
 ENCRYPTION_KEY=${hex(32)}
-RENDER_SHARED_SECRET=${hex(32)}
+RENDER_SHARED_SECRET=${newRenderSecret()}
 
 # Used once, when the administrator account is created.
 INITIAL_SYSTEM_ADMIN_EMAIL=${adminEmail}

@@ -42,6 +42,8 @@ final class ResponsesCsv
             'not routed' => 'Not sent anywhere',
             'in progress' => 'In progress',
             'completed' => 'Finished',
+            'sent back' => 'Sent back for changes',
+            'not approved' => 'Not approved',
             'withdrawn' => 'Withdrawn',
             'yes' => 'Yes',
             'no' => 'No',
@@ -55,6 +57,8 @@ final class ResponsesCsv
             'not routed' => 'لم يُرسل إلى أي جهة',
             'in progress' => 'قيد المعالجة',
             'completed' => 'مكتمل',
+            'sent back' => 'أُعيد لإجراء تعديلات',
+            'not approved' => 'لم تتم الموافقة',
             'withdrawn' => 'مسحوب',
             'yes' => 'نعم',
             'no' => 'لا',
@@ -192,6 +196,27 @@ final class ResponsesCsv
      */
     private static function cell(array $field, mixed $answer, string $language): string
     {
+        return self::answerText($field, $answer, $language, true);
+    }
+
+    /**
+     * One answer as a person reads it, for print rather than a spreadsheet
+     * (WHIT-921: a route's final document): the same words as the export, with
+     * no guard against spreadsheet formulas.
+     *
+     * @param array<string, mixed> $field
+     */
+    public static function printed(array $field, mixed $answer, string $language): string
+    {
+        return self::answerText($field, $answer, $language, false);
+    }
+
+    /**
+     * @param array<string, mixed> $field
+     */
+    private static function answerText(array $field, mixed $answer, string $language, bool $safe): string
+    {
+        $guard = static fn (string $text): string => $safe ? self::safeText($text) : $text;
         if ($answer === null) {
             return '';
         }
@@ -212,22 +237,22 @@ final class ResponsesCsv
             return sprintf(self::word('attached', $language), $count);
         }
         if ($type === FieldType::SIGNATURE && is_array($answer)) {
-            return self::safeText(trim((string) ($answer['name'] ?? '') . ' ' . self::timestamp((string) ($answer['signed_at'] ?? ''))));
+            return $guard(trim((string) ($answer['name'] ?? '') . ' ' . self::timestamp((string) ($answer['signed_at'] ?? ''))));
         }
         if ($type === FieldType::REPEATING && is_array($answer)) {
-            return self::safeText(implode(' | ', array_map(
+            return $guard(implode(' | ', array_map(
                 static fn (mixed $row): string => self::rowText($field, $row, $language),
                 $answer,
             )));
         }
         if (is_array($answer)) {
-            return self::safeText(implode(', ', array_map(
+            return $guard(implode(', ', array_map(
                 static fn (mixed $one): string => self::optionText($field, $one, $language),
                 $answer,
             )));
         }
 
-        return self::safeText(self::optionText($field, $answer, $language));
+        return $guard(self::optionText($field, $answer, $language));
     }
 
     /**

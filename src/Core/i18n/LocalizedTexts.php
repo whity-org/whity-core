@@ -302,7 +302,7 @@ final class LocalizedTexts
     {
         $out = [];
         foreach ($rows as $row) {
-            if (!is_array($row)) {
+            if (!is_array($row) || !isset($row['entity_id'], $row['language_code'], $row['value'])) {
                 continue;
             }
             $out[(int) $row['entity_id']][(string) $row['language_code']] = (string) $row['value'];

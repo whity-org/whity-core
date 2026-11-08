@@ -380,12 +380,18 @@ final class SettingsRegistry
     public const PLUGINS_MCP_PROMPTS_REQUIRE_MARK = 'plugins.mcp_prompts_require_mark';
 
     // Document/label designer server-side render tier (ADR 0012 / WC-docdesigner
-    // Track 2). GLOBAL-ONLY operator toggle: the render endpoint calls out to the
+    // Track 2). GLOBAL-ONLY operator switch: the render endpoint calls out to the
     // separate `whity_render` Docker service (headless-Chromium + Puppeteer), a
     // heavyweight OPTIONAL add-on not every sovereign deployment wants running.
-    // Default 'false' (disabled) — opt-in, mirroring MCP_ENABLED's shape. The
-    // route checks this FIRST and returns a clean 503 (never a raw exception, and
-    // never attempts the internal HTTP call) when off.
+    //
+    // Default 'true' since WHIT-1001, and that does NOT make rendering opt-out:
+    // printing also needs a READY render service (RenderServiceClient::
+    // readiness(): configured with a >= 32-char shared secret, reachable, built
+    // for this core release, accepting the secret). Running that service is the
+    // opt-in; this setting is the operator's way to switch printing off while it
+    // runs. When either half says no, the route returns a clean 503 naming why
+    // (never a raw exception), and when the switch is off it never makes the
+    // internal HTTP call.
     public const DOCUMENTS_RENDER_ENABLED = 'documents.render_enabled';
 
     // The workspace's default document theme (editor M4d, E.44): a theme ref,
@@ -466,9 +472,9 @@ final class SettingsRegistry
     // documents while another is only previewing labels, and an operator should
     // be able to hold back the second without turning off the first.
     //
-    // Default TRUE — deliberately opt-OUT where the master switch is opt-in.
-    // Rendering is already off by default, so an instance that reaches this key
-    // has explicitly turned the subsystem on; a second off-by-default gate
+    // Default TRUE — deliberately opt-OUT, like the master switch since
+    // WHIT-1001. Rendering is off until a render service is running, so an
+    // instance that reaches this key has deliberately set one up; an off-by-default gate
     // would make a correctly-documented `persist: true` answer 503 on a
     // correctly-configured deployment, discoverable only by reading this file.
     // That is precisely the complaint #947 records about the master switch
@@ -599,6 +605,14 @@ final class SettingsRegistry
     // and some would consider the same sentence a leak. Defaulting to `minimal`
     // is defaulting to the version that cannot leak.
     public const DOCUMENTS_QR_PUBLIC_DETAIL = 'documents.qr_public_detail';
+
+    // WHIT-920 (#1724, A9). Whether the person who sent a form sees WHO reviewed
+    // it, or only the stages and their outcomes. Off: an applicant sees "Head of
+    // department: approved", not the name of the person who approved. A
+    // workspace that wants its applicants to know who is handling their request
+    // turns it on. Tenant-overridable, because it is a decision about how an
+    // organisation speaks to the people it serves.
+    public const FORMS_SHOW_REVIEWER_NAMES = 'forms.show_reviewer_names';
 
     // How many people a USER GROUP preview SHOWS (#999). Not a ceiling on
     // resolution — the count a preview reports is always exact — but the size of
@@ -872,6 +886,7 @@ final class SettingsRegistry
         self::DOCUMENTS_RENDER_ENABLED,
         self::DOCUMENTS_PERSIST_ENABLED,
         self::DOCUMENTS_QR_ENABLED,
+        self::FORMS_SHOW_REVIEWER_NAMES,
         self::I18N_ENABLED,
         self::UI_HIDE_DATES,
         self::BILLING_TAX_INCLUSIVE,
@@ -1102,7 +1117,7 @@ final class SettingsRegistry
         // Heavyweight optional add-on (a whole separate Chromium-bearing
         // container) — opt-in, not opt-out. A sovereign deploy that never runs
         // the `render` compose profile stays disabled here regardless.
-        self::DOCUMENTS_RENDER_ENABLED => 'false',
+        self::DOCUMENTS_RENDER_ENABLED => 'true',
         self::DOCUMENTS_THEME => 'whity.standard',
         self::DOCUMENTS_THEME_BY_KIND => '',
         self::DOCUMENTS_SLOT_BINDINGS => '',
@@ -1162,6 +1177,8 @@ final class SettingsRegistry
         // The minimum that satisfies verification. See the constant, and
         // VerificationPresenter for what each level does and does not say.
         self::DOCUMENTS_QR_PUBLIC_DETAIL => 'minimal',
+        // Off: applicants see stages and outcomes, not reviewers. See the constant.
+        self::FORMS_SHOW_REVIEWER_NAMES => 'false',
         // Ten faces. Enough to recognise a group at a glance — "yes, those are
         // the instructors" — and small enough that nobody mistakes the sample
         // for the list. The COUNT beside it is exact and unbounded, which is
@@ -1533,6 +1550,7 @@ final class SettingsRegistry
             self::DOCUMENTS_ROUTING_NOTIFICATION_CHANNELS => self::validateRoutingNotificationChannels($value),
             self::DOCUMENTS_QR_ENABLED => self::validateBoolean($value, self::DOCUMENTS_QR_ENABLED),
             self::DOCUMENTS_QR_PUBLIC_DETAIL => self::validateEnum($key, $value),
+            self::FORMS_SHOW_REVIEWER_NAMES => self::validateBoolean($value, self::FORMS_SHOW_REVIEWER_NAMES),
             self::GROUPS_PREVIEW_SAMPLE_SIZE => self::validateGroupsPreviewSampleSize($value),
             self::DATA_TYPES_BULK_MAX_IDS => self::validateBulkMaxIds($value),
             // Error tracking. These five were declared with defaults, types,

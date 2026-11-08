@@ -622,7 +622,7 @@ final class PublicFormRouteRealEngineTest extends TestCase
         self::assertStringNotContainsString($data['key'], $listing);
         self::assertStringNotContainsString(hash('sha256', $data['key']), $listing);
         self::assertSame(
-            ['id', 'plugin', 'form', 'label', 'key_hint', 'allowed_origins', 'created_at', 'revoked_at'],
+            ['id', 'plugin', 'form', 'kind', 'label', 'key_hint', 'allowed_origins', 'created_at', 'revoked_at'],
             array_keys(json_decode($listing, true)['data'][0]),
         );
         $hash = $this->scalar('SELECT key_hash FROM public_form_keys WHERE id = ' . (int) $data['id']);

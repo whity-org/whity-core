@@ -22,6 +22,7 @@ import {
 } from '@whity/ui/select';
 import { IconPencil, IconPlus, IconShieldLock, IconTrash } from '@tabler/icons-react';
 import { useTranslation, type TranslateFn } from '@whity/features/i18n';
+import { useLocalizedUnits } from '@/hooks/useLocalizedUnits';
 import { useDateDisplay } from '@whity/features/datetime';
 import { SECURITY_MANAGE, errorMessage, type AddToast } from '../settings-shared';
 import type { components } from '@/lib/api/schema';
@@ -149,7 +150,7 @@ function TwoFactorPoliciesSection({
   // stops a short list being presented as the whole organization; the same list
   // also names the scope of existing policies below, which is why the failure is
   // surfaced rather than swallowed into an empty array as it used to be.
-  const { data: ous, error: ousError } = useFetch<OuOption[]>(async () => {
+  const { data: loadedOus, error: ousError } = useFetch<OuOption[]>(async () => {
     const result = await fetchAllPagesTyped<OuOption>((query) =>
       api.GET('/api/v1/ous', { params: { query } })
     );
@@ -166,6 +167,7 @@ function TwoFactorPoliciesSection({
     }
     return result.items;
   }, [t]);
+  const ous = useLocalizedUnits(loadedOus);
 
   const { data: users } = useFetch<UserOption[]>(async () => {
     const { data: body } = await api.GET('/api/v1/users');
@@ -220,7 +222,7 @@ function TwoFactorPoliciesSection({
       <CardContent className="space-y-4">
         {adding && (
           <PolicyFormCard
-            ous={ous ?? []}
+            ous={ous}
             ousError={ousError}
             users={users ?? []}
             onCancel={() => setAdding(false)}
@@ -262,7 +264,7 @@ function TwoFactorPoliciesSection({
                 <PolicyFormCard
                   key={policy.id}
                   editing={policy}
-                  ous={ous ?? []}
+                  ous={ous}
                   ousError={ousError}
                   users={users ?? []}
                   onCancel={() => setEditingId(null)}

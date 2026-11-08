@@ -28,6 +28,14 @@ final class RouteStepKind
     /** The engine produces the final document (#1725). */
     public const FINALISE = 'finalise';
 
+    /**
+     * The `rule_kind` a finalise step stores (WHIT-921). A finalise step names
+     * no rule because it reaches nobody: the engine satisfies it. The column is
+     * NOT NULL, so it holds this reserved word, which no routing rule can be
+     * registered under (core's rules are fixed, and a plugin's are namespaced).
+     */
+    public const FINALISE_RULE = 'finalise';
+
     /** @return list<string> */
     public static function all(): array
     {

@@ -86,9 +86,10 @@ final class RoutingPresenter
     ): array {
         return [
             'id' => (int) $route['id'],
-            'document_id' => (int) $route['document_id'],
-            // WHIT-918 (#1722). What the route travels on. Always a document in
-            // this release; form submissions and plugin records follow.
+            // WHIT-920: null on a route whose subject has no document yet.
+            'document_id' => isset($route['document_id']) ? (int) $route['document_id'] : null,
+            // WHIT-918 (#1722). What the route travels on: a document, or a form
+            // submission (WHIT-920); plugin records follow.
             'subject' => [
                 'type' => (string) ($route['subject_type'] ?? DocumentRouteSubject::TYPE),
                 'id' => (int) ($route['subject_id'] ?? $route['document_id']),
@@ -203,6 +204,42 @@ final class RoutingPresenter
                 ),
             // WHIT-919: whether a person on this step may send it back to the author.
             'allow_send_back' => DbBool::of($step['allow_send_back'] ?? true),
+            // WHIT-922: on a `sign` step, the capacity the signer signs in and
+            // whom they sign for. Null on every other step.
+            'sign_capacity' => isset($step['sign_capacity']) ? (string) $step['sign_capacity'] : null,
+            'sign_on_behalf_of' => isset($step['sign_on_behalf_of']) ? (string) $step['sign_on_behalf_of'] : null,
+            // WHIT-921: the template a finalise step renders with; null elsewhere.
+            'final_template_id' => isset($step['final_template_id']) ? (int) $step['final_template_id'] : null,
+        ];
+    }
+
+    /**
+     * What a route's finalise step did (WHIT-921): the engine's own act, never a
+     * person's, so it is not a trail entry. Null when the route has not reached
+     * one.
+     *
+     * `status` is `waiting` (being made, or the render service is down and a job
+     * will try again), `done` or `failed`; `reason` says why it waits or failed.
+     *
+     * @param array<string, mixed>|null $row
+     * @return array<string, mixed>|null
+     */
+    public static function finalisation(?array $row): ?array
+    {
+        if ($row === null) {
+            return null;
+        }
+
+        return [
+            'step_id' => (int) $row['step_id'],
+            'status' => (string) $row['status'],
+            'reason' => $row['reason'],
+            'subject_version' => $row['subject_version'],
+            'content_hash' => $row['content_hash'],
+            'document_id' => $row['document_id'],
+            'has_pdf' => $row['artifact_id'] !== null,
+            'reached_at' => (string) $row['reached_at'],
+            'finalised_at' => $row['finalised_at'],
         ];
     }
 
@@ -216,7 +253,7 @@ final class RoutingPresenter
     {
         return [
             'id' => (int) $event['id'],
-            'document_id' => (int) $event['document_id'],
+            'document_id' => isset($event['document_id']) ? (int) $event['document_id'] : null,
             'route_id' => (int) $event['route_id'],
             'step_id' => $event['step_id'],
             'actor_profile_id' => $event['actor_profile_id'],
@@ -259,7 +296,7 @@ final class RoutingPresenter
     {
         return [
             'id' => (int) $recipient['id'],
-            'document_id' => (int) $recipient['document_id'],
+            'document_id' => isset($recipient['document_id']) ? (int) $recipient['document_id'] : null,
             'route_id' => (int) $recipient['route_id'],
             'step_id' => (int) $recipient['step_id'],
             'profile_id' => (int) $recipient['profile_id'],

@@ -475,6 +475,8 @@ final class DocumentRouterRealEngineTest extends TestCase
                 // WHIT-684. A READ: how a route ended, for a number waiting on final approval.
                 'latestVerdictOnRoute',
                 'listForDocument',
+                // WHIT-920. A READ: one route's trail, for a subject with no document.
+                'listForRoute',
                 // #1037. A READ: `SELECT … GROUP BY step_id`, deriving the lap
                 // count from the verdict rows already in the trail. Listed here
                 // deliberately rather than the assertion being loosened to

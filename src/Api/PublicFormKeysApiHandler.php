@@ -57,7 +57,10 @@ final class PublicFormKeysApiHandler
             return Response::json([
                 'data' => array_map(self::present(...), $this->keys->listForTenant($tenantId)),
                 'meta' => [
-                    'forms' => PluginPublicRoutes::forms(),
+                    'forms' => array_map(
+                        static fn (array $route): array => $route + ['kind' => PluginPublicRoutes::kindOf($route['plugin'], $route['form'])],
+                        PluginPublicRoutes::forms()
+                    ),
                     'bot_check_ready' => $this->botCheck->isReady(),
                 ],
             ]);
@@ -302,6 +305,8 @@ final class PublicFormKeysApiHandler
             'id' => $row['id'],
             'plugin' => $row['plugin'],
             'form' => $row['form_name'],
+            // A form takes submissions, a read shows something: one key table, two jobs.
+            'kind' => PluginPublicRoutes::kindOf((string) $row['plugin'], (string) $row['form_name']),
             'label' => $row['label'],
             'key_hint' => $row['key_hint'],
             'allowed_origins' => $row['allowed_origins'],

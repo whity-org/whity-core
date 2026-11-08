@@ -23,6 +23,7 @@ use Whity\Core\i18n\ServerLabels;
  *   print.record.status = Status
  *   print.signature = Signature
  *   print.date = Date
+ *   print.madeFrom = Made from version {version} · SHA-256 {hash}
  */
 final class PrintLabels
 {
@@ -75,6 +76,16 @@ final class PrintLabels
     public function date(): string
     {
         return $this->get('print.date', 'Date');
+    }
+
+    /** WHIT-921: the closing line of a route's final document. */
+    public function madeFrom(int $version, string $hash): string
+    {
+        return str_replace(
+            ['{version}', '{hash}'],
+            [(string) $version, $hash],
+            $this->get('print.madeFrom', 'Made from version {version} · SHA-256 {hash}'),
+        );
     }
 
     private function get(string $key, string $english): string

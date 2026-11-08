@@ -23,7 +23,7 @@ import { useFetch } from '@/hooks/useFetch';
 import { useToast } from '@/lib/toast-context';
 import { WAITING_CHANGED_EVENT } from '@/lib/waiting-changed';
 import type { AgentAction, AgentProposal } from '@/components/agents/proposals';
-import { routingMeta, type InboxItem } from '@/components/documents/routing-wire';
+import { routingHref, routingMeta, type InboxItem } from '@/components/documents/routing-wire';
 
 /** At most this many rows show; the rest are "and N more". */
 const MAX_ROWS = 6;
@@ -95,7 +95,7 @@ export function WaitingForYou({ onChange }: { onChange?: () => void }) {
         title: row.item.title,
         from: row.item.subtitle ?? '',
         waited: dates.relative(row.at, ageLabels),
-        href: meta === null ? undefined : `/admin/document-library/${meta.document_id}?tab=routing`,
+        href: meta === null ? undefined : routingHref(meta),
       }];
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
