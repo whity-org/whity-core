@@ -5004,6 +5004,45 @@ class PluginLoader
     }
 
     /**
+     * The error boundary for an observe-only listener (SDK 1.NEXT).
+     *
+     * The wrapper returns nothing, so the hook manager keeps the payload it
+     * already has, and the listener only ever holds this call's own copy, even
+     * if it takes the array by reference. A veto does not cross this boundary:
+     * a listener that asked not to affect the operation cannot stop it. That is
+     * a mistake in the plugin rather than a fault at run time, so it is logged
+     * and does not count towards the three strikes that disable a plugin.
+     *
+     * @param string $pluginKey The plugin's stable identity (original FQCN).
+     * @param callable $callback The raw hook callback.
+     * @return callable(array<mixed>, array<mixed>): void
+     */
+    private function wrapObserveOnlyCallback(string $pluginKey, callable $callback): callable
+    {
+        return function (array $data, array $context = []) use ($pluginKey, $callback): void {
+            $lifecycle = $this->lifecycles[$pluginKey] ?? null;
+
+            if ($lifecycle !== null && $lifecycle->isFailed()) {
+                return;
+            }
+
+            try {
+                $callback($data, $context);
+                $lifecycle?->recordSuccess();
+            } catch (HookVetoException $e) {
+                $lifecycle?->recordSuccess();
+                $this->logWarning(sprintf(
+                    'Plugin "%s" threw a veto from an observe-only listener on "%s"; it was ignored.',
+                    $pluginKey,
+                    $e->eventName()
+                ));
+            } catch (Throwable $e) {
+                $this->handlePluginThrowable($pluginKey, $e, 'hook callback');
+            }
+        };
+    }
+
+    /**
      * Record a plugin's deliberate veto (WC-713).
      *
      * Logged at INFO, not ERROR: nothing malfunctioned — a plugin exercised the
@@ -5096,29 +5135,28 @@ class PluginLoader
 
         $registered = [];
 
-        if (is_callable($hookData)) {
-            $wrapped = $this->wrapHookCallback($pluginKey, $hookData);
-            $this->hookManager->listen($eventName, $wrapped);
+        $hooks = $this->hookManager;
+        $subscribe = function (callable $callback, int $priority = 10, bool $observe = false) use ($hooks, $pluginKey, $eventName, &$registered): void {
+            $wrapped = $observe
+                ? $this->wrapObserveOnlyCallback($pluginKey, $callback)
+                : $this->wrapHookCallback($pluginKey, $callback);
+            $hooks->listen($eventName, $wrapped, $priority);
             $registered[] = $wrapped;
+        };
+
+        if (is_callable($hookData)) {
+            $subscribe($hookData);
         } elseif (is_array($hookData)) {
             // Check if it is a single structured subscription with a callback
             if (isset($hookData['callback']) && is_callable($hookData['callback'])) {
-                $priority = $hookData['priority'] ?? 10;
-                $wrapped = $this->wrapHookCallback($pluginKey, $hookData['callback']);
-                $this->hookManager->listen($eventName, $wrapped, $priority);
-                $registered[] = $wrapped;
+                $subscribe($hookData['callback'], $hookData['priority'] ?? 10, ($hookData['observe'] ?? false) === true);
             } else {
                 // Check if it is a list of callbacks/subscriptions
                 foreach ($hookData as $sub) {
                     if (is_array($sub) && isset($sub['callback']) && is_callable($sub['callback'])) {
-                        $priority = $sub['priority'] ?? 10;
-                        $wrapped = $this->wrapHookCallback($pluginKey, $sub['callback']);
-                        $this->hookManager->listen($eventName, $wrapped, $priority);
-                        $registered[] = $wrapped;
+                        $subscribe($sub['callback'], $sub['priority'] ?? 10, ($sub['observe'] ?? false) === true);
                     } elseif (is_callable($sub)) {
-                        $wrapped = $this->wrapHookCallback($pluginKey, $sub);
-                        $this->hookManager->listen($eventName, $wrapped);
-                        $registered[] = $wrapped;
+                        $subscribe($sub);
                     }
                 }
             }

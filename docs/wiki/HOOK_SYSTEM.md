@@ -116,6 +116,10 @@ The loader records the exact wrapped callbacks it registered so it can cleanly `
 
 **One exception crosses that boundary: `Whity\Sdk\Hooks\HookVetoException` (SDK 1.15, WC-713).** The isolation above is what makes a broken plugin survivable, but it also meant a plugin could never say *"do not do this"* — its objection was logged and the host carried on regardless. A veto is therefore re-thrown to the dispatching handler, and does **not** count toward the failure threshold (a veto is a healthy plugin doing its job, not a fault). See the deletion contract below.
 
+## Observe-only listeners
+
+A plugin subscribes with `['callback' => $fn, 'observe' => true]` when it only needs to know something happened (SDK 1.NEXT). `PluginLoader::wrapObserveOnlyCallback()` returns nothing to `HookManager`, so the payload is unchanged whatever the listener does, and a `HookVetoException` stops at that boundary and is logged. The desktop host's `HookRegistrar` does the same. [Plugin-Development](Plugin-Development.md#what-a-listener-may-change) lists the events whose return value the host reads.
+
 ## Events fired by the core
 
 These events are dispatched by the current core code (verify in source before relying on payload shapes):
