@@ -2181,6 +2181,15 @@ $tenantManifestPublisher = new \Whity\Core\Plugin\Tenant\TenantManifestPublisher
     array_values(array_map(static fn ($plugin): string => $plugin->getName(), $pluginLoader->getPlugins())),
     $auditLogger
 );
+// WHIT-995 (SDK 1.76): a workspace plugin's starter templates are seeded when
+// it goes live in a workspace, and never overwrite the workspace's edits.
+$tenantManifestPublisher->useStarterTemplates(new \Whity\Core\Document\PluginStarterTemplates(
+    $db->getPdo(),
+    new \Whity\Core\Document\DocumentSourceRepository($db->getPdo()),
+    new \Whity\Core\Document\DocumentSourceVersionRepository($db->getPdo()),
+    $settingsService,
+    $logger
+));
 $manifestImpact = new \Whity\Core\Plugin\Tenant\ManifestImpact($tenantRecordRepository);
 // The publish check: a version's own tests, through a writer with no audit
 // and no automations, in a transaction that is always rolled back.

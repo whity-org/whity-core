@@ -286,6 +286,9 @@ final class InstallFromStoreApiHandler
             );
             if ($verified) {
                 $enabled = $this->workspacePlugins->setEnabled($tenantId, $published['plugin'], true);
+                if ($enabled) {
+                    $this->publisher->seedStarters($tenantId, $published['plugin']);
+                }
             }
         }
 

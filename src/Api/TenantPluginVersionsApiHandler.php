@@ -105,6 +105,10 @@ final class TenantPluginVersionsApiHandler
             if (!$this->plugins->setEnabled($tenantId, $plugin, $enabled)) {
                 return self::notFound();
             }
+            if ($enabled) {
+                // Its starter templates (WHIT-995), seeded once per workspace.
+                $this->publisher->seedStarters($tenantId, $plugin);
+            }
             $this->audit?->record($enabled ? 'tenant_plugin.enabled' : 'tenant_plugin.disabled', [
                 'tenant_id' => $tenantId,
                 'actor_user_id' => self::profileId($request),

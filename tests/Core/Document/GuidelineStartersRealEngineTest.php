@@ -90,6 +90,28 @@ final class GuidelineStartersRealEngineTest extends TestCase
     }
 
     /**
+     * WHIT-995: an Arabic starter's samples are Arabic too. Codes, numbers,
+     * amounts and the [placeholders] stay as they are; no English word does.
+     */
+    public function testAnArabicStartersSamplesAreArabic(): void
+    {
+        $allowed = ['CliQ', 'IBAN', 'JOD', 'EXAMPLEBAKERY'];
+        foreach ($this->seeder->starters() as $key => $starter) {
+            if (!str_ends_with($key, '.ar')) {
+                continue;
+            }
+            foreach ($starter['own_fields'] as $field) {
+                $sample = (string) ($field['sample'] ?? '');
+                // Drop placeholders and codes (INV-1042, PAY-2026-10-014), then look for English words.
+                $rest = (string) preg_replace(['/\[[^\]]*\]/u', '/\b[A-Z]{2,}(-[A-Z0-9]+)+\b/u'], '', $sample);
+                preg_match_all('/\b[A-Za-z][A-Za-z]+\b/u', $rest, $words);
+                $english = array_values(array_diff($words[0], $allowed));
+                self::assertSame([], $english, "{$key}: {$field['key']} sample '{$sample}' carries English");
+            }
+        }
+    }
+
+    /**
      * A published template mustn't print the example: Example Bakery's figures
      * are samples on fields, never typed into the document's text.
      */

@@ -103,6 +103,7 @@ final class CoreTables
         'workspace_signup_settings' => '222_create_workspace_signup.php',
         'customer_signups' => '222_create_workspace_signup.php',
         'localized_texts' => '225_create_localized_texts.php',
+        'plugin_starter_seeds' => '228_create_plugin_starter_seeds.php',
         'agents' => '180_create_agents.php',
         'agent_assignments' => '181_create_agent_assignments.php',
         'agent_actions' => '182_create_agent_actions.php',

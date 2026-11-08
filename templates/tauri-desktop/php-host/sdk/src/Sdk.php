@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.80).
+ * SDK identity (v1.81).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1088,12 +1088,20 @@ namespace Whity\Sdk;
  *
  * Narrows 1.9: an ungranted plugin's prompts, and any plugin prompt without a
  * `requiredPermission`, are no longer served.)
+ *
+ * 1.81 (STARTER TEMPLATES: a workspace plugin ships templates under `documents.starters`
+ * in plugin.json ({@see Manifest\DocumentStarterValidator}, `PluginManifest::documentStarters()`).
+ * The host seeds each into a workspace when the plugin goes live there, published, and binds
+ * it to its slot when the slot has no template. Seeded once; a copy the workspace changed is
+ * never overwritten; an untouched copy follows the plugin's updates (WHIT-995).
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.80.0';
+    public const VERSION = '1.81.0';
 
     /**
      * Static identity only — never instantiated.
