@@ -654,9 +654,11 @@ final class SettingsRegistryTest extends TestCase
 
     // ---- documents.render_* (ADR 0012 / WC-docdesigner Track 2) ----
 
-    public function testDocumentsRenderEnabledIsGlobalOnlyBooleanDefaultFalse(): void
+    public function testDocumentsRenderEnabledIsGlobalOnlyBooleanDefaultTrue(): void
     {
-        self::assertSame('false', SettingsRegistry::defaultFor('documents.render_enabled'));
+        // WHIT-1001: on unless switched off. Printing also needs a ready render
+        // service, which is what keeps an install without one from printing.
+        self::assertSame('true', SettingsRegistry::defaultFor('documents.render_enabled'));
         self::assertSame('bool', SettingsRegistry::typeFor('documents.render_enabled'));
         self::assertTrue(SettingsRegistry::isGlobalOnly('documents.render_enabled'));
         self::assertNotContains('documents.render_enabled', SettingsRegistry::tenantTextKeys());

@@ -85,6 +85,12 @@ A renderer swapped for another version between checks cannot slip a print
 through either: every answer carries an `X-Render-Core-Version` header, and
 core refuses a PDF whose version is not its own.
 
+**Upgrading from before 0.2.27.** `documents.render_enabled` used to default
+to off. An install that already runs the renderer with a valid secret, and
+never set the switch, starts printing after the upgrade. To keep printing off,
+set it to false (Settings, Feature flags). A saved `false` stays off, and an
+install with no renderer is unchanged.
+
 **Security does not change.** The renderer stays on the compose network only
 (`expose`, not `ports`, in the published files; the dev files bind it to
 `127.0.0.1`), every render still needs the shared secret, and the secret
