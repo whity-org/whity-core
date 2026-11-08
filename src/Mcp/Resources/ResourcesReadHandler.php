@@ -17,6 +17,7 @@ use Whity\Mcp\JsonRpc\MethodHandler;
 use Whity\Sdk\Http\Request;
 use Whity\Mcp\Auth\McpScope;
 use Whity\Mcp\McpExposure;
+use Whity\Sdk\Mcp\McpToolContext;
 
 /**
  * MCP resources/read handler (WC-30513809).
@@ -42,6 +43,11 @@ final class ResourcesReadHandler implements MethodHandler
         // opt-in lives in the static schemas, not on the Router). Without it
         // only an opt-in carried on the matched route itself counts.
         private readonly ?ResourceDeriver      $resourceDeriver = null,
+        // SDK 1.80 (WHIT-993): resources from plugins the operator granted agent context.
+        private readonly ?PluginResourceRegistry $pluginResources = null,
+        // Whether a plugin is still granted agent context, asked on every call so
+        // a revoke applies at once. Null: trust the registry.
+        private readonly ?\Closure $pluginGranted = null,
     ) {}
 
     /**
@@ -54,6 +60,9 @@ final class ResourcesReadHandler implements MethodHandler
         $uri = $params['uri'] ?? null;
         if (!is_string($uri) || $uri === '') {
             throw new McpException(ErrorCode::INVALID_PARAMS, 'Missing required parameter: uri');
+        }
+        if (str_starts_with($uri, PluginResourceRegistry::URI_SCHEME)) {
+            return $this->readPluginResource($uri, $bearerToken);
         }
         if (!str_starts_with($uri, ResourceDeriver::URI_SCHEME)) {
             throw new McpException(ErrorCode::INVALID_PARAMS, 'Invalid resource URI scheme');
@@ -198,5 +207,65 @@ final class ResourcesReadHandler implements MethodHandler
         $request->user = (object) $claims;
 
         return $request;
+    }
+
+    /**
+     * A plugin's resource (SDK 1.80, WHIT-993): only from a plugin the operator
+     * granted agent context (the registry holds nothing else), only to a caller
+     * holding its permission in this workspace and whose token allows it, and
+     * read with the caller's workspace and identity.
+     *
+     * @return array<string, mixed>
+     */
+    private function readPluginResource(string $uri, ?string $bearerToken): array
+    {
+        $resource = $this->pluginResources?->find($uri);
+        if ($resource === null || ($this->pluginGranted !== null && !($this->pluginGranted)($resource['plugin']))) {
+            throw new McpException(ErrorCode::RESOURCE_NOT_FOUND, "Resource not found: {$uri}");
+        }
+        $principal = $bearerToken !== null ? $this->tokenValidator->validateMcpToken($bearerToken) : null;
+        if ($principal === null) {
+            throw new McpException(ErrorCode::UNAUTHENTICATED, 'Unauthenticated');
+        }
+        AuditContext::setActor($principal->actor());
+        $tenantId = TenantContext::getTenantId();
+        if ($tenantId === null) {
+            throw new McpException(ErrorCode::UNAUTHENTICATED, 'No tenant context');
+        }
+        if (!McpScope::of($principal)->allowsPermission($resource['requiredPermission'])
+            || !$this->roleChecker->hasPermissionForProfile($principal->userId, $resource['requiredPermission'], $tenantId)) {
+            throw new McpException(ErrorCode::FORBIDDEN, 'Forbidden');
+        }
+
+        $context = new McpToolContext(
+            $tenantId,
+            $principal->profileId,
+            $principal->isAgent() ? McpToolContext::ACTOR_AGENT : McpToolContext::ACTOR_PERSON,
+            $principal->principalKind,
+            $principal->isAgent() ? $principal->agentPrincipalId() : null,
+            $principal->isAgent() ? $principal->agentName : null,
+            $principal->subject,
+        );
+        try {
+            $text = ($resource['read'])($context);
+            if (!is_string($text)) {
+                throw new \UnexpectedValueException('read() must return a string');
+            }
+            if (strlen($text) > PluginResourceRegistry::MAX_BYTES) {
+                throw new \LengthException('read() returned more than ' . PluginResourceRegistry::MAX_BYTES . ' bytes');
+            }
+        } catch (\Throwable $e) {
+            error_log("[mcp] resource {$uri} from plugin '{$resource['plugin']}' failed: " . $e->getMessage());
+            throw new McpException(ErrorCode::INTERNAL_ERROR, "Resource '{$uri}' failed");
+        } finally {
+            $this->auditLogger?->record('mcp.resources.read', [
+                'tenant_id'     => $principal->tenantId,
+                'actor_user_id' => $principal->userId,
+                'target_type'   => 'resource',
+                'metadata'      => ['uri' => $uri, 'plugin' => $resource['plugin']],
+            ]);
+        }
+
+        return ['contents' => [['uri' => $uri, 'mimeType' => $resource['mimeType'], 'text' => $text]]];
     }
 }

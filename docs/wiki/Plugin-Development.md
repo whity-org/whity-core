@@ -1620,6 +1620,30 @@ $notice = new Notice(
 - A single send reaches at most 1000 people, and notifications are in-app only for now.
 
 Declared types and their labels are listed in `GET /api/me/notification-preferences` as `plugin_types`.
+### Prompts and resources for agents (SDK 1.80)
+
+Prompts (`PluginMcpInterface`) and resources (`PluginMcpResourcesInterface`) put your text straight into an AI agent's context, so the host serves them only from a **Verified** plugin the operator has granted **agent context**:
+
+```bash
+whity-cli plugin agent-context grant HelloWorld
+```
+
+The grant is install-wide, only the operator can make it, and it's audited. Until then your prompts and resources are not listed. Each prompt and resource must declare `requiredPermission`: one that doesn't is refused at load. The permission is checked for every caller, and a token limited to other permissions doesn't see it.
+
+```php
+public function getMcpResources(): array
+{
+    return [[
+        'path'               => 'prices/current',   // whity-plugin://<your slug>/prices/current
+        'name'               => 'Current prices',
+        'mimeType'           => 'text/csv',
+        'requiredPermission' => 'prices:read',
+        'read'               => fn (McpToolContext $context): string => $this->prices->csv($context->tenantId),
+    ]];
+}
+```
+
+Scope what `read` returns to `$context->tenantId`. At most 1 MB is served. A revoke (`agent-context revoke <name>`) applies to the next call. A new grant applies once workers reload plugins (`plugin reload`) or restart.
 
 ## Step 13 — Declare it in `plugin.json` instead (SDK 1.47)
 

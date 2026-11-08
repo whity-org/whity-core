@@ -50,6 +50,7 @@ class PluginsCommand extends BaseCommand implements CliCommand
             'disable' => $this->disable($argv),
             'reload' => $this->reload(),
             'uninstall' => $this->uninstall($argv),
+            'agent-context' => $this->agentContext($argv),
             '--help', '-h', 'help' => $this->showHelp(),
             default => $this->unknownAction($action),
         };
@@ -239,6 +240,59 @@ class PluginsCommand extends BaseCommand implements CliCommand
     }
 
     /**
+     * Which code plugins' MCP prompts and resources may reach AI agents (SDK 1.80,
+     * WHIT-993). An operator action: it runs on the server, against the
+     * deployment's own database, and every grant and revoke is audited. A revoke
+     * applies to the next call; a new grant once workers reload their plugins
+     * (`plugin reload`) or restart.
+     *
+     * @param array<mixed> $argv
+     */
+    private function agentContext(array $argv): int
+    {
+        $action = array_shift($argv);
+        $action = is_string($action) ? $action : 'list';
+        $pdo    = \Whity\Database\Database::connect()->getPdo();
+        $grants = new \Whity\Core\Plugin\Trust\AgentContextGrants(
+            $pdo,
+            new \Whity\Core\Plugin\Trust\CodePluginVerification($pdo, new \Whity\Core\Plugin\Store\StoreMarks(
+                new \Whity\Core\Settings\GlobalSettingsRepository($pdo),
+                new \Whity\Core\Plugin\PluginRecords($pdo),
+                static fn (string $url): ?array => (new \Whity\Core\Http\HttpFetcher(timeoutSeconds: 10))->getJson($url),
+            )),
+            new \Whity\Core\Audit\AuditLogger($pdo),
+        );
+        if ($action === 'list') {
+            $rows = array_map(static fn (array $g): array => [$g['plugin'], $g['grantedAt']], $grants->list());
+            if ($rows === []) {
+                echo "No plugin may put prompts or resources in front of AI agents.\n";
+                return 0;
+            }
+            $this->renderTable(['Plugin', 'Granted at'], $rows);
+            return 0;
+        }
+        $name = array_shift($argv);
+        if (!in_array($action, ['grant', 'revoke'], true) || !is_string($name) || $name === '') {
+            echo "Usage: whity-cli plugin agent-context [list | grant <name> | revoke <name>]\n";
+            return 1;
+        }
+        if ($action === 'grant') {
+            try {
+                $granted = $grants->grant($name, null);
+            } catch (\Whity\Core\Plugin\Trust\NotVerifiedException $e) {
+                echo 'Refused: ' . $e->getMessage() . ".\n";
+                return 1;
+            }
+            echo $granted
+                ? "Granted: {$name}'s MCP prompts and resources can reach AI agents once workers reload plugins.\n"
+                : "{$name} was already granted.\n";
+            return 0;
+        }
+        echo $grants->revoke($name, null) ? "Revoked: {$name}'s prompts and resources no longer reach AI agents.\n" : "{$name} was not granted.\n";
+        return 0;
+    }
+
+    /**
      * Show help for plugins command
      */
     private function showHelp(): int
@@ -250,6 +304,9 @@ class PluginsCommand extends BaseCommand implements CliCommand
         echo "  disable <id>                          Disable a plugin\n";
         echo "  reload                                Reload discovered plugins\n";
         echo "  uninstall <id> [--dry-run] [--now] [--force]  Uninstall a plugin, kept 30 days unless --now\n";
+        echo "  agent-context [list]                  Plugins whose MCP prompts and resources may reach AI agents\n";
+        echo "  agent-context grant <name>            Let this Verified plugin's prompts and resources reach AI agents\n";
+        echo "  agent-context revoke <name>           Stop them, at once\n";
         return 0;
     }
 

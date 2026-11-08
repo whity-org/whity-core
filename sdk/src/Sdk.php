@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.79).
+ * SDK identity (v1.80).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1078,12 +1078,22 @@ namespace Whity\Sdk;
  * `MCP_CONNECTION_REVOKED`, by connection id, after the change (WHIT-992).
  *
  * Purely additive.)
+ *
+ * 1.80 (AGENT CONTEXT: the optional {@see PluginMcpResourcesInterface} offers MCP
+ * resources, `whity-plugin://<slug>/<path>`, read per call with the caller's
+ * {@see Mcp\McpToolContext}. A plugin's resources and its prompts
+ * ({@see PluginMcpInterface}, now served with their `messages` and `arguments`) reach
+ * agents only from a Verified plugin the operator grants agent context, install-wide
+ * and audited, and each must declare `requiredPermission`, checked per caller (WHIT-993).
+ *
+ * Narrows 1.9: an ungranted plugin's prompts, and any plugin prompt without a
+ * `requiredPermission`, are no longer served.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.79.0';
+    public const VERSION = '1.80.0';
 
     /**
      * Static identity only — never instantiated.
