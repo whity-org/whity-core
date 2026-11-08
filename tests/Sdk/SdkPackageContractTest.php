@@ -242,9 +242,10 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsOneEightForInteractiveBlocks(): void
     {
         $this->assertSame(
-            '1.85.0',
+            '1.86.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.85 ADDS Licensing\StoreLicence and Licensing\LicenceState: whether a paid Whity store plugin is '
+            'SDK 1.86 ADDS Billing\\LicenceSales and PluginLicenceSalesInterface: one billing plugin sells store plugin licences, and no other plugin can answer in its place (WHIT-1013). '
+            . 'SDK 1.85 ADDS Licensing\StoreLicence and Licensing\LicenceState: whether a paid Whity store plugin is '
             . 'licensed here, from the store-signed statement with a 7-day offline window (store licensing PR-4). '
             . 'SDK 1.84 ADDS service routes (Http\\ServiceCall, Identity\\LinkedPeople): server-to-server calls with the trusted issuer\'s token, and Billing\\PlanCatalogue (WHIT-1011). '
             . 'SDK 1.83 ADDS Documents::issueMany() and Documents::batch(): bulk issuing from one template as a background job, with a result per item and an idempotent batch key (WHIT-997). '
