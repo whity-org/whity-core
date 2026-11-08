@@ -20,6 +20,7 @@ use Whity\Core\Document\Routing\DocumentRoutingInboxSource;
 use Whity\Core\Document\Routing\RoleBelowActorRuleResolver;
 use Whity\Core\Document\Routing\RoleRuleResolver;
 use Whity\Core\Document\Routing\RouteAction;
+use Whity\Core\Document\Routing\RouteTrailChain;
 use Whity\Core\Document\Routing\RouteEdgeRepository;
 use Whity\Core\Document\Routing\RouteEventRepository;
 use Whity\Core\Document\Routing\RouteRecipientRepository;
@@ -434,6 +435,41 @@ final class FormSubmissionRoutesRealEngineTest extends TestCase
 
         $this->expectException(RoutingRejectedException::class);
         $this->router->act(self::TENANT, self::CLERK, $route, RouteAction::SENT_BACK, 'Please fix.', null, RouteResume::START);
+    }
+
+    public function testATrailWithNoDocumentLinksAlongItsRoute(): void
+    {
+        $submission = $this->send(self::APPLICANT, ['supplier' => 'Example Mill', 'amount' => '100']);
+        $route = $this->routeOf((int) $submission['id']);
+        self::assertNull($route['document_id'] ?? null);
+
+        $this->router->act(self::TENANT, self::CLERK, $route, RouteAction::NOTED, 'Checked the supplier.');
+
+        $stmt = $this->pdo->prepare(
+            'SELECT prev_hash, entry_hash FROM document_route_events WHERE route_id = ? ORDER BY id ASC'
+        );
+        $stmt->execute([(int) $route['id']]);
+        $entries = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+        self::assertGreaterThanOrEqual(2, count($entries));
+        self::assertSame(RouteTrailChain::GENESIS, $entries[0]['prev_hash']);
+        self::assertSame($entries[0]['entry_hash'], $entries[1]['prev_hash']);
+    }
+
+    public function testARouteWithNoDocumentCannotHaveASigningStep(): void
+    {
+        $this->expectException(RoutingRejectedException::class);
+        $this->expectExceptionMessage('A signing step needs a document');
+
+        $this->router->issueOnSubject(
+            self::TENANT,
+            self::APPLICANT,
+            'form_submission',
+            1,
+            null,
+            'Purchase request',
+            [['rule_kind' => RoutingRuleRegistry::KIND_EXPLICIT, 'rule_config' => ['profile_ids' => [self::CLERK]], 'kind' => 'sign', 'sign_capacity' => 'Clerk']],
+        );
     }
 
     public function testARejectionEndsTheRouteAndTellsTheApplicantWhy(): void

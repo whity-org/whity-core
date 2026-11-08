@@ -279,6 +279,18 @@ final class DocumentRouter
     ): array {
         $declared = $this->validateSteps($tenantId, $steps);
 
+        if ($documentId === null) {
+            // A signature is made on a document (WHIT-922), and nobody could
+            // answer this step, so the route would never finish.
+            foreach ($declared as $step) {
+                if ($step['kind'] === RouteStepKind::SIGN) {
+                    throw RoutingRejectedException::because(
+                        'A signing step needs a document to sign, and this route travels on a form submission.'
+                    );
+                }
+            }
+        }
+
         // The actor's unit, captured once and reused for the event and for the
         // first step's resolution — so "the unit this was raised from" and "the
         // unit the first rule scoped to" cannot differ within one request.

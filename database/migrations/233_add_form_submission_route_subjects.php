@@ -82,6 +82,14 @@ final class AddFormSubmissionRouteSubjects
             self::setDocumentRequired($db, $table, false);
         }
 
+        // A route with no document has its own trail chain (migration 232's
+        // index cannot refuse a fork there: its document_id is NULL).
+        $db->exec(
+            'CREATE UNIQUE INDEX IF NOT EXISTS uq_document_route_events_route_chain
+                ON document_route_events(tenant_id, route_id, prev_hash)
+             WHERE document_id IS NULL AND prev_hash IS NOT NULL'
+        );
+
         // Re-point the route each submission started (see the class docblock
         // for how it is told apart). Unscoped by design (migration): every
         // tenant's routes, each matched to a submission of its own tenant.
@@ -138,6 +146,7 @@ final class AddFormSubmissionRouteSubjects
     public static function down(Database $db): void
     {
         $pdo = $db->getPdo();
+        $db->exec('DROP INDEX IF EXISTS uq_document_route_events_route_chain');
         foreach (self::TABLES as $table) {
             $stmt = $pdo->query("SELECT COUNT(*) FROM {$table} WHERE document_id IS NULL");
             $missing = $stmt === false ? 0 : (int) $stmt->fetchColumn();

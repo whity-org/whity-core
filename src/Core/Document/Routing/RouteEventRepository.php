@@ -63,6 +63,9 @@ final class RouteEventRepository
     /** The first key of the advisory lock that serialises one document's chain. */
     private const CHAIN_LOCK_SPACE = 922001;
 
+    /** The same, for the chain of a route with no document (WHIT-920). */
+    private const ROUTE_CHAIN_LOCK_SPACE = 922002;
+
     public function __construct(private readonly PDO $db)
     {
     }
@@ -140,12 +143,15 @@ final class RouteEventRepository
      * acts on one document link one after the other; the unique index on
      * `prev_hash` refuses a fork on either engine.
      *
+     * A route with no document (a form submission routed on itself, WHIT-920)
+     * has no document's chain to join, so its entries link along the route.
+     *
      * @param array{route_id: int, step_id: ?int, actor_profile_id: ?int, action: string,
      *              from_ou_id: ?int, to_ou_id: ?int, note: ?string, verdict: ?string, withdrawal: bool,
      *              subject_version: ?int, content_hash: ?string, to_author: bool,
      *              resume_from: ?string} $fields
      */
-    private function insertLinked(int $tenantId, int $documentId, array $fields): int
+    private function insertLinked(int $tenantId, ?int $documentId, array $fields): int
     {
         $ownTransaction = !$this->db->inTransaction();
         if ($ownTransaction) {
@@ -154,8 +160,10 @@ final class RouteEventRepository
 
         try {
             if ($this->db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'pgsql') {
-                $lock = $this->db->prepare('SELECT pg_advisory_xact_lock(:space, :document_id)');
-                $lock->execute([':space' => self::CHAIN_LOCK_SPACE, ':document_id' => $documentId]);
+                $lock = $this->db->prepare('SELECT pg_advisory_xact_lock(:space, :chain_id)');
+                $lock->execute($documentId !== null
+                    ? [':space' => self::CHAIN_LOCK_SPACE, ':chain_id' => $documentId]
+                    : [':space' => self::ROUTE_CHAIN_LOCK_SPACE, ':chain_id' => $fields['route_id']]);
                 $lock->closeCursor();
             }
 
@@ -164,7 +172,9 @@ final class RouteEventRepository
                 'document_id' => $documentId,
                 'occurred_at' => gmdate('Y-m-d H:i:s'),
             ];
-            $prevHash = $this->chainHead($tenantId, $documentId);
+            $prevHash = $documentId !== null
+                ? $this->chainHead($tenantId, $documentId)
+                : $this->routeChainHead($tenantId, $fields['route_id']);
             $body = RouteTrailChain::body($row);
             $entryHash = RouteTrailChain::entryHash($prevHash, $body);
 
@@ -215,6 +225,24 @@ final class RouteEventRepository
         }
 
         return $id;
+    }
+
+    /**
+     * What the next entry on a route with no document links to. Such a route
+     * began after migration 232, so it has no earlier, unlinked entries.
+     */
+    private function routeChainHead(int $tenantId, int $routeId): string
+    {
+        $stmt = $this->db->prepare(
+            'SELECT entry_hash FROM document_route_events
+              WHERE tenant_id = :tenant_id AND route_id = :route_id AND document_id IS NULL
+              ORDER BY id DESC LIMIT 1'
+        );
+        $stmt->execute([':tenant_id' => $tenantId, ':route_id' => $routeId]);
+        $head = $stmt->fetchColumn();
+        $stmt->closeCursor();
+
+        return is_string($head) && $head !== '' ? $head : RouteTrailChain::GENESIS;
     }
 
     /**
