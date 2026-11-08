@@ -2489,6 +2489,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/documents/{id}/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The audit of a document: every act and signature, whether each seal checks, and whether the trail is intact
+         * @description Email addresses, IP addresses and browsers of signers are included only for callers holding audit:read.
+         */
+        get: operations["get_api_v1_documents_id_audit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/documents/{id}/content": {
         parameters: {
             query?: never;
@@ -2677,6 +2697,60 @@ export interface paths {
         put?: never;
         /** Act on a route: forward, acknowledge, return, or add a note */
         post: operations["post_api_v1_documents_id_routes_routeid_actions"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/{id}/routes/{routeId}/sign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign your open item on a signing step: electronic signature with audit trail
+         * @description Needs the consent line ticked in its current wording, a drawn signature (or your saved one), the content hash you were shown, and the second check your account uses. The act and a sealed signature record are written together. The record is bound to the hash of this version and does not carry over to a new one.
+         */
+        post: operations["post_api_v1_documents_id_routes_routeid_sign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/{id}/routes/{routeId}/signing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What you see before signing: the step, its capacity, the content hash, the consent version and how you will confirm */
+        get: operations["get_api_v1_documents_id_routes_routeid_signing"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/{id}/routes/{routeId}/signing/code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Email yourself a one-time code to confirm a signature */
+        post: operations["post_api_v1_documents_id_routes_routeid_signing_code"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4500,6 +4574,25 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/signature": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Your saved drawn signature, or null */
+        get: operations["get_api_v1_me_signature"];
+        /** Save your drawn signature for reuse */
+        put: operations["put_api_v1_me_signature"];
+        post?: never;
+        /** Forget your saved drawn signature. Signatures already made keep their own copy. */
+        delete: operations["delete_api_v1_me_signature"];
         options?: never;
         head?: never;
         patch?: never;
@@ -6494,6 +6587,23 @@ export interface paths {
         };
         /** List the settings console tabs visible to the caller */
         get: operations["get_api_v1_settings_tabs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/signing-keys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The public keys that seal signature records on this instance (public) */
+        get: operations["get_api_v1_signing_keys"];
         put?: never;
         post?: never;
         delete?: never;
@@ -8775,6 +8885,8 @@ export interface components {
                 reason: string;
                 fix: string | null;
             };
+            /** @description Who signed the current version, in what capacity and when. Electronic signatures with an audit trail. */
+            signatures?: components["schemas"]["DocumentSignature"][];
         };
         DocumentActor: {
             /**
@@ -8802,6 +8914,28 @@ export interface components {
             /** @description How many pages these bytes have, to compare with a paper copy. Null on an artifact stored before this was kept. */
             pages?: number | null;
             content_url: string;
+        };
+        DocumentAudit: {
+            document_id: number;
+            chain: {
+                intact: boolean;
+                entries: number;
+                linked: number;
+                /** @description Entries written before the chain began; the first linked entry commits to them. */
+                earlier: number;
+                /** @description Linked entries whose person, unit or step was removed later. Not a break. */
+                detached: number;
+                broken_at_event_id?: number | null;
+                last_hash?: string | null;
+                /** @description Signing entries with no signature record. Any here means the trail is not intact. */
+                signed_without_record: number[];
+            };
+            events: components["schemas"]["DocumentTrailEvent"][];
+            signatures: components["schemas"]["SignatureRecord"][];
+            keys: components["schemas"]["SigningKey"][];
+        };
+        DocumentAuditResponse: {
+            data: components["schemas"]["DocumentAudit"];
         };
         DocumentBackgroundIssuer: {
             /** @description A plugin that declares it issues documents from its jobs with no person */
@@ -9191,10 +9325,10 @@ export interface components {
         };
         DocumentRouteActionRequest: {
             /**
-             * @description What you did with the document: `forwarded`, `acknowledged`, `returned`, `noted`, `sent_back` (to the author for changes, with a note) or `resubmitted` (by the author, after a send-back).
+             * @description What you did with the document: `forwarded`, `acknowledged`, `returned`, `noted`, `sent_back` (to the author for changes, with a note), `resubmitted` (by the author, after a send-back) or `declined` (declining to sign, with a reason). Signing has its own endpoint.
              * @enum {string}
              */
-            action: "forwarded" | "acknowledged" | "returned" | "noted" | "sent_back" | "resubmitted";
+            action: "forwarded" | "acknowledged" | "returned" | "noted" | "sent_back" | "resubmitted" | "declined";
             /** @description Comment for the trail. Required for `noted`. */
             note?: string | null;
             /**
@@ -9235,6 +9369,12 @@ export interface components {
                 /** @enum {string} */
                 satisfied_by?: "act" | "delivery";
                 allow_send_back?: boolean;
+                /** @enum {string|null} */
+                kind?: "sign" | null;
+                /** @description On a signing step: the capacity the signer signs in, such as "Director". At most 200 characters. */
+                sign_capacity?: string | null;
+                /** @description On a signing step: whom the signer signs for, such as the workspace. At most 200 characters. */
+                sign_on_behalf_of?: string | null;
             }[];
         };
         DocumentRouteEdge: {
@@ -9295,7 +9435,21 @@ export interface components {
             /** @enum {string} */
             kind?: "review" | "decide" | "deliver" | "sign" | "stamp" | "finalise";
             allow_send_back?: boolean;
+            sign_capacity?: string | null;
+            sign_on_behalf_of?: string | null;
             rejection_count: number;
+        };
+        DocumentSignature: {
+            id: number;
+            capacity?: string | null;
+            on_behalf_of?: string | null;
+            by: {
+                profile_id: number;
+                name: string;
+            };
+            /** @description Server time, UTC, to the second. */
+            at: string;
+            subject_version: number;
         };
         DocumentSource: {
             /** @description How documents from this template are numbered, when it has its own rule */
@@ -9925,6 +10079,8 @@ export interface components {
             /** @enum {string|null} */
             resume_from?: "sender" | "start" | null;
             occurred_at: string;
+            prev_hash?: string | null;
+            entry_hash?: string | null;
         };
         DocumentTrailListResponse: {
             data: components["schemas"]["DocumentTrailEvent"][];
@@ -12600,6 +12756,12 @@ export interface components {
         RoutingRuleListResponse: {
             data: components["schemas"]["RoutingRule"][];
         };
+        SavedSignatureRequest: {
+            appearance: components["schemas"]["SignatureAppearance"];
+        };
+        SavedSignatureResponse: {
+            data: components["schemas"]["SignatureAppearance"] | null;
+        };
         SearchGroup: {
             type: string;
             label: components["schemas"]["SearchLabel"];
@@ -12698,6 +12860,118 @@ export interface components {
                 done: number;
                 total: number;
             };
+        };
+        SignRequest: {
+            /** @description The `subject.content_hash` the signer was shown. Refused (409) when the content changed since. */
+            content_hash: string;
+            /** @description The signer ticked the consent line. Must be true. */
+            consent: boolean;
+            /** @description The version of the consent wording shown, from the signing context. */
+            consent_version: string;
+            appearance?: components["schemas"]["SignatureAppearance"] | null;
+            use_saved_signature?: boolean;
+            save_signature?: boolean;
+            second_factor: {
+                /** @enum {string} */
+                method: "totp" | "email_code" | "fresh_sign_in";
+                code?: string | null;
+            };
+        };
+        SignResponse: {
+            data: components["schemas"]["SignatureRecord"];
+            event: components["schemas"]["DocumentTrailEvent"];
+            /** @enum {string|null} */
+            decided?: "approved" | "rejected" | null;
+            resolved: number;
+            delivered: number;
+        };
+        SignatureAppearance: {
+            width: number;
+            height: number;
+            /** @description Each stroke is a list of [x, y] points inside the box. */
+            strokes: number[][][];
+        };
+        SignatureRecord: {
+            id: number;
+            route_id: number;
+            event_id: number;
+            step_id?: number;
+            subject_type?: string;
+            subject_id?: number;
+            subject_version: number;
+            content_hash: string;
+            by: {
+                profile_id: number;
+                name: string;
+                email?: string | null;
+            };
+            capacity?: string | null;
+            on_behalf_of?: string | null;
+            /** @enum {string} */
+            confirmed_by: "totp" | "passkey" | "email_code" | "fresh_sign_in";
+            at: string;
+            ip_address?: string | null;
+            user_agent?: string | null;
+            consent_version: string;
+            consent_wording?: string | null;
+            appearance?: components["schemas"]["SignatureAppearance"] | null;
+            record_hash: string;
+            /** @description Ed25519 signature, base64, by the published key `seal_key_id`. */
+            seal: string;
+            seal_key_id: string;
+            seal_valid?: boolean;
+            /** @description True when the email address, IP address and browser are left out because the reader does not hold audit:read. */
+            details_withheld?: boolean;
+        };
+        SigningCodeResponse: {
+            data: {
+                email_hint?: string | null;
+            };
+        };
+        SigningContext: {
+            route_id: number;
+            can_sign: boolean;
+            step?: {
+                id: number;
+                position: number;
+                label?: string | null;
+                capacity?: string | null;
+                on_behalf_of?: string | null;
+                /** @enum {string} */
+                quorum: "all" | "any";
+            } | null;
+            subject?: {
+                type: string;
+                id: number;
+                title?: string | null;
+                version: number;
+                /** @description SHA-256 of the content as it is now. Send it back when signing. */
+                content_hash: string;
+            } | null;
+            consent_version: string;
+            second_factor: {
+                /** @enum {string} */
+                method: "totp" | "email_code" | "fresh_sign_in";
+                provider_key?: string | null;
+                email_hint?: string | null;
+                signed_in_again: boolean;
+            };
+            saved_signature?: components["schemas"]["SignatureAppearance"] | null;
+        };
+        SigningContextResponse: {
+            data: components["schemas"]["SigningContext"];
+        };
+        SigningKey: {
+            key_id: string;
+            /** @enum {string} */
+            algorithm: "Ed25519";
+            /** @description Base64. */
+            public_key: string;
+            created_at: string;
+            retired_at?: string | null;
+        };
+        SigningKeyListResponse: {
+            data: components["schemas"]["SigningKey"][];
         };
         SignupDecisionResponse: {
             data: {
@@ -26669,6 +26943,73 @@ export interface operations {
             };
         };
     };
+    get_api_v1_documents_id_audit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The audit */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentAuditResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Document not found or not visible to the caller */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     get_api_v1_documents_id_content: {
         parameters: {
             query?: never;
@@ -27736,6 +28077,268 @@ export interface operations {
             };
             /** @description No open item on this route, a forward from the last step, a return from the first, an empty note, or an unknown action */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_documents_id_routes_routeid_sign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+                routeId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignRequest"];
+            };
+        };
+        responses: {
+            /** @description The signature record and the trail entry */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Document or route not found, or not visible to the caller */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The content changed since you opened it */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Consent, drawn signature or second check missing or not correct, or nothing here waits for your signature */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too many tries */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_documents_id_routes_routeid_signing: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+                routeId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The signing context */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SigningContextResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Document or route not found, or not visible to the caller */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_documents_id_routes_routeid_signing_code: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+                routeId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The code was sent */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SigningCodeResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Document or route not found, or not visible to the caller */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Nothing here waits for your signature, or the account confirms another way */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too many codes were sent */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -37220,6 +37823,221 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["SetupStepsResponse"];
                 };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_me_signature: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Your saved signature */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedSignatureResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    put_api_v1_me_signature: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SavedSignatureRequest"];
+            };
+        };
+        responses: {
+            /** @description The saved signature */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedSignatureResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The drawing could not be used as a signature */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    delete_api_v1_me_signature: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Forgotten */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Missing or invalid authentication */
             401: {
@@ -47770,6 +48588,53 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_signing_keys: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The published keys */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SigningKeyListResponse"];
                 };
             };
             /** @description Not found */

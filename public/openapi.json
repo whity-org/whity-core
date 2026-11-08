@@ -16503,6 +16503,88 @@
                 ]
             }
         },
+        "/api/v1/documents/{id}/audit": {
+            "get": {
+                "operationId": "get_api_v1_documents_id_audit",
+                "summary": "The audit of a document: every act and signature, whether each seal checks, and whether the trail is intact",
+                "tags": [
+                    "documents"
+                ],
+                "description": "Email addresses, IP addresses and browsers of signers are included only for callers holding audit:read.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The audit",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DocumentAuditResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Document not found or not visible to the caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/documents/{id}/content": {
             "get": {
                 "operationId": "get_api_v1_documents_id_content",
@@ -17948,6 +18030,344 @@
                     },
                     "422": {
                         "description": "No open item on this route, a forward from the last step, a return from the first, an empty note, or an unknown action",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/documents/{id}/routes/{routeId}/sign": {
+            "post": {
+                "operationId": "post_api_v1_documents_id_routes_routeid_sign",
+                "summary": "Sign your open item on a signing step: electronic signature with audit trail",
+                "tags": [
+                    "documents"
+                ],
+                "description": "Needs the consent line ticked in its current wording, a drawn signature (or your saved one), the content hash you were shown, and the second check your account uses. The act and a sealed signature record are written together. The record is bound to the hash of this version and does not carry over to a new one.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "routeId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SignRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The signature record and the trail entry",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SignResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Document or route not found, or not visible to the caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The content changed since you opened it",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Consent, drawn signature or second check missing or not correct, or nothing here waits for your signature",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many tries",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/documents/{id}/routes/{routeId}/signing": {
+            "get": {
+                "operationId": "get_api_v1_documents_id_routes_routeid_signing",
+                "summary": "What you see before signing: the step, its capacity, the content hash, the consent version and how you will confirm",
+                "tags": [
+                    "documents"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "routeId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The signing context",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SigningContextResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Document or route not found, or not visible to the caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/documents/{id}/routes/{routeId}/signing/code": {
+            "post": {
+                "operationId": "post_api_v1_documents_id_routes_routeid_signing_code",
+                "summary": "Email yourself a one-time code to confirm a signature",
+                "tags": [
+                    "documents"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "routeId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "The code was sent",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SigningCodeResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Document or route not found, or not visible to the caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Nothing here waits for your signature, or the account confirms another way",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many codes were sent",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -29812,6 +30232,238 @@
                         "bearerAuth": []
                     }
                 ]
+            }
+        },
+        "/api/v1/me/signature": {
+            "delete": {
+                "operationId": "delete_api_v1_me_signature",
+                "summary": "Forget your saved drawn signature. Signatures already made keep their own copy.",
+                "tags": [
+                    "documents"
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Forgotten"
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "get": {
+                "operationId": "get_api_v1_me_signature",
+                "summary": "Your saved drawn signature, or null",
+                "tags": [
+                    "documents"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Your saved signature",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SavedSignatureResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "put": {
+                "operationId": "put_api_v1_me_signature",
+                "summary": "Save your drawn signature for reuse",
+                "tags": [
+                    "documents"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SavedSignatureRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The saved signature",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SavedSignatureResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "The drawing could not be used as a signature",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
             }
         },
         "/api/v1/me/waiting": {
@@ -43061,6 +43713,57 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/signing-keys": {
+            "get": {
+                "operationId": "get_api_v1_signing_keys",
+                "summary": "The public keys that seal signature records on this instance (public)",
+                "tags": [
+                    "documents"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The published keys",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SigningKeyListResponse"
                                 }
                             }
                         }
@@ -56570,6 +57273,13 @@
                             "reason",
                             "fix"
                         ]
+                    },
+                    "signatures": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/DocumentSignature"
+                        },
+                        "description": "Who signed the current version, in what capacity and when. Electronic signatures with an audit trail."
                     }
                 },
                 "required": [
@@ -56671,6 +57381,95 @@
                     "checksum_sha256",
                     "rendered_at",
                     "content_url"
+                ]
+            },
+            "DocumentAudit": {
+                "type": "object",
+                "properties": {
+                    "document_id": {
+                        "type": "integer"
+                    },
+                    "chain": {
+                        "type": "object",
+                        "properties": {
+                            "intact": {
+                                "type": "boolean"
+                            },
+                            "entries": {
+                                "type": "integer"
+                            },
+                            "linked": {
+                                "type": "integer"
+                            },
+                            "earlier": {
+                                "type": "integer",
+                                "description": "Entries written before the chain began; the first linked entry commits to them."
+                            },
+                            "detached": {
+                                "type": "integer",
+                                "description": "Linked entries whose person, unit or step was removed later. Not a break."
+                            },
+                            "broken_at_event_id": {
+                                "type": "integer",
+                                "nullable": true
+                            },
+                            "last_hash": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "signed_without_record": {
+                                "type": "array",
+                                "items": {
+                                    "type": "integer"
+                                },
+                                "description": "Signing entries with no signature record. Any here means the trail is not intact."
+                            }
+                        },
+                        "required": [
+                            "intact",
+                            "entries",
+                            "linked",
+                            "earlier",
+                            "detached",
+                            "signed_without_record"
+                        ]
+                    },
+                    "events": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/DocumentTrailEvent"
+                        }
+                    },
+                    "signatures": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/SignatureRecord"
+                        }
+                    },
+                    "keys": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/SigningKey"
+                        }
+                    }
+                },
+                "required": [
+                    "document_id",
+                    "chain",
+                    "events",
+                    "signatures",
+                    "keys"
+                ]
+            },
+            "DocumentAuditResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/DocumentAudit"
+                    }
+                },
+                "required": [
+                    "data"
                 ]
             },
             "DocumentBackgroundIssuer": {
@@ -57997,9 +58796,10 @@
                             "returned",
                             "noted",
                             "sent_back",
-                            "resubmitted"
+                            "resubmitted",
+                            "declined"
                         ],
-                        "description": "What you did with the document: `forwarded`, `acknowledged`, `returned`, `noted`, `sent_back` (to the author for changes, with a note) or `resubmitted` (by the author, after a send-back)."
+                        "description": "What you did with the document: `forwarded`, `acknowledged`, `returned`, `noted`, `sent_back` (to the author for changes, with a note), `resubmitted` (by the author, after a send-back) or `declined` (declining to sign, with a reason). Signing has its own endpoint."
                     },
                     "note": {
                         "type": "string",
@@ -58114,6 +58914,23 @@
                                 },
                                 "allow_send_back": {
                                     "type": "boolean"
+                                },
+                                "kind": {
+                                    "type": "string",
+                                    "enum": [
+                                        "sign"
+                                    ],
+                                    "nullable": true
+                                },
+                                "sign_capacity": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "description": "On a signing step: the capacity the signer signs in, such as \"Director\". At most 200 characters."
+                                },
+                                "sign_on_behalf_of": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "description": "On a signing step: whom the signer signs for, such as the workspace. At most 200 characters."
                                 }
                             },
                             "required": [
@@ -58340,6 +59157,14 @@
                     "allow_send_back": {
                         "type": "boolean"
                     },
+                    "sign_capacity": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "sign_on_behalf_of": {
+                        "type": "string",
+                        "nullable": true
+                    },
                     "rejection_count": {
                         "type": "integer"
                     }
@@ -58352,6 +59177,50 @@
                     "decision",
                     "satisfied_by",
                     "rejection_count"
+                ]
+            },
+            "DocumentSignature": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "capacity": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "on_behalf_of": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "by": {
+                        "type": "object",
+                        "properties": {
+                            "profile_id": {
+                                "type": "integer"
+                            },
+                            "name": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "profile_id",
+                            "name"
+                        ]
+                    },
+                    "at": {
+                        "type": "string",
+                        "description": "Server time, UTC, to the second."
+                    },
+                    "subject_version": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "id",
+                    "by",
+                    "at",
+                    "subject_version"
                 ]
             },
             "DocumentSource": {
@@ -60227,6 +61096,14 @@
                     },
                     "occurred_at": {
                         "type": "string"
+                    },
+                    "prev_hash": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "entry_hash": {
+                        "type": "string",
+                        "nullable": true
                     }
                 },
                 "required": [
@@ -70338,6 +71215,33 @@
                     "data"
                 ]
             },
+            "SavedSignatureRequest": {
+                "type": "object",
+                "properties": {
+                    "appearance": {
+                        "$ref": "#/components/schemas/SignatureAppearance"
+                    }
+                },
+                "required": [
+                    "appearance"
+                ]
+            },
+            "SavedSignatureResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "nullable": true,
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/SignatureAppearance"
+                            }
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
             "SearchGroup": {
                 "type": "object",
                 "properties": {
@@ -70735,6 +71639,441 @@
                             "done",
                             "total"
                         ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "SignRequest": {
+                "type": "object",
+                "properties": {
+                    "content_hash": {
+                        "type": "string",
+                        "description": "The `subject.content_hash` the signer was shown. Refused (409) when the content changed since."
+                    },
+                    "consent": {
+                        "type": "boolean",
+                        "description": "The signer ticked the consent line. Must be true."
+                    },
+                    "consent_version": {
+                        "type": "string",
+                        "description": "The version of the consent wording shown, from the signing context."
+                    },
+                    "appearance": {
+                        "nullable": true,
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/SignatureAppearance"
+                            }
+                        ]
+                    },
+                    "use_saved_signature": {
+                        "type": "boolean"
+                    },
+                    "save_signature": {
+                        "type": "boolean"
+                    },
+                    "second_factor": {
+                        "type": "object",
+                        "properties": {
+                            "method": {
+                                "type": "string",
+                                "enum": [
+                                    "totp",
+                                    "email_code",
+                                    "fresh_sign_in"
+                                ]
+                            },
+                            "code": {
+                                "type": "string",
+                                "nullable": true
+                            }
+                        },
+                        "required": [
+                            "method"
+                        ]
+                    }
+                },
+                "required": [
+                    "content_hash",
+                    "consent",
+                    "consent_version",
+                    "second_factor"
+                ]
+            },
+            "SignResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/SignatureRecord"
+                    },
+                    "event": {
+                        "$ref": "#/components/schemas/DocumentTrailEvent"
+                    },
+                    "decided": {
+                        "type": "string",
+                        "enum": [
+                            "approved",
+                            "rejected"
+                        ],
+                        "nullable": true
+                    },
+                    "resolved": {
+                        "type": "integer"
+                    },
+                    "delivered": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "data",
+                    "event",
+                    "resolved",
+                    "delivered"
+                ]
+            },
+            "SignatureAppearance": {
+                "type": "object",
+                "properties": {
+                    "width": {
+                        "type": "integer"
+                    },
+                    "height": {
+                        "type": "integer"
+                    },
+                    "strokes": {
+                        "type": "array",
+                        "items": {
+                            "type": "array",
+                            "items": {
+                                "type": "array",
+                                "items": {
+                                    "type": "number"
+                                },
+                                "minItems": 2,
+                                "maxItems": 2
+                            }
+                        },
+                        "description": "Each stroke is a list of [x, y] points inside the box."
+                    }
+                },
+                "required": [
+                    "width",
+                    "height",
+                    "strokes"
+                ]
+            },
+            "SignatureRecord": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "route_id": {
+                        "type": "integer"
+                    },
+                    "event_id": {
+                        "type": "integer"
+                    },
+                    "step_id": {
+                        "type": "integer"
+                    },
+                    "subject_type": {
+                        "type": "string"
+                    },
+                    "subject_id": {
+                        "type": "integer"
+                    },
+                    "subject_version": {
+                        "type": "integer"
+                    },
+                    "content_hash": {
+                        "type": "string"
+                    },
+                    "by": {
+                        "type": "object",
+                        "properties": {
+                            "profile_id": {
+                                "type": "integer"
+                            },
+                            "name": {
+                                "type": "string"
+                            },
+                            "email": {
+                                "type": "string",
+                                "nullable": true
+                            }
+                        },
+                        "required": [
+                            "profile_id",
+                            "name"
+                        ]
+                    },
+                    "capacity": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "on_behalf_of": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "confirmed_by": {
+                        "type": "string",
+                        "enum": [
+                            "totp",
+                            "passkey",
+                            "email_code",
+                            "fresh_sign_in"
+                        ]
+                    },
+                    "at": {
+                        "type": "string"
+                    },
+                    "ip_address": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "user_agent": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "consent_version": {
+                        "type": "string"
+                    },
+                    "consent_wording": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "appearance": {
+                        "nullable": true,
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/SignatureAppearance"
+                            }
+                        ]
+                    },
+                    "record_hash": {
+                        "type": "string"
+                    },
+                    "seal": {
+                        "type": "string",
+                        "description": "Ed25519 signature, base64, by the published key `seal_key_id`."
+                    },
+                    "seal_key_id": {
+                        "type": "string"
+                    },
+                    "seal_valid": {
+                        "type": "boolean"
+                    },
+                    "details_withheld": {
+                        "type": "boolean",
+                        "description": "True when the email address, IP address and browser are left out because the reader does not hold audit:read."
+                    }
+                },
+                "required": [
+                    "id",
+                    "route_id",
+                    "event_id",
+                    "subject_version",
+                    "content_hash",
+                    "by",
+                    "confirmed_by",
+                    "at",
+                    "consent_version",
+                    "record_hash",
+                    "seal",
+                    "seal_key_id"
+                ]
+            },
+            "SigningCodeResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "email_hint": {
+                                "type": "string",
+                                "nullable": true
+                            }
+                        }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "SigningContext": {
+                "type": "object",
+                "properties": {
+                    "route_id": {
+                        "type": "integer"
+                    },
+                    "can_sign": {
+                        "type": "boolean"
+                    },
+                    "step": {
+                        "type": "object",
+                        "nullable": true,
+                        "properties": {
+                            "id": {
+                                "type": "integer"
+                            },
+                            "position": {
+                                "type": "integer"
+                            },
+                            "label": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "capacity": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "on_behalf_of": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "quorum": {
+                                "type": "string",
+                                "enum": [
+                                    "all",
+                                    "any"
+                                ]
+                            }
+                        },
+                        "required": [
+                            "id",
+                            "position",
+                            "quorum"
+                        ]
+                    },
+                    "subject": {
+                        "type": "object",
+                        "nullable": true,
+                        "properties": {
+                            "type": {
+                                "type": "string"
+                            },
+                            "id": {
+                                "type": "integer"
+                            },
+                            "title": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "version": {
+                                "type": "integer"
+                            },
+                            "content_hash": {
+                                "type": "string",
+                                "description": "SHA-256 of the content as it is now. Send it back when signing."
+                            }
+                        },
+                        "required": [
+                            "type",
+                            "id",
+                            "version",
+                            "content_hash"
+                        ]
+                    },
+                    "consent_version": {
+                        "type": "string"
+                    },
+                    "second_factor": {
+                        "type": "object",
+                        "properties": {
+                            "method": {
+                                "type": "string",
+                                "enum": [
+                                    "totp",
+                                    "email_code",
+                                    "fresh_sign_in"
+                                ]
+                            },
+                            "provider_key": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "email_hint": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "signed_in_again": {
+                                "type": "boolean"
+                            }
+                        },
+                        "required": [
+                            "method",
+                            "signed_in_again"
+                        ]
+                    },
+                    "saved_signature": {
+                        "nullable": true,
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/SignatureAppearance"
+                            }
+                        ]
+                    }
+                },
+                "required": [
+                    "route_id",
+                    "can_sign",
+                    "consent_version",
+                    "second_factor"
+                ]
+            },
+            "SigningContextResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/SigningContext"
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "SigningKey": {
+                "type": "object",
+                "properties": {
+                    "key_id": {
+                        "type": "string"
+                    },
+                    "algorithm": {
+                        "type": "string",
+                        "enum": [
+                            "Ed25519"
+                        ]
+                    },
+                    "public_key": {
+                        "type": "string",
+                        "description": "Base64."
+                    },
+                    "created_at": {
+                        "type": "string"
+                    },
+                    "retired_at": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "key_id",
+                    "algorithm",
+                    "public_key",
+                    "created_at"
+                ]
+            },
+            "SigningKeyListResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/SigningKey"
+                        }
                     }
                 },
                 "required": [
