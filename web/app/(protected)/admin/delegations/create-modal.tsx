@@ -9,6 +9,7 @@ import {
   type FetchAllPagesResult,
 } from '@/lib/api/fetch-all-pages';
 import { useToast } from '@/lib/toast-context';
+import { useLocalizedUnits } from '@/hooks/useLocalizedUnits';
 import {
   Dialog,
   DialogContent,
@@ -122,7 +123,8 @@ export function CreateDelegationModal({
   const [permissions, setPermissions] = useState<Permission[]>([]);
   const [roles, setRoles] = useState<RoleOption[]>([]);
   const [users, setUsers] = useState<UserOption[]>([]);
-  const [ous, setOus] = useState<OuOption[]>([]);
+  const [loadedOus, setOus] = useState<OuOption[]>([]);
+  const ous = useLocalizedUnits(loadedOus);
   // All four lists above are paginated, and none of them is ever presented
   // short: an entry here means that walk did not reach the end, so the list is
   // withheld and the gap is stated where the picker was. What each field then

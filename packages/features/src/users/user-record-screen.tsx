@@ -105,6 +105,7 @@
 import { roleLabel } from '../roles/role-label';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
+import { useLanguageCode } from '../i18n/useLanguageCode';
 import { Avatar } from '@whity/ui/avatar';
 import { Badge } from '@whity/ui/badge';
 import { Button } from '@whity/ui/button';
@@ -394,12 +395,25 @@ export function UserRecordScreen({
   }, [record, resetDraft]);
 
   const form = draft !== null && current !== null && draft.id === current.id ? draft : null;
+  const language = useLanguageCode();
 
   // A complete OU list, or none at all. A SHORT list is indistinguishable from a
   // correct one, and acting on it writes the wrong unit onto a real person — the
   // same rule the users modals follow, and the reason `complete` travels with
   // the options rather than being inferred from their length.
-  const ouOptions = ous.status === 'ready' && ous.value.complete ? ous.value.options : null;
+  //
+  // Each unit shows the reader's name for it, or the original (#821). The draft
+  // holds the unit's id, so the display name is never saved.
+  const ouOptions = useMemo(
+    () =>
+      ous.status === 'ready' && ous.value.complete
+        ? ous.value.options.map((ou) => ({
+            ...ou,
+            name: (language !== null && ou.names?.[language]?.trim()) || ou.name,
+          }))
+        : null,
+    [ous, language]
+  );
   const ouName = useMemo(() => {
     if (current?.ouId == null || ouOptions === null) return null;
     return ouOptions.find((ou) => ou.id === current.ouId)?.name ?? null;

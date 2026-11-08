@@ -58,6 +58,8 @@ jest.mock('@/lib/toast-context', () => ({
  * assertion below renders around, and the absence would look like a layout bug.
  */
 jest.mock('next/navigation', () => ({ useRouter: () => ({ push: jest.fn() }) }));
+let mockLanguage: string | null = null;
+jest.mock('../../packages/features/src/i18n/useLanguageCode', () => ({ useLanguageCode: () => mockLanguage }));
 
 const heldCapabilities = new Set<string>(['documents:issue', 'documents:route']);
 jest.mock('@/hooks/useCapabilities', () => ({
@@ -799,4 +801,28 @@ it("shows the server's reason for a folder this caller cannot anchor, not a gene
   await userEvent.click(screen.getByRole('button', { name: /Raised by my unit/ }));
 
   await waitFor(() => expect(screen.getByText(reason)).toBeInTheDocument());
+});
+
+describe('the unit column: names (#821)', () => {
+  afterEach(() => {
+    mockLanguage = null;
+  });
+
+  it("uses the reader's name from the unit list ahead of the label endpoint's original", async () => {
+    mockLanguage = 'en';
+    installApi({
+      labels: { ok: true, body: { data: { ous: { 3: 'التسجيل' }, roles: {} } } },
+      ous: {
+        ok: true,
+        body: {
+          data: [{ id: 3, name: 'التسجيل', name_language: 'ar', names: { ar: 'التسجيل', en: 'Registry' }, parent_id: null }],
+          pagination: { page: 1, perPage: 100, total: 1, totalPages: 1 },
+        },
+      },
+    });
+    render(<DocumentLibraryPage />);
+
+    await waitFor(() => expect(screen.getAllByText('Registry').length).toBeGreaterThan(0));
+    expect(screen.queryByText('التسجيل')).not.toBeInTheDocument();
+  });
 });
