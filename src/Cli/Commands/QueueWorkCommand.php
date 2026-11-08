@@ -143,6 +143,7 @@ final class QueueWorkCommand implements CliCommand
             $registry->register(
                 \Whity\Core\Document\Issuing\IssueBatchJob::NAME,
                 new \Whity\Core\Document\Issuing\IssueBatchJob(\Whity\app(\Whity\Core\Document\Issuing\BulkIssuing::class)),
+                false
             );
 
             // WHIT-921: tries a route's final document again while the render
