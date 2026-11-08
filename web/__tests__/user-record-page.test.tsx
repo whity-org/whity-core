@@ -34,6 +34,9 @@ import type { UserMembership, UserRecord, UsersAdapter } from '@whity/features/u
 import type { Transport } from '@whity/features/roles';
 import { createUsersAdapter } from '@/lib/users-adapter';
 
+let mockLanguage: string | null = null;
+jest.mock('../../packages/features/src/i18n/useLanguageCode', () => ({ useLanguageCode: () => mockLanguage }));
+
 /** English-fallback translator: returns the caller-supplied source string. */
 const t = (_key: string, fallback?: string, vars?: Record<string, string | number>): string => {
   const text = fallback ?? _key;
@@ -566,5 +569,35 @@ describe('web users adapter', () => {
 
     expect(result.complete).toBe(false);
     expect(result.options).toEqual([]);
+  });
+});
+
+describe('UserRecordScreen: unit names (#821)', () => {
+  afterEach(() => {
+    mockLanguage = null;
+  });
+
+  const named = () =>
+    fakeAdapter({
+      listOus: jest.fn().mockResolvedValue({
+        options: [{ id: 7, name: 'الدعم', names: { ar: 'الدعم', en: 'Support' } }],
+        complete: true,
+      }),
+    });
+
+  it("names the person's unit in the reader's language", async () => {
+    mockLanguage = 'en';
+    renderRecord({ adapter: named() });
+    await waitFor(() =>
+      expect(screen.getByText('manager · Support · sara@example.test · Not active yet')).toBeInTheDocument()
+    );
+  });
+
+  it('falls back to the original for a language the unit has no name in', async () => {
+    mockLanguage = 'fr';
+    renderRecord({ adapter: named() });
+    await waitFor(() =>
+      expect(screen.getByText('manager · الدعم · sara@example.test · Not active yet')).toBeInTheDocument()
+    );
   });
 });

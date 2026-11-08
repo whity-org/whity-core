@@ -24,7 +24,7 @@
  * own submission and keep no draft.
  */
 
-import { use, useEffect, useRef, useState } from 'react';
+import { use, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Icon } from '@whity/ui/icon';
@@ -35,6 +35,7 @@ import { useDirection } from '@/lib/direction-context';
 import { apiClient } from '@/lib/api-client';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { useTranslation } from '@whity/features/i18n';
+import { useLocalizedUnits, type UnitNames } from '@/hooks/useLocalizedUnits';
 import { useDateDisplay } from '@whity/features/datetime';
 import {
   localized,
@@ -46,6 +47,9 @@ import {
 import { FormFill, type FillableField, type FormSectionSpec } from '@/components/forms/form-fill';
 import { useRefusalMessage, type RefusalBody } from '@/components/forms/form-refusals';
 import { useFormDraft } from '@/components/forms/use-form-draft';
+
+/** A unit from `GET /api/ous`, reduced to what the `ou_ref` picker reads. */
+type UnitRow = UnitNames & { id: number; ou_type_key?: string | null };
 
 interface RenderedForm {
   form: {
@@ -127,7 +131,14 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
   const [submitted, setSubmitted] = useState(false);
   const [reference, setReference] = useState<string | null>(null);
-  const [units, setUnits] = useState<ReferenceOption[]>([]);
+  const [unitRows, setUnitRows] = useState<UnitRow[]>([]);
+  const localizedUnits = useLocalizedUnits(unitRows);
+  // The kind travels with the option so a field constrained to `ou_type` can
+  // narrow this one list rather than refetching.
+  const units = useMemo<ReferenceOption[]>(
+    () => localizedUnits.map((ou) => ({ value: String(ou.id), label: ou.name, type: ou.ou_type_key ?? null })),
+    [localizedUnits]
+  );
   const [restored, setRestored] = useState(false);
   const [startStep, setStartStep] = useState(0);
   // Bumped by Start over, so the steps begin again too.
@@ -149,16 +160,12 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
       .then(async (response) => {
         if (!response.ok) return;
         const body = (await response.json().catch(() => ({}))) as {
-          data?: Array<{ id?: number; name?: string; ou_type_key?: string | null }>;
+          data?: Array<Partial<UnitRow>>;
         };
         if (cancelled) return;
-        setUnits(
-          (body.data ?? [])
-            .filter((ou): ou is { id: number; name: string; ou_type_key?: string | null } =>
-              typeof ou.id === 'number' && typeof ou.name === 'string')
-            // The kind travels with the option so a field constrained to
-            // `ou_type` can narrow this one list rather than refetching.
-            .map((ou) => ({ value: String(ou.id), label: ou.name, type: ou.ou_type_key ?? null }))
+        setUnitRows(
+          (body.data ?? []).filter((ou): ou is UnitRow =>
+            typeof ou.id === 'number' && typeof ou.name === 'string')
         );
       })
       .catch(() => {

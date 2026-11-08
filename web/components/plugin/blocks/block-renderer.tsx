@@ -165,7 +165,8 @@ import {
   TabsList,
   TabsTrigger,
 } from '@whity/ui/tabs';
-import { useTranslation } from '@whity/features/i18n';
+import { useLanguageCode, useTranslation } from '@whity/features/i18n';
+import { localizedName, type LocalizedNames } from '@/lib/localized-name';
 import { useDateDisplay } from '@whity/features/datetime';
 
 /**
@@ -3669,14 +3670,23 @@ function orderOuRows(rows: OuRow[]): { row: OuRow; depth: number }[] {
   return out;
 }
 
-/** Coerce one `/api/v1/ous` row into the three fields the picker reads. */
-function toOuRow(raw: Record<string, unknown>): OuRow | null {
+/**
+ * Coerce one `/api/v1/ous` row into the three fields the picker reads. `name`
+ * is the name to show this reader (#821); the rule the picker writes holds the
+ * unit's id, so it never reaches the API.
+ */
+function toOuRow(raw: Record<string, unknown>, language: string | null): OuRow | null {
   const id = Number(raw.id);
   if (!Number.isFinite(id)) return null;
   const parent = raw.parent_id;
   return {
     id,
-    name: raw.name === undefined || raw.name === null ? String(id) : String(raw.name),
+    name: localizedName(
+      typeof raw.names === 'object' ? (raw.names as LocalizedNames | null) : null,
+      language,
+      typeof raw.name_language === 'string' ? raw.name_language : null,
+      raw.name === undefined || raw.name === null ? String(id) : String(raw.name)
+    ),
     parent_id: parent === undefined || parent === null ? null : Number(parent),
   };
 }
@@ -3765,6 +3775,7 @@ function OuScopePickerRenderer({ block }: { block: OuScopePickerBlock }) {
  */
 function OuScopePickerField({ block, ctx }: { block: OuScopePickerBlock; ctx: FormBlockContextValue }) {
   const t = useTranslation('plugin');
+  const language = useLanguageCode();
 
   // `anchorType` narrows the ANCHOR list at the source rather than client-side:
   // core answers `?type=` itself, so a tenant with ten thousand units does not
@@ -3809,7 +3820,7 @@ function OuScopePickerField({ block, ctx }: { block: OuScopePickerBlock; ctx: Fo
     units.status === 'ready'
       ? orderOuRows(
           units.data.flatMap((raw) => {
-            const row = toOuRow(raw);
+            const row = toOuRow(raw, language);
             return row === null ? [] : [row];
           })
         )
