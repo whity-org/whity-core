@@ -1593,7 +1593,7 @@ The approvals card shows each row's `label`, `before` and `after`. The host runs
 
 `Events::MCP_CONNECTION_CREATED`, `MCP_CONNECTION_GRANT_CHANGED` and `MCP_CONNECTION_REVOKED` say a connection was made, its grant changed, or it was disconnected (`by` is `owner`, `admin` or `agent_removed`). Ids only, after the change. Connecting and disconnecting stay with people.
 
-### Notify people (SDK SDK_MINOR)
+### Notify people (SDK 1.90)
 
 Declare the types you send with [`PluginNotificationsInterface`](../../sdk/src/Notification/PluginNotificationsInterface.php), each with an English and an Arabic label, then send through the host's notifier:
 
