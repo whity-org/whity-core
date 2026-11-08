@@ -47,7 +47,7 @@ final class GlossaryPlugin implements PluginInterface, PluginRequirementsInterfa
 
     public function getSdkConstraint(): string
     {
-        return '^1.79';
+        return '^1.93';
     }
 
     public function getCoreConstraint(): string

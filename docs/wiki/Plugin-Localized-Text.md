@@ -2,7 +2,7 @@
 
 Use a translatable field when the **data** a person writes exists in more than one language, such as a question, a product name or a definition. Interface wording, such as button labels, is a separate thing.
 
-Needs SDK SDK-MINOR. The working example is [`plugins/Glossary`](../../plugins/Glossary/GlossaryPlugin.php).
+Needs SDK 1.93. The working example is [`plugins/Glossary`](../../plugins/Glossary/GlossaryPlugin.php).
 
 ## The shape
 
@@ -91,10 +91,10 @@ The screen goes by the page direction: right-to-left reads Arabic first, and lef
 For anything the screens don't draw, such as a notification or a document, pick the text with `LocalizedText::resolve()`:
 
 ```php
-$label = LocalizedText::resolve($term, 'ar') ?? $code;
+$label = LocalizedText::resolve($term, $request->getLanguage()) ?? $code;
 ```
 
-It follows the same order as the screens: the language you ask for, then the other one, and `null` when there is no text at all. `ar-JO` counts as `ar`, and any language other than Arabic reads English first. You decide which language to pass.
+It follows the same order as the screens: the language you ask for, then the other one, and `null` when there is no text at all. `ar-JO` counts as `ar`, and any language other than Arabic reads English first.
 
 ## Testing
 

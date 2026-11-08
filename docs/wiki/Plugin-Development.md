@@ -1714,7 +1714,7 @@ Declare `'public' => 'read'` on GET `/api/<your slug>/public/<name>/{key}` for s
 
 See [Public reads](Plugin-Public-Forms.md#public-reads-sdk-169).
 
-## Step 12d-2 — Keep a field in Arabic and English (SDK SDK-MINOR)
+## Step 12d-2 — Keep a field in Arabic and English (SDK 1.93)
 
 Declare the property with `Whity\Sdk\I18n\LocalizedText::schema()` and a `crud` screen shows the reader's language in lists and both languages in forms. See [Translatable fields for plugins](Plugin-Localized-Text.md) and `plugins/Glossary`.
 
