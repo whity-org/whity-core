@@ -50,6 +50,7 @@ use Whity\Core\Form\FormRejectedException;
 use Whity\Core\Form\FormRepository;
 use Whity\Core\Form\FormSubmissionRepository;
 use Whity\Core\Form\FormSubmissionRouteSubject;
+use Whity\Core\Form\FormTemplateDraft;
 use Whity\Core\Form\FormUploadRepository;
 use Whity\Core\Form\SubmissionIssuer;
 use Whity\Core\Form\SubmissionProgress;
@@ -318,6 +319,54 @@ final class RouteFinaliseRealEngineTest extends TestCase
         // A form that keeps the final document in the office says so.
         $this->forms->update(self::TENANT, $formId, ['final_document_to_applicant' => false]);
         self::assertFalse($this->progress->forSubmission(self::TENANT, $fresh, self::APPLICANT)['final_document']['can_open'] ?? true);
+    }
+
+    public function testATemplatesOwnFieldPrintsTheAnswerOfTheQuestionThatFitsIt(): void
+    {
+        $id = $this->editor->sourceRepo->create(self::TENANT, [
+            'kind' => 'template',
+            'title' => 'Starter letter',
+            'lang' => 'en',
+            'default_view' => 'page',
+            'blocks' => [$this->editor->para('Vendor: ', $this->editor->field('template.vendor'))],
+            'own_fields' => [['key' => 'vendor', 'label' => 'Supplier']],
+            'scope' => 'tenant',
+            'created_by' => self::APPLICANT,
+        ]);
+        $this->editor->publish(self::TENANT, $id, self::APPLICANT);
+
+        $this->approve($this->form($this->clerkThenFinalise(null), $id), ['supplier' => 'Example Mill']);
+
+        self::assertContains('Vendor: Example Mill', EditorTemplateFixture::texts($this->render->flowCalls[0]));
+    }
+
+    public function testATemplateMadeFromTheFormIssuesACorrectDocumentFromARealSubmission(): void
+    {
+        $formId = $this->form($this->clerkThenFinalise(null), null);
+        $form = $this->forms->find(self::TENANT, $formId);
+        self::assertNotNull($form);
+        $id = $this->editor->sourceRepo->create(self::TENANT, [
+            'kind' => 'template',
+            'title' => 'Supplier request',
+            'lang' => 'en',
+            'default_view' => 'page',
+            'record_type' => 'form.supplier_request',
+            'blocks' => FormTemplateDraft::blocks($form, $this->fields->listForForm(self::TENANT, $formId), 'en'),
+            'scope' => 'tenant',
+            'created_by' => self::APPLICANT,
+        ]);
+        $this->editor->publish(self::TENANT, $id, self::APPLICANT);
+        $this->forms->update(self::TENANT, $formId, ['final_template_id' => $id]);
+
+        $submissionId = $this->approve($formId, ['supplier' => 'Example Mill']);
+
+        $fresh = $this->submissions->find(self::TENANT, $submissionId);
+        self::assertNotNull($fresh);
+        self::assertIsInt($fresh['document_id']);
+        $printed = (string) json_encode($this->render->flowCalls[0], JSON_UNESCAPED_UNICODE);
+        self::assertStringContainsString('Supplier request', $printed);
+        self::assertStringContainsString('Example Mill', $printed, 'the answer is on the page');
+        self::assertStringContainsString(substr((string) $fresh['submitted_at'], 0, 10), $printed, 'and so is when it was sent');
     }
 
     public function testWithTheRenderServiceDownTheRouteCompletesTheStepWaitsAndTheJobMakesItLater(): void
@@ -774,6 +823,19 @@ final class RouteFinaliseRealEngineTest extends TestCase
         $fields = FormFieldRepository::applicantFields($this->fields->listForForm(self::TENANT, $formId));
 
         return $this->issuer->submit(self::TENANT, self::APPLICANT, $form, $fields, $answers)['submission'];
+    }
+
+    /**
+     * Send the form and have the clerk approve it, which makes the final document.
+     *
+     * @param array<string, mixed> $answers
+     */
+    private function approve(int $formId, array $answers): int
+    {
+        $submission = $this->send($formId, $answers);
+        $this->router->act(self::TENANT, self::CLERK, $this->routeOf((int) $submission['id']), RouteAction::ACKNOWLEDGED, null, RouteVerdict::APPROVED);
+
+        return (int) $submission['id'];
     }
 
     /** @return array<string, mixed> */

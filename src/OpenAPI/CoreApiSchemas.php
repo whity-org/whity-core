@@ -1541,6 +1541,42 @@ final class CoreApiSchemas
                     409 => self::errorResponse('The form is published or has submissions'),
                 ] + self::authErrors(),
             ]),
+            self::permissionRoute('GET', '/api/forms/{id:\d+}/document-fit', 'forms:manage', [
+                'summary' => 'How a form and its final document template fit',
+                'description' => 'What the template prints that the form never asks, and what the form asks that the '
+                    . 'template has no place for. Null when the form has no template; `{"hidden": true}` when the caller '
+                    . 'cannot see it.',
+                'tags' => ['forms'],
+                'responses' => [
+                    200 => ['description' => 'The report, or null'],
+                    404 => self::errorResponse('Form not found'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/forms/{id:\d+}/document-fit/template-fields', 'forms:manage', [
+                'summary' => 'Put questions in the draft of the form\'s template',
+                'description' => 'Changes the draft only: what prints stays the same until somebody publishes the '
+                    . 'template. Also needs `documents:write`. Body: `{"field_keys": ["..."]}`.',
+                'tags' => ['forms'],
+                'responses' => [
+                    200 => ['description' => 'The report, as it now stands'],
+                    404 => self::errorResponse('Form not found, or no template the caller can change'),
+                    409 => self::errorResponse('The template was changed just now'),
+                    422 => self::errorResponse('field_keys does not name questions on this form'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/forms/{id:\d+}/document-template', 'forms:manage', [
+                'summary' => 'Make a document template from a form',
+                'description' => 'A template listing every question the applicant answers, published and chosen as the '
+                    . 'form\'s final document template. Also needs `documents:write` and `documents:publish`. Body: '
+                    . '`{"lang": "en"|"ar", "title": "..."}`.',
+                'tags' => ['forms'],
+                'responses' => [
+                    201 => ['description' => 'The template that was made'],
+                    404 => self::errorResponse('Form not found'),
+                    409 => self::errorResponse('The template could not be published'),
+                    422 => self::errorResponse('The form has no questions, or the title or language is not valid'),
+                ] + self::authErrors(),
+            ]),
             self::permissionRoute('POST', '/api/forms/{id:\d+}/member-access', 'forms:manage', [
                 'summary' => 'Let this workspace\'s members fill in this form',
                 'description' => 'OFF BY DEFAULT on every form. Active members of the workspace can then '
@@ -8239,6 +8275,7 @@ final class CoreApiSchemas
                 // the form can open the final document.
                 'final_template_id' => self::int(true),
                 'final_document_to_applicant' => self::bool(),
+                'document_left_out' => ['type' => 'array', 'items' => ['type' => 'string']],
                 // 64 hex characters — 256 bits from a CSPRNG. It is the ONLY
                 // credential the public endpoints have, so treat it as one: it is
                 // returned to tenant members (who must be able to hand the link
@@ -8518,6 +8555,7 @@ final class CoreApiSchemas
                 'public_requires_sign_in' => self::bool() + ['description' => 'The public link asks visitors to sign in: only the workspace\'s members and customers can send it, under their own name, so it can be sent back to them for changes.'],
                 'final_template_id' => self::int(true) + ['description' => 'The document template a route\'s final document stage uses when it names none; null for none.'],
                 'final_document_to_applicant' => self::bool() + ['description' => 'Whether the person who sent the form can open its final document from My submissions.'],
+                'document_left_out' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'Questions, by key, accepted as staying out of the final document. Emptied when the template changes.'],
             ], []) + ['minProperties' => 1],
             'FormFieldCreateRequest' => self::object([
                 'field_key' => [

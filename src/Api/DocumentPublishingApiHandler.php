@@ -192,6 +192,22 @@ final class DocumentPublishingApiHandler
         return Response::json(['data' => ['published_version' => $version]], 201);
     }
 
+    /**
+     * Publish the draft as it stands, under the same check as {@see publish()}.
+     * Null when something blocks it or the draft moved on.
+     *
+     * @param array<string, mixed> $row
+     */
+    public function publishChecked(int $tenantId, int $callerId, array $row): ?int
+    {
+        if ($this->blockers($tenantId, $callerId, $row) !== []) {
+            return null;
+        }
+        $theme = $this->print->theme($tenantId, $row['theme'] ?? null, (string) $row['kind']);
+
+        return $this->versions->publish((int) $row['id'], $tenantId, (int) $row['draft_version'], $callerId, $theme);
+    }
+
     /** @param array<string, string> $params */
     public function history(Request $request, array $params): Response
     {
