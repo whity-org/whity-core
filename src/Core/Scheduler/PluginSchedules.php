@@ -68,7 +68,7 @@ final class PluginSchedules
             foreach ($declared['schedules'] as $name => $cron) {
                 $row = $rows[$name] ?? null;
                 if ($row === null || (string) $row['cron_expression'] !== $cron) {
-                    $this->schedules->register($tenantId, $name, $cron, [], ['enabled' => $row === null || (bool) $row['enabled']]);
+                    $this->schedules->register($tenantId, $name, $cron, [], ['enabled' => $row === null || $row['enabled'] === true]);
                 }
                 unset($rows[$name]);
             }

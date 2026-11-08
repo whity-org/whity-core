@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.80).
+ * SDK identity (v1.91).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1088,12 +1088,19 @@ namespace Whity\Sdk;
  *
  * Narrows 1.9: an ungranted plugin's prompts, and any plugin prompt without a
  * `requiredPermission`, are no longer served.)
+ *
+ * 1.91 (PLUGIN JOBS: the host service {@see Jobs\PluginJobQueue} enqueues a plugin's own
+ * declared jobs in the current workspace and reads their status, and the optional
+ * {@see Jobs\PluginScheduledJobsInterface} declares cron schedules run once per
+ * workspace. A plugin can neither enqueue nor see another plugin's jobs (WHIT-1031).
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.80.0';
+    public const VERSION = '1.91.0';
 
     /**
      * Static identity only — never instantiated.
