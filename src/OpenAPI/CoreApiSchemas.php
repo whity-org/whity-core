@@ -21,6 +21,7 @@ use Whity\Core\Router;
 use Whity\Core\TimeWindow\WindowState;
 use Whity\Core\TimeWindow\WindowTypeRegistry;
 use Whity\Http\InputLimits;
+use Whity\Sdk\I18n\LocalizedText;
 
 /**
  * Typed OpenAPI declarations for the core admin resources (WC-167).
@@ -5015,7 +5016,7 @@ final class CoreApiSchemas
                 'id' => self::int(),
                 'tenant_id' => self::int(),
                 'key' => self::str(),
-                'display_name' => ['type' => 'object', 'x-whity-localized-text' => true, 'properties' => ['ar' => self::str(), 'en' => self::str()]],
+                'display_name' => self::localizedText(),
                 'created_at' => self::str(),
                 'updated_at' => self::str(),
             ], ['id', 'tenant_id', 'key', 'display_name', 'created_at', 'updated_at']),
@@ -15560,17 +15561,14 @@ final class CoreApiSchemas
 
     /**
      * The bilingual `{ar?, en?}` label object (WC-532), marked for the
-     * schema-driven CRUD screen's LocalizedText renderer.
+     * schema-driven CRUD screen's LocalizedText renderer. The contract is the
+     * SDK's, so core and plugins declare the same thing (#521).
      *
      * @return array<string, mixed>
      */
     private static function localizedText(): array
     {
-        return [
-            'type' => 'object',
-            'x-whity-localized-text' => true,
-            'properties' => ['ar' => self::str(), 'en' => self::str()],
-        ];
+        return LocalizedText::schema();
     }
 
     /**
