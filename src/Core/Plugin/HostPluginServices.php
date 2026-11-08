@@ -21,5 +21,6 @@ final class HostPluginServices
 
     public static function register(PDO $pdo, AuditLoggerInterface $audit, ?LoggerInterface $logger = null): void
     {
+        \Whity\register_service(\Whity\Sdk\Audit\PluginAudit::class, new \Whity\Core\Audit\HostPluginAudit($pdo, $audit));
     }
 }

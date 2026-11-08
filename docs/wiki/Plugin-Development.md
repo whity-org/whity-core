@@ -1309,6 +1309,18 @@ audits `helloworld:greeting.created` when a greeting is created.
 
 ---
 
+### Record and read entries directly (SDK SDK_MINOR)
+
+When a declared event doesn't fit, write the entry yourself and read your own back:
+
+```php
+$trail = \Whity\app(PluginAudit::class)->for($this);
+$trail->record('order.refunded', 'order', $orderId, ['amount' => 500]);
+$entries = $trail->entries(limit: 20, action: 'order.refunded');
+```
+
+Use bare names. The host stores `your_plugin:order.refunded`, and takes the actor, IP address and workspace from the request or job, so nothing you pass can write under another plugin's or core's name, or name someone else as the actor. `entries()` returns only your plugin's rows in the current workspace, including your declared events, newest first; pass the last id as `beforeId` for the next page. With no workspace in scope, both calls throw.
+
 ## Step 12 — Turn your content into a document (SDK 1.41)
 
 Before SDK 1.41 the SDK had **no rendering surface at all**. A plugin holding
