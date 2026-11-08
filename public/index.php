@@ -2997,6 +2997,17 @@ $billingAccessRecorder = new \Whity\Core\Billing\External\AccessRecorder(
     $logger
 );
 
+// Any plugin may ask the host to re-read one workspace's access through the
+// active portal (SDK 1.86, WHIT-1013): only a subject goes in, never a state,
+// throttled per subject and audited, the same path as a verified notification.
+\Whity\register_service(\Whity\Sdk\Billing\AccessRefresh::class, new \Whity\Core\Billing\External\HostAccessRefresh(
+    $billingPortal,
+    $billingAccessRecorder,
+    new DatabaseSharedStore($db->getPdo()),
+    $auditLogger,
+    $logger,
+));
+
 $externalBillingHandler = new \Whity\Api\ExternalBillingApiHandler(
     $billingPortal,
     $billingAccessRecorder,

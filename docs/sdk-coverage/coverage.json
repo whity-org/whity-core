@@ -861,6 +861,10 @@
                     "since": "1.84"
                 },
                 {
+                    "what": "Asking the host to re-read a workspace's billing access (AccessRefresh)",
+                    "since": "1.86"
+                },
+                {
                     "what": "A plugin can be the deployment's billing portal: checkout, subscriptions, customer portal, refunds and verified provider notifications (PluginBillingPortalInterface)",
                     "since": "1.77"
                 },
