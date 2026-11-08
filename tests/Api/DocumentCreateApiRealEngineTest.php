@@ -1516,6 +1516,7 @@ final class DocumentCreateApiRealEngineTest extends TestCase
             'sender-gone',
         )));
 
+        $this->enableForeignKeys();
         $this->pdo->exec('DELETE FROM profiles WHERE id = ' . self::RAISER);
         RoleChecker::clearCache();
         $bulk->run(self::TENANT, $status->batchId);
@@ -1584,9 +1585,10 @@ final class DocumentCreateApiRealEngineTest extends TestCase
         )));
         $bulk->run(self::TENANT, $status->batchId);
 
+        $this->enableForeignKeys();
         $this->pdo->exec('DELETE FROM documents');
 
-        $done = $this->asPerson(self::RAISER, fn () => $documents->batch($status->batchId));
+        $done =$this->asPerson(self::RAISER, fn () => $documents->batch($status->batchId));
         self::assertNotNull($done);
         self::assertSame(BulkIssueItemResult::ISSUED, $done->items[0]->status);
         self::assertNull($done->items[0]->documentId);
@@ -1597,6 +1599,18 @@ final class DocumentCreateApiRealEngineTest extends TestCase
     {
         $this->expectException(\InvalidArgumentException::class);
         new BulkIssueRequest(TemplateRef::source(1), array_fill(0, BulkIssueRequest::MAX_ITEMS + 1, new BulkIssueItem()), 'too-big');
+    }
+
+    /**
+     * SQLite only applies foreign keys when asked and this harness doesn't ask;
+     * PostgreSQL always applies them. These tests are about the keys' delete
+     * actions, so both engines have to run them.
+     */
+    private function enableForeignKeys(): void
+    {
+        if ((string) $this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite') {
+            $this->pdo->exec('PRAGMA foreign_keys = ON');
+        }
     }
 
     /** @return array{0: SdkDocuments, 1: BulkIssuing} */
