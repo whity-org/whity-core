@@ -145,6 +145,16 @@ final class QueueWorkCommand implements CliCommand
                 new \Whity\Core\Queue\Jobs\PurgeRemovedPluginsJob($pdo, static fn (): ?\Whity\Core\PluginLoader => $loaded->loader, $auditLogger, $this->logger),
                 false
             );
+            // WHIT-1014: the Whity store's Verified marks for code plugins. Internal.
+            $registry->register(
+                \Whity\Core\Queue\Jobs\RefreshStoreMarksJob::NAME,
+                new \Whity\Core\Queue\Jobs\RefreshStoreMarksJob(new \Whity\Core\Plugin\Store\StoreMarks(
+                    new \Whity\Core\Settings\GlobalSettingsRepository($pdo),
+                    new \Whity\Core\Plugin\PluginRecords($pdo),
+                    static fn (string $url): ?array => (new \Whity\Core\Http\HttpFetcher(timeoutSeconds: 10))->getJson($url),
+                )),
+                false
+            );
             $runner ??= new JobRunner($repo, $registry, $this->logger);
         }
         $this->repo = $repo;

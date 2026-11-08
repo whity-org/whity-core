@@ -372,6 +372,13 @@ final class SettingsRegistry
     // shipped.
     public const PLUGINS_STORE_ENABLED = 'plugins.store_enabled';
 
+    // Serve a code plugin's MCP prompts only while it carries a live Verified mark from the
+    // Whity store (WHIT-1014, VERIFIED-PLUGINS-SECURITY.md 4.1). Off by default, so nothing
+    // changes until the operator turns it on; mounted and uploaded plugins have no mark, so
+    // their prompts stop with it on. GLOBAL-ONLY: code plugins are install-wide. Tools are not
+    // gated by this; they keep their own permission checks.
+    public const PLUGINS_MCP_PROMPTS_REQUIRE_MARK = 'plugins.mcp_prompts_require_mark';
+
     // Document/label designer server-side render tier (ADR 0012 / WC-docdesigner
     // Track 2). GLOBAL-ONLY operator toggle: the render endpoint calls out to the
     // separate `whity_render` Docker service (headless-Chromium + Puppeteer), a
@@ -817,6 +824,7 @@ final class SettingsRegistry
         self::SEATS_COUNT_INVITED,
         self::PLUGINS_STORE_ALLOWED_HOSTS,
         self::PLUGINS_STORE_ENABLED,
+        self::PLUGINS_MCP_PROMPTS_REQUIRE_MARK,
         // Master on/off switch for the render tier: infrastructure-level (is the
         // whole optional subsystem available on this instance), not a per-tenant
         // preference — a per-tenant override would be inert/misleading. The
@@ -860,6 +868,7 @@ final class SettingsRegistry
         self::MAIL_EVENT_DELETION,
         self::MAIL_EVENT_PASSWORD_RESET,
         self::PLUGINS_STORE_ENABLED,
+        self::PLUGINS_MCP_PROMPTS_REQUIRE_MARK,
         self::DOCUMENTS_RENDER_ENABLED,
         self::DOCUMENTS_PERSIST_ENABLED,
         self::DOCUMENTS_QR_ENABLED,
@@ -1089,6 +1098,7 @@ final class SettingsRegistry
         // silently disable the store for every instance that configured hosts
         // before this flag existed.
         self::PLUGINS_STORE_ENABLED => 'true',
+        self::PLUGINS_MCP_PROMPTS_REQUIRE_MARK => 'false',
         // Heavyweight optional add-on (a whole separate Chromium-bearing
         // container) — opt-in, not opt-out. A sovereign deploy that never runs
         // the `render` compose profile stays disabled here regardless.
@@ -1502,6 +1512,7 @@ final class SettingsRegistry
             self::MAIL_FOOTER_TEXT,
             self::PLUGINS_STORE_ALLOWED_HOSTS => null, // free-form strings
             self::PLUGINS_STORE_ENABLED => self::validateBoolean($value, self::PLUGINS_STORE_ENABLED),
+            self::PLUGINS_MCP_PROMPTS_REQUIRE_MARK => self::validateBoolean($value, self::PLUGINS_MCP_PROMPTS_REQUIRE_MARK),
             self::DOCUMENTS_RENDER_ENABLED => self::validateBoolean($value, self::DOCUMENTS_RENDER_ENABLED),
             self::DOCUMENTS_RENDER_MAX_ROWS => self::validateRenderMaxRows($value),
             self::DOCUMENTS_RENDER_MAX_PAGES => self::validateRenderMaxPages($value),

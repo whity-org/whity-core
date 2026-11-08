@@ -11857,8 +11857,17 @@ export interface components {
             version?: string;
             routes_count?: number;
             permissions_count?: number;
-            /** @enum {string} */
-            trust?: "unverified";
+            /**
+             * @description verified only while the Whity store has a live, signed Verified mark for the exact installed package (WHIT-1014)
+             * @enum {string}
+             */
+            trust?: "verified" | "unverified";
+            mark?: {
+                host: string;
+                reviewed_at: string | null;
+                checked_at: string;
+                offline: boolean;
+            } | null;
             install?: {
                 source: string;
                 store_host?: string | null;

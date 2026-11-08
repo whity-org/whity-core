@@ -9391,7 +9391,14 @@ final class CoreApiSchemas
                 'version' => self::str(),
                 'routes_count' => self::int(),
                 'permissions_count' => self::int(),
-                'trust' => ['type' => 'string', 'enum' => ['unverified']],
+                'trust' => ['type' => 'string', 'enum' => ['verified', 'unverified'], 'description' => 'verified only while the Whity store has a live, signed Verified mark for the exact installed package (WHIT-1014)'],
+                // The store's mark behind `verified`; null otherwise.
+                'mark' => array_merge(self::object([
+                    'host' => self::str(),
+                    'reviewed_at' => self::str(true),
+                    'checked_at' => self::str(),
+                    'offline' => self::bool(),
+                ], ['host', 'reviewed_at', 'checked_at', 'offline']), ['nullable' => true]),
                 // Operators only.
                 'install' => self::object([
                     'source' => self::str(),

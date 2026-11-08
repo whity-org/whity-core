@@ -22,6 +22,7 @@ use Whity\Core\Exception\PluginPersistenceException;
 use Whity\Core\Plugin\PluginOperatorGate;
 use Whity\Core\Plugin\PluginRecords;
 use Whity\Core\Plugin\StoreCatalogueEntry;
+use Whity\Core\Plugin\Store\StoreMarks;
 
 /**
  * Plugins API Handler
@@ -74,6 +75,9 @@ class PluginsApiHandler
     /** The deployment's record of its plugins (S.6, S.7); needs the PDO. */
     private readonly ?PluginRecords $records;
 
+    /** Store-signed Verified marks for code plugins (WHIT-1014); null where not wired. */
+    private ?StoreMarks $storeMarks = null;
+
     /**
      * @param string $pluginDir Directory containing plugin files.
      * @param PluginLoader|null $pluginLoader Optional live loader for lifecycle state.
@@ -90,6 +94,11 @@ class PluginsApiHandler
         $this->pluginLoader = $pluginLoader;
         $this->auditLogger = $auditLogger;
         $this->records = $pdo !== null ? new PluginRecords($pdo) : null;
+    }
+
+    public function setStoreMarks(?StoreMarks $storeMarks): void
+    {
+        $this->storeMarks = $storeMarks;
     }
 
     /**
@@ -277,6 +286,15 @@ class PluginsApiHandler
                 }
             }
 
+            // The operator looking at the list is a good moment to fetch marks that are due
+            // (at most hourly per plugin); the scheduler does it every 15 minutes otherwise.
+            if (PluginOperatorGate::isOperator()) {
+                try {
+                    $this->storeMarks?->refresh();
+                } catch (\Throwable $e) {
+                    error_log('[plugins] store mark refresh failed: ' . $e::class);
+                }
+            }
             $plugins = $this->withRecords($plugins);
 
             // Errors and file names describe the deployment, not the workspace
@@ -865,8 +883,10 @@ class PluginsApiHandler
 
     /**
      * Hide what's been uninstalled and add what the deployment knows about each
-     * plugin. Trust is always "unverified" until the Verified design is approved
-     * (docs/design/VERIFIED-PLUGINS-SECURITY.md); nothing here can raise it.
+     * plugin. Trust is "verified" only while {@see StoreMarks} holds a live mark
+     * from a pinned store for the exact installed package (WHIT-1014,
+     * VERIFIED-PLUGINS-SECURITY.md 4.1); nothing in the plugin, its manifest or a
+     * store catalogue field can raise it.
      *
      * @param list<array<string, mixed>> $plugins
      * @return list<array<string, mixed>>
@@ -889,7 +909,9 @@ class PluginsApiHandler
                 continue;
             }
 
-            $plugin['trust'] = StoreCatalogueEntry::TRUST_UNVERIFIED;
+            $mark = $this->storeMarks?->mark($name);
+            $plugin['trust'] = $mark === null ? StoreCatalogueEntry::TRUST_UNVERIFIED : 'verified';
+            $plugin['mark'] = $mark;
             $install = $installs[$name] ?? $installs[$id] ?? null;
             if ($install !== null) {
                 $plugin['install'] = self::installFacts($install);

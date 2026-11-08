@@ -93,6 +93,23 @@ An older sequence number is refused, so an attacker can't replay a list from bef
 
 Native code couldn't honour the kill timing: an open tab keeps running what it already loaded until it's reloaded.
 
+### 4.1 Store marks for code plugins (decision 8, 8 Nov 2026)
+
+The owner decided that the Whity store also marks **code plugins**, one exact package at a time. This is a separate source from the attestations above, and it says less: an operator on app.whity.dev reviewed these bytes. It does not say the code is contained. A code plugin still runs on the server with the access section 2 describes, and the label says so.
+
+| | How it works |
+| --- | --- |
+| **Granting** | The store's operator, in its system workspace only, marks a version after reviewing it. They give the package's sha256, so the mark names the bytes they reviewed. A later version is never covered by an earlier one's mark |
+| **Statement** | The store signs a statement good for 24 hours: `whity-mark+jwt`, EdDSA, with plugin, version, sha256, `verified` / `revoked` / `none`, and when it was reviewed. It is served on the store's public plugin page, per version |
+| **Key** | Its own key (`PLUGIN_STORE_MARK_KEY`), separate from the licence key. **It lives on app.whity.dev for now**, not offline as section 5.2 describes; reviewer-side offline signing is a recorded follow-up |
+| **Pinning** | Core pins the mark keys per store host (`StoreMarks::PINNED_KEYS`). A store that is allowed for installing but has no pinned key can never make a plugin Verified (fact 9) |
+| **Checking** | Core fetches statements for store-installed code plugins every 15 minutes and when an operator opens the plugins page, and caches them. A plugin is Verified only while a cached statement from a pinned key names its slug, version and installed sha256 (`plugin_installs`) and says `verified`. Requests read the cache only |
+| **Revoking** | The store's operator revokes with a reason, and the statement says `revoked` from then on. Installations stop showing Verified at their next fetch, within about 15 minutes when online |
+| **Offline** | A `verified` statement keeps counting until 7 days after the last good fetch, and never more than 6 days past its expiry. Then the plugin is Not verified until the store answers. The detail line says "Not confirmed since [date]" |
+| **What it changes** | The plugins page shows "Verified", with "Reviewed on app.whity.dev on [date]; its code runs on your server". With `plugins.mcp_prompts_require_mark` on (off by default), a code plugin's MCP prompts are served only while it is Verified. The check runs at every list and get, so a revocation reaches every worker. Tools keep their own permission checks and are not gated by the mark |
+
+Store marks never write `plugin_version_marks`, which stays for declarative plugins and Whity's root-key attestations.
+
 ## 5. Loading, signing and pinning
 
 ### 5.1 The package and its signature
@@ -116,6 +133,8 @@ Native code couldn't honour the kill timing: an open tab keeps running what it a
 If the signing key is compromised, root signs a statement rejecting that key and everything it signed after a date. This is a small version of the TUF model. **Core pins root's public keys in code**, so a settings change or a store can't add a trust root. Installing a deployment-local key takes server access (CLI), never the UI.
 
 **Don't ship a placeholder.** If the key ceremony hasn't happened when 0.2.25 ships, core ships with no Whity key pinned, and only the operator path can grant a mark.
+
+**Exception for store marks (decision 8).** The key that signs store marks for code plugins (section 4.1) sits on app.whity.dev for 0.2.27, online, with only its public half pinned in core. A compromise of that host can mark code Verified until the key is rotated in a core release. That is accepted for now. Moving the signing to the reviewer's own machine, with only the 24-hour status signed online, is the recorded follow-up.
 
 ### What's built now (decision 6)
 
@@ -183,7 +202,7 @@ The recommended design needs **no CSP change**, because no new script comes in. 
 2. **C replaces today's frame for third-party screens**, as its own later work: `Content-Security-Policy: sandbox allow-scripts`, `connect-src 'none'`, `frame-ancestors` set to the app, no `allow-same-origin`. An opaque origin needs no extra domain, so it works for self-hosters.
 3. **A isn't built.** If the owner still wants it, the minimum before any third-party code loads is: nonce CSP across the app, a fresh two-step check on every sensitive action so script can't complete them alone, reviewed source with reproducible builds, and written acceptance that a bad Verified update can act as any administrator who opens it.
 
-**And the PHP half.** Option B needs no publisher PHP at all, which is the point. A plugin that truly needs server code stays what it is today: an operator's install-wide decision, never one a workspace can make, and never marked as if it were contained. An out-of-process plugin runtime would be the real fix and is a separate project.
+**And the PHP half.** Option B needs no publisher PHP at all, which is the point. A plugin that truly needs server code stays what it is today: an operator's install-wide decision, never one a workspace can make, and never marked as if it were contained. Since decision 8 the store can mark a code plugin's exact package as reviewed (section 4.1). That mark says who reviewed which bytes, not that the code is contained, and its label says the code runs on your server. An out-of-process plugin runtime would be the real fix and is a separate project.
 
 **What this gives up.** Publishers can't ship anything Whity's blocks can't draw, so the store will start with fewer and simpler plugins. Whity carries the work of growing the block vocabulary and of adding safe, declared reads of core data. In exchange, one publisher's mistake can't become every customer's incident.
 
@@ -223,6 +242,7 @@ Each runs on real Postgres where data is involved, and each must be seen to fail
 | 5 | Code plugin updates | By hand only (S.6) |
 | 6 | Root key holder, key ceremony, who reviews | The owner holds the root key for now, generated and kept on the owner's machine, never in this repository or any session. The owner is the only reviewer until a process exists, so nothing can be marked Verified in practice. Core has only public-key verification and server-side checks |
 | 7 | Offline, stale revocation list | Keeps running Verified plugins, shows a banner, no new activations |
+| 8 | Code plugins and the store (8 Nov 2026) | The store marks reviewed code-plugin versions (section 4.1). Labelled "Verified", with "Reviewed on app.whity.dev on [date]; its code runs on your server". Its key is separate from the licence key and stays online on app.whity.dev for 0.2.27; offline reviewer signing is a follow-up. An operator setting, off by default, serves code plugins' MCP prompts only while they are Verified; tools aren't gated by the mark |
 
 ### The move to a bridge (decision 4)
 
