@@ -7,6 +7,7 @@ namespace Tests\Integration;
 use PDO;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\SchemaFromMigrations;
+use Whity\Core\Audit\AuditContext;
 use Whity\Core\Hooks\HookManager;
 use Whity\Core\Plugin\HostPluginSettings;
 use Whity\Core\Settings\GlobalSettingsRepository;
@@ -43,6 +44,7 @@ final class PluginSettingsRealEngineTest extends TestCase
     protected function setUp(): void
     {
         TenantContext::reset();
+        AuditContext::reset();
         $this->pdo = SchemaFromMigrations::make();
         foreach ([self::BAKERY => 'Example Bakery', self::FLORIST => 'Example Florist'] as $id => $name) {
             $this->pdo->prepare('INSERT INTO tenants (id, name, slug) VALUES (?, ?, ?) ON CONFLICT DO NOTHING')
@@ -76,6 +78,7 @@ final class PluginSettingsRealEngineTest extends TestCase
     protected function tearDown(): void
     {
         TenantContext::reset();
+        AuditContext::reset();
     }
 
     public function testOneWorkspaceCannotReadAnothersSettings(): void
@@ -199,9 +202,11 @@ final class PluginSettingsRealEngineTest extends TestCase
 
     public function testAChangeFromASettingsScreenIsAnnouncedToo(): void
     {
+        AuditContext::set(77, null);
+
         $this->service->setGlobal('acme:mode', 'live');
 
-        self::assertSame(['tenant_id' => null, 'plugin' => 'acme', 'key' => 'mode', 'actor_profile_id' => null], $this->heard[0]);
+        self::assertSame(['tenant_id' => null, 'plugin' => 'acme', 'key' => 'mode', 'actor_profile_id' => 77], $this->heard[0]);
     }
 
     public function testCoreKeysAreNotAnnounced(): void
