@@ -436,6 +436,13 @@ export function fieldMeta(t: TranslateFn): Record<string, FieldMeta> {
         'The addresses of the stores people may install plugins from, separated by commas, for example store.example.com. Only secure (https) stores on the public internet are accepted when a plugin is installed. Leave this empty to keep the plugin store off.'
       ),
     },
+    'plugins.mcp_prompts_require_mark': {
+      label: t('settings.meta.plugins.mcp_prompts_require_mark.label', 'Prompts only from Verified plugins'),
+      help: t(
+        'settings.meta.plugins.mcp_prompts_require_mark.help',
+        'Offer AI agents the prompts of a server plugin only while the Whity store has marked its installed version Verified. Plugins added by hand or from another store have no mark, so their prompts stop while this is on. Tools are not affected.'
+      ),
+    },
     'plugins.store_enabled': {
       label: t('settings.meta.plugins.store_enabled.label', 'Plugin marketplace'),
       help: t(
@@ -520,9 +527,9 @@ export function settingsSections(t: TranslateFn): readonly SectionDef[] {
       title: t('settings.section.pluginStore.title', 'Plugin store'),
       description: t(
         'settings.section.pluginStore.description',
-        'Which stores plugins can be installed from. The plugin marketplace switch is in Feature flags.'
+        'Which stores plugins can be installed from, and whether agents get prompts only from Verified plugins. The plugin marketplace switch is in Feature flags.'
       ),
-      keys: ['plugins.store_allowed_hosts'],
+      keys: ['plugins.store_allowed_hosts', 'plugins.mcp_prompts_require_mark'],
     },
     {
       id: 'storage',

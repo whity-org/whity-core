@@ -2327,6 +2327,14 @@ $router->registerUnversioned('GET', '/api/openapi.json', [$openApiHandler, 'hand
 // WC-220: pass $auditLogger so staged uploads (plugin.upload) and enable
 // (plugin.enable / plugin.enable.migrate_failed) emit secret-free audit rows.
 $pluginsHandler = new PluginsApiHandler(__DIR__ . '/../plugins', $pluginLoader, $db->getPdo(), $auditLogger);
+// WHIT-1014: Verified marks the Whity store signs for code plugins it reviewed. Read from the
+// cache on every request; fetched by the plugins list (operators) and the scheduler.
+$storeMarks = new \Whity\Core\Plugin\Store\StoreMarks(
+    $globalSettingsRepository,
+    new \Whity\Core\Plugin\PluginRecords($db->getPdo()),
+    static fn (string $url): ?array => (new \Whity\Core\Http\HttpFetcher(timeoutSeconds: 10))->getJson($url),
+);
+$pluginsHandler->setStoreMarks($storeMarks);
 $router->register('GET', '/api/plugins', [$pluginsHandler, 'list'], null, null, CorePermissions::PLUGINS_READ);
 // WC-220: staged plugin upload/install. Multipart field name "package"; the
 // installer lands the artifact DISABLED and migration-on-enable applies its
@@ -5147,6 +5155,12 @@ $resourceDeriver = new ResourceDeriver(
     $router,
 );
 $promptRegistry = new PromptRegistry();
+// WHIT-1014: with plugins.mcp_prompts_require_mark on, a code plugin's prompts are served only
+// while it carries a live Verified mark. Asked at every list and get, so it follows the setting
+// and a revoked mark without a reload. Core prompts are never gated.
+$promptRegistry->setPluginGate(static fn (string $plugin): bool =>
+    $globalSettingsRepository->get(\Whity\Core\Settings\SettingsRegistry::PLUGINS_MCP_PROMPTS_REQUIRE_MARK) !== 'true'
+    || $storeMarks->isVerified($plugin));
 CorePrompts::register($promptRegistry);
 // WC-a89ece0d: per-tenant and per-principal call budgets. Limits are tunable
 // via env vars so operators can adjust without a code deploy.

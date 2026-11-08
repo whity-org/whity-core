@@ -385,6 +385,39 @@ describe('PluginsPage optimistic sidenav on disable', () => {
  * already gated on `plugins:read` — the same permission the server applies
  * before it will send `dropped` at all — so no extra gate is needed here.
  */
+describe('PluginsPage store Verified marks (WHIT-1014)', () => {
+  it('shows Verified and who reviewed it only when the server says so', async () => {
+    const user = userEvent.setup();
+    setCapabilities(['plugins:read']);
+    mockPluginList([
+      {
+        ...ACTIVE_PLUGIN,
+        trust: 'verified',
+        mark: { host: 'app.whity.dev', reviewed_at: '2026-11-07T10:00:00+00:00', checked_at: '2026-11-08T07:00:00+00:00', offline: false },
+      } as PluginRow,
+      { ...DISABLED_PLUGIN, trust: 'unverified', mark: null } as PluginRow,
+    ]);
+
+    render(<PluginsPage />);
+    await screen.findByText('HelloWorld');
+    expect(screen.getByText('Verified')).toBeInTheDocument();
+    expect(screen.getByText('Not verified')).toBeInTheDocument();
+
+    const menu = await openRowMenu(user, 'HelloWorld');
+    await user.click(within(menu).getByRole('menuitem', { name: 'Details' }));
+    expect(await screen.findByText(/^Reviewed on app\.whity\.dev on .+; its code runs on your server\.$/)).toBeInTheDocument();
+  });
+
+  it('never shows Verified for a plugin without a mark', async () => {
+    setCapabilities(['plugins:read']);
+    mockPluginList([{ ...ACTIVE_PLUGIN, trust: 'unverified', mark: null } as PluginRow]);
+
+    render(<PluginsPage />);
+    await screen.findByText('HelloWorld');
+    expect(screen.queryByText('Verified')).toBeNull();
+  });
+});
+
 describe('PluginsPage rejected screens (#953)', () => {
   const DROPPED = {
     plugin: 'HelloWorld',

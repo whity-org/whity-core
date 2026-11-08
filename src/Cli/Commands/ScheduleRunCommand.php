@@ -165,6 +165,15 @@ final class ScheduleRunCommand implements CliCommand
             ]);
         }
 
+        // WHIT-1014: the Whity store's Verified marks, every 15 minutes. The job fetches only
+        // what is due, so a deployment with no store-installed plugin does nothing.
+        if ((int) $now->format('i') % 15 === 0) {
+            $this->queue->dispatch(\Whity\Core\Queue\Jobs\RefreshStoreMarksJob::NAME, [], [
+                'tenant_id' => 0,
+                'idempotency_key' => 'plugins-store-marks-' . $bucket,
+            ]);
+        }
+
         $this->logger->info('[schedule:run] tick complete', [
             'bucket'     => $bucket,
             'dispatched' => $dispatched,

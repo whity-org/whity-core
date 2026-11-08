@@ -67501,8 +67501,35 @@
                     "trust": {
                         "type": "string",
                         "enum": [
+                            "verified",
                             "unverified"
-                        ]
+                        ],
+                        "description": "verified only while the Whity store has a live, signed Verified mark for the exact installed package (WHIT-1014)"
+                    },
+                    "mark": {
+                        "type": "object",
+                        "properties": {
+                            "host": {
+                                "type": "string"
+                            },
+                            "reviewed_at": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "checked_at": {
+                                "type": "string"
+                            },
+                            "offline": {
+                                "type": "boolean"
+                            }
+                        },
+                        "required": [
+                            "host",
+                            "reviewed_at",
+                            "checked_at",
+                            "offline"
+                        ],
+                        "nullable": true
                     },
                     "install": {
                         "type": "object",

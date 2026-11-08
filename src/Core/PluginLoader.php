@@ -1585,7 +1585,7 @@ class PluginLoader
                 continue;
             }
             foreach ($descriptors as $descriptor) {
-                $this->registerMcpPrompt($registry, $descriptor, $pluginKey);
+                $this->registerMcpPrompt($registry, $descriptor, $pluginKey, $plugin->getName());
             }
         }
     }
@@ -1651,7 +1651,7 @@ class PluginLoader
         }
     }
 
-    private function registerMcpPrompt(PromptRegistry $registry, mixed $descriptor, string $pluginKey): void
+    private function registerMcpPrompt(PromptRegistry $registry, mixed $descriptor, string $pluginKey, string $pluginName): void
     {
         if (!is_array($descriptor)) {
             $this->logWarning("[Plugin:{$pluginKey}] getMcpPrompts() returned a non-array descriptor — skipped.");
@@ -1662,7 +1662,7 @@ class PluginLoader
             $this->logWarning("[Plugin:{$pluginKey}] getMcpPrompts() descriptor missing or empty 'name' — skipped.");
             return;
         }
-        if ($registry->find($name) !== null) {
+        if ($registry->has($name)) {
             $this->logWarning("[Plugin:{$pluginKey}] getMcpPrompts() prompt '{$name}' already registered — skipped (first-registration-wins).");
             return;
         }
@@ -1675,6 +1675,7 @@ class PluginLoader
             description:        $description,
             requiredRole:       $requiredRole,
             requiredPermission: $requiredPermission,
+            plugin:             $pluginName,
         ));
     }
 

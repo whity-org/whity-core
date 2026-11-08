@@ -130,6 +130,7 @@ final class SettingsRegistryCorePinTest extends TestCase
             'dunning.lock_after_days',
             'plugins.store_allowed_hosts',
             'plugins.store_enabled',
+            'plugins.mcp_prompts_require_mark',
             'documents.render_enabled',
             'documents.theme',
             'documents.theme_by_kind',
@@ -308,6 +309,7 @@ final class SettingsRegistryCorePinTest extends TestCase
             'dunning.lock_after_days' => '14',
             'plugins.store_allowed_hosts' => 'app.whity.dev',
             'plugins.store_enabled' => 'true',
+            'plugins.mcp_prompts_require_mark' => 'false',
             'documents.render_enabled' => 'false',
             // Whity's standard theme until a workspace chooses its own (editor M4d).
             'documents.theme' => 'whity.standard',
@@ -600,6 +602,8 @@ final class SettingsRegistryCorePinTest extends TestCase
         // Languages are a PLATFORM catalogue with no tenant_id column, and the
         // sign-in screen resolves one before any tenant is known.
         self::assertTrue(SettingsRegistry::isGlobalOnly('i18n.enabled'));
+        // Code plugins are install-wide, so whose prompts are served is too (WHIT-1014).
+        self::assertTrue(SettingsRegistry::isGlobalOnly('plugins.mcp_prompts_require_mark'));
 
         self::assertTrue(SettingsRegistry::isFeatureFlag('mcp.enabled'));
         self::assertFalse(SettingsRegistry::isFeatureFlag('mail.events.welcome_enabled'));

@@ -70,7 +70,7 @@ final class SettingsRegistryTest extends TestCase
              // goes to somebody outside the company, so no tenant decides it.
              'affiliate.clawback_on_refund', 'affiliate.withholding_bp',
              'dunning.retry_schedule_days', 'dunning.lock_after_days',
-             'plugins.store_allowed_hosts', 'plugins.store_enabled',
+             'plugins.store_allowed_hosts', 'plugins.store_enabled', 'plugins.mcp_prompts_require_mark',
              'documents.render_enabled', 'documents.theme', 'documents.theme_by_kind', 'documents.slot_bindings', 'documents.background_issuing', 'documents.render_max_rows',
              'documents.render_max_pages', 'documents.render_max_template_bytes',
              'documents.flow_max_blocks', 'documents.flow_max_table_rows',
@@ -440,7 +440,8 @@ final class SettingsRegistryTest extends TestCase
         // 100 since WHIT-901: mail.smtp.auth_mode and three mail.oauth.* keys.
         // 101 since #1019: labels.resolve_max_ids.
         // 102 since #1733: app.installable, the instance's install switch.
-        self::assertCount(102, $describe);
+        // 103 since WHIT-1014: plugins.mcp_prompts_require_mark.
+        self::assertCount(103, $describe);
         self::assertSame(
             ['key' => 'site_name', 'type' => 'string', 'default' => 'Whity'],
             $describe[0]
@@ -633,6 +634,10 @@ final class SettingsRegistryTest extends TestCase
         self::assertNull(SettingsRegistry::validate('plugins.store_enabled', 'false'));
         self::assertNotNull(SettingsRegistry::validate('plugins.store_enabled', '1'));
         self::assertNotNull(SettingsRegistry::validate('plugins.store_enabled', ''));
+        // WHIT-1014: off by default, boolean, operator-only.
+        self::assertSame('false', SettingsRegistry::defaultFor('plugins.mcp_prompts_require_mark'));
+        self::assertNull(SettingsRegistry::validate('plugins.mcp_prompts_require_mark', 'true'));
+        self::assertNotNull(SettingsRegistry::validate('plugins.mcp_prompts_require_mark', 'yes'));
     }
 
     public function testPluginsStoreAllowedHostsIsGlobalOnlyFreeformDefaultWhityStore(): void
