@@ -242,9 +242,10 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsOneEightForInteractiveBlocks(): void
     {
         $this->assertSame(
-            '1.78.0',
+            '1.79.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.78 ADDS proposal created, decided and undone events and a read-only preview on authored tools (WHIT-991). '
+            'SDK 1.79 ADDS Mcp\McpConnections and connection created, grant changed and revoked events, never with a token (WHIT-992). '
+            . 'SDK 1.78 ADDS proposal created, decided and undone events and a read-only preview on authored tools (WHIT-991). '
             . 'SDK 1.77 ADDS PluginBillingPortalInterface and Billing\\BillingPortal: a plugin can be the deployment\'s '
             . 'billing portal through one payment provider (WHIT-1010). '
             . 'SDK 1.76: DocumentRenderer resolves in queue jobs and CLI commands, over one storage stack per process (#1151). No signature changes. '

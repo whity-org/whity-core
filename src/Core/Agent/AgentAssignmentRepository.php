@@ -24,8 +24,11 @@ final class AgentAssignmentRepository
 
     private const COLUMNS = 'a.id, a.tenant_id, a.agent_id, a.profile_id, a.grant_modes, a.revoked_at, a.created_at, a.updated_at';
 
-    public function __construct(private readonly PDO $db)
-    {
+    public function __construct(
+        private readonly PDO $db,
+        // WHIT-992: tells plugins the agent's connections were disconnected.
+        private readonly ?\Whity\Mcp\Auth\McpConnectionEvents $connectionEvents = null,
+    ) {
     }
 
     public static function principalId(int $assignmentId): string
@@ -317,6 +320,9 @@ final class AgentAssignmentRepository
         $insert = $this->db->prepare('INSERT INTO revoked_tokens (jti, expires_at) VALUES (:jti, :expires_at) ON CONFLICT (jti) DO NOTHING');
         foreach ($tokens->fetchAll(PDO::FETCH_ASSOC) as $token) {
             $insert->execute([':jti' => $token['jti'], ':expires_at' => $token['expires_at']]);
+            if ($insert->rowCount() === 1) {
+                $this->connectionEvents?->revoked((string) $token['jti'], $tenantId, $profileId, \Whity\Mcp\Auth\McpConnectionEvents::BY_AGENT_REMOVED);
+            }
             $revoked++;
         }
 

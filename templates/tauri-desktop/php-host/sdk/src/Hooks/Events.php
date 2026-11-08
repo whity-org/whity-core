@@ -186,6 +186,18 @@ final class Events
      */
     public const AGENT_ACTION_UNDONE = 'agent.action.undone';
 
+    // ---- AI connections (SDK 1.79, WHIT-992) ----
+    // An app or agent connected over MCP. Fired after the change, the return
+    // value ignored. Payload: `tenant_id`, `connection_id` (as
+    // {@see \Whity\Sdk\Mcp\McpConnections} lists it), `profile_id` (whose
+    // connection), `kind` (`user` or `ai-agent`), `agent_assignment_id` (null
+    // unless it is a workspace agent's), `actor_profile_id` (who did it). Never
+    // the token or its id.
+    public const MCP_CONNECTION_CREATED = 'mcp.connection.created';
+    public const MCP_CONNECTION_GRANT_CHANGED = 'mcp.connection.grant_changed';
+    /** Also `by`: `owner`, `admin`, or `agent_removed` (the person stopped using the agent). */
+    public const MCP_CONNECTION_REVOKED = 'mcp.connection.revoked';
+
     // ---- platform ----
     public const NAVIGATION_REGISTER = 'navigation.register';
     public const PERMISSION_REGISTERED = 'permission.registered';
