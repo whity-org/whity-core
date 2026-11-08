@@ -457,6 +457,19 @@ class EnforceTenantIsolation
         if (\Whity\Core\Plugin\PluginPublicRoutes::admits($request, $this->router, $path)) {
             return $next($request);
         }
+        // A plugin's SERVICE route (WHIT-1011): no person and no tenant, so it
+        // never reaches the session path below. It runs only with a verified
+        // token from the trusted issuer for exactly this route's scope; anything
+        // else, a person's session included, is refused here.
+        $serviceScope = \Whity\Core\Plugin\PluginServiceRoutes::scopeFor($request, $this->router);
+        if ($serviceScope !== null) {
+            return \Whity\Core\Plugin\PluginServiceRoutes::admit($request, $serviceScope)
+                ? $next($request)
+                : Response::error('Unauthorized', 401)->withHeaders([
+                    'WWW-Authenticate' => 'Bearer error="invalid_token"',
+                    'Cache-Control' => 'no-store',
+                ]);
+        }
 
         // Single decode (WC-159): parse the JWT exactly once per request and
         // stash the claims (array|null) on the Request. Downstream consumers —
