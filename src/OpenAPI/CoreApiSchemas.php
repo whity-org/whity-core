@@ -113,6 +113,7 @@ final class CoreApiSchemas
             self::delegationRoutes(),
             self::auditRoutes(),
             self::frontendFeatureRoutes(),
+            self::pluginSecretFieldRoutes(),
             self::meRoutes(),
             self::meNotificationRoutes(),
             self::tenantNotificationSettingsRoutes(),
@@ -2949,6 +2950,56 @@ final class CoreApiSchemas
                     ] + self::authErrors(),
                 ],
             ],
+        ];
+    }
+
+    /**
+     * Behind the host-drawn `secretField` block (WHIT-1016).
+     *
+     * WRITE-ONLY: every answer is {@see PluginSecretFieldStatusResponse}, whether
+     * a value is set and when, never the value. The routes carry no gate here
+     * because the permission is each plugin's own declaration for that key, and
+     * the handler enforces it. Never tools: an agent doesn't handle secrets.
+     *
+     * @return list<array{method: string, path: string, requiredRole: ?string, requiredPermission: ?string, schema: array<string, mixed>}>
+     */
+    private static function pluginSecretFieldRoutes(): array
+    {
+        $errors = [
+            400 => self::errorResponse('The caller is not in a workspace'),
+            404 => self::errorResponse('No such plugin, or the plugin does not declare this secret'),
+        ] + self::authErrors();
+        $route = static fn (string $method, array $schema): array => [
+            'method' => $method,
+            'path' => '/api/plugin-secrets/{plugin}/{key}',
+            'requiredRole' => null,
+            'requiredPermission' => null,
+            'schema' => $schema + ['tags' => ['plugins'], 'mcp' => ['expose' => false]],
+        ];
+
+        return [
+            $route('GET', [
+                'summary' => 'Whether a plugin\'s secret is set for this workspace',
+                'description' => 'Answers only whether a value is set and when. The value is never returned.',
+                'responses' => [
+                    200 => self::jsonResponse('Whether the secret is set', 'PluginSecretFieldStatusResponse'),
+                ] + $errors,
+            ]),
+            $route('PUT', [
+                'summary' => 'Store a plugin\'s secret for this workspace',
+                'description' => 'Replaces any earlier value. The answer does not include the value.',
+                'request' => 'PluginSecretFieldSaveRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The secret is stored', 'PluginSecretFieldStatusResponse'),
+                    422 => self::errorResponse('The value is empty or too long'),
+                ] + $errors,
+            ]),
+            $route('DELETE', [
+                'summary' => 'Remove a plugin\'s secret for this workspace',
+                'responses' => [
+                    200 => self::jsonResponse('The secret is removed', 'PluginSecretFieldStatusResponse'),
+                ] + $errors,
+            ]),
         ];
     }
 
@@ -8343,6 +8394,14 @@ final class CoreApiSchemas
                 'label' => self::str(),
                 'allowed_origins' => ['type' => 'array', 'items' => ['type' => 'string']],
             ], ['plugin', 'form', 'label']),
+            // Closed on purpose: nothing may be added to this answer that could carry the value.
+            'PluginSecretFieldStatusResponse' => self::object([
+                'is_set' => self::bool(),
+                'updated_at' => self::str(nullable: true),
+            ], ['is_set', 'updated_at']) + ['additionalProperties' => false],
+            'PluginSecretFieldSaveRequest' => self::object([
+                'value' => ['type' => 'string', 'format' => 'password', 'writeOnly' => true, 'minLength' => 1],
+            ], ['value']),
             'PublicFormKeyUpdateRequest' => self::object([
                 'label' => self::str(),
                 'allowed_origins' => ['type' => 'array', 'items' => ['type' => 'string']],

@@ -14,6 +14,7 @@ use Whity\Core\Request;
 use Whity\Core\Security\EncryptedSecretStore;
 use Whity\Core\Tenant\TenantContext;
 use Whity\Http\JsonBody;
+use Whity\OpenAPI\CoreApiSchemas;
 use Whity\Sdk\Http\Response;
 use Whity\Sdk\PluginInterface;
 use Whity\Sdk\Secrets\PluginSecretFieldsInterface;
@@ -107,6 +108,37 @@ final class PluginSecretFieldsApiHandlerRealEngineTest extends TestCase
         self::assertTrue(json_decode($status->getBody(), true)['is_set']);
         self::assertSame(['is_set', 'updated_at'], array_keys(json_decode($status->getBody(), true)));
         self::assertSame(self::VALUE, $this->secrets->for($this->acme)->get(self::BAKERY, 'api_key'), 'the plugin itself can read it');
+    }
+
+    public function testThePublishedContractAndTheAnswersCarryOnlyTheStatus(): void
+    {
+        $contract = CoreApiSchemas::components()['PluginSecretFieldStatusResponse'];
+        self::assertFalse($contract['additionalProperties']);
+        self::assertSame(['is_set', 'updated_at'], array_keys($contract['properties']));
+
+        $routes = array_values(array_filter(
+            CoreApiSchemas::routes(),
+            static fn (array $route): bool => $route['path'] === '/api/plugin-secrets/{plugin}/{key}',
+        ));
+        self::assertSame(['GET', 'PUT', 'DELETE'], array_column($routes, 'method'));
+        foreach ($routes as $route) {
+            self::assertStringEndsWith(
+                '/PluginSecretFieldStatusResponse',
+                $route['schema']['responses'][200]['content']['application/json']['schema']['$ref'],
+                $route['method'],
+            );
+            self::assertSame(['expose' => false], $route['schema']['mcp'], $route['method']);
+        }
+
+        foreach (
+            [
+                $this->save(),
+                $this->handler->status($this->request('GET'), $this->params()),
+                $this->handler->clear($this->request('DELETE'), $this->params()),
+            ] as $answer
+        ) {
+            self::assertSame(array_keys($contract['properties']), array_keys(json_decode($answer->getBody(), true)));
+        }
     }
 
     public function testItIsStoredEncrypted(): void
