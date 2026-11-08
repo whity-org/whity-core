@@ -96,7 +96,7 @@ test.describe('OU Management Hub (admin)', () => {
 
     const dialog = page.getByRole('dialog');
     await expect(dialog.getByText('Create Organizational Unit')).toBeVisible();
-    await dialog.getByPlaceholder('e.g., Engineering').fill(childName);
+    await dialog.locator('#ou-create-name-en').fill(childName);
     await dialog.getByRole('button', { name: 'Create', exact: true }).click();
     await expect(page.getByText('Organizational unit created successfully')).toBeVisible();
 
@@ -121,7 +121,7 @@ test.describe('OU Management Hub (admin)', () => {
 
     const dialog = page.getByRole('dialog');
     await expect(dialog.getByRole('heading', { name: 'Edit Organizational Unit' })).toBeVisible();
-    const nameField = dialog.getByPlaceholder('e.g., Engineering');
+    const nameField = dialog.locator('#ou-edit-name-en');
     await expect(nameField).toHaveValue(name);
     await nameField.fill(renamed);
     await dialog.getByRole('button', { name: 'Update' }).click();

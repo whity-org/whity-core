@@ -4292,6 +4292,8 @@ final class CoreApiSchemas
             'tenant_id' => self::int(),
             'parent_id' => self::int(true),
             'name' => self::str(),
+            'name_language' => self::str() + ['description' => 'Language code of the original name (`name`). For many institutions this is Arabic.'],
+            'names' => self::localizedText() + ['description' => 'The name in every language it has, original included. A reader with no name in their language sees the original.'],
             'slug' => self::str(),
             'description' => self::str(true),
             'created_at' => self::str(true),
@@ -4301,7 +4303,7 @@ final class CoreApiSchemas
             // Active people directly in this unit, not counting the units below.
             'member_count' => self::int(),
         ], [
-            'id', 'tenant_id', 'parent_id', 'name', 'slug', 'description', 'created_at',
+            'id', 'tenant_id', 'parent_id', 'name', 'name_language', 'names', 'slug', 'description', 'created_at',
             'ou_type_id', 'ou_type_key', 'ou_type_label', 'member_count',
         ]);
 
@@ -7731,6 +7733,8 @@ final class CoreApiSchemas
                 'tenant_id' => self::int(),
                 'parent_id' => self::int(true),
                 'name' => self::str(),
+                'name_language' => self::str() + ['description' => 'Language code of the original name (`name`). For many institutions this is Arabic.'],
+                'names' => self::localizedText() + ['description' => 'The name in every language it has, original included. A reader with no name in their language sees the original.'],
                 'slug' => self::str(),
                 'description' => self::str(true),
                 'created_at' => self::str(true),
@@ -7742,12 +7746,14 @@ final class CoreApiSchemas
                     'items' => self::object(['id' => self::int()], ['id']),
                 ],
             ], [
-                'id', 'tenant_id', 'parent_id', 'name', 'slug', 'description', 'created_at',
+                'id', 'tenant_id', 'parent_id', 'name', 'name_language', 'names', 'slug', 'description', 'created_at',
                 'ou_type_id', 'ou_type_key', 'ou_type_label', 'children',
             ]),
             'OuDetailResponse' => self::dataEnvelope(SchemaBuilder::ref('OuDetail')),
             'OuCreateRequest' => self::object([
-                'name' => self::name(nonEmpty: true) + ['description' => 'Name of the organizational unit.'],
+                'name' => self::name(nonEmpty: true) + ['description' => 'Original name of the organizational unit, in `name_language`.'],
+                'names' => self::localizedText() + ['description' => 'The name in every language, for example `{"ar": "...", "en": "..."}`.'],
+                'name_language' => self::str() + ['description' => 'Language code of the original name. Defaults to `ar` for a name in Arabic letters, `en` otherwise.'],
                 'description' => self::text() + ['description' => 'What the unit is.'],
                 // Omitted or null makes the unit a root. A parent outside the
                 // caller's tenant is a 403, not a 404.
@@ -7759,7 +7765,9 @@ final class CoreApiSchemas
                 'type' => self::ouTypeKey() + ['description' => 'Kind of unit, by its stable key (see GET /api/ou-types). Send this or `ou_type_id`, not both.'],
             ], ['name']) + self::mutuallyExclusive('ou_type_id', 'type'),
             'OuUpdateRequest' => self::object([
-                'name' => self::name(nonEmpty: true) + ['description' => 'New name.'],
+                'name' => self::name(nonEmpty: true) + ['description' => 'New original name, in `name_language`.'],
+                'names' => self::localizedText() + ['description' => 'The name in every language; replaces them all. A blank language is removed.'],
+                'name_language' => self::str() + ['description' => 'Language code of the original name. The original must have text.'],
                 'description' => self::text() + ['description' => 'New description.'],
                 // array_key_exists, not isset: an explicit null moves the unit
                 // to the root, and an explicit null `ou_type_id`/`type` untypes
