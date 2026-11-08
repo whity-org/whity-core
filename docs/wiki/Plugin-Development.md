@@ -1276,6 +1276,29 @@ the HelloWorld plugin, enqueued as `helloworld:greeting_digest`.
 
 ---
 
+### Enqueue your own jobs and read their status (SDK 1.91)
+
+```php
+$queue = \Whity\app(PluginJobQueue::class)->for($this);
+$id = $queue->enqueue('catalog.sync', ['page' => 1], idempotencyKey: 'sync-page-1');
+$status = $queue->status($id);
+```
+
+Use the bare name from `getJobs()`; the host adds your namespace, so you can't enqueue another plugin's job or a core one. The job runs in the workspace you enqueued it from. With none in scope, the call throws. `status()` and `recent()` show only your plugin's jobs in that workspace, and a finished job stays readable for a day.
+
+### Run a job on a schedule (SDK 1.91)
+
+Implement [`PluginScheduledJobsInterface`](../../sdk/src/Jobs/PluginScheduledJobsInterface.php) and name one of your jobs with a five-field cron expression in UTC:
+
+```php
+public function getScheduledJobs(): array
+{
+    return ['catalog.sync' => '0 * * * *'];
+}
+```
+
+The host runs it once per workspace at each occurrence, with an empty payload. Schedules appear within a few minutes of the plugin loading and go when it does. A workspace that paused one stays paused. A declaration naming a job you don't ship, or a bad cron expression, is refused whole and logged.
+
 ## Step 11 — Put your own events in the audit trail (SDK 1.29)
 
 The host's audit writer subscribes to a hardcoded map of **core** event names,
