@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.89).
+ * SDK identity (v1.90).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1162,12 +1162,21 @@ namespace Whity\Sdk;
  * already fired (WHIT-1033).
  *
  * Purely additive.)
+ *
+ * 1.90 (NOTIFIER: the optional {@see Notification\PluginNotificationsInterface} declares
+ * notification types with English and Arabic labels, and the host service
+ * {@see Notification\PluginNotifier} sends them to a person, role or unit in the
+ * current workspace, in each recipient's language. Only active members are reached,
+ * opt-outs apply, and types are namespaced under the plugin, so none can pose as a
+ * security or billing notice (WHIT-1030).
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.89.0';
+    public const VERSION = '1.90.0';
 
     /**
      * Static identity only — never instantiated.

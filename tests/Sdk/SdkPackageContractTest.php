@@ -242,9 +242,10 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsOneEightForInteractiveBlocks(): void
     {
         $this->assertSame(
-            '1.89.0',
+            '1.90.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.89 ADDS observe-only hook listeners and constants for events core already fired (WHIT-1033). '
+            'SDK 1.90 ADDS Notification\\PluginNotifier and PluginNotificationsInterface, bound by the host to the current workspace and its active members (WHIT-1030). '
+            . 'SDK 1.89 ADDS observe-only hook listeners and constants for events core already fired (WHIT-1033). '
             . 'SDK 1.88 ADDS Settings\PluginSettings, a settings-changed event and the secretField block (WHIT-1016). '
             . 'SDK 1.87 ADDS workspace, language and actor kind on Http\Request (WHIT-1015). '
             . 'SDK 1.86 ADDS Billing\\LicenceSales and PluginLicenceSalesInterface: one billing plugin sells store plugin licences, and no other plugin can answer in its place (WHIT-1013). '

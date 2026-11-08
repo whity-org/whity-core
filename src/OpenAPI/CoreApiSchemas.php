@@ -9684,7 +9684,12 @@ final class CoreApiSchemas
             'NotificationPreferencesResponse' => self::object([
                 'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('NotificationPreferenceEntry')],
                 'transactional_prefixes' => ['type' => 'array', 'items' => self::str()],
-            ], ['data', 'transactional_prefixes']),
+                'plugin_types' => ['type' => 'array', 'items' => self::object([
+                    'type' => self::str(),
+                    'label' => self::object(['en' => self::str(), 'ar' => self::str()], ['en', 'ar']),
+                    'plugin' => self::str(),
+                ], ['type', 'label', 'plugin'])],
+            ], ['data', 'transactional_prefixes', 'plugin_types']),
             'DisplayPreferences' => self::object([
                 'textSize' => ['type' => 'string', 'enum' => ['standard', 'larger']],
                 'showTechnicalDetails' => self::bool(),

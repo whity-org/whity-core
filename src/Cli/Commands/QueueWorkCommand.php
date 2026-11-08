@@ -96,6 +96,7 @@ final class QueueWorkCommand implements CliCommand
             $auditLogger = new AuditLogger($pdo, $this->logger, AuditOrigin::job());
             $auditLogger->subscribe($hookManager);
             \Whity\register_service(HookManager::class, $hookManager);
+            \Whity\Core\Plugin\HostPluginServices::register($pdo, $auditLogger, $this->logger);
 
             $repo ??= new JobRepository($pdo);
             $registry = new JobRegistry();

@@ -1556,6 +1556,40 @@ class PluginLoader
     }
 
     /**
+     * The notification types active plugins declare, with their labels
+     * (WHIT-1030). A declaration that throws or is malformed costs that plugin
+     * its entries here and nothing else.
+     *
+     * @return list<array{type: string, label: array{en: string, ar: string}, plugin: string}>
+     */
+    public function declaredNotificationTypes(): array
+    {
+        $declared = [];
+        foreach ($this->registeredPlugins as $pluginKey => $info) {
+            $plugin = $info['plugin'];
+            $lifecycle = $this->lifecycles[$pluginKey] ?? null;
+            if (
+                !$plugin instanceof \Whity\Sdk\Notification\PluginNotificationsInterface
+                || isset($this->administrativelyDisabled[$pluginKey])
+                || $lifecycle === null
+                || !$lifecycle->isActive()
+            ) {
+                continue;
+            }
+            try {
+                $slug = \Whity\Core\Plugin\PluginIdentity::slugOf($plugin);
+                foreach (\Whity\Core\Notification\PluginNotificationTypes::of($plugin, $slug) as $type => $label) {
+                    $declared[] = ['type' => $type, 'label' => $label, 'plugin' => $slug];
+                }
+            } catch (Throwable $e) {
+                $this->logWarning("Plugin {$pluginKey} declares invalid notification types: " . $e->getMessage());
+            }
+        }
+
+        return $declared;
+    }
+
+    /**
      * Get all registered plugins
      *
      * @return array<PluginInterface> Array of registered plugin instances
@@ -3218,6 +3252,10 @@ class PluginLoader
         string $namespacePrefix,
         string $pluginKey
     ): array {
+        // WHIT-1030: the name a plugin's own services are bound to, fixed here
+        // rather than read from the plugin each time it asks.
+        \Whity\Core\Plugin\PluginIdentity::bind($plugin, $plugin->getName());
+
         // Snapshot the declared routes ONCE so registration and the frontend
         // descriptor validation below judge the same declaration set.
         $routes = $plugin->getRoutes();

@@ -1720,6 +1720,33 @@ The approvals card shows each row's `label`, `before` and `after`. The host runs
 
 `Events::MCP_CONNECTION_CREATED`, `MCP_CONNECTION_GRANT_CHANGED` and `MCP_CONNECTION_REVOKED` say a connection was made, its grant changed, or it was disconnected (`by` is `owner`, `admin` or `agent_removed`). Ids only, after the change. Connecting and disconnecting stay with people.
 
+### Notify people (SDK 1.90)
+
+Declare the types you send with [`PluginNotificationsInterface`](../../sdk/src/Notification/PluginNotificationsInterface.php), each with an English and an Arabic label, then send through the host's notifier:
+
+```php
+public function getNotificationTypes(): array
+{
+    return ['order.shipped' => ['label' => ['en' => 'Order shipped', 'ar' => 'تم شحن الطلب']]];
+}
+
+$notice = new Notice(
+    ['en' => 'Your order shipped', 'ar' => 'تم شحن طلبك'],
+    ['en' => 'It is on its way.', 'ar' => 'طلبك في الطريق.'],
+    ['order_id' => $orderId],
+);
+\Whity\app(PluginNotifier::class)->for($this)->toRole('order.shipped', $roleId, $notice);
+```
+
+`toPerson`, `toRole` and `toUnit` (the unit and those below it) return how many people were notified. The host decides the rest:
+
+- The workspace is the one the request or job runs in. With none in scope, the call throws.
+- Only active members of that workspace are reached. Anyone else counts as nobody, so check the returned number rather than expecting an error.
+- Your type is stored as `your_plugin:order.shipped`, so it can't be mistaken for another plugin's or for a core notice, and it always respects a person's opt-outs, even if you name it `security.alert`.
+- Pass the plugin itself to `for()`. An object the host didn't load is refused.
+- A single send reaches at most 1000 people, and notifications are in-app only for now.
+
+Declared types and their labels are listed in `GET /api/me/notification-preferences` as `plugin_types`.
 ### Prompts and resources for agents (SDK 1.80)
 
 Prompts (`PluginMcpInterface`) and resources (`PluginMcpResourcesInterface`) put your text straight into an AI agent's context, so the host serves them only from a **Verified** plugin the operator has granted **agent context**:

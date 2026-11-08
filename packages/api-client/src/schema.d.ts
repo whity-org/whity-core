@@ -11837,6 +11837,14 @@ export interface components {
         NotificationPreferencesResponse: {
             data: components["schemas"]["NotificationPreferenceEntry"][];
             transactional_prefixes: string[];
+            plugin_types: {
+                type: string;
+                label: {
+                    en: string;
+                    ar: string;
+                };
+                plugin: string;
+            }[];
         };
         NotificationPreferencesUpdateRequest: {
             /** @description Entries of `{type, channel, enabled}` to set for the signed-in user. Transactional notification types cannot be turned off. */
