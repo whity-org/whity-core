@@ -16,10 +16,17 @@
  * server could not resolve a prefill for is reported rather than silently left
  * blank, because "we tried to fill this and could not" and "this was never
  * meant to be filled" look identical once the box is empty.
+ *
+ * WHIT-920: `?edit={submission}` changes a submission that was sent back to
+ * this person and sends it again (`PUT /api/v1/me/form-submissions/{id}`), and
+ * `?from={submission}` starts a new one with the answers of an earlier one (a
+ * submission that was not approved). Both seed the answers from the person's
+ * own submission and keep no draft.
  */
 
 import { use, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { Icon } from '@whity/ui/icon';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
 import { FormHeader, type FormBannerValue } from '@whity/features/forms';
@@ -61,6 +68,29 @@ interface RenderedForm {
   accepts_submissions: boolean;
 }
 
+/** WHIT-920: the parts of the person's own submission that seed the answers. */
+interface OwnSubmission {
+  data: Record<string, unknown> | [];
+  progress?: { can_resubmit: boolean; notes: Array<{ kind: string; note: string }> } | null;
+}
+
+function positiveId(raw: string | null): number | null {
+  return raw !== null && /^\d+$/.test(raw) && Number(raw) > 0 ? Number(raw) : null;
+}
+
+/** Earlier answers as the fill page holds them; anything it cannot hold is left out. */
+function answersFrom(data: Record<string, unknown> | [], fileKeys: Set<string>): Record<string, Answer> {
+  const out: Record<string, Answer> = {};
+  if (Array.isArray(data)) return out;
+  for (const [key, value] of Object.entries(data)) {
+    if (fileKeys.has(key)) continue;
+    if (typeof value === 'string' || typeof value === 'boolean') out[key] = value;
+    else if (typeof value === 'number') out[key] = String(value);
+    else if (Array.isArray(value) && value.every((item) => typeof item === 'string')) out[key] = value as string[];
+  }
+  return out;
+}
+
 export default function FillFormPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { dir } = useDirection();
@@ -70,6 +100,13 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
   const { hasPermission, loading: capabilitiesLoading } = useCapabilities();
   const { time } = useDateDisplay();
   const draft = useFormDraft(id);
+  // WHIT-920: which submission seeds the answers, and whether this sends it again.
+  const searchParams = useSearchParams();
+  // Null outside the app router (a test rendering the page on its own).
+  const editId = positiveId(searchParams?.get('edit') ?? null);
+  const fromId = editId === null ? positiveId(searchParams?.get('from') ?? null) : null;
+  const seedId = editId ?? fromId;
+  const [changesAsked, setChangesAsked] = useState<string | null>(null);
   // Fail-closed while loading, so nothing is asked until this is known. Latched, because
   // a later refresh of the permissions mustn't refetch the form and reseed the answers.
   const [capabilitiesKnown, setCapabilitiesKnown] = useState(false);
@@ -85,7 +122,7 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
   const [rendered, setRendered] = useState<RenderedForm | null>(null);
   // Which failure, not its wording: the words are chosen when they are drawn, so a
   // language loading late can't refetch the form and reseed the answers below.
-  const [loadError, setLoadError] = useState<'notOpened' | 'loadFailed' | null>(null);
+  const [loadError, setLoadError] = useState<'notOpened' | 'loadFailed' | 'notSentBack' | null>(null);
   const [loading, setLoading] = useState(true);
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
   const [submitted, setSubmitted] = useState(false);
@@ -171,10 +208,28 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
         for (const [key, value] of Object.entries(body.data.prefill ?? {})) {
           if (typeof value === 'string' && value !== '') seed[key] = value;
         }
+
+        // WHIT-920: the person's own earlier answers, over the prefill. A file is
+        // not carried: a new submission attaches its own, and an edit keeps the
+        // one already attached unless a new one is given.
+        if (seedId !== null) {
+          const own = await apiClient(`/api/v1/me/form-submissions/${seedId}`, { headers: { Accept: 'application/json' } });
+          const ownBody = (await own.json().catch(() => ({}))) as { data?: OwnSubmission };
+          if (cancelled) return;
+          if (!own.ok || ownBody.data === undefined || (editId !== null && ownBody.data.progress?.can_resubmit !== true)) {
+            setLoadError(editId !== null ? 'notSentBack' : 'notOpened');
+            return;
+          }
+          const fileKeys = new Set(body.data.fields.filter((f) => f.field_type === 'file').map((f) => f.field_key));
+          Object.assign(seed, answersFrom(ownBody.data.data, fileKeys));
+          const asked = (ownBody.data.progress?.notes ?? []).filter((note) => note.kind === 'sent_back');
+          setChangesAsked(asked.length > 0 ? asked[asked.length - 1].note : null);
+        }
+
         prefilled.current = seed;
         // Prefill first, then whatever was already typed — a draft is a
         // later statement of intent than a default, so it wins.
-        const saved = body.data.accepts_submissions ? await draft.load() : null;
+        const saved = body.data.accepts_submissions && seedId === null ? await draft.load() : null;
         if (cancelled) return;
         setAnswers({ ...seed, ...(saved?.answers ?? {}) });
         setRestored(saved !== null);
@@ -202,6 +257,8 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
   // single-use, so restoring one would hand the server a reference it has already spent
   // and refuse the submission for a reason nobody can see.
   function keepDraft(next: Record<string, Answer>, step: number) {
+    // Seeded from a submission (WHIT-920): the answers already live on it.
+    if (seedId !== null) return;
     const fileKeys = new Set(
       (rendered?.fields ?? []).filter((f) => f.field_type === 'file').map((f) => f.field_key)
     );
@@ -274,8 +331,10 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
     // No save may land after this and bring the draft back. The server drops the draft
     // as it takes the answers.
     await draft.pause();
-    const response = await apiClient(`${apiBase}/${encodeURIComponent(id)}/submissions`, {
-      method: 'POST',
+    // WHIT-920: an edit sends the sent-back submission again rather than a new one.
+    const address = editId !== null ? `/api/v1/me/form-submissions/${editId}` : `${apiBase}/${encodeURIComponent(id)}/submissions`;
+    const response = await apiClient(address, {
+      method: editId !== null ? 'PUT' : 'POST',
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
@@ -318,7 +377,9 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
           <CardDescription>
             {loadError === 'loadFailed'
               ? t('fill.loadFailed', 'This form could not be loaded. Check your connection and try again.')
-              : t('fill.notOpened', 'This form could not be opened.')}
+              : loadError === 'notSentBack'
+                ? t('fill.notSentBack', 'This submission is not waiting for your changes, so it cannot be edited now.')
+                : t('fill.notOpened', 'This form could not be opened.')}
           </CardDescription>
         </CardHeader>
       </Card>
@@ -335,9 +396,11 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
     return (
       <Card>
         <CardHeader>
-          <CardTitle>{t('fill.sentMemberTitle', 'Submitted')}</CardTitle>
+          <CardTitle>{editId !== null ? t('fill.resentTitle', 'Sent again') : t('fill.sentMemberTitle', 'Submitted')}</CardTitle>
           <CardDescription>
-            {t('fill.sentMember', '{title} was recorded. It appears under your own submissions.', { title })}
+            {editId !== null
+              ? t('fill.resent', 'Your changes to {title} were sent. It appears under your own submissions.', { title })
+              : t('fill.sentMember', '{title} was recorded. It appears under your own submissions.', { title })}
           </CardDescription>
           {reference !== null && (
             <p className="text-sm font-medium">{t('fill.reference', 'Your reference: {reference}', { reference })}</p>
@@ -364,6 +427,18 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
             </p>
           ) : (
             <div className="space-y-6">
+              {seedId !== null && (
+                <div className="space-y-1 rounded-xl border border-border/60 bg-card p-3 text-sm shadow-2xs">
+                  <p>
+                    {editId !== null
+                      ? t('fill.editing', 'You are changing a submission that was sent back to you. Files you attached stay unless you attach new ones.')
+                      : t('fill.startingFrom', 'Your earlier answers are filled in. Change what you need and send it as a new submission.')}
+                  </p>
+                  {changesAsked !== null && (
+                    <p className="text-muted-foreground">{t('fill.changesAsked', 'Changes asked for: {note}', { note: changesAsked })}</p>
+                  )}
+                </div>
+              )}
               {restored && (
                 <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-card p-3 text-sm shadow-2xs">
                   <span className="text-muted-foreground">

@@ -85,4 +85,13 @@ final class DocumentRouteSubject implements RouteSubjectProviderInterface
     {
         return false;
     }
+
+    public function isWithdrawn(int $tenantId, int $subjectId): bool
+    {
+        $stmt = $this->db->prepare('SELECT withdrawn_at FROM documents WHERE id = :id AND tenant_id = :tenant_id');
+        $stmt->execute([':id' => $subjectId, ':tenant_id' => $tenantId]);
+        $at = $stmt->fetchColumn();
+
+        return $at !== false && $at !== null;
+    }
 }

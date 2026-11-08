@@ -75,6 +75,13 @@ final class FormResponsesApiHandler
             foreach ($this->rows($tenantId, $formId) as $row) {
                 $total++;
                 $state = (string) ($row['state'] ?? 'not routed');
+                // WHIT-920: waiting for its author's changes is still in progress,
+                // and a route that ended on a rejection has finished.
+                $state = match ($state) {
+                    'sent back' => 'in progress',
+                    'not approved' => 'completed',
+                    default => $state,
+                };
                 $routing[$state] = ($routing[$state] ?? 0) + 1;
 
                 $week = self::weekOf((string) ($row['submitted_at'] ?? ''));

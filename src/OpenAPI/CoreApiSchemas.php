@@ -207,6 +207,9 @@ final class CoreApiSchemas
         'DELETE /api/data-types/{type}/{id}',
         'POST /api/data-types/{type}/bulk',
         'POST /api/documents/{id:\d+}/routes/{routeId:\d+}/actions',
+        // WHIT-920: the same act on a route whatever it travels on. The engine
+        // refuses anybody without an open item on the route.
+        'POST /api/routes/{routeId:\d+}/actions',
     ];
 
     /**
@@ -2191,6 +2194,27 @@ final class CoreApiSchemas
                     'responses' => [
                         200 => self::jsonResponse('The submission and its fields', 'FormSubmissionDetailResponse'),
                         404 => self::errorResponse('Not one of the caller\'s submissions'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'PUT',
+                'path' => '/api/me/form-submissions/{id:\d+}',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Change a submission that was sent back to the caller, and send it again',
+                    'description' => 'Only while its route is waiting for the caller\'s changes: otherwise a 409 '
+                        . 'with `details.reason` `not_sent_back`. The answers are checked as a new submission\'s '
+                        . 'are, a new version is recorded for the reviewers to compare, and the route resumes '
+                        . 'where the reviewer chose. Somebody else\'s submission is a 404.',
+                    'tags' => ['forms'],
+                    'request' => 'FormSubmissionResubmitRequest',
+                    'responses' => [
+                        200 => self::jsonResponse('The changed submission', 'FormSubmissionResubmitResponse'),
+                        404 => self::errorResponse('Not one of the caller\'s submissions'),
+                        409 => self::errorResponse('Not waiting for the caller\'s changes'),
+                        422 => self::errorResponse('An answer failed validation'),
                     ] + self::authErrors(),
                 ],
             ],
@@ -6027,9 +6051,10 @@ final class CoreApiSchemas
             ], ['id', 'route_id', 'from_step_id', 'to_step_id', 'verdict']),
             'DocumentRoute' => self::object([
                 'id' => self::int(),
-                'document_id' => self::int(),
-                // WHIT-918 (#1722). What the route travels on: a document today,
-                // form submissions and plugin records later.
+                // WHIT-920: null on a route whose subject has no document yet.
+                'document_id' => self::int(true),
+                // WHIT-918 (#1722). What the route travels on: a document, or a
+                // form submission (WHIT-920); plugin records later.
                 'subject' => self::object([
                     'type' => self::str(),
                     'id' => self::int(),
@@ -6148,7 +6173,7 @@ final class CoreApiSchemas
             // the argument for the table existing at all.
             'DocumentTrailEvent' => self::object([
                 'id' => self::int(),
-                'document_id' => self::int(),
+                'document_id' => self::int(true),
                 'route_id' => self::int(),
                 // Null on an `issued` event, which is about the route rather than
                 // any one step.
@@ -6194,7 +6219,7 @@ final class CoreApiSchemas
             // check it.
             'DocumentRouteRecipient' => self::object([
                 'id' => self::int(),
-                'document_id' => self::int(),
+                'document_id' => self::int(true),
                 'route_id' => self::int(),
                 'step_id' => self::int(),
                 'profile_id' => self::int(),
@@ -6963,6 +6988,13 @@ final class CoreApiSchemas
                 'updated_at' => self::str(),
                 'steps' => ['type' => 'array', 'items' => SchemaBuilder::ref('RouteTemplateStep')],
                 'edges' => ['type' => 'array', 'items' => SchemaBuilder::ref('RouteTemplateEdge')],
+                // WHIT-920: published forms whose public link takes anonymous
+                // submissions through this design. Nobody can send those back
+                // for changes, so the editor warns while a stage allows it.
+                'anonymous_public_forms' => ['type' => 'array', 'items' => self::object([
+                    'id' => self::int(),
+                    'name' => self::str(),
+                ], ['id', 'name'])],
             ], ['id', 'name', 'default_quorum', 'max_steps', 'steps', 'edges'])),
             'RouteTemplateCreateRequest' => self::object([
                 'name' => self::str(),
@@ -8116,6 +8148,9 @@ final class CoreApiSchemas
                 // somebody holding `forms:manage` called
                 // POST /api/v1/forms/{id}/public-link.
                 'public_enabled' => self::bool(),
+                // WHIT-920: the public link asks visitors to sign in, so only the
+                // workspace's members and customers send it, under their own name.
+                'public_requires_sign_in' => self::bool(),
                 // 64 hex characters — 256 bits from a CSPRNG. It is the ONLY
                 // credential the public endpoints have, so treat it as one: it is
                 // returned to tenant members (who must be able to hand the link
@@ -8384,6 +8419,7 @@ final class CoreApiSchemas
                 'banner' => SchemaBuilder::ref('FormBannerInput') + ['nullable' => true, 'description' => 'A drawn pattern, `{"kind": "image"}` to keep the uploaded picture, or null for none. Upload a picture with POST /api/v1/forms/{id}/banner.'],
                 'sections' => ['type' => 'array', 'maxItems' => 100, 'items' => SchemaBuilder::ref('FormSectionText'), 'description' => 'The title and description of each section, by `section_key`.'],
                 'reference_format' => ['type' => 'string', 'maxLength' => 64, 'nullable' => true, 'description' => 'The reference each new submission is given, e.g. `BAKE-{YYYY}-{SEQ:4}`. Tokens: {YYYY}, {YY}, {MM}, {SEQ}, {SEQ:n}. {SEQ} is required. Dates are UTC. Null gives none.'],
+                'public_requires_sign_in' => self::bool() + ['description' => 'The public link asks visitors to sign in: only the workspace\'s members and customers can send it, under their own name, so it can be sent back to them for changes.'],
             ], []) + ['minProperties' => 1],
             'FormFieldCreateRequest' => self::object([
                 'field_key' => [
@@ -8514,6 +8550,9 @@ final class CoreApiSchemas
                 'accepts_submissions' => self::bool(),
                 'opens_at' => self::str(true),
                 'closes_at' => self::str(true),
+                // WHIT-920: sign in first, then fill it in at /forms/{form_id}.
+                'sign_in_required' => self::bool(),
+                'form_id' => self::int(true) + ['description' => 'Given only when sign-in is required: the form to fill in once signed in.'],
             ], ['slug', 'name', 'fields', 'sections', 'accepts_submissions'])),
             // A field, reduced to what drawing it requires. `id`, `tenant_id` and
             // `form_id` are internal identifiers a stranger has no use for and
@@ -8675,6 +8714,11 @@ final class CoreApiSchemas
                 // fetched by this read", never "empty".
                 'form_key' => self::str(),
                 'form_name' => self::localizedText(),
+                // Where it is, from its route. WHIT-920 adds `sent back` (waiting
+                // for its author's changes) and `not approved` (the route ended
+                // on a rejection).
+                'state' => ['type' => 'string', 'enum' => ['not routed', 'in progress', 'sent back', 'not approved', 'completed', 'withdrawn']],
+                'current_step' => self::str(true),
             ], ['id', 'tenant_id', 'form_id', 'form_version', 'data', 'submitted_at']),
             'FormSubmissionListResponse' => self::listEnvelope('FormSubmission'),
             'FormSubmissionDetailResponse' => self::dataEnvelope([
@@ -8690,9 +8734,78 @@ final class CoreApiSchemas
                             'filename' => self::str(true),
                         ], ['id', 'field_key', 'content_type', 'byte_size', 'filename'])],
                         'form_version_now' => self::int(true),
+                        // WHIT-920: on the caller's own submission only.
+                        'progress' => SchemaBuilder::ref('FormSubmissionProgress') + ['nullable' => true],
                     ], []),
                 ],
             ]),
+            // WHIT-920 (A9): where a submission is, as the person who sent it
+            // sees it. Stages and outcomes, and the notes written for them;
+            // reviewer names only when the workspace shows them.
+            'FormSubmissionProgress' => self::object([
+                'state' => self::str(),
+                'stages' => ['type' => 'array', 'items' => self::object([
+                    'position' => self::int(),
+                    'label' => self::str(true),
+                    'status' => ['type' => 'string', 'enum' => ['done', 'current', 'waiting', 'sent_back', 'not_approved']],
+                    'outcome' => ['type' => 'string', 'enum' => ['approved', 'rejected'], 'nullable' => true],
+                    'reviewers' => ['type' => 'array', 'items' => ['type' => 'string']],
+                ], ['position', 'label', 'status', 'outcome'])],
+                'notes' => ['type' => 'array', 'items' => self::object([
+                    'kind' => ['type' => 'string', 'enum' => ['sent_back', 'not_approved', 'note']],
+                    'note' => self::str(),
+                    'stage' => self::str(true),
+                    'stage_position' => self::int(true),
+                    'at' => self::str(),
+                    'from' => self::str(true),
+                ], ['kind', 'note', 'stage', 'at'])],
+                'can_resubmit' => self::bool(),
+                'resume_from' => ['type' => 'string', 'enum' => ['sender', 'start'], 'nullable' => true],
+                'shows_reviewers' => self::bool(),
+            ], ['state', 'stages', 'notes', 'can_resubmit', 'resume_from', 'shows_reviewers']),
+            'FormSubmissionResubmitRequest' => self::object([
+                'data' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'The changed answers, keyed by field key. A file question left unanswered keeps the file already attached.'],
+                'note' => self::str(true) + ['description' => 'An optional note for the reviewers.'],
+            ], ['data']),
+            'FormSubmissionResubmitResponse' => self::object([
+                'data' => SchemaBuilder::ref('FormSubmission'),
+                'meta' => self::object([
+                    'ignored_keys' => ['type' => 'array', 'items' => ['type' => 'string']],
+                ], ['ignored_keys']),
+            ], ['data', 'meta']),
+            // WHIT-920: a subject and its routes, for a reviewer.
+            'RoutesBySubjectResponse' => self::dataEnvelope(self::object([
+                'subject' => self::object([
+                    'type' => self::str(),
+                    'id' => self::int(),
+                    'title' => self::str(true),
+                    'document_id' => self::int(true),
+                    'version' => self::int(true),
+                    'content_hash' => self::str(true),
+                    'can_send_back' => self::bool(),
+                    'form' => ['type' => 'object', 'nullable' => true, 'additionalProperties' => true, 'description' => 'On a form submission: its questions, its answers and its files.'],
+                ], ['type', 'id', 'title', 'document_id', 'version', 'can_send_back']),
+                'routes' => ['type' => 'array', 'items' => [
+                    'allOf' => [
+                        SchemaBuilder::ref('DocumentRoute'),
+                        self::object([
+                            'trail' => ['type' => 'array', 'items' => SchemaBuilder::ref('DocumentTrailEvent')],
+                            'recipients' => ['type' => 'array', 'items' => SchemaBuilder::ref('DocumentRouteRecipient')],
+                            'changes' => self::object([
+                                'seen_version' => self::int(true),
+                                'current_version' => self::int(true),
+                                'changes' => ['type' => 'array', 'items' => self::object([
+                                    'key' => self::str(),
+                                    'before' => ['nullable' => true],
+                                    'after' => ['nullable' => true],
+                                ], ['key'])],
+                            ], ['seen_version', 'current_version', 'changes']),
+                            'can_send_back' => self::bool(),
+                        ], ['trail', 'recipients', 'changes']),
+                    ],
+                ]],
+                'people' => ['type' => 'object', 'additionalProperties' => ['type' => 'string'], 'description' => 'Display names by profile id, for the people on these routes.'],
+            ], ['subject', 'routes', 'people'])),
             'FormSubmissionWithdrawnResponse' => self::object(['data' => SchemaBuilder::ref('FormSubmission')], ['data']),
             'FormSubmissionCreateResponse' => self::object([
                 'data' => SchemaBuilder::ref('FormSubmission'),
@@ -13541,6 +13654,64 @@ final class CoreApiSchemas
                         200 => self::jsonResponse('The card and its new state', 'HomeCardHiddenResponse'),
                         404 => self::errorResponse('No card by that name that the caller may see'),
                         422 => self::errorResponse('hidden is missing or not true or false'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            // WHIT-920 (#1724). Routes by SUBJECT: a route on a form submission
+            // has no document, so these reach any route. Session-gated with no
+            // permission, like the document routes above.
+            [
+                'method' => 'GET',
+                'path' => '/api/routes',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'A subject and its routes, with their trails, items and what changed',
+                    'description' => 'For a person a route on the subject reached, or who may otherwise read it '
+                        . '(a document they can see; a form submission with `forms:read`). The person who sent '
+                        . 'a form reads their own through My submissions instead. Everybody else gets a 404.',
+                    'tags' => ['documents'],
+                    'parameters' => [
+                        self::queryParam('subject_type', 'string', '`document` or `form_submission`.'),
+                        self::queryParam('subject_id', 'integer', 'The subject\'s id.'),
+                    ],
+                    'responses' => [
+                        200 => self::jsonResponse('The subject and its routes', 'RoutesBySubjectResponse'),
+                        404 => self::errorResponse('Not found, or not visible to the caller'),
+                        422 => self::errorResponse('The subject type and id are required'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'POST',
+                'path' => '/api/routes/{routeId:\d+}/actions',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Act on a route, whatever it travels on',
+                    'description' => 'The same body as acting on a document\'s route. On a form submission a '
+                        . 'rejection needs its reason, which the person who sent it reads.',
+                    'tags' => ['documents'],
+                    'request' => 'DocumentRouteActionRequest',
+                    'responses' => [
+                        201 => self::jsonResponse('The appended trail event', 'DocumentRouteActionResponse'),
+                        404 => self::errorResponse('Route not found, or not visible to the caller'),
+                        422 => self::errorResponse('The act is not available to the caller on this route'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'GET',
+                'path' => '/api/routes/{routeId:\d+}/files/{fileId:\d+}',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Download a file attached to the form submission a route travels on',
+                    'tags' => ['documents'],
+                    'responses' => [
+                        200 => ['description' => 'The file, as an attachment', 'content' => ['application/octet-stream' => ['schema' => ['type' => 'string', 'format' => 'binary']]]],
+                        404 => self::errorResponse('Not a file the caller may read'),
+                        503 => self::errorResponse('The file could not be read from storage'),
                     ] + self::authErrors(),
                 ],
             ],

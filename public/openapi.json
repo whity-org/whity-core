@@ -28150,6 +28150,126 @@
                         }
                     }
                 }
+            },
+            "put": {
+                "operationId": "put_api_v1_me_form_submissions_id",
+                "summary": "Change a submission that was sent back to the caller, and send it again",
+                "tags": [
+                    "forms"
+                ],
+                "description": "Only while its route is waiting for the caller's changes: otherwise a 409 with `details.reason` `not_sent_back`. The answers are checked as a new submission's are, a new version is recorded for the reviewers to compare, and the route resumes where the reviewer chose. Somebody else's submission is a 404.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/FormSubmissionResubmitRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The changed submission",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/FormSubmissionResubmitResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not one of the caller's submissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Not waiting for the caller's changes",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "An answer failed validation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
             }
         },
         "/api/v1/me/form-submissions/{id}/files/{fileId}": {
@@ -42872,6 +42992,320 @@
                         "bearerAuth": []
                     }
                 ]
+            }
+        },
+        "/api/v1/routes": {
+            "get": {
+                "operationId": "get_api_v1_routes",
+                "summary": "A subject and its routes, with their trails, items and what changed",
+                "tags": [
+                    "documents"
+                ],
+                "description": "For a person a route on the subject reached, or who may otherwise read it (a document they can see; a form submission with `forms:read`). The person who sent a form reads their own through My submissions instead. Everybody else gets a 404.",
+                "parameters": [
+                    {
+                        "name": "subject_type",
+                        "in": "query",
+                        "required": false,
+                        "description": "`document` or `form_submission`.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "subject_id",
+                        "in": "query",
+                        "required": false,
+                        "description": "The subject's id.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The subject and its routes",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RoutesBySubjectResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found, or not visible to the caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "The subject type and id are required",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/routes/{routeId}/actions": {
+            "post": {
+                "operationId": "post_api_v1_routes_routeid_actions",
+                "summary": "Act on a route, whatever it travels on",
+                "tags": [
+                    "documents"
+                ],
+                "description": "The same body as acting on a document's route. On a form submission a rejection needs its reason, which the person who sent it reads.",
+                "parameters": [
+                    {
+                        "name": "routeId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DocumentRouteActionRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The appended trail event",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DocumentRouteActionResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Route not found, or not visible to the caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "The act is not available to the caller on this route",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/routes/{routeId}/files/{fileId}": {
+            "get": {
+                "operationId": "get_api_v1_routes_routeid_files_fileid",
+                "summary": "Download a file attached to the form submission a route travels on",
+                "tags": [
+                    "documents"
+                ],
+                "parameters": [
+                    {
+                        "name": "routeId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "fileId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The file, as an attachment",
+                        "content": {
+                            "application/octet-stream": {
+                                "schema": {
+                                    "type": "string",
+                                    "format": "binary"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not a file the caller may read",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "The file could not be read from storage",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
             }
         },
         "/api/v1/routing-rules": {
@@ -58942,7 +59376,8 @@
                         "type": "integer"
                     },
                     "document_id": {
-                        "type": "integer"
+                        "type": "integer",
+                        "nullable": true
                     },
                     "subject": {
                         "type": "object",
@@ -59236,7 +59671,8 @@
                         "type": "integer"
                     },
                     "document_id": {
-                        "type": "integer"
+                        "type": "integer",
+                        "nullable": true
                     },
                     "route_id": {
                         "type": "integer"
@@ -61247,7 +61683,8 @@
                         "type": "integer"
                     },
                     "document_id": {
-                        "type": "integer"
+                        "type": "integer",
+                        "nullable": true
                     },
                     "route_id": {
                         "type": "integer"
@@ -61908,6 +62345,9 @@
                         "type": "boolean"
                     },
                     "public_enabled": {
+                        "type": "boolean"
+                    },
+                    "public_requires_sign_in": {
                         "type": "boolean"
                     },
                     "public_slug": {
@@ -63114,6 +63554,21 @@
                                 "type": "string"
                             }
                         }
+                    },
+                    "state": {
+                        "type": "string",
+                        "enum": [
+                            "not routed",
+                            "in progress",
+                            "sent back",
+                            "not approved",
+                            "completed",
+                            "withdrawn"
+                        ]
+                    },
+                    "current_step": {
+                        "type": "string",
+                        "nullable": true
                     }
                 },
                 "required": [
@@ -63219,6 +63674,10 @@
                                     "form_version_now": {
                                         "type": "integer",
                                         "nullable": true
+                                    },
+                                    "progress": {
+                                        "$ref": "#/components/schemas/FormSubmissionProgress",
+                                        "nullable": true
                                     }
                                 }
                             }
@@ -63241,6 +63700,165 @@
                 },
                 "required": [
                     "data"
+                ]
+            },
+            "FormSubmissionProgress": {
+                "type": "object",
+                "properties": {
+                    "state": {
+                        "type": "string"
+                    },
+                    "stages": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "position": {
+                                    "type": "integer"
+                                },
+                                "label": {
+                                    "type": "string",
+                                    "nullable": true
+                                },
+                                "status": {
+                                    "type": "string",
+                                    "enum": [
+                                        "done",
+                                        "current",
+                                        "waiting",
+                                        "sent_back",
+                                        "not_approved"
+                                    ]
+                                },
+                                "outcome": {
+                                    "type": "string",
+                                    "enum": [
+                                        "approved",
+                                        "rejected"
+                                    ],
+                                    "nullable": true
+                                },
+                                "reviewers": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                }
+                            },
+                            "required": [
+                                "position",
+                                "label",
+                                "status",
+                                "outcome"
+                            ]
+                        }
+                    },
+                    "notes": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "kind": {
+                                    "type": "string",
+                                    "enum": [
+                                        "sent_back",
+                                        "not_approved",
+                                        "note"
+                                    ]
+                                },
+                                "note": {
+                                    "type": "string"
+                                },
+                                "stage": {
+                                    "type": "string",
+                                    "nullable": true
+                                },
+                                "stage_position": {
+                                    "type": "integer",
+                                    "nullable": true
+                                },
+                                "at": {
+                                    "type": "string"
+                                },
+                                "from": {
+                                    "type": "string",
+                                    "nullable": true
+                                }
+                            },
+                            "required": [
+                                "kind",
+                                "note",
+                                "stage",
+                                "at"
+                            ]
+                        }
+                    },
+                    "can_resubmit": {
+                        "type": "boolean"
+                    },
+                    "resume_from": {
+                        "type": "string",
+                        "enum": [
+                            "sender",
+                            "start"
+                        ],
+                        "nullable": true
+                    },
+                    "shows_reviewers": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "state",
+                    "stages",
+                    "notes",
+                    "can_resubmit",
+                    "resume_from",
+                    "shows_reviewers"
+                ]
+            },
+            "FormSubmissionResubmitRequest": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "additionalProperties": true,
+                        "description": "The changed answers, keyed by field key. A file question left unanswered keeps the file already attached."
+                    },
+                    "note": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "An optional note for the reviewers."
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "FormSubmissionResubmitResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/FormSubmission"
+                    },
+                    "meta": {
+                        "type": "object",
+                        "properties": {
+                            "ignored_keys": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "required": [
+                            "ignored_keys"
+                        ]
+                    }
+                },
+                "required": [
+                    "data",
+                    "meta"
                 ]
             },
             "FormSubmissionReview": {
@@ -63408,6 +64026,10 @@
                         "maxLength": 64,
                         "nullable": true,
                         "description": "The reference each new submission is given, e.g. `BAKE-{YYYY}-{SEQ:4}`. Tokens: {YYYY}, {YY}, {MM}, {SEQ}, {SEQ:n}. {SEQ} is required. Dates are UTC. Null gives none."
+                    },
+                    "public_requires_sign_in": {
+                        "type": "boolean",
+                        "description": "The public link asks visitors to sign in: only the workspace's members and customers can send it, under their own name, so it can be sent back to them for changes."
                     }
                 },
                 "minProperties": 1
@@ -69783,6 +70405,14 @@
                             "closes_at": {
                                 "type": "string",
                                 "nullable": true
+                            },
+                            "sign_in_required": {
+                                "type": "boolean"
+                            },
+                            "form_id": {
+                                "type": "integer",
+                                "nullable": true,
+                                "description": "Given only when sign-in is required: the form to fill in once signed in."
                             }
                         },
                         "required": [
@@ -71300,6 +71930,24 @@
                                 "items": {
                                     "$ref": "#/components/schemas/RouteTemplateEdge"
                                 }
+                            },
+                            "anonymous_public_forms": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "id": {
+                                            "type": "integer"
+                                        },
+                                        "name": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "id",
+                                        "name"
+                                    ]
+                                }
                             }
                         },
                         "required": [
@@ -71404,6 +72052,148 @@
                         "nullable": true
                     }
                 }
+            },
+            "RoutesBySubjectResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "subject": {
+                                "type": "object",
+                                "properties": {
+                                    "type": {
+                                        "type": "string"
+                                    },
+                                    "id": {
+                                        "type": "integer"
+                                    },
+                                    "title": {
+                                        "type": "string",
+                                        "nullable": true
+                                    },
+                                    "document_id": {
+                                        "type": "integer",
+                                        "nullable": true
+                                    },
+                                    "version": {
+                                        "type": "integer",
+                                        "nullable": true
+                                    },
+                                    "content_hash": {
+                                        "type": "string",
+                                        "nullable": true
+                                    },
+                                    "can_send_back": {
+                                        "type": "boolean"
+                                    },
+                                    "form": {
+                                        "type": "object",
+                                        "nullable": true,
+                                        "additionalProperties": true,
+                                        "description": "On a form submission: its questions, its answers and its files."
+                                    }
+                                },
+                                "required": [
+                                    "type",
+                                    "id",
+                                    "title",
+                                    "document_id",
+                                    "version",
+                                    "can_send_back"
+                                ]
+                            },
+                            "routes": {
+                                "type": "array",
+                                "items": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/DocumentRoute"
+                                        },
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "trail": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "$ref": "#/components/schemas/DocumentTrailEvent"
+                                                    }
+                                                },
+                                                "recipients": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "$ref": "#/components/schemas/DocumentRouteRecipient"
+                                                    }
+                                                },
+                                                "changes": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "seen_version": {
+                                                            "type": "integer",
+                                                            "nullable": true
+                                                        },
+                                                        "current_version": {
+                                                            "type": "integer",
+                                                            "nullable": true
+                                                        },
+                                                        "changes": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "type": "object",
+                                                                "properties": {
+                                                                    "key": {
+                                                                        "type": "string"
+                                                                    },
+                                                                    "before": {
+                                                                        "nullable": true
+                                                                    },
+                                                                    "after": {
+                                                                        "nullable": true
+                                                                    }
+                                                                },
+                                                                "required": [
+                                                                    "key"
+                                                                ]
+                                                            }
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "seen_version",
+                                                        "current_version",
+                                                        "changes"
+                                                    ]
+                                                },
+                                                "can_send_back": {
+                                                    "type": "boolean"
+                                                }
+                                            },
+                                            "required": [
+                                                "trail",
+                                                "recipients",
+                                                "changes"
+                                            ]
+                                        }
+                                    ]
+                                }
+                            },
+                            "people": {
+                                "type": "object",
+                                "additionalProperties": {
+                                    "type": "string"
+                                },
+                                "description": "Display names by profile id, for the people on these routes."
+                            }
+                        },
+                        "required": [
+                            "subject",
+                            "routes",
+                            "people"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
             },
             "RoutingRule": {
                 "type": "object",

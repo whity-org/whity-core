@@ -42,7 +42,7 @@ final class RouteEffectAttemptRepository
      *         the vocabulary instead of arriving as a driver error from inside a
      *         fail-soft handler.
      */
-    public function append(int $tenantId, int $documentId, array $attempt): int
+    public function append(int $tenantId, ?int $documentId, array $attempt): int
     {
         $status = (string) $attempt['status'];
         if (!RouteEffectStatus::isValid($status)) {
@@ -111,7 +111,8 @@ final class RouteEffectAttemptRepository
     {
         $row['id'] = (int) $row['id'];
         $row['tenant_id'] = (int) $row['tenant_id'];
-        $row['document_id'] = (int) $row['document_id'];
+        // WHIT-920: null for an attempt on a route whose subject has no document.
+        $row['document_id'] = $row['document_id'] === null ? null : (int) $row['document_id'];
         $row['event_id'] = $row['event_id'] === null ? null : (int) $row['event_id'];
         $row['effect_id'] = $row['effect_id'] === null ? null : (int) $row['effect_id'];
         $row['attempt'] = (int) $row['attempt'];

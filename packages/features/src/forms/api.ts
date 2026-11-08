@@ -106,6 +106,9 @@ export function createFormsApi(transport: Transport) {
       call(transport, "GET", "/api/v1/me/form-submissions?limit=200", undefined, fallback, (b) => data<SubmissionRow[]>(b)),
     getMySubmission: (id: number, fallback: string) =>
       call(transport, "GET", `/api/v1/me/form-submissions/${id}`, undefined, fallback, (b) => data<SubmissionDetail>(b)),
+    /** WHIT-920: change a submission that was sent back, and send it again. */
+    resubmitMySubmission: (id: number, answers: Record<string, unknown>, note: string | null, fallback: string) =>
+      call(transport, "PUT", `/api/v1/me/form-submissions/${id}`, { data: answers, ...(note ? { note } : {}) }, fallback, (b) => data<SubmissionRow>(b)),
     withdrawMySubmission: (id: number, fallback: string) =>
       call(transport, "POST", `/api/v1/me/form-submissions/${id}/withdraw`, {}, fallback, (b) => data<SubmissionRow>(b)),
     listMyDrafts: (fallback: string) =>

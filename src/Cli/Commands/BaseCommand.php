@@ -249,6 +249,8 @@ abstract class BaseCommand implements CliCommand, CommandHelp
         // WHIT-918: what a route travels on, mirroring public/index.php.
         $routeSubjectRegistry = new \Whity\Core\Document\Routing\RouteSubjectRegistry();
         $routeSubjectRegistry->register(new \Whity\Core\Document\Routing\DocumentRouteSubject($db->getPdo()));
+        // WHIT-920: form submissions travel on their routes as themselves.
+        $routeSubjectRegistry->register(new \Whity\Core\Form\FormSubmissionRouteSubject($db->getPdo()));
         \Whity\register_service(\Whity\Core\Document\Routing\RouteSubjectRegistry::class, $routeSubjectRegistry);
 
         // EFFECT catalogue (#1032), mirroring public/index.php exactly.
@@ -279,7 +281,12 @@ abstract class BaseCommand implements CliCommand, CommandHelp
         $inboxSourceRegistry->registerCoreSource(
             \Whity\Core\Inbox\InboxSourceRegistry::CORE_DOCUMENT_ROUTING,
             new \Whity\Core\Document\Routing\DocumentRoutingInboxSource(
-                new \Whity\Core\Document\Routing\RouteRecipientRepository($db->getPdo())
+                new \Whity\Core\Document\Routing\RouteRecipientRepository($db->getPdo()),
+                // WHIT-920: whether a form's sender sees who reviewed it.
+                new \Whity\Core\Settings\SettingsService(
+                    new \Whity\Core\Settings\GlobalSettingsRepository($db->getPdo()),
+                    new \Whity\Core\Settings\TenantSettingsRepository($db->getPdo())
+                )
             )
         );
         \Whity\register_service(\Whity\Core\Inbox\InboxSourceRegistry::class, $inboxSourceRegistry);

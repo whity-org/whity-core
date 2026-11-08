@@ -13,7 +13,7 @@ import { useCurrentLanguage } from "./language"
 import { createFormsApi } from "./api"
 import { pickText } from "./text"
 import { ResponsesSummaryCards } from "./responses-summary"
-import type { FieldDraft, FormsScreenEnv, ResponsesSummary, SubmissionDetail, SubmissionFile, SubmissionRow } from "./types"
+import type { FieldDraft, FormsScreenEnv, ResponsesSummary, SubmissionDetail, SubmissionFile, SubmissionProgress, SubmissionRow } from "./types"
 
 /** Where a response is in its routing, in plain words. */
 export function useRoutingLabel() {
@@ -21,6 +21,9 @@ export function useRoutingLabel() {
   return (row: Pick<SubmissionRow, "state" | "current_step">): string => {
     if (row.state === "completed") return t("responses.routing.done", "Finished")
     if (row.state === "withdrawn") return t("responses.routing.withdrawn", "Withdrawn")
+    // WHIT-920: waiting for the sender's changes, or ended on a rejection.
+    if (row.state === "sent back") return t("responses.routing.sentBack", "Sent back for changes")
+    if (row.state === "not approved") return t("responses.routing.notApproved", "Not approved")
     if (row.state === "in progress") {
       return row.current_step ? t("responses.routing.with", "With {step}", { step: row.current_step }) : t("responses.routing.inProgress", "In progress")
     }
@@ -31,7 +34,7 @@ export function useRoutingLabel() {
 /** The badge for where a response is: withdrawn reads as over, not as waiting. */
 export function routingVariant(state: string | undefined): "success" | "secondary" | "outline" {
   if (state === "completed") return "success"
-  return state === "withdrawn" ? "secondary" : "outline"
+  return state === "withdrawn" || state === "not approved" ? "secondary" : "outline"
 }
 
 /** An answer as one line of words. */
@@ -200,13 +203,87 @@ export function ResponseDialog({ env, submissionId, mine = false, onClose }: { e
             ))}
           </dl>
         )}
-        <div className="flex justify-end">
+        {mine && detail?.progress && <SubmissionProgressView progress={detail.progress} />}
+        <div className="flex flex-wrap justify-end gap-2">
           <Button variant="outline" onClick={onClose}>
             {t("builder.close", "Close")}
           </Button>
+          {mine && detail?.progress?.can_resubmit === true && (
+            <Button onClick={() => env.navigate(`/forms/${detail.form_id}?edit=${detail.id}`)}>{t("mine.edit", "Edit and send again")}</Button>
+          )}
+          {mine && detail?.state === "not approved" && (
+            <Button variant="outline" onClick={() => env.navigate(`/forms/${detail.form_id}?from=${detail.id}`)}>
+              {t("mine.startAgain", "Start a new one from this")}
+            </Button>
+          )}
         </div>
       </DialogContent>
     </Dialog>
+  )
+}
+
+/**
+ * WHIT-920: where the sender's own submission is — each stage and its outcome,
+ * and the notes written for them. Who reviewed it shows only when the workspace
+ * shows reviewer names.
+ */
+function SubmissionProgressView({ progress }: { progress: SubmissionProgress }) {
+  const t = useTranslation("forms")
+  const { dateTime } = useDateDisplay()
+  if (progress.stages.length === 0) return null
+
+  const statusWord = (stage: SubmissionProgress["stages"][number]): string => {
+    switch (stage.status) {
+      case "not_approved":
+        return t("progress.notApproved", "Not approved")
+      case "sent_back":
+        return t("progress.sentBack", "Sent back to you for changes")
+      case "current":
+        return t("progress.current", "Being reviewed")
+      case "waiting":
+        return t("progress.waiting", "Not reached yet")
+      default:
+        return stage.outcome === "approved" ? t("progress.approved", "Approved") : t("progress.done", "Done")
+    }
+  }
+
+  return (
+    <section className="space-y-3 border-t border-border pt-4" aria-label={t("progress.title", "Where it is")}>
+      <h3 className="text-sm font-medium">{t("progress.title", "Where it is")}</h3>
+      <ol className="space-y-2">
+        {progress.stages.map((stage) => (
+          <li key={stage.position} className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
+            <span>{stage.label ?? t("progress.stage", "Stage {number}", { number: stage.position })}</span>
+            <span className="text-muted-foreground">
+              {statusWord(stage)}
+              {stage.reviewers && stage.reviewers.length > 0 ? ` · ${stage.reviewers.join(", ")}` : ""}
+            </span>
+          </li>
+        ))}
+      </ol>
+      {progress.notes.length > 0 && (
+        <div className="space-y-2">
+          <h4 className="text-sm font-medium">{t("progress.notes", "Notes for you")}</h4>
+          <ul className="space-y-2">
+            {progress.notes.map((note, index) => (
+              <li key={`${note.at}-${index}`} className="rounded-control bg-muted px-3 py-2 text-sm">
+                <p className="text-xs text-muted-foreground">
+                  {note.kind === "sent_back"
+                    ? t("progress.note.sentBack", "Changes asked for")
+                    : note.kind === "not_approved"
+                      ? t("progress.note.notApproved", "Why it was not approved")
+                      : t("progress.note.note", "Note")}
+                  {note.stage ? ` · ${note.stage}` : ""}
+                  {note.from ? ` · ${note.from}` : ""}
+                  {` · ${dateTime(note.at) ?? ""}`}
+                </p>
+                <p className="whitespace-pre-wrap">{note.note}</p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </section>
   )
 }
 

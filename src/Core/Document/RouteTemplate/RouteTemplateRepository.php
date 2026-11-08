@@ -474,4 +474,33 @@ final class RouteTemplateRepository
             'canvas_y' => (int) $row['canvas_y'],
         ];
     }
+
+    /**
+     * The forms using this design whose public link accepts ANONYMOUS
+     * submissions (WHIT-920): open to the public without asking visitors to sign
+     * in. A submission from one of them has no author, so it cannot be sent back
+     * for changes, and the route editor says so.
+     *
+     * @return list<array{id: int, name: string}>
+     */
+    public function anonymousPublicFormsUsing(int $templateId, int $tenantId): array
+    {
+        $stmt = $this->db->prepare(
+            'SELECT id, name, form_key FROM forms
+              WHERE tenant_id = :tenant_id AND route_template_id = :template_id
+                AND public_enabled = TRUE AND public_requires_sign_in = FALSE
+              ORDER BY id ASC'
+        );
+        $stmt->execute([':tenant_id' => $tenantId, ':template_id' => $templateId]);
+
+        $forms = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $name = \Whity\Core\Form\LocalizedLabel::preferred(
+                \Whity\Core\Form\LocalizedLabel::decode(isset($row['name']) ? (string) $row['name'] : null)
+            );
+            $forms[] = ['id' => (int) $row['id'], 'name' => $name !== '' ? $name : (string) $row['form_key']];
+        }
+
+        return $forms;
+    }
 }

@@ -12,6 +12,7 @@ use Whity\Core\Form\FormSubmissionRepository;
 use Whity\Core\Form\FormUploadPolicy;
 use Whity\Core\Form\FormUploadRepository;
 use Whity\Core\Form\SubmissionIssuer;
+use Whity\Core\Form\SubmissionProgress;
 use Whity\Core\Request;
 use Whity\Core\Response;
 use Whity\Core\Tenant\TenantContext;
@@ -42,8 +43,12 @@ use Whity\Http\JsonBody;
  * member who filled in a form opened to them (migration 198) holds none. Same argument migration 113 makes about routing
  * ("being a recipient IS the authorization") and #978 about the inbox.
  *
- * THERE IS NO PATCH AND NO DELETE
- * --------------------------------
+ * THERE IS NO PATCH AND NO DELETE, AND ONE PUT
+ * ---------------------------------------------
+ * WHIT-920: `PUT /api/v1/me/form-submissions/{id}` is the author changing a
+ * submission the route SENT BACK to them, which resubmits it and records a new
+ * version the reviewers can compare. Nothing else edits one.
+ *
  * A submission is what somebody declared, at a moment, under their own name, and
  * other people have already acted on it — the document it produced may be halfway
  * through an approval whose trail records approvals of a thing that would no
@@ -60,6 +65,8 @@ final class FormSubmissionsApiHandler
         private readonly SubmissionIssuer $issuer,
         private readonly FormUploadRepository $uploads,
         private readonly StorageDriverInterface $storage,
+        // WHIT-920: where the caller's own submission is, for My submissions.
+        private readonly ?SubmissionProgress $progress = null,
     ) {
     }
 
@@ -256,6 +263,9 @@ final class FormSubmissionsApiHandler
                     'fields' => $fields,
                     'files' => $files,
                     'form_version_now' => $form === null ? null : (int) $form['version'],
+                    // WHIT-920: the stages and outcomes, the notes written for
+                    // them, and whether they can edit and resubmit it now.
+                    'progress' => $this->progress?->forSubmission($tenantId, $submission, $profileId),
                 ],
             ]);
         } catch (\Exception $e) {
@@ -263,6 +273,133 @@ final class FormSubmissionsApiHandler
 
             return Response::error('Failed to fetch the submission', 500);
         }
+    }
+
+    /**
+     * PUT /api/v1/me/form-submissions/{id} — change a submission that was sent
+     * back to the caller, and send it again (WHIT-920).
+     *
+     * Body: `{ "data": { ...answers }, "note": "optional" }`. The answers are
+     * checked as a new submission's are. A file question left unanswered keeps
+     * the file already attached, so the author only uploads what they replace.
+     * Refused with reason `not_sent_back` unless the route is waiting for this
+     * person's changes; somebody else's submission is the same 404 as one that
+     * does not exist.
+     *
+     * @param array<string, string> $params
+     */
+    public function resubmitMine(Request $request, array $params): Response
+    {
+        try {
+            $tenantId = TenantContext::getTenantId();
+            $profileId = self::actorProfileId($request);
+            if ($tenantId === null || $profileId === null) {
+                return Response::error('Submission not found', 404);
+            }
+
+            $submission = $this->submissions->find($tenantId, (int) ($params['id'] ?? 0), $profileId);
+            if ($submission === null) {
+                return Response::error('Submission not found', 404);
+            }
+
+            $body = JsonBody::parsed($request);
+            $data = $body['data'] ?? [];
+            if (!is_array($data)) {
+                return Response::error('data must be an object of answers keyed by field key', 422);
+            }
+            $note = $body['note'] ?? null;
+            if ($note !== null && (!is_string($note) || mb_strlen($note) > 4000)) {
+                return Response::error("'note' must be text of 4000 characters or fewer", 422);
+            }
+
+            $fields = FormFieldRepository::applicantFields(
+                $this->fields->listForForm($tenantId, (int) $submission['form_id'])
+            );
+            $before = is_array($submission['data'] ?? null) ? $submission['data'] : [];
+
+            /** @var array<string, mixed> $answers */
+            $answers = [];
+            foreach ($data as $key => $value) {
+                if (is_string($key)) {
+                    $answers[$key] = $value;
+                }
+            }
+            foreach ($fields as $field) {
+                $key = (string) $field['field_key'];
+                $given = $answers[$key] ?? null;
+                if ($field['field_type'] === FieldType::FILE
+                    && ($given === null || $given === '' || $given === [] || $given === true)
+                    && isset($before[$key])) {
+                    $answers[$key] = $before[$key];
+                }
+            }
+
+            $result = $this->issuer->resubmit(
+                $tenantId,
+                $profileId,
+                $submission,
+                $fields,
+                $answers,
+                is_string($note) && trim($note) !== '' ? trim($note) : null,
+            );
+
+            return Response::json([
+                'data' => $result['submission'],
+                'meta' => ['ignored_keys' => $result['ignored']],
+            ]);
+        } catch (FormRejectedException $e) {
+            $status = in_array($e->reason, ['not_sent_back', 'has_document'], true) ? 409 : 422;
+
+            return Response::error($e->clientMessage, $status, $e->details());
+        } catch (\Exception $e) {
+            error_log('[FormSubmissionsApiHandler] resubmitMine failed: ' . $e->getMessage());
+
+            return Response::error('Failed to send the submission again', 500);
+        }
+    }
+
+    /**
+     * One file on a submission, for a reviewer the route reached (WHIT-920).
+     * The caller has already decided they may read the submission; this only
+     * finds the file among the answers and sends it.
+     */
+    public function fileForReviewer(int $tenantId, int $submissionId, int $fileId): Response
+    {
+        try {
+            $submission = $this->submissions->find($tenantId, $submissionId);
+            if ($submission === null) {
+                return Response::error('File not found', 404);
+            }
+            $fields = $this->fields->listForForm($tenantId, (int) $submission['form_id']);
+
+            return $this->sendFile($this->filesOf($tenantId, $submissionId, $fields, $submission['data'] ?? null), $fileId);
+        } catch (\Exception $e) {
+            error_log('[FormSubmissionsApiHandler] fileForReviewer failed: ' . $e->getMessage());
+
+            return Response::error('Failed to fetch the file', 500);
+        }
+    }
+
+    /**
+     * The questions and files of a submission, for a reviewer the route reached
+     * (WHIT-920): every question, the applicant's and the office's, with the
+     * files described rather than addressed by their storage key.
+     *
+     * @return array{fields: list<array<string, mixed>>, files: list<array<string, mixed>>, data: mixed}|null
+     */
+    public function contentForReviewer(int $tenantId, int $submissionId): ?array
+    {
+        $submission = $this->submissions->find($tenantId, $submissionId);
+        if ($submission === null) {
+            return null;
+        }
+        $fields = $this->fields->listForForm($tenantId, (int) $submission['form_id']);
+
+        return [
+            'fields' => $fields,
+            'files' => self::publicFiles($this->filesOf($tenantId, $submissionId, $fields, $submission['data'] ?? null)),
+            'data' => $submission['data'] ?? new \stdClass(),
+        ];
     }
 
     /**

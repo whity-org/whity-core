@@ -237,7 +237,59 @@ final class DocumentRouter
         ?string $templateName = null,
     ): array {
         $documentId = (int) $document['id'];
+
+        return $this->issueOnSubject(
+            $tenantId,
+            $actorId,
+            DocumentRouteSubject::TYPE,
+            $documentId,
+            $documentId,
+            $title,
+            $steps,
+            $templateId,
+            $templateName,
+        );
+    }
+
+    /**
+     * Issue a route on any subject (WHIT-920, #1724): a document, or a subject
+     * that has no document yet, such as a form submission. Everything
+     * {@see issue()} says holds; the only difference is what the route travels
+     * on. `$documentId` is the subject's document when it has one, and null
+     * otherwise: the route's trail and items then carry no document, and are
+     * read through the subject.
+     *
+     * @param list<array<string, mixed>> $steps See {@see issue()}.
+     *
+     * @return array{route: array<string, mixed>, steps: list<array<string, mixed>>,
+     *               edges: list<array<string, mixed>>, resolved: int, delivered: int}
+     *
+     * @throws RoutingRejectedException When the request is not acceptable (422).
+     */
+    public function issueOnSubject(
+        int $tenantId,
+        ?int $actorId,
+        string $subjectType,
+        int $subjectId,
+        ?int $documentId,
+        string $title,
+        array $steps,
+        ?int $templateId = null,
+        ?string $templateName = null,
+    ): array {
         $declared = $this->validateSteps($tenantId, $steps);
+
+        if ($documentId === null) {
+            // A signature is made on a document (WHIT-922), and nobody could
+            // answer this step, so the route would never finish.
+            foreach ($declared as $step) {
+                if ($step['kind'] === RouteStepKind::SIGN) {
+                    throw RoutingRejectedException::because(
+                        'A signing step needs a document to sign, and this route travels on a form submission.'
+                    );
+                }
+            }
+        }
 
         // The actor's unit, captured once and reused for the event and for the
         // first step's resolution — so "the unit this was raised from" and "the
@@ -252,13 +304,22 @@ final class DocumentRouter
         }
 
         try {
-            $this->assertNotWithdrawn($tenantId, $documentId);
+            $this->assertOpen($tenantId, $documentId, $subjectType, $subjectId);
 
-            $routeId = $this->routes->create($tenantId, $documentId, $title, $actorId, $templateId, $templateName);
+            $routeId = $this->routes->create(
+                $tenantId,
+                $documentId,
+                $title,
+                $actorId,
+                $templateId,
+                $templateName,
+                $subjectType,
+                $subjectId,
+            );
 
             // WHIT-919: issuing is the subject's submit, so it records a version
             // (or reuses the current one when nothing changed since).
-            $version = $this->subjectVersion($tenantId, DocumentRouteSubject::TYPE, $documentId, $actorId, true);
+            $version = $this->subjectVersion($tenantId, $subjectType, $subjectId, $actorId, true);
 
             $stepIds = [];
             foreach ($declared as $i => $step) {
@@ -369,6 +430,8 @@ final class DocumentRouter
         }
 
         $this->broadcast('document.routed', $tenantId, $documentId, [
+            'subject_type' => $subjectType,
+            'subject_id' => $subjectId,
             'route_id' => $routeId,
             // The ROUTE's title, which defaults to the document's own. Carried so
             // a subscriber can name the thing in a notification without a second
@@ -449,9 +512,9 @@ final class DocumentRouter
         bool $toAuthor = false,
     ): array {
         $routeId = (int) $route['id'];
-        $documentId = (int) $route['document_id'];
+        [$documentId, $subjectType, $subjectId] = self::routeSubject($route);
 
-        $this->assertNotWithdrawn($tenantId, $documentId);
+        $this->assertOpen($tenantId, $documentId, $subjectType, $subjectId);
 
         if ($action === RouteAction::NOTED) {
             if ($verdict !== null) {
@@ -532,15 +595,24 @@ final class DocumentRouter
             $verdict = $action === RouteAction::SIGNED ? RouteVerdict::APPROVED : RouteVerdict::REJECTED;
         }
 
+        // WHIT-920: on a route with NO document (a form submission routed on
+        // itself), a rejection is told to the applicant, so it needs its
+        // reason, and the reason is marked for them. A route that still has a
+        // document — every document route, and a submission route re-pointed by
+        // migration 233 — behaves as it always did.
+        $travelsWithoutDocument = $documentId === null;
+        if ($verdict === RouteVerdict::REJECTED && $travelsWithoutDocument) {
+            if ($note === null || trim($note) === '') {
+                throw RoutingRejectedException::because(
+                    'Say why it is not approved. The person who sent it sees the reason.'
+                );
+            }
+            $toAuthor = true;
+        }
+
         // WHIT-919: the version this act is made on. Read, never recorded here:
         // only a submit or a resubmit makes a version.
-        $version = $this->subjectVersion(
-            $tenantId,
-            (string) ($route['subject_type'] ?? DocumentRouteSubject::TYPE),
-            (int) ($route['subject_id'] ?? $documentId),
-            $actorId,
-            false,
-        );
+        $version = $this->subjectVersion($tenantId, $subjectType, $subjectId, $actorId, false);
         if ($action === RouteAction::SIGNED && ($version['version'] === null || $version['content_hash'] === null)) {
             // A signature binds to the hash of one version; with none recorded
             // there is nothing to bind it to.
@@ -623,8 +695,14 @@ final class DocumentRouter
             $this->db->beginTransaction();
         }
 
+        // WHIT-920 (A6): on a route with no document, a rejection that
+        // draws no further path ENDS the route. Every item still open on it
+        // closes with the rejection, so the applicant reads "Not approved" rather
+        // than a route still running somewhere else.
+        $endsRoute = $decided === RouteVerdict::REJECTED && $next === null && $travelsWithoutDocument;
+
         try {
-            $this->assertNotWithdrawn($tenantId, $documentId);
+            $this->assertOpen($tenantId, $documentId, $subjectType, $subjectId);
 
             if ($action === RouteAction::SIGNED) {
                 // WHIT-922: read the version again inside the transaction, and
@@ -668,6 +746,7 @@ final class DocumentRouter
                 // the engine then did about it. Null on every act that decided
                 // nothing. {@see RouteVerdict}.
                 'verdict' => $verdict,
+                'to_author' => $toAuthor,
                 'subject_version' => $version['version'],
                 'content_hash' => $version['content_hash'],
             ]);
@@ -688,6 +767,10 @@ final class DocumentRouter
                     (int) $recipient['created_by_event_id'],
                     $eventId,
                 );
+            }
+
+            if ($endsRoute) {
+                $this->recipients->closeOpenOnRoute($tenantId, $routeId, $eventId);
             }
 
             $outcome = ['resolved' => 0, 'delivered' => 0, 'recipients' => []];
@@ -769,6 +852,8 @@ final class DocumentRouter
         }
 
         $this->broadcast('document.route_acted', $tenantId, $documentId, [
+            'subject_type' => $subjectType,
+            'subject_id' => $subjectId,
             'route_id' => $routeId,
             'title' => (string) $route['title'],
             'action' => $action,
@@ -864,11 +949,9 @@ final class DocumentRouter
     public function sendBack(int $tenantId, int $actorId, array $route, ?string $note, string $resumeFrom): array
     {
         $routeId = (int) $route['id'];
-        $documentId = (int) $route['document_id'];
-        $subjectType = (string) ($route['subject_type'] ?? DocumentRouteSubject::TYPE);
-        $subjectId = (int) ($route['subject_id'] ?? $documentId);
+        [$documentId, $subjectType, $subjectId] = self::routeSubject($route);
 
-        $this->assertNotWithdrawn($tenantId, $documentId);
+        $this->assertOpen($tenantId, $documentId, $subjectType, $subjectId);
 
         if ($note === null || trim($note) === '') {
             throw RoutingRejectedException::because(
@@ -898,8 +981,12 @@ final class DocumentRouter
             );
         }
 
-        $provider = $this->subjects?->get($subjectType);
-        $author = $provider?->author($tenantId, $subjectId);
+        // WHIT-920: a route that has a document sends back to the document's
+        // author, as it always did — including a submission route re-pointed by
+        // migration 233. Only a route with no document asks its subject.
+        $author = $documentId !== null
+            ? $this->subjects?->get(DocumentRouteSubject::TYPE)?->author($tenantId, $documentId)
+            : $this->subjects?->get($subjectType)?->author($tenantId, $subjectId);
         if ($author === null) {
             throw RoutingRejectedException::because(
                 'There is nobody to send this back to: its author is not known. Return it or reject it instead.'
@@ -914,7 +1001,7 @@ final class DocumentRouter
         }
 
         try {
-            $this->assertNotWithdrawn($tenantId, $documentId);
+            $this->assertOpen($tenantId, $documentId, $subjectType, $subjectId);
 
             $eventId = $this->events->append($tenantId, $documentId, [
                 'route_id' => $routeId,
@@ -975,6 +1062,8 @@ final class DocumentRouter
         ]];
 
         $this->broadcast('document.route_acted', $tenantId, $documentId, [
+            'subject_type' => $subjectType,
+            'subject_id' => $subjectId,
             'route_id' => $routeId,
             'title' => (string) $route['title'],
             'action' => RouteAction::SENT_BACK,
@@ -1010,11 +1099,9 @@ final class DocumentRouter
     public function resubmit(int $tenantId, int $actorId, array $route, ?string $note): array
     {
         $routeId = (int) $route['id'];
-        $documentId = (int) $route['document_id'];
-        $subjectType = (string) ($route['subject_type'] ?? DocumentRouteSubject::TYPE);
-        $subjectId = (int) ($route['subject_id'] ?? $documentId);
+        [$documentId, $subjectType, $subjectId] = self::routeSubject($route);
 
-        $this->assertNotWithdrawn($tenantId, $documentId);
+        $this->assertOpen($tenantId, $documentId, $subjectType, $subjectId);
 
         $item = $this->recipients->findOpenForProfile($tenantId, $routeId, $actorId);
         if ($item === null || $item['role'] !== RouteRecipientRepository::ROLE_AUTHOR) {
@@ -1052,7 +1139,7 @@ final class DocumentRouter
         }
 
         try {
-            $this->assertNotWithdrawn($tenantId, $documentId);
+            $this->assertOpen($tenantId, $documentId, $subjectType, $subjectId);
 
             // Inside the transaction, so the version and the act that made it
             // commit together.
@@ -1100,6 +1187,8 @@ final class DocumentRouter
         }
 
         $this->broadcast('document.route_acted', $tenantId, $documentId, [
+            'subject_type' => $subjectType,
+            'subject_id' => $subjectId,
             'route_id' => $routeId,
             'title' => (string) $route['title'],
             'action' => RouteAction::RESUBMITTED,
@@ -1153,6 +1242,42 @@ final class DocumentRouter
     }
 
 
+    /**
+     * What a route travels on (WHIT-920): its document (null when the subject
+     * has none yet), the subject type, and the subject id.
+     *
+     * @param array<string, mixed> $route
+     * @return array{0: ?int, 1: string, 2: int}
+     */
+    private static function routeSubject(array $route): array
+    {
+        $documentId = isset($route['document_id']) ? (int) $route['document_id'] : null;
+        $subjectType = (string) ($route['subject_type'] ?? DocumentRouteSubject::TYPE);
+        $subjectId = (int) ($route['subject_id'] ?? $documentId ?? 0);
+
+        return [$documentId, $subjectType, $subjectId];
+    }
+
+    /**
+     * Refuse to move a route whose subject was taken back. A route on a document
+     * is held by the document's withdrawal (S5); a route on a subject without one
+     * asks the subject's provider (WHIT-920).
+     */
+    private function assertOpen(int $tenantId, ?int $documentId, string $subjectType, int $subjectId): void
+    {
+        if ($documentId !== null) {
+            $this->assertNotWithdrawn($tenantId, $documentId);
+
+            return;
+        }
+
+        if ($this->subjects?->get($subjectType)?->isWithdrawn($tenantId, $subjectId) === true) {
+            throw RoutingRejectedException::because(
+                'This has been withdrawn, so nothing further can happen on its routes.'
+            );
+        }
+    }
+
     // -- internals ----------------------------------------------------------
 
     /**
@@ -1163,9 +1288,11 @@ final class DocumentRouter
      * Null unless this call handed it out, so a replay or a second approver finishing
      * at the same moment announces nothing; {@see DocumentNumbering} makes it once.
      */
-    private function numberOnFinalApproval(int $tenantId, int $documentId, int $routeId): ?string
+    private function numberOnFinalApproval(int $tenantId, ?int $documentId, int $routeId): ?string
     {
-        if (!$this->numbering->isPending($tenantId, $documentId)
+        // WHIT-920: a subject with no document has no number to wait for.
+        if ($documentId === null
+            || !$this->numbering->isPending($tenantId, $documentId)
             || $this->recipients->hasOpenOnRoute($tenantId, $routeId)
             || $this->events->latestVerdictOnRoute($routeId, $tenantId) !== RouteVerdict::APPROVED) {
             return null;
@@ -1546,20 +1673,14 @@ final class DocumentRouter
         bool $toAuthor,
     ): array {
         $routeId = (int) $route['id'];
-        $documentId = (int) $route['document_id'];
+        [$documentId, $subjectType, $subjectId] = self::routeSubject($route);
         $title = (string) $route['title'];
 
         if ($note === null || trim($note) === '') {
             throw RoutingRejectedException::because('A note needs some text — an empty note records nothing.');
         }
 
-        $version = $this->subjectVersion(
-            $tenantId,
-            (string) ($route['subject_type'] ?? DocumentRouteSubject::TYPE),
-            (int) ($route['subject_id'] ?? $documentId),
-            $actorId,
-            false,
-        );
+        $version = $this->subjectVersion($tenantId, $subjectType, $subjectId, $actorId, false);
 
         // The note is attributed to the unit the author is acting from. Their
         // OPEN recipient row is preferred when they have one, because that is
@@ -1592,6 +1713,8 @@ final class DocumentRouter
         }
 
         $this->broadcast('document.route_acted', $tenantId, $documentId, [
+            'subject_type' => $subjectType,
+            'subject_id' => $subjectId,
             'route_id' => $routeId,
             'title' => $title,
             'action' => RouteAction::NOTED,
@@ -1650,7 +1773,7 @@ final class DocumentRouter
      */
     private function planChain(
         int $tenantId,
-        int $documentId,
+        ?int $documentId,
         int $routeId,
         array $firstStep,
         ?int $actorId,
@@ -1738,7 +1861,7 @@ final class DocumentRouter
      */
     private function planStep(
         int $tenantId,
-        int $documentId,
+        ?int $documentId,
         int $routeId,
         int $stepId,
         int $position,
@@ -1830,7 +1953,7 @@ final class DocumentRouter
      */
     private function openChain(
         int $tenantId,
-        int $documentId,
+        ?int $documentId,
         int $routeId,
         array $stops,
         ?int $parentRecipientId,
@@ -1915,7 +2038,7 @@ final class DocumentRouter
      */
     private function resolveStep(
         int $tenantId,
-        int $documentId,
+        ?int $documentId,
         int $routeId,
         array $step,
         int $position,
@@ -1938,7 +2061,10 @@ final class DocumentRouter
 
         $context = new RoutingRuleContext(
             tenantId: $tenantId,
-            documentId: $documentId,
+            // WHIT-920: 0 on a route whose subject has no document yet. The SDK
+            // context carries a document id until subject providers reach the
+            // SDK (#1728); core's rules never read it.
+            documentId: $documentId ?? 0,
             routeId: $routeId,
             stepId: (int) $step['id'],
             position: $position,
@@ -2296,7 +2422,7 @@ final class DocumentRouter
      *
      * @param array<string, mixed> $payload
      */
-    private function broadcast(string $event, int $tenantId, int $documentId, array $payload): void
+    private function broadcast(string $event, int $tenantId, ?int $documentId, array $payload): void
     {
         if ($this->hooks === null) {
             return;
