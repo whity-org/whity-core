@@ -1,6 +1,6 @@
 {
     "$comment": "Plugin SDK coverage matrix: the single source of truth. Edit this file, then run `php scripts/sdk-coverage.php` to regenerate docs/wiki/Plugin-SDK-Coverage.md. CI fails when sdk_version is behind Sdk::VERSION, when an SDK minor in the Sdk.php ledger is not named by any `since`, or when the generated page is stale. Security notes say only that a design is needed; vulnerabilities go through SECURITY.md, never here.",
-    "sdk_version": "1.93.0",
+    "sdk_version": "1.94.0",
     "core_version": "0.2.26",
     "updated": "2026-11-06",
     "ratings": {
@@ -333,13 +333,23 @@
                 {
                     "what": "Issue in bulk from one template as a background job (Documents::issueMany)",
                     "since": "1.83"
+                },
+                {
+                    "what": "Issue events for documents raised by form submissions",
+                    "since": "1.94"
+                },
+                {
+                    "what": "Published constants for document.routed and document.route_acted",
+                    "since": "1.94"
+                },
+                {
+                    "what": "route.sent_back, route.resubmitted, route.completed, route.signed and document.finalised events",
+                    "since": "1.94"
                 }
             ],
             "missing": [
                 "Reading and listing documents other than the plugin's own",
                 "Withdraw and revise contracts, and document.withdrawn",
-                "Issue events for documents raised by form submissions",
-                "Published constants for document.routed and document.route_acted",
                 "Embed record providers and chart sources",
                 "Collections and organizer views"
             ],
@@ -463,10 +473,14 @@
             "id": "core-forms",
             "group": "workflow",
             "name": "Core forms and submissions",
-            "rating": "none",
-            "has": [],
+            "rating": "partial",
+            "has": [
+                {
+                    "what": "form.submitted, submission.reviewed and submission.withdrawn events",
+                    "since": "1.94"
+                }
+            ],
             "missing": [
-                "form.submitted, submission.reviewed and submission.withdrawn events",
                 "Reading submissions",
                 "Custom field types, validators and prefill sources",
                 "Mapping a submission to a plugin record",

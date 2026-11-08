@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Whity\Core\Form;
 
+use Whity\Core\Hooks\HookManager;
+use Whity\Sdk\Hooks\Events;
 use PDO;
 use Whity\Core\Document\RouteTemplate\RouteTemplateInstantiation;
 use Whity\Core\Document\RouteTemplate\RouteTemplateRejectedException;
@@ -61,6 +63,7 @@ final class SubmissionIssuer
         private readonly FormUploadRepository $uploads,
         private readonly RouteRepository $routes,
         private readonly RouteRecipientRepository $recipients,
+        private readonly ?HookManager $hooks = null,
     ) {
     }
 
@@ -153,6 +156,12 @@ final class SubmissionIssuer
 
         if ($submission === null) {
             throw new \RuntimeException('The submission was recorded but could not be read back.');
+        }
+
+        if ($ownTransaction) {
+            SubmissionEvents::announce($this->hooks, Events::FORM_SUBMITTED, $tenantId, (int) $submission['id'], $formId, $actorProfileId, [
+                'route_id' => $routeId,
+            ]);
         }
 
         // WHIT-921: a route that went straight to its final document makes it

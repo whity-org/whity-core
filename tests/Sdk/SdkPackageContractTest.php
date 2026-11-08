@@ -242,9 +242,10 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsOneEightForInteractiveBlocks(): void
     {
         $this->assertSame(
-            '1.93.0',
+            '1.94.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.93 ADDS I18n\LocalizedText, the translatable-field marker and value contract (#521). '
+            'SDK 1.94 ADDS route and form events: constants for document.routed and document.route_acted, and route.*, document.finalised, form.submitted and submission.* with ids only. '
+            . 'SDK 1.93 ADDS I18n\LocalizedText, the translatable-field marker and value contract (#521). '
             . 'SDK 1.92 ADDS Audit\\PluginAudit, entries attributed by the host and readable only by the plugin that wrote them (WHIT-1032). '
             . 'SDK 1.91 ADDS Jobs\\PluginJobQueue and PluginScheduledJobsInterface, limited to the plugin\'s own jobs in the current workspace (WHIT-1031). '
             . 'SDK 1.90 ADDS Notification\\PluginNotifier and PluginNotificationsInterface, bound by the host to the current workspace and its active members (WHIT-1030). '

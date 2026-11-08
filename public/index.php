@@ -4323,7 +4323,8 @@ $submissionIssuer = new \Whity\Core\Form\SubmissionIssuer(
     $documentRouter,
     $formUploadRepository,
     $routeRepository,
-    $routeRecipientRepository
+    $routeRecipientRepository,
+    $hookManager
 );
 // WHIT-921: what each route's finalise step did, and the PDF it made.
 $routeFinalisationRepository = new \Whity\Core\Document\Routing\RouteFinalisationRepository($db->getPdo());
@@ -4356,7 +4357,8 @@ $formSubmissionReviewsHandler = new \Whity\Api\FormSubmissionReviewsApiHandler(
     $formFieldRepository,
     $formSubmissionRepository,
     new \Whity\Core\Form\FormSubmissionReviewRepository($db->getPdo()),
-    $submissionIssuer
+    $submissionIssuer,
+    $hookManager
 );
 $router->register('POST', '/api/forms/{id:\d+}/submissions', [$formSubmissionsHandler, 'submit'], null, null, CorePermissions::FORMS_SUBMIT);
 $router->register('GET', '/api/form-submissions', [$formSubmissionsHandler, 'list'], null, null, CorePermissions::FORMS_READ);
@@ -4429,7 +4431,8 @@ $formSubmissionWithdrawalHandler = new \Whity\Api\FormSubmissionWithdrawalApiHan
     // WHIT-920: a submission routed on itself closes its own routes' items.
     $routeRepository,
     $routeRecipientRepository,
-    $routeEventRepository
+    $routeEventRepository,
+    $hookManager
 );
 $router->register('POST', '/api/me/form-submissions/{id:\d+}/withdraw', [$formSubmissionWithdrawalHandler, 'withdraw'], null);
 

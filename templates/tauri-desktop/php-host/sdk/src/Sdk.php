@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.93).
+ * SDK identity (v1.94).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1191,12 +1191,21 @@ namespace Whity\Sdk;
  * with helpers to check a value and pick the text for a language (#521).
  *
  * Purely additive.)
+ *
+ * 1.94 (ROUTE AND FORM EVENTS: {@see Hooks\Events::DOCUMENT_ROUTED} and
+ * {@see Hooks\Events::DOCUMENT_ROUTE_ACTED} are published constants for what core already fired.
+ * New: `route.sent_back`, `route.resubmitted`, `route.completed`, `route.signed`,
+ * `document.finalised`, `form.submitted`, `submission.reviewed` and `submission.withdrawn`, each
+ * after the change is saved and carrying ids only. A form submission's final document fires
+ * `document.issuing` and `document.issued` with `origin: route` (WHIT-923).
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.93.0';
+    public const VERSION = '1.94.0';
 
     /**
      * Static identity only — never instantiated.

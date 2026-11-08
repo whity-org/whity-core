@@ -193,7 +193,9 @@ final class RouteFinaliser implements RouteFinaliseService
         if ($outcome === self::DONE && $documentId !== null && $artifactId !== null) {
             // False when a slower attempt was overtaken: the faster one finished
             // it, and this one's PDF stays as an extra artifact on the document.
-            $this->finalisations->complete($tenantId, (int) $row['id'], $token, $documentId, $artifactId);
+            if ($this->finalisations->complete($tenantId, (int) $row['id'], $token, $documentId, $artifactId)) {
+                $this->announceFinalised($tenantId, $row, $documentId, $artifactId);
+            }
 
             return self::DONE;
         }
@@ -413,6 +415,37 @@ final class RouteFinaliser implements RouteFinaliseService
         $resolved = $this->fields->resolve($tenantId, 0, static fn (string $permission): bool => false, null, null);
 
         return $resolved['values'] ?? [];
+    }
+
+    /**
+     * `document.finalised` (SDK 1.94): after the row says done, ids only.
+     *
+     * @param array<string, mixed> $row
+     */
+    private function announceFinalised(int $tenantId, array $row, int $documentId, int $artifactId): void
+    {
+        if ($this->hooks === null) {
+            return;
+        }
+        $payload = [
+            'id' => $documentId,
+            'document_id' => $documentId,
+            'tenant_id' => $tenantId,
+            'route_id' => (int) $row['route_id'],
+            'subject_type' => (string) $row['subject_type'],
+            'subject_id' => (int) $row['subject_id'],
+            'artifact_id' => $artifactId,
+        ];
+        try {
+            $this->hooks->dispatch(Events::DOCUMENT_FINALISED, $payload);
+        } catch (Throwable $e) {
+            error_log('[RouteFinaliser] a listener on document.finalised failed: ' . $e->getMessage());
+        }
+        try {
+            $this->hooks->dispatchAsync(Events::DOCUMENT_FINALISED_ASYNC, $payload);
+        } catch (Throwable $e) {
+            error_log('[RouteFinaliser] could not record document.finalised: ' . $e->getMessage());
+        }
     }
 
     /** The number this call handed out, or null. */

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Api;
 
+use Whity\Core\Hooks\HookManager;
+use Whity\Sdk\Hooks\Events;
 use PDO;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\SchemaFromMigrations;
@@ -62,6 +64,9 @@ final class FormStaffFieldsApiRealEngineTest extends TestCase
     private FormRenderer $renderer;
     private int $formId;
 
+    /** @var list<array{0: string, 1: array<string, mixed>}> */
+    private array $fired = [];
+
     protected function setUp(): void
     {
         $this->pdo = SchemaFromMigrations::make();
@@ -100,11 +105,14 @@ final class FormStaffFieldsApiRealEngineTest extends TestCase
             new RouteRepository($this->pdo),
             new RouteRecipientRepository($this->pdo),
         );
+        $hooks = new HookManager();
+        $this->recordOn($hooks, Events::SUBMISSION_REVIEWED);
         $this->reviews = new FormSubmissionReviewsApiHandler(
             $this->fields,
             $this->submissions,
             new FormSubmissionReviewRepository($this->pdo),
             $this->issuer,
+            $hooks,
         );
 
         $this->formId = $this->forms->create(self::TENANT, 'supplier_request', ['en' => 'Supplier request'], null, null, null);
@@ -228,6 +236,21 @@ final class FormStaffFieldsApiRealEngineTest extends TestCase
         self::assertEquals(['supplier' => 'Example Flour Mill'], $row['data']);
     }
 
+    public function testARecordedReviewIsAnnouncedWithIdsOnlyAndARefusedOneIsNot(): void
+    {
+        $id = $this->submit(['supplier' => 'Example Flour Mill']);
+
+        $this->record($id, ['notes' => 'No decision yet']);
+        self::assertSame([], $this->firedOf(Events::SUBMISSION_REVIEWED));
+
+        $this->record($id, ['decision' => 'approved', 'notes' => 'Complete']);
+        $fired = $this->firedOf(Events::SUBMISSION_REVIEWED);
+        self::assertCount(1, $fired);
+        self::assertSame($id, $fired[0]['id']);
+        self::assertSame(self::OFFICER, $fired[0]['actor_profile_id']);
+        self::assertStringNotContainsString('Complete', (string) json_encode($fired));
+    }
+
     public function testAReviewIsCheckedAgainstTheStaffFieldsAndStaysOutOfTheSubmission(): void
     {
         $id = $this->submit(['supplier' => 'Example Flour Mill']);
@@ -339,5 +362,28 @@ final class FormStaffFieldsApiRealEngineTest extends TestCase
 
         self::assertNotSame([], $holders('forms:manage'));
         self::assertEqualsCanonicalizing($holders('forms:manage'), $holders('forms:review'));
+    }
+
+    private function recordOn(HookManager $hooks, string ...$events): void
+    {
+        foreach ($events as $event) {
+            $hooks->listen($event, function (array $payload) use ($event): array {
+                $this->fired[] = [$event, $payload];
+
+                return $payload;
+            });
+        }
+    }
+
+    /**
+     * @phpstan-impure
+     * @return list<array<string, mixed>>
+     */
+    private function firedOf(string $event): array
+    {
+        return array_values(array_map(
+            static fn (array $f): array => $f[1],
+            array_filter($this->fired, static fn (array $f): bool => $f[0] === $event)
+        ));
     }
 }

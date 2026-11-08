@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Core\Document\Routing;
 
+use Whity\Core\Hooks\HookManager;
+use Whity\Sdk\Hooks\Events;
 use OTPHP\TOTP;
 use PDO;
 use PHPUnit\Framework\TestCase;
@@ -70,6 +72,9 @@ final class RouteSigningRealEngineTest extends TestCase
     private TotpService $totp;
     private SigningService $signing;
 
+    /** @var list<array{0: string, 1: array<string, mixed>}> */
+    private array $fired = [];
+
     protected function setUp(): void
     {
         $this->pdo = $this->makeSchema();
@@ -93,6 +98,9 @@ final class RouteSigningRealEngineTest extends TestCase
         $subjects = new RouteSubjectRegistry();
         $subjects->register(new DocumentRouteSubject($this->pdo));
 
+        $hooks = new HookManager();
+        $this->recordOn($hooks, Events::ROUTE_SIGNED, Events::ROUTE_COMPLETED);
+
         $this->router = new DocumentRouter(
             $this->pdo,
             new RouteRepository($this->pdo),
@@ -102,7 +110,7 @@ final class RouteSigningRealEngineTest extends TestCase
             new RouteEdgeRepository($this->pdo),
             $rules,
             new SettingsService(new GlobalSettingsRepository($this->pdo), new TenantSettingsRepository($this->pdo)),
-            null,
+            $hooks,
             $subjects,
             $this->versions,
         );
@@ -351,6 +359,22 @@ final class RouteSigningRealEngineTest extends TestCase
         self::assertSame($before['signer_name'], $after[0]['signer_name']);
         self::assertSame($before['signer_email'], $after[0]['signer_email']);
         self::assertTrue($this->audit($documentId)['signatures'][0]['seal_valid']);
+    }
+
+    public function testSigningAnnouncesTheSignatureAndThenTheEndOfTheRoute(): void
+    {
+        $documentId = $this->seedDocument();
+        $route = $this->issueSignStep($documentId, 'all');
+
+        $this->sign(self::SIGNER_A, $route);
+        self::assertCount(1, $this->firedOf(Events::ROUTE_SIGNED));
+        self::assertSame($documentId, $this->firedOf(Events::ROUTE_SIGNED)[0]['document_id']);
+        self::assertSame([], $this->firedOf(Events::ROUTE_COMPLETED), 'the other signer is still to sign');
+
+        $this->sign(self::SIGNER_B, $route);
+        self::assertCount(2, $this->firedOf(Events::ROUTE_SIGNED));
+        self::assertCount(1, $this->firedOf(Events::ROUTE_COMPLETED));
+        self::assertSame('approved', $this->firedOf(Events::ROUTE_COMPLETED)[0]['outcome']);
     }
 
     public function testTheTrailChainDetectsABrokenLink(): void
@@ -716,5 +740,28 @@ final class RouteSigningRealEngineTest extends TestCase
         }
 
         return $pdo;
+    }
+
+    private function recordOn(HookManager $hooks, string ...$events): void
+    {
+        foreach ($events as $event) {
+            $hooks->listen($event, function (array $payload) use ($event): array {
+                $this->fired[] = [$event, $payload];
+
+                return $payload;
+            });
+        }
+    }
+
+    /**
+     * @phpstan-impure
+     * @return list<array<string, mixed>>
+     */
+    private function firedOf(string $event): array
+    {
+        return array_values(array_map(
+            static fn (array $f): array => $f[1],
+            array_filter($this->fired, static fn (array $f): bool => $f[0] === $event)
+        ));
     }
 }
