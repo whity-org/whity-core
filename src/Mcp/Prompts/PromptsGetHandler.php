@@ -29,6 +29,9 @@ final class PromptsGetHandler implements MethodHandler
         private readonly PromptRegistry $registry,
         private readonly RoleChecker    $roleChecker,
         private readonly TokenValidator $tokenValidator,
+        // SDK 1.80 (WHIT-993): whether a plugin is still granted agent context,
+        // asked on every call so a revoke applies at once. Null: trust the registry.
+        private readonly ?\Closure $pluginGranted = null,
     ) {}
 
     /**
@@ -45,7 +48,7 @@ final class PromptsGetHandler implements MethodHandler
 
         // 2. Look up the prompt.
         $prompt = $this->registry->find($name);
-        if ($prompt === null) {
+        if ($prompt === null || ($prompt->plugin !== null && $this->pluginGranted !== null && !($this->pluginGranted)($prompt->plugin))) {
             throw new McpException(ErrorCode::METHOD_NOT_FOUND, "Unknown prompt: {$name}");
         }
 

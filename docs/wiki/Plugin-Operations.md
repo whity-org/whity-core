@@ -101,6 +101,18 @@ auto-failed plugin everywhere, either re-enable it (which converges via the disk
 signal if it had also been administratively disabled) or restart the worker
 pool.
 
+## Agent context: prompts and resources (WHIT-993)
+
+A code plugin's MCP prompts and resources go straight into AI agents' context, so they are served only from Verified plugins the operator grants, on the server. Verified means a live mark on the exact package that was installed: the Whity store's signed mark (WHIT-1014, fetched every 15 minutes, so a store revocation counts at the next fetch) or a Whity mark recorded with the install. The older `plugins.mcp_prompts_require_mark` setting still applies on top, but a granted plugin is Verified anyway. An unverified plugin can't be granted, and a grant stops counting the moment its mark is revoked:
+
+```bash
+whity-cli plugin agent-context list
+whity-cli plugin agent-context grant PriceBook
+whity-cli plugin agent-context revoke PriceBook
+```
+
+**Upgrade note:** before this, plugin prompts reached agents without a grant. After upgrading they stop until you grant the plugin. The grant is install-wide, and each grant, refusal and revoke is in the audit log. A revoke applies to the next call. A grant applies once workers reload plugins (`plugin reload`) or restart. Grant only plugins you would let speak to every agent in every workspace. Even then, each prompt and resource still needs its own permission for each caller.
+
 ## Who changes plugins, and uninstalling (S7, WHIT-869, WHIT-870)
 
 A code plugin is install-wide, so only the system tenant may install, upload, turn on or off, remove, reload or update one. Workspaces can read the list, without errors or file names. `plugins:install` installs from a store; `plugins:upload` uploads unreviewed code.
