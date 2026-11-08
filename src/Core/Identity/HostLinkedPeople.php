@@ -43,7 +43,7 @@ final class HostLinkedPeople implements LinkedPeople, HostWiredService
         }
         $profileId = (int) $link['profile_id'];
 
-        // @tenant-guard-ignore: lists the tenants a linked profile belongs to before any tenant is chosen; scoped by the profile the issuer-signed call resolved to, and each row is then permission-checked in its own tenant
+        // Across tenants by design: lists the tenants a linked profile belongs to before any tenant is chosen; scoped by the profile the issuer-signed call resolved to, and each row is then permission-checked in its own tenant
         $stmt = $this->db->prepare(
             "SELECT t.id, t.name FROM memberships m JOIN tenants t ON t.id = m.tenant_id
              WHERE m.profile_id = ? AND m.status = 'active' AND m.tenant_id <> 0

@@ -69,6 +69,19 @@ final class LinkedPeopleRealEngineTest extends TestCase
         self::assertSame([[1, 'Example Bakery']], array_map(static fn ($w): array => [$w->id, $w->name], $workspaces));
     }
 
+    public function testOnlyThePersonsOwnMembershipsAreListedEvenIfThePermissionCheckSaysYes(): void
+    {
+        $saysYes = self::createStub(RoleChecker::class);
+        $saysYes->method('hasPermissionForProfile')->willReturn(true);
+        $people = new HostLinkedPeople($this->pdo, $saysYes);
+
+        // Profile 11 is active in workspace 4, so without the profile filter 4 would be listed for profile 10.
+        self::assertSame([1, 2], array_map(
+            static fn ($w): int => $w->id,
+            $people->workspacesFor($this->call('sub-a'), 'billing:view'),
+        ));
+    }
+
     public function testATenantScopedLinkDoesNotCount(): void
     {
         self::assertSame([], $this->people->workspacesFor($this->call('sub-b'), 'billing:view'));
