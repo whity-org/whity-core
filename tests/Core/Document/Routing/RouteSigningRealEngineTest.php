@@ -334,6 +334,25 @@ final class RouteSigningRealEngineTest extends TestCase
         self::assertFalse($this->audit($documentId)['signatures'][0]['seal_valid']);
     }
 
+    public function testDeletingThePersonKeepsWhoSignedAndTheSeal(): void
+    {
+        $documentId = $this->seedDocument();
+        $route = $this->issueSignStep($documentId, 'any');
+        $this->sign(self::SIGNER_A, $route);
+
+        $before = $this->signatures->listForDocument(self::TENANT, $documentId)[0];
+
+        // A signature is a legal record: it must not depend on the profile.
+        $this->pdo->exec('DELETE FROM profiles WHERE id = ' . self::SIGNER_A);
+
+        $after = $this->signatures->listForDocument(self::TENANT, $documentId);
+        self::assertCount(1, $after);
+        self::assertSame(self::SIGNER_A, $after[0]['signer_profile_id']);
+        self::assertSame($before['signer_name'], $after[0]['signer_name']);
+        self::assertSame($before['signer_email'], $after[0]['signer_email']);
+        self::assertTrue($this->audit($documentId)['signatures'][0]['seal_valid']);
+    }
+
     public function testTheTrailChainDetectsABrokenLink(): void
     {
         $documentId = $this->seedDocument();

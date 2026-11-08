@@ -83,6 +83,7 @@ final class AddRouteSignatures
                 subject_id        BIGINT       NOT NULL,
                 subject_version   INTEGER      NOT NULL,
                 content_hash      VARCHAR(64)  NOT NULL,
+                -- @reference-lint-ignore: who signed, a fact of a legal record that outlives the profile; the seal covers it and signer_name and signer_email keep the person, so it has no foreign key to clear it
                 signer_profile_id INTEGER      NOT NULL,
                 signer_name       VARCHAR(255) NOT NULL,
                 signer_email      VARCHAR(320),
@@ -146,6 +147,7 @@ final class AddRouteSignatures
         $db->exec("
             CREATE TABLE IF NOT EXISTS instance_signing_keys (
                 id         SERIAL      NOT NULL PRIMARY KEY,
+                -- @reference-lint-ignore: this key's own public name, not a reference to another row
                 key_id     VARCHAR(64) NOT NULL UNIQUE,
                 algorithm  VARCHAR(16) NOT NULL DEFAULT 'Ed25519',
                 public_key VARCHAR(128) NOT NULL,
