@@ -259,6 +259,23 @@ Core has a handful of deliberately unversioned endpoints — `/api/health`,
 `registerUnversioned()` method. That method is not part of the plugin contract:
 **every** plugin route is versioned, and there is no opt-out.
 
+### Who is calling, and in which workspace (SDK 1.87)
+
+The host tells every route handler its context on the `Request`, the same on a
+normal request and an MCP tool call:
+
+```php
+$workspace = $request->getWorkspaceId(); // null when there is none
+$language  = $request->getLanguage();    // 'ar', or 'en' by default
+if ($request->isAgent()) {               // or getActorKind(): person, agent, system
+    return Response::error('A person has to do this.', 403);
+}
+```
+
+Use `getWorkspaceId()` rather than an id from the path, query or body. On a
+public form or webhook nobody is signed in, so `getActorKind()` is `null`: treat
+that as an anonymous caller, not as the host.
+
 ### Permissions (`resource:action` colon notation)
 
 `getPermissions()` returns plain permission strings. Whity Core standardises on

@@ -169,6 +169,8 @@ abstract class BaseCommand implements CliCommand, CommandHelp
 
         $this->kernel = new HttpKernel($router, $rbacMiddleware);
         $this->kernel->use($tenantIsolationMiddleware);
+        // WHIT-1015: a plugin route reached from the CLI reads the same context.
+        $this->kernel->use(new \Whity\Http\Middleware\StampRequestContext());
 
         // Resource-type catalogue (WC-712 §2), registered as a service exactly as
         // public/index.php does so a plugin reached through a CLI command sees
