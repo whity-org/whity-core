@@ -64,6 +64,11 @@ import PublicFormsPage from '@/app/(protected)/admin/settings/public-forms/page'
 
 const KEY = 'a'.repeat(64);
 
+const FORMS = [
+  { plugin: 'arcline', form: 'enquiry', kind: 'form' },
+  { plugin: 'arcline', form: 'hours', kind: 'read' },
+];
+
 function json(body: unknown, status = 200): Response {
   return { ok: status < 400, status, json: async () => body } as unknown as Response;
 }
@@ -72,6 +77,7 @@ const liveKey = {
   id: 3,
   plugin: 'arcline',
   form: 'enquiry',
+  kind: 'form',
   label: 'Example Bakery website',
   key_hint: 'abcd1234',
   allowed_origins: ['https://www.example-bakery.com'],
@@ -82,10 +88,11 @@ const liveKey = {
 function route(keys: unknown[], ready = true, botSettings: unknown = null) {
   mockApiClient.mockImplementation(async (url: string, init?: RequestInit) => {
     if (url === '/api/v1/public-form-keys' && !init?.method) {
-      return json({ data: keys, meta: { forms: [{ plugin: 'arcline', form: 'enquiry' }], bot_check_ready: ready } });
+      return json({ data: keys, meta: { forms: FORMS, bot_check_ready: ready } });
     }
     if (url === '/api/v1/public-form-keys' && init?.method === 'POST') {
-      return json({ data: { ...liveKey, key: KEY } }, 201);
+      const asked = JSON.parse(String(init.body)) as { form: string };
+      return json({ data: { ...liveKey, ...FORMS.find((f) => f.form === asked.form), key: KEY } }, 201);
     }
     if (url === '/api/v1/public-form-keys/3/revoke') {
       return json({}, 204);
@@ -125,6 +132,55 @@ describe('PublicFormsPage', () => {
     expect(within(card).getByText('https://www.example-bakery.com')).toBeTruthy();
   });
 
+  it('labels a read key differently from a form key', async () => {
+    const readKey = { ...liveKey, id: 4, form: 'hours', kind: 'read', label: 'Opening hours' };
+    route([liveKey, readKey]);
+    render(<PublicFormsPage />);
+
+    const form = await screen.findByTestId('public-form-key-3');
+    expect(within(form).getByTestId('public-form-key-kind-3').textContent).toBe('Form');
+    expect(form.textContent).toContain('Opens');
+
+    const read = screen.getByTestId('public-form-key-4');
+    expect(within(read).getByTestId('public-form-key-kind-4').textContent).toBe('Read-only link');
+    expect(read.textContent).toContain('Shows');
+    expect(read.textContent).not.toContain('Opens');
+  });
+
+  it('shows no kind for a key whose plugin is not loaded', async () => {
+    route([{ ...liveKey, kind: null }]);
+    render(<PublicFormsPage />);
+    await screen.findByTestId('public-form-key-3');
+    expect(screen.queryByTestId('public-form-key-kind-3')).toBeNull();
+  });
+
+  it('names the kind when issuing, and gives a read key its own address', async () => {
+    route([]);
+    render(<PublicFormsPage />);
+    fireEvent.click(await screen.findByTestId('public-forms-issue'));
+
+    expect(screen.getByRole('option', { name: 'arcline · enquiry (Form)' })).toBeTruthy();
+    expect(screen.getByRole('option', { name: 'arcline · hours (Read-only link)' })).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText('What this key opens'), { target: { value: 'arcline/hours' } });
+    expect(screen.getByLabelText('Sites that may read this')).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Hours' } });
+    fireEvent.click(screen.getByTestId('public-forms-issue-submit'));
+
+    const issued = await screen.findByTestId('public-forms-issued');
+    expect(within(issued).getByText('Address to read it from')).toBeTruthy();
+    expect(within(issued).getByText(`/api/v1/arcline/public/hours/${KEY}`)).toBeTruthy();
+  });
+
+  it('says a read key stops working, not that its form stops taking submissions', async () => {
+    route([{ ...liveKey, form: 'hours', kind: 'read' }]);
+    render(<PublicFormsPage />);
+    fireEvent.click(await screen.findByTestId('public-form-key-revoke-3'));
+    const dialog = await screen.findByRole('alertdialog');
+    expect(dialog.textContent).toContain('Its link stops working');
+    expect(dialog.textContent).not.toContain('submissions');
+  });
+
   it('says forms are closed when the bot check is not ready', async () => {
     route([liveKey], false);
     render(<PublicFormsPage />);
@@ -136,6 +192,7 @@ describe('PublicFormsPage', () => {
     route([]);
     render(<PublicFormsPage />);
     fireEvent.click(await screen.findByTestId('public-forms-issue'));
+    fireEvent.change(screen.getByLabelText('What this key opens'), { target: { value: 'arcline/enquiry' } });
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Main website' } });
     fireEvent.change(screen.getByLabelText('Sites that may send this form'), {
       target: { value: 'https://a.example.com\nhttps://b.example.com' },

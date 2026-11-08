@@ -60,6 +60,26 @@ function collab(over: Partial<EditorCollab> = {}): EditorCollab {
 beforeEach(() => jest.useFakeTimers());
 afterEach(() => jest.useRealTimers());
 
+it('opening a document is not an edit: nothing is reported to save', async () => {
+  const onChange = jest.fn();
+  render(<DocEditor document={DOC} onChange={onChange} canEdit />);
+  await act(async () => {
+    jest.advanceTimersByTime(5000);
+  });
+  expect(onChange).not.toHaveBeenCalled();
+});
+
+it('names who edited last in the status bar, and shows only the time without a name', async () => {
+  const stamp = { updatedAt: '2026-11-08 07:16:00' };
+  const { rerender } = render(<DocEditor document={{ ...DOC, ...stamp, updatedBy: RANA }} onChange={jest.fn()} canEdit />);
+  await act(async () => {});
+  expect(screen.getByText(/^Last edited by Rana Haddad at \d{2}:\d{2}$/)).toBeTruthy();
+
+  rerender(<DocEditor document={{ ...DOC, ...stamp, updatedBy: { ...RANA, name: '' } }} onChange={jest.fn()} canEdit />);
+  await act(async () => {});
+  expect(screen.getByText(/^Last edited at \d{2}:\d{2}$/)).toBeTruthy();
+});
+
 it('without edit permission it opens in Suggesting, with Editing locked (E.10)', async () => {
   render(<DocEditor document={DOC} onChange={jest.fn()} canEdit={false} collab={collab()} />);
   await act(async () => {});

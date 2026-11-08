@@ -339,7 +339,8 @@ function DocEditor({
   })
 
   React.useEffect(() => {
-    editor?.setEditable(editable)
+    // Not an edit: left to emit its update, this saved a draft on every open.
+    editor?.setEditable(editable, false)
   }, [editor, editable])
 
   /* ------------------------------------------- Comments and suggestions */

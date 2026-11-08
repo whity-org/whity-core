@@ -267,6 +267,21 @@ final class PluginPublicRoutes
         return $out;
     }
 
+    /**
+     * Whether a plugin's named route is a form or a read, for the admin screen.
+     * Null when no loaded plugin has it, as when the plugin has been turned off.
+     */
+    public static function kindOf(string $plugin, string $name): ?string
+    {
+        foreach (self::$forms as $entry) {
+            if ($entry['plugin'] === $plugin && $entry['form'] === $name) {
+                return $entry['kind'];
+            }
+        }
+
+        return null;
+    }
+
     /** Record a served route (the router's /api/v1/... path) as public. */
     public static function add(string $owner, string $method, string $servedPath): void
     {

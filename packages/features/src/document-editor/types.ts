@@ -27,7 +27,7 @@ export type DraftPatch = Pick<WhityDocument, 'title' | 'blocks'> &
 
 export type SaveResult =
   /** `resolvedTheme`: the saved draft's theme, when the server returns the row. */
-  | { ok: true; version: number; updatedAt: string; resolvedTheme?: ResolvedDocumentTheme | null }
+  | { ok: true; version: number; updatedAt: string; updatedBy?: WhityDocument['updatedBy']; resolvedTheme?: ResolvedDocumentTheme | null }
   /** Someone saved in between; nothing was written. */
   | { ok: false; conflict: true; currentVersion: number };
 

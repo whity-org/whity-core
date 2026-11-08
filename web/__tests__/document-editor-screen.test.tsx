@@ -68,6 +68,22 @@ it('saves once typing pauses, with the version it edited, then the next version'
   expect(screen.getByTestId('editor').dataset.save).toBe('saved');
 });
 
+it('moves "Last edited" to the save, with who made it', async () => {
+  const by = { kind: 'person' as const, id: '9', name: 'Lina Haddad' };
+  const { a } = adapter([{ ok: true, version: 5, updatedAt: '2026-11-08 09:30:00', updatedBy: by }]);
+  await mount(a);
+
+  edit('Payment');
+  await act(async () => {
+    jest.advanceTimersByTime(800);
+  });
+
+  const shown = lastProps.document as WhityDocument;
+  expect(shown.updatedAt).toBe('2026-11-08 09:30:00');
+  expect(shown.updatedBy).toEqual(by);
+  expect(shown.title).toBe('Payment');
+});
+
 it('on a conflict, stops saving and offers the newer version', async () => {
   const { a } = adapter([{ ok: false, conflict: true, currentVersion: 9 }]);
   await mount(a);

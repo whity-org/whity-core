@@ -58368,6 +58368,11 @@
                         "type": "integer",
                         "nullable": true
                     },
+                    "updated_by_name": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Who last edited it, on the single-document answers. Null when nobody has, or they have left this workspace."
+                    },
                     "starter_key": {
                         "type": "string",
                         "nullable": true,
@@ -68178,6 +68183,11 @@
                     "form": {
                         "type": "string"
                     },
+                    "kind": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "What the key opens: `form` takes submissions, `read` shows something to whoever holds the link. Null when no loaded plugin has this route."
+                    },
                     "label": {
                         "type": "string"
                     },
@@ -68202,6 +68212,7 @@
                     "id",
                     "plugin",
                     "form",
+                    "kind",
                     "label",
                     "key_hint",
                     "allowed_origins",
@@ -68249,6 +68260,11 @@
                             "form": {
                                 "type": "string"
                             },
+                            "kind": {
+                                "type": "string",
+                                "nullable": true,
+                                "description": "What the key opens: `form` takes submissions, `read` shows something to whoever holds the link. Null when no loaded plugin has this route."
+                            },
                             "label": {
                                 "type": "string"
                             },
@@ -68276,6 +68292,7 @@
                             "id",
                             "plugin",
                             "form",
+                            "kind",
                             "label",
                             "key_hint",
                             "allowed_origins",
@@ -68311,11 +68328,16 @@
                                         },
                                         "form": {
                                             "type": "string"
+                                        },
+                                        "kind": {
+                                            "type": "string",
+                                            "nullable": true
                                         }
                                     },
                                     "required": [
                                         "plugin",
-                                        "form"
+                                        "form",
+                                        "kind"
                                     ]
                                 }
                             },
