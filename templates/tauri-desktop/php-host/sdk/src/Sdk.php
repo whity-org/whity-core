@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.85).
+ * SDK identity (v1.86).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1135,12 +1135,23 @@ namespace Whity\Sdk;
  * or a key (store licensing, PR-4).
  *
  * Purely additive.)
+ *
+ * 1.86 (STORE LICENCE SALES: a billing plugin sells paid store plugin licences through
+ * {@see PluginLicenceSalesInterface}, and the store reaches it as {@see Billing\LicenceSales}:
+ * checkout() for an installation, status() for the truth. The host keeps ONE seller, stamped
+ * with its plugin name ({@see Billing\ProvidedBy}) and refuses a second, so no other plugin
+ * can answer in its place. {@see Billing\LicenceSaleStatus::$testMode} marks a licence bought in
+ * the provider's test mode, which is never active. And {@see Billing\AccessRefresh}: any plugin may
+ * ask the host to re-read one workspace's access through the active portal; only the subject goes
+ * in, never a state, throttled and audited (WHIT-1013).
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.85.0';
+    public const VERSION = '1.86.0';
 
     /**
      * Static identity only — never instantiated.

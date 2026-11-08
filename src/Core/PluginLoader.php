@@ -72,6 +72,8 @@ use Whity\Sdk\PluginRolesInterface;
 use Whity\Sdk\PluginThemeInterface;
 use Whity\Sdk\PluginBillingPortalInterface;
 use Whity\Core\Billing\External\PluginBillingPortals;
+use Whity\Core\Billing\HostLicenceSales;
+use Whity\Sdk\PluginLicenceSalesInterface;
 use Whity\Sdk\Sdk;
 
 /**
@@ -158,6 +160,9 @@ class PluginLoader
 
     /** Where a plugin-provided billing portal goes (SDK 1.77); null means plugins cannot sell. */
     private ?PluginBillingPortals $billingPortals = null;
+
+    /** Where a plugin's licence seller goes (SDK 1.86); null means plugins cannot sell licences. */
+    private ?HostLicenceSales $licenceSales = null;
 
     /**
      * Optional catalogue of plugin-contributed status-page probes.
@@ -482,6 +487,12 @@ class PluginLoader
     public function setBillingPortals(PluginBillingPortals $billingPortals): void
     {
         $this->billingPortals = $billingPortals;
+    }
+
+    /** Accept a plugin's store-licence seller (SDK 1.86, WHIT-1013). One per deployment. */
+    public function setLicenceSales(HostLicenceSales $licenceSales): void
+    {
+        $this->licenceSales = $licenceSales;
     }
 
     /**
@@ -3619,6 +3630,24 @@ class PluginLoader
                 }
             } catch (Throwable $e) {
                 $this->handlePluginThrowable($pluginKey, $e, 'getBillingPortal');
+            }
+        }
+
+        // 2a-quinquies. Accept a plugin's STORE-LICENCE SELLER (SDK 1.86,
+        //     WHIT-1013). One per deployment, stamped with the plugin's own
+        //     name: the store must reach exactly one seller and know which, so
+        //     a second offer is refused rather than allowed to answer for it.
+        if ($this->licenceSales !== null && $plugin instanceof PluginLicenceSalesInterface) {
+            try {
+                if (!$this->licenceSales->offer($plugin->getName(), $plugin->getLicenceSales())) {
+                    $this->logWarning(
+                        "Plugin {$pluginKey} offers to sell store licences, but "
+                        . ($this->licenceSales->providerName() ?? 'another plugin')
+                        . ' already does; it was not used.'
+                    );
+                }
+            } catch (Throwable $e) {
+                $this->handlePluginThrowable($pluginKey, $e, 'getLicenceSales');
             }
         }
 
