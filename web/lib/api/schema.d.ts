@@ -9309,6 +9309,8 @@ export interface components {
             created_by?: number | null;
             owner_ou_id?: number | null;
             updated_by?: number | null;
+            /** @description Who last edited it, on the single-document answers. Null when nobody has, or they have left this workspace. */
+            updated_by_name?: string | null;
             /** @description Which of Whity's starters this is, or null for anything a person made */
             starter_key?: string | null;
             /** @description The old Document designer template this was converted from (migration 165), or null */
@@ -12030,6 +12032,8 @@ export interface components {
             id: number;
             plugin: string;
             form: string;
+            /** @description What the key opens: `form` takes submissions, `read` shows something to whoever holds the link. Null when no loaded plugin has this route. */
+            kind: string | null;
             label: string;
             key_hint: string;
             allowed_origins: string[];
@@ -12047,6 +12051,8 @@ export interface components {
                 id: number;
                 plugin: string;
                 form: string;
+                /** @description What the key opens: `form` takes submissions, `read` shows something to whoever holds the link. Null when no loaded plugin has this route. */
+                kind: string | null;
                 label: string;
                 key_hint: string;
                 allowed_origins: string[];
@@ -12061,6 +12067,7 @@ export interface components {
                 forms: {
                     plugin: string;
                     form: string;
+                    kind: string | null;
                 }[];
                 bot_check_ready: boolean;
             };
