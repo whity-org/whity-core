@@ -242,9 +242,10 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsOneEightForInteractiveBlocks(): void
     {
         $this->assertSame(
-            '1.80.0',
+            '1.92.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.80 ADDS PluginMcpResourcesInterface; plugin prompts and resources need the operator\'s agent-context grant and a requiredPermission (WHIT-993). '
+            'SDK 1.92 ADDS Audit\\PluginAudit, entries attributed by the host and readable only by the plugin that wrote them (WHIT-1032). '
+            . 'SDK 1.80 ADDS PluginMcpResourcesInterface; plugin prompts and resources need the operator\'s agent-context grant and a requiredPermission (WHIT-993). '
             . 'SDK 1.79 ADDS Mcp\McpConnections and connection created, grant changed and revoked events, never with a token (WHIT-992). '
             . 'SDK 1.78 ADDS proposal created, decided and undone events and a read-only preview on authored tools (WHIT-991). '
             . 'SDK 1.77 ADDS PluginBillingPortalInterface and Billing\\BillingPortal: a plugin can be the deployment\'s '

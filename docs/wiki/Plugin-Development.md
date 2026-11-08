@@ -1309,7 +1309,7 @@ audits `helloworld:greeting.created` when a greeting is created.
 
 ---
 
-### Record and read entries directly (SDK SDK_MINOR)
+### Record and read entries directly (SDK 1.92)
 
 When a declared event doesn't fit, write the entry yourself and read your own back:
 

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.80).
+ * SDK identity (v1.92).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1088,12 +1088,19 @@ namespace Whity\Sdk;
  *
  * Narrows 1.9: an ungranted plugin's prompts, and any plugin prompt without a
  * `requiredPermission`, are no longer served.)
+ *
+ * 1.92 (PLUGIN AUDIT: the host service {@see Audit\PluginAudit} records an entry with a
+ * target and reads the plugin's own entries in the current workspace. The host
+ * attributes every entry: names go under the plugin's namespace, and the actor, IP
+ * address and workspace come from the request or job (WHIT-1032).
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.80.0';
+    public const VERSION = '1.92.0';
 
     /**
      * Static identity only — never instantiated.
