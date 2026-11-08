@@ -382,6 +382,10 @@
     "en": "Download one earlier or current file of a document",
     "ar": "تنزيل نسخة محددة من مستند"
   },
+  "get_api_documents_id_audit": {
+    "en": "See a document's audit: its signatures and the history of its routes",
+    "ar": "عرض سجل تدقيق مستند: تواقيعه وتاريخ مساراته"
+  },
   "get_api_documents_id_content": {
     "en": "Download a document's current file",
     "ar": "تنزيل المستند"
