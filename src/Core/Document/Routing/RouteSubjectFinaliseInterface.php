@@ -28,9 +28,10 @@ interface RouteSubjectFinaliseInterface
      *
      * @param array{version: int, content_hash: string, data: mixed} $version
      * @param string $language The template's language, for choice labels.
+     * @param array<string, mixed> $template The template version being printed.
      * @return array<string, string|null> Field path => printed value.
      */
-    public function finalValues(int $tenantId, int $subjectId, array $version, string $language): array;
+    public function finalValues(int $tenantId, int $subjectId, array $version, string $language, array $template = []): array;
 
     /**
      * The record the final document is about, as `type:id` for the issuing

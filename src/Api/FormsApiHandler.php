@@ -350,6 +350,18 @@ final class FormsApiHandler
                     return Response::error('final_template_id must be a document template of this workspace, or null', 422);
                 }
                 $changes['final_template_id'] = $finalTemplateId;
+                // Leaving a question out was a choice about the template it was made for.
+                $current = $this->forms->find($tenantId, $id);
+                if ($current !== null && $current['final_template_id'] !== $finalTemplateId) {
+                    $changes['document_left_out'] = [];
+                }
+            }
+            if (array_key_exists('document_left_out', $body)) {
+                $leftOut = $body['document_left_out'];
+                if (!is_array($leftOut) || !array_is_list($leftOut) || count(array_filter($leftOut, 'is_string')) !== count($leftOut)) {
+                    return Response::error('document_left_out must be a list of question keys', 422);
+                }
+                $changes['document_left_out'] = array_values(array_unique($leftOut));
             }
             if (array_key_exists('final_document_to_applicant', $body)) {
                 if (!is_bool($body['final_document_to_applicant'])) {

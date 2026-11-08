@@ -58,7 +58,7 @@ final class FormRepository
                              open_to_members, members_opened_at, members_opened_by_profile_id,
                              public_enabled, public_slug, public_opens_at, public_closes_at,
                              public_enabled_at, public_enabled_by_profile_id, public_requires_sign_in,
-                             final_template_id, final_document_to_applicant,
+                             final_template_id, final_document_to_applicant, document_left_out,
                              ' . self::WINDOW_OPEN_SQL . ' AS public_window_open';
 
     /**
@@ -543,6 +543,10 @@ final class FormRepository
             $sets[] = 'final_template_id = :final_template_id';
             $params[':final_template_id'] = $changes['final_template_id'];
         }
+        if (array_key_exists('document_left_out', $changes)) {
+            $sets[] = 'document_left_out = :document_left_out';
+            $params[':document_left_out'] = json_encode($changes['document_left_out'], JSON_THROW_ON_ERROR);
+        }
         if (array_key_exists('final_document_to_applicant', $changes)) {
             $sets[] = 'final_document_to_applicant = ' . ($changes['final_document_to_applicant'] === true ? 'TRUE' : 'FALSE');
         }
@@ -660,6 +664,14 @@ final class FormRepository
         return null;
     }
 
+    /** @return list<string> */
+    private static function decodeLeftOut(mixed $stored): array
+    {
+        $keys = is_string($stored) ? json_decode($stored, true) : null;
+
+        return is_array($keys) ? array_values(array_filter($keys, 'is_string')) : [];
+    }
+
     /**
      * @return list<array{key: string, title: array<string, string>, description: array<string, string>}>
      */
@@ -734,6 +746,8 @@ final class FormRepository
             // the finalise stage names none; and whether the applicant gets it.
             'final_template_id' => ($row['final_template_id'] ?? null) === null ? null : (int) $row['final_template_id'],
             'final_document_to_applicant' => DbBool::of($row['final_document_to_applicant'] ?? true),
+            // The questions a person chose to keep out of that document.
+            'document_left_out' => self::decodeLeftOut($row['document_left_out'] ?? null),
             // S5: so the builder can say "Routed to" without `route_templates:read`.
             'route_template_name' => isset($row['route_template_name']) ? (string) $row['route_template_name'] : null,
             'created_by_profile_id' => $row['created_by_profile_id'] === null

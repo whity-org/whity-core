@@ -45,6 +45,8 @@ export interface FormRow {
   final_template_id?: number | null
   /** WHIT-921: whether the person who sent it can open its final document. */
   final_document_to_applicant?: boolean
+  /** Questions a person chose to keep out of that document. */
+  document_left_out?: string[]
   submission_count?: number
   /** The heading the person filling it in reads; null shows the name (WHIT-944). */
   title?: LocalizedMap | null
@@ -195,6 +197,26 @@ export interface SubmissionProgress {
 export interface FinalTemplateOption {
   id: number
   title: string
+}
+
+/** A field the template prints that nothing on the form fills. */
+export interface DocumentFitNeed {
+  path: string
+  label: string
+  reason: "not_asked" | "staff_only" | "other_record"
+  /** The question to add for it, or null when a question can't fill it. */
+  field_key: string | null
+}
+
+/** How a form and its final document template fit, both ways. */
+export interface DocumentFit {
+  hidden: false
+  template: { id: number; title: string; lang: string; published: boolean }
+  filled: number
+  needs: DocumentFitNeed[]
+  unused: Array<{ field_key: string; label: LocalizedMap; in_draft: boolean; left_out: boolean }>
+  can_edit_template: boolean
+  route_uses_other_template: boolean
 }
 
 export interface SubmissionDetail extends SubmissionRow {

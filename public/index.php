@@ -4269,6 +4269,23 @@ $router->register('DELETE', '/api/forms/{id:\d+}/member-access', [$formsHandler,
 $formBannerHandler = new \Whity\Api\FormBannerApiHandler($formRepository, $storageDriver);
 $router->register('POST', '/api/forms/{id:\d+}/banner', [$formBannerHandler, 'upload'], null, null, CorePermissions::FORMS_MANAGE);
 
+// A form against its final document template. Writing a template also checks
+// the document permissions, inside the handler.
+$formDocumentFitHandler = new \Whity\Api\FormDocumentFitApiHandler(
+    $formRepository,
+    $formFieldRepository,
+    new \Whity\Core\Document\DocumentSourceRepository($db->getPdo()),
+    new \Whity\Core\Document\DocumentSourceVersionRepository($db->getPdo()),
+    $documentSourcesHandler,
+    $documentPublishingHandler,
+    $documentFieldRegistry,
+    $roleChecker,
+    $routeTemplateRepository,
+);
+$router->register('GET', '/api/forms/{id:\d+}/document-fit', [$formDocumentFitHandler, 'show'], null, null, CorePermissions::FORMS_MANAGE);
+$router->register('POST', '/api/forms/{id:\d+}/document-fit/template-fields', [$formDocumentFitHandler, 'addToTemplate'], null, null, CorePermissions::FORMS_MANAGE);
+$router->register('POST', '/api/forms/{id:\d+}/document-template', [$formDocumentFitHandler, 'createTemplate'], null, null, CorePermissions::FORMS_MANAGE);
+
 $formFieldsHandler = new \Whity\Api\FormFieldsApiHandler($formRepository, $formFieldRepository);
 $router->register('GET', '/api/form-fields', [$formFieldsHandler, 'listByQuery'], null, null, CorePermissions::FORMS_READ);
 $router->register('GET', '/api/forms/{id:\d+}/fields', [$formFieldsHandler, 'list'], null, null, CorePermissions::FORMS_READ);

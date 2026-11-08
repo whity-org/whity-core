@@ -1,5 +1,7 @@
 "use client"
 
+import type { ReactNode } from "react"
+
 import { BilingualField } from "./bilingual-field"
 import { Button } from "@whity/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@whity/ui/card"
@@ -40,6 +42,7 @@ export function FormSettingsTab({
   onUploadBanner,
   finalTemplates,
   onFinalDocument,
+  documentFit,
 }: {
   form: FormRow
   settings: FormSettings
@@ -57,6 +60,8 @@ export function FormSettingsTab({
   finalTemplates?: FinalTemplateOption[]
   /** WHIT-921: change the final document template, or whether the applicant gets the final document. */
   onFinalDocument?: (changes: { final_template_id?: number | null; final_document_to_applicant?: boolean }) => void
+  /** How the chosen template and the form fit, and making a template from the form. */
+  documentFit?: ReactNode
 }) {
   const t = useTranslation("forms")
   const { enabled, setEnabled } = useFormLanguages()
@@ -267,6 +272,7 @@ export function FormSettingsTab({
                 </SelectContent>
               </Select>
             </div>
+            {documentFit}
             {form.final_document_to_applicant !== undefined && (
               <div className="space-y-1">
                 <div className="flex items-center gap-3">

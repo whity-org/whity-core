@@ -153,7 +153,7 @@ final class FormSubmissionRouteSubject implements RouteSubjectProviderInterface,
      * names them, so a template written for the form prints them. Choices print
      * by their label, files as "1 file attached", as in the responses export.
      */
-    public function finalValues(int $tenantId, int $subjectId, array $version, string $language): array
+    public function finalValues(int $tenantId, int $subjectId, array $version, string $language, array $template = []): array
     {
         $stmt = $this->db->prepare(
             'SELECT s.form_id, s.reference, s.submitted_at, p.display_name
@@ -169,16 +169,19 @@ final class FormSubmissionRouteSubject implements RouteSubjectProviderInterface,
 
         $data = is_array($version['data']) ? $version['data'] : [];
         $answers = is_array($data['values'] ?? null) ? $data['values'] : [];
-        $fields = FormFieldRepository::applicantFields(
-            (new FormFieldRepository($this->db))->listForForm($tenantId, (int) $row['form_id'])
-        );
+        $allFields = (new FormFieldRepository($this->db))->listForForm($tenantId, (int) $row['form_id']);
 
         $values = [];
-        foreach ($fields as $field) {
+        foreach (FormFieldRepository::applicantFields($allFields) as $field) {
             $key = (string) $field['field_key'];
             $answer = $answers[$key] ?? null;
             $text = ResponsesCsv::printed($field, $answer, $language);
             $values[FormSubmissionFieldProvider::path($key)] = $text !== '' ? $text : null;
+        }
+
+        // A template's own fields print the answer of the question that fits them.
+        foreach (FormTemplateFit::ownFieldAnswers($allFields, $template) as $path => $question) {
+            $values[$path] = $values[FormSubmissionFieldProvider::path($question)] ?? null;
         }
 
         return $values + [

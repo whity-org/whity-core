@@ -109,7 +109,7 @@ final class DocumentRouteSubject implements RouteSubjectProviderInterface, Route
      * WHIT-921: the values the document was issued with, as the approved
      * version recorded them.
      */
-    public function finalValues(int $tenantId, int $subjectId, array $version, string $language): array
+    public function finalValues(int $tenantId, int $subjectId, array $version, string $language, array $template = []): array
     {
         $data = is_array($version['data']) ? $version['data'] : [];
         $rows = is_array($data['values'] ?? null) ? $data['values'] : [];

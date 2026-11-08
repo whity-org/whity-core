@@ -1,4 +1,5 @@
 import type {
+  DocumentFit,
   FormBannerValue,
   FieldDraft,
   FieldOption,
@@ -52,6 +53,10 @@ function data<T>(body: unknown): T {
   return (typeof body === "object" && body !== null && "data" in body ? (body as { data: T }).data : body) as T
 }
 
+function visibleFit(fit: DocumentFit | { hidden: true } | null): DocumentFit | null {
+  return fit === null || fit.hidden ? null : fit
+}
+
 /** The API calls the forms screens make, over whichever transport a client has. */
 export function createFormsApi(transport: Transport) {
   return {
@@ -77,6 +82,17 @@ export function createFormsApi(transport: Transport) {
           .filter((row) => row.published_version !== null)
           .map((row): FinalTemplateOption => ({ id: row.id, title: row.title }))
       ),
+    /** The form against its final document template; null with no template, or one the caller can't see. */
+    documentFit: (id: number, fallback: string) =>
+      call(transport, "GET", `/api/v1/forms/${id}/document-fit`, undefined, fallback, (b) => visibleFit(data<DocumentFit | { hidden: true } | null>(b))),
+    /** Put questions in the template's draft. What prints doesn't change until it is published. */
+    addToTemplate: (id: number, fieldKeys: string[], fallback: string) =>
+      call(transport, "POST", `/api/v1/forms/${id}/document-fit/template-fields`, { field_keys: fieldKeys }, fallback, (b) =>
+        visibleFit(data<DocumentFit | { hidden: true } | null>(b))
+      ),
+    /** Make a template from the form, publish it and choose it. */
+    makeTemplate: (id: number, title: string, lang: "en" | "ar", fallback: string) =>
+      call(transport, "POST", `/api/v1/forms/${id}/document-template`, { title, lang }, fallback, (b) => data<FinalTemplateOption>(b)),
     replaceFields: (id: number, fields: unknown[], fallback: string) =>
       call(transport, "PUT", `/api/v1/forms/${id}/fields`, { fields }, fallback, (b) => data<FieldDraft[]>(b)),
     publish: (id: number, fallback: string) =>

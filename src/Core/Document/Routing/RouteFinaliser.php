@@ -282,7 +282,7 @@ final class RouteFinaliser implements RouteFinaliseService
 
         $approved = $this->approvedVersion($tenantId, $row);
         $values = $this->sharedValues($tenantId)
-            + $provider->finalValues($tenantId, $subjectId, $approved, (string) ($source['lang'] ?? 'en'));
+            + $provider->finalValues($tenantId, $subjectId, $approved, (string) ($source['lang'] ?? 'en'), $templateVersion);
         $actor = ActingAs::engine($tenantId);
 
         if ($existingDocumentId === null) {
