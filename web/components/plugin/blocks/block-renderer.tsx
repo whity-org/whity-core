@@ -3343,6 +3343,7 @@ function SecretFieldRenderer({ block }: { block: SecretFieldBlock }) {
   const [value, setValue] = React.useState('');
   const [saving, setSaving] = React.useState(false);
   const [confirming, setConfirming] = React.useState(false);
+  const [attempt, setAttempt] = React.useState(0);
   const inputId = `block-secret-${block.secret}`;
 
   const applyResponse = React.useCallback(async (res: Response): Promise<boolean> => {
@@ -3356,20 +3357,14 @@ function SecretFieldRenderer({ block }: { block: SecretFieldBlock }) {
     return true;
   }, []);
 
-  const load = React.useCallback(async () => {
-    setStatus('loading');
-    try {
-      if (!(await applyResponse(await apiClient(block.endpoint)))) {
-        setStatus((current) => (current === 'forbidden' ? current : 'error'));
-      }
-    } catch {
-      setStatus('error');
-    }
-  }, [applyResponse, block.endpoint]);
-
   React.useEffect(() => {
-    void load();
-  }, [load]);
+    apiClient(block.endpoint)
+      .then(applyResponse)
+      .then((applied) => {
+        if (!applied) setStatus((current) => (current === 'forbidden' ? current : 'error'));
+      })
+      .catch(() => setStatus('error'));
+  }, [applyResponse, block.endpoint, attempt]);
 
   const save = async () => {
     setSaving(true);
@@ -3417,7 +3412,7 @@ function SecretFieldRenderer({ block }: { block: SecretFieldBlock }) {
     return (
       <div className="flex items-center gap-2">
         <p className="text-sm text-destructive">{t('blocks.secretField.loadError', 'Could not load this field.')}</p>
-        <Button variant="outline" onClick={() => void load()}>{t('blocks.retry', 'Retry')}</Button>
+        <Button variant="outline" onClick={() => { setStatus('loading'); setAttempt((n) => n + 1); }}>{t('blocks.retry', 'Retry')}</Button>
       </div>
     );
   }

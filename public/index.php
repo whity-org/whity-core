@@ -5073,9 +5073,9 @@ $pluginSecretFields = new \Whity\Api\PluginSecretFieldsApiHandler(
     ),
     static fn (): array => $pluginLoader->getPlugins(),
 );
-foreach (['GET' => 'status', 'PUT' => 'save', 'DELETE' => 'clear'] as $secretFieldMethod => $secretFieldAction) {
-    $router->register($secretFieldMethod, '/api/plugin-secrets/{plugin}/{key}', [$pluginSecretFields, $secretFieldAction], null, null, null, ['mcp' => ['expose' => false]]);
-}
+$router->register('GET', '/api/plugin-secrets/{plugin}/{key}', [$pluginSecretFields, 'status'], null, null, null, ['mcp' => ['expose' => false]]);
+$router->register('PUT', '/api/plugin-secrets/{plugin}/{key}', [$pluginSecretFields, 'save'], null, null, null, ['mcp' => ['expose' => false]]);
+$router->register('DELETE', '/api/plugin-secrets/{plugin}/{key}', [$pluginSecretFields, 'clear'], null, null, null, ['mcp' => ['expose' => false]]);
 $router->register('POST', '/api/settings/mail/test',         [$mailSettingsHandler, 'test'],        null, null, CorePermissions::SETTINGS_MANAGE);
 
 // 13c. Register the Tenant Branding API (WC-233). Public GET /api/v1/branding
