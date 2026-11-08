@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.83).
+ * SDK identity (v1.84).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1114,12 +1114,24 @@ namespace Whity\Sdk;
  * resumed batch never issues twice. Each item is checked and preflighted as the submitter
  * when it runs. New reasons `batch_key_conflict` and `forbidden` (WHIT-997). Documents is
  * implemented by the host only, so the new methods are additive for plugins.)
+ *
+ * 1.84 (SERVICE ROUTES: a plugin route declared `'service' => '<scope>'` is called
+ * server to server with a client-credentials JWT from the deployment's trusted
+ * issuer (Whity ID), for an operator-allowed client, this deployment's audience,
+ * at most ten minutes long and carrying the scope. The handler reads the verified
+ * caller with {@see Http\ServiceCall::from()}. Only the issuer's own client may act
+ * for a person (`sub_on_behalf`); {@see Identity\LinkedPeople} resolves that person
+ * through that issuer, only for workspaces where they hold the asked permission. And
+ * {@see Billing\PlanCatalogue}: read-only plan prices, so a billing plugin prices a plan
+ * as the host does without reading its tables (WHIT-1011).
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.83.0';
+    public const VERSION = '1.84.0';
 
     /**
      * Static identity only — never instantiated.

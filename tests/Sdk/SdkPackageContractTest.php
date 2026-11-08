@@ -242,9 +242,10 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsOneEightForInteractiveBlocks(): void
     {
         $this->assertSame(
-            '1.83.0',
+            '1.84.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.83 ADDS Documents::issueMany() and Documents::batch(): bulk issuing from one template as a background job, with a result per item and an idempotent batch key (WHIT-997). '
+            'SDK 1.84 ADDS service routes (Http\\ServiceCall, Identity\\LinkedPeople): server-to-server calls with the trusted issuer\'s token, and Billing\\PlanCatalogue (WHIT-1011). '
+            . 'SDK 1.83 ADDS Documents::issueMany() and Documents::batch(): bulk issuing from one template as a background job, with a result per item and an idempotent batch key (WHIT-997). '
             . 'SDK 1.82 ADDS Documents\Templates: read the published templates the caller can see and their merge fields (WHIT-996). Purely additive. '
             . 'SDK 1.81 ADDS documents.starters: starter templates a workspace plugin ships, seeded per workspace and never overwriting its edits (WHIT-995). Purely additive. '
             . 'SDK 1.80 ADDS PluginMcpResourcesInterface; plugin prompts and resources need the operator\'s agent-context grant and a requiredPermission (WHIT-993). '

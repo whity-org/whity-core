@@ -1,6 +1,6 @@
 {
     "$comment": "Plugin SDK coverage matrix: the single source of truth. Edit this file, then run `php scripts/sdk-coverage.php` to regenerate docs/wiki/Plugin-SDK-Coverage.md. CI fails when sdk_version is behind Sdk::VERSION, when an SDK minor in the Sdk.php ledger is not named by any `since`, or when the generated page is stale. Security notes say only that a design is needed; vulnerabilities go through SECURITY.md, never here.",
-    "sdk_version": "1.83.0",
+    "sdk_version": "1.84.0",
     "core_version": "0.2.26",
     "updated": "2026-11-06",
     "ratings": {
@@ -857,6 +857,10 @@
                     "since": "1.84"
                 },
                 {
+                    "what": "Read-only plan prices (PlanCatalogue)",
+                    "since": "1.84"
+                },
+                {
                     "what": "A plugin can be the deployment's billing portal: checkout, subscriptions, customer portal, refunds and verified provider notifications (PluginBillingPortalInterface)",
                     "since": "1.77"
                 }
@@ -959,6 +963,10 @@
                 {
                     "what": "Multipart requests",
                     "since": "1.5"
+                },
+                {
+                    "what": "Service routes: server-to-server calls with the trusted issuer's token, and the people they name (ServiceCall, LinkedPeople)",
+                    "since": "1.84"
                 },
                 {
                     "what": "Route schemas in the OpenAPI document",
