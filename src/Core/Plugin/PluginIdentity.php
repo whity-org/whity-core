@@ -8,7 +8,7 @@ use Whity\Sdk\PluginInterface;
 use Whity\Sdk\PluginNamespace;
 
 /**
- * Who a plugin object is, as the loader saw it (SDK 1.8x, WHIT-1030).
+ * Who a plugin object is, as the loader saw it (WHIT-1030).
  *
  * A host service that hands a plugin something of its own (`->for($this)`) has
  * to know which plugin is asking. `getName()` cannot answer that: it is code the

@@ -4767,7 +4767,8 @@ $router->register('POST', '/api/me/notifications/{id:\d+}/read',  [$inboxHandler
 $notificationPreferencesHandler = new \Whity\Api\NotificationPreferencesApiHandler(
     $tokenValidator,
     $notificationPreferenceRepository,
-    $notificationPreferenceResolver
+    $notificationPreferenceResolver,
+    fn (): array => $pluginLoader->declaredNotificationTypes()
 );
 $router->register('GET', '/api/me/notification-preferences', [$notificationPreferencesHandler, 'list'],   null);
 $router->register('PUT', '/api/me/notification-preferences', [$notificationPreferencesHandler, 'update'], null);
