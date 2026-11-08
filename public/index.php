@@ -5759,6 +5759,11 @@ $pluginLoader->setBillingPortals($pluginBillingPortals);
 ));
 \Whity\register_service(\Whity\Sdk\Billing\PlanCatalogue::class, new \Whity\Core\Plan\HostPlanCatalogue($db->getPdo()));
 \Whity\register_service(\Whity\Sdk\Identity\LinkedPeople::class, new \Whity\Core\Identity\HostLinkedPeople($db->getPdo(), $roleChecker));
+// The one plugin that sells store licences (SDK 1.86, WHIT-1013). The store resolves
+// the host's object, never a plugin's, so no other plugin can answer in its place.
+$hostLicenceSales = new \Whity\Core\Billing\HostLicenceSales($logger);
+\Whity\register_service(\Whity\Sdk\Billing\LicenceSales::class, $hostLicenceSales);
+$pluginLoader->setLicenceSales($hostLicenceSales);
 // Code plugins' template slots and record types as merge fields (SDK 1.56, WHIT-742).
 $pluginLoader->setDocumentRegistries($templateSlotRegistry, $documentFieldRegistry);
 $pluginLoader->load();
