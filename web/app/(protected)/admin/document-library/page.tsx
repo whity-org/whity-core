@@ -14,6 +14,7 @@ import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { Button } from '@whity/ui/button';
 import { IconFilePlus } from '@tabler/icons-react';
 import { useTranslation } from '@whity/features/i18n';
+import { useLocalizedUnits, type UnitNames } from '@/hooks/useLocalizedUnits';
 import { formNameFrom } from '@/lib/documents/template-name';
 import { useDateDisplay } from '@whity/features/datetime';
 import { useRouter } from 'next/navigation';
@@ -133,9 +134,8 @@ import type {
  */
 
 /** The tenant's own units, for the anchor selector. */
-interface OuOption {
+interface OuOption extends UnitNames {
   id: number;
-  name: string;
   parent_id: number | null;
 }
 
@@ -281,6 +281,7 @@ export default function DocumentLibraryPage() {
     }
     return result.items;
   }, [apiClient]);
+  const units = useLocalizedUnits(ous.data);
 
   const selectedView: DocumentView | null = useMemo(() => {
     const all = views.data?.data ?? [];
@@ -550,16 +551,17 @@ export default function DocumentLibraryPage() {
       }
       // A bare `#4` rather than a guess when the name could not be read — and
       // the notice below says why, so an id in this column is never mistaken for
-      // a unit whose name is missing. The name comes from the label endpoint
-      // (#1019); the anchor picker's list is a second source for a caller who
-      // also holds `ous:read`.
+      // a unit whose name is missing. The anchor picker's list comes first for a
+      // caller who holds `ous:read`, because it has the name in the reader's
+      // language (#821). The label endpoint (#1019) gives the original name, and
+      // is all a caller without `ous:read` has.
       return (
+        units.find((ou) => ou.id === ouId)?.name ??
         unitLabels.data?.ous.get(ouId) ??
-        (ous.data ?? []).find((ou) => ou.id === ouId)?.name ??
         `#${ouId}`
       );
     },
-    [ous.data, unitLabels.data, t]
+    [units, unitLabels.data, t]
   );
 
   // Filing needs the collection list — to show what is already true, and to
@@ -756,7 +758,7 @@ export default function DocumentLibraryPage() {
             }}
             anchorOuId={anchorOuId}
             onAnchorChange={selectAnchor}
-            ous={ous.data ?? []}
+            ous={units}
             selectedView={selectedView}
             sortField={sortField}
             sortDirection={appliedSort.direction}

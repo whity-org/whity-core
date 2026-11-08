@@ -213,8 +213,8 @@ export function createUsersAdapter(transport: Transport): UsersAdapter {
         if (!isOk(status)) {
           return { options: [], complete: false };
         }
-        const rows = unwrapData<{ id: number; name: string }[]>(body) ?? [];
-        for (const row of rows) options.push({ id: row.id, name: row.name });
+        const rows = unwrapData<OuOption[]>(body) ?? [];
+        for (const row of rows) options.push({ id: row.id, name: row.name, names: row.names });
 
         total = paginationTotal(body) ?? total;
         if (rows.length === 0 || (total !== null && options.length >= total)) {

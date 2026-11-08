@@ -38,7 +38,7 @@ Areas marked **Needs a design** have gaps that could cross workspaces, skip perm
 | [Data types](#data-types) | Full |  | later |
 | [Reports](#reports) | None | Yes | 0.2.28 |
 | [Search and the command palette](#search) | Partial | Yes | 0.2.28 |
-| [Settings](#settings) | Partial | Yes | 0.2.27 |
+| [Settings](#settings) | Partial |  | 0.2.27 |
 | [Secrets](#secrets) | Partial | Yes | 0.2.27 |
 | [File storage](#files) | Partial | Yes | 0.2.28 |
 | [Notifications and mail](#notifications) | Partial | Yes | 0.2.27 |
@@ -61,7 +61,7 @@ Areas marked **Needs a design** have gaps that could cross workspaces, skip perm
 | [Install, versions and lifecycle](#plugin-lifecycle) | Partial | Yes | 0.2.28 |
 | [Logging, errors and rate limits](#observability) | None | Yes | 0.2.28 |
 | [Database and migrations](#database) | Full | Yes | later |
-| [HTTP routes](#http-routes) | Full | Yes | 0.2.27 |
+| [HTTP routes](#http-routes) | Full |  | 0.2.27 |
 | [Hook events](#events) | Partial |  | 0.2.27 |
 | [Command line](#cli) | None | Yes | later |
 | [Personal preferences](#preferences) | None |  | 0.2.27 |
@@ -281,6 +281,7 @@ Planned: 0.2.28. Tracked in [#714](https://github.com/whity-org/whity-core/issue
 - Document numbering rules and document.numbered (SDK 1.65)
 - Preflight an issue without writing (SDK 1.66)
 - document.revised (SDK 1.68)
+- Issue in bulk from one template as a background job (Documents::issueMany) (SDK 1.83)
 
 **Missing**
 
@@ -303,13 +304,13 @@ Planned: 0.2.27.
 
 - Template slots in plugin.json (SDK 1.55)
 - Template slots and merge-field providers for code plugins (SDK 1.56)
+- Starter templates shipped by a plugin, seeded per workspace (SDK 1.81)
+- Read published templates and their merge fields (Templates) (SDK 1.82)
 
 **Missing**
 
 - Plugin document themes
 - Editor blocks, toolbar items and slash-menu entries
-- Starter templates shipped by a plugin
-- Reading templates
 - Template and theme events
 
 **Needs a design.** Merge fields and editor blocks end up in printed, immutable documents. Providers must be held to the caller's workspace and permissions by the host, and plugin block markup needs a sandbox and server-side schema checks.
@@ -522,14 +523,11 @@ Planned: 0.2.28.
 **In the SDK**
 
 - Declared, typed, namespaced settings keys (SDK 1.21)
+- Read and write the plugin's own keys in the current workspace, and a settings-changed event (SDK 1.88)
 
 **Missing**
 
-- An SDK reader and writer for the plugin's own keys
-- A settings-changed event
 - A settings page per plugin and per workspace
-
-**Needs a design.** The internal settings service also covers core and install-wide keys. The SDK reader must be limited to the plugin's own keys in the current workspace.
 
 Planned: 0.2.27.
 
@@ -540,10 +538,10 @@ Planned: 0.2.27.
 **In the SDK**
 
 - PluginSecrets: encrypted per plugin and workspace (SDK 1.60)
+- A host-rendered secret entry field that never returns the value (SDK 1.88)
 
 **Missing**
 
-- A host-rendered secret entry field
 - Listing and rotation
 
 **Needs a design.** The host, not the caller, must decide which plugin and workspace a store belongs to.
@@ -595,12 +593,12 @@ Planned: 0.2.27.
 **In the SDK**
 
 - English and Arabic labels on settings, data types, manifest screens and agents (SDK 1.21)
+- The request's language on the SDK Request (SDK 1.87)
 
 **Missing**
 
 - Shipping a translation catalogue
 - Arabic labels on frontend features, navigation and block text
-- The request's language in the SDK Request
 
 Planned: 0.2.27. Tracked in [#521](https://github.com/whity-org/whity-core/issues/521).
 
@@ -712,7 +710,13 @@ Planned: later.
 **In the SDK**
 
 - Declared sellable limits in the plan catalogue (PluginEntitlementsInterface) (host)
+- Selling store plugin licences through one billing plugin (LicenceSales, PluginLicenceSalesInterface) (SDK 1.86)
+- Asking the host to re-read a workspace's billing access (AccessRefresh) (SDK 1.86)
+- Read-only plan prices (PlanCatalogue) (SDK 1.84)
+- Read-only plan prices (PlanCatalogue) (SDK 1.84)
+- Asking the host to re-read a workspace's billing access (AccessRefresh) (SDK 1.86)
 - A plugin can be the deployment's billing portal: checkout, subscriptions, customer portal, refunds and verified provider notifications (PluginBillingPortalInterface) (SDK 1.77)
+- Whether a paid Whity store plugin is licensed here: licensed, grace with an until date, or unlicensed, from the store's signed statement with a 7-day offline window (Licensing\StoreLicence) (SDK 1.85)
 
 **Missing**
 
@@ -923,14 +927,13 @@ Planned: later.
 
 - Request and Response (SDK 1.0)
 - Multipart requests (SDK 1.5)
+- Service routes: server-to-server calls with the trusted issuer's token, and the people they name (ServiceCall, LinkedPeople) (SDK 1.84)
 - Route schemas in the OpenAPI document (host)
+- Workspace, language and actor kind on Request (SDK 1.87)
 
 **Missing**
 
-- Workspace, language and actor kind on Request
 - Per-route rate limits and entitlements
-
-**Needs a design.** Routes cannot tell an agent from a person today, so they cannot apply stricter rules to agents.
 
 Planned: 0.2.27.
 

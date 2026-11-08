@@ -97,7 +97,6 @@ final class MemberFormsApiRealEngineTest extends TestCase
         $issuer = new SubmissionIssuer(
             $this->pdo,
             $submissions,
-            new DocumentIssuer($this->pdo, new DocumentRepository($this->pdo), $artifacts, new DocumentArtifactStore($storage)),
             new RouteTemplateRepository($this->pdo),
             new DocumentRouter(
                 $this->pdo,
@@ -111,7 +110,8 @@ final class MemberFormsApiRealEngineTest extends TestCase
                 null
             ),
             $uploadRows,
-            $artifacts,
+            new RouteRepository($this->pdo),
+            new RouteRecipientRepository($this->pdo),
         );
 
         $this->manage = new FormsApiHandler($this->forms, $this->fields, $renderer, $submissions, new PublicFormLink('https://records.example.test'));

@@ -649,7 +649,7 @@
       }
     },
     "documents": {
-      "description": "Template slots (SDK 1.55): the named places this plugin needs a document template. The host addresses each as <plugin name>.<slot>, and a workspace binds a published template to it.",
+      "description": "Template slots (SDK 1.55): the named places this plugin needs a document template. The host addresses each as <plugin name>.<slot>, and a workspace binds a published template to it. Starter templates (SDK 1.81): templates the plugin ships, seeded into a workspace when the plugin goes live there.",
       "type": "object",
       "additionalProperties": false,
       "properties": {
@@ -686,6 +686,125 @@
                   ]
                 },
                 "description": "Which document kinds can fill the slot. Default: template."
+              }
+            }
+          }
+        },
+        "starters": {
+          "type": "object",
+          "maxProperties": 20,
+          "propertyNames": {
+            "pattern": "^[a-z][a-z0-9_]{0,39}$"
+          },
+          "description": "Seeded once per workspace, published, and bound to its slot when that slot has no template. A workspace's edits are never overwritten; an untouched copy follows the plugin's updates.",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "label",
+              "page",
+              "blocks"
+            ],
+            "properties": {
+              "label": {
+                "$ref": "#/$defs/label"
+              },
+              "kind": {
+                "enum": [
+                  "template",
+                  "label"
+                ],
+                "description": "Default: template."
+              },
+              "lang": {
+                "enum": [
+                  "en",
+                  "ar"
+                ],
+                "description": "Default: en."
+              },
+              "slot": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]{0,39}$",
+                "description": "One of this manifest's slots. The starter is bound to it where the slot has no template yet."
+              },
+              "record": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                "description": "One of this manifest's record types. Default: the slot's."
+              },
+              "page": {
+                "type": "object",
+                "description": "The page, as the editor saves it: size, marginMm, letterhead, labels."
+              },
+              "blocks": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 500,
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "type"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "type": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              },
+              "ownFields": {
+                "type": "array",
+                "maxItems": 50,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "key",
+                    "label"
+                  ],
+                  "properties": {
+                    "key": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_]{0,39}$"
+                    },
+                    "label": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    },
+                    "sample": {
+                      "description": "Text, or text per language ({\"en\": ..., \"ar\": ...}); a starter takes the one in its own language.",
+                      "oneOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 200
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "minProperties": 1,
+                          "properties": {
+                            "en": {
+                              "type": "string",
+                              "maxLength": 200
+                            },
+                            "ar": {
+                              "type": "string",
+                              "maxLength": 200
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
               }
             }
           }

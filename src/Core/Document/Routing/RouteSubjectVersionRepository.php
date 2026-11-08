@@ -92,6 +92,37 @@ final class RouteSubjectVersionRepository
     }
 
     /**
+     * One version of a subject with its recorded content (WHIT-921: the version a
+     * final document is made from), or null.
+     *
+     * @return array{version: int, content_hash: string, data: mixed}|null
+     */
+    public function find(int $tenantId, string $subjectType, int $subjectId, int $version): ?array
+    {
+        $stmt = $this->db->prepare(
+            'SELECT version, content_hash, data FROM route_subject_versions
+              WHERE tenant_id = :tenant_id AND subject_type = :subject_type AND subject_id = :subject_id
+                AND version = :version'
+        );
+        $stmt->execute([
+            ':tenant_id' => $tenantId,
+            ':subject_type' => $subjectType,
+            ':subject_id' => $subjectId,
+            ':version' => $version,
+        ]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!is_array($row)) {
+            return null;
+        }
+
+        return [
+            'version' => (int) $row['version'],
+            'content_hash' => (string) $row['content_hash'],
+            'data' => json_decode((string) $row['data'], true),
+        ];
+    }
+
+    /**
      * Every version of a subject, oldest first, with its recorded content.
      *
      * @return list<array{version: int, content_hash: string, data: mixed, created_by: ?int, created_at: string}>

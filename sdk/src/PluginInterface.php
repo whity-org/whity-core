@@ -111,8 +111,28 @@ interface PluginInterface
      *   route stays private (sign-in required, and then still refused) until the
      *   instance's operator sets `PLUGIN_PUBLIC_READS=on`. Return only what anybody
      *   with the link may see, and a 4xx on bad input rather than a throw.
+     * - 'service' (string, optional, SDK 1.84): makes the route a SERVICE route,
+     *   called server to server by another service of the deployment's trusted
+     *   issuer (Whity ID), never by a person. The value is the scope it needs,
+     *   shaped `area:verb` like a permission. The host admits the request only
+     *   with a bearer JWT that:
+     *     - is from that issuer, signed with an asymmetric key from its JWKS;
+     *     - has this deployment's API (APP_URL + /api/v1) as its audience;
+     *     - is for a client on the operator's `SERVICE_TOKEN_CLIENTS`;
+     *     - lives at most ten minutes;
+     *     - carries the scope.
+     *   Anything else gets 401, a person's session included. Read the verified
+     *   caller from {@see Http\ServiceCall::from()}. There is no tenant and no
+     *   signed-in user. Only the issuer's own client may act for a person
+     *   (`sub_on_behalf` in its token, {@see Http\ServiceCall::$onBehalfOf});
+     *   any other client sending it is refused. Resolve that person with
+     *   {@see Identity\LinkedPeople}, which answers only through the issuer
+     *   that signed the call and only for workspaces where that person holds
+     *   the permission you ask for. No requiredPermission or requiredRole, and not
+     *   public: a declaration with either is NOT registered. Service routes
+     *   are never MCP tools.
      *
-     * @return array<array{method: string, path: string, handler: callable, requiredRole?: ?string, requiredPermission?: ?string, schema?: array<string, mixed>}>
+     * @return array<array{method: string, path: string, handler: callable, requiredRole?: ?string, requiredPermission?: ?string, schema?: array<string, mixed>, service?: string}>
      */
     public function getRoutes(): array;
 

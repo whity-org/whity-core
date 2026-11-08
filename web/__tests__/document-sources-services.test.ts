@@ -37,6 +37,13 @@ beforeEach(() => {
   );
 });
 
+it('takes the last editor name from the row, and has none for an unedited starter', () => {
+  const row = { id: 3, kind: 'template', title: 'Invoice', lang: 'en', blocks: [], updated_at: '2026-11-08 07:16:00' };
+  const named = toDocument({ ...row, updated_by: 9, updated_by_name: 'Lina Haddad' } as never);
+  expect(named.updatedBy).toEqual({ kind: 'person', id: '9', name: 'Lina Haddad' });
+  expect(toDocument({ ...row, updated_by: null, updated_by_name: null } as never).updatedBy).toMatchObject({ name: '' });
+});
+
 it('lists what the blocks can show, and where files are served', async () => {
   const services = await documentSourcesAdapter.loadServices!('7');
   expect(services.recordTypes).toEqual([{ key: 'document', label: 'Issued document' }]);
@@ -194,6 +201,7 @@ describe('document themes (M4d, E.44)', () => {
       ok: true,
       version: 6,
       updatedAt: row.updated_at,
+      updatedBy: { kind: 'person', id: '', name: '' },
       resolvedTheme: THEME,
     });
   });

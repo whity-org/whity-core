@@ -65,8 +65,11 @@ function jsonResponse(body: unknown, ok = true, status = 200) {
  * requests from two effects, and an ordered mock would pin an ordering that
  * neither effect promises — the exact way a mount-time fetch desyncs a suite.
  */
-function routeApi(handlers: { stats?: unknown; platform?: unknown }) {
+function routeApi(handlers: { stats?: unknown; platform?: unknown; renderer?: unknown }) {
   mockApiClient.mockImplementation((url: string) => {
+    if (url.includes('/platform/renderer')) {
+      return Promise.resolve(handlers.renderer ?? jsonResponse({ error: 'Insufficient permissions' }, false, 403));
+    }
     if (url.includes('/platform/version')) {
       const platform = handlers.platform;
       if (platform instanceof Error) return Promise.reject(platform);
@@ -92,6 +95,45 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
+
+describe('/admin/stats — document renderer (WHIT-1001)', () => {
+  it('says the renderer is connected, with its version', async () => {
+    routeApi({
+      renderer: jsonResponse({
+        state: 'ready', ready: true, app_version: '0.2.4', render_version: '0.2.4',
+        message: 'The document renderer is connected', fix: '', switched_on: true, printing: true,
+      }),
+    });
+    render(<AdminStats />);
+
+    expect(await screen.findByText('Document renderer')).toBeInTheDocument();
+    expect(screen.getByText(/Connected/)).toBeInTheDocument();
+  });
+
+  it('names a version mismatch and the exact fix', async () => {
+    routeApi({
+      renderer: jsonResponse({
+        state: 'version_mismatch', ready: false, app_version: '0.2.4', render_version: '0.2.3',
+        message: 'The document renderer is version 0.2.3 but this app is 0.2.4',
+        fix: 'Run the render image at the app tag.', switched_on: true, printing: false,
+      }),
+    });
+    render(<AdminStats />);
+
+    expect(await screen.findByText(/Version mismatch/)).toBeInTheDocument();
+    expect(
+      screen.getByText('The document renderer is version 0.2.3 but this app is 0.2.4. Run the render image at the app tag.')
+    ).toBeInTheDocument();
+  });
+
+  it('shows nothing about the renderer to someone who may not read it', async () => {
+    routeApi({});
+    render(<AdminStats />);
+
+    await screen.findByText('Core version');
+    expect(screen.queryByText('Document renderer')).toBeNull();
+  });
+});
 
 describe('/admin/stats — platform versions', () => {
   it('renders the core and plugin-SDK versions for a permitted operator', async () => {

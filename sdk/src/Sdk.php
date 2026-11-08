@@ -1087,7 +1087,74 @@ namespace Whity\Sdk;
  * and audited, and each must declare `requiredPermission`, checked per caller (WHIT-993).
  *
  * Narrows 1.9: an ungranted plugin's prompts, and any plugin prompt without a
- * `requiredPermission`, are no longer served.) →
+ * `requiredPermission`, are no longer served.)
+ *
+ * 1.81 (STARTER TEMPLATES: a workspace plugin ships templates under `documents.starters`
+ * in plugin.json ({@see Manifest\DocumentStarterValidator}, `PluginManifest::documentStarters()`).
+ * The host seeds each into a workspace when the plugin goes live there, published, and binds
+ * it to its slot when the slot has no template. Seeded once; a copy the workspace changed is
+ * never overwritten; an untouched copy follows the plugin's updates (WHIT-995).
+ *
+ * Purely additive.)
+ *
+ * 1.82 (TEMPLATE READER: {@see Documents\Templates}, resolved as a host service, lists and
+ * reads the workspace's published templates ({@see Documents\TemplateInfo}) with the merge
+ * fields their published version prints ({@see Documents\TemplateField}: path, label, source
+ * template, record or host, required, sample). It answers for the caller Documents acts for:
+ * the person in a request, or a background plugin's own bound templates where allowed
+ * (WHIT-996).
+ *
+ * Purely additive.)
+ *
+ * 1.83 (BULK ISSUING: {@see Documents\Documents::issueMany()} takes a
+ * {@see Documents\BulkIssueRequest} (one template, up to 500 {@see Documents\BulkIssueItem}s,
+ * a batch key) and issues it in the background; {@see Documents\Documents::batch()} reads
+ * its {@see Documents\BulkIssueStatus} with a {@see Documents\BulkIssueItemResult} per item.
+ * The batch key makes a resend return the same batch; each item gets an origin key, so a
+ * resumed batch never issues twice. Each item is checked and preflighted as the submitter
+ * when it runs. New reasons `batch_key_conflict` and `forbidden` (WHIT-997). Documents is
+ * implemented by the host only, so the new methods are additive for plugins.)
+ *
+ * 1.84 (SERVICE ROUTES: a plugin route declared `'service' => '<scope>'` is called
+ * server to server with a client-credentials JWT from the deployment's trusted
+ * issuer (Whity ID), for an operator-allowed client, this deployment's audience,
+ * at most ten minutes long and carrying the scope. The handler reads the verified
+ * caller with {@see Http\ServiceCall::from()}. Only the issuer's own client may act
+ * for a person (`sub_on_behalf`); {@see Identity\LinkedPeople} resolves that person
+ * through that issuer, only for workspaces where they hold the asked permission. And
+ * {@see Billing\PlanCatalogue}: read-only plan prices, so a billing plugin prices a plan
+ * as the host does without reading its tables (WHIT-1011).
+ *
+ * Purely additive.)
+ *
+ * 1.85 (STORE LICENCES: the host service {@see Licensing\StoreLicence} answers whether a paid
+ * plugin from the Whity store is licensed on this installation, as a {@see Licensing\LicenceState}:
+ * `licensed`, `grace` with an until date, or `unlicensed`. The host fetches the store's signed
+ * statement over the installation's Whity ID connection, verifies it against the store's pinned
+ * key, caches it, and keeps answering through a 7-day offline window. A plugin never sees a token
+ * or a key (store licensing, PR-4).
+ *
+ * Purely additive.)
+ *
+ * 1.86 (STORE LICENCE SALES: a billing plugin sells paid store plugin licences through
+ * {@see PluginLicenceSalesInterface}, and the store reaches it as {@see Billing\LicenceSales}:
+ * checkout() for an installation, status() for the truth. The host keeps ONE seller, stamped
+ * with its plugin name ({@see Billing\ProvidedBy}) and refuses a second, so no other plugin
+ * can answer in its place. {@see Billing\LicenceSaleStatus::$testMode} marks a licence bought in
+ * the provider's test mode, which is never active. And {@see Billing\AccessRefresh}: any plugin may
+ * ask the host to re-read one workspace's access through the active portal; only the subject goes
+ * in, never a state, throttled and audited (WHIT-1013).
+ *
+ * Purely additive.)
+ *
+ * 1.87 (REQUEST CONTEXT: {@see Http\Request} gains `getWorkspaceId()`, `getLanguage()`, `getActorKind()` (person, agent, system; null when nobody is signed in) and `isAgent()`. The host stamps them on every route, MCP tool and resource call, from its own authorization, never from what the caller sent (WHIT-1015).
+ *
+ * Purely additive.)
+ *
+ * 1.88 (PLUGIN SETTINGS AND SECRET FIELDS: the host service {@see Settings\PluginSettings} reads and writes a plugin's own declared keys for the current workspace, {@see Hooks\Events::PLUGIN_SETTINGS_CHANGED} says one changed, by key, and {@see Secrets\PluginSecretFieldsInterface} with a `secretField` block lets a person enter a secret the host stores and never sends back (WHIT-1016).
+ *
+ * Purely additive.)
+ *
  * 1.89 (OBSERVE-ONLY LISTENERS AND THE REST OF THE EVENT CATALOGUE: a `getHooks()` subscription
  * with `'observe' => true` sees the event, but its return value is ignored and it cannot change
  * the payload or veto. {@see Hooks\Events} publishes the membership, registration, federated

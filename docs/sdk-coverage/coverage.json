@@ -329,6 +329,10 @@
                 {
                     "what": "document.revised",
                     "since": "1.68"
+                },
+                {
+                    "what": "Issue in bulk from one template as a background job (Documents::issueMany)",
+                    "since": "1.83"
                 }
             ],
             "missing": [
@@ -355,13 +359,19 @@
                 {
                     "what": "Template slots and merge-field providers for code plugins",
                     "since": "1.56"
+                },
+                {
+                    "what": "Starter templates shipped by a plugin, seeded per workspace",
+                    "since": "1.81"
+                },
+                {
+                    "what": "Read published templates and their merge fields (Templates)",
+                    "since": "1.82"
                 }
             ],
             "missing": [
                 "Plugin document themes",
                 "Editor blocks, toolbar items and slash-menu entries",
-                "Starter templates shipped by a plugin",
-                "Reading templates",
                 "Template and theme events"
             ],
             "security": "Merge fields and editor blocks end up in printed, immutable documents. Providers must be held to the caller's workspace and permissions by the host, and plugin block markup needs a sandbox and server-side schema checks.",
@@ -628,14 +638,16 @@
                 {
                     "what": "Declared, typed, namespaced settings keys",
                     "since": "1.21"
+                },
+                {
+                    "what": "Read and write the plugin's own keys in the current workspace, and a settings-changed event",
+                    "since": "1.88"
                 }
             ],
             "missing": [
-                "An SDK reader and writer for the plugin's own keys",
-                "A settings-changed event",
                 "A settings page per plugin and per workspace"
             ],
-            "security": "The internal settings service also covers core and install-wide keys. The SDK reader must be limited to the plugin's own keys in the current workspace.",
+            "security": null,
             "plan": "0.2.27"
         },
         {
@@ -647,10 +659,13 @@
                 {
                     "what": "PluginSecrets: encrypted per plugin and workspace",
                     "since": "1.60"
+                },
+                {
+                    "what": "A host-rendered secret entry field that never returns the value",
+                    "since": "1.88"
                 }
             ],
             "missing": [
-                "A host-rendered secret entry field",
                 "Listing and rotation"
             ],
             "security": "The host, not the caller, must decide which plugin and workspace a store belongs to.",
@@ -708,12 +723,15 @@
                 {
                     "what": "English and Arabic labels on settings, data types, manifest screens and agents",
                     "since": "1.21"
+                },
+                {
+                    "what": "The request's language on the SDK Request",
+                    "since": "1.87"
                 }
             ],
             "missing": [
                 "Shipping a translation catalogue",
-                "Arabic labels on frontend features, navigation and block text",
-                "The request's language in the SDK Request"
+                "Arabic labels on frontend features, navigation and block text"
             ],
             "security": null,
             "issues": [
@@ -846,8 +864,32 @@
                     "since": null
                 },
                 {
+                    "what": "Selling store plugin licences through one billing plugin (LicenceSales, PluginLicenceSalesInterface)",
+                    "since": "1.86"
+                },
+                {
+                    "what": "Asking the host to re-read a workspace's billing access (AccessRefresh)",
+                    "since": "1.86"
+                },
+                {
+                    "what": "Read-only plan prices (PlanCatalogue)",
+                    "since": "1.84"
+                },
+                {
+                    "what": "Read-only plan prices (PlanCatalogue)",
+                    "since": "1.84"
+                },
+                {
+                    "what": "Asking the host to re-read a workspace's billing access (AccessRefresh)",
+                    "since": "1.86"
+                },
+                {
                     "what": "A plugin can be the deployment's billing portal: checkout, subscriptions, customer portal, refunds and verified provider notifications (PluginBillingPortalInterface)",
                     "since": "1.77"
+                },
+                {
+                    "what": "Whether a paid Whity store plugin is licensed here: licensed, grace with an until date, or unlicensed, from the store's signed statement with a 7-day offline window (Licensing\\StoreLicence)",
+                    "since": "1.85"
                 }
             ],
             "missing": [
@@ -950,15 +992,22 @@
                     "since": "1.5"
                 },
                 {
+                    "what": "Service routes: server-to-server calls with the trusted issuer's token, and the people they name (ServiceCall, LinkedPeople)",
+                    "since": "1.84"
+                },
+                {
                     "what": "Route schemas in the OpenAPI document",
                     "since": null
+                },
+                {
+                    "what": "Workspace, language and actor kind on Request",
+                    "since": "1.87"
                 }
             ],
             "missing": [
-                "Workspace, language and actor kind on Request",
                 "Per-route rate limits and entitlements"
             ],
-            "security": "Routes cannot tell an agent from a person today, so they cannot apply stricter rules to agents.",
+            "security": null,
             "plan": "0.2.27"
         },
         {

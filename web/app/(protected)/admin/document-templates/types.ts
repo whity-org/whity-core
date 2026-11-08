@@ -8,6 +8,8 @@
  * can narrow to `components['schemas']['DocumentSource']`.
  */
 
+import type { UnitNames } from '@/hooks/useLocalizedUnits';
+
 /** The four visibility tiers `DocumentAccessPolicy` understands. */
 export type DocumentScope = 'personal' | 'tenant' | 'global' | 'system';
 
@@ -65,9 +67,8 @@ export interface DocumentNumberingRule {
 }
 
 /** A unit, as `GET /api/v1/ous` lists them. */
-export interface OuOption {
+export interface OuOption extends UnitNames {
   id: number;
-  name: string;
 }
 
 /** One entry of the permission catalogue, as `GET /api/v1/permissions` lists them. */

@@ -2,7 +2,7 @@ import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { backup, restoreSteps } from '../backup.js';
 import { CliError } from '../errors.js';
-import { parseEnv, setEnvValue } from '../envfile.js';
+import { newRenderSecret, parseEnv, renderNeedsSecret, setEnvValue } from '../envfile.js';
 import { readIfPresent } from '../files.js';
 import { m } from '../messages.js';
 import { assertSupported, compareVersions, composeFor, latestVersion, normalizeVersion } from '../release.js';
@@ -125,6 +125,11 @@ export async function update(options, deps) {
   const failed = (reason) => new CliError(m.restore({ reason, from, to, steps }));
 
   setEnvValue(envPath, 'WHITY_VERSION', to);
+  // After the backup on purpose: the restore steps put the old .env back.
+  if (renderNeedsSecret(env)) {
+    setEnvValue(envPath, 'RENDER_SHARED_SECRET', newRenderSecret());
+    deps.log(m.renderSecretAdded());
+  }
   writeFileSync(composePath, nextCompose);
   const nextEnv = readFileSync(envPath, 'utf8');
   const nextRun = stack(dir, nextEnv, deps);

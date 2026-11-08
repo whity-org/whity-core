@@ -485,6 +485,18 @@ export interface VariantCaseBlock {
   children: Block[];
 }
 
+/**
+ * Leaf: a write-only secret the host stores for the plugin (SDK 1.88). `endpoint`
+ * is set by the host, never by the plugin; a value is never read back through it.
+ */
+export interface SecretFieldBlock {
+  type: 'secretField';
+  secret: string;
+  label: string;
+  description?: string;
+  endpoint: string;
+}
+
 /** Leaf (form only): a single-line text input. */
 export interface TextInputBlock {
   type: 'textInput';
@@ -964,6 +976,7 @@ export type Block = BlockFacets &
   | VariantBlock
   | VariantCaseBlock
   | TextInputBlock
+  | SecretFieldBlock
   | TextAreaBlock
   | RichTextInputBlock
   | NumberInputBlock

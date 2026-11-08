@@ -8,8 +8,10 @@ use Whity\Auth\RoleChecker;
 use Whity\Auth\TokenValidator;
 use Whity\Core\Audit\AuditContext;
 use Whity\Core\Audit\AuditLoggerInterface;
+use Whity\Core\i18n\RequestLanguageResolver;
 use Whity\Core\Router;
 use Whity\Core\Tenant\TenantContext;
+use Whity\Http\RequestContext;
 use Whity\Mcp\Auth\McpPrincipal;
 use Whity\Mcp\JsonRpc\ErrorCode;
 use Whity\Mcp\JsonRpc\McpException;
@@ -48,6 +50,8 @@ final class ResourcesReadHandler implements MethodHandler
         // Whether a plugin is still granted agent context, asked on every call so
         // a revoke applies at once. Null: trust the registry.
         private readonly ?\Closure $pluginGranted = null,
+        // WHIT-1015: the language a plugin's route handler reads on its Request.
+        private readonly ?RequestLanguageResolver $languages = null,
     ) {}
 
     /**
@@ -205,6 +209,12 @@ final class ResourcesReadHandler implements MethodHandler
         $request = new Request('GET', $path, ['content-type' => 'application/json'], '');
         $request->setAttribute(Request::ATTR_JWT_CLAIMS, $claims);
         $request->user = (object) $claims;
+        RequestContext::stamp(
+            $request,
+            $principal->tenantId > 0 ? $principal->tenantId : null,
+            RequestContext::languageOf($this->languages, $principal->userId),
+            $principal->actor()->kind,
+        );
 
         return $request;
     }
