@@ -106,6 +106,8 @@ final class WorkerDocumentServices
         \Whity\register_service(TemplateSlotRegistry::class, $slots);
         \Whity\register_service(TemplateIssuing::class, $issuing);
         \Whity\register_service(Documents::class, new SdkDocuments($issuing, $roleChecker, $jobPlugin, $slots));
+        // SDK 1.82 (WHIT-996): a job reads templates for the same caller it issues for.
+        \Whity\register_service(\Whity\Sdk\Documents\Templates::class, SdkTemplates::build($pdo, $roleChecker, $resourceTypes, $settings, $slots, $jobPlugin));
         // #1151: a plugin's job renders and issues flowing documents too.
         \Whity\register_service(
             \Whity\Sdk\Render\DocumentRenderer::class,

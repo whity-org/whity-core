@@ -3683,6 +3683,13 @@ $documentsHandler = new \Whity\Api\DocumentsApiHandler(
     \Whity\app(\Whity\Core\Document\Issuing\TemplateIssuing::class),
     $roleChecker,
 ));
+// SDK 1.82 (WHIT-996): plugins read the published templates the person can see.
+\Whity\register_service(\Whity\Sdk\Documents\Templates::class, \Whity\Core\Document\Issuing\SdkTemplates::build(
+    $db->getPdo(),
+    $roleChecker,
+    $resourceTypeRegistry,
+    $settingsService,
+));
 $documentWithdrawal = new \Whity\Core\Document\DocumentWithdrawal(
     $db->getPdo(),
     $documentRepository,

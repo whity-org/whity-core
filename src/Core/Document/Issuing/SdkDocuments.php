@@ -10,8 +10,6 @@ use Whity\Core\Audit\AuditContext;
 use Whity\Core\Container\HostWiredService;
 use Whity\Core\Document\DocumentPresenter;
 use Whity\Core\Document\Slots\TemplateSlotRegistry;
-use Whity\Core\RBAC\ScopedPermissionSet;
-use Whity\Core\Tenant\TenantContext;
 use Whity\Sdk\Documents\DocumentNotIssuedException;
 use Whity\Sdk\Documents\Documents;
 use Whity\Sdk\Documents\IssueRequest;
@@ -130,23 +128,7 @@ final class SdkDocuments implements Documents, HostWiredService
 
     private function actor(): ?ActingAs
     {
-        $tenantId = TenantContext::getTenantId();
-        if ($tenantId === null || $tenantId === 0) {
-            return null;
-        }
-        $profileId = AuditContext::getActorUserId();
-        if ($profileId !== null) {
-            return new ActingAs($tenantId, $profileId, ScopedPermissionSet::forProfile($this->roleChecker, $profileId, $tenantId));
-        }
-
-        // No person: a job of a plugin that declares it issues in the background.
-        $job = AuditContext::getJob();
-        $owner = $job !== null && $this->jobPlugin !== null ? ($this->jobPlugin)($job) : null;
-        if ($owner === null || $this->slots === null || !$this->slots->declaresBackground($owner['plugin'])) {
-            return null;
-        }
-
-        return ActingAs::background($tenantId, $owner['plugin'], $owner['permissions']);
+        return (new SdkActor($this->roleChecker, $this->jobPlugin, $this->slots))->current();
     }
 
     private function issuing(): TemplateIssuing
