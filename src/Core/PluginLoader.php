@@ -48,7 +48,10 @@ use Whity\Sdk\Manifest\ManifestPlugin;
 use Whity\Sdk\Http\Request;
 use Whity\Sdk\Http\Response;
 use Whity\Mcp\Prompts\Prompt;
+use Whity\Mcp\Prompts\PromptArgument;
+use Whity\Mcp\Prompts\PromptMessage;
 use Whity\Mcp\Prompts\PromptRegistry;
+use Whity\Mcp\Resources\PluginResourceRegistry;
 use Whity\Mcp\Tools\AuthoredToolRegistry;
 use Whity\Sdk\PluginAgentPresetsInterface;
 use Whity\Sdk\PluginAgentsInterface;
@@ -59,6 +62,7 @@ use Whity\Sdk\PluginFrontendInterface;
 use Whity\Sdk\PluginInterface;
 use Whity\Sdk\PluginJobsInterface;
 use Whity\Sdk\PluginMcpInterface;
+use Whity\Sdk\PluginMcpResourcesInterface;
 use Whity\Sdk\PluginMcpToolsInterface;
 use Whity\Sdk\PluginMcpToolsetsInterface;
 use Whity\Sdk\PluginRequirementsInterface;
@@ -79,6 +83,10 @@ use Whity\Sdk\Sdk;
  */
 class PluginLoader
 {
+    /** Arguments and messages kept per plugin prompt, and the length of each message (SDK 1.80). */
+    private const MAX_PROMPT_ITEMS = 20;
+    private const MAX_PROMPT_TEXT  = 8000;
+
     /**
      * The mandated `resource:action` permission pattern (WC-13/WC-169).
      *
@@ -1600,12 +1608,20 @@ class PluginLoader
      *   would still be part of the platform's surface, which is not what
      *   disabling one means — and it is what made prompts/list keep advertising
      *   a plugin after it was turned off (#952).
+     * - SDK 1.80 (WHIT-993): only a plugin the operator granted agent context
+     *   contributes, and each prompt must declare `requiredPermission`. With no
+     *   $granted, no plugin is granted.
+     *
+     * @param (\Closure(string): bool)|null $granted whether the plugin of this name may reach agents
      */
-    public function collectMcpPrompts(PromptRegistry $registry): void
+    public function collectMcpPrompts(PromptRegistry $registry, ?\Closure $granted = null): void
     {
         foreach ($this->registeredPlugins as $pluginKey => $info) {
             $plugin = $info['plugin'];
             if (!$plugin instanceof PluginMcpInterface) {
+                continue;
+            }
+            if ($granted === null || !$granted($plugin->getName())) {
                 continue;
             }
 
@@ -1705,16 +1721,84 @@ class PluginLoader
             return;
         }
         $description        = is_string($descriptor['description'] ?? null) ? $descriptor['description'] : '';
-        $requiredRole       = is_string($descriptor['requiredRole'] ?? null) ? $descriptor['requiredRole'] : null;
-        $requiredPermission = is_string($descriptor['requiredPermission'] ?? null) ? $descriptor['requiredPermission'] : null;
+        $requiredRole       = is_string($descriptor['requiredRole'] ?? null) && $descriptor['requiredRole'] !== '' ? $descriptor['requiredRole'] : null;
+        $requiredPermission = is_string($descriptor['requiredPermission'] ?? null) && $descriptor['requiredPermission'] !== '' ? $descriptor['requiredPermission'] : null;
+        // SDK 1.80 (WHIT-993): never open to every caller.
+        if ($requiredPermission === null) {
+            $this->logWarning("[Plugin:{$pluginKey}] getMcpPrompts() prompt '{$name}' declares no requiredPermission — skipped (SDK 1.80).");
+            return;
+        }
+
+        $arguments = [];
+        foreach (array_slice(is_array($descriptor['arguments'] ?? null) ? $descriptor['arguments'] : [], 0, self::MAX_PROMPT_ITEMS) as $argument) {
+            if (is_array($argument) && is_string($argument['name'] ?? null) && preg_match('/^[A-Za-z_][A-Za-z0-9_]{0,63}$/', $argument['name']) === 1) {
+                $arguments[] = new PromptArgument(
+                    $argument['name'],
+                    is_string($argument['description'] ?? null) ? mb_substr($argument['description'], 0, 500) : '',
+                    ($argument['required'] ?? false) === true,
+                );
+            }
+        }
+        $messages = [];
+        foreach (array_slice(is_array($descriptor['messages'] ?? null) ? $descriptor['messages'] : [], 0, self::MAX_PROMPT_ITEMS) as $message) {
+            $role = is_array($message) ? ($message['role'] ?? null) : null;
+            $text = is_array($message) && is_array($message['content'] ?? null) ? ($message['content']['text'] ?? null) : null;
+            if (in_array($role, ['user', 'assistant'], true) && is_string($text)) {
+                $messages[] = new PromptMessage($role, mb_substr($text, 0, self::MAX_PROMPT_TEXT));
+            }
+        }
 
         $registry->register(new Prompt(
             name:               $name,
             description:        $description,
+            arguments:          $arguments,
+            messages:           $messages,
             requiredRole:       $requiredRole,
             requiredPermission: $requiredPermission,
             plugin:             $pluginName,
         ));
+    }
+
+    /**
+     * Register the MCP resources plugins offer agents (SDK 1.80, WHIT-993,
+     * {@see PluginMcpResourcesInterface}). The same rules as
+     * {@see collectMcpPrompts()}: active plugins only, and only those the
+     * operator granted agent context; with no $granted, none.
+     *
+     * @param (\Closure(string): bool)|null $granted whether the plugin of this name may reach agents
+     */
+    public function collectMcpResources(PluginResourceRegistry $registry, ?\Closure $granted = null): void
+    {
+        foreach ($this->registeredPlugins as $pluginKey => $info) {
+            $plugin = $info['plugin'];
+            if (!$plugin instanceof PluginMcpResourcesInterface) {
+                continue;
+            }
+            if (isset($this->administrativelyDisabled[$pluginKey])) {
+                continue;
+            }
+            $lifecycle = $this->lifecycles[$pluginKey] ?? null;
+            if ($lifecycle === null || !$lifecycle->isActive()) {
+                continue;
+            }
+            if ($granted === null || !$granted($plugin->getName())) {
+                continue;
+            }
+            try {
+                $descriptors = $plugin->getMcpResources();
+            } catch (Throwable $e) {
+                $this->handlePluginThrowable($pluginKey, $e, 'getMcpResources');
+                continue;
+            }
+            foreach ($descriptors as $descriptor) {
+                $refused = is_array($descriptor) // @phpstan-ignore function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
+                    ? $registry->register($descriptor, $plugin->getName())
+                    : 'getMcpResources() returned a non-array descriptor';
+                if ($refused !== null) {
+                    $this->logWarning("[Plugin:{$pluginKey}] {$refused} — skipped.");
+                }
+            }
+        }
     }
 
     /**

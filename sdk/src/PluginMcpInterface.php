@@ -34,6 +34,20 @@ namespace Whity\Sdk;
  * - `requiredPermission` (string, optional): same semantics as `requiredRole`
  *   but checked against the caller's permission set.
  *
+ * Agent context (SDK 1.80, WHIT-993)
+ * ---------------------------------
+ * Prompt text goes straight into an agent's context. From SDK 1.80 the host
+ * serves a plugin's prompts only from a Verified plugin the operator has granted
+ * **agent context** (install-wide, system tenant only, audited, revocable),
+ * the same grant {@see PluginMcpResourcesInterface} resources need. Until then
+ * they are neither listed nor served. And every prompt must declare
+ * `requiredPermission`: one without it is refused at load, so no plugin prompt
+ * is open to every caller.
+ *
+ * From 1.80 `messages` and `arguments` are served too (before, only the name and
+ * description were). At most 20 messages of at most 8,000 characters each, and
+ * 20 arguments; `{{name}}` in a message is replaced by that argument.
+ *
  * Descriptors with a missing or empty `name` are silently dropped with a
  * logged warning. A `getMcpPrompts()` call that throws is caught, logged, and
  * treated as if the plugin contributed nothing — the plugin itself continues

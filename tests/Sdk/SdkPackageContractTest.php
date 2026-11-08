@@ -242,9 +242,10 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsOneEightForInteractiveBlocks(): void
     {
         $this->assertSame(
-            '1.79.0',
+            '1.80.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.79 ADDS Mcp\McpConnections and connection created, grant changed and revoked events, never with a token (WHIT-992). '
+            'SDK 1.80 ADDS PluginMcpResourcesInterface; plugin prompts and resources need the operator\'s agent-context grant and a requiredPermission (WHIT-993). '
+            . 'SDK 1.79 ADDS Mcp\McpConnections and connection created, grant changed and revoked events, never with a token (WHIT-992). '
             . 'SDK 1.78 ADDS proposal created, decided and undone events and a read-only preview on authored tools (WHIT-991). '
             . 'SDK 1.77 ADDS PluginBillingPortalInterface and Billing\\BillingPortal: a plugin can be the deployment\'s '
             . 'billing portal through one payment provider (WHIT-1010). '
@@ -1113,6 +1114,16 @@ final class SdkPackageContractTest extends TestCase
                 'getSettings'
             ))->getReturnType()
         );
+    }
+
+    public function testPluginMcpResourcesInterface_existsWithGetMcpResourcesMethod(): void
+    {
+        $methods = array_map(
+            static fn (\ReflectionMethod $m): string => $m->getName(),
+            (new \ReflectionClass(\Whity\Sdk\PluginMcpResourcesInterface::class))->getMethods()
+        );
+        $this->assertSame(['getMcpResources'], $methods);
+        $this->assertSame('array', (string) (new \ReflectionMethod(\Whity\Sdk\PluginMcpResourcesInterface::class, 'getMcpResources'))->getReturnType());
     }
 
     public function testPluginMcpInterface_existsWithGetMcpPromptsMethod(): void
