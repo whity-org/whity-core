@@ -203,6 +203,10 @@ final class RoutingPresenter
                 ),
             // WHIT-919: whether a person on this step may send it back to the author.
             'allow_send_back' => DbBool::of($step['allow_send_back'] ?? true),
+            // WHIT-922: on a `sign` step, the capacity the signer signs in and
+            // whom they sign for. Null on every other step.
+            'sign_capacity' => isset($step['sign_capacity']) ? (string) $step['sign_capacity'] : null,
+            'sign_on_behalf_of' => isset($step['sign_on_behalf_of']) ? (string) $step['sign_on_behalf_of'] : null,
         ];
     }
 

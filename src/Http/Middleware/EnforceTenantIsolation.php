@@ -195,6 +195,9 @@ class EnforceTenantIsolation
         // the reader asking whether the service is down. Exposes component states
         // and uptime only, never deployment internals.
         '/api/v1/status',
+        // WHIT-922: the instance's public signing keys, so anyone holding a
+        // signature record can check its seal. Public keys only.
+        '/api/v1/signing-keys',
     ];
 
     /**

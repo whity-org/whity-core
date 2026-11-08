@@ -79,8 +79,10 @@ final class SanctionedGlobalTablesTest extends TestCase
         // QUEUE for both is tenant-scoped at query time via a JOIN to
         // memberships, not via a column on either table. All reviewed as
         // legitimately global (rows join only to global tables, no tenant_id).
+        // 11 (WHIT-922): instance_signing_keys — the instance's own key pairs
+        // that seal signature records; one set per instance, not per tenant.
         self::assertLessThanOrEqual(
-            10,
+            11,
             count(SanctionedGlobalTables::all()),
             'The sanctioned global-table allowlist should stay minimal; review any growth.'
         );

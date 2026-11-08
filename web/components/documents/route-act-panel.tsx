@@ -129,6 +129,7 @@ import {
   type RouteRecipient,
   type RouteVerdictName,
 } from './routing-wire';
+import { SignPanel } from './sign-panel';
 
 /**
  * The server's own ceiling on a note, from `DocumentRoutingApiHandler`.
@@ -525,6 +526,12 @@ export function RouteActPanel({
   };
 
   const overLimit = note.length > MAX_NOTE_LENGTH;
+
+  // WHIT-922: a signing step is answered by signing or declining, with its own
+  // panel. Nothing on this panel would be accepted there.
+  if (myStep?.kind === 'sign') {
+    return <SignPanel documentId={documentId} route={route} onActed={onActed} />;
+  }
 
   return (
     <div

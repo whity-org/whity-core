@@ -3701,7 +3701,9 @@ $documentsHandler = new \Whity\Api\DocumentsApiHandler(
     // WHIT-742: `slot` in the body names the template through the workspace's bindings.
     $templateSlotRegistry,
     $documentPeople,
-    $documentFieldLabels
+    $documentFieldLabels,
+    // WHIT-922: `signatures` on GET /api/documents/{id}.
+    new \Whity\Core\Document\Signing\SignatureRepository($db->getPdo()),
 );
 // The one issuing path (WHIT-742), registered for plugin code and automations
 // running in a request. BaseCommand registers the same for CLI commands, and
@@ -3948,6 +3950,55 @@ $router->register('GET',  '/api/documents/{id:\d+}/people',                     
 // to somebody who then cannot answer it, leaving the item open forever with no
 // way for them to discover why. Same posture as /api/me/notifications.
 $router->register('POST', '/api/documents/{id:\d+}/routes/{routeId:\d+}/actions',      [$documentRoutingHandler, 'act'],        null);
+
+// 13a-nonies-ter-bis. ELECTRONIC SIGNATURES (WHIT-922, #1726). A `sign` step is
+// answered by signing: consent, a drawn signature and a fresh second check,
+// then the act and a sealed signature record in one transaction. Session-gated
+// with no permission, like acting: being the person the step reached is the
+// authorization. The audit page reads every act and signature and checks the
+// trail's hash chain and each seal. The public keys are published, unauthenticated.
+$signingChallengeRepository = new \Whity\Core\Document\Signing\SigningChallengeRepository($db->getPdo());
+$instanceSealKeys = new \Whity\Core\Document\Signing\InstanceSealKeys($db->getPdo(), $secretStore);
+$savedSignatureRepository = new \Whity\Core\Document\Signing\SavedSignatureRepository($db->getPdo());
+$signingService = new \Whity\Core\Document\Signing\SigningService(
+    $db->getPdo(),
+    $documentRouter,
+    $routeRecipientRepository,
+    $routeStepRepository,
+    $routeSubjectRegistry,
+    new \Whity\Core\Document\Routing\RouteSubjectVersionRepository($db->getPdo()),
+    new \Whity\Core\Document\Signing\SignatureRepository($db->getPdo()),
+    $savedSignatureRepository,
+    new \Whity\Core\Document\Signing\SigningSecondFactor(
+        $db->getPdo(),
+        $signingChallengeRepository,
+        $totpService,
+        // Signing checks count on their own: a try takes a slot before it is
+        // checked, and a check that passes gives it back.
+        new \Whity\Core\Document\Signing\SigningAttemptLimiter(new DatabaseSharedStore($db->getPdo())),
+    ),
+    $signingChallengeRepository,
+    $instanceSealKeys,
+    new \Whity\Core\Document\Signing\SigningCodeMailer($mailer, new \Whity\Core\Mail\EmailLayout(), $settingsService),
+);
+$documentSigningHandler = new \Whity\Api\DocumentSigningApiHandler(
+    $documentRepository,
+    $routeRepository,
+    $routeEventRepository,
+    $documentVisibilityPolicy,
+    $roleChecker,
+    $signingService,
+    $savedSignatureRepository,
+    $instanceSealKeys,
+);
+$router->register('GET',    '/api/documents/{id:\d+}/routes/{routeId:\d+}/signing',      [$documentSigningHandler, 'context'],         null);
+$router->register('POST',   '/api/documents/{id:\d+}/routes/{routeId:\d+}/signing/code', [$documentSigningHandler, 'sendCode'],        null);
+$router->register('POST',   '/api/documents/{id:\d+}/routes/{routeId:\d+}/sign',         [$documentSigningHandler, 'sign'],            null);
+$router->register('GET',    '/api/documents/{id:\d+}/audit',                              [$documentSigningHandler, 'audit'],           null);
+$router->register('GET',    '/api/me/signature',                                          [$documentSigningHandler, 'savedSignature'],  null);
+$router->register('PUT',    '/api/me/signature',                                          [$documentSigningHandler, 'saveSignature'],   null);
+$router->register('DELETE', '/api/me/signature',                                          [$documentSigningHandler, 'deleteSignature'], null);
+$router->register('GET',    '/api/signing-keys',                                          [$documentSigningHandler, 'publishedKeys'],   null);
 
 // 13a-nonies-quater. NAMED USER GROUPS (#999). A group is a named, reusable RULE
 // over the tenant's people, stored once and referenced from many places —
@@ -5100,6 +5151,10 @@ $ssoAuthHandler = new \Whity\Api\SsoAuthHandler(
     // WHIT-917: "Continue with …" on a workspace's sign-up page joins it as a customer.
     $customerSignupService,
     $brandingHostRepo,
+    // WHIT-922: signing in again to confirm a signature.
+    $tokenValidator,
+    $externalIdentityRepository,
+    $signingChallengeRepository,
 );
 // Public list of ENABLED providers for the current tenant, so the login page can
 // render "Sign in with …" buttons (display-safe fields only; no secrets).
