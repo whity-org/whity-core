@@ -5166,7 +5166,7 @@ CorePrompts::register($promptRegistry);
 // plugins the operator granted agent context (`whity-cli plugin agent-context`).
 // Collected from the grants as they stand at boot and on every reload, and asked
 // again on every call, so a revoke applies at once.
-$agentContextGrants = new \Whity\Core\Plugin\Trust\AgentContextGrants($db->getPdo(), new \Whity\Core\Plugin\Trust\CodePluginVerification($db->getPdo()), $auditLogger);
+$agentContextGrants = new \Whity\Core\Plugin\Trust\AgentContextGrants($db->getPdo(), new \Whity\Core\Plugin\Trust\CodePluginVerification($db->getPdo(), $storeMarks), $auditLogger);
 $agentContextGranted = static fn (string $plugin): bool => $agentContextGrants->isGranted($plugin);
 $agentContextGrantedNow = static function () use ($agentContextGrants): \Closure {
     $names = array_flip($agentContextGrants->granted());

@@ -255,7 +255,11 @@ class PluginsCommand extends BaseCommand implements CliCommand
         $pdo    = \Whity\Database\Database::connect()->getPdo();
         $grants = new \Whity\Core\Plugin\Trust\AgentContextGrants(
             $pdo,
-            new \Whity\Core\Plugin\Trust\CodePluginVerification($pdo),
+            new \Whity\Core\Plugin\Trust\CodePluginVerification($pdo, new \Whity\Core\Plugin\Store\StoreMarks(
+                new \Whity\Core\Settings\GlobalSettingsRepository($pdo),
+                new \Whity\Core\Plugin\PluginRecords($pdo),
+                static fn (string $url): ?array => (new \Whity\Core\Http\HttpFetcher(timeoutSeconds: 10))->getJson($url),
+            )),
             new \Whity\Core\Audit\AuditLogger($pdo),
         );
         if ($action === 'list') {

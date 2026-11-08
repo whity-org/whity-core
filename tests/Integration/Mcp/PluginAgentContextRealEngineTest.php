@@ -10,11 +10,14 @@ use Whity\Auth\RoleChecker;
 use Whity\Auth\TokenValidator;
 use Whity\Core\Audit\AuditLoggerInterface;
 use Whity\Core\Hooks\HookManager;
+use Whity\Core\Plugin\PluginRecords;
+use Whity\Core\Plugin\Store\StoreMarks;
 use Whity\Core\Plugin\Trust\AgentContextGrants;
 use Whity\Core\Plugin\Trust\CodePluginVerification;
 use Whity\Core\Plugin\Trust\NotVerifiedException;
 use Whity\Core\PluginLoader;
 use Whity\Core\RBAC\PermissionRegistry;
+use Whity\Core\Settings\GlobalSettingsRepository;
 use Whity\Core\Router;
 use Whity\Core\Tenant\TenantContext;
 use Whity\Mcp\Auth\McpPrincipal;
@@ -249,6 +252,52 @@ PHP);
         $this->pdo->exec("UPDATE plugin_installs SET version = '1.1.0', package_sha256 = '" . str_repeat('c', 64) . "' WHERE plugin_name = 'PriceBook'");
 
         self::assertFalse($this->grants->isGranted('PriceBook'), 'the mark was for 1.0.0\'s package');
+    }
+
+    public function testAPluginTheStoreMarkedVerifiedCanBeGrantedUntilTheStoreRevokesIt(): void
+    {
+        // WHIT-1014: the Whity store's signed mark for the exact installed package.
+        $host = 'store.whity.test';
+        $sha = hash('sha256', 'crm-1.2.0-package');
+        (new PluginRecords($this->pdo))->recordInstall('Crm', 'store', $host, 'crm', '1.2.0', $sha, [], [], null);
+        $seed = random_bytes(SODIUM_CRYPTO_SIGN_SEEDBYTES);
+        $keys = sodium_crypto_sign_seed_keypair($seed);
+        $b64u = static fn (string $b): string => rtrim(strtr(base64_encode($b), '+/', '-_'), '=');
+        $state = 'verified';
+        $now = time();
+        $sign = static function (array $claims) use ($keys, $b64u): string {
+            $input = $b64u((string) json_encode(['alg' => 'EdDSA', 'typ' => StoreMarks::TYP, 'kid' => 'k'])) . '.' . $b64u((string) json_encode($claims));
+
+            return $input . '.' . $b64u(sodium_crypto_sign_detached($input, sodium_crypto_sign_secretkey($keys)));
+        };
+        $marks = new StoreMarks(
+            new GlobalSettingsRepository($this->pdo),
+            new PluginRecords($this->pdo),
+            static function () use (&$state, $sign, $host, $sha, $now): array {
+                return ['data' => ['slug' => 'crm', 'versions' => [['version' => '1.2.0', 'mark' => $sign([
+                    'iss' => 'https://' . $host . '/api/v1/plugin-store', 'plugin' => 'crm', 'version' => '1.2.0',
+                    'sha256' => $sha, 'state' => $state, 'reviewed_at' => gmdate('c', $now - 86400), 'revoked_at' => null,
+                    'iat' => $now, 'exp' => $now + 86400,
+                ])]]]];
+            },
+            [$host => [$b64u(sodium_crypto_sign_publickey($keys))]],
+            static fn (): int => $now,
+        );
+        $grants = new AgentContextGrants($this->pdo, new CodePluginVerification($this->pdo, $marks));
+
+        try {
+            $grants->grant('Crm', self::OPERATOR);
+            self::fail('granted before any mark was fetched');
+        } catch (NotVerifiedException) {
+        }
+
+        $marks->refresh();
+        $grants->grant('Crm', self::OPERATOR);
+        self::assertTrue($grants->isGranted('Crm'));
+
+        $state = 'revoked';
+        $marks->refresh(force: true);
+        self::assertFalse($grants->isGranted('Crm'), 'the store revoked its mark');
     }
 
     private function installVerified(string $plugin, string $version): void
