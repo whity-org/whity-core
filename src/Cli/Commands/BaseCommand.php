@@ -565,6 +565,7 @@ abstract class BaseCommand implements CliCommand, CommandHelp
                 static fn (): \Whity\Sdk\Render\DocumentRenderer => $documentParts->sdkRenderer()
             )
         );
+        \Whity\Core\Plugin\HostPluginServices::register($db->getPdo(), $auditLogger);
         // WHIT-838 (SDK 1.60): plugin secrets, as in public/index.php, so a
         // plugin's job reaches the same store its routes write. The cipher is
         // built on first use: a command that touches no secret needs no key.

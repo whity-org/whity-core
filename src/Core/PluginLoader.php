@@ -3120,6 +3120,10 @@ class PluginLoader
         string $namespacePrefix,
         string $pluginKey
     ): array {
+        // WHIT-1030: the name a plugin's own services are bound to, fixed here
+        // rather than read from the plugin each time it asks.
+        \Whity\Core\Plugin\PluginIdentity::bind($plugin, $plugin->getName());
+
         // Snapshot the declared routes ONCE so registration and the frontend
         // descriptor validation below judge the same declaration set.
         $routes = $plugin->getRoutes();

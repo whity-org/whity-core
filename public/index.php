@@ -4529,6 +4529,7 @@ $notificationDispatcher = new \Whity\Core\Notification\NotificationDispatcher(
     $auditLogger
 );
 $notificationDispatcher->subscribe($hookManager);
+\Whity\Core\Plugin\HostPluginServices::register($db->getPdo(), $auditLogger, $logger);
 
 // Comments and suggestions on editor documents (editor M5; E.4, E.6, E.10,
 // E.29, E.37). Registered here, after the notification dispatcher, because a
