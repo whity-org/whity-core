@@ -271,6 +271,7 @@
     "tests/Integration/Agent/SdkAgentsRealEngineTest.php": 4.765,
     "tests/Integration/AgentsApiRealEngineTest.php": 7.895,
     "tests/Integration/Audit/ActorRecordingRealEngineTest.php": 4.761,
+    "tests/Integration/Audit/PluginAuditRealEngineTest.php": 30.0,
     "tests/Integration/AuditLogRbacTest.php": 0.004,
     "tests/Integration/AuthBruteForceTest.php": 29.522,
     "tests/Integration/AuthFlowTest.php": 6.169,

@@ -242,9 +242,10 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsOneEightForInteractiveBlocks(): void
     {
         $this->assertSame(
-            '1.91.0',
+            '1.92.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.91 ADDS Jobs\\PluginJobQueue and PluginScheduledJobsInterface, limited to the plugin\'s own jobs in the current workspace (WHIT-1031). '
+            'SDK 1.92 ADDS Audit\\PluginAudit, entries attributed by the host and readable only by the plugin that wrote them (WHIT-1032). '
+            . 'SDK 1.91 ADDS Jobs\\PluginJobQueue and PluginScheduledJobsInterface, limited to the plugin\'s own jobs in the current workspace (WHIT-1031). '
             . 'SDK 1.90 ADDS Notification\\PluginNotifier and PluginNotificationsInterface, bound by the host to the current workspace and its active members (WHIT-1030). '
             . 'SDK 1.89 ADDS observe-only hook listeners and constants for events core already fired (WHIT-1033). '
             . 'SDK 1.88 ADDS Settings\PluginSettings, a settings-changed event and the secretField block (WHIT-1016). '
