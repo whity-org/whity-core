@@ -102,6 +102,8 @@ render image at another tag printed the old layout without a word. Now:
   it is reachable, the same release, and accepting the secret, caches the
   answer briefly, and prints only when all three hold.
 - `documents.render_enabled` defaults to `true` and is the operator's off switch.
+  An install that upgrades with a renderer configured and no saved value stays
+  off until someone turns it on (WHIT-1018, migration 238).
 - A mismatched version or secret is a named `503` and an admin status line with
   the fix, not a silent wrong print or a bare `401`.
 - The published compose files take one `WHITY_VERSION` for all three images.
