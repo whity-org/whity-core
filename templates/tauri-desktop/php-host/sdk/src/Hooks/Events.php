@@ -18,7 +18,7 @@ use Whity\Sdk\PluginNamespace;
  * - Notification hooks (`*.created` / `*.updated` / `*.deleted` and the
  *   `*.async` variants): listeners observe; async variants are queued.
  *
- * Any listener can be OBSERVE-ONLY (SDK 1.NEXT): subscribe with
+ * Any listener can be OBSERVE-ONLY (SDK 1.89): subscribe with
  * `['callback' => $fn, 'observe' => true]`. The host ignores what it returns,
  * a change to its copy of the payload reaches nobody, and it cannot veto: a
  * {@see HookVetoException} it throws is logged and the operation carries on. Use
@@ -72,14 +72,14 @@ final class Events
     public const USER_CREATED_ASYNC = 'user.created.async';
     public const USER_UPDATED = 'user.updated';
     public const USER_DELETED = 'user.deleted';
-    // Fired after the change, the return value ignored (SDK 1.NEXT). Payload:
+    // Fired after the change, the return value ignored (SDK 1.89). Payload:
     // `profile_id`, `tenant_id`, `membership_id`, `role_id`, `role_name`, `ou_id`.
     // `added` may also carry `status`, `kind`, `via` or `is_primary`; `removed`
     // also carries `status` and `granted_at`.
     public const USER_MEMBERSHIP_ADDED = 'user.membership.added';
     public const USER_MEMBERSHIP_REMOVED = 'user.membership.removed';
 
-    // ---- registration (SDK 1.NEXT) ----
+    // ---- registration (SDK 1.89) ----
     // Fired after the change, the return value ignored. These carry the
     // person's address, so treat the payload as personal data.
     /** Payload: `email`, `name`, `tenant_name`, `approval_required`, `verification_required`. */
@@ -89,7 +89,7 @@ final class Events
     /** Payload: `email`, `name`. */
     public const REGISTRATION_REJECTED = 'registration.rejected';
 
-    // ---- federated sign-in (SDK 1.NEXT) ----
+    // ---- federated sign-in (SDK 1.89) ----
     /**
      * Somebody signed in through a federated provider. Fired after the sign-in,
      * the return value ignored. Payload: `profile_id`, `email`, `provider_key`,
@@ -98,7 +98,7 @@ final class Events
      */
     public const AUTH_FEDERATED_SIGNED_IN = 'auth.federated.signed_in';
 
-    // ---- resource grants (SDK 1.NEXT) ----
+    // ---- resource grants (SDK 1.89) ----
     /** After the grant. Payload: `id`, `tenant_id`, `resource_type`, `resource_id`, `role_id`, `profile_id`. */
     public const RBAC_RESOURCE_GRANT_CREATED = 'rbac.resource_grant.created';
     /** After the revoke. Payload: `id`, `tenant_id`. */
@@ -113,7 +113,7 @@ final class Events
      */
     public const RBAC_RESOURCE_GRANT_VERIFY_RESOURCE = 'rbac.resource_grant.verify_resource';
 
-    // ---- time windows (SDK 1.NEXT) ----
+    // ---- time windows (SDK 1.89) ----
     /**
      * A FILTER: the host collects what is unfinished before a period closes.
      * Payload: `tenant_id`, `window_id`, `window_type_id`, `starts_on`, `ends_on`,
@@ -122,7 +122,7 @@ final class Events
      */
     public const TIME_WINDOW_CLOSE_REPORT = 'time_window.close_report';
 
-    // ---- data type lifecycle (SDK 1.NEXT) ----
+    // ---- data type lifecycle (SDK 1.89) ----
     /** Before a declared data type's record changes state. A listener may veto. */
     public const DATATYPE_LIFECYCLE_CHANGING = 'datatype.lifecycle.changing';
     /** After the change, the return value ignored. */
@@ -262,7 +262,7 @@ final class Events
     // ---- platform ----
     public const NAVIGATION_REGISTER = 'navigation.register';
     public const PERMISSION_REGISTERED = 'permission.registered';
-    // Boot-time announcements (SDK 1.NEXT). Each names the `source` that registered
+    // Boot-time announcements (SDK 1.89). Each names the `source` that registered
     // and what it registered; the return value is ignored.
     public const DATATYPE_REGISTERED = 'datatype.registered';
     public const OU_TYPE_REGISTERED = 'ou_type.registered';

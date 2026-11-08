@@ -113,7 +113,7 @@ final class HookRegistrar
     }
 
     /**
-     * An observe-only listener (SDK 1.NEXT): its return value is ignored, it holds
+     * An observe-only listener (SDK 1.89): its return value is ignored, it holds
      * its own copy of the payload, and a veto it throws does not cross this
      * boundary. Matches production's PluginLoader::wrapObserveOnlyCallback().
      */

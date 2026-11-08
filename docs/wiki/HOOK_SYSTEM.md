@@ -118,7 +118,7 @@ The loader records the exact wrapped callbacks it registered so it can cleanly `
 
 ## Observe-only listeners
 
-A plugin subscribes with `['callback' => $fn, 'observe' => true]` when it only needs to know something happened (SDK 1.NEXT). `PluginLoader::wrapObserveOnlyCallback()` returns nothing to `HookManager`, so the payload is unchanged whatever the listener does, and a `HookVetoException` stops at that boundary and is logged. The desktop host's `HookRegistrar` does the same. [Plugin-Development](Plugin-Development.md#what-a-listener-may-change) lists the events whose return value the host reads.
+A plugin subscribes with `['callback' => $fn, 'observe' => true]` when it only needs to know something happened (SDK 1.89). `PluginLoader::wrapObserveOnlyCallback()` returns nothing to `HookManager`, so the payload is unchanged whatever the listener does, and a `HookVetoException` stops at that boundary and is logged. The desktop host's `HookRegistrar` does the same. [Plugin-Development](Plugin-Development.md#what-a-listener-may-change) lists the events whose return value the host reads.
 
 ## Events fired by the core
 

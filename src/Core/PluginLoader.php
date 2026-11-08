@@ -5088,7 +5088,7 @@ class PluginLoader
     }
 
     /**
-     * The error boundary for an observe-only listener (SDK 1.NEXT).
+     * The error boundary for an observe-only listener (SDK 1.89).
      *
      * The wrapper returns nothing, so the hook manager keeps the payload it
      * already has, and the listener only ever holds this call's own copy, even

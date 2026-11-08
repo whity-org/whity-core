@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.80).
+ * SDK identity (v1.89).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1087,13 +1087,20 @@ namespace Whity\Sdk;
  * and audited, and each must declare `requiredPermission`, checked per caller (WHIT-993).
  *
  * Narrows 1.9: an ungranted plugin's prompts, and any plugin prompt without a
- * `requiredPermission`, are no longer served.)
+ * `requiredPermission`, are no longer served.) →
+ * 1.89 (OBSERVE-ONLY LISTENERS AND THE REST OF THE EVENT CATALOGUE: a `getHooks()` subscription
+ * with `'observe' => true` sees the event, but its return value is ignored and it cannot change
+ * the payload or veto. {@see Hooks\Events} publishes the membership, registration, federated
+ * sign-in, resource grant, period close report, data type lifecycle and boot-time events core
+ * already fired (WHIT-1033).
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.80.0';
+    public const VERSION = '1.89.0';
 
     /**
      * Static identity only — never instantiated.

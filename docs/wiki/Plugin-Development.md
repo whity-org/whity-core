@@ -366,7 +366,7 @@ the full walkthrough.
 ### Observe-only listeners
 
 Add `'observe' => true` when a listener only needs to know that something happened
-(since SDK 1.NEXT):
+(since SDK 1.89):
 
 ```php
 public function getHooks(): array

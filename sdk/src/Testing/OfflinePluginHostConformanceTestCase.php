@@ -260,7 +260,7 @@ abstract class OfflinePluginHostConformanceTestCase extends TestCase
                     );
                 }
 
-                // An observe-only listener (SDK 1.NEXT) may return anything: the host ignores it.
+                // An observe-only listener (SDK 1.89) may return anything: the host ignores it.
                 if ($observe) {
                     self::addToAssertionCount(1);
                     continue;
