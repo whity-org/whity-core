@@ -62,6 +62,10 @@ export interface RouteTemplateStepWire {
   satisfied_by: RouteFlowSatisfaction;
   /** WHIT-919: false turns off sending back to the author at this stage. True when absent. */
   allow_send_back?: boolean;
+  /** WHIT-921: `finalise` on the stage that makes the final document; null on every other. */
+  kind?: 'finalise' | null;
+  /** WHIT-921: the template the final document stage renders with; null uses the form's. */
+  final_template_id?: number | null;
   canvas_x: number;
   canvas_y: number;
 }
@@ -84,6 +88,8 @@ export interface RouteTemplateGraphWire extends RouteTemplateSummary {
    * through this design. Nobody can send those back for changes.
    */
   anonymous_public_forms?: Array<{ id: number; name: string }>;
+  /** WHIT-921: whether a stage may make the final document here (a render service is configured). */
+  can_finalise?: boolean;
 }
 
 /** The wire graph, as the kit editor holds it. */
@@ -104,6 +110,9 @@ export function toFlowGraph(wire: RouteTemplateGraphWire): RouteFlowGraph {
         // WHIT-920: on unless the design turned it off; a server that predates
         // #1723 sends nothing, which meant on.
         allowSendBack: s.allow_send_back !== false,
+        // WHIT-921: carried, so a save keeps the final document stage as it is.
+        kind: s.kind === 'finalise' ? 'finalise' : null,
+        finalTemplateId: s.final_template_id ?? null,
         canvasX: s.canvas_x,
         canvasY: s.canvas_y,
       })
@@ -140,6 +149,8 @@ export function toGraphRequest(graph: RouteFlowGraph): {
       // WHIT-920: always sent, so a save never turns a stage that has it off
       // back on (the server reads a missing value as on).
       allow_send_back: s.allowSendBack !== false,
+      // WHIT-921: only the final document stage says what it is.
+      ...(s.kind === 'finalise' ? { kind: 'finalise' as const, final_template_id: s.finalTemplateId ?? null } : {}),
       canvas_x: s.canvasX,
       canvas_y: s.canvasY,
     })),

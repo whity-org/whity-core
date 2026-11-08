@@ -284,6 +284,9 @@ final class DocumentIssuing
         if ($actor->plugin !== null) {
             // A plugin in the background: no person, and which plugin it was.
             $event['origin'] = 'plugin:' . $actor->plugin;
+        } elseif ($actor->engine) {
+            // WHIT-921: a route's finalise step.
+            $event['origin'] = 'route';
         }
 
         return $event;
@@ -581,6 +584,30 @@ final class DocumentIssuing
     }
 
     /**
+     * Render a route's final document (WHIT-921, #1725) onto a document that
+     * already exists, with the version of the template and the values the
+     * finalise step chose, and a closing line naming the version it was made
+     * from and its SHA-256. The document's own number and verification code go
+     * on it, as on every print.
+     *
+     * @param array<string, mixed>   $source   The `document_sources` row.
+     * @param array<string, mixed>   $version  The template version to print.
+     * @param array<string, ?string> $values   Field path => value.
+     * @param array<string, mixed>   $document The `documents` row.
+     * @return array{0: array{attempted: bool, stored: bool, reason: string|null}, 1: array<string, mixed>|null}
+     */
+    public function renderFinal(
+        ActingAs $actor,
+        array $source,
+        array $version,
+        array $values,
+        array $document,
+        string $footnote,
+    ): array {
+        return $this->renderAndStore($actor, $source, $version, $values, null, $document, $footnote);
+    }
+
+    /**
      * @param array<string, mixed>   $source
      * @param array<string, mixed>   $version
      * @param array<string, ?string> $values
@@ -594,6 +621,7 @@ final class DocumentIssuing
         array $values,
         ?string $recordLabel,
         array $document,
+        ?string $footnote = null,
     ): array {
         [$tenantId, $callerId] = [$actor->tenantId, $actor->issuerId()];
         $effective = $this->settings->effective($tenantId);
@@ -619,6 +647,10 @@ final class DocumentIssuing
             // The theme frozen with the version: an issue and a correction print alike.
             $this->print->versionTheme($tenantId, $version, (string) $source['kind']),
         );
+        if ($footnote !== null && $footnote !== '') {
+            // WHIT-921: which version a final document was made from.
+            $payload['content'][] = ['type' => 'paragraph', 'text' => $footnote];
+        }
         $stamp = $this->stamp($tenantId, $callerId, (int) $document['id'], $effective);
         if ($stamp !== null) {
             $payload['content'][] = ['type' => 'qr', 'value' => $stamp->url, 'reference' => $stamp->reference];

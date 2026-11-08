@@ -51,9 +51,24 @@ interface TrailEntry {
   occurred_at: string;
 }
 
+/** WHIT-921: what the route's final document stage did — the engine's act, not a person's. */
+interface RouteFinalisation {
+  status: 'waiting' | 'done' | 'failed';
+  reason: string | null;
+  subject_version: number | null;
+  content_hash: string | null;
+  has_pdf: boolean;
+  reached_at: string;
+  finalised_at: string | null;
+  /** Whether the viewer may ask for another try. */
+  can_retry?: boolean;
+}
+
 interface SubjectRoute extends DocumentRoute {
   /** Whether this route can send it back to anybody (absent on an older server). */
   can_send_back?: boolean;
+  /** WHIT-921: null until the route reaches its final document stage. */
+  finalisation?: RouteFinalisation | null;
   trail: TrailEntry[];
   recipients: RouteRecipient[];
   changes: {
@@ -288,7 +303,51 @@ export default function RouteSubjectPage({ params }: { params: Promise<{ type: s
                     detail={entry.note ?? undefined}
                   />
                 ))}
+                {/* WHIT-921: the final document, made by Whity and attributed
+                    to nobody, because nobody acted at that stage. */}
+                {route.finalisation != null && (
+                  <RecordTimelineItem
+                    key="final-document"
+                    title={
+                      <span className="font-sans">
+                        {route.finalisation.status === 'done'
+                          ? t('subject.final.done', 'Final document made')
+                          : route.finalisation.status === 'failed'
+                            ? t('subject.final.failed', 'The final document could not be made')
+                            : t('subject.final.waiting', 'Final document waiting')}
+                      </span>
+                    }
+                    meta={`${t('subject.final.by', 'Whity')} · ${
+                      dateTime(route.finalisation.finalised_at ?? route.finalisation.reached_at) ?? ''
+                    }`}
+                    detail={
+                      route.finalisation.status !== 'done' && route.finalisation.reason !== null
+                        ? finalReason(t, route.finalisation.reason)
+                        : route.finalisation.subject_version !== null && route.finalisation.content_hash !== null
+                        ? t('subject.final.version', 'From version {version} · SHA-256 {hash}', {
+                            version: String(route.finalisation.subject_version),
+                            hash: route.finalisation.content_hash,
+                          })
+                        : undefined
+                    }
+                  />
+                )}
               </RecordTimeline>
+              {route.finalisation?.can_retry === true && (
+                <TryFinalAgain routeId={route.id} onQueued={() => setVersion((current) => current + 1)} />
+              )}
+              {route.finalisation?.has_pdf === true && (
+                <p className="text-sm">
+                  <a
+                    href={`/api/v1/routes/${route.id}/final-document`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-primary underline-offset-4 hover:underline"
+                  >
+                    {t('subject.final.open', 'Open the final document')}
+                  </a>
+                </p>
+              )}
             </section>
           </CardContent>
         </Card>
@@ -423,4 +482,66 @@ function SendBack({
       </Dialog>
     </>
   );
+}
+
+/**
+ * WHIT-921: another try at a final document that failed or is still waiting,
+ * for somebody who may manage the route. The queue makes it; the page reloads
+ * to show it waiting again.
+ */
+function TryFinalAgain({ routeId, onQueued }: { routeId: number; onQueued: () => void }) {
+  const t = useTranslation('documents');
+  const { apiClient } = useAuth();
+  const { addToast } = useToast();
+  const [busy, setBusy] = useState(false);
+
+  async function retry() {
+    setBusy(true);
+    try {
+      const response = await apiClient(`/api/v1/routes/${routeId}/final-document/retry`, { method: 'POST' });
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as { error?: string } | null;
+        addToast(body?.error ?? t('subject.final.retryFailed', 'It could not be tried again. Try once more.'), 'error');
+        return;
+      }
+      addToast(t('subject.final.retried', 'The final document will be made again shortly.'), 'success');
+      onQueued();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Button variant="outline" onClick={() => void retry()} disabled={busy}>
+      {t('subject.final.retry', 'Try again')}
+    </Button>
+  );
+}
+
+/** WHIT-921: why a final document waits or could not be made, in plain words. */
+function finalReason(t: (key: string, fallback?: string) => string, reason: string): string {
+  switch (reason) {
+    case 'render_unavailable':
+      return t('subject.final.reason.renderUnavailable', "PDFs can't be made right now. Whity will try again.");
+    case 'error':
+      return t('subject.final.reason.error', 'Something went wrong. Whity will try again.');
+    case 'pdfs_off':
+      return t('subject.final.reason.pdfsOff', 'PDFs are turned off for this workspace.');
+    case 'limit':
+      return t('subject.final.reason.limit', 'This workspace has reached its limit for PDFs.');
+    case 'template_missing':
+      return t('subject.final.reason.templateMissing', 'The template for the final document no longer exists.');
+    case 'template_unpublished':
+      return t('subject.final.reason.templateUnpublished', 'The template for the final document has not been published.');
+    case 'render_refused':
+      return t('subject.final.reason.renderRefused', 'The template could not be made into a PDF. Check its content.');
+    case 'refused_by_plugin':
+      return t('subject.final.reason.refusedByPlugin', 'An add-on stopped the final document from being made.');
+    case 'gave_up':
+      return t('subject.final.reason.gaveUp', 'Whity tried many times and stopped.');
+    case 'withdrawn':
+      return t('subject.final.reason.withdrawn', 'It was withdrawn.');
+    default:
+      return t('subject.final.reason.other', 'It could not be made.');
+  }
 }

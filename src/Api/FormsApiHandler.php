@@ -341,6 +341,22 @@ final class FormsApiHandler
                 }
                 $changes['public_requires_sign_in'] = $body['public_requires_sign_in'];
             }
+            // WHIT-921: the "Final document template", which a route's finalise
+            // stage uses when it names none.
+            if (array_key_exists('final_template_id', $body)) {
+                $finalTemplateId = $body['final_template_id'];
+                if ($finalTemplateId !== null
+                    && (!is_int($finalTemplateId) || !$this->forms->documentTemplateExists($tenantId, $finalTemplateId))) {
+                    return Response::error('final_template_id must be a document template of this workspace, or null', 422);
+                }
+                $changes['final_template_id'] = $finalTemplateId;
+            }
+            if (array_key_exists('final_document_to_applicant', $body)) {
+                if (!is_bool($body['final_document_to_applicant'])) {
+                    return Response::error('final_document_to_applicant must be true or false', 422);
+                }
+                $changes['final_document_to_applicant'] = $body['final_document_to_applicant'];
+            }
 
             if ($changes === []) {
                 return Response::error('No updatable fields supplied', 422);

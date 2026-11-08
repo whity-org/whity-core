@@ -41,6 +41,10 @@ export interface FormRow {
   open_to_members?: boolean
   /** WHIT-920: the public link asks visitors to sign in first. */
   public_requires_sign_in?: boolean
+  /** WHIT-921: the "Final document template" a route's final document stage uses when it names none. */
+  final_template_id?: number | null
+  /** WHIT-921: whether the person who sent it can open its final document. */
+  final_document_to_applicant?: boolean
   submission_count?: number
   /** The heading the person filling it in reads; null shows the name (WHIT-944). */
   title?: LocalizedMap | null
@@ -164,6 +168,8 @@ export interface SubmissionProgress {
     label: string | null
     status: "done" | "current" | "waiting" | "sent_back" | "not_approved"
     outcome: "approved" | "rejected" | null
+    /** WHIT-921: the stage that makes the final document. */
+    kind?: "finalise"
     /** Only when the workspace shows who reviewed it. */
     reviewers?: string[]
   }>
@@ -178,6 +184,17 @@ export interface SubmissionProgress {
   can_resubmit: boolean
   resume_from: "sender" | "start" | null
   shows_reviewers: boolean
+  /**
+   * WHIT-921: the route's final document, once its final stage is reached.
+   * `can_open`: the PDF exists and the form lets the applicant have it.
+   */
+  final_document?: { status: "waiting" | "ready" | "failed"; can_open: boolean } | null
+}
+
+/** WHIT-921: a published document template a form's final document can be made with. */
+export interface FinalTemplateOption {
+  id: number
+  title: string
 }
 
 export interface SubmissionDetail extends SubmissionRow {

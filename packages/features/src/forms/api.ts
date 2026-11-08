@@ -4,6 +4,7 @@ import type {
   FieldOption,
   FieldValidation,
   FieldVocabulary,
+  FinalTemplateOption,
   FormRow,
   FormSectionDef,
   FormDraftRow,
@@ -69,6 +70,13 @@ export function createFormsApi(transport: Transport) {
       call(transport, "POST", "/api/v1/forms", input, fallback, (b) => data<FormRow>(b)),
     updateForm: (id: number, changes: Record<string, unknown>, fallback: string) =>
       call(transport, "PATCH", `/api/v1/forms/${id}`, changes, fallback, (b) => data<FormRow>(b)),
+    /** WHIT-921: published document templates, for the form's final document. */
+    listFinalTemplates: (fallback: string) =>
+      call(transport, "GET", "/api/v1/document-sources?kind=template", undefined, fallback, (b) =>
+        data<Array<{ id: number; title: string; published_version: number | null }>>(b)
+          .filter((row) => row.published_version !== null)
+          .map((row): FinalTemplateOption => ({ id: row.id, title: row.title }))
+      ),
     replaceFields: (id: number, fields: unknown[], fallback: string) =>
       call(transport, "PUT", `/api/v1/forms/${id}/fields`, { fields }, fallback, (b) => data<FieldDraft[]>(b)),
     publish: (id: number, fallback: string) =>

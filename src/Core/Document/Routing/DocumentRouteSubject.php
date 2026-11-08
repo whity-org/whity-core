@@ -12,7 +12,7 @@ use PDO;
  *
  * Stateless apart from the injected handle — worker-safe.
  */
-final class DocumentRouteSubject implements RouteSubjectProviderInterface
+final class DocumentRouteSubject implements RouteSubjectProviderInterface, RouteSubjectFinaliseInterface
 {
     public const TYPE = 'document';
 
@@ -93,5 +93,41 @@ final class DocumentRouteSubject implements RouteSubjectProviderInterface
         $at = $stmt->fetchColumn();
 
         return $at !== false && $at !== null;
+    }
+
+    /** WHIT-921: a document's final document uses its own template unless the step names one. */
+    public function finalTemplateId(int $tenantId, int $subjectId): ?int
+    {
+        $stmt = $this->db->prepare('SELECT document_source_id FROM documents WHERE id = :id AND tenant_id = :tenant_id');
+        $stmt->execute([':id' => $subjectId, ':tenant_id' => $tenantId]);
+        $id = $stmt->fetchColumn();
+
+        return $id === false || $id === null ? null : (int) $id;
+    }
+
+    /**
+     * WHIT-921: the values the document was issued with, as the approved
+     * version recorded them.
+     */
+    public function finalValues(int $tenantId, int $subjectId, array $version, string $language): array
+    {
+        $data = is_array($version['data']) ? $version['data'] : [];
+        $rows = is_array($data['values'] ?? null) ? $data['values'] : [];
+        $values = [];
+        foreach (is_array($rows[0] ?? null) ? $rows[0] : [] as $path => $value) {
+            $values[(string) $path] = is_scalar($value) ? (string) $value : null;
+        }
+
+        return $values;
+    }
+
+    public function finalRecord(int $tenantId, int $subjectId): ?string
+    {
+        return null;
+    }
+
+    /** A document is its own final document; there is nothing to record. */
+    public function attachDocument(int $tenantId, int $subjectId, int $documentId): void
+    {
     }
 }

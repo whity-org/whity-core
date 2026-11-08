@@ -175,6 +175,8 @@ final class DocumentRouter
      */
     private ?array $expectedSignVersion = null;
 
+    private readonly RouteFinalisationRepository $finalisations;
+
     public function __construct(
         private readonly PDO $db,
         private readonly RouteRepository $routes,
@@ -190,8 +192,12 @@ final class DocumentRouter
         // records no subject versions.
         private readonly ?RouteSubjectRegistry $subjects = null,
         private readonly ?RouteSubjectVersionRepository $versions = null,
+        // WHIT-921: makes a route's final document. Without it a route cannot
+        // have a finalise step, exactly as on an install with no render service.
+        private readonly ?RouteFinaliseService $finaliser = null,
     ) {
         $this->numbering = new DocumentNumbering($db);
+        $this->finalisations = new RouteFinalisationRepository($db);
     }
 
     /**
@@ -278,6 +284,7 @@ final class DocumentRouter
         ?string $templateName = null,
     ): array {
         $declared = $this->validateSteps($tenantId, $steps);
+        $declared = $this->resolveFinalTemplate($tenantId, $declared, $subjectType, $subjectId);
 
         if ($documentId === null) {
             // A signature is made on a document (WHIT-922), and nobody could
@@ -337,6 +344,7 @@ final class DocumentRouter
                     $step['kind'],
                     $step['sign_capacity'],
                     $step['sign_on_behalf_of'],
+                    $step['final_template_id'],
                 );
             }
 
@@ -407,6 +415,7 @@ final class DocumentRouter
                 parentRecipientId: null,
                 eventId: $eventId,
             );
+            $this->reachFinalise($tenantId, $routeId, $plan, $subjectType, $subjectId, $version);
 
             $route = $this->routes->findById($routeId, $tenantId);
             $written = $this->steps->listForRoute($routeId, $tenantId);
@@ -456,6 +465,8 @@ final class DocumentRouter
             // and announce nothing to the very people the step existed to tell.
             'recipients' => $outcome['recipients'],
         ]);
+
+        $this->finishFinalise($tenantId, $routeId, $ownTransaction);
 
         return [
             'route' => $route,
@@ -636,6 +647,16 @@ final class DocumentRouter
             }
         }
 
+        if ($action === RouteAction::ACKNOWLEDGED && $verdict === null) {
+            // WHIT-921: acknowledging the last step people act on ends the
+            // chain, and when all that follows is the final document the route
+            // goes on to make it: nobody could forward to a step nobody holds.
+            $following = $this->steps->findNext($routeId, $tenantId, (int) $step['position']);
+            if ($following !== null && self::isFinalise($following)) {
+                $next = $following;
+            }
+        }
+
         if ($verdict !== null) {
             // Counted BEFORE anything is written, with this person's answer
             // overlaid arithmetically onto their still-open row. That keeps the
@@ -688,7 +709,7 @@ final class DocumentRouter
                 // one argument.
                 $recipient['ou_id'],
             )
-            : ['stops' => [], 'destinationOuId' => null];
+            : ['stops' => [], 'destinationOuId' => null, 'finalise' => null];
 
         $ownTransaction = !$this->db->inTransaction();
         if ($ownTransaction) {
@@ -785,6 +806,7 @@ final class DocumentRouter
                     eventId: $eventId,
                 );
             }
+            $this->reachFinalise($tenantId, $routeId, $plan, $subjectType, $subjectId, $version);
 
             if ($returnTo !== null) {
                 // A NEW row for the predecessor, never an un-closing of their old
@@ -848,6 +870,9 @@ final class DocumentRouter
                 'number' => $number,
                 'route_id' => $routeId,
                 'actor_profile_id' => $actorId,
+                // WHIT-921: the route's finalise step prints the number on the
+                // final document, so nothing else should reprint it.
+                'finalising' => $this->finalisations->findForRoute($tenantId, $routeId) !== null,
             ]);
         }
 
@@ -873,6 +898,8 @@ final class DocumentRouter
             // being asked for anything.
             'recipients' => $outcome['recipients'],
         ]);
+
+        $this->finishFinalise($tenantId, $routeId, $ownTransaction);
 
         return [
             'event' => $event,
@@ -1169,6 +1196,7 @@ final class DocumentRouter
                 parentRecipientId: (int) $item['id'],
                 eventId: $eventId,
             );
+            $this->reachFinalise($tenantId, $routeId, $plan, $subjectType, $subjectId, $version);
 
             $event = $this->events->findById($eventId, $tenantId);
 
@@ -1200,6 +1228,8 @@ final class DocumentRouter
             'decided' => null,
             'recipients' => $outcome['recipients'],
         ]);
+
+        $this->finishFinalise($tenantId, $routeId, $ownTransaction);
 
         return [
             'event' => $event,
@@ -1276,6 +1306,144 @@ final class DocumentRouter
                 'This has been withdrawn, so nothing further can happen on its routes.'
             );
         }
+    }
+
+    // -- the finalise step (WHIT-921) ---------------------------------------
+
+    /** @param array<string, mixed> $step */
+    private static function isFinalise(array $step): bool
+    {
+        return ($step['kind'] ?? null) === RouteStepKind::FINALISE;
+    }
+
+    /**
+     * Record, inside the act's transaction, that this act brought the route to
+     * its finalise step, with the version the final document will be made from.
+     *
+     * @param array{finalise?: array<string, mixed>|null} $plan
+     * @param array{version: ?int, content_hash: ?string} $version
+     */
+    private function reachFinalise(
+        int $tenantId,
+        int $routeId,
+        array $plan,
+        string $subjectType,
+        int $subjectId,
+        array $version,
+    ): void {
+        $step = $plan['finalise'] ?? null;
+        if ($step === null) {
+            return;
+        }
+
+        $this->finalisations->reach(
+            $tenantId,
+            $routeId,
+            (int) $step['id'],
+            $subjectType,
+            $subjectId,
+            isset($step['final_template_id']) ? (int) $step['final_template_id'] : null,
+            $version['version'],
+            $version['content_hash'],
+        );
+    }
+
+    /**
+     * After the commit: make the final document if this route is waiting for
+     * one and nothing on it is open any more. A failure here is logged, never
+     * thrown: the act is already committed.
+     *
+     * When the caller holds the transaction, nothing is committed yet, so
+     * nothing may be rendered, raised or announced: the request goes to the
+     * queue inside that transaction (and rolls back with it), and the caller
+     * may run {@see finalisePending()} itself after its commit.
+     */
+    private function finishFinalise(int $tenantId, int $routeId, bool $ownTransaction): void
+    {
+        if ($this->finaliser === null) {
+            return;
+        }
+        try {
+            if (!$ownTransaction) {
+                $row = $this->finalisations->findForRoute($tenantId, $routeId);
+                if ($row !== null && $row['status'] === RouteFinalisationRepository::WAITING) {
+                    $this->finaliser->defer($tenantId, $routeId);
+                }
+
+                return;
+            }
+            $this->finaliser->finalise($tenantId, $routeId);
+        } catch (Throwable $e) {
+            error_log('[DocumentRouter] making the final document of route ' . $routeId . ' failed: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * For a caller that held its own transaction around an act: make the
+     * route's final document now that it has committed. Does nothing when the
+     * route is not waiting for one.
+     */
+    public function finalisePending(int $tenantId, int $routeId): void
+    {
+        if ($this->db->inTransaction()) {
+            // Still not committed: the queued request made inside the
+            // transaction will make it.
+            return;
+        }
+        $this->finishFinalise($tenantId, $routeId, true);
+    }
+
+    /**
+     * A finalise step that names no template takes its subject's default: a
+     * form's "Final document template", or a document's own template. Refused
+     * when there is none, or it is not a published template of this workspace,
+     * so a route never starts that could not make its final document.
+     *
+     * @param list<array<string, mixed>> $declared
+     * @return list<array<string, mixed>>
+     *
+     * @throws RoutingRejectedException
+     */
+    private function resolveFinalTemplate(int $tenantId, array $declared, string $subjectType, int $subjectId): array
+    {
+        foreach ($declared as $i => $step) {
+            if ($step['kind'] !== RouteStepKind::FINALISE) {
+                continue;
+            }
+            $provider = $this->subjects?->get($subjectType);
+            if (!$provider instanceof RouteSubjectFinaliseInterface) {
+                throw RoutingRejectedException::because(
+                    'This route ends with a final document, but what it travels on cannot have one.'
+                );
+            }
+            $templateId = $step['final_template_id'] ?? $provider->finalTemplateId($tenantId, $subjectId);
+            if ($templateId === null) {
+                throw RoutingRejectedException::because(
+                    'This route ends with a final document, but no template is chosen for it. '
+                    . 'Choose one in the final document stage, or set the form\'s final document template.'
+                );
+            }
+            $stmt = $this->db->prepare(
+                "SELECT published_version FROM document_sources
+                  WHERE id = :id AND tenant_id = :tenant_id AND kind = 'template'"
+            );
+            $stmt->execute([':id' => $templateId, ':tenant_id' => $tenantId]);
+            $published = $stmt->fetchColumn();
+            $stmt->closeCursor();
+            if ($published === false) {
+                throw RoutingRejectedException::because(
+                    'The template chosen for the final document no longer exists. Choose another one.'
+                );
+            }
+            if ($published === null) {
+                throw RoutingRejectedException::because(
+                    'The template chosen for the final document has not been published yet. Publish it first.'
+                );
+            }
+            $declared[$i]['final_template_id'] = (int) $templateId;
+        }
+
+        return $declared;
     }
 
     // -- internals ----------------------------------------------------------
@@ -1769,7 +1937,7 @@ final class DocumentRouter
      * @param array<string, mixed> $firstStep The step the act reaches first.
      *
      * @return array{stops: list<array{step: array<string, mixed>, members: list<ResolvedRecipient>}>,
-     *               destinationOuId: int|null}
+     *               destinationOuId: int|null, finalise: array<string, mixed>|null}
      */
     private function planChain(
         int $tenantId,
@@ -1783,6 +1951,7 @@ final class DocumentRouter
         $units = [];
         $seen = [];
         $step = $firstStep;
+        $finalise = null;
 
         while (true) {
             $stepId = (int) $step['id'];
@@ -1801,6 +1970,14 @@ final class DocumentRouter
                 );
             }
             $seen[$stepId] = true;
+
+            if (self::isFinalise($step)) {
+                // WHIT-921: nobody is resolved at a finalise step. The engine
+                // makes the final document once the act that got here commits,
+                // and the step is always the last, so the chain ends here.
+                $finalise = $step;
+                break;
+            }
 
             $plan = $this->planStep(
                 $tenantId,
@@ -1839,6 +2016,7 @@ final class DocumentRouter
         return [
             'stops' => $stops,
             'destinationOuId' => count($units) === 1 ? (int) array_key_first($units) : null,
+            'finalise' => $finalise,
         ];
     }
 
@@ -2113,7 +2291,8 @@ final class DocumentRouter
      * @return list<array{rule_kind: string, rule_config: array<string, mixed>, label: ?string,
      *                    decision: bool, decision_quorum: ?string, satisfied_by: string,
      *                    allow_send_back: bool, edges: array<string, int>, kind: ?string,
-     *                    sign_capacity: ?string, sign_on_behalf_of: ?string}>
+     *                    sign_capacity: ?string, sign_on_behalf_of: ?string,
+     *                    final_template_id: ?int}>
      */
     private function validateSteps(int $tenantId, array $steps): array
     {
@@ -2134,9 +2313,30 @@ final class DocumentRouter
             ));
         }
 
+        $finaliseSteps = array_filter(
+            $steps,
+            static fn (array $step): bool => ($step['kind'] ?? null) === RouteStepKind::FINALISE,
+        );
+        if (count($finaliseSteps) > 1) {
+            throw RoutingRejectedException::because(
+                'A route makes one final document, so it can have only one final document step.'
+            );
+        }
+
         $out = [];
         foreach ($steps as $i => $step) {
             $position = $i + 1;
+
+            // WHIT-921: a finalise step names no rule, so it is checked on its own.
+            if (($step['kind'] ?? null) === RouteStepKind::FINALISE) {
+                $out[] = $this->validateFinaliseStep($tenantId, $step, $position, count($steps));
+                continue;
+            }
+            if (($step['final_template_id'] ?? null) !== null) {
+                throw RoutingRejectedException::because(
+                    "Step {$position}: 'final_template_id' only means something on the final document step."
+                );
+            }
 
             $kind = $step['rule_kind'] ?? null;
             if (!is_string($kind) || $kind === '') {
@@ -2194,7 +2394,7 @@ final class DocumentRouter
                     implode(', ', RouteStepKind::all()),
                 ));
             }
-            if ($stepKind === RouteStepKind::STAMP || $stepKind === RouteStepKind::FINALISE) {
+            if ($stepKind === RouteStepKind::STAMP) {
                 throw RoutingRejectedException::because(sprintf(
                     "Step %d: '%s' steps are not available yet.",
                     $position,
@@ -2292,6 +2492,13 @@ final class DocumentRouter
                 if ($target === null) {
                     continue;
                 }
+                if ($verdict === RouteVerdict::REJECTED && is_int($target)
+                    && (($steps[$target - 1]['kind'] ?? null) === RouteStepKind::FINALISE)) {
+                    // WHIT-921: a final document is made from what was approved.
+                    throw RoutingRejectedException::because(
+                        "Step {$position}: a rejection cannot lead to the final document."
+                    );
+                }
                 if (!$decision) {
                     throw RoutingRejectedException::because(
                         "Step {$position}: '{$key}' only means something on a decision step, because nothing "
@@ -2350,6 +2557,7 @@ final class DocumentRouter
                 'kind' => $isSign ? RouteStepKind::SIGN : null,
                 'sign_capacity' => $signCapacity,
                 'sign_on_behalf_of' => $signOnBehalfOf,
+                'final_template_id' => null,
             ];
         }
 
@@ -2369,6 +2577,75 @@ final class DocumentRouter
         }
 
         return trim($value) === '' ? null : trim($value);
+    }
+
+    /**
+     * A finalise step (WHIT-921): last, at most one, nobody acts on it, and only
+     * where a PDF can be made.
+     *
+     * @param array<string, mixed> $step
+     * @return array{rule_kind: string, rule_config: array<string, mixed>, label: ?string,
+     *               decision: bool, decision_quorum: ?string, satisfied_by: string,
+     *               allow_send_back: bool, edges: array<string, int>, kind: ?string,
+     *               sign_capacity: ?string, sign_on_behalf_of: ?string, final_template_id: ?int}
+     *
+     * @throws RoutingRejectedException
+     */
+    private function validateFinaliseStep(int $tenantId, array $step, int $position, int $count): array
+    {
+        if ($position !== $count) {
+            throw RoutingRejectedException::because(sprintf(
+                'Step %d makes the final document, so it must be the last step. A route has one final document, '
+                . 'made once everything before it is done.',
+                $position,
+            ));
+        }
+        if ($this->finaliser === null || !$this->finaliser->isAvailable($tenantId)) {
+            throw RoutingRejectedException::because(
+                'This route ends with a final document, but PDFs can\'t be made on this install. '
+                . 'Remove the final document step, or ask your administrator to set up the render service.'
+            );
+        }
+        if (($step['decision'] ?? false) !== false || ($step['decision_quorum'] ?? null) !== null
+            || ($step['on_approved'] ?? null) !== null || ($step['on_rejected'] ?? null) !== null) {
+            throw RoutingRejectedException::because(sprintf(
+                'Step %d makes the final document. Nobody acts on it, so it is not a decision and leads nowhere.',
+                $position,
+            ));
+        }
+        $satisfiedBy = $step['satisfied_by'] ?? RouteSatisfaction::ACT;
+        if ($satisfiedBy !== RouteSatisfaction::ACT) {
+            throw RoutingRejectedException::because(sprintf(
+                'Step %d makes the final document, so it sends nothing to anybody.',
+                $position,
+            ));
+        }
+        $label = $step['label'] ?? null;
+        if ($label !== null && !is_string($label)) {
+            throw RoutingRejectedException::because("Step {$position}: 'label' must be a string when present.");
+        }
+        $templateId = $step['final_template_id'] ?? null;
+        if ($templateId !== null && (!is_int($templateId) || $templateId < 1)) {
+            throw RoutingRejectedException::because(
+                "Step {$position}: 'final_template_id' must be the id of a document template."
+            );
+        }
+
+        return [
+            'rule_kind' => RouteStepKind::FINALISE_RULE,
+            'rule_config' => [],
+            'label' => is_string($label) && trim($label) !== '' ? trim($label) : null,
+            'decision' => false,
+            'decision_quorum' => null,
+            'satisfied_by' => RouteSatisfaction::ACT,
+            // Nobody holds an item here, so there is nobody to send it back.
+            'allow_send_back' => false,
+            'edges' => [],
+            'kind' => RouteStepKind::FINALISE,
+            'sign_capacity' => null,
+            'sign_on_behalf_of' => null,
+            'final_template_id' => $templateId,
+        ];
     }
 
     /**

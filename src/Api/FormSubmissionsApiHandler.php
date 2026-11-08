@@ -11,6 +11,7 @@ use Whity\Core\Form\FormRepository;
 use Whity\Core\Form\FormSubmissionRepository;
 use Whity\Core\Form\FormUploadPolicy;
 use Whity\Core\Form\FormUploadRepository;
+use Whity\Core\Form\LocalizedLabel;
 use Whity\Core\Form\SubmissionIssuer;
 use Whity\Core\Form\SubmissionProgress;
 use Whity\Core\Request;
@@ -67,6 +68,9 @@ final class FormSubmissionsApiHandler
         private readonly StorageDriverInterface $storage,
         // WHIT-920: where the caller's own submission is, for My submissions.
         private readonly ?SubmissionProgress $progress = null,
+        // WHIT-921: the final document a submission's route made.
+        private readonly ?\Whity\Core\Document\Routing\RouteFinalisationRepository $finalisations = null,
+        private readonly ?\Whity\Core\Document\Routing\RouteFinalDocumentFile $finalFile = null,
     ) {
     }
 
@@ -427,6 +431,50 @@ final class FormSubmissionsApiHandler
             error_log('[FormSubmissionsApiHandler] fileContent failed: ' . $e->getMessage());
 
             return Response::error('Failed to fetch the file', 500);
+        }
+    }
+
+    /**
+     * GET /api/v1/me/form-submissions/{id}/final-document — the final document
+     * the submission's route made (WHIT-921), for the person who sent it, when
+     * the form lets applicants have it. Somebody else's submission, a form that
+     * keeps it in the office, and a document still waiting are all the same 404.
+     *
+     * @param array<string, string> $params
+     */
+    public function myFinalDocument(Request $request, array $params): Response
+    {
+        try {
+            $tenantId = TenantContext::getTenantId();
+            $profileId = self::actorProfileId($request);
+            if ($tenantId === null || $profileId === null || $this->finalisations === null || $this->finalFile === null) {
+                return Response::error('There is no final document yet', 404);
+            }
+            $submission = $this->submissions->find($tenantId, (int) ($params['id'] ?? 0), $profileId);
+            if ($submission === null) {
+                return Response::error('There is no final document yet', 404);
+            }
+            $form = $this->forms->find($tenantId, (int) $submission['form_id']);
+            if ($form === null || ($form['final_document_to_applicant'] ?? true) !== true) {
+                return Response::error('There is no final document yet', 404);
+            }
+            $finalisation = $this->finalisations->latestForSubject(
+                $tenantId,
+                \Whity\Core\Form\FormSubmissionRouteSubject::TYPE,
+                (int) $submission['id'],
+            );
+            if ($finalisation === null) {
+                return Response::error('There is no final document yet', 404);
+            }
+            /** @var array<string, string> $name */
+            $name = is_array($submission['form_name'] ?? null) ? $submission['form_name'] : [];
+            $title = LocalizedLabel::preferred($name);
+
+            return $this->finalFile->forRoute($tenantId, (int) $finalisation['route_id'], $title !== '' ? $title : 'final-document');
+        } catch (\Exception $e) {
+            error_log('[FormSubmissionsApiHandler] myFinalDocument failed: ' . $e->getMessage());
+
+            return Response::error('Failed to fetch the final document', 500);
         }
     }
 

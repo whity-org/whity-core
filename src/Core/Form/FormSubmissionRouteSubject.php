@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Whity\Core\Form;
 
 use PDO;
+use Whity\Core\Document\Routing\RouteSubjectFinaliseInterface;
 use Whity\Core\Document\Routing\RouteSubjectProviderInterface;
 
 /**
@@ -23,7 +24,7 @@ use Whity\Core\Document\Routing\RouteSubjectProviderInterface;
  *
  * Stateless apart from the injected handle — worker-safe.
  */
-final class FormSubmissionRouteSubject implements RouteSubjectProviderInterface
+final class FormSubmissionRouteSubject implements RouteSubjectProviderInterface, RouteSubjectFinaliseInterface
 {
     public const TYPE = 'form_submission';
 
@@ -131,5 +132,83 @@ final class FormSubmissionRouteSubject implements RouteSubjectProviderInterface
         $at = $stmt->fetchColumn();
 
         return $at !== false && $at !== null;
+    }
+
+    /** WHIT-921: the form's "Final document template". */
+    public function finalTemplateId(int $tenantId, int $subjectId): ?int
+    {
+        $stmt = $this->db->prepare(
+            'SELECT f.final_template_id FROM form_submissions s
+               JOIN forms f ON f.id = s.form_id AND f.tenant_id = s.tenant_id
+              WHERE s.id = :id AND s.tenant_id = :tenant_id'
+        );
+        $stmt->execute([':id' => $subjectId, ':tenant_id' => $tenantId]);
+        $id = $stmt->fetchColumn();
+
+        return $id === false || $id === null ? null : (int) $id;
+    }
+
+    /**
+     * WHIT-921: the approved answers, as {@see FormSubmissionFieldProvider}
+     * names them, so a template written for the form prints them. Choices print
+     * by their label, files as "1 file attached", as in the responses export.
+     */
+    public function finalValues(int $tenantId, int $subjectId, array $version, string $language): array
+    {
+        $stmt = $this->db->prepare(
+            'SELECT s.form_id, s.reference, s.submitted_at, p.display_name
+               FROM form_submissions s
+               LEFT JOIN profiles p ON p.id = s.submitted_by_profile_id
+              WHERE s.id = :id AND s.tenant_id = :tenant_id'
+        );
+        $stmt->execute([':id' => $subjectId, ':tenant_id' => $tenantId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!is_array($row)) {
+            return [];
+        }
+
+        $data = is_array($version['data']) ? $version['data'] : [];
+        $answers = is_array($data['values'] ?? null) ? $data['values'] : [];
+        $fields = FormFieldRepository::applicantFields(
+            (new FormFieldRepository($this->db))->listForForm($tenantId, (int) $row['form_id'])
+        );
+
+        $values = [];
+        foreach ($fields as $field) {
+            $key = (string) $field['field_key'];
+            $answer = $answers[$key] ?? null;
+            $text = ResponsesCsv::printed($field, $answer, $language);
+            $values[FormSubmissionFieldProvider::path($key)] = $text !== '' ? $text : null;
+        }
+
+        return $values + [
+            FormSubmissionFieldProvider::REFERENCE => isset($row['reference']) ? (string) $row['reference'] : null,
+            FormSubmissionFieldProvider::SENT_BY => isset($row['display_name']) ? (string) $row['display_name'] : null,
+            FormSubmissionFieldProvider::SENT_ON => substr((string) $row['submitted_at'], 0, 10),
+            FormSubmissionFieldProvider::VERSION => (string) $version['version'],
+            FormSubmissionFieldProvider::CONTENT_HASH => (string) $version['content_hash'],
+        ];
+    }
+
+    public function finalRecord(int $tenantId, int $subjectId): ?string
+    {
+        $stmt = $this->db->prepare(
+            'SELECT f.form_key FROM form_submissions s
+               JOIN forms f ON f.id = s.form_id AND f.tenant_id = s.tenant_id
+              WHERE s.id = :id AND s.tenant_id = :tenant_id'
+        );
+        $stmt->execute([':id' => $subjectId, ':tenant_id' => $tenantId]);
+        $key = $stmt->fetchColumn();
+
+        return $key === false ? null : FormSubmissionFieldProvider::recordTypeFor((string) $key) . ':' . $subjectId;
+    }
+
+    /** WHIT-921: the submission now has its document, made by the finalise step. */
+    public function attachDocument(int $tenantId, int $subjectId, int $documentId): void
+    {
+        $this->db->prepare(
+            'UPDATE form_submissions SET document_id = :document_id
+              WHERE id = :id AND tenant_id = :tenant_id AND document_id IS NULL'
+        )->execute([':document_id' => $documentId, ':id' => $subjectId, ':tenant_id' => $tenantId]);
     }
 }

@@ -133,8 +133,9 @@ final class SubmissionIssuer
             $this->attach($tenantId, $actorProfileId, $formId, $submissionId, $fields, $values, []);
 
             $routed = false;
+            $routeId = null;
             if ($routeTemplateId !== null) {
-                $this->route($tenantId, $actorProfileId, $submissionId, $title, $routeTemplateId);
+                $routeId = $this->route($tenantId, $actorProfileId, $submissionId, $title, $routeTemplateId);
                 $routed = true;
             }
 
@@ -152,6 +153,12 @@ final class SubmissionIssuer
 
         if ($submission === null) {
             throw new \RuntimeException('The submission was recorded but could not be read back.');
+        }
+
+        // WHIT-921: a route that went straight to its final document makes it
+        // only now, after the commit, so a refused submission makes nothing.
+        if ($ownTransaction && $routeId !== null) {
+            $this->router->finalisePending($tenantId, $routeId);
         }
 
         return ['submission' => $submission, 'ignored' => $checked['ignored'], 'routed' => $routed];
@@ -249,6 +256,11 @@ final class SubmissionIssuer
             throw new \RuntimeException('The submission was changed but could not be read back.');
         }
 
+        // WHIT-921: after the commit, as for a new submission.
+        if ($ownTransaction) {
+            $this->router->finalisePending($tenantId, (int) $route['id']);
+        }
+
         return ['submission' => $fresh, 'ignored' => $checked['ignored']];
     }
 
@@ -333,7 +345,7 @@ final class SubmissionIssuer
      * re-thrown as {@see FormRejectedException} carrying the ORIGINAL client
      * message, which is already written for the person who can fix it.
      */
-    private function route(int $tenantId, ?int $actorProfileId, int $submissionId, string $title, int $templateId): void
+    private function route(int $tenantId, ?int $actorProfileId, int $submissionId, string $title, int $templateId): int
     {
         $template = $this->routeTemplates->findById($templateId, $tenantId);
         if ($template === null) {
@@ -352,7 +364,7 @@ final class SubmissionIssuer
         }
 
         try {
-            $this->router->issueOnSubject(
+            $issued = $this->router->issueOnSubject(
                 $tenantId,
                 $actorProfileId,
                 FormSubmissionRouteSubject::TYPE,
@@ -366,6 +378,8 @@ final class SubmissionIssuer
         } catch (RoutingRejectedException $e) {
             throw new FormRejectedException($e->clientMessage, 'route issue failed: ' . $e->getMessage(), $e);
         }
+
+        return (int) $issued['route']['id'];
     }
 
     /**

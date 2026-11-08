@@ -104,15 +104,17 @@ final class RouteStepRepository
         ?string $kind = null,
         ?string $signCapacity = null,
         ?string $signOnBehalfOf = null,
+        ?int $finalTemplateId = null,
     ): int {
+        $isFinalise = $kind === RouteStepKind::FINALISE;
         $stmt = $this->db->prepare(
             'INSERT INTO document_route_steps
                  (tenant_id, route_id, position, rule_kind, rule_config, label,
                   decision, decision_quorum, satisfied_by, kind, allow_send_back,
-                  sign_capacity, sign_on_behalf_of, created_at)
+                  sign_capacity, sign_on_behalf_of, final_template_id, created_at)
              VALUES (:tenant_id, :route_id, :position, :rule_kind, :rule_config, :label,
                      :decision, :decision_quorum, :satisfied_by, :kind, :allow_send_back,
-                     :sign_capacity, :sign_on_behalf_of, NOW())'
+                     :sign_capacity, :sign_on_behalf_of, :final_template_id, NOW())'
         );
         $stmt->execute([
             ':tenant_id' => $tenantId,
@@ -139,12 +141,16 @@ final class RouteStepRepository
             ':satisfied_by' => $satisfiedBy,
             // WHIT-918: derived from the two columns above on every write, so the
             // three cannot disagree while the engine still reads the old pair.
-            // WHIT-922: a `sign` step names its kind; the old two columns cannot.
-            ':kind' => $kind === RouteStepKind::SIGN ? $kind : RouteStepKind::derive($decision, $satisfiedBy),
+            // WHIT-922, WHIT-921: a `sign` or finalise step names its kind; the old two columns cannot.
+            ':kind' => $kind === RouteStepKind::SIGN
+                ? $kind
+                : ($isFinalise ? RouteStepKind::FINALISE : RouteStepKind::derive($decision, $satisfiedBy)),
             // WHIT-919. 1/0 for the reason `decision` gives above.
             ':allow_send_back' => $allowSendBack ? 1 : 0,
             ':sign_capacity' => $kind === RouteStepKind::SIGN ? $signCapacity : null,
             ':sign_on_behalf_of' => $kind === RouteStepKind::SIGN ? $signOnBehalfOf : null,
+            // WHIT-921: the template a finalise step renders with; nothing else has one.
+            ':final_template_id' => $isFinalise ? $finalTemplateId : null,
         ]);
 
         return (int) $this->db->lastInsertId();
@@ -160,7 +166,7 @@ final class RouteStepRepository
         $stmt = $this->db->prepare(
             'SELECT id, tenant_id, route_id, position, rule_kind, rule_config, label,
                     decision, decision_quorum, satisfied_by, kind, allow_send_back,
-                    sign_capacity, sign_on_behalf_of, created_at
+                    sign_capacity, sign_on_behalf_of, final_template_id, created_at
                FROM document_route_steps
               WHERE id = :id AND tenant_id = :tenant_id'
         );
@@ -180,7 +186,7 @@ final class RouteStepRepository
         $stmt = $this->db->prepare(
             'SELECT id, tenant_id, route_id, position, rule_kind, rule_config, label,
                     decision, decision_quorum, satisfied_by, kind, allow_send_back,
-                    sign_capacity, sign_on_behalf_of, created_at
+                    sign_capacity, sign_on_behalf_of, final_template_id, created_at
                FROM document_route_steps
               WHERE tenant_id = :tenant_id AND route_id = :route_id
               ORDER BY position ASC'
@@ -223,7 +229,7 @@ final class RouteStepRepository
         $stmt = $this->db->prepare(
             'SELECT id, tenant_id, route_id, position, rule_kind, rule_config, label,
                     decision, decision_quorum, satisfied_by, kind, allow_send_back,
-                    sign_capacity, sign_on_behalf_of, created_at
+                    sign_capacity, sign_on_behalf_of, final_template_id, created_at
                FROM document_route_steps
               WHERE tenant_id = :tenant_id AND route_id = :route_id AND position > :position
               ORDER BY position ASC
@@ -289,6 +295,8 @@ final class RouteStepRepository
             // WHIT-922: the capacity and on-behalf-of a `sign` step fixes.
             'sign_capacity' => isset($row['sign_capacity']) ? (string) $row['sign_capacity'] : null,
             'sign_on_behalf_of' => isset($row['sign_on_behalf_of']) ? (string) $row['sign_on_behalf_of'] : null,
+            // WHIT-921: the template a finalise step renders with, or null.
+            'final_template_id' => isset($row['final_template_id']) ? (int) $row['final_template_id'] : null,
             'created_at' => (string) $row['created_at'],
         ];
     }

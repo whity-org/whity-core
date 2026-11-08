@@ -145,6 +145,23 @@ final class QueueWorkCommand implements CliCommand
                 new \Whity\Core\Document\Issuing\IssueBatchJob(\Whity\app(\Whity\Core\Document\Issuing\BulkIssuing::class)),
                 false
             );
+
+            // WHIT-921: tries a route's final document again while the render
+            // service was down. Internal: never API-submittable.
+            $registry->register(
+                \Whity\Core\Document\Routing\Jobs\FinaliseRouteJob::NAME,
+                new \Whity\Core\Document\Routing\Jobs\FinaliseRouteJob(
+                    static function (): \Whity\Core\Document\Routing\RouteFinaliseService {
+                        $finaliser = \Whity\app(\Whity\Core\Document\Routing\RouteFinaliser::class);
+                        if (!$finaliser instanceof \Whity\Core\Document\Routing\RouteFinaliseService) {
+                            throw new \RuntimeException('The route finaliser is not registered in this worker.');
+                        }
+
+                        return $finaliser;
+                    }
+                ),
+                false
+            );
             // S.7: ends the 30-day keep on uninstalled plugins. Internal: never API-submittable.
             $registry->register(
                 \Whity\Core\Queue\Jobs\PurgeRemovedPluginsJob::NAME,
