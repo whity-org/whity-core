@@ -268,6 +268,22 @@ final class WhityStoreConnector
         ];
     }
 
+    /** This installation's Whity ID client_id while connected, else null. */
+    public function clientId(): ?string
+    {
+        $connection = $this->connection();
+
+        return $connection === null || !is_string($connection['client_id'] ?? null) ? null : $connection['client_id'];
+    }
+
+    /** The connected account's email, for a store receipt. */
+    public function accountEmail(): ?string
+    {
+        $email = $this->connection()['account']['email'] ?? null;
+
+        return is_string($email) ? $email : null;
+    }
+
     // ── Tokens ──────────────────────────────────────────────────────────────
 
     /**

@@ -27,7 +27,8 @@ final class RouteEffectContext
 {
     /**
      * @param int                       $tenantId    The tenant the act happened in.
-     * @param int                       $documentId  The document being routed.
+     * @param int|null                  $documentId  The document being routed, or null
+     *        when the route's subject has none yet (WHIT-920: a form submission).
      * @param int|null                  $stepId      The step whose effects these are.
      * @param int|null                  $eventId     The route event that fired this.
      * @param int|null                  $actorProfileId Who acted. Null for a
@@ -46,10 +47,12 @@ final class RouteEffectContext
      *        {@see recipientProfileIds()} are load-bearing rather than dead code
      *        a stricter signature would invite somebody to delete.
      * @param array<string, mixed>      $config      The effect's own stored `effect_config`.
+     * @param string                    $subjectType What the route travels on (WHIT-920).
+     * @param int|null                  $subjectId   Its id; the document's when it is one.
      */
     public function __construct(
         public readonly int $tenantId,
-        public readonly int $documentId,
+        public readonly ?int $documentId,
         public readonly ?int $stepId,
         public readonly ?int $eventId,
         public readonly ?int $actorProfileId,
@@ -58,6 +61,8 @@ final class RouteEffectContext
         public readonly ?string $decided,
         public readonly array $recipients,
         public readonly array $config,
+        public readonly string $subjectType = DocumentRouteSubject::TYPE,
+        public readonly ?int $subjectId = null,
     ) {
     }
 

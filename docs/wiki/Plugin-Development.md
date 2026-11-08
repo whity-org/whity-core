@@ -259,6 +259,23 @@ Core has a handful of deliberately unversioned endpoints — `/api/health`,
 `registerUnversioned()` method. That method is not part of the plugin contract:
 **every** plugin route is versioned, and there is no opt-out.
 
+### Who is calling, and in which workspace (SDK 1.87)
+
+The host tells every route handler its context on the `Request`, the same on a
+normal request and an MCP tool call:
+
+```php
+$workspace = $request->getWorkspaceId(); // null when there is none
+$language  = $request->getLanguage();    // 'ar', or 'en' by default
+if ($request->isAgent()) {               // or getActorKind(): person, agent, system
+    return Response::error('A person has to do this.', 403);
+}
+```
+
+Use `getWorkspaceId()` rather than an id from the path, query or body. On a
+public form or webhook nobody is signed in, so `getActorKind()` is `null`: treat
+that as an anonymous caller, not as the host.
+
 ### Permissions (`resource:action` colon notation)
 
 `getPermissions()` returns plain permission strings. Whity Core standardises on
@@ -362,6 +379,53 @@ filled at boot, implement the marker on it too.
 Lower `priority` numbers run first (default `10`). See the
 [Hooks section](#step-4--add-a-hook-that-runs-before-user-creation) below for
 the full walkthrough.
+
+### Observe-only listeners
+
+Add `'observe' => true` when a listener only needs to know that something happened
+(since SDK 1.89):
+
+```php
+public function getHooks(): array
+{
+    return [
+        Events::USER_MEMBERSHIP_ADDED => [
+            'callback' => [$this, 'onMemberAdded'],
+            'observe' => true,
+        ],
+    ];
+}
+
+public function onMemberAdded(array $data, array $context): void
+{
+    // Sync your own records. Nothing you return or change reaches the host.
+}
+```
+
+The host ignores what the listener returns, and changes to its copy of the payload
+reach nobody. It cannot refuse the operation either: a `HookVetoException` thrown from
+it is logged and the operation carries on. Any other exception is handled as for every
+listener. Priority still applies, so give an observer a high number to run after the
+listeners that can change the payload.
+
+### What a listener may change
+
+Most events ignore what a listener returns. Only these use it, and only these fields:
+
+| Event | Fields the host reads back |
+|---|---|
+| `tenant.creating` | `name`, `slug` |
+| `role.creating` | `name`, `description`, `permissions` |
+| `ou.creating` | `name`, `parent_id`, `description`, `slug`, `ou_type_id` |
+| `navigation.register` | `items` |
+| `document.issuing`, in a pre-issue check (`check_only` is true) | `checks` |
+| `time_window.close_report` | `unfinished` |
+| `rbac.resource_grant.verify_resource` | `exists` |
+
+A listener on these events can still be observe-only, but then it contributes nothing.
+Every other event treats a returned payload as if nothing was returned. Refusing an
+operation with `HookVetoException` is a separate mechanism, documented on the events
+that honour it.
 
 ### Migrations
 
@@ -1212,6 +1276,29 @@ the HelloWorld plugin, enqueued as `helloworld:greeting_digest`.
 
 ---
 
+### Enqueue your own jobs and read their status (SDK 1.91)
+
+```php
+$queue = \Whity\app(PluginJobQueue::class)->for($this);
+$id = $queue->enqueue('catalog.sync', ['page' => 1], idempotencyKey: 'sync-page-1');
+$status = $queue->status($id);
+```
+
+Use the bare name from `getJobs()`; the host adds your namespace, so you can't enqueue another plugin's job or a core one. The job runs in the workspace you enqueued it from. With none in scope, the call throws. `status()` and `recent()` show only your plugin's jobs in that workspace, and a finished job stays readable for a day.
+
+### Run a job on a schedule (SDK 1.91)
+
+Implement [`PluginScheduledJobsInterface`](../../sdk/src/Jobs/PluginScheduledJobsInterface.php) and name one of your jobs with a five-field cron expression in UTC:
+
+```php
+public function getScheduledJobs(): array
+{
+    return ['catalog.sync' => '0 * * * *'];
+}
+```
+
+The host runs it once per workspace at each occurrence, with an empty payload. Schedules appear within a few minutes of the plugin loading and go when it does. A workspace that paused one stays paused. A declaration naming a job you don't ship, or a bad cron expression, is refused whole and logged.
+
 ## Step 11 — Put your own events in the audit trail (SDK 1.29)
 
 The host's audit writer subscribes to a hardcoded map of **core** event names,
@@ -1517,6 +1604,69 @@ try {
 - `plugins/HelloWorld` declares a `greeting_card` slot for its greetings as a
   worked example.
 
+**Reading templates (SDK 1.82).** `\Whity\app(\Whity\Sdk\Documents\Templates::class)`
+lists and reads the workspace's published templates, so a plugin can offer a
+choice of template or check what a template needs before issuing:
+
+```php
+use Whity\Sdk\Documents\Templates;
+use Whity\Sdk\Documents\TemplateField;
+
+$templates = \Whity\app(Templates::class);
+foreach ($templates->list(recordType: 'Invoicing.invoice') as $t) {
+    // $t->id, $t->title, $t->kind, $t->lang, $t->publishedVersion, $t->slots
+    $ask = $t->requiredValues(); // template.* fields an issue must pass
+}
+$bound = $templates->forSlot('Invoicing.invoice');
+```
+
+- Each `TemplateInfo` describes the **published version**, which is what an
+  issue prints, never the draft. Its `fields` are every merge field it prints,
+  once each, with a `source`: `template` (pass it in `values`), `record` (the
+  record fills it) or `host` (company, today, the number).
+- It answers for the same caller as `Documents`: the person in a request, who
+  sees what the editor shows them; in your jobs, only templates bound to your
+  own slots, where the workspace allowed background issuing. With nobody,
+  `canRead()` is false and it returns nothing.
+- `list()` returns at most 200, newest first, and takes `kind` and
+  `recordType` filters.
+
+**Issuing in bulk (SDK 1.83).** `Documents::issueMany()` issues many documents
+from one template as a background job, and `Documents::batch()` reads where it
+is:
+
+```php
+use Whity\Sdk\Documents\BulkIssueItem;
+use Whity\Sdk\Documents\BulkIssueRequest;
+use Whity\Sdk\Documents\TemplateRef;
+
+$documents = \Whity\app(\Whity\Sdk\Documents\Documents::class);
+$batch = $documents->issueMany(new BulkIssueRequest(
+    TemplateRef::slot('Payroll.payslip'),
+    array_map(fn ($p) => new BulkIssueItem(record: "Payroll.payslip:{$p->id}"), $payslips),
+    batchKey: 'payroll:2026-11',
+));
+// later
+$status = $documents->batch($batch->batchId); // status, counts, a result per item
+```
+
+- **Nothing is issued in the call.** The batch is recorded and queued, and
+  `queue:work` issues it a chunk at a time. `status` is `queued`, `running`,
+  then `done`; `done` means every item has a result, so count `refused` and
+  `failed` or read `items`.
+- **Each item is checked when it runs**, as the caller who sent the batch:
+  a person needs `documents:issue` and is read with the permissions they hold
+  then; a background plugin issues only from its own slots, where allowed.
+  Each item is preflighted first, and a refusal (`reason`, `message`) writes
+  nothing.
+- **Safe to retry.** The same `batchKey` returns the batch already started
+  (`resubmitted: true`); the same key with different items is
+  `batch_key_conflict`. Every item has an origin key (yours, or
+  `batch:<batchKey>:<index>`), so a resumed batch replays instead of issuing
+  twice.
+- At most 500 items per batch; split larger runs into several batches. Only
+  the person or plugin that sent a batch can read it.
+
 
 ## Step 12b — Add a card to the home page (SDK 1.62)
 
@@ -1605,6 +1755,33 @@ The approvals card shows each row's `label`, `before` and `after`. The host runs
 
 `Events::MCP_CONNECTION_CREATED`, `MCP_CONNECTION_GRANT_CHANGED` and `MCP_CONNECTION_REVOKED` say a connection was made, its grant changed, or it was disconnected (`by` is `owner`, `admin` or `agent_removed`). Ids only, after the change. Connecting and disconnecting stay with people.
 
+### Notify people (SDK 1.90)
+
+Declare the types you send with [`PluginNotificationsInterface`](../../sdk/src/Notification/PluginNotificationsInterface.php), each with an English and an Arabic label, then send through the host's notifier:
+
+```php
+public function getNotificationTypes(): array
+{
+    return ['order.shipped' => ['label' => ['en' => 'Order shipped', 'ar' => 'تم شحن الطلب']]];
+}
+
+$notice = new Notice(
+    ['en' => 'Your order shipped', 'ar' => 'تم شحن طلبك'],
+    ['en' => 'It is on its way.', 'ar' => 'طلبك في الطريق.'],
+    ['order_id' => $orderId],
+);
+\Whity\app(PluginNotifier::class)->for($this)->toRole('order.shipped', $roleId, $notice);
+```
+
+`toPerson`, `toRole` and `toUnit` (the unit and those below it) return how many people were notified. The host decides the rest:
+
+- The workspace is the one the request or job runs in. With none in scope, the call throws.
+- Only active members of that workspace are reached. Anyone else counts as nobody, so check the returned number rather than expecting an error.
+- Your type is stored as `your_plugin:order.shipped`, so it can't be mistaken for another plugin's or for a core notice, and it always respects a person's opt-outs, even if you name it `security.alert`.
+- Pass the plugin itself to `for()`. An object the host didn't load is refused.
+- A single send reaches at most 1000 people, and notifications are in-app only for now.
+
+Declared types and their labels are listed in `GET /api/me/notification-preferences` as `plugin_types`.
 ### Prompts and resources for agents (SDK 1.80)
 
 Prompts (`PluginMcpInterface`) and resources (`PluginMcpResourcesInterface`) put your text straight into an AI agent's context, so the host serves them only from a **Verified** plugin the operator has granted **agent context**:
@@ -1629,6 +1806,39 @@ public function getMcpResources(): array
 ```
 
 Scope what `read` returns to `$context->tenantId`. At most 1 MB is served. A revoke (`agent-context revoke <name>`) applies to the next call. A new grant applies once workers reload plugins (`plugin reload`) or restart.
+
+## Step 12f — Read your settings, and take a secret from a screen (SDK 1.88)
+
+Declare keys with `PluginSettingsInterface`, then read and write them for the
+current workspace. No call names a workspace, and only your own keys resolve:
+
+```php
+$settings = \Whity\app(\Whity\Sdk\Settings\PluginSettings::class)->for($this);
+$interval = $settings->get('sync_interval'); // int, as declared
+$settings->set('sync_interval', 600);        // checked against the declaration
+$settings->reset('sync_interval');           // follow the deployment's value again
+```
+
+`Events::PLUGIN_SETTINGS_CHANGED` fires after a change, including one made on a
+settings screen. It carries `tenant_id` (null for a deployment-wide change),
+`plugin`, `key` and `actor_profile_id`, never the value.
+
+For an API key or password, implement `PluginSecretFieldsInterface` and put a
+`secretField` block on a screen:
+
+```php
+public function getSecretFields(): array
+{
+    return ['api_key' => ['permission' => 'acme:settings:manage']];
+}
+
+// In a blocks screen:
+['type' => 'secretField', 'secret' => 'api_key', 'label' => 'API key']
+```
+
+The host draws the field, checks the permission and stores the value in your
+`SecretStore` for that person's workspace. The browser only learns whether it is
+set. A block naming a secret you did not declare drops the screen at load.
 
 ## Step 13 — Declare it in `plugin.json` instead (SDK 1.47)
 

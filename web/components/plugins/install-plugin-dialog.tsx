@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api/client';
 import type { components } from '@/lib/api/schema';
 import { useToast } from '@/lib/toast-context';
 import { useNavigation } from '@/lib/navigation-context';
 import { useCapabilities } from '@/hooks/useCapabilities';
+import { PaidPluginLicence } from '@/components/plugins/paid-plugin-licence';
 import { useTranslation } from '@whity/features/i18n';
 import { Button } from '@whity/ui/button';
 import { Badge } from '@whity/ui/badge';
@@ -43,6 +44,10 @@ export function InstallPluginDialog({ plugin, storeUrl, connected = false, onOpe
   const [token, setToken] = useState('');
   const [minting, setMinting] = useState(false);
   const [installing, setInstalling] = useState(false);
+  // PR-4: a paid plugin installs only once it is licensed (or in grace) here.
+  const [licenceUsable, setLicenceUsable] = useState(false);
+  const onLicence = useCallback((usable: boolean) => setLicenceUsable(usable), []);
+  const paid = plugin?.paid === true;
   const [error, setError] = useState<string | null>(null);
   const [installed, setInstalled] = useState<PluginEntry | null>(null);
   const [installedSlug, setInstalledSlug] = useState<string | null>(null);
@@ -239,6 +244,8 @@ export function InstallPluginDialog({ plugin, storeUrl, connected = false, onOpe
                   ) : null}
                 </TechnicalDetails>
 
+                {paid ? <PaidPluginLicence plugin={plugin} storeUrl={storeUrl} connected={connected} onUsable={onLicence} /> : null}
+
                 {connected ? (
                   <p className="text-sm text-muted-foreground">
                     {t('pluginStore.connect.usesConnection', 'Installed with this installation\'s Whity store connection.')}
@@ -298,7 +305,7 @@ export function InstallPluginDialog({ plugin, storeUrl, connected = false, onOpe
                   <Button variant="outline" onClick={() => close(false)} disabled={installing}>
                     {t('pluginInstall.cancel', 'Cancel')}
                   </Button>
-                  <Button onClick={install} loading={installing} disabled={installing}>
+                  <Button onClick={install} loading={installing} disabled={installing || (paid && !licenceUsable)}>
                     {t('pluginInstall.allow', 'Allow and continue')}
                   </Button>
                 </>

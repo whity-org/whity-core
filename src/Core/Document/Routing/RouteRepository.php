@@ -65,12 +65,21 @@ final class RouteRepository
      */
     public function create(
         int $tenantId,
-        int $documentId,
+        ?int $documentId,
         string $title,
         ?int $createdBy,
         ?int $templateId = null,
         ?string $templateName = null,
+        // WHIT-920: what the route travels on. Omitted, it is the document.
+        ?string $subjectType = null,
+        ?int $subjectId = null,
     ): int {
+        $subjectType ??= DocumentRouteSubject::TYPE;
+        $subjectId ??= $documentId;
+        if ($subjectId === null) {
+            throw new \InvalidArgumentException('A route needs a subject: a document, or a subject type and id.');
+        }
+
         $stmt = $this->db->prepare(
             'INSERT INTO document_routes
                  (tenant_id, document_id, subject_type, subject_id, title, created_by,
@@ -81,9 +90,9 @@ final class RouteRepository
         $stmt->execute([
             ':tenant_id' => $tenantId,
             ':document_id' => $documentId,
-            // WHIT-918: every route the engine issues today travels on a document.
-            ':subject_type' => DocumentRouteSubject::TYPE,
-            ':subject_id' => $documentId,
+            // WHIT-918/920: a document, or a subject without one (a form submission).
+            ':subject_type' => $subjectType,
+            ':subject_id' => $subjectId,
             ':title' => $title,
             ':created_by' => $createdBy,
             ':template_id' => $templateId,
@@ -172,7 +181,8 @@ final class RouteRepository
         return [
             'id' => (int) $row['id'],
             'tenant_id' => (int) $row['tenant_id'],
-            'document_id' => (int) $row['document_id'],
+            // WHIT-920: null for a route on a subject that has no document yet.
+            'document_id' => isset($row['document_id']) ? (int) $row['document_id'] : null,
             // WHIT-918. What the route travels on. A row from before migration 224
             // that somehow escaped its backfill is still a route on its document.
             'subject_type' => isset($row['subject_type']) ? (string) $row['subject_type'] : DocumentRouteSubject::TYPE,

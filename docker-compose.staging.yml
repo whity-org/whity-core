@@ -102,10 +102,10 @@ services:
       # MUST be set outside development (AES-256-CBC key for stored TOTP secrets).
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY must be set for staging}
       # Document/label designer server-side render tier (ADR 0012). Optional —
-      # only meaningful when BOTH the `render` profile is started AND the
-      # documents.render_enabled setting is turned on; left unset/empty here is
-      # fine for a staging run that never uses it (the render endpoint 503s
-      # cleanly). Must match the render service's own secret when both are set.
+      # printing starts once the `render` profile runs and this secret (>= 32
+      # chars) matches the render service's (WHIT-1001); documents.render_enabled
+      # is the off switch. Left unset/empty is fine for a staging run that never
+      # prints (the render endpoint 503s cleanly, saying the renderer is not set up).
       RENDER_SERVICE_URL: ${RENDER_SERVICE_URL:-http://render:8130}
       RENDER_SHARED_SECRET: ${RENDER_SHARED_SECRET:-}
       # Explicit CORS allowlist (never a wildcard); reflected back with credentials.
@@ -192,8 +192,11 @@ services:
     environment:
       PORT: "8130"
       RENDER_SHARED_SECRET: ${RENDER_SHARED_SECRET:-}
+    # Loopback only (WHIT-1001): the app reaches it over the compose network,
+    # and this port is just for `curl localhost:8130/health` while debugging.
+    # The renderer must never be on a public interface.
     ports:
-      - "${RENDER_PORT_HOST:-8130}:8130"
+      - "127.0.0.1:${RENDER_PORT_HOST:-8130}:8130"
     profiles:
       - render
     restart: unless-stopped

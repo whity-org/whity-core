@@ -145,6 +145,7 @@ standalone one-click mutation. Inputs and `submitButton` are valid **only inside
 | `form` | `submit: { method: POST\|PUT, endpoint }`, `requiredPermission?` | container |
 | `textInput` | `name`, `label`, `placeholder?`, `required?`, `default?` | |
 | `textArea` | `name`, `label`, `rows?`, `required?`, `default?` | |
+| `secretField` | `secret`, `label`, `description?` | standalone, not inside a `form`. Write-only: the host stores the value and only says whether one is set. `secret` must be declared in `PluginSecretFieldsInterface` (SDK 1.88). |
 | `numberInput` | `name`, `label`, `min?`, `max?`, `step?`, `required?`, `default?` | |
 | `select` | `name`, `label`, `options: { value, label }[]`, `required?`, `default?` | |
 | `checkbox` | `name`, `label`, `default?: bool` | boolean value |

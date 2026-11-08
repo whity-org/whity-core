@@ -76,6 +76,29 @@ interface PlatformVersion {
   php_version: string;
 }
 
+/**
+ * The document renderer's state, from `GET /api/v1/platform/renderer`
+ * (WHIT-1001). Same gate and same silent-on-failure story as the versions.
+ * `message` and `fix` are the server's own sentences: the fix names env
+ * variables and image tags, which are the operator's words for it.
+ */
+interface PlatformRenderer {
+  state:
+    | "ready"
+    | "not_configured"
+    | "secret_missing"
+    | "unreachable"
+    | "secret_mismatch"
+    | "version_mismatch";
+  ready: boolean;
+  app_version: string;
+  render_version: string | null;
+  message: string;
+  fix: string;
+  switched_on: boolean;
+  printing: boolean;
+}
+
 // The stats query aggregates several COUNT/GROUP BY queries server-side with
 // no request-level timeout of its own (see AdminApiHandler::stats()) — if the
 // backend is unhealthy (DB lock contention, connection exhaustion during a
@@ -124,6 +147,7 @@ export default function AdminStats() {
   // timeout, a network error, a malformed body. See the effect below for why
   // that collapse is deliberate rather than lazy.
   const [platform, setPlatform] = useState<PlatformVersion | null>(null);
+  const [renderer, setRenderer] = useState<PlatformRenderer | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -210,7 +234,25 @@ export default function AdminStats() {
       }
     }
 
+    // The renderer line (WHIT-1001): same gate, same silence on refusal.
+    async function fetchRenderer() {
+      try {
+        const response = await apiClient("/api/v1/platform/renderer", {
+          signal: controller.signal,
+        });
+        if (cancelled || !response.ok) return;
+        const data = (await response.json()) as Partial<PlatformRenderer> | null;
+        // Shown only when it is the answer this line expects.
+        if (!cancelled && data && typeof data.state === 'string' && typeof data.ready === 'boolean') {
+          setRenderer(data as PlatformRenderer);
+        }
+      } catch {
+        // Intentionally empty, as above.
+      }
+    }
+
     fetchPlatformVersion();
+    fetchRenderer();
     return () => {
       cancelled = true;
       clearTimeout(hangGuard);
@@ -494,6 +536,7 @@ export default function AdminStats() {
                 </div>
               </>
             )}
+            {renderer && <RendererStatus renderer={renderer} />}
             <div className="flex justify-between items-center text-sm">
               <span className="text-muted-foreground">
                 {t("stats.system.phpVersion", "PHP version")}
@@ -566,6 +609,60 @@ export default function AdminStats() {
           </CardContent>
         </Card>
       </div>
+    </div>
+  );
+}
+
+/**
+ * One line for the document renderer (WHIT-1001): connected, switched off, or
+ * what is wrong and the exact fix. Printing failed silently or with a bare
+ * 503 before, and the fix was three separate settings an operator had to
+ * know about.
+ */
+function RendererStatus({ renderer }: { renderer: PlatformRenderer }) {
+  const t = useTranslation("admin");
+
+  const label = renderer.printing
+    ? t("stats.system.renderer.connected", "Connected")
+    : !renderer.ready
+      ? renderer.state === "version_mismatch"
+        ? t("stats.system.renderer.versionMismatch", "Version mismatch")
+        : renderer.state === "secret_mismatch"
+          ? t("stats.system.renderer.secretMismatch", "Key mismatch")
+          : renderer.state === "unreachable"
+            ? t("stats.system.renderer.unreachable", "Not reachable")
+            : t("stats.system.renderer.notSetUp", "Not set up")
+      : t("stats.system.renderer.switchedOff", "Switched off");
+  const tone = renderer.printing
+    ? "text-success"
+    : renderer.ready
+      ? "text-muted-foreground"
+      : "text-destructive";
+
+  return (
+    <div className="space-y-1 text-sm" data-testid="renderer-status">
+      <div className="flex justify-between items-center">
+        <span className="text-muted-foreground">
+          {t("stats.system.renderer.title", "Document renderer")}
+        </span>
+        <span className={`font-medium ${tone}`}>
+          {label}
+          {renderer.render_version ? ` · ${renderer.render_version}` : ""}
+        </span>
+      </div>
+      {!renderer.ready && (
+        <p className="text-muted-foreground">
+          {renderer.message}. {renderer.fix}
+        </p>
+      )}
+      {renderer.ready && !renderer.switched_on && (
+        <p className="text-muted-foreground">
+          {t(
+            "stats.system.renderer.switchedOffHint",
+            "The renderer is ready, but printing is switched off. Turn on Render Enabled in Settings, Feature flags."
+          )}
+        </p>
+      )}
     </div>
   );
 }

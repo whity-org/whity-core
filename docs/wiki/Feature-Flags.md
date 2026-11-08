@@ -82,9 +82,11 @@ should mirror. Read `src/Core/Document/Render/FlowDocumentRenderer.php`
 section.
 
 1. **Registry entry** (`SettingsRegistry.php`): a constant
-   (`DOCUMENTS_RENDER_ENABLED = 'documents.render_enabled'`), a `'false'`
-   default (opt-in — the render tier is a whole separate Chromium-bearing
-   Docker service, not something every sovereign deploy wants running),
+   (`DOCUMENTS_RENDER_ENABLED = 'documents.render_enabled'`), a `'true'`
+   default since WHIT-1001 (it was `'false'`). The opt-in is running the
+   render service itself, a whole separate Chromium-bearing Docker service;
+   the flag is the operator's off switch, and printing also needs that
+   service to be ready (`RenderServiceClient::readiness()`),
    membership in `BOOL_KEYS`, `GLOBAL_ONLY_KEYS` (an infra-level master switch,
    not a meaningful per-tenant preference), and `FEATURE_FLAG_KEYS`, plus a
    `validateBoolean()` arm in `validate()`.

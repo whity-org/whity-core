@@ -8,6 +8,7 @@ use PDO;
 use Psr\Log\LoggerInterface;
 use Whity\Auth\RoleChecker;
 use Whity\Core\Document\DocumentRepository;
+use Whity\Core\Document\DocumentSourceRepository;
 use Whity\Core\Document\DocumentVisibilityPolicy;
 use Whity\Core\Document\Embed\DocumentEmbedRegistry;
 use Whity\Core\Document\Embed\IssuedDocumentRecordProvider;
@@ -17,12 +18,22 @@ use Whity\Core\Document\Fields\DocumentFieldRegistry;
 use Whity\Core\Document\Fields\IssuedDocumentFieldProvider;
 use Whity\Core\Document\Fields\TenantRecordFieldProvider;
 use Whity\Core\Document\Fields\TodayFieldProvider;
+use Whity\Core\Document\Routing\DocumentRouteSubject;
+use Whity\Core\Document\Routing\RouteEventRepository;
+use Whity\Core\Document\Routing\RouteFinalisationRepository;
+use Whity\Core\Document\Routing\RouteFinaliser;
 use Whity\Core\Document\Routing\RouteRecipientRepository;
+use Whity\Core\Document\Routing\RouteRepository;
+use Whity\Core\Document\Routing\RouteSubjectRegistry;
+use Whity\Core\Document\Routing\RouteSubjectVersionRepository;
 use Whity\Core\Document\Slots\TemplateSlotRegistry;
+use Whity\Core\Form\FormSubmissionRouteSubject;
 use Whity\Core\Hooks\HookManager;
 use Whity\Core\Plugin\Tenant\TenantManifestHost;
 use Whity\Core\Plugin\Tenant\TenantPluginRepository;
 use Whity\Core\Plugin\Tenant\TenantRecordRepository;
+use Whity\Core\Queue\JobRepository;
+use Whity\Core\Queue\QueueService;
 use Whity\Core\RBAC\PermissionRegistry;
 use Whity\Core\RBAC\ResourceRoleAssignmentRepository;
 use Whity\Core\RBAC\ResourceTypeRegistry;
@@ -95,6 +106,8 @@ final class WorkerDocumentServices
             null,
             static fn (int $tenant, int $profileId): ?string => $records->memberName($tenant, $profileId),
         ));
+        // WHIT-921: each form's submissions as a record type, as in public/index.php.
+        $fields->addTenantSource(static fn (int $tenantId): array => \Whity\Core\Form\FormSubmissionFieldProvider::forTenant($pdo, $tenantId));
         $slots = new TemplateSlotRegistry($liveManifests);
 
         // One document stack for the worker (#1151): issuing and the SDK's
@@ -104,8 +117,17 @@ final class WorkerDocumentServices
 
         \Whity\register_service(DocumentFieldRegistry::class, $fields);
         \Whity\register_service(TemplateSlotRegistry::class, $slots);
+        // WHIT-921: the worker retries a route's final document while the render
+        // service was down. Its issuing stack is built on the first attempt.
+        \Whity\register_service(RouteFinaliser::class, self::finaliser($pdo, $settings, $hooks, $fields, $parts));
         \Whity\register_service(TemplateIssuing::class, $issuing);
-        \Whity\register_service(Documents::class, new SdkDocuments($issuing, $roleChecker, $jobPlugin, $slots));
+        // SDK 1.83 (WHIT-997): bulk issuing. A plugin's job may start a batch, and
+        // the worker runs every batch (IssueBatchJob, registered by queue:work).
+        $bulk = new BulkIssuing($pdo, $roleChecker, static fn (): TemplateIssuing => $issuing, new \Whity\Core\Queue\JobRepository($pdo), $logger, BulkIssuing::rendersPerMinuteFrom($env));
+        \Whity\register_service(BulkIssuing::class, $bulk);
+        \Whity\register_service(Documents::class, new SdkDocuments($issuing, $roleChecker, $jobPlugin, $slots, $bulk));
+        // SDK 1.82 (WHIT-996): a job reads templates for the same caller it issues for.
+        \Whity\register_service(\Whity\Sdk\Documents\Templates::class, SdkTemplates::build($pdo, $roleChecker, $resourceTypes, $settings, $slots, $jobPlugin));
         // #1151: a plugin's job renders and issues flowing documents too.
         \Whity\register_service(
             \Whity\Sdk\Render\DocumentRenderer::class,
@@ -141,5 +163,35 @@ final class WorkerDocumentServices
         ));
 
         return ['slots' => $slots, 'fields' => $fields];
+    }
+
+    /** The route finaliser (WHIT-921) over the worker's document stack. */
+    private static function finaliser(
+        PDO $pdo,
+        SettingsService $settings,
+        HookManager $hooks,
+        DocumentFieldRegistry $fields,
+        WorkerDocumentParts $parts,
+    ): RouteFinaliser {
+        $subjects = new RouteSubjectRegistry();
+        $subjects->register(new DocumentRouteSubject($pdo));
+        $subjects->register(new FormSubmissionRouteSubject($pdo));
+
+        return new RouteFinaliser(
+            $pdo,
+            new RouteRepository($pdo),
+            new RouteRecipientRepository($pdo),
+            new RouteEventRepository($pdo),
+            new RouteFinalisationRepository($pdo),
+            $subjects,
+            new RouteSubjectVersionRepository($pdo),
+            new DocumentSourceRepository($pdo),
+            new DocumentRepository($pdo),
+            static fn (): DocumentIssuing => $parts->issuing(),
+            static fn (int $tenantId): bool => RouteFinaliser::pdfsCanBeMade($parts->flowRenderer(), $settings)($tenantId),
+            $fields,
+            new QueueService(new JobRepository($pdo)),
+            $hooks,
+        );
     }
 }

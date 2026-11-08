@@ -19,6 +19,9 @@ namespace Whity\Sdk\Documents;
  * allowed it, otherwise {@see DocumentNotIssuedException::BACKGROUND_NOT_ALLOWED}.
  * Anywhere else with no person it is {@see DocumentNotIssuedException::NO_ACTOR}.
  *
+ * Many documents from one template: {@see issueMany()} (SDK 1.83), a
+ * background job with a result per document.
+ *
  * For documents from templates this replaces `DocumentRenderer::issue()`:
  * they carry the workspace's letterhead, theme, fields and QR code.
  */
@@ -44,4 +47,35 @@ interface Documents
      *         issue is in the result.
      */
     public function preflight(IssueRequest $request): PreflightResult;
+
+    /**
+     * Issue many documents from one template, in the background (SDK 1.83).
+     * Nothing is issued in this call: the batch is recorded and queued, and a
+     * worker issues each item as whoever is calling now, checking and
+     * preflighting it when it runs. Read progress with {@see batch()}.
+     *
+     * Sending the same `batchKey` again returns the batch it already started
+     * (`resubmitted: true`), so a retry can't issue twice; the same key with
+     * different items is {@see DocumentNotIssuedException::BATCH_KEY_CONFLICT}.
+     * A person needs `documents:issue`, otherwise
+     * {@see DocumentNotIssuedException::FORBIDDEN}.
+     *
+     * @throws DocumentNotIssuedException when no batch was started
+     */
+    public function issueMany(BulkIssueRequest $request): BulkIssueStatus;
+
+    /**
+     * A batch this caller started, with a result per item; null for any other
+     * batch (SDK 1.83). Batches belong to their workspace and their sender: the
+     * plugin, for a plugin's background job, or the person, in a request. A
+     * batch key is scoped the same way, so two plugins never share one.
+     */
+    public function batch(int $batchId): ?BulkIssueStatus;
+
+    /**
+     * Stop a batch this caller started (SDK 1.83): its pending items become
+     * `cancelled` and the documents already issued stay. Null for any other
+     * batch. Cancelling a finished batch changes nothing and returns it.
+     */
+    public function cancelBatch(int $batchId): ?BulkIssueStatus;
 }

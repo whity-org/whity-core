@@ -15,6 +15,7 @@ import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { useAuth } from '@/lib/auth-context';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { useFetch } from '@/hooks/useFetch';
+import { useLocalizedUnits, type UnitNames } from '@/hooks/useLocalizedUnits';
 import { fetchAllPages } from '@/lib/api/fetch-all-pages';
 import { DOCUMENTS_WRITE } from '@/lib/capabilities';
 import { useToast } from '@/lib/toast-context';
@@ -49,11 +50,11 @@ export default function DocumentSourcesPage() {
   // Names for "Shared with". A viewer who cannot list units gets the fallback
   // wording instead of ids. "Written by" comes with the list.
   const directory = useFetch(async () => {
-    const units = await fetchAllPages<{ id: number; name: string }>(apiClient, '/api/v1/ous').catch(() => null);
-    return {
-      units: new Map((units?.items ?? []).map((u) => [u.id, u.name])),
-    };
+    const units = await fetchAllPages<{ id: number } & UnitNames>(apiClient, '/api/v1/ous').catch(() => null);
+    return { units: units?.items ?? [] };
   }, [apiClient]);
+  const localizedUnits = useLocalizedUnits(directory.data?.units);
+  const unitNames = useMemo(() => new Map(localizedUnits.map((u) => [u.id, u.name])), [localizedUnits]);
 
   const pages = useMemo(
     () =>
@@ -85,14 +86,14 @@ export default function DocumentSourcesPage() {
         return t('blockEditor.list.sharedPermission', 'People with extra access');
       }
       if (row.owner_ou_id !== null && row.owner_ou_id !== undefined) {
-        const unit = directory.data?.units.get(row.owner_ou_id);
+        const unit = unitNames.get(row.owner_ou_id);
         return unit
           ? t('blockEditor.list.sharedUnit', 'Everyone at {unit} and below', { unit })
           : t('blockEditor.list.sharedAUnit', 'Everyone in one unit and below');
       }
       return t('blockEditor.list.sharedEveryone', 'Everyone in the workspace');
     },
-    [directory.data, t, viewerId]
+    [unitNames, t, viewerId]
   );
 
   const create = async (kind: DocumentKind) => {

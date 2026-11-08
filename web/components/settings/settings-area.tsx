@@ -26,7 +26,7 @@ import { useFetch } from '@/hooks/useFetch';
 import { useNavigation } from '@/lib/navigation-context';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { LICENSING_VIEW } from '@/lib/capabilities';
-import { useTranslation } from '@whity/features/i18n';
+import { useLanguageCode, useTranslation } from '@whity/features/i18n';
 import type { components } from '@/lib/api/schema';
 
 type SettingsTab = components['schemas']['SettingsTab'];
@@ -105,11 +105,13 @@ export function SettingsArea({ children }: { children: ReactNode }) {
   const { items: navItems } = useNavigation();
   const { has } = useCapabilities();
   const canSeeDevices = has(LICENSING_VIEW);
+  const language = useLanguageCode();
 
+  // The server words the tabs in the caller's language, so a switch needs them again.
   const { data: tabs } = useFetch<SettingsTab[]>(async () => {
     const { data: body } = await api.GET('/api/v1/settings/tabs');
     return body?.data ?? [];
-  }, []);
+  }, [language]);
 
   const groups = useMemo(() => {
     const groupLabels: Record<GroupId, string> = {

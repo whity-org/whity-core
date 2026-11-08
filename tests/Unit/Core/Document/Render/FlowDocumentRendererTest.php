@@ -9,6 +9,8 @@ use Tests\Support\FakeRenderServiceClient;
 use Tests\Support\SchemaFromMigrations;
 use Whity\Core\Document\Render\DocumentRenderRejectedException;
 use Whity\Core\Document\Render\FlowDocumentRenderer;
+use Whity\Core\Document\Render\RenderReadiness;
+use Whity\Core\Document\Render\RenderServiceClient;
 use Whity\Core\Settings\GlobalSettingsRepository;
 use Whity\Core\Settings\SettingsRegistry;
 use Whity\Core\Settings\SettingsService;
@@ -65,15 +67,64 @@ final class FlowDocumentRendererTest extends TestCase
         $this->renderer = new FlowDocumentRenderer($this->settings, $this->client);
     }
 
-    public function testRenderingIsOffUntilAnOperatorTurnsItOn(): void
+    public function testRenderingIsOnWhenAReadyRendererIsConfiguredAndTheSwitchCanTurnItOff(): void
     {
-        // The default, and the reason every caller needs an unavailable branch:
-        // a fresh install runs no render container at all.
-        self::assertFalse($this->renderer->isEnabled(self::TENANT));
-
-        $this->settings->setGlobal(SettingsRegistry::DOCUMENTS_RENDER_ENABLED, 'true');
-
+        // WHIT-1001: running a ready render service is the opt-in. The setting
+        // defaults on, and stays the operator's way to switch printing off.
         self::assertTrue($this->renderer->isEnabled(self::TENANT));
+        self::assertNull($this->renderer->unavailableReason(self::TENANT));
+
+        $this->settings->setGlobal(SettingsRegistry::DOCUMENTS_RENDER_ENABLED, 'false');
+
+        self::assertFalse($this->renderer->isEnabled(self::TENANT));
+        self::assertSame(FlowDocumentRenderer::SWITCHED_OFF, $this->renderer->unavailableReason(self::TENANT));
+    }
+
+    public function testAnInstallWithNoRendererStaysClosedAndSaysHowToSetItUp(): void
+    {
+        // The default turned on in WHIT-1001 must change nothing for an
+        // install with no renderer: no URL or no secret means no print, and no
+        // network call is even attempted.
+        foreach ([['', ''], ['http://render:8130', ''], ['http://render:8130', 'too-short']] as [$url, $secret]) {
+            RenderServiceClient::resetReadinessCache();
+            $calls = 0;
+            $client = new RenderServiceClient($url, $secret, 30, 1024, function () use (&$calls): ?array {
+                $calls++;
+
+                return null;
+            });
+            $renderer = new FlowDocumentRenderer($this->settings, $client);
+
+            self::assertFalse($renderer->isEnabled(self::TENANT));
+            self::assertSame('Document rendering is not set up on this instance', $renderer->unavailableReason(self::TENANT));
+            self::assertStringContainsString('RENDER_S', $renderer->readiness()->fix);
+            self::assertSame(0, $calls);
+        }
+        RenderServiceClient::resetReadinessCache();
+    }
+
+    public function testAVersionMismatchedRendererIsNotARendererAndSaysSo(): void
+    {
+        // A render image at another release prints that release's layout
+        // without a word; refusing, with both versions named, is the fix.
+        $this->client->readiness = RenderReadiness::versionMismatch('0.2.27', '0.2.26');
+
+        self::assertFalse($this->renderer->isEnabled(self::TENANT));
+        self::assertSame(
+            'The document renderer is version 0.2.26 but this app is 0.2.27, so printing is paused until they match',
+            $this->renderer->unavailableReason(self::TENANT)
+        );
+    }
+
+    public function testAnUnreachableRendererNamesTheFaultWithoutTheAddress(): void
+    {
+        $this->client->readiness = RenderReadiness::unreachable('0.2.27', 'http://render:8130');
+
+        $reason = (string) $this->renderer->unavailableReason(self::TENANT);
+        self::assertSame('The document renderer is not reachable', $reason);
+        self::assertStringNotContainsString('render:8130', $reason);
+        // The operator's fix carries it, for the admin screen and render:check.
+        self::assertStringContainsString('http://render:8130', $this->renderer->readiness()->fix);
     }
 
     public function testAnUnconfiguredClientIsNotEnabledEvenWhenTheSettingIsOn(): void

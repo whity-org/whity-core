@@ -14,7 +14,8 @@ import { SignInBrandPanel } from '@/components/auth/sign-in-brand-panel';
 import { Alert, AlertDescription } from '@whity/ui/alert';
 import { SsoLoginButtons } from '@/components/sso-login-buttons';
 import { TwoFactorSetupWizard } from '@/components/TwoFactorSettings';
-import { useTranslation, type TranslateFn } from '@whity/features/i18n';
+import { useLanguageCode, useTranslation, type TranslateFn } from '@whity/features/i18n';
+import { localizedName } from '@/lib/localized-name';
 import { SSO_ERROR_KEYS } from './sso-error-keys';
 
 /**
@@ -127,9 +128,17 @@ export default function LoginPage() {
   // session — the caller must pick a tenant (POST /api/v1/auth/select-tenant)
   // before a session is issued.
   const [pendingMemberships, setPendingMemberships] = useState<
-    Array<{ tenant_id: number; tenant_name: string; role: string }> | null
+    Array<{
+      tenant_id: number;
+      tenant_name: string;
+      /** The original name's language, and the name in every language (#821). */
+      tenant_name_language?: string;
+      tenant_names?: Record<string, string>;
+      role: string;
+    }> | null
   >(null);
   const [selectingTenant, setSelectingTenant] = useState(false);
+  const readerLanguage = useLanguageCode();
   const emailInputRef = useRef<HTMLInputElement>(null);
   const recoveryCodeInputRef = useRef<HTMLInputElement>(null);
 
@@ -599,7 +608,9 @@ export default function LoginPage() {
                 disabled={selectingTenant}
                 onClick={() => handleSelectTenant(m.tenant_id)}
               >
-                <span>{m.tenant_name}</span>
+                <span>
+                  {localizedName(m.tenant_names, readerLanguage, m.tenant_name_language, m.tenant_name)}
+                </span>
                 <span className="text-xs capitalize text-muted-foreground">{m.role}</span>
               </Button>
             ))}

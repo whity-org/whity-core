@@ -23,7 +23,7 @@ type Row = { kind: "draft"; id: string; draft: FormDraftRow } | { kind: "sent"; 
 
 /** The server refuses the rest: a review recorded since this list loaded, say. */
 function mayWithdraw(row: SubmissionRow): boolean {
-  return row.state !== "withdrawn" && row.state !== "completed"
+  return row.state !== "withdrawn" && row.state !== "completed" && row.state !== "not approved"
 }
 
 /** What a person has sent, where each one is, and what they started and did not send. */
@@ -177,6 +177,16 @@ export function MySubmissionsScreen({ env }: { env: FormsScreenEnv }) {
                       ) : (
                         <>
                           <DropdownMenuItem onSelect={() => openRow(row)}>{t("mine.open", "Open")}</DropdownMenuItem>
+                          {row.submission.state === "sent back" && (
+                            <DropdownMenuItem onSelect={() => env.navigate(`/forms/${row.submission.form_id}?edit=${row.submission.id}`)}>
+                              {t("mine.edit", "Edit and send again")}
+                            </DropdownMenuItem>
+                          )}
+                          {row.submission.state === "not approved" && (
+                            <DropdownMenuItem onSelect={() => env.navigate(`/forms/${row.submission.form_id}?from=${row.submission.id}`)}>
+                              {t("mine.startAgain", "Start a new one from this")}
+                            </DropdownMenuItem>
+                          )}
                           {mayWithdraw(row.submission) && (
                             <DropdownMenuItem variant="destructive" onSelect={() => setWithdrawing(row.submission)}>
                               {t("mine.withdraw", "Withdraw")}

@@ -209,6 +209,14 @@ if ($isCli && isset($argv[1])) {
         exit($sweepCommand->execute($argv));
     }
 
+    // WHIT-1001: can this deployment print documents, and if not, the fix.
+    if ($command === 'render:check') {
+        $renderCheckCommand = new \Whity\Cli\Commands\RenderCheckCommand();
+        array_shift($argv); // Remove script name
+        array_shift($argv); // Remove 'render:check' command
+        exit($renderCheckCommand->execute($argv));
+    }
+
     if ($command === 'update:check') {
         $updateCheckCommand = new \Whity\Cli\Commands\UpdateCheckCommand();
         array_shift($argv); // Remove script name
@@ -251,6 +259,7 @@ if ($isCli && isset($argv[1])) {
     echo "  billing:sync-device-quantity  Bill per-device subscriptions for the devices in service\n";
     echo "  affiliate:accrue-commissions  Turn referred customers' payments into affiliate commissions\n";
     echo "  update:check               Compare the core version against the latest GitHub release\n";
+    echo "  render:check               Check the document renderer: connected, same version, shared secret\n";
     echo "  queue:work                 Run the durable async job worker loop\n";
     echo "  schedule:run               Run the cron-tick scheduler (exactly-once per minute)\n";
     echo "  health:watch               Sample service health for the public /status page\n";
@@ -577,9 +586,11 @@ $routingRuleRegistry->registerCoreRoutingRules(
 
 // WHIT-918 (#1722). WHAT A ROUTE TRAVELS ON. Routes name a subject by type and
 // id (migration 224); the provider for a type answers for it. Core registers
-// `document` here; form submissions (#1724) and plugin records follow.
+// `document` and, since WHIT-920 (#1724), `form_submission`; plugin records follow.
+// Registered here AND in BaseCommand::setupKernel(), so the CLI knows them too.
 $routeSubjectRegistry = new \Whity\Core\Document\Routing\RouteSubjectRegistry();
 $routeSubjectRegistry->register(new \Whity\Core\Document\Routing\DocumentRouteSubject($db->getPdo()));
+$routeSubjectRegistry->register(new \Whity\Core\Form\FormSubmissionRouteSubject($db->getPdo()));
 \Whity\register_service(\Whity\Core\Document\Routing\RouteSubjectRegistry::class, $routeSubjectRegistry); // @phpstan-ignore-line
 
 // 4b-bis. WHAT A ROUTING STAGE DOES TO THE WORLD (#1032) — the sibling
@@ -1526,7 +1537,8 @@ $settingsService = new \Whity\Core\Settings\SettingsService(
     // #713 item 1: resolve against the UNION of core's keys and the loaded
     // plugins' declarations, so a plugin key lands in these same two tables and
     // resolves through this same per-tenant ?? global ?? default chain.
-    $settingsCatalog
+    $settingsCatalog,
+    $hookManager,
 );
 \Whity\register_service(\Whity\Core\Settings\SettingsService::class, $settingsService); // @phpstan-ignore-line
 $authHandler = new AuthHandler($db->getPdo(), $jwtParser, null, null, $totpService, $logger, $auditLogger, $loginThrottle, $twoFactorPolicyResolver, $settingsService);
@@ -1554,6 +1566,13 @@ $secretStore = \Whity\Core\Security\EncryptedSecretStore::fromEnv($_ENV);
     $db->getPdo(),
     static fn (): \Whity\Core\Security\EncryptedSecretStore => $secretStore,
     $auditLogger,
+)); // @phpstan-ignore-line
+
+// WHIT-1016 (SDK 1.88): a plugin reads and writes its own settings for the
+// current workspace. Registered in BaseCommand::setupKernel() too, so jobs reach it.
+\Whity\register_service(\Whity\Sdk\Settings\PluginSettings::class, new \Whity\Core\Plugin\HostPluginSettings(
+    $settingsService,
+    static fn (): array => $pluginLoader->getPlugins(),
 )); // @phpstan-ignore-line
 
 // WC-error-tracking: UPGRADE the boot-time error tracker now that settings, the
@@ -2181,6 +2200,15 @@ $tenantManifestPublisher = new \Whity\Core\Plugin\Tenant\TenantManifestPublisher
     array_values(array_map(static fn ($plugin): string => $plugin->getName(), $pluginLoader->getPlugins())),
     $auditLogger
 );
+// WHIT-995 (SDK 1.76): a workspace plugin's starter templates are seeded when
+// it goes live in a workspace, and never overwrite the workspace's edits.
+$tenantManifestPublisher->useStarterTemplates(new \Whity\Core\Document\PluginStarterTemplates(
+    $db->getPdo(),
+    new \Whity\Core\Document\DocumentSourceRepository($db->getPdo()),
+    new \Whity\Core\Document\DocumentSourceVersionRepository($db->getPdo()),
+    $settingsService,
+    $logger
+));
 $manifestImpact = new \Whity\Core\Plugin\Tenant\ManifestImpact($tenantRecordRepository);
 // The publish check: a version's own tests, through a writer with no audit
 // and no automations, in a transaction that is always rolled back.
@@ -2298,12 +2326,23 @@ $router->registerUnversioned('GET', '/api/version', static function () use ($rou
 // source checkout as for an immutable container image.
 $platformVersionHandler = new \Whity\Api\PlatformVersionApiHandler(
     $roleChecker,
-    new \Whity\Core\Update\LatestReleaseCheck()
+    new \Whity\Core\Update\LatestReleaseCheck(),
+    // The same env the document renderer is built from further down; the
+    // readiness cache is per process, so both see one answer.
+    new \Whity\Core\Document\Render\RenderServiceClient(
+        (string) ($_ENV['RENDER_SERVICE_URL'] ?? 'http://render:8130'),
+        (string) ($_ENV['RENDER_SHARED_SECRET'] ?? ''),
+        (int) ($_ENV['RENDER_TIMEOUT_SECONDS'] ?? 30)
+    ),
+    $settingsService
 );
 $router->register('GET', '/api/platform/version',        [$platformVersionHandler, 'version'], null, null, CorePermissions::SETTINGS_MANAGE);
 // Separate route because it reaches out to the release stream: the local
 // snapshot above must stay instant and offline-safe.
 $router->register('GET', '/api/platform/version/latest', [$platformVersionHandler, 'latest'],  null, null, CorePermissions::SETTINGS_MANAGE);
+// WHIT-1001: is the document renderer connected, the same release, and
+// accepting the shared secret — and if not, the exact fix.
+$router->register('GET', '/api/platform/renderer',       [$platformVersionHandler, 'renderer'], null, null, CorePermissions::SETTINGS_MANAGE);
 
 // WC-209: dynamic OpenAPI document. Regenerates the spec from the LIVE router
 // at request time, so a plugin installed/uninstalled/reloaded after the last
@@ -2352,6 +2391,27 @@ $router->register('POST', '/api/plugins/{name}/reinstall', [$pluginsHandler, 're
 // be on the operator `plugins.store_allowed_hosts` allowlist; empty ⇒ disabled)
 // and stage it through the SAME hardened installer as an upload (lands DISABLED).
 // S.9: its own permission, plugins:install; upload stays for unreviewed code.
+// WHIT-1003: connected to a store through Whity ID, a fresh token rides every store call.
+$whityStoreConnector = new \Whity\Core\Plugin\Store\WhityStoreConnector(
+    $globalSettingsRepository,
+    $secretStore,
+    \Whity\Core\Plugin\Store\WhityStoreConnector::issuersFromEnv(),
+    $frontendUrls->link(\Whity\Core\Http\FrontendUrls::STORE_CONNECT),
+    'Whity (' . ((string) parse_url($frontendUrls->base(), PHP_URL_HOST) ?: 'installation') . ')',
+    static fn (string $url, array $headers = []): ?array => (new \Whity\Core\Http\HttpFetcher(timeoutSeconds: 10))->getJson($url, $headers),
+    static fn (string $url, array $params): ?array => (new \Whity\Core\Http\HttpFetcher(timeoutSeconds: 10))->postForm($url, $params),
+    static fn (string $url, array $payload): ?array => (new \Whity\Core\Http\HttpFetcher(timeoutSeconds: 10))->postJson($url, $payload),
+);
+// Store licensing (PR-4, SDK 1.85): plugins ask the host whether they are licensed here.
+$hostStoreLicence = new \Whity\Core\Plugin\Store\HostStoreLicence(
+    $globalSettingsRepository,
+    $whityStoreConnector,
+    static fn (string $url, array $headers = []): ?array => (new \Whity\Core\Http\HttpFetcher(timeoutSeconds: 10))->getJson($url, $headers),
+    \Whity\Core\Plugin\Store\HostStoreLicence::PINNED_KEYS,
+    7,
+    \Whity\Core\Plugin\Store\HostStoreLicence::selfLicensedFromEnv(),
+);
+\Whity\register_service(\Whity\Sdk\Licensing\StoreLicence::class, $hostStoreLicence); // @phpstan-ignore-line
 $installFromStoreHandler = new \Whity\Api\InstallFromStoreApiHandler(
     __DIR__ . '/../plugins',
     $settingsService,
@@ -2363,17 +2423,10 @@ $installFromStoreHandler = new \Whity\Api\InstallFromStoreApiHandler(
     $tenantManifestPublisher,
     $tenantPluginRepository,
     $pluginTrust,
-    // WHIT-1003: connected to a store through Whity ID, a fresh token rides every store call.
-    new \Whity\Core\Plugin\Store\WhityStoreConnector(
-        $globalSettingsRepository,
-        $secretStore,
-        \Whity\Core\Plugin\Store\WhityStoreConnector::issuersFromEnv(),
-        $frontendUrls->link(\Whity\Core\Http\FrontendUrls::STORE_CONNECT),
-        'Whity (' . ((string) parse_url($frontendUrls->base(), PHP_URL_HOST) ?: 'installation') . ')',
-        static fn (string $url, array $headers = []): ?array => (new \Whity\Core\Http\HttpFetcher(timeoutSeconds: 10))->getJson($url, $headers),
-        static fn (string $url, array $params): ?array => (new \Whity\Core\Http\HttpFetcher(timeoutSeconds: 10))->postForm($url, $params),
-        static fn (string $url, array $payload): ?array => (new \Whity\Core\Http\HttpFetcher(timeoutSeconds: 10))->postJson($url, $payload),
-    )
+    $whityStoreConnector,
+    $hostStoreLicence,
+    null,
+    $frontendUrls->base() !== '' ? $frontendUrls->base() . '/admin/plugins/store' : '',
 );
 $router->register('POST', '/api/plugins/install-from-store', [$installFromStoreHandler, 'install'], null, null, CorePermissions::PLUGINS_INSTALL);
 // Decision 2: a workspace installs declarative plugins into itself. Data, not code.
@@ -2396,6 +2449,9 @@ $router->register('GET', '/api/plugins/store/connection', [$installFromStoreHand
 $router->register('POST', '/api/plugins/store/connect', [$installFromStoreHandler, 'connect'], null, null, CorePermissions::PLUGINS_INSTALL);
 $router->register('POST', '/api/plugins/store/connect/complete', [$installFromStoreHandler, 'completeConnect'], null, null, CorePermissions::PLUGINS_INSTALL);
 $router->register('DELETE', '/api/plugins/store/connection', [$installFromStoreHandler, 'disconnect'], null, null, CorePermissions::PLUGINS_INSTALL);
+// PR-4: buy a paid store plugin or start its trial; read this installation's licence.
+$router->register('POST', '/api/plugins/store/checkout', [$installFromStoreHandler, 'checkout'], null, null, CorePermissions::PLUGINS_INSTALL);
+$router->register('GET', '/api/plugins/store/licences/{slug}', [$installFromStoreHandler, 'licenceStatus'], null, null, CorePermissions::PLUGINS_READ);
 
 // Desktop plugin release catalog/download (WC-desktop-plugins). Consumed by an
 // already-enrolled desktop device using the SAME bearer access token it uses
@@ -2618,6 +2674,9 @@ $kernel->use(new \Whity\Http\Middleware\ResolveLanguage(
     new \Whity\Core\i18n\RequestLanguageResolver($db->getPdo(), $languageRegistry, $settingsService),
     $languageRegistry,
 ));
+// WHIT-1015: right after the language, because it reports what isolation and
+// the language step decided to the SDK Request a plugin's route handler reads.
+$kernel->use(new \Whity\Http\Middleware\StampRequestContext($languageRegistry));
 
 // Registered versioned (bare paths) so the router prepends /v1 itself —
 // writing '/api/v1/...' here would double-prefix to '/api/v1/v1/...'.
@@ -2948,6 +3007,17 @@ $billingAccessRecorder = new \Whity\Core\Billing\External\AccessRecorder(
     new \Whity\Core\Plan\PlanRepository($db->getPdo()),
     $logger
 );
+
+// Any plugin may ask the host to re-read one workspace's access through the
+// active portal (SDK 1.86, WHIT-1013): only a subject goes in, never a state,
+// throttled per subject and audited, the same path as a verified notification.
+\Whity\register_service(\Whity\Sdk\Billing\AccessRefresh::class, new \Whity\Core\Billing\External\HostAccessRefresh(
+    $billingPortal,
+    $billingAccessRecorder,
+    new DatabaseSharedStore($db->getPdo()),
+    $auditLogger,
+    $logger,
+));
 
 $externalBillingHandler = new \Whity\Api\ExternalBillingApiHandler(
     $billingPortal,
@@ -3393,6 +3463,11 @@ $documentFieldRegistry->addTenantSource(
         static fn (int $tenant, int $profileId): ?string => $tenantRecordRepository->memberName($tenant, $profileId),
     )
 );
+// WHIT-921: each form's submissions as a record type (`form.<key>`), so a
+// template can print a submission's answers: what a route's final document is.
+$documentFieldRegistry->addTenantSource(
+    static fn (int $tenantId): array => \Whity\Core\Form\FormSubmissionFieldProvider::forTenant($db->getPdo(), $tenantId, $documentFieldLabels)
+);
 \Whity\register_service(\Whity\Core\Document\Fields\DocumentFieldRegistry::class, $documentFieldRegistry);
 // 13a-nonies-quinquies. QR VERIFICATION ON DOCUMENTS (#1036). A code printed on
 // a document that anybody can scan to confirm it is genuine, and that a
@@ -3655,7 +3730,9 @@ $documentsHandler = new \Whity\Api\DocumentsApiHandler(
     // WHIT-742: `slot` in the body names the template through the workspace's bindings.
     $templateSlotRegistry,
     $documentPeople,
-    $documentFieldLabels
+    $documentFieldLabels,
+    // WHIT-922: `signatures` on GET /api/documents/{id}.
+    new \Whity\Core\Document\Signing\SignatureRepository($db->getPdo()),
 );
 // The one issuing path (WHIT-742), registered for plugin code and automations
 // running in a request. BaseCommand registers the same for CLI commands, and
@@ -3673,6 +3750,23 @@ $documentsHandler = new \Whity\Api\DocumentsApiHandler(
 \Whity\register_service(\Whity\Sdk\Documents\Documents::class, new \Whity\Core\Document\Issuing\SdkDocuments(
     \Whity\app(\Whity\Core\Document\Issuing\TemplateIssuing::class),
     $roleChecker,
+    // SDK 1.83 (WHIT-997): Documents::issueMany() records the batch and queues
+    // it; queue:work issues it.
+    bulk: new \Whity\Core\Document\Issuing\BulkIssuing(
+        $db->getPdo(),
+        $roleChecker,
+        static fn (): \Whity\Core\Document\Issuing\TemplateIssuing => \Whity\app(\Whity\Core\Document\Issuing\TemplateIssuing::class),
+        new \Whity\Core\Queue\JobRepository($db->getPdo()),
+        $logger,
+        \Whity\Core\Document\Issuing\BulkIssuing::rendersPerMinuteFrom($_ENV),
+    ),
+));
+// SDK 1.82 (WHIT-996): plugins read the published templates the person can see.
+\Whity\register_service(\Whity\Sdk\Documents\Templates::class, \Whity\Core\Document\Issuing\SdkTemplates::build(
+    $db->getPdo(),
+    $roleChecker,
+    $resourceTypeRegistry,
+    $settingsService,
 ));
 $documentWithdrawal = new \Whity\Core\Document\DocumentWithdrawal(
     $db->getPdo(),
@@ -3794,6 +3888,25 @@ $router->register('GET', '/api/document-verifications/{token}', [$documentVerifi
 // HookManager::dispatchAsync, AFTER its own commit — #947 notes documents emit
 // nothing into `domain_events` today. One trail, one broadcast derived from it;
 // the broadcast is never read as authoritative.
+// WHIT-921: makes a route's final document when it reaches its finalise step,
+// and retries through the queue while the render service is down.
+$routeFinaliser = new \Whity\Core\Document\Routing\RouteFinaliser(
+    $db->getPdo(),
+    $routeRepository,
+    $routeRecipientRepository,
+    $routeEventRepository,
+    new \Whity\Core\Document\Routing\RouteFinalisationRepository($db->getPdo()),
+    $routeSubjectRegistry,
+    new \Whity\Core\Document\Routing\RouteSubjectVersionRepository($db->getPdo()),
+    $documentSourceRepository,
+    $documentRepository,
+    $documentIssuing,
+    \Whity\Core\Document\Routing\RouteFinaliser::pdfsCanBeMade($flowDocumentRenderer, $settingsService),
+    $documentFieldRegistry,
+    $queueService,
+    $hookManager,
+    new \Whity\Core\Document\Print\PrintLabels($serverLabels),
+);
 $documentRouter = new \Whity\Core\Document\Routing\DocumentRouter(
     $db->getPdo(),
     $routeRepository,
@@ -3808,11 +3921,17 @@ $documentRouter = new \Whity\Core\Document\Routing\DocumentRouter(
     // author is and record each version of what was reviewed.
     $routeSubjectRegistry,
     new \Whity\Core\Document\Routing\RouteSubjectVersionRepository($db->getPdo()),
+    $routeFinaliser,
 );
 // WHIT-684: a number handed out at final approval goes on the PDF, printed for the
 // approver, when the template prints it. Listening after the commit, so a failed
 // render costs the PDF, never the approval or the number.
 $hookManager->listen(\Whity\Sdk\Hooks\Events::DOCUMENT_NUMBERED, static function (array $event) use ($documentRepository, $documentSourceRepository, $documentIssuing, $roleChecker): void {
+    // WHIT-921: a route with a finalise step prints the number on its final
+    // document, so it is not reprinted here as well.
+    if (($event['finalising'] ?? false) === true || ($event['finalised'] ?? false) === true) {
+        return;
+    }
     $tenantId = (int) $event['tenant_id'];
     $actorId = (int) $event['actor_profile_id'];
     $document = $documentRepository->findById((int) $event['id'], $tenantId);
@@ -3885,6 +4004,55 @@ $router->register('GET',  '/api/documents/{id:\d+}/people',                     
 // to somebody who then cannot answer it, leaving the item open forever with no
 // way for them to discover why. Same posture as /api/me/notifications.
 $router->register('POST', '/api/documents/{id:\d+}/routes/{routeId:\d+}/actions',      [$documentRoutingHandler, 'act'],        null);
+
+// 13a-nonies-ter-bis. ELECTRONIC SIGNATURES (WHIT-922, #1726). A `sign` step is
+// answered by signing: consent, a drawn signature and a fresh second check,
+// then the act and a sealed signature record in one transaction. Session-gated
+// with no permission, like acting: being the person the step reached is the
+// authorization. The audit page reads every act and signature and checks the
+// trail's hash chain and each seal. The public keys are published, unauthenticated.
+$signingChallengeRepository = new \Whity\Core\Document\Signing\SigningChallengeRepository($db->getPdo());
+$instanceSealKeys = new \Whity\Core\Document\Signing\InstanceSealKeys($db->getPdo(), $secretStore);
+$savedSignatureRepository = new \Whity\Core\Document\Signing\SavedSignatureRepository($db->getPdo());
+$signingService = new \Whity\Core\Document\Signing\SigningService(
+    $db->getPdo(),
+    $documentRouter,
+    $routeRecipientRepository,
+    $routeStepRepository,
+    $routeSubjectRegistry,
+    new \Whity\Core\Document\Routing\RouteSubjectVersionRepository($db->getPdo()),
+    new \Whity\Core\Document\Signing\SignatureRepository($db->getPdo()),
+    $savedSignatureRepository,
+    new \Whity\Core\Document\Signing\SigningSecondFactor(
+        $db->getPdo(),
+        $signingChallengeRepository,
+        $totpService,
+        // Signing checks count on their own: a try takes a slot before it is
+        // checked, and a check that passes gives it back.
+        new \Whity\Core\Document\Signing\SigningAttemptLimiter(new DatabaseSharedStore($db->getPdo())),
+    ),
+    $signingChallengeRepository,
+    $instanceSealKeys,
+    new \Whity\Core\Document\Signing\SigningCodeMailer($mailer, new \Whity\Core\Mail\EmailLayout(), $settingsService),
+);
+$documentSigningHandler = new \Whity\Api\DocumentSigningApiHandler(
+    $documentRepository,
+    $routeRepository,
+    $routeEventRepository,
+    $documentVisibilityPolicy,
+    $roleChecker,
+    $signingService,
+    $savedSignatureRepository,
+    $instanceSealKeys,
+);
+$router->register('GET',    '/api/documents/{id:\d+}/routes/{routeId:\d+}/signing',      [$documentSigningHandler, 'context'],         null);
+$router->register('POST',   '/api/documents/{id:\d+}/routes/{routeId:\d+}/signing/code', [$documentSigningHandler, 'sendCode'],        null);
+$router->register('POST',   '/api/documents/{id:\d+}/routes/{routeId:\d+}/sign',         [$documentSigningHandler, 'sign'],            null);
+$router->register('GET',    '/api/documents/{id:\d+}/audit',                              [$documentSigningHandler, 'audit'],           null);
+$router->register('GET',    '/api/me/signature',                                          [$documentSigningHandler, 'savedSignature'],  null);
+$router->register('PUT',    '/api/me/signature',                                          [$documentSigningHandler, 'saveSignature'],   null);
+$router->register('DELETE', '/api/me/signature',                                          [$documentSigningHandler, 'deleteSignature'], null);
+$router->register('GET',    '/api/signing-keys',                                          [$documentSigningHandler, 'publishedKeys'],   null);
 
 // 13a-nonies-quater. NAMED USER GROUPS (#999). A group is a named, reusable RULE
 // over the tenant's people, stored once and referenced from many places —
@@ -3969,11 +4137,16 @@ $router->register('DELETE', '/api/user-groups/{id:\d+}',           [$userGroupsH
 // `/preview` is above — the router matches in registration order.
 // $routeTemplateRepository is constructed above, beside the routing handler that
 // also needs it (#1031).
-$routeTemplateGraph = new \Whity\Core\Document\RouteTemplate\RouteTemplateGraph($routingRuleRegistry);
+$routeTemplateGraph = new \Whity\Core\Document\RouteTemplate\RouteTemplateGraph(
+    $routingRuleRegistry,
+    // WHIT-921: a design may end with a final document only where PDFs can be made.
+    static fn (int $tenantId): bool => $routeFinaliser->isAvailable($tenantId),
+);
 $routeTemplatesHandler = new \Whity\Api\DocumentRouteTemplatesApiHandler(
     $routeTemplateRepository,
     $routeTemplateGraph,
-    $settingsService
+    $settingsService,
+    static fn (int $tenantId): bool => $routeFinaliser->isAvailable($tenantId),
 );
 $router->register('GET',    '/api/document-route-templates',                  [$routeTemplatesHandler, 'index'],         null, null, CorePermissions::ROUTE_TEMPLATES_READ);
 $router->register('POST',   '/api/document-route-templates',                  [$routeTemplatesHandler, 'create'],        null, null, CorePermissions::ROUTE_TEMPLATES_WRITE);
@@ -4122,19 +4295,25 @@ $formUploadsHandler = new \Whity\Api\FormUploadsApiHandler(
 );
 $router->register('POST', '/api/forms/{id:\d+}/uploads', [$formUploadsHandler, 'upload'], null, null, CorePermissions::FORMS_SUBMIT);
 
+// WHIT-920: a submission raises no document; its route travels on the
+// submission. The upload repository CLAIMS each staged upload for it (the check
+// that stops a key from another tenant being attached here), and the route and
+// recipient repositories find a sent-back submission the author may resubmit.
 $submissionIssuer = new \Whity\Core\Form\SubmissionIssuer(
     $db->getPdo(),
     $formSubmissionRepository,
-    $documentIssuer,
     $routeTemplateRepository,
     $documentRouter,
-    // The two collaborators that turn a `file` answer into evidence: the
-    // upload repository CLAIMS the staged upload (the check that stops a key
-    // from another tenant becoming an artifact on this one), and the artifact
-    // repository records the row that makes the bytes reachable through the
-    // ordinary document-artifact download route.
     $formUploadRepository,
-    $documentArtifactRepository
+    $routeRepository,
+    $routeRecipientRepository
+);
+// WHIT-921: what each route's finalise step did, and the PDF it made.
+$routeFinalisationRepository = new \Whity\Core\Document\Routing\RouteFinalisationRepository($db->getPdo());
+$routeFinalDocumentFile = new \Whity\Core\Document\Routing\RouteFinalDocumentFile(
+    $routeFinalisationRepository,
+    new \Whity\Core\Document\DocumentArtifactRepository($db->getPdo()),
+    $documentArtifactStore,
 );
 $formSubmissionsHandler = new \Whity\Api\FormSubmissionsApiHandler(
     $formRepository,
@@ -4142,7 +4321,19 @@ $formSubmissionsHandler = new \Whity\Api\FormSubmissionsApiHandler(
     $formSubmissionRepository,
     $submissionIssuer,
     $formUploadRepository,
-    $storageDriver
+    $storageDriver,
+    // WHIT-920: stages, outcomes and notes for the person who sent it.
+    new \Whity\Core\Form\SubmissionProgress(
+        $db->getPdo(),
+        $routeRepository,
+        $routeStepRepository,
+        $routeEventRepository,
+        $routeRecipientRepository,
+        $settingsService,
+        $routeFinalisationRepository,
+    ),
+    $routeFinalisationRepository,
+    $routeFinalDocumentFile,
 );
 $formSubmissionReviewsHandler = new \Whity\Api\FormSubmissionReviewsApiHandler(
     $formFieldRepository,
@@ -4175,12 +4366,53 @@ $router->register('POST', '/api/form-submissions/{id:\d+}/review', [$formSubmiss
 $router->register('GET', '/api/me/form-submissions', [$formSubmissionsHandler, 'listMine'], null);
 $router->register('GET', '/api/me/form-submissions/{id:\d+}', [$formSubmissionsHandler, 'showMine'], null);
 $router->register('GET', '/api/me/form-submissions/{id:\d+}/files/{fileId:\d+}', [$formSubmissionsHandler, 'myFileContent'], null);
+// WHIT-921: the final document a submission's route made, when the form lets the applicant have it.
+$router->register('GET', '/api/me/form-submissions/{id:\d+}/final-document', [$formSubmissionsHandler, 'myFinalDocument'], null);
+// WHIT-920: the author changes a submission the route sent back to them, and
+// sends it again. No permission, like the reads above: the route decides whose,
+// and the handler refuses unless the route is waiting for this person's changes.
+$router->register('PUT', '/api/me/form-submissions/{id:\d+}', [$formSubmissionsHandler, 'resubmitMine'], null);
+
+// WHIT-920 (#1724). ROUTES BY SUBJECT. A route on a form submission has no
+// document, so the document routes cannot reach it; these read and act on a
+// route whatever it travels on. Session-gated with no permission, like the
+// document routes: being reached by the route is the authorization, and the
+// handler 404s everybody else. The document routes are unchanged.
+$routesHandler = new \Whity\Api\RoutesApiHandler(
+    $db->getPdo(),
+    $routeRepository,
+    $routeStepRepository,
+    $routeEventRepository,
+    $routeRecipientRepository,
+    $routeEdgeRepository,
+    $documentRouter,
+    $routeSubjectRegistry,
+    new \Whity\Core\Document\Routing\RouteSubjectVersionRepository($db->getPdo()),
+    $documentRepository,
+    $documentVisibilityPolicy,
+    $roleChecker,
+    $formSubmissionsHandler,
+    $routeFinalisationRepository,
+    $routeFinalDocumentFile,
+    $routeFinaliser,
+);
+$router->register('GET',  '/api/routes',                                        [$routesHandler, 'bySubject'], null);
+$router->register('POST', '/api/routes/{routeId:\d+}/actions',                  [$routesHandler, 'act'],       null);
+$router->register('GET',  '/api/routes/{routeId:\d+}/files/{fileId:\d+}',      [$routesHandler, 'file'],      null);
+// WHIT-921: the PDF a route's finalise step made, for somebody who may read the route.
+$router->register('GET',  '/api/routes/{routeId:\d+}/final-document',           [$routesHandler, 'finalDocument'], null);
+// WHIT-921: another try at a final document, for somebody who may manage the route (checked in the handler).
+$router->register('POST', '/api/routes/{routeId:\d+}/final-document/retry',     [$routesHandler, 'retryFinalDocument'], null);
 $formSubmissionWithdrawalHandler = new \Whity\Api\FormSubmissionWithdrawalApiHandler(
     $db->getPdo(),
     $formSubmissionRepository,
     $documentRepository,
     $documentWithdrawal,
-    $auditLogger
+    $auditLogger,
+    // WHIT-920: a submission routed on itself closes its own routes' items.
+    $routeRepository,
+    $routeRecipientRepository,
+    $routeEventRepository
 );
 $router->register('POST', '/api/me/form-submissions/{id:\d+}/withdraw', [$formSubmissionWithdrawalHandler, 'withdraw'], null);
 
@@ -4232,23 +4464,15 @@ $router->register('POST', '/api/me/forms/{id:\d+}/submissions', [$memberFormsHan
 // the class reachable without a session has no collaborator that could.
 //
 // The SAME SubmissionIssuer the authenticated path uses, not a reduced copy: a
-// public submission becomes a document and circulates through the existing
-// routing engine exactly as an internal one does. The caller cannot choose the
+// public submission circulates through the existing routing engine exactly as
+// an internal one does (WHIT-920: on the submission, with no document yet). The caller cannot choose the
 // route template — it lives on the FORM, set only by `forms:manage` — so there
 // is no arbitrary flow for an unauthenticated caller to inject work into. See
 // PublicFormsApiHandler's docblock, point 6.
 $publicFormsHandler = new \Whity\Api\PublicFormsApiHandler(
     $formRepository,
     $formFieldRepository,
-    new \Whity\Core\Form\SubmissionIssuer(
-        $db->getPdo(),
-        $formSubmissionRepository,
-        $documentIssuer,
-        $routeTemplateRepository,
-        $documentRouter,
-        $formUploadRepository,
-        $documentArtifactRepository
-    ),
+    $submissionIssuer,
     new DatabaseSharedStore($db->getPdo()),
     // The SAME store the authenticated path uses. An anonymous upload differs
     // only in its ceiling, its throttle and its null uploader — none of which is
@@ -4291,7 +4515,8 @@ $router->register('POST', '/api/public/forms/{slug}/submissions', [$publicFormsH
 // exists nowhere.
 $inboxSourceRegistry->registerCoreSource(
     \Whity\Core\Inbox\InboxSourceRegistry::CORE_DOCUMENT_ROUTING,
-    new \Whity\Core\Document\Routing\DocumentRoutingInboxSource($routeRecipientRepository)
+    // WHIT-920: the settings say whether a form's sender sees who reviewed it.
+    new \Whity\Core\Document\Routing\DocumentRoutingInboxSource($routeRecipientRepository, $settingsService)
 );
 $meInboxHandler = new \Whity\Api\MeInboxApiHandler($tokenValidator, $inboxSourceRegistry);
 // Session-gated, unpermissioned, like the other /api/me surfaces: an inbox row
@@ -4767,7 +4992,8 @@ $router->register('POST', '/api/me/notifications/{id:\d+}/read',  [$inboxHandler
 $notificationPreferencesHandler = new \Whity\Api\NotificationPreferencesApiHandler(
     $tokenValidator,
     $notificationPreferenceRepository,
-    $notificationPreferenceResolver
+    $notificationPreferenceResolver,
+    fn (): array => $pluginLoader->declaredNotificationTypes()
 );
 $router->register('GET', '/api/me/notification-preferences', [$notificationPreferencesHandler, 'list'],   null);
 $router->register('PUT', '/api/me/notification-preferences', [$notificationPreferencesHandler, 'update'], null);
@@ -4838,6 +5064,20 @@ $publicFormBotSettingsHandler = new \Whity\Api\PublicFormBotSettingsApiHandler(
 );
 $router->register('GET', '/api/settings/public-forms/bot-check', [$publicFormBotSettingsHandler, 'show'], null, null, CorePermissions::SETTINGS_MANAGE);
 $router->register('PUT', '/api/settings/public-forms/bot-check', [$publicFormBotSettingsHandler, 'update'], null, null, CorePermissions::SETTINGS_MANAGE);
+// WHIT-1016: the host-drawn secret field. Permission comes from the plugin's own
+// declaration, checked in the handler. Never an MCP tool: agents don't handle secrets.
+$pluginSecretFields = new \Whity\Api\PluginSecretFieldsApiHandler(
+    $roleChecker,
+    new \Whity\Core\Plugin\HostPluginSecrets(
+        $db->getPdo(),
+        static fn (): \Whity\Core\Security\EncryptedSecretStore => $secretStore,
+        $auditLogger,
+    ),
+    static fn (): array => $pluginLoader->getPlugins(),
+);
+$router->register('GET', '/api/plugin-secrets/{plugin}/{key}', [$pluginSecretFields, 'status'], null, null, null, ['mcp' => ['expose' => false]]);
+$router->register('PUT', '/api/plugin-secrets/{plugin}/{key}', [$pluginSecretFields, 'save'], null, null, null, ['mcp' => ['expose' => false]]);
+$router->register('DELETE', '/api/plugin-secrets/{plugin}/{key}', [$pluginSecretFields, 'clear'], null, null, null, ['mcp' => ['expose' => false]]);
 $router->register('POST', '/api/settings/mail/test',         [$mailSettingsHandler, 'test'],        null, null, CorePermissions::SETTINGS_MANAGE);
 
 // 13c. Register the Tenant Branding API (WC-233). Public GET /api/v1/branding
@@ -5038,6 +5278,10 @@ $ssoAuthHandler = new \Whity\Api\SsoAuthHandler(
     // WHIT-917: "Continue with …" on a workspace's sign-up page joins it as a customer.
     $customerSignupService,
     $brandingHostRepo,
+    // WHIT-922: signing in again to confirm a signature.
+    $tokenValidator,
+    $externalIdentityRepository,
+    $signingChallengeRepository,
 );
 // Public list of ENABLED providers for the current tenant, so the login page can
 // render "Sign in with …" buttons (display-safe fields only; no secrets).
@@ -5267,7 +5511,7 @@ $proposalDiffs->useAuthoredTools($authoredMcpTools, new \Whity\Mcp\Tools\ReadOnl
 ))->registerOn($proposalDiffs);
 // WHIT-812: what an agent did that its person can still undo.
 $agentActions = new \Whity\Core\Agent\AgentActionRepository($db->getPdo());
-$mcpToolsCallHandler = new ToolsCallHandler($toolDeriver, $router, $roleChecker, $tokenValidator, auditLogger: $auditLogger, authoredTools: $authoredMcpTools, proposals: $agentProposals, proposalDiffs: $proposalDiffs, actions: $agentActions);
+$mcpToolsCallHandler = new ToolsCallHandler($toolDeriver, $router, $roleChecker, $tokenValidator, auditLogger: $auditLogger, authoredTools: $authoredMcpTools, proposals: $agentProposals, proposalDiffs: $proposalDiffs, actions: $agentActions, languages: new \Whity\Core\i18n\RequestLanguageResolver($db->getPdo(), $languageRegistry, $settingsService));
 // The approvals inbox: the person an agent acts for approves, edits or
 // declines what it asked to do. Session-gated and never on the MCP surface:
 // an agent must not be able to approve its own proposal.
@@ -5377,7 +5621,7 @@ $mcpHandlers = [
     'tools/list'              => $mcpToolsListHandler,
     'tools/call'              => $mcpToolsCallHandler,
     'resources/list'          => new ResourcesListHandler($resourceDeriver, $roleChecker, $tokenValidator, $pluginResources, $agentContextGranted),
-    'resources/read'          => new ResourcesReadHandler($router, $roleChecker, $tokenValidator, auditLogger: $auditLogger, resourceDeriver: $resourceDeriver, pluginResources: $pluginResources, pluginGranted: $agentContextGranted),
+    'resources/read'          => new ResourcesReadHandler($router, $roleChecker, $tokenValidator, auditLogger: $auditLogger, resourceDeriver: $resourceDeriver, pluginResources: $pluginResources, pluginGranted: $agentContextGranted, languages: new \Whity\Core\i18n\RequestLanguageResolver($db->getPdo(), $languageRegistry, $settingsService)),
     'prompts/list'            => new PromptsListHandler($promptRegistry, $roleChecker, $tokenValidator, $agentContextGranted),
     'prompts/get'             => new PromptsGetHandler($promptRegistry, $roleChecker, $tokenValidator, $agentContextGranted),
 ];
@@ -5594,6 +5838,24 @@ $router->register('POST', '/api/mcp/connect/preview', [$mcpConnectHandler, 'prev
 $pluginLoader->setAgentPresetRegistry($agentPresetRegistry);
 // A plugin's billing portal goes into its slot (SDK 1.77, WHIT-1010).
 $pluginLoader->setBillingPortals($pluginBillingPortals);
+// WHIT-1011: plugin SERVICE routes accept a client-credentials token from the
+// trusted issuer (SERVICE_TOKEN_ISSUER, else MCP_OAUTH_ISSUER) for a client on
+// SERVICE_TOKEN_CLIENTS. Off, so no service route opens, until both are set.
+\Whity\Core\Plugin\PluginServiceRoutes::useVerifier(\Whity\Auth\Service\ServiceTokenVerifier::fromEnv(
+    (string) ($_ENV['APP_URL'] ?? getenv('APP_URL') ?: ''),
+    new \Whity\Core\Http\HttpFetcher(),
+    new \Whity\Auth\Oidc\JwksProvider(
+        static fn(string $uri): array => (new \Whity\Core\Http\HttpFetcher())->getJson($uri) ?? [],
+        minRefreshSeconds: 60,
+    ),
+));
+\Whity\register_service(\Whity\Sdk\Billing\PlanCatalogue::class, new \Whity\Core\Plan\HostPlanCatalogue($db->getPdo()));
+\Whity\register_service(\Whity\Sdk\Identity\LinkedPeople::class, new \Whity\Core\Identity\HostLinkedPeople($db->getPdo(), $roleChecker));
+// The one plugin that sells store licences (SDK 1.86, WHIT-1013). The store resolves
+// the host's object, never a plugin's, so no other plugin can answer in its place.
+$hostLicenceSales = new \Whity\Core\Billing\HostLicenceSales($logger);
+\Whity\register_service(\Whity\Sdk\Billing\LicenceSales::class, $hostLicenceSales);
+$pluginLoader->setLicenceSales($hostLicenceSales);
 // Code plugins' template slots and record types as merge fields (SDK 1.56, WHIT-742).
 $pluginLoader->setDocumentRegistries($templateSlotRegistry, $documentFieldRegistry);
 $pluginLoader->load();

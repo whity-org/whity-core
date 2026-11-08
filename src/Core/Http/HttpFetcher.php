@@ -53,15 +53,16 @@ final class HttpFetcher implements HttpClient
      * error response is decoded too, so the caller can read an OAuth `error`.
      *
      * @param array<string, mixed> $payload
+     * @param array<string, string> $headers
      * @return array<mixed>|null
      */
-    public function postJson(string $url, #[\SensitiveParameter] array $payload): ?array
+    public function postJson(string $url, #[\SensitiveParameter] array $payload, #[\SensitiveParameter] array $headers = []): ?array
     {
         return $this->decode($this->fetch(
             'POST',
             $url,
             (string) json_encode($payload, JSON_UNESCAPED_SLASHES),
-            [],
+            $headers,
             'application/json',
         ));
     }

@@ -36,6 +36,11 @@ function pageOf(page: Row['page']): Pick<WhityDocument, 'page' | 'labels'> {
   return { page: rest as WhityDocument['page'], labels: (labels ?? undefined) as WhityDocument['labels'] };
 }
 
+/** Who edited last, for the status bar. No name (a seeded starter) shows the time alone. */
+function lastEditor(row: Row): WhityDocument['updatedBy'] {
+  return { kind: 'person', id: String(row.updated_by ?? ''), name: row.updated_by_name ?? '' };
+}
+
 export function toDocument(row: Row): WhityDocument {
   return {
     id: String(row.id),
@@ -55,8 +60,7 @@ export function toDocument(row: Row): WhityDocument {
     status: row.published_version != null ? 'published' : 'draft',
     publishedVersion: row.published_version ?? undefined,
     updatedAt: row.updated_at,
-    // The editor shows who edited last; names come with the people lookup in M5.
-    updatedBy: { kind: 'person', id: String(row.updated_by ?? ''), name: '' },
+    updatedBy: lastEditor(row),
   };
 }
 
@@ -341,6 +345,7 @@ export const documentSourcesAdapter: DocumentEditorAdapter = {
       ok: true,
       version: versionFrom(response, data.data.draft_version),
       updatedAt: data.data.updated_at,
+      updatedBy: lastEditor(data.data),
       resolvedTheme: themeOf(data.data),
     };
   },

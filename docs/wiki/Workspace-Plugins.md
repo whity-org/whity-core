@@ -226,7 +226,7 @@ A slot is a named place the plugin needs a document template, such as its order 
 - **Key.** The host addresses the slot as `<plugin name>.<slot>`, for example `CakeOrders.order_confirmation`, the same as a code plugin's slots.
 - **`record`** must be one of the manifest's own record types. The slot's documents are for that record type, which the document field registry knows as `<plugin name>.<record>`.
 - **`kinds`** says which document kinds can fill it: `template` (the default) or `label`.
-- **No starter yet.** Starters come with WHIT-687; until then an unbound slot has no template, and issuing from it is a 409 `slot_unbound`.
+- **Starters.** A slot with a starter template (below) is bound to it when the plugin goes live, unless the workspace already bound one. Otherwise an unbound slot has no template, and issuing from it is a 409 `slot_unbound`.
 - At most 50 slots per manifest.
 
 **Templates for its records.** In a workspace where the plugin is on, each of its record types is a document record type, `<plugin name>.<type>` (`CakeOrders.order`), so the editor offers it when a template is written. A record is addressed as `CakeOrders.order:12`. Its fields are `record.<field>`, read with the record type's `permissions.read`, and print as a reader sees them: money in major units with its currency (`18.000 JOD`), dates as `5 November 2026`, choices by their label in the reader's language, a person by name (members of the workspace only), a linked record by its title field, and Yes or No. An empty field is empty on the page.
@@ -247,6 +247,34 @@ The list shows only the slots of switched-on plugins, each with its binding and,
 | `slot_unavailable` | No such slot here, or its plugin is off (`plugin` names it) |
 | `slot_unbound` | Nothing is bound to it |
 | `slot_misfit` | The bound template no longer fits; `reason` says why |
+
+### Starter templates (SDK 1.81, WHIT-995)
+
+A plugin can ship the templates it needs, so a workspace that turns it on can issue at once and adapt them later.
+
+```json
+"documents": {
+  "slots": { "order_confirmation": { "label": {...}, "record": "order" } },
+  "starters": {
+    "confirmation": {
+      "label": { "en": "Order confirmation", "ar": "تأكيد الطلب" },
+      "slot": "order_confirmation",
+      "lang": "en",
+      "page": { "size": "A4", "marginMm": 16, "letterhead": true },
+      "ownFields": [{ "key": "note", "label": "Note", "sample": "Thank you" }],
+      "blocks": [{ "id": "b1", "type": "heading", "level": 1, "content": [{ "type": "text", "text": "Order confirmation" }]}]
+    }
+  }
+}
+```
+
+- **What a starter is.** The editor's own document: `page`, `blocks` (the editor's blocks, see `docs/design/handoff/editor`) and `ownFields`. A field's `sample` is text, or text per language (`{"en": "Winter", "ar": "الشتاء"}`); the starter takes the one in its language, so an Arabic starter's samples are Arabic. Its title is the label in its `lang` (`en` by default). `kind` is `template` (default) or `label`. `slot` names one of the manifest's slots (one starter per slot). `record` is one of its record types and defaults to the slot's. The manifest check covers the shape only: a list of objects, each with a unique string `id` and a string `type`. At most 20 starters, 500 blocks each.
+- **When it is seeded.** When the plugin goes live in a workspace: it is published switched on, a version is activated, or it is switched on. A plugin installed from a store switched off is seeded when it is switched on. Each starter becomes a template every member can see, published as its first version, and bound to its slot when that slot has nothing bound.
+- **Once.** A starter is seeded once per workspace. One the workspace deletes is not brought back.
+- **Edits are the workspace's.** A copy a person changed is never overwritten. A copy nobody changed follows the plugin: when a new plugin version changes the starter, the template is replaced and the change published.
+- **Left in place.** Switching the plugin off or removing it leaves its templates.
+- **Checks.** What the editor checks before a person publishes (for example unknown merge fields) is not checked here, and the version has no frozen theme, so it prints in the workspace's current theme until a person publishes it. An issue that needs a field the record can't fill is still refused when the document is issued.
+- **Bookkeeping.** `plugin_starter_seeds` (migration 228) records each seeded starter with the hash of what the plugin last wrote. The template's `starter_key` is `plugin:` and a hash of `<plugin>.<starter>`.
 
 **From code and the worker.** Core issues through one service, `Whity\Core\Document\Issuing\TemplateIssuing`, registered in `public/index.php`, in the CLI kernel (`BaseCommand`), and in `queue:work`, which isn't a `BaseCommand` and registers its own through `WorkerDocumentServices`. `events:relay` loads no plugins yet, so nothing there issues. `issue(ActingAs, IssueInput)` takes a slot or a template id, the record (`CakeOrders.order:12`), values, a title, an origin key and `render`. It returns the issued document, or throws `DocumentIssueRefused` with a stable `reason`, the HTTP `status` the REST route answers with, and `details`, having written nothing:
 

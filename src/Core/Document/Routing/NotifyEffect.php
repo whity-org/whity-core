@@ -74,6 +74,9 @@ final class NotifyEffect implements RouteEffectInterface
             $context->configString('type') ?? self::DEFAULT_TYPE,
             [
                 'document_id' => $context->documentId,
+                // WHIT-920: what to open when there is no document yet.
+                'subject_type' => $context->subjectType,
+                'subject_id' => $context->subjectId,
                 'step_id' => $context->stepId,
                 'action' => $context->action,
                 // The STEP's conclusion, not one person's vote — see

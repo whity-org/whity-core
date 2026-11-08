@@ -11,7 +11,8 @@ import { AdminHeader } from '@/components/admin/admin-header';
 import { Button } from '@whity/ui/button';
 import { Skeleton } from '@whity/ui/skeleton';
 import { IconBinaryTree2, IconList, IconPlus, IconRefresh } from '@tabler/icons-react';
-import { useTranslation } from '@whity/features/i18n';
+import { useLanguageCode, useTranslation } from '@whity/features/i18n';
+import { localizedName } from '@/lib/localized-name';
 import { CreateOuModal } from './create-modal';
 import { EditOuModal } from './edit-modal';
 import { DeleteOuModal } from './delete-modal';
@@ -87,7 +88,18 @@ export default function OUsPage() {
     return result.items;
   }, [apiClient, t]);
 
-  const ous = useMemo(() => data ?? [], [data]);
+  // Every screen here shows a unit in the reader's language, falling back to
+  // the original (#821). `name` becomes that display name; the edit form reads
+  // `names` and `name_language`, so nothing writes it back.
+  const language = useLanguageCode();
+  const ous = useMemo(
+    () =>
+      (data ?? []).map((ou) => ({
+        ...ou,
+        name: localizedName(ou.names, language, ou.name_language, ou.name),
+      })),
+    [data, language]
+  );
 
   useEffect(() => {
     if (error) {

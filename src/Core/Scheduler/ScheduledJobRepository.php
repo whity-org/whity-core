@@ -122,6 +122,37 @@ final class ScheduledJobRepository
     }
 
     /**
+     * Every plugin-declared schedule, across workspaces ({@see PluginSchedules}).
+     * A name with the namespace colon is a plugin's; core's never have one.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function listPluginSchedules(): array
+    {
+        // @tenant-guard-ignore: the scheduler reconciles declared plugin schedules ACROSS all tenants (system infra); every write that follows binds the row's tenant.
+        $stmt = $this->pdo->query("SELECT * FROM scheduled_jobs WHERE name LIKE '%:%'");
+        /** @var list<array<string, mixed>> $rows */
+        $rows = $stmt === false ? [] : $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return array_map(static fn (array $r): array => self::mapRow($r), $rows);
+    }
+
+    /**
+     * The workspaces a declared schedule runs in: every tenant but the system one.
+     *
+     * @return list<int>
+     */
+    public function workspaceIds(): array
+    {
+        // The tenants themselves, for the scheduler (system infra).
+        $stmt = $this->pdo->query('SELECT id FROM tenants WHERE id <> 0 ORDER BY id ASC');
+        /** @var list<int|string> $ids */
+        $ids = $stmt === false ? [] : $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+        return array_map('intval', $ids);
+    }
+
+    /**
      * Claim the schedules due to run at `$nowUtc` (enabled + next_run_at due),
      * ACROSS all tenants — this is the system-infra tick path.
      *

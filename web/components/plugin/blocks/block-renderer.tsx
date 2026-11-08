@@ -76,6 +76,7 @@ import type {
   TextAreaBlock,
   TextBlock,
   TextInputBlock,
+  SecretFieldBlock,
   TimelineBlock,
   VisibleWhen,
   AccessGateBlock,
@@ -151,6 +152,8 @@ import {
   AlertTitle,
 } from '@whity/ui/alert';
 import { Badge } from '@whity/ui/badge';
+import { ConfirmAction } from '@whity/ui/confirm-action';
+import { apiClient } from '@/lib/api-client';
 import { Button } from '@whity/ui/button';
 import {
   Card,
@@ -165,7 +168,8 @@ import {
   TabsList,
   TabsTrigger,
 } from '@whity/ui/tabs';
-import { useTranslation } from '@whity/features/i18n';
+import { useLanguageCode, useTranslation } from '@whity/features/i18n';
+import { localizedName, type LocalizedNames } from '@/lib/localized-name';
 import { useDateDisplay } from '@whity/features/datetime';
 
 /**
@@ -3331,6 +3335,133 @@ function TextInputRenderer({ block }: { block: TextInputBlock }) {
   );
 }
 
+// SDK 1.88: a write-only secret. The field starts empty and stays empty: the
+// server only ever says whether a value is set.
+function SecretFieldRenderer({ block }: { block: SecretFieldBlock }) {
+  const t = useTranslation('plugin');
+  const { addToast } = useToast();
+  const [status, setStatus] = React.useState<'loading' | 'error' | 'forbidden' | 'set' | 'unset'>('loading');
+  const [value, setValue] = React.useState('');
+  const [saving, setSaving] = React.useState(false);
+  const [confirming, setConfirming] = React.useState(false);
+  const [attempt, setAttempt] = React.useState(0);
+  const inputId = `block-secret-${block.secret}`;
+
+  const applyResponse = React.useCallback(async (res: Response): Promise<boolean> => {
+    if (res.status === 403) {
+      setStatus('forbidden');
+      return false;
+    }
+    if (!res.ok) return false;
+    const body = (await res.json()) as { is_set?: unknown };
+    setStatus(body.is_set === true ? 'set' : 'unset');
+    return true;
+  }, []);
+
+  React.useEffect(() => {
+    apiClient(block.endpoint)
+      .then(applyResponse)
+      .then((applied) => {
+        if (!applied) setStatus((current) => (current === 'forbidden' ? current : 'error'));
+      })
+      .catch(() => setStatus('error'));
+  }, [applyResponse, block.endpoint, attempt]);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const res = await apiClient(block.endpoint, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value }),
+      });
+      if (await applyResponse(res)) {
+        setValue('');
+        addToast(t('blocks.secretField.saved', 'Saved. It will not be shown again.'), 'success');
+      } else {
+        addToast(t('blocks.secretField.saveError', 'Could not save this. Try again.'), 'error');
+      }
+    } catch {
+      addToast(t('blocks.secretField.saveError', 'Could not save this. Try again.'), 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const remove = async () => {
+    try {
+      const res = await apiClient(block.endpoint, { method: 'DELETE' });
+      if (await applyResponse(res)) {
+        addToast(t('blocks.secretField.removed', 'Removed.'), 'success');
+      } else {
+        addToast(t('blocks.secretField.removeError', 'Could not remove this. Try again.'), 'error');
+      }
+    } catch {
+      addToast(t('blocks.secretField.removeError', 'Could not remove this. Try again.'), 'error');
+    }
+  };
+
+  if (status === 'loading') return <Skeleton className="h-10 w-full" />;
+  if (status === 'forbidden') {
+    return (
+      <p className="text-sm text-muted-foreground">
+        {block.label}: {t('blocks.secretField.forbidden', 'You do not have permission to change this.')}
+      </p>
+    );
+  }
+  if (status === 'error') {
+    return (
+      <div className="flex items-center gap-2">
+        <p className="text-sm text-destructive">{t('blocks.secretField.loadError', 'Could not load this field.')}</p>
+        <Button variant="outline" onClick={() => { setStatus('loading'); setAttempt((n) => n + 1); }}>{t('blocks.retry', 'Retry')}</Button>
+      </div>
+    );
+  }
+
+  const isSet = status === 'set';
+  return (
+    <div className="space-y-1.5" data-slot="secret-field">
+      <div className="flex items-center justify-between gap-2">
+        <label htmlFor={inputId} className="text-sm font-medium text-foreground">{block.label}</label>
+        <Badge variant={isSet ? 'secondary' : 'outline'}>
+          {isSet ? t('blocks.secretField.isSet', 'Set') : t('blocks.secretField.notSet', 'Not set')}
+        </Badge>
+      </div>
+      <div className="flex gap-2">
+        <Input
+          id={inputId}
+          type="password"
+          autoComplete="new-password"
+          value={value}
+          disabled={saving}
+          placeholder={isSet ? t('blocks.secretField.replace', 'Type a new value to replace it') : undefined}
+          onChange={(e) => setValue(e.target.value)}
+        />
+        <Button variant="outline" disabled={saving || value === ''} onClick={() => void save()}>
+          {saving ? t('blocks.secretField.saving', 'Saving…') : t('blocks.secretField.save', 'Save')}
+        </Button>
+        {isSet && (
+          <Button variant="outline" disabled={saving} onClick={() => setConfirming(true)}>
+            {t('blocks.secretField.remove', 'Remove')}
+          </Button>
+        )}
+      </div>
+      <p className="text-xs text-muted-foreground">
+        {block.description ?? t('blocks.secretField.help', 'Stored encrypted and never shown again.')}
+      </p>
+      <ConfirmAction
+        open={confirming}
+        onOpenChange={setConfirming}
+        title={t('blocks.secretField.confirm.title', 'Remove {label}?', { label: block.label })}
+        description={t('blocks.secretField.confirm.description', 'Anything using it in this workspace stops working until a new value is saved.')}
+        confirmLabel={t('blocks.secretField.remove', 'Remove')}
+        cancelLabel={t('blocks.dialog.cancel', 'Cancel')}
+        onConfirm={remove}
+      />
+    </div>
+  );
+}
+
 function TextAreaRenderer({ block }: { block: TextAreaBlock }) {
   const ctx = useFormBlockContext();
   if (ctx === null) return <UnsupportedBlock type="textArea" />;
@@ -3669,14 +3800,23 @@ function orderOuRows(rows: OuRow[]): { row: OuRow; depth: number }[] {
   return out;
 }
 
-/** Coerce one `/api/v1/ous` row into the three fields the picker reads. */
-function toOuRow(raw: Record<string, unknown>): OuRow | null {
+/**
+ * Coerce one `/api/v1/ous` row into the three fields the picker reads. `name`
+ * is the name to show this reader (#821); the rule the picker writes holds the
+ * unit's id, so it never reaches the API.
+ */
+function toOuRow(raw: Record<string, unknown>, language: string | null): OuRow | null {
   const id = Number(raw.id);
   if (!Number.isFinite(id)) return null;
   const parent = raw.parent_id;
   return {
     id,
-    name: raw.name === undefined || raw.name === null ? String(id) : String(raw.name),
+    name: localizedName(
+      typeof raw.names === 'object' ? (raw.names as LocalizedNames | null) : null,
+      language,
+      typeof raw.name_language === 'string' ? raw.name_language : null,
+      raw.name === undefined || raw.name === null ? String(id) : String(raw.name)
+    ),
     parent_id: parent === undefined || parent === null ? null : Number(parent),
   };
 }
@@ -3765,6 +3905,7 @@ function OuScopePickerRenderer({ block }: { block: OuScopePickerBlock }) {
  */
 function OuScopePickerField({ block, ctx }: { block: OuScopePickerBlock; ctx: FormBlockContextValue }) {
   const t = useTranslation('plugin');
+  const language = useLanguageCode();
 
   // `anchorType` narrows the ANCHOR list at the source rather than client-side:
   // core answers `?type=` itself, so a tenant with ten thousand units does not
@@ -3809,7 +3950,7 @@ function OuScopePickerField({ block, ctx }: { block: OuScopePickerBlock; ctx: Fo
     units.status === 'ready'
       ? orderOuRows(
           units.data.flatMap((raw) => {
-            const row = toOuRow(raw);
+            const row = toOuRow(raw, language);
             return row === null ? [] : [row];
           })
         )
@@ -4437,6 +4578,8 @@ function BlockNode({ block }: { block: Block }): React.ReactElement | null {
     // rendering the branch as though it had been selected.
     case 'variantCase':
       return <UnsupportedBlock type="variantCase" />;
+    case 'secretField':
+      return isNonEmptyString(block.secret) && isNonEmptyString(block.label) && isNonEmptyString(block.endpoint) ? <SecretFieldRenderer block={block} /> : <UnsupportedBlock type="secretField" />;
     case 'textInput':
       return isNonEmptyString(block.name) && isNonEmptyString(block.label) ? <TextInputRenderer block={block} /> : <UnsupportedBlock type="textInput" />;
     case 'textArea':

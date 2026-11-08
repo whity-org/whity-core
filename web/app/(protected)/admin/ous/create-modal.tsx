@@ -11,7 +11,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@whity/ui/button';
-import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -20,7 +19,10 @@ import {
   SelectValue,
 } from '@whity/ui/select';
 import { Textarea } from '@whity/ui/textarea';
-import { useTranslation } from '@whity/features/i18n';
+import { useLanguageCode, useTranslation } from '@whity/features/i18n';
+import { LocalizedNameField } from '@/components/localized-name-field';
+import { cleanNames, type NameLanguage } from '@/lib/localized-name';
+import type { BilingualValue } from '@whity/ui/bilingual-input';
 import type { OU } from './types';
 
 interface CreateOuModalProps {
@@ -43,7 +45,21 @@ export function CreateOuModal({
   const { addToast } = useToast();
   const t = useTranslation('admin');
   const [isLoading, setIsLoading] = useState(false);
-  const [name, setName] = useState('');
+  // #821: the name in Arabic and English, and which one is the original. Until
+  // the person picks, the original is the only language filled in, or the
+  // language they are reading in.
+  const readerLanguage = useLanguageCode();
+  const [names, setNames] = useState<BilingualValue>({});
+  const [chosenLanguage, setChosenLanguage] = useState<NameLanguage | null>(null);
+  const [nameError, setNameError] = useState<string | null>(null);
+  const filled = Object.keys(cleanNames(names));
+  const nameLanguage: NameLanguage =
+    chosenLanguage ??
+    (filled.length === 1 && (filled[0] === 'ar' || filled[0] === 'en')
+      ? filled[0]
+      : readerLanguage === 'ar'
+        ? 'ar'
+        : 'en');
   const [description, setDescription] = useState('');
   // Initialised from the (possibly pre-selected) parent. The page remounts this
   // modal per open via a `key` tied to defaultParentId, so the initial value is
@@ -53,15 +69,24 @@ export function CreateOuModal({
   );
 
   const handleCreate = async () => {
-    if (!name.trim()) {
-      addToast(t('ous.create.validation.nameRequired', 'Name is required'), 'error');
+    const cleaned = cleanNames(names);
+    const original = cleaned[nameLanguage] ?? '';
+    if (original === '') {
+      setNameError(
+        Object.keys(cleaned).length === 0
+          ? t('ous.create.validation.nameRequired', 'Name is required')
+          : t('ous.create.validation.originalRequired', 'Fill in the name in the original language.')
+      );
       return;
     }
+    setNameError(null);
 
     try {
       setIsLoading(true);
       const payload: Record<string, unknown> = {
-        name: name.trim(),
+        name: original,
+        names: cleaned,
+        name_language: nameLanguage,
         description: description.trim(),
       };
 
@@ -82,7 +107,9 @@ export function CreateOuModal({
       }
 
       addToast(t('ous.create.success', 'Organizational unit created successfully'), 'success');
-      setName('');
+      setNames({});
+      setChosenLanguage(null);
+      setNameError(null);
       setDescription('');
       setParentId('');
       onSuccess();
@@ -99,7 +126,9 @@ export function CreateOuModal({
 
   const handleOpenChange = (open: boolean) => {
     if (!open) {
-      setName('');
+      setNames({});
+      setChosenLanguage(null);
+      setNameError(null);
       setDescription('');
       setParentId('');
       onClose();
@@ -117,15 +146,16 @@ export function CreateOuModal({
         </DialogHeader>
 
         <div className="space-y-4">
-          <div>
-            <label className="text-sm font-medium">{t('ous.create.name.label', 'Name *')}</label>
-            <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder={t('ous.create.name.placeholder', 'e.g., Engineering')}
-              disabled={isLoading}
-            />
-          </div>
+          <LocalizedNameField
+            id="ou-create-name"
+            label={t('ous.create.name.label', 'Name *')}
+            names={names}
+            originalLanguage={nameLanguage}
+            onNamesChange={setNames}
+            onOriginalLanguageChange={setChosenLanguage}
+            disabled={isLoading}
+            error={nameError}
+          />
 
           <div>
             <label className="text-sm font-medium">

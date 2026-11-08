@@ -31,7 +31,7 @@ final class QueueService
      * (tenant, idempotency_key) already exists (deduped).
      *
      * @param array<string, mixed> $payload
-     * @param array{queue?: string, priority?: int, max_attempts?: int, delay?: int, idempotency_key?: string|null, tenant_id?: int} $opts
+     * @param array{queue?: string, priority?: int, max_attempts?: int, delay?: int, idempotency_key?: string|null, tenant_id?: int, retain_result?: bool} $opts
      */
     public function dispatch(string $name, array $payload = [], array $opts = []): ?int
     {

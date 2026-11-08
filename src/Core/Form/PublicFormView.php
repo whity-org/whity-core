@@ -291,6 +291,12 @@ final class PublicFormView
             'accepts_submissions' => PublicFormLink::acceptsPublicSubmissions($form) && $fields !== [],
             'opens_at' => $form['public_opens_at'] ?? null,
             'closes_at' => $form['public_closes_at'] ?? null,
+            // WHIT-920: the link asks the visitor to sign in first, and the form
+            // is filled in at /forms/{form_id} under their own name. The id is
+            // given only then, because only then is there a signed-in page to
+            // send them to.
+            'sign_in_required' => ($form['public_requires_sign_in'] ?? false) === true,
+            'form_id' => ($form['public_requires_sign_in'] ?? false) === true ? (int) ($form['id'] ?? 0) : null,
         ];
     }
 }

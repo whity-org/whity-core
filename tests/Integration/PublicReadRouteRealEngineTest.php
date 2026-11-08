@@ -126,6 +126,10 @@ final class PublicReadRouteRealEngineTest extends TestCase
             self::assertNull($this->router->match($this->get($this->readPath(str_repeat('0', 64), $name))), "{$name} must not be registered");
         }
         self::assertContains(['plugin' => $slug, 'form' => 'hours'], PluginPublicRoutes::forms());
+        // The admin screen labels the two kinds of key from this.
+        self::assertSame(PluginPublicRoutes::KIND_READ, PluginPublicRoutes::kindOf($slug, 'hours'));
+        self::assertSame(PluginPublicRoutes::KIND_FORM, PluginPublicRoutes::kindOf($slug, 'enquiry'));
+        self::assertNull(PluginPublicRoutes::kindOf($slug, 'nothing-by-this-name'));
         self::assertTrue(PluginPublicRoutes::allows('GET', '/api/v1/' . $slug . '/public/hours/{key}'));
         self::assertFalse(PluginPublicRoutes::allows('POST', '/api/v1/' . $slug . '/public/hours/{key}'));
         // The form kept its name; the read that wanted it too was registered private.

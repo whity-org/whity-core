@@ -35,6 +35,25 @@ final class JobRepository
     }
 
     /**
+     * A tenant's jobs whose name begins with $prefix, newest first.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function listByNamePrefix(int $tenantId, string $prefix, int $limit): array
+    {
+        // Escaped: a plugin slug can hold `_`, which LIKE would read as any character.
+        $pattern = addcslashes($prefix, '\\%_') . '%';
+        $stmt = $this->pdo->prepare(
+            "SELECT * FROM jobs WHERE tenant_id = :tenant_id AND name LIKE :pattern ESCAPE '\\' ORDER BY id DESC LIMIT " . max(1, $limit)
+        );
+        $stmt->execute([':tenant_id' => $tenantId, ':pattern' => $pattern]);
+        /** @var list<array<string, mixed>> $rows */
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return array_map(static fn (array $row): array => self::mapJob($row), $rows);
+    }
+
+    /**
      * Enqueue a job for a tenant. Returns the new id, or null when a live job
      * with the same (tenant, idempotency_key) already exists (deduped).
      *

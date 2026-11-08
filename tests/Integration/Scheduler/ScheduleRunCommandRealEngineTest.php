@@ -96,7 +96,9 @@ final class ScheduleRunCommandRealEngineTest extends TestCase
 
         $this->command->tick(300, 3600); // retention 1h → the 2h-old completed job is pruned
 
-        self::assertNull($this->fetchOne('SELECT * FROM jobs WHERE id = ' . $jobId), 'old completed job pruned by the tick');
+        // Match on the name too: SQLite can give the freed id to a job this same tick
+        // enqueues, such as the quarter-hourly store-marks refresh.
+        self::assertNull($this->fetchOne("SELECT * FROM jobs WHERE id = {$jobId} AND name = 'x'"), 'old completed job pruned by the tick');
     }
 
     private function makeDue(int $scheduleId): void
