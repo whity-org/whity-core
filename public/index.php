@@ -1537,7 +1537,8 @@ $settingsService = new \Whity\Core\Settings\SettingsService(
     // #713 item 1: resolve against the UNION of core's keys and the loaded
     // plugins' declarations, so a plugin key lands in these same two tables and
     // resolves through this same per-tenant ?? global ?? default chain.
-    $settingsCatalog
+    $settingsCatalog,
+    $hookManager,
 );
 \Whity\register_service(\Whity\Core\Settings\SettingsService::class, $settingsService); // @phpstan-ignore-line
 $authHandler = new AuthHandler($db->getPdo(), $jwtParser, null, null, $totpService, $logger, $auditLogger, $loginThrottle, $twoFactorPolicyResolver, $settingsService);
@@ -1565,6 +1566,13 @@ $secretStore = \Whity\Core\Security\EncryptedSecretStore::fromEnv($_ENV);
     $db->getPdo(),
     static fn (): \Whity\Core\Security\EncryptedSecretStore => $secretStore,
     $auditLogger,
+)); // @phpstan-ignore-line
+
+// WHIT-1016 (SDK 1.88): a plugin reads and writes its own settings for the
+// current workspace. Registered in BaseCommand::setupKernel() too, so jobs reach it.
+\Whity\register_service(\Whity\Sdk\Settings\PluginSettings::class, new \Whity\Core\Plugin\HostPluginSettings(
+    $settingsService,
+    static fn (): array => $pluginLoader->getPlugins(),
 )); // @phpstan-ignore-line
 
 // WC-error-tracking: UPGRADE the boot-time error tracker now that settings, the
@@ -5054,6 +5062,20 @@ $publicFormBotSettingsHandler = new \Whity\Api\PublicFormBotSettingsApiHandler(
 );
 $router->register('GET', '/api/settings/public-forms/bot-check', [$publicFormBotSettingsHandler, 'show'], null, null, CorePermissions::SETTINGS_MANAGE);
 $router->register('PUT', '/api/settings/public-forms/bot-check', [$publicFormBotSettingsHandler, 'update'], null, null, CorePermissions::SETTINGS_MANAGE);
+// WHIT-1016: the host-drawn secret field. Permission comes from the plugin's own
+// declaration, checked in the handler. Never an MCP tool: agents don't handle secrets.
+$pluginSecretFields = new \Whity\Api\PluginSecretFieldsApiHandler(
+    $roleChecker,
+    new \Whity\Core\Plugin\HostPluginSecrets(
+        $db->getPdo(),
+        static fn (): \Whity\Core\Security\EncryptedSecretStore => $secretStore,
+        $auditLogger,
+    ),
+    static fn (): array => $pluginLoader->getPlugins(),
+);
+$router->register('GET', '/api/plugin-secrets/{plugin}/{key}', [$pluginSecretFields, 'status'], null, null, null, ['mcp' => ['expose' => false]]);
+$router->register('PUT', '/api/plugin-secrets/{plugin}/{key}', [$pluginSecretFields, 'save'], null, null, null, ['mcp' => ['expose' => false]]);
+$router->register('DELETE', '/api/plugin-secrets/{plugin}/{key}', [$pluginSecretFields, 'clear'], null, null, null, ['mcp' => ['expose' => false]]);
 $router->register('POST', '/api/settings/mail/test',         [$mailSettingsHandler, 'test'],        null, null, CorePermissions::SETTINGS_MANAGE);
 
 // 13c. Register the Tenant Branding API (WC-233). Public GET /api/v1/branding

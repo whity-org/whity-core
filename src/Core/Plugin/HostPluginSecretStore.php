@@ -78,6 +78,19 @@ final class HostPluginSecretStore implements SecretStore
         }
     }
 
+    /**
+     * When the secret was last set in this workspace, or null when none is.
+     * Host-only, for the secret field: it never reads the value.
+     */
+    public function setAt(int $tenantId, string $key): ?string
+    {
+        self::assertKey($key);
+        $stmt = $this->db->prepare('SELECT updated_at FROM plugin_secrets WHERE tenant_id = :tenant_id AND plugin = :plugin AND secret_key = :key');
+        $stmt->execute([':tenant_id' => $tenantId, ':plugin' => $this->plugin, ':key' => $key]);
+        $at = $stmt->fetchColumn();
+        return is_string($at) ? $at : null;
+    }
+
     private static function assertKey(string $key): void
     {
         if (preg_match(self::KEY_PATTERN, $key) !== 1) {

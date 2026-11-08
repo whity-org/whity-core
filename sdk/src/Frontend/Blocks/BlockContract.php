@@ -912,6 +912,14 @@ final class BlockContract
                 // Rendered as a password field; for secrets an operator types in once (SDK 1.77).
                 'sensitive'   => ['type' => 'bool',      'required' => false],
             ]],
+            // SDK 1.88: a write-only field the HOST draws and stores. `secret` is
+            // a key the plugin declares in PluginSecretFieldsInterface; the loader
+            // refuses any other, and sets the endpoint itself.
+            'secretField' => ['container' => false, 'props' => [
+                'secret'      => ['type' => 'string', 'required' => true],
+                'label'       => ['type' => 'string', 'required' => true],
+                'description' => ['type' => 'string', 'required' => false],
+            ]],
             'textArea' => ['container' => false, 'props' => [
                 'name'        => ['type' => 'inputName', 'required' => true],
                 'label'       => ['type' => 'string',    'required' => true],

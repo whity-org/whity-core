@@ -198,6 +198,13 @@ final class Events
     /** Also `by`: `owner`, `admin`, or `agent_removed` (the person stopped using the agent). */
     public const MCP_CONNECTION_REVOKED = 'mcp.connection.revoked';
 
+    // A plugin setting changed (SDK 1.88). Fired after the change, the return
+    // value ignored. Payload: `tenant_id` (null when the deployment's own value
+    // changed, which every workspace without its own follows), `plugin` (slug),
+    // `key` (bare), `actor_profile_id` (null with no person behind it). Never
+    // the value: read your own with {@see \Whity\Sdk\Settings\PluginSettingsStore}.
+    public const PLUGIN_SETTINGS_CHANGED = 'plugin.settings.changed';
+
     // ---- platform ----
     public const NAVIGATION_REGISTER = 'navigation.register';
     public const PERMISSION_REGISTERED = 'permission.registered';

@@ -242,9 +242,10 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsOneEightForInteractiveBlocks(): void
     {
         $this->assertSame(
-            '1.87.0',
+            '1.88.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.87 ADDS workspace, language and actor kind on Http\Request (WHIT-1015). '
+            'SDK 1.88 ADDS Settings\PluginSettings, a settings-changed event and the secretField block (WHIT-1016). '
+            . 'SDK 1.87 ADDS workspace, language and actor kind on Http\Request (WHIT-1015). '
             . 'SDK 1.86 ADDS Billing\\LicenceSales and PluginLicenceSalesInterface: one billing plugin sells store plugin licences, and no other plugin can answer in its place (WHIT-1013). '
             . 'SDK 1.85 ADDS Licensing\StoreLicence and Licensing\LicenceState: whether a paid Whity store plugin is '
             . 'licensed here, from the store-signed statement with a 7-day offline window (store licensing PR-4). '
