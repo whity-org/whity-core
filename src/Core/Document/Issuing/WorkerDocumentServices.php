@@ -105,7 +105,11 @@ final class WorkerDocumentServices
         \Whity\register_service(DocumentFieldRegistry::class, $fields);
         \Whity\register_service(TemplateSlotRegistry::class, $slots);
         \Whity\register_service(TemplateIssuing::class, $issuing);
-        \Whity\register_service(Documents::class, new SdkDocuments($issuing, $roleChecker, $jobPlugin, $slots));
+        // SDK 1.83 (WHIT-997): bulk issuing. A plugin's job may start a batch, and
+        // the worker runs every batch (IssueBatchJob, registered by queue:work).
+        $bulk = new BulkIssuing($pdo, $roleChecker, static fn (): TemplateIssuing => $issuing, new \Whity\Core\Queue\JobRepository($pdo), $logger, BulkIssuing::rendersPerMinuteFrom($env));
+        \Whity\register_service(BulkIssuing::class, $bulk);
+        \Whity\register_service(Documents::class, new SdkDocuments($issuing, $roleChecker, $jobPlugin, $slots, $bulk));
         // SDK 1.82 (WHIT-996): a job reads templates for the same caller it issues for.
         \Whity\register_service(\Whity\Sdk\Documents\Templates::class, SdkTemplates::build($pdo, $roleChecker, $resourceTypes, $settings, $slots, $jobPlugin));
         // #1151: a plugin's job renders and issues flowing documents too.

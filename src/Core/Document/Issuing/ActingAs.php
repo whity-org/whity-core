@@ -26,6 +26,8 @@ final class ActingAs
         callable $hasPermission,
         // The plugin acting with no person; null for a person.
         public readonly ?string $plugin = null,
+        /** @var list<string> What a background plugin declares (its whole permission set). */
+        public readonly array $declared = [],
     ) {
         $this->hasPermission = $hasPermission;
     }
@@ -33,7 +35,7 @@ final class ActingAs
     /** @param list<string> $permissions what the plugin declares */
     public static function background(int $tenantId, string $plugin, array $permissions): self
     {
-        return new self($tenantId, 0, static fn (string $permission): bool => in_array($permission, $permissions, true), $plugin);
+        return new self($tenantId, 0, static fn (string $permission): bool => in_array($permission, $permissions, true), $plugin, $permissions);
     }
 
     /** The profile to record as the issuer: none for a plugin in the background. */

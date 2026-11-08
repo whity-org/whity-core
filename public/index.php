@@ -3702,6 +3702,16 @@ $documentsHandler = new \Whity\Api\DocumentsApiHandler(
 \Whity\register_service(\Whity\Sdk\Documents\Documents::class, new \Whity\Core\Document\Issuing\SdkDocuments(
     \Whity\app(\Whity\Core\Document\Issuing\TemplateIssuing::class),
     $roleChecker,
+    // SDK 1.83 (WHIT-997): Documents::issueMany() records the batch and queues
+    // it; queue:work issues it.
+    bulk: new \Whity\Core\Document\Issuing\BulkIssuing(
+        $db->getPdo(),
+        $roleChecker,
+        static fn (): \Whity\Core\Document\Issuing\TemplateIssuing => \Whity\app(\Whity\Core\Document\Issuing\TemplateIssuing::class),
+        new \Whity\Core\Queue\JobRepository($db->getPdo()),
+        $logger,
+        \Whity\Core\Document\Issuing\BulkIssuing::rendersPerMinuteFrom($_ENV),
+    ),
 ));
 // SDK 1.82 (WHIT-996): plugins read the published templates the person can see.
 \Whity\register_service(\Whity\Sdk\Documents\Templates::class, \Whity\Core\Document\Issuing\SdkTemplates::build(

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.82).
+ * SDK identity (v1.83).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1105,12 +1105,21 @@ namespace Whity\Sdk;
  * (WHIT-996).
  *
  * Purely additive.)
+ *
+ * 1.83 (BULK ISSUING: {@see Documents\Documents::issueMany()} takes a
+ * {@see Documents\BulkIssueRequest} (one template, up to 500 {@see Documents\BulkIssueItem}s,
+ * a batch key) and issues it in the background; {@see Documents\Documents::batch()} reads
+ * its {@see Documents\BulkIssueStatus} with a {@see Documents\BulkIssueItemResult} per item.
+ * The batch key makes a resend return the same batch; each item gets an origin key, so a
+ * resumed batch never issues twice. Each item is checked and preflighted as the submitter
+ * when it runs. New reasons `batch_key_conflict` and `forbidden` (WHIT-997). Documents is
+ * implemented by the host only, so the new methods are additive for plugins.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.82.0';
+    public const VERSION = '1.83.0';
 
     /**
      * Static identity only — never instantiated.

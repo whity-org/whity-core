@@ -624,7 +624,16 @@ abstract class BaseCommand implements CliCommand, CommandHelp
             \Whity\Sdk\Documents\Documents::class,
             new \Whity\Core\Document\Issuing\SdkDocuments(
                 static fn (): \Whity\Core\Document\Issuing\TemplateIssuing => \Whity\app(\Whity\Core\Document\Issuing\TemplateIssuing::class),
-                $roleChecker
+                $roleChecker,
+                // SDK 1.83 (WHIT-997): a command starts a bulk issue; queue:work runs it.
+                bulk: new \Whity\Core\Document\Issuing\BulkIssuing(
+                    $db->getPdo(),
+                    $roleChecker,
+                    static fn (): \Whity\Core\Document\Issuing\TemplateIssuing => \Whity\app(\Whity\Core\Document\Issuing\TemplateIssuing::class),
+                    new \Whity\Core\Queue\JobRepository($db->getPdo()),
+                    null,
+                    \Whity\Core\Document\Issuing\BulkIssuing::rendersPerMinuteFrom($_ENV),
+                ),
             )
         );
         $pluginLoader->setAgentPresetRegistry($agentPresetRegistry);
