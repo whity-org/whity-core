@@ -136,6 +136,11 @@ export interface DocumentRecord {
   created_at: string;
   /** Newest first — `DocumentArtifactRepository::listForDocument` orders by id DESC. */
   artifacts: DocumentArtifact[];
+  /**
+   * Sent when there is no PDF (WHIT-1001): the server's reason, and the
+   * operator's fix, which is null for everyone but operators.
+   */
+  pdf_pending?: { reason: string; fix: string | null };
 }
 
 /**
@@ -150,7 +155,10 @@ type ViewerFailure =
   | 'unavailable'
   /** The record is real; its bytes could not be read right now. Retry is meaningful. */
   | 'temporarily-unavailable'
-  /** The record exists and has no artifact at all — only reachable via a partial restore. */
+  /**
+   * The record exists and has no PDF: rendering is off or not ready, its print
+   * failed at issue time, or a partial restore lost it. `pdf_pending` says which.
+   */
   | 'no-content'
   /** `artifactIdFrom` named an artifact this document does not have. */
   | 'pinned-missing';
@@ -158,7 +166,7 @@ type ViewerFailure =
 /** What one record fetch settled on. `loading` is derived, never stored. */
 type LoadResult =
   | { ok: true; document: DocumentRecord }
-  | { ok: false; failure: ViewerFailure; retryable: boolean };
+  | { ok: false; failure: ViewerFailure; retryable: boolean; pending?: DocumentRecord['pdf_pending'] };
 
 /** What one content fetch settled on, plus whether this browser can show it inline. */
 type ContentResult =
@@ -245,7 +253,7 @@ function versionOf(artifacts: DocumentArtifact[], index: number): number {
 async function loadDocument(
   documentId: string,
   signal: AbortSignal
-): Promise<{ ok: true; document: DocumentRecord } | { ok: false; failure: ViewerFailure; retryable: boolean }> {
+): Promise<LoadResult> {
   const response = await apiClient(`${DOCUMENTS_PATH}/${encodeURIComponent(documentId)}`, { signal });
 
   if (response.status === 404 || response.status === 403) {
@@ -276,9 +284,10 @@ async function loadDocument(
     return { ok: false, failure: 'temporarily-unavailable', retryable: true };
   }
   if (document.artifacts.length === 0) {
-    // The issuer rolls back rather than leaving a record with no bytes, so this
-    // is the restored-from-a-partial-backup case, not a routine one.
-    return { ok: false, failure: 'no-content', retryable: false };
+    // Rendering is off or not ready, or the print failed at issue time
+    // (WHIT-1001): the server says which, and the PDF can still come, so
+    // trying again is meaningful.
+    return { ok: false, failure: 'no-content', retryable: true, pending: document.pdf_pending };
   }
 
   return { ok: true, document };
@@ -373,6 +382,7 @@ export function DocumentViewer({
     return (
       <ViewerFailureState
         failure={settled.result.failure}
+        pending={settled.result.pending}
         onRetry={settled.result.retryable ? retry : undefined}
       />
     );
@@ -717,9 +727,11 @@ function ArtifactFrame({
 /** The four ways a document does not appear, each with its own sentence. */
 function ViewerFailureState({
   failure,
+  pending,
   onRetry,
 }: {
   failure: ViewerFailure;
+  pending?: DocumentRecord['pdf_pending'];
   onRetry?: () => void;
 }) {
   const t = useTranslation('plugin');
@@ -740,11 +752,15 @@ function ViewerFailureState({
       ),
     },
     'no-content': {
-      title: t('blocks.documentViewer.noContent', 'This document has no stored file.'),
-      description: t(
-        'blocks.documentViewer.noContentHint',
-        'The record exists but no rendered file was found for it.'
-      ),
+      title: t('blocks.documentViewer.noContent', 'PDF not available yet'),
+      // The server's reason, and for operators its fix. They name settings and
+      // image tags, which are the operator's own words for them.
+      description: pending
+        ? [pending.reason + '.', pending.fix].filter(Boolean).join(' ')
+        : t(
+            'blocks.documentViewer.noContentHint',
+            'The record is saved. Its PDF has not been made yet.'
+          ),
     },
     'pinned-missing': {
       title: t('blocks.documentViewer.pinnedMissing', 'That version of this document is not available.'),

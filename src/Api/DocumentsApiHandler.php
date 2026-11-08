@@ -593,7 +593,38 @@ final class DocumentsApiHandler
             $data['sections'] = $verdicts;
         }
 
+        if (($data['artifacts'] ?? []) === []) {
+            $data['pdf_pending'] = $this->pdfPending($tenantId, $callerId);
+        }
+
         return Response::json(['data' => $data]);
+    }
+
+    /**
+     * Why an issued record has no PDF yet (WHIT-1001), instead of a bare
+     * "no stored file". Everyone gets the plain reason; the operator's fix
+     * (env variables, image tags) only reaches someone who holds
+     * `settings:manage` in the system tenant, the same audience as the
+     * renderer line on the admin Stats page.
+     *
+     * With a ready renderer the record still has no PDF when its print was
+     * refused or failed at issue time; asking for it again is the way out.
+     *
+     * @return array{reason: string, fix: ?string}
+     */
+    private function pdfPending(int $tenantId, int $callerId): array
+    {
+        $reason = $this->issuing->renderUnavailable($tenantId)
+            ?? 'The PDF was not made when this document was issued';
+        $operator = $tenantId === SettingsService::SYSTEM_TENANT_ID
+            && $this->roleChecker->hasPermissionForProfile($callerId, CorePermissions::SETTINGS_MANAGE, $tenantId);
+        $fix = null;
+        if ($operator) {
+            $fix = $this->issuing->renderFix($tenantId)
+                ?? 'Print it again from the document page.';
+        }
+
+        return ['reason' => $reason, 'fix' => $fix];
     }
 
     /**
@@ -614,7 +645,10 @@ final class DocumentsApiHandler
             // A record with no stored bytes is not a state the issuer can
             // produce (it rolls back rather than leave one), so this is the
             // "restored from a partial backup" case rather than a routine miss.
-            return Response::error('Document has no stored content', 404);
+            return Response::error(
+                'PDF not available yet: ' . ($this->issuing->renderUnavailable($tenantId) ?? 'it was not made when this document was issued'),
+                404
+            );
         }
 
         return $this->streamArtifact($document, $artifact);
@@ -684,8 +718,9 @@ final class DocumentsApiHandler
         }
 
         $effective = $this->settings->effective($tenantId);
-        if (($effective[SettingsRegistry::DOCUMENTS_RENDER_ENABLED] ?? 'false') !== 'true') {
-            return Response::error('Server-side document rendering is disabled on this instance', 503);
+        $unavailable = $this->issuing->renderUnavailable($tenantId);
+        if ($unavailable !== null) {
+            return Response::error($unavailable, 503);
         }
         if (($effective[SettingsRegistry::DOCUMENTS_PERSIST_ENABLED] ?? 'true') !== 'true') {
             return Response::error('Persisting rendered documents is disabled on this instance', 503);
@@ -713,7 +748,10 @@ final class DocumentsApiHandler
                 'rejected' => Response::error('The template could not be rendered with these values', 422),
                 'limit'    => Response::error('The document render limit has been reached', 429),
                 'storage_unavailable' => Response::error('Storing the rendered document is temporarily unavailable', 503),
-                default    => Response::error('Document rendering is temporarily unavailable', 503),
+                default    => Response::error(
+                    $this->issuing->renderUnavailable($tenantId) ?? 'Document rendering is temporarily unavailable',
+                    503
+                ),
             };
         }
 
@@ -1014,7 +1052,7 @@ final class DocumentsApiHandler
         }
 
         $effective = $this->settings->effective($tenantId);
-        if (($effective[SettingsRegistry::DOCUMENTS_RENDER_ENABLED] ?? 'false') !== 'true') {
+        if ($this->issuing->renderUnavailable($tenantId) !== null) {
             return false;
         }
         if (($effective[SettingsRegistry::DOCUMENTS_PERSIST_ENABLED] ?? 'true') !== 'true') {

@@ -544,6 +544,43 @@ final class DocumentIssuing
     }
 
     /**
+     * Null when this tenant can print, or the sentence saying why it cannot
+     * (WHIT-1001): rendering switched off, or what is wrong with the render
+     * service. The routes answer their 503 with it instead of a bare
+     * "unavailable".
+     */
+    public function renderUnavailable(int $tenantId): ?string
+    {
+        if ($this->renderer === null) {
+            return 'Document rendering is not set up on this instance';
+        }
+
+        return $this->renderer->unavailableReason($tenantId);
+    }
+
+    /**
+     * The operator's fix for {@see renderUnavailable()}: env variables, image
+     * tags, the setting to turn back on. Null when this tenant can print. Show
+     * it only to operators; everyone else gets the reason alone.
+     */
+    public function renderFix(int $tenantId): ?string
+    {
+        if ($this->renderer === null) {
+            return 'Start the render service and set RENDER_SHARED_SECRET on the app and the render service. '
+                . 'See docs/wiki/Document-Render-Service.md, "Set up rendering".';
+        }
+        $reason = $this->renderer->unavailableReason($tenantId);
+        if ($reason === null) {
+            return null;
+        }
+        if ($reason === FlowDocumentRenderer::SWITCHED_OFF) {
+            return 'Turn on Render Enabled (documents.render_enabled) in Settings, Feature flags.';
+        }
+
+        return $this->renderer->readiness()->fix;
+    }
+
+    /**
      * @param array<string, mixed>   $source
      * @param array<string, mixed>   $version
      * @param array<string, ?string> $values

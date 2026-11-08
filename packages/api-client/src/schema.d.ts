@@ -2386,7 +2386,7 @@ export interface paths {
         put?: never;
         /**
          * Issue a document from a template, for a record and with the template's own fields
-         * @description The record is the deliverable and the rendered artifact is opportunistic. `documents.render_enabled` defaults to FALSE, so on a default install this returns a document with no artifact and `content_url: null` — which is a complete, routable document, not a degraded one: the values it was raised with are stored on the record, and POST /api/documents/{id}/render mints the artifact from them if the tier is later switched on. The `render` block says what happened. Sending `render: true` turns "could not render" into a 503 instead, for a caller who genuinely requires the bytes. The template's published version is issued, with the verification QR when the tenant has it on. A template the caller cannot SEE is a 404, never a 403, and the check is the editor's own visibility policy — creating from a gated template must not be a way to read it.
+         * @description The record is the deliverable and the rendered artifact is opportunistic. An instance without a ready render service (one reachable, at this release, accepting the shared secret) or with `documents.render_enabled` switched off returns a document with no artifact and `content_url: null` — which is a complete, routable document, not a degraded one: the values it was raised with are stored on the record, and POST /api/documents/{id}/render mints the artifact from them if the tier is later switched on. The `render` block says what happened. Sending `render: true` turns "could not render" into a 503 instead, for a caller who genuinely requires the bytes. The template's published version is issued, with the verification QR when the tenant has it on. A template the caller cannot SEE is a 404, never a 403, and the check is the editor's own visibility policy — creating from a gated template must not be a way to read it.
          */
         post: operations["post_api_v1_documents"];
         delete?: never;
@@ -5416,6 +5416,23 @@ export interface paths {
          * @description Subscribers, invoices, prices, limits and promotion links, plus whether the tier may be deleted. A tier with live subscribers or invoices is RETIRED rather than removed: tenant_plan.plan_id and invoices.plan_id are both ON DELETE SET NULL, so deleting one would silently detach its customers and blank it out of invoices that have already been paid.
          */
         get: operations["get_api_v1_plans_id_usage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/renderer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Whether the document renderer is connected, the same version and accepting the shared secret (system tenant only) */
+        get: operations["get_api_v1_platform_renderer"];
         put?: never;
         post?: never;
         delete?: never;
@@ -8754,6 +8771,10 @@ export interface components {
             sections?: {
                 [key: string]: components["schemas"]["RecordSectionVerdict"];
             };
+            pdf_pending?: {
+                reason: string;
+                fix: string | null;
+            };
         };
         DocumentActor: {
             /**
@@ -11838,6 +11859,17 @@ export interface components {
             published_at?: string | null;
             failure_reason?: string | null;
             detail?: string | null;
+        };
+        PlatformRendererResponse: {
+            /** @enum {string} */
+            state: "ready" | "not_configured" | "secret_missing" | "unreachable" | "secret_mismatch" | "version_mismatch";
+            ready: boolean;
+            app_version: string;
+            render_version: string | null;
+            message: string;
+            fix: string;
+            switched_on: boolean;
+            printing: boolean;
         };
         PlatformVersionResponse: {
             core_version: string;
@@ -42062,6 +42094,71 @@ export interface operations {
                 };
             };
             /** @description Plan not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_platform_renderer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The renderer state, with a plain sentence and the exact fix when it is not ready */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformRendererResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
             404: {
                 headers: {
                     [name: string]: unknown;

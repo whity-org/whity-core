@@ -310,7 +310,9 @@ final class SettingsRegistryCorePinTest extends TestCase
             'plugins.store_allowed_hosts' => 'app.whity.dev',
             'plugins.store_enabled' => 'true',
             'plugins.mcp_prompts_require_mark' => 'false',
-            'documents.render_enabled' => 'false',
+            // WHIT-1001: on by default; printing also needs a ready render
+            // service, so an install without one still prints nothing.
+            'documents.render_enabled' => 'true',
             // Whity's standard theme until a workspace chooses its own (editor M4d).
             'documents.theme' => 'whity.standard',
             'documents.theme_by_kind' => '',

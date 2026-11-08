@@ -3254,6 +3254,17 @@ final class CoreApiSchemas
                     200 => self::jsonResponse('The versions this deployment is running', 'PlatformVersionResponse'),
                 ] + self::authErrors(),
             ]),
+            // WHIT-1001: the document renderer's state and the operator's fix.
+            self::permissionRoute('GET', '/api/platform/renderer', 'settings:manage', [
+                'summary' => 'Whether the document renderer is connected, the same version and accepting the shared secret (system tenant only)',
+                'tags' => ['platform-ops'],
+                'responses' => [
+                    200 => self::jsonResponse(
+                        'The renderer state, with a plain sentence and the exact fix when it is not ready',
+                        'PlatformRendererResponse'
+                    ),
+                ] + self::authErrors(),
+            ]),
             self::permissionRoute('GET', '/api/platform/version/latest', 'settings:manage', [
                 'summary' => 'Compare the running core against the latest published release (system tenant only)',
                 'tags' => ['platform-ops'],
@@ -5733,6 +5744,15 @@ final class CoreApiSchemas
                     'type' => 'object',
                     'additionalProperties' => SchemaBuilder::ref('RecordSectionVerdict'),
                 ],
+                // WHIT-1001: sent by `GET /{id}` when the record has no PDF.
+                // `reason` is safe for anyone (renderer not set up, not
+                // reachable, version mismatch, switched off); `fix` is the
+                // operator's change and is null unless the caller holds
+                // settings:manage in the system tenant.
+                'pdf_pending' => self::object([
+                    'reason' => self::str(),
+                    'fix' => self::str(true),
+                ], ['reason', 'fix']),
             ], ['id', 'tenant_id', 'template_name', 'title', 'created_at', 'artifacts']),
             // Not paginatedListEnvelope: the organizer echoes back WHICH view it
             // ran and what anchor it resolved to, so a client rendering a rail
@@ -5830,7 +5850,7 @@ final class CoreApiSchemas
             // Why the render outcome is a SIBLING of `data` rather than a status
             // code, and why `reason` is a closed vocabulary: a 201 means the
             // document exists, which it does on an instance with no render tier
-            // at all (`documents.render_enabled` defaults to false). A client
+            // at all (no render service running, WHIT-1001). A client
             // deciding whether to offer a "render now" button has to tell
             // `disabled` (never going to work here) from `unavailable`
             // (transient, retry) from `declined` (you asked for this), and a
@@ -9320,6 +9340,19 @@ final class CoreApiSchemas
                 'php_version' => self::str(),
             ], ['core_version', 'sdk_version', 'php_version']),
 
+            // GET /api/platform/renderer (WHIT-1001). `printing` is what the
+            // document routes act on: the switch AND a ready renderer.
+            'PlatformRendererResponse' => self::object([
+                'state' => ['type' => 'string', 'enum' => ['ready', 'not_configured', 'secret_missing', 'unreachable', 'secret_mismatch', 'version_mismatch']],
+                'ready' => self::bool(),
+                'app_version' => self::str(),
+                'render_version' => self::str(true),
+                'message' => self::str(),
+                'fix' => self::str(),
+                'switched_on' => self::bool(),
+                'printing' => self::bool(),
+            ], ['state', 'ready', 'app_version', 'render_version', 'message', 'fix', 'switched_on', 'printing']),
+
             // GET /api/platform/version/latest (WHIT-587). `check_failed` is a
             // 200 verdict, not an HTTP error — "could not tell" must never be
             // read as "up to date".
@@ -12381,7 +12414,8 @@ final class CoreApiSchemas
                 'mcp' => ['agentPolicy' => 'propose'],
                 'description' =>
                     'The record is the deliverable and the rendered artifact is opportunistic. '
-                    . '`documents.render_enabled` defaults to FALSE, so on a default install this '
+                    . 'An instance without a ready render service (one reachable, at this release, '
+                    . 'accepting the shared secret) or with `documents.render_enabled` switched off '
                     . 'returns a document with no artifact and `content_url: null` — which is a '
                     . 'complete, routable document, not a degraded one: the values it was raised with '
                     . 'are stored on the record, and POST /api/documents/{id}/render mints the '
