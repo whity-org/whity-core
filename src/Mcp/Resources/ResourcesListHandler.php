@@ -30,6 +30,11 @@ final class ResourcesListHandler implements MethodHandler
         private readonly ResourceDeriver $resourceDeriver,
         private readonly RoleChecker     $roleChecker,
         private readonly TokenValidator  $tokenValidator,
+        // SDK 1.80 (WHIT-993): resources from plugins the operator granted agent context.
+        private readonly ?PluginResourceRegistry $pluginResources = null,
+        // Whether a plugin is still granted agent context, asked on every call so
+        // a revoke applies at once. Null: trust the registry.
+        private readonly ?\Closure $pluginGranted = null,
     ) {}
 
     /** @param array<string, mixed>|null $params */
@@ -62,6 +67,22 @@ final class ResourcesListHandler implements MethodHandler
                 $tenantId,
             ),
         ));
+
+        // Every plugin resource carries a permission, so none is listed to a
+        // caller without a person behind it.
+        foreach ($this->pluginResources?->all() ?? [] as $resource) {
+            if ($this->pluginGranted !== null && !($this->pluginGranted)($resource['plugin'])) {
+                continue;
+            }
+            if ($principal !== null && $this->callerCanUse(['requiredPermission' => $resource['requiredPermission']], $principal, $tenantId)) {
+                $resources[] = [
+                    'uri'         => $resource['uri'],
+                    'name'        => $resource['name'],
+                    'description' => $resource['description'],
+                    'mimeType'    => $resource['mimeType'],
+                ];
+            }
+        }
 
         return ['resources' => $resources, 'resourceTemplates' => $resourceTemplates];
     }
