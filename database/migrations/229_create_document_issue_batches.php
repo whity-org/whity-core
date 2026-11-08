@@ -25,6 +25,13 @@ use Whity\Database\Database;
  * a crash replays an item that was issued but not yet marked, instead of
  * issuing it twice.
  *
+ * A batch is a record of what happened, so nothing it points at holds it back
+ * or takes it away. Deleting the sender clears `actor_profile_id` (their pending
+ * items are then refused: no one is left to check), deleting a document clears
+ * that item's `document_id` and leaves its status, and `template_source_id` is
+ * not enforced: it is the id the sender asked for, a deleted template refuses
+ * the items still pending, and a finished batch still says which one it used.
+ *
  * Idempotent and reversible.
  */
 final class CreateDocumentIssueBatches
@@ -38,10 +45,11 @@ final class CreateDocumentIssueBatches
                 owner              VARCHAR(80)  NOT NULL,
                 batch_key          VARCHAR(100) NOT NULL,
                 request_hash       VARCHAR(64)  NOT NULL,
-                actor_profile_id   BIGINT,
+                actor_profile_id   INTEGER      REFERENCES profiles(id) ON DELETE SET NULL,
                 actor_plugin       VARCHAR(64),
                 actor_permissions  TEXT,
                 template_slot      VARCHAR(105),
+                -- @reference-lint-ignore: the template the sender asked for, resolved for each item when it runs; an unknown or deleted one is refused per item, and the record keeps the id
                 template_source_id BIGINT,
                 render             VARCHAR(8)   NOT NULL DEFAULT 'auto',
                 status             VARCHAR(16)  NOT NULL DEFAULT 'queued'
@@ -71,7 +79,7 @@ final class CreateDocumentIssueBatches
                 origin_key   VARCHAR(160) NOT NULL,
                 status       VARCHAR(16)  NOT NULL DEFAULT 'pending'
                              CHECK (status IN ('pending', 'issued', 'replayed', 'refused', 'failed', 'cancelled')),
-                document_id  BIGINT,
+                document_id  BIGINT       REFERENCES documents(id) ON DELETE SET NULL,
                 reason       VARCHAR(64),
                 message      VARCHAR(500),
                 updated_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,

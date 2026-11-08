@@ -1505,6 +1505,94 @@ final class DocumentCreateApiRealEngineTest extends TestCase
         new BulkIssueRequest(TemplateRef::source(1), [new BulkIssueItem(values: ['template.note' => str_repeat('x', BulkIssueRequest::MAX_ITEM_BYTES)])], 'too-long');
     }
 
+    /** The sender is deleted: the record stays, and no one is left to issue the pending items as. */
+    public function testDeletingTheSenderKeepsTheBatchAndRefusesWhatIsPending(): void
+    {
+        [$documents, $bulk] = $this->bulkFacade();
+        $template = $this->circular('Payslip');
+        $status = $this->asPerson(self::RAISER, fn () => $documents->issueMany(new BulkIssueRequest(
+            TemplateRef::source($template),
+            [new BulkIssueItem(values: ['template.reference' => 'PAY-1'])],
+            'sender-gone',
+        )));
+
+        $this->pdo->exec('DELETE FROM profiles WHERE id = ' . self::RAISER);
+        RoleChecker::clearCache();
+        $bulk->run(self::TENANT, $status->batchId);
+
+        $batch = $this->pdo->query('SELECT actor_profile_id, status, refused FROM document_issue_batches WHERE id = ' . $status->batchId);
+        self::assertNotFalse($batch);
+        $row = $batch->fetch(PDO::FETCH_ASSOC);
+        self::assertIsArray($row, 'the batch outlives its sender');
+        self::assertNull($row['actor_profile_id']);
+        self::assertSame(BulkIssueStatus::DONE, $row['status']);
+        self::assertSame(1, (int) $row['refused']);
+        self::assertSame(0, $this->countDocuments());
+    }
+
+    /** The template is deleted: pending items are refused one by one, and the record still names it. */
+    public function testDeletingTheTemplateRefusesPendingItemsAndKeepsItsId(): void
+    {
+        [$documents, $bulk] = $this->bulkFacade();
+        $template = $this->circular('Payslip');
+        $status = $this->asPerson(self::RAISER, fn () => $documents->issueMany(new BulkIssueRequest(
+            TemplateRef::source($template),
+            [new BulkIssueItem(values: ['template.reference' => 'PAY-1'])],
+            'template-gone',
+        )));
+
+        $this->pdo->exec('DELETE FROM document_sources WHERE id = ' . $template);
+        $bulk->run(self::TENANT, $status->batchId);
+
+        $done = $this->asPerson(self::RAISER, fn () => $documents->batch($status->batchId));
+        self::assertNotNull($done);
+        self::assertSame(BulkIssueItemResult::REFUSED, $done->items[0]->status);
+        self::assertSame('template_not_found', $done->items[0]->reason);
+        self::assertSame(0, $this->countDocuments());
+
+        $source = $this->pdo->query('SELECT template_source_id FROM document_issue_batches WHERE id = ' . $status->batchId);
+        self::assertNotFalse($source);
+        self::assertSame($template, (int) $source->fetchColumn());
+    }
+
+    /** A batch naming a template that never existed is refused per item, not a server error. */
+    public function testAnUnknownTemplateIsRefusedPerItem(): void
+    {
+        [$documents, $bulk] = $this->bulkFacade();
+        $status = $this->asPerson(self::RAISER, fn () => $documents->issueMany(new BulkIssueRequest(
+            TemplateRef::source(999999),
+            [new BulkIssueItem(values: ['template.reference' => 'PAY-1'])],
+            'template-unknown',
+        )));
+        $bulk->run(self::TENANT, $status->batchId);
+
+        $done = $this->asPerson(self::RAISER, fn () => $documents->batch($status->batchId));
+        self::assertNotNull($done);
+        self::assertSame(BulkIssueItemResult::REFUSED, $done->items[0]->status);
+        self::assertSame('template_not_found', $done->items[0]->reason);
+    }
+
+    /** An issued document is deleted: its item still says it was issued, with no document to open. */
+    public function testDeletingADocumentKeepsItsItemAsIssued(): void
+    {
+        [$documents, $bulk] = $this->bulkFacade();
+        $template = $this->circular('Payslip');
+        $status = $this->asPerson(self::RAISER, fn () => $documents->issueMany(new BulkIssueRequest(
+            TemplateRef::source($template),
+            [new BulkIssueItem(values: ['template.reference' => 'PAY-1'])],
+            'document-gone',
+        )));
+        $bulk->run(self::TENANT, $status->batchId);
+
+        $this->pdo->exec('DELETE FROM documents');
+
+        $done = $this->asPerson(self::RAISER, fn () => $documents->batch($status->batchId));
+        self::assertNotNull($done);
+        self::assertSame(BulkIssueItemResult::ISSUED, $done->items[0]->status);
+        self::assertNull($done->items[0]->documentId);
+        self::assertSame(1, $done->issued);
+    }
+
     public function testABatchIsCapped(): void
     {
         $this->expectException(\InvalidArgumentException::class);
