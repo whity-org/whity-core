@@ -628,6 +628,10 @@
     "en": "See this installation's Whity store connection",
     "ar": "عرض ربط هذا التثبيت بمتجر Whity"
   },
+  "get_api_plugins_store_licences_slug": {
+    "en": "See a store plugin's licence",
+    "ar": "عرض ترخيص إضافة من المتجر"
+  },
   "get_api_profiles_id_relations": {
     "en": "See a user's person record and relationships",
     "ar": "عرض بيانات شخص وعلاقاته من حسابه"
@@ -1272,6 +1276,10 @@
   "post_api_plugins_reload": {
     "en": "Reload the list of plugins",
     "ar": "إعادة تحميل الإضافات"
+  },
+  "post_api_plugins_store_checkout": {
+    "en": "Buy a plugin from the Whity store",
+    "ar": "شراء إضافة من متجر Whity"
   },
   "post_api_plugins_store_connect": {
     "en": "Start connecting to the Whity store",

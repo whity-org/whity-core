@@ -384,6 +384,20 @@ class EnforceTenantIsolation
         '#^/api/v1/plugin-store/index\.json$#',                          // registry index
         '#^/api/v1/plugin-store/plugins/[^/]+$#',                        // show {slug}
         '#^/api/v1/plugin-store/plugins/[^/]+/versions/[^/]+/download$#', // token-gated download
+        '#^/api/v1/plugin-store/auth$#',                                  // which Whity ID to use (WHIT-1003)
+        '#^/api/v1/plugin-store/keys$#',                                  // licence statement keys (PR-4)
+        '#^/api/v1/plugin-store/licences/[^/]+$#',                        // signed licence, Whity ID token (PR-4)
+    ];
+
+    /**
+     * The one store WRITE a consuming host makes without a session on the store: buying a plugin
+     * or starting its trial (PR-4). Self-authenticating, like the download: the handler accepts
+     * only a Whity ID access token for this store's resource.
+     *
+     * @var list<string>
+     */
+    private const PLUGIN_STORE_PUBLIC_POST_PATTERNS = [
+        '#^/api/v1/plugin-store/plugins/[^/]+/checkout$#',
     ];
 
     private JwtParser $jwtParser;
@@ -928,6 +942,15 @@ class EnforceTenantIsolation
      */
     private function isPublicPluginStoreRead(string $method, string $path): bool
     {
+        if (strtoupper($method) === 'POST') {
+            foreach (self::PLUGIN_STORE_PUBLIC_POST_PATTERNS as $pattern) {
+                if (preg_match($pattern, $path) === 1) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
         if (strtoupper($method) !== 'GET') {
             return false;
         }

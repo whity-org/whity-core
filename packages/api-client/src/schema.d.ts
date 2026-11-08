@@ -5603,6 +5603,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/plugins/store/checkout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Buy a paid store plugin, or start its trial, for this installation
+         * @description Operator only, and only while connected to the store through Whity ID. Buying returns the Whity Pay checkout to send the operator to; a trial starts at once.
+         */
+        post: operations["post_api_v1_plugins_store_checkout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/plugins/store/connect": {
         parameters: {
             query?: never;
@@ -5662,6 +5682,26 @@ export interface paths {
          * @description Operator only. Revokes the refresh token at Whity ID (best effort) and forgets it.
          */
         delete: operations["delete_api_v1_plugins_store_connection"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/plugins/store/licences/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * This installation's licence for a store plugin
+         * @description licensed, grace (with an until date) or unlicensed, from the store's signed statement or, when the store cannot be reached, from the last one within the offline window.
+         */
+        get: operations["get_api_v1_plugins_store_licences_slug"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -12827,6 +12867,15 @@ export interface components {
             trust: "unverified";
             /** @enum {string} */
             kind?: "declarative" | "code";
+            paid?: boolean;
+            prices?: {
+                plan: string;
+                /** @enum {string} */
+                period: "month" | "year" | "once";
+                currency: string;
+                amount: string;
+                trial_days?: number | null;
+            }[];
             price?: {
                 amount: string;
                 currency: string;
@@ -12854,6 +12903,26 @@ export interface components {
             data: components["schemas"]["StoreCataloguePlugin"][];
             store_url?: string;
             count?: number;
+        };
+        StoreCheckoutRequest: {
+            /** @description The store, a bare https origin on the allowlist. */
+            store_url: string;
+            /** @description The plugin to buy. */
+            slug: string;
+            /** @description The plan; standard when left out. */
+            plan?: string;
+            /** @description month, year or once. */
+            period: string;
+            /** @description A 3-letter currency the store sells in; optional. */
+            currency?: string;
+            /** @description Start the free trial instead of paying. */
+            trial?: boolean;
+        };
+        StoreCheckoutResponse: {
+            data: {
+                checkout_url?: string;
+                status?: string;
+            };
         };
         StoreConnectCompleteRequest: {
             /** @description The authorization code Whity ID sent back to /admin/plugins/store/connect. */
@@ -12884,6 +12953,16 @@ export interface components {
         };
         StoreConnectionResponse: {
             data: components["schemas"]["StoreConnection"];
+        };
+        StoreLicenceResponse: {
+            data: {
+                /** @enum {string} */
+                state: "licensed" | "grace" | "unlicensed";
+                until?: string | null;
+                message: string;
+                offline?: boolean;
+                checked_at?: string | null;
+            };
         };
         Subscription: {
             tenant_id: number;
@@ -42870,6 +42949,111 @@ export interface operations {
             };
         };
     };
+    post_api_v1_plugins_store_checkout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StoreCheckoutRequest"];
+            };
+        };
+        responses: {
+            /** @description Checkout URL, or the trial started */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StoreCheckoutResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not the operator, or the store host is not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not connected to the store */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Invalid slug */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The store could not start the purchase */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     post_api_v1_plugins_store_connect: {
         parameters: {
             query?: never;
@@ -43143,6 +43327,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StoreConnectionResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_plugins_store_licences_slug: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The plugin's slug in the store. */
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The licence state */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StoreLicenceResponse"];
                 };
             };
             /** @description Unauthorized */

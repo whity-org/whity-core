@@ -2381,6 +2381,27 @@ $router->register('POST', '/api/plugins/{name}/reinstall', [$pluginsHandler, 're
 // be on the operator `plugins.store_allowed_hosts` allowlist; empty ⇒ disabled)
 // and stage it through the SAME hardened installer as an upload (lands DISABLED).
 // S.9: its own permission, plugins:install; upload stays for unreviewed code.
+// WHIT-1003: connected to a store through Whity ID, a fresh token rides every store call.
+$whityStoreConnector = new \Whity\Core\Plugin\Store\WhityStoreConnector(
+    $globalSettingsRepository,
+    $secretStore,
+    \Whity\Core\Plugin\Store\WhityStoreConnector::issuersFromEnv(),
+    $frontendUrls->link(\Whity\Core\Http\FrontendUrls::STORE_CONNECT),
+    'Whity (' . ((string) parse_url($frontendUrls->base(), PHP_URL_HOST) ?: 'installation') . ')',
+    static fn (string $url, array $headers = []): ?array => (new \Whity\Core\Http\HttpFetcher(timeoutSeconds: 10))->getJson($url, $headers),
+    static fn (string $url, array $params): ?array => (new \Whity\Core\Http\HttpFetcher(timeoutSeconds: 10))->postForm($url, $params),
+    static fn (string $url, array $payload): ?array => (new \Whity\Core\Http\HttpFetcher(timeoutSeconds: 10))->postJson($url, $payload),
+);
+// Store licensing (PR-4, SDK 1.85): plugins ask the host whether they are licensed here.
+$hostStoreLicence = new \Whity\Core\Plugin\Store\HostStoreLicence(
+    $globalSettingsRepository,
+    $whityStoreConnector,
+    static fn (string $url, array $headers = []): ?array => (new \Whity\Core\Http\HttpFetcher(timeoutSeconds: 10))->getJson($url, $headers),
+    \Whity\Core\Plugin\Store\HostStoreLicence::PINNED_KEYS,
+    7,
+    \Whity\Core\Plugin\Store\HostStoreLicence::selfLicensedFromEnv(),
+);
+\Whity\register_service(\Whity\Sdk\Licensing\StoreLicence::class, $hostStoreLicence); // @phpstan-ignore-line
 $installFromStoreHandler = new \Whity\Api\InstallFromStoreApiHandler(
     __DIR__ . '/../plugins',
     $settingsService,
@@ -2392,17 +2413,10 @@ $installFromStoreHandler = new \Whity\Api\InstallFromStoreApiHandler(
     $tenantManifestPublisher,
     $tenantPluginRepository,
     $pluginTrust,
-    // WHIT-1003: connected to a store through Whity ID, a fresh token rides every store call.
-    new \Whity\Core\Plugin\Store\WhityStoreConnector(
-        $globalSettingsRepository,
-        $secretStore,
-        \Whity\Core\Plugin\Store\WhityStoreConnector::issuersFromEnv(),
-        $frontendUrls->link(\Whity\Core\Http\FrontendUrls::STORE_CONNECT),
-        'Whity (' . ((string) parse_url($frontendUrls->base(), PHP_URL_HOST) ?: 'installation') . ')',
-        static fn (string $url, array $headers = []): ?array => (new \Whity\Core\Http\HttpFetcher(timeoutSeconds: 10))->getJson($url, $headers),
-        static fn (string $url, array $params): ?array => (new \Whity\Core\Http\HttpFetcher(timeoutSeconds: 10))->postForm($url, $params),
-        static fn (string $url, array $payload): ?array => (new \Whity\Core\Http\HttpFetcher(timeoutSeconds: 10))->postJson($url, $payload),
-    )
+    $whityStoreConnector,
+    $hostStoreLicence,
+    null,
+    $frontendUrls->base() !== '' ? $frontendUrls->base() . '/admin/plugins/store' : '',
 );
 $router->register('POST', '/api/plugins/install-from-store', [$installFromStoreHandler, 'install'], null, null, CorePermissions::PLUGINS_INSTALL);
 // Decision 2: a workspace installs declarative plugins into itself. Data, not code.
@@ -2425,6 +2439,9 @@ $router->register('GET', '/api/plugins/store/connection', [$installFromStoreHand
 $router->register('POST', '/api/plugins/store/connect', [$installFromStoreHandler, 'connect'], null, null, CorePermissions::PLUGINS_INSTALL);
 $router->register('POST', '/api/plugins/store/connect/complete', [$installFromStoreHandler, 'completeConnect'], null, null, CorePermissions::PLUGINS_INSTALL);
 $router->register('DELETE', '/api/plugins/store/connection', [$installFromStoreHandler, 'disconnect'], null, null, CorePermissions::PLUGINS_INSTALL);
+// PR-4: buy a paid store plugin or start its trial; read this installation's licence.
+$router->register('POST', '/api/plugins/store/checkout', [$installFromStoreHandler, 'checkout'], null, null, CorePermissions::PLUGINS_INSTALL);
+$router->register('GET', '/api/plugins/store/licences/{slug}', [$installFromStoreHandler, 'licenceStatus'], null, null, CorePermissions::PLUGINS_READ);
 
 // Desktop plugin release catalog/download (WC-desktop-plugins). Consumed by an
 // already-enrolled desktop device using the SAME bearer access token it uses
