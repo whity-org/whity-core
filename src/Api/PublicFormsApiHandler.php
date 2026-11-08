@@ -347,6 +347,9 @@ final class PublicFormsApiHandler
             if ($form === null) {
                 return self::refuse();
             }
+            if (($form['public_requires_sign_in'] ?? false) === true) {
+                return self::signInRequired();
+            }
 
             $tenantId = (int) $form['tenant_id'];
             $formId = (int) $form['id'];
@@ -444,6 +447,12 @@ final class PublicFormsApiHandler
             $form = $this->resolve($params);
             if ($form === null) {
                 return self::refuse();
+            }
+
+            // WHIT-920: this form is sent only by people who sign in, under
+            // their own name, through the signed-in form page.
+            if (($form['public_requires_sign_in'] ?? false) === true) {
+                return self::signInRequired();
             }
 
             $tenantId = (int) $form['tenant_id'];
@@ -615,6 +624,12 @@ final class PublicFormsApiHandler
      * code that was written not to be one. The sentence names no organisation, no
      * form and no reason.
      */
+    /** WHIT-920: the visitor must sign in and use the signed-in form page. */
+    private static function signInRequired(): Response
+    {
+        return Response::error('Sign in to send this form', 401, ['reason' => 'sign_in_required']);
+    }
+
     private static function refuse(): Response
     {
         return Response::error('This form link is not valid, or is no longer open', 404);

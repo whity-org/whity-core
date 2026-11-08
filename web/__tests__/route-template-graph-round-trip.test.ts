@@ -35,6 +35,7 @@ describe('the route-template graph round trip', () => {
     decision: false,
     decision_quorum: null,
     satisfied_by: 'act',
+    allow_send_back: true,
     canvas_x: 120,
     canvas_y: 40,
     ...overrides,
@@ -61,6 +62,7 @@ describe('the route-template graph round trip', () => {
         decision: true,
         decision_quorum: 'majority',
         satisfied_by: 'act',
+        allow_send_back: false,
         canvas_x: 400,
         canvas_y: 220,
       }),
@@ -78,6 +80,24 @@ describe('the route-template graph round trip', () => {
     const saved = toGraphRequest(toFlowGraph(graph([step({ satisfied_by: 'delivery' })])));
 
     expect(saved.steps[0].satisfied_by).toBe('delivery');
+  });
+
+  it('keeps a stage that cannot be sent back that way (WHIT-920)', () => {
+    // The server reads a missing `allow_send_back` as on, so a save that dropped
+    // it would quietly let reviewers send back at a stage the author closed.
+    const saved = toGraphRequest(toFlowGraph(graph([step({ allow_send_back: false })])));
+
+    expect(saved.steps[0].allow_send_back).toBe(false);
+  });
+
+  it('reads a stage from a server that sends no send-back flag as one that can be sent back', () => {
+    const legacy = step();
+    delete (legacy as Partial<RouteTemplateStepWire>).allow_send_back;
+
+    const flow = toFlowGraph(graph([legacy]));
+
+    expect(flow.steps[0].allowSendBack).toBe(true);
+    expect(toGraphRequest(flow).steps[0].allow_send_back).toBe(true);
   });
 
   it('reads a stage from a server that predates the field as an act stage', () => {

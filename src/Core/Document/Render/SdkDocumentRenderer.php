@@ -366,7 +366,7 @@ final class SdkDocumentRenderer implements SdkRenderer, HostWiredService
         } catch (RenderServiceUnavailableException $e) {
             error_log('[SdkDocumentRenderer] render failed: ' . $e->getMessage());
 
-            throw new RenderUnavailableException('Document rendering is temporarily unavailable');
+            throw new RenderUnavailableException($this->flow->failureReason($tenantId));
         } catch (\Throwable $e) {
             // Anything unforeseen is an outage from the caller's side, not a
             // rejection: telling a plugin its document is malformed when the

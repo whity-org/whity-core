@@ -15900,7 +15900,7 @@
                 "tags": [
                     "documents"
                 ],
-                "description": "The record is the deliverable and the rendered artifact is opportunistic. `documents.render_enabled` defaults to FALSE, so on a default install this returns a document with no artifact and `content_url: null` \u2014 which is a complete, routable document, not a degraded one: the values it was raised with are stored on the record, and POST /api/documents/{id}/render mints the artifact from them if the tier is later switched on. The `render` block says what happened. Sending `render: true` turns \"could not render\" into a 503 instead, for a caller who genuinely requires the bytes. The template's published version is issued, with the verification QR when the tenant has it on. A template the caller cannot SEE is a 404, never a 403, and the check is the editor's own visibility policy \u2014 creating from a gated template must not be a way to read it.",
+                "description": "The record is the deliverable and the rendered artifact is opportunistic. An instance without a ready render service (one reachable, at this release, accepting the shared secret) or with `documents.render_enabled` switched off returns a document with no artifact and `content_url: null` \u2014 which is a complete, routable document, not a degraded one: the values it was raised with are stored on the record, and POST /api/documents/{id}/render mints the artifact from them if the tier is later switched on. The `render` block says what happened. Sending `render: true` turns \"could not render\" into a 503 instead, for a caller who genuinely requires the bytes. The template's published version is issued, with the verification QR when the tenant has it on. A template the caller cannot SEE is a 404, never a 403, and the check is the editor's own visibility policy \u2014 creating from a gated template must not be a way to read it.",
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -16501,6 +16501,88 @@
                         "bearerAuth": []
                     }
                 ]
+            }
+        },
+        "/api/v1/documents/{id}/audit": {
+            "get": {
+                "operationId": "get_api_v1_documents_id_audit",
+                "summary": "The audit of a document: every act and signature, whether each seal checks, and whether the trail is intact",
+                "tags": [
+                    "documents"
+                ],
+                "description": "Email addresses, IP addresses and browsers of signers are included only for callers holding audit:read.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The audit",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DocumentAuditResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Document not found or not visible to the caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
             }
         },
         "/api/v1/documents/{id}/content": {
@@ -17948,6 +18030,344 @@
                     },
                     "422": {
                         "description": "No open item on this route, a forward from the last step, a return from the first, an empty note, or an unknown action",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/documents/{id}/routes/{routeId}/sign": {
+            "post": {
+                "operationId": "post_api_v1_documents_id_routes_routeid_sign",
+                "summary": "Sign your open item on a signing step: electronic signature with audit trail",
+                "tags": [
+                    "documents"
+                ],
+                "description": "Needs the consent line ticked in its current wording, a drawn signature (or your saved one), the content hash you were shown, and the second check your account uses. The act and a sealed signature record are written together. The record is bound to the hash of this version and does not carry over to a new one.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "routeId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SignRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The signature record and the trail entry",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SignResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Document or route not found, or not visible to the caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The content changed since you opened it",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Consent, drawn signature or second check missing or not correct, or nothing here waits for your signature",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many tries",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/documents/{id}/routes/{routeId}/signing": {
+            "get": {
+                "operationId": "get_api_v1_documents_id_routes_routeid_signing",
+                "summary": "What you see before signing: the step, its capacity, the content hash, the consent version and how you will confirm",
+                "tags": [
+                    "documents"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "routeId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The signing context",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SigningContextResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Document or route not found, or not visible to the caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/documents/{id}/routes/{routeId}/signing/code": {
+            "post": {
+                "operationId": "post_api_v1_documents_id_routes_routeid_signing_code",
+                "summary": "Email yourself a one-time code to confirm a signature",
+                "tags": [
+                    "documents"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "routeId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "The code was sent",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SigningCodeResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Document or route not found, or not visible to the caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Nothing here waits for your signature, or the account confirms another way",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many codes were sent",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -27730,6 +28150,126 @@
                         }
                     }
                 }
+            },
+            "put": {
+                "operationId": "put_api_v1_me_form_submissions_id",
+                "summary": "Change a submission that was sent back to the caller, and send it again",
+                "tags": [
+                    "forms"
+                ],
+                "description": "Only while its route is waiting for the caller's changes: otherwise a 409 with `details.reason` `not_sent_back`. The answers are checked as a new submission's are, a new version is recorded for the reviewers to compare, and the route resumes where the reviewer chose. Somebody else's submission is a 404.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/FormSubmissionResubmitRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The changed submission",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/FormSubmissionResubmitResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not one of the caller's submissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Not waiting for the caller's changes",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "An answer failed validation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
             }
         },
         "/api/v1/me/form-submissions/{id}/files/{fileId}": {
@@ -27792,6 +28332,99 @@
                     },
                     "404": {
                         "description": "Not a file on one of the caller's submissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "The file could not be read from storage",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/me/form-submissions/{id}/final-document": {
+            "get": {
+                "operationId": "get_api_v1_me_form_submissions_id_final_document",
+                "summary": "The final document of the caller's own submission",
+                "tags": [
+                    "forms"
+                ],
+                "description": "When its route made one and the form lets the person who sent it have it. Anybody else's submission, and a document still waiting, is a 404.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The PDF",
+                        "content": {
+                            "application/pdf": {
+                                "schema": {
+                                    "type": "string",
+                                    "format": "binary"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No final document the caller may open",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -29812,6 +30445,238 @@
                         "bearerAuth": []
                     }
                 ]
+            }
+        },
+        "/api/v1/me/signature": {
+            "delete": {
+                "operationId": "delete_api_v1_me_signature",
+                "summary": "Forget your saved drawn signature. Signatures already made keep their own copy.",
+                "tags": [
+                    "documents"
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Forgotten"
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "get": {
+                "operationId": "get_api_v1_me_signature",
+                "summary": "Your saved drawn signature, or null",
+                "tags": [
+                    "documents"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Your saved signature",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SavedSignatureResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "put": {
+                "operationId": "put_api_v1_me_signature",
+                "summary": "Save your drawn signature for reuse",
+                "tags": [
+                    "documents"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SavedSignatureRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The saved signature",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SavedSignatureResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "The drawing could not be used as a signature",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
             }
         },
         "/api/v1/me/waiting": {
@@ -36026,6 +36891,82 @@
                 ]
             }
         },
+        "/api/v1/platform/renderer": {
+            "get": {
+                "operationId": "get_api_v1_platform_renderer",
+                "summary": "Whether the document renderer is connected, the same version and accepting the shared secret (system tenant only)",
+                "tags": [
+                    "platform-ops"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The renderer state, with a plain sentence and the exact fix when it is not ready",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PlatformRendererResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/platform/version": {
             "get": {
                 "operationId": "get_api_v1_platform_version",
@@ -36176,6 +37117,321 @@
                         "bearerAuth": []
                     }
                 ]
+            }
+        },
+        "/api/v1/plugin-secrets/{plugin}/{key}": {
+            "delete": {
+                "operationId": "delete_api_v1_plugin_secrets_plugin_key",
+                "summary": "Remove a plugin's secret for this workspace",
+                "tags": [
+                    "plugins"
+                ],
+                "parameters": [
+                    {
+                        "name": "plugin",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "key",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The secret is removed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PluginSecretFieldStatusResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "The caller is not in a workspace",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No such plugin, or the plugin does not declare this secret",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "get": {
+                "operationId": "get_api_v1_plugin_secrets_plugin_key",
+                "summary": "Whether a plugin's secret is set for this workspace",
+                "tags": [
+                    "plugins"
+                ],
+                "description": "Answers only whether a value is set and when. The value is never returned.",
+                "parameters": [
+                    {
+                        "name": "plugin",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "key",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Whether the secret is set",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PluginSecretFieldStatusResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "The caller is not in a workspace",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No such plugin, or the plugin does not declare this secret",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "put": {
+                "operationId": "put_api_v1_plugin_secrets_plugin_key",
+                "summary": "Store a plugin's secret for this workspace",
+                "tags": [
+                    "plugins"
+                ],
+                "description": "Replaces any earlier value. The answer does not include the value.",
+                "parameters": [
+                    {
+                        "name": "plugin",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "key",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PluginSecretFieldSaveRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The secret is stored",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PluginSecretFieldStatusResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "The caller is not in a workspace",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No such plugin, or the plugin does not declare this secret",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "The value is empty or too long",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
             }
         },
         "/api/v1/plugins": {
@@ -36811,6 +38067,133 @@
                 ]
             }
         },
+        "/api/v1/plugins/store/checkout": {
+            "post": {
+                "operationId": "post_api_v1_plugins_store_checkout",
+                "summary": "Buy a paid store plugin, or start its trial, for this installation",
+                "tags": [
+                    "platform-ops"
+                ],
+                "description": "Operator only, and only while connected to the store through Whity ID. Buying returns the Whity Pay checkout to send the operator to; a trial starts at once.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StoreCheckoutRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Checkout URL, or the trial started",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/StoreCheckoutResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Not the operator, or the store host is not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Not connected to the store",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid slug",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "The store could not start the purchase",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/plugins/store/connect": {
             "post": {
                 "operationId": "post_api_v1_plugins_store_connect",
@@ -37135,6 +38518,102 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/StoreConnectionResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/plugins/store/licences/{slug}": {
+            "get": {
+                "operationId": "get_api_v1_plugins_store_licences_slug",
+                "summary": "This installation's licence for a store plugin",
+                "tags": [
+                    "platform-ops"
+                ],
+                "description": "licensed, grace (with an until date) or unlicensed, from the store's signed statement or, when the store cannot be reached, from the last one within the offline window.",
+                "parameters": [
+                    {
+                        "name": "slug",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "slug",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "The plugin's slug in the store."
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The licence state",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/StoreLicenceResponse"
                                 }
                             }
                         }
@@ -41923,6 +43402,505 @@
                 ]
             }
         },
+        "/api/v1/routes": {
+            "get": {
+                "operationId": "get_api_v1_routes",
+                "summary": "A subject and its routes, with their trails, items and what changed",
+                "tags": [
+                    "documents"
+                ],
+                "description": "For a person a route on the subject reached, or who may otherwise read it (a document they can see; a form submission with `forms:read`). The person who sent a form reads their own through My submissions instead. Everybody else gets a 404.",
+                "parameters": [
+                    {
+                        "name": "subject_type",
+                        "in": "query",
+                        "required": false,
+                        "description": "`document` or `form_submission`.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "subject_id",
+                        "in": "query",
+                        "required": false,
+                        "description": "The subject's id.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The subject and its routes",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RoutesBySubjectResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found, or not visible to the caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "The subject type and id are required",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/routes/{routeId}/actions": {
+            "post": {
+                "operationId": "post_api_v1_routes_routeid_actions",
+                "summary": "Act on a route, whatever it travels on",
+                "tags": [
+                    "documents"
+                ],
+                "description": "The same body as acting on a document's route. On a form submission a rejection needs its reason, which the person who sent it reads.",
+                "parameters": [
+                    {
+                        "name": "routeId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DocumentRouteActionRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The appended trail event",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DocumentRouteActionResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Route not found, or not visible to the caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "The act is not available to the caller on this route",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/routes/{routeId}/files/{fileId}": {
+            "get": {
+                "operationId": "get_api_v1_routes_routeid_files_fileid",
+                "summary": "Download a file attached to the form submission a route travels on",
+                "tags": [
+                    "documents"
+                ],
+                "parameters": [
+                    {
+                        "name": "routeId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "fileId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The file, as an attachment",
+                        "content": {
+                            "application/octet-stream": {
+                                "schema": {
+                                    "type": "string",
+                                    "format": "binary"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not a file the caller may read",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "The file could not be read from storage",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/routes/{routeId}/final-document": {
+            "get": {
+                "operationId": "get_api_v1_routes_routeid_final_document",
+                "summary": "The final document a route's finalise step made",
+                "tags": [
+                    "documents"
+                ],
+                "description": "For a person who may read the route. A 404 while the final document is still waiting.",
+                "parameters": [
+                    {
+                        "name": "routeId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The PDF",
+                        "content": {
+                            "application/pdf": {
+                                "schema": {
+                                    "type": "string",
+                                    "format": "binary"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No final document yet, or the route is not visible to the caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "The file could not be read from storage",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/routes/{routeId}/final-document/retry": {
+            "post": {
+                "operationId": "post_api_v1_routes_routeid_final_document_retry",
+                "summary": "Try again to make the final document of a route",
+                "tags": [
+                    "documents"
+                ],
+                "description": "For a failed or waiting final document. The caller may read the route and either started it, or may route documents (a document) or manage forms (a form submission). The queue makes it.",
+                "parameters": [
+                    {
+                        "name": "routeId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Queued again",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RouteFinalisationResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The caller may not manage this route",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Route not found, or not visible to the caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "There is no final document to try again",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/routing-rules": {
             "get": {
                 "operationId": "get_api_v1_routing_rules",
@@ -42985,6 +44963,57 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/signing-keys": {
+            "get": {
+                "operationId": "get_api_v1_signing_keys",
+                "summary": "The public keys that seal signature records on this instance (public)",
+                "tags": [
+                    "documents"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The published keys",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SigningKeyListResponse"
                                 }
                             }
                         }
@@ -56478,6 +58507,29 @@
                         "additionalProperties": {
                             "$ref": "#/components/schemas/RecordSectionVerdict"
                         }
+                    },
+                    "pdf_pending": {
+                        "type": "object",
+                        "properties": {
+                            "reason": {
+                                "type": "string"
+                            },
+                            "fix": {
+                                "type": "string",
+                                "nullable": true
+                            }
+                        },
+                        "required": [
+                            "reason",
+                            "fix"
+                        ]
+                    },
+                    "signatures": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/DocumentSignature"
+                        },
+                        "description": "Who signed the current version, in what capacity and when. Electronic signatures with an audit trail."
                     }
                 },
                 "required": [
@@ -56579,6 +58631,95 @@
                     "checksum_sha256",
                     "rendered_at",
                     "content_url"
+                ]
+            },
+            "DocumentAudit": {
+                "type": "object",
+                "properties": {
+                    "document_id": {
+                        "type": "integer"
+                    },
+                    "chain": {
+                        "type": "object",
+                        "properties": {
+                            "intact": {
+                                "type": "boolean"
+                            },
+                            "entries": {
+                                "type": "integer"
+                            },
+                            "linked": {
+                                "type": "integer"
+                            },
+                            "earlier": {
+                                "type": "integer",
+                                "description": "Entries written before the chain began; the first linked entry commits to them."
+                            },
+                            "detached": {
+                                "type": "integer",
+                                "description": "Linked entries whose person, unit or step was removed later. Not a break."
+                            },
+                            "broken_at_event_id": {
+                                "type": "integer",
+                                "nullable": true
+                            },
+                            "last_hash": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "signed_without_record": {
+                                "type": "array",
+                                "items": {
+                                    "type": "integer"
+                                },
+                                "description": "Signing entries with no signature record. Any here means the trail is not intact."
+                            }
+                        },
+                        "required": [
+                            "intact",
+                            "entries",
+                            "linked",
+                            "earlier",
+                            "detached",
+                            "signed_without_record"
+                        ]
+                    },
+                    "events": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/DocumentTrailEvent"
+                        }
+                    },
+                    "signatures": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/SignatureRecord"
+                        }
+                    },
+                    "keys": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/SigningKey"
+                        }
+                    }
+                },
+                "required": [
+                    "document_id",
+                    "chain",
+                    "events",
+                    "signatures",
+                    "keys"
+                ]
+            },
+            "DocumentAuditResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/DocumentAudit"
+                    }
+                },
+                "required": [
+                    "data"
                 ]
             },
             "DocumentBackgroundIssuer": {
@@ -57828,7 +59969,8 @@
                         "type": "integer"
                     },
                     "document_id": {
-                        "type": "integer"
+                        "type": "integer",
+                        "nullable": true
                     },
                     "subject": {
                         "type": "object",
@@ -57905,9 +60047,10 @@
                             "returned",
                             "noted",
                             "sent_back",
-                            "resubmitted"
+                            "resubmitted",
+                            "declined"
                         ],
-                        "description": "What you did with the document: `forwarded`, `acknowledged`, `returned`, `noted`, `sent_back` (to the author for changes, with a note) or `resubmitted` (by the author, after a send-back)."
+                        "description": "What you did with the document: `forwarded`, `acknowledged`, `returned`, `noted`, `sent_back` (to the author for changes, with a note), `resubmitted` (by the author, after a send-back) or `declined` (declining to sign, with a reason). Signing has its own endpoint."
                     },
                     "note": {
                         "type": "string",
@@ -58022,11 +60165,31 @@
                                 },
                                 "allow_send_back": {
                                     "type": "boolean"
+                                },
+                                "kind": {
+                                    "type": "string",
+                                    "enum": [
+                                        "sign",
+                                        "finalise"
+                                    ],
+                                    "nullable": true
+                                },
+                                "sign_capacity": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "description": "On a signing step: the capacity the signer signs in, such as \"Director\". At most 200 characters."
+                                },
+                                "sign_on_behalf_of": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "description": "On a signing step: whom the signer signs for, such as the workspace. At most 200 characters."
+                                },
+                                "final_template_id": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "description": "On a `finalise` step: the document template to render with. Absent uses the template the subject names: the final document template of a form, or the template of a document."
                                 }
-                            },
-                            "required": [
-                                "rule_kind"
-                            ]
+                            }
                         },
                         "description": "Ordered steps, at least one. Each names a `rule_kind` (see GET /api/routing-rules) and its `rule_config`, deciding who receives the document at that step. A step with `decision: true` is an approval gate whose `on_approved`/`on_rejected` name 1-based step positions."
                     }
@@ -58104,7 +60267,8 @@
                         "type": "integer"
                     },
                     "document_id": {
-                        "type": "integer"
+                        "type": "integer",
+                        "nullable": true
                     },
                     "route_id": {
                         "type": "integer"
@@ -58248,6 +60412,18 @@
                     "allow_send_back": {
                         "type": "boolean"
                     },
+                    "sign_capacity": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "sign_on_behalf_of": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "final_template_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
                     "rejection_count": {
                         "type": "integer"
                     }
@@ -58260,6 +60436,50 @@
                     "decision",
                     "satisfied_by",
                     "rejection_count"
+                ]
+            },
+            "DocumentSignature": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "capacity": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "on_behalf_of": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "by": {
+                        "type": "object",
+                        "properties": {
+                            "profile_id": {
+                                "type": "integer"
+                            },
+                            "name": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "profile_id",
+                            "name"
+                        ]
+                    },
+                    "at": {
+                        "type": "string",
+                        "description": "Server time, UTC, to the second."
+                    },
+                    "subject_version": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "id",
+                    "by",
+                    "at",
+                    "subject_version"
                 ]
             },
             "DocumentSource": {
@@ -58367,6 +60587,11 @@
                     "updated_by": {
                         "type": "integer",
                         "nullable": true
+                    },
+                    "updated_by_name": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Who last edited it, on the single-document answers. Null when nobody has, or they have left this workspace."
                     },
                     "starter_key": {
                         "type": "string",
@@ -60058,7 +62283,8 @@
                         "type": "integer"
                     },
                     "document_id": {
-                        "type": "integer"
+                        "type": "integer",
+                        "nullable": true
                     },
                     "route_id": {
                         "type": "integer"
@@ -60130,6 +62356,14 @@
                     },
                     "occurred_at": {
                         "type": "string"
+                    },
+                    "prev_hash": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "entry_hash": {
+                        "type": "string",
+                        "nullable": true
                     }
                 },
                 "required": [
@@ -60711,6 +62945,16 @@
                         "type": "boolean"
                     },
                     "public_enabled": {
+                        "type": "boolean"
+                    },
+                    "public_requires_sign_in": {
+                        "type": "boolean"
+                    },
+                    "final_template_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "final_document_to_applicant": {
                         "type": "boolean"
                     },
                     "public_slug": {
@@ -61917,6 +64161,21 @@
                                 "type": "string"
                             }
                         }
+                    },
+                    "state": {
+                        "type": "string",
+                        "enum": [
+                            "not routed",
+                            "in progress",
+                            "sent back",
+                            "not approved",
+                            "completed",
+                            "withdrawn"
+                        ]
+                    },
+                    "current_step": {
+                        "type": "string",
+                        "nullable": true
                     }
                 },
                 "required": [
@@ -62022,6 +64281,10 @@
                                     "form_version_now": {
                                         "type": "integer",
                                         "nullable": true
+                                    },
+                                    "progress": {
+                                        "$ref": "#/components/schemas/FormSubmissionProgress",
+                                        "nullable": true
                                     }
                                 }
                             }
@@ -62044,6 +64307,192 @@
                 },
                 "required": [
                     "data"
+                ]
+            },
+            "FormSubmissionProgress": {
+                "type": "object",
+                "properties": {
+                    "state": {
+                        "type": "string"
+                    },
+                    "stages": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "position": {
+                                    "type": "integer"
+                                },
+                                "label": {
+                                    "type": "string",
+                                    "nullable": true
+                                },
+                                "status": {
+                                    "type": "string",
+                                    "enum": [
+                                        "done",
+                                        "current",
+                                        "waiting",
+                                        "sent_back",
+                                        "not_approved"
+                                    ]
+                                },
+                                "outcome": {
+                                    "type": "string",
+                                    "enum": [
+                                        "approved",
+                                        "rejected"
+                                    ],
+                                    "nullable": true
+                                },
+                                "reviewers": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                },
+                                "kind": {
+                                    "type": "string",
+                                    "enum": [
+                                        "finalise"
+                                    ]
+                                }
+                            },
+                            "required": [
+                                "position",
+                                "label",
+                                "status",
+                                "outcome"
+                            ]
+                        }
+                    },
+                    "notes": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "kind": {
+                                    "type": "string",
+                                    "enum": [
+                                        "sent_back",
+                                        "not_approved",
+                                        "note"
+                                    ]
+                                },
+                                "note": {
+                                    "type": "string"
+                                },
+                                "stage": {
+                                    "type": "string",
+                                    "nullable": true
+                                },
+                                "stage_position": {
+                                    "type": "integer",
+                                    "nullable": true
+                                },
+                                "at": {
+                                    "type": "string"
+                                },
+                                "from": {
+                                    "type": "string",
+                                    "nullable": true
+                                }
+                            },
+                            "required": [
+                                "kind",
+                                "note",
+                                "stage",
+                                "at"
+                            ]
+                        }
+                    },
+                    "can_resubmit": {
+                        "type": "boolean"
+                    },
+                    "resume_from": {
+                        "type": "string",
+                        "enum": [
+                            "sender",
+                            "start"
+                        ],
+                        "nullable": true
+                    },
+                    "shows_reviewers": {
+                        "type": "boolean"
+                    },
+                    "final_document": {
+                        "type": "object",
+                        "properties": {
+                            "status": {
+                                "type": "string",
+                                "enum": [
+                                    "waiting",
+                                    "ready",
+                                    "failed"
+                                ]
+                            },
+                            "can_open": {
+                                "type": "boolean"
+                            }
+                        },
+                        "required": [
+                            "status",
+                            "can_open"
+                        ],
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "state",
+                    "stages",
+                    "notes",
+                    "can_resubmit",
+                    "resume_from",
+                    "shows_reviewers"
+                ]
+            },
+            "FormSubmissionResubmitRequest": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "additionalProperties": true,
+                        "description": "The changed answers, keyed by field key. A file question left unanswered keeps the file already attached."
+                    },
+                    "note": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "An optional note for the reviewers."
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "FormSubmissionResubmitResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/FormSubmission"
+                    },
+                    "meta": {
+                        "type": "object",
+                        "properties": {
+                            "ignored_keys": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "required": [
+                            "ignored_keys"
+                        ]
+                    }
+                },
+                "required": [
+                    "data",
+                    "meta"
                 ]
             },
             "FormSubmissionReview": {
@@ -62211,6 +64660,19 @@
                         "maxLength": 64,
                         "nullable": true,
                         "description": "The reference each new submission is given, e.g. `BAKE-{YYYY}-{SEQ:4}`. Tokens: {YYYY}, {YY}, {MM}, {SEQ}, {SEQ:n}. {SEQ} is required. Dates are UTC. Null gives none."
+                    },
+                    "public_requires_sign_in": {
+                        "type": "boolean",
+                        "description": "The public link asks visitors to sign in: only the workspace's members and customers can send it, under their own name, so it can be sent back to them for changes."
+                    },
+                    "final_template_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "The document template a route's final document stage uses when it names none; null for none."
+                    },
+                    "final_document_to_applicant": {
+                        "type": "boolean",
+                        "description": "Whether the person who sent the form can open its final document from My submissions."
                     }
                 },
                 "minProperties": 1
@@ -65842,6 +68304,23 @@
                     "name": {
                         "type": "string"
                     },
+                    "name_language": {
+                        "type": "string",
+                        "description": "Language code of the original name (`name`). For many institutions this is Arabic."
+                    },
+                    "names": {
+                        "type": "object",
+                        "x-whity-localized-text": true,
+                        "properties": {
+                            "ar": {
+                                "type": "string"
+                            },
+                            "en": {
+                                "type": "string"
+                            }
+                        },
+                        "description": "The name in every language it has, original included. A reader with no name in their language sees the original."
+                    },
                     "slug": {
                         "type": "string"
                     },
@@ -65874,6 +68353,8 @@
                     "tenant_id",
                     "parent_id",
                     "name",
+                    "name_language",
+                    "names",
                     "slug",
                     "description",
                     "created_at",
@@ -65890,7 +68371,24 @@
                         "type": "string",
                         "maxLength": 255,
                         "minLength": 1,
-                        "description": "Name of the organizational unit."
+                        "description": "Original name of the organizational unit, in `name_language`."
+                    },
+                    "names": {
+                        "type": "object",
+                        "x-whity-localized-text": true,
+                        "properties": {
+                            "ar": {
+                                "type": "string"
+                            },
+                            "en": {
+                                "type": "string"
+                            }
+                        },
+                        "description": "The name in every language, for example `{\"ar\": \"...\", \"en\": \"...\"}`."
+                    },
+                    "name_language": {
+                        "type": "string",
+                        "description": "Language code of the original name. Defaults to `ar` for a name in Arabic letters, `en` otherwise."
                     },
                     "description": {
                         "type": "string",
@@ -65951,6 +68449,23 @@
                     "name": {
                         "type": "string"
                     },
+                    "name_language": {
+                        "type": "string",
+                        "description": "Language code of the original name (`name`). For many institutions this is Arabic."
+                    },
+                    "names": {
+                        "type": "object",
+                        "x-whity-localized-text": true,
+                        "properties": {
+                            "ar": {
+                                "type": "string"
+                            },
+                            "en": {
+                                "type": "string"
+                            }
+                        },
+                        "description": "The name in every language it has, original included. A reader with no name in their language sees the original."
+                    },
                     "slug": {
                         "type": "string"
                     },
@@ -65994,6 +68509,8 @@
                     "tenant_id",
                     "parent_id",
                     "name",
+                    "name_language",
+                    "names",
                     "slug",
                     "description",
                     "created_at",
@@ -66250,7 +68767,24 @@
                         "type": "string",
                         "maxLength": 255,
                         "minLength": 1,
-                        "description": "New name."
+                        "description": "New original name, in `name_language`."
+                    },
+                    "names": {
+                        "type": "object",
+                        "x-whity-localized-text": true,
+                        "properties": {
+                            "ar": {
+                                "type": "string"
+                            },
+                            "en": {
+                                "type": "string"
+                            }
+                        },
+                        "description": "The name in every language; replaces them all. A blank language is removed."
+                    },
+                    "name_language": {
+                        "type": "string",
+                        "description": "Language code of the original name. The original must have text."
                     },
                     "description": {
                         "type": "string",
@@ -67463,6 +69997,54 @@
                     "current_version"
                 ]
             },
+            "PlatformRendererResponse": {
+                "type": "object",
+                "properties": {
+                    "state": {
+                        "type": "string",
+                        "enum": [
+                            "ready",
+                            "not_configured",
+                            "secret_missing",
+                            "unreachable",
+                            "secret_mismatch",
+                            "version_mismatch"
+                        ]
+                    },
+                    "ready": {
+                        "type": "boolean"
+                    },
+                    "app_version": {
+                        "type": "string"
+                    },
+                    "render_version": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "message": {
+                        "type": "string"
+                    },
+                    "fix": {
+                        "type": "string"
+                    },
+                    "switched_on": {
+                        "type": "boolean"
+                    },
+                    "printing": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "state",
+                    "ready",
+                    "app_version",
+                    "render_version",
+                    "message",
+                    "fix",
+                    "switched_on",
+                    "printing"
+                ]
+            },
             "PlatformVersionResponse": {
                 "type": "object",
                 "properties": {
@@ -67715,6 +70297,37 @@
                 "required": [
                     "data"
                 ]
+            },
+            "PluginSecretFieldSaveRequest": {
+                "type": "object",
+                "properties": {
+                    "value": {
+                        "type": "string",
+                        "format": "password",
+                        "writeOnly": true,
+                        "minLength": 1
+                    }
+                },
+                "required": [
+                    "value"
+                ]
+            },
+            "PluginSecretFieldStatusResponse": {
+                "type": "object",
+                "properties": {
+                    "is_set": {
+                        "type": "boolean"
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "is_set",
+                    "updated_at"
+                ],
+                "additionalProperties": false
             },
             "PluginTrustStatusResponse": {
                 "type": "object",
@@ -68213,6 +70826,11 @@
                     "form": {
                         "type": "string"
                     },
+                    "kind": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "What the key opens: `form` takes submissions, `read` shows something to whoever holds the link. Null when no loaded plugin has this route."
+                    },
                     "label": {
                         "type": "string"
                     },
@@ -68237,6 +70855,7 @@
                     "id",
                     "plugin",
                     "form",
+                    "kind",
                     "label",
                     "key_hint",
                     "allowed_origins",
@@ -68284,6 +70903,11 @@
                             "form": {
                                 "type": "string"
                             },
+                            "kind": {
+                                "type": "string",
+                                "nullable": true,
+                                "description": "What the key opens: `form` takes submissions, `read` shows something to whoever holds the link. Null when no loaded plugin has this route."
+                            },
                             "label": {
                                 "type": "string"
                             },
@@ -68311,6 +70935,7 @@
                             "id",
                             "plugin",
                             "form",
+                            "kind",
                             "label",
                             "key_hint",
                             "allowed_origins",
@@ -68346,11 +70971,16 @@
                                         },
                                         "form": {
                                             "type": "string"
+                                        },
+                                        "kind": {
+                                            "type": "string",
+                                            "nullable": true
                                         }
                                     },
                                     "required": [
                                         "plugin",
-                                        "form"
+                                        "form",
+                                        "kind"
                                     ]
                                 }
                             },
@@ -68484,6 +71114,14 @@
                             "closes_at": {
                                 "type": "string",
                                 "nullable": true
+                            },
+                            "sign_in_required": {
+                                "type": "boolean"
+                            },
+                            "form_id": {
+                                "type": "integer",
+                                "nullable": true,
+                                "description": "Given only when sign-in is required: the form to fill in once signed in."
                             }
                         },
                         "required": [
@@ -69840,6 +72478,77 @@
                     }
                 }
             },
+            "RouteFinalisation": {
+                "type": "object",
+                "properties": {
+                    "step_id": {
+                        "type": "integer"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "waiting",
+                            "done",
+                            "failed"
+                        ],
+                        "description": "`waiting`: being made, or the render service is down and it will be tried again."
+                    },
+                    "reason": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Why it waits or failed. Waiting: `render_unavailable`, `error`. Failed: `pdfs_off`, `limit`, `template_missing`, `template_unpublished`, `render_refused`, `refused_by_plugin`, `document_conflict`, `withdrawn`, `no_subject`, `not_approved`, `gave_up`."
+                    },
+                    "subject_version": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "content_hash": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "SHA-256 of the approved version the final document was made from."
+                    },
+                    "document_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "has_pdf": {
+                        "type": "boolean"
+                    },
+                    "reached_at": {
+                        "type": "string"
+                    },
+                    "finalised_at": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "can_retry": {
+                        "type": "boolean",
+                        "description": "On GET /api/routes: the caller may ask for another try (POST .../final-document/retry)."
+                    }
+                },
+                "required": [
+                    "step_id",
+                    "status",
+                    "reason",
+                    "subject_version",
+                    "content_hash",
+                    "document_id",
+                    "has_pdf",
+                    "reached_at",
+                    "finalised_at"
+                ]
+            },
+            "RouteFinalisationResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/RouteFinalisation"
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
             "RouteTemplate": {
                 "type": "object",
                 "properties": {
@@ -70001,6 +72710,27 @@
                                 "items": {
                                     "$ref": "#/components/schemas/RouteTemplateEdge"
                                 }
+                            },
+                            "anonymous_public_forms": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "id": {
+                                            "type": "integer"
+                                        },
+                                        "name": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "id",
+                                        "name"
+                                    ]
+                                }
+                            },
+                            "can_finalise": {
+                                "type": "boolean"
                             }
                         },
                         "required": [
@@ -70080,6 +72810,17 @@
                     "allow_send_back": {
                         "type": "boolean"
                     },
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "finalise"
+                        ],
+                        "nullable": true
+                    },
+                    "final_template_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
                     "canvas_x": {
                         "type": "integer"
                     },
@@ -70105,6 +72846,152 @@
                         "nullable": true
                     }
                 }
+            },
+            "RoutesBySubjectResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "subject": {
+                                "type": "object",
+                                "properties": {
+                                    "type": {
+                                        "type": "string"
+                                    },
+                                    "id": {
+                                        "type": "integer"
+                                    },
+                                    "title": {
+                                        "type": "string",
+                                        "nullable": true
+                                    },
+                                    "document_id": {
+                                        "type": "integer",
+                                        "nullable": true
+                                    },
+                                    "version": {
+                                        "type": "integer",
+                                        "nullable": true
+                                    },
+                                    "content_hash": {
+                                        "type": "string",
+                                        "nullable": true
+                                    },
+                                    "can_send_back": {
+                                        "type": "boolean"
+                                    },
+                                    "form": {
+                                        "type": "object",
+                                        "nullable": true,
+                                        "additionalProperties": true,
+                                        "description": "On a form submission: its questions, its answers and its files."
+                                    }
+                                },
+                                "required": [
+                                    "type",
+                                    "id",
+                                    "title",
+                                    "document_id",
+                                    "version",
+                                    "can_send_back"
+                                ]
+                            },
+                            "routes": {
+                                "type": "array",
+                                "items": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/DocumentRoute"
+                                        },
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "trail": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "$ref": "#/components/schemas/DocumentTrailEvent"
+                                                    }
+                                                },
+                                                "recipients": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "$ref": "#/components/schemas/DocumentRouteRecipient"
+                                                    }
+                                                },
+                                                "changes": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "seen_version": {
+                                                            "type": "integer",
+                                                            "nullable": true
+                                                        },
+                                                        "current_version": {
+                                                            "type": "integer",
+                                                            "nullable": true
+                                                        },
+                                                        "changes": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "type": "object",
+                                                                "properties": {
+                                                                    "key": {
+                                                                        "type": "string"
+                                                                    },
+                                                                    "before": {
+                                                                        "nullable": true
+                                                                    },
+                                                                    "after": {
+                                                                        "nullable": true
+                                                                    }
+                                                                },
+                                                                "required": [
+                                                                    "key"
+                                                                ]
+                                                            }
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "seen_version",
+                                                        "current_version",
+                                                        "changes"
+                                                    ]
+                                                },
+                                                "can_send_back": {
+                                                    "type": "boolean"
+                                                },
+                                                "finalisation": {
+                                                    "$ref": "#/components/schemas/RouteFinalisation",
+                                                    "nullable": true
+                                                }
+                                            },
+                                            "required": [
+                                                "trail",
+                                                "recipients",
+                                                "changes"
+                                            ]
+                                        }
+                                    ]
+                                }
+                            },
+                            "people": {
+                                "type": "object",
+                                "additionalProperties": {
+                                    "type": "string"
+                                },
+                                "description": "Display names by profile id, for the people on these routes."
+                            }
+                        },
+                        "required": [
+                            "subject",
+                            "routes",
+                            "people"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
             },
             "RoutingRule": {
                 "type": "object",
@@ -70133,6 +73020,33 @@
                         "items": {
                             "$ref": "#/components/schemas/RoutingRule"
                         }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "SavedSignatureRequest": {
+                "type": "object",
+                "properties": {
+                    "appearance": {
+                        "$ref": "#/components/schemas/SignatureAppearance"
+                    }
+                },
+                "required": [
+                    "appearance"
+                ]
+            },
+            "SavedSignatureResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "nullable": true,
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/SignatureAppearance"
+                            }
+                        ]
                     }
                 },
                 "required": [
@@ -70536,6 +73450,441 @@
                             "done",
                             "total"
                         ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "SignRequest": {
+                "type": "object",
+                "properties": {
+                    "content_hash": {
+                        "type": "string",
+                        "description": "The `subject.content_hash` the signer was shown. Refused (409) when the content changed since."
+                    },
+                    "consent": {
+                        "type": "boolean",
+                        "description": "The signer ticked the consent line. Must be true."
+                    },
+                    "consent_version": {
+                        "type": "string",
+                        "description": "The version of the consent wording shown, from the signing context."
+                    },
+                    "appearance": {
+                        "nullable": true,
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/SignatureAppearance"
+                            }
+                        ]
+                    },
+                    "use_saved_signature": {
+                        "type": "boolean"
+                    },
+                    "save_signature": {
+                        "type": "boolean"
+                    },
+                    "second_factor": {
+                        "type": "object",
+                        "properties": {
+                            "method": {
+                                "type": "string",
+                                "enum": [
+                                    "totp",
+                                    "email_code",
+                                    "fresh_sign_in"
+                                ]
+                            },
+                            "code": {
+                                "type": "string",
+                                "nullable": true
+                            }
+                        },
+                        "required": [
+                            "method"
+                        ]
+                    }
+                },
+                "required": [
+                    "content_hash",
+                    "consent",
+                    "consent_version",
+                    "second_factor"
+                ]
+            },
+            "SignResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/SignatureRecord"
+                    },
+                    "event": {
+                        "$ref": "#/components/schemas/DocumentTrailEvent"
+                    },
+                    "decided": {
+                        "type": "string",
+                        "enum": [
+                            "approved",
+                            "rejected"
+                        ],
+                        "nullable": true
+                    },
+                    "resolved": {
+                        "type": "integer"
+                    },
+                    "delivered": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "data",
+                    "event",
+                    "resolved",
+                    "delivered"
+                ]
+            },
+            "SignatureAppearance": {
+                "type": "object",
+                "properties": {
+                    "width": {
+                        "type": "integer"
+                    },
+                    "height": {
+                        "type": "integer"
+                    },
+                    "strokes": {
+                        "type": "array",
+                        "items": {
+                            "type": "array",
+                            "items": {
+                                "type": "array",
+                                "items": {
+                                    "type": "number"
+                                },
+                                "minItems": 2,
+                                "maxItems": 2
+                            }
+                        },
+                        "description": "Each stroke is a list of [x, y] points inside the box."
+                    }
+                },
+                "required": [
+                    "width",
+                    "height",
+                    "strokes"
+                ]
+            },
+            "SignatureRecord": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "route_id": {
+                        "type": "integer"
+                    },
+                    "event_id": {
+                        "type": "integer"
+                    },
+                    "step_id": {
+                        "type": "integer"
+                    },
+                    "subject_type": {
+                        "type": "string"
+                    },
+                    "subject_id": {
+                        "type": "integer"
+                    },
+                    "subject_version": {
+                        "type": "integer"
+                    },
+                    "content_hash": {
+                        "type": "string"
+                    },
+                    "by": {
+                        "type": "object",
+                        "properties": {
+                            "profile_id": {
+                                "type": "integer"
+                            },
+                            "name": {
+                                "type": "string"
+                            },
+                            "email": {
+                                "type": "string",
+                                "nullable": true
+                            }
+                        },
+                        "required": [
+                            "profile_id",
+                            "name"
+                        ]
+                    },
+                    "capacity": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "on_behalf_of": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "confirmed_by": {
+                        "type": "string",
+                        "enum": [
+                            "totp",
+                            "passkey",
+                            "email_code",
+                            "fresh_sign_in"
+                        ]
+                    },
+                    "at": {
+                        "type": "string"
+                    },
+                    "ip_address": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "user_agent": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "consent_version": {
+                        "type": "string"
+                    },
+                    "consent_wording": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "appearance": {
+                        "nullable": true,
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/SignatureAppearance"
+                            }
+                        ]
+                    },
+                    "record_hash": {
+                        "type": "string"
+                    },
+                    "seal": {
+                        "type": "string",
+                        "description": "Ed25519 signature, base64, by the published key `seal_key_id`."
+                    },
+                    "seal_key_id": {
+                        "type": "string"
+                    },
+                    "seal_valid": {
+                        "type": "boolean"
+                    },
+                    "details_withheld": {
+                        "type": "boolean",
+                        "description": "True when the email address, IP address and browser are left out because the reader does not hold audit:read."
+                    }
+                },
+                "required": [
+                    "id",
+                    "route_id",
+                    "event_id",
+                    "subject_version",
+                    "content_hash",
+                    "by",
+                    "confirmed_by",
+                    "at",
+                    "consent_version",
+                    "record_hash",
+                    "seal",
+                    "seal_key_id"
+                ]
+            },
+            "SigningCodeResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "email_hint": {
+                                "type": "string",
+                                "nullable": true
+                            }
+                        }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "SigningContext": {
+                "type": "object",
+                "properties": {
+                    "route_id": {
+                        "type": "integer"
+                    },
+                    "can_sign": {
+                        "type": "boolean"
+                    },
+                    "step": {
+                        "type": "object",
+                        "nullable": true,
+                        "properties": {
+                            "id": {
+                                "type": "integer"
+                            },
+                            "position": {
+                                "type": "integer"
+                            },
+                            "label": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "capacity": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "on_behalf_of": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "quorum": {
+                                "type": "string",
+                                "enum": [
+                                    "all",
+                                    "any"
+                                ]
+                            }
+                        },
+                        "required": [
+                            "id",
+                            "position",
+                            "quorum"
+                        ]
+                    },
+                    "subject": {
+                        "type": "object",
+                        "nullable": true,
+                        "properties": {
+                            "type": {
+                                "type": "string"
+                            },
+                            "id": {
+                                "type": "integer"
+                            },
+                            "title": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "version": {
+                                "type": "integer"
+                            },
+                            "content_hash": {
+                                "type": "string",
+                                "description": "SHA-256 of the content as it is now. Send it back when signing."
+                            }
+                        },
+                        "required": [
+                            "type",
+                            "id",
+                            "version",
+                            "content_hash"
+                        ]
+                    },
+                    "consent_version": {
+                        "type": "string"
+                    },
+                    "second_factor": {
+                        "type": "object",
+                        "properties": {
+                            "method": {
+                                "type": "string",
+                                "enum": [
+                                    "totp",
+                                    "email_code",
+                                    "fresh_sign_in"
+                                ]
+                            },
+                            "provider_key": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "email_hint": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "signed_in_again": {
+                                "type": "boolean"
+                            }
+                        },
+                        "required": [
+                            "method",
+                            "signed_in_again"
+                        ]
+                    },
+                    "saved_signature": {
+                        "nullable": true,
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/SignatureAppearance"
+                            }
+                        ]
+                    }
+                },
+                "required": [
+                    "route_id",
+                    "can_sign",
+                    "consent_version",
+                    "second_factor"
+                ]
+            },
+            "SigningContextResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/SigningContext"
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "SigningKey": {
+                "type": "object",
+                "properties": {
+                    "key_id": {
+                        "type": "string"
+                    },
+                    "algorithm": {
+                        "type": "string",
+                        "enum": [
+                            "Ed25519"
+                        ]
+                    },
+                    "public_key": {
+                        "type": "string",
+                        "description": "Base64."
+                    },
+                    "created_at": {
+                        "type": "string"
+                    },
+                    "retired_at": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "key_id",
+                    "algorithm",
+                    "public_key",
+                    "created_at"
+                ]
+            },
+            "SigningKeyListResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/SigningKey"
+                        }
                     }
                 },
                 "required": [
@@ -71040,6 +74389,44 @@
                             "code"
                         ]
                     },
+                    "paid": {
+                        "type": "boolean"
+                    },
+                    "prices": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "plan": {
+                                    "type": "string"
+                                },
+                                "period": {
+                                    "type": "string",
+                                    "enum": [
+                                        "month",
+                                        "year",
+                                        "once"
+                                    ]
+                                },
+                                "currency": {
+                                    "type": "string"
+                                },
+                                "amount": {
+                                    "type": "string"
+                                },
+                                "trial_days": {
+                                    "type": "integer",
+                                    "nullable": true
+                                }
+                            },
+                            "required": [
+                                "plan",
+                                "period",
+                                "currency",
+                                "amount"
+                            ]
+                        }
+                    },
                     "price": {
                         "type": "object",
                         "properties": {
@@ -71162,6 +74549,59 @@
                     "data"
                 ]
             },
+            "StoreCheckoutRequest": {
+                "type": "object",
+                "properties": {
+                    "store_url": {
+                        "type": "string",
+                        "description": "The store, a bare https origin on the allowlist."
+                    },
+                    "slug": {
+                        "type": "string",
+                        "description": "The plugin to buy."
+                    },
+                    "plan": {
+                        "type": "string",
+                        "description": "The plan; standard when left out."
+                    },
+                    "period": {
+                        "type": "string",
+                        "description": "month, year or once."
+                    },
+                    "currency": {
+                        "type": "string",
+                        "description": "A 3-letter currency the store sells in; optional."
+                    },
+                    "trial": {
+                        "type": "boolean",
+                        "description": "Start the free trial instead of paying."
+                    }
+                },
+                "required": [
+                    "store_url",
+                    "slug",
+                    "period"
+                ]
+            },
+            "StoreCheckoutResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "checkout_url": {
+                                "type": "string"
+                            },
+                            "status": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
             "StoreConnectCompleteRequest": {
                 "type": "object",
                 "properties": {
@@ -71253,6 +74693,45 @@
                 "properties": {
                     "data": {
                         "$ref": "#/components/schemas/StoreConnection"
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "StoreLicenceResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "state": {
+                                "type": "string",
+                                "enum": [
+                                    "licensed",
+                                    "grace",
+                                    "unlicensed"
+                                ]
+                            },
+                            "until": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "message": {
+                                "type": "string"
+                            },
+                            "offline": {
+                                "type": "boolean"
+                            },
+                            "checked_at": {
+                                "type": "string",
+                                "nullable": true
+                            }
+                        },
+                        "required": [
+                            "state",
+                            "message"
+                        ]
                     }
                 },
                 "required": [

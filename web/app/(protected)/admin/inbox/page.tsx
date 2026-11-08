@@ -70,6 +70,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useFetch } from '@/hooks/useFetch';
 import {
   routingMeta,
+  routingHref,
   type InboxItem,
   type InboxListResponse,
   type InboxSource,
@@ -307,7 +308,7 @@ export default function InboxPage() {
           ariaLabel={t('inbox.table.label', 'Inbox items')}
           onRowClick={(row) => {
             const meta = routingMeta(row);
-            if (meta !== null) router.push(`/admin/document-library/${meta.document_id}?tab=routing`);
+            if (meta !== null) router.push(routingHref(meta));
           }}
           emptyState={{
             title: openOnly

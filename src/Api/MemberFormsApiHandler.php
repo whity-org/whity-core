@@ -10,6 +10,7 @@ use Whity\Core\Form\FormRejectedException;
 use Whity\Core\Form\FormRenderer;
 use Whity\Core\Form\FormRepository;
 use Whity\Core\Form\FormStatus;
+use Whity\Core\Form\PublicFormLink;
 use Whity\Core\Form\PublicFormView;
 use Whity\Core\Form\SubmissionIssuer;
 use Whity\Core\Request;
@@ -190,7 +191,7 @@ final class MemberFormsApiHandler
         $form = $this->forms->find($tenantId, (int) ($params['id'] ?? 0));
         if (
             $form === null
-            || ($form['open_to_members'] ?? false) !== true
+            || !self::openToSignedIn($form)
             || !FormStatus::acceptsSubmissions((string) ($form['status'] ?? ''))
             || !$this->isActiveMember($tenantId, $profileId)
         ) {
@@ -198,6 +199,23 @@ final class MemberFormsApiHandler
         }
 
         return $form;
+    }
+
+    /**
+     * Opened to the workspace's members, or (WHIT-920) a public link that asks
+     * visitors to sign in: then any active member or customer sends it here,
+     * under their own name, while the link accepts submissions.
+     *
+     * @param array<string, mixed> $form
+     */
+    public static function openToSignedIn(array $form): bool
+    {
+        if (($form['open_to_members'] ?? false) === true) {
+            return true;
+        }
+
+        return ($form['public_requires_sign_in'] ?? false) === true
+            && PublicFormLink::acceptsPublicSubmissions($form);
     }
 
     private function isActiveMember(int $tenantId, int $profileId): bool

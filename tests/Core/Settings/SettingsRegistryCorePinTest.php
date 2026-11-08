@@ -158,6 +158,8 @@ final class SettingsRegistryCorePinTest extends TestCase
             // them was the pin working; they are added here deliberately.
             'documents.qr_enabled',
             'documents.qr_public_detail',
+            // WHIT-920: whether an applicant sees who reviewed their form. Off.
+            'forms.show_reviewer_names',
             // #999 — how many people a USER GROUP preview SHOWS. Not a ceiling
             // on resolution: the count a preview reports is exact and unbounded,
             // this is the size of the sample beside it.
@@ -310,7 +312,9 @@ final class SettingsRegistryCorePinTest extends TestCase
             'plugins.store_allowed_hosts' => 'app.whity.dev',
             'plugins.store_enabled' => 'true',
             'plugins.mcp_prompts_require_mark' => 'false',
-            'documents.render_enabled' => 'false',
+            // WHIT-1001: on by default; printing also needs a ready render
+            // service, so an install without one still prints nothing.
+            'documents.render_enabled' => 'true',
             // Whity's standard theme until a workspace chooses its own (editor M4d).
             'documents.theme' => 'whity.standard',
             'documents.theme_by_kind' => '',
@@ -355,6 +359,8 @@ final class SettingsRegistryCorePinTest extends TestCase
             // leak where a document sits internally.
             'documents.qr_enabled' => 'false',
             'documents.qr_public_detail' => 'minimal',
+            // WHIT-920: OFF. Applicants see stages and outcomes, not reviewers.
+            'forms.show_reviewer_names' => 'false',
             // Ten faces: enough to recognise a group at a glance, small enough
             // that nobody mistakes the sample for the list.
             'groups.preview_sample_size' => '10',

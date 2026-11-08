@@ -93,6 +93,8 @@ final class SettingsRegistryTest extends TestCase
              // e-mail would mean re-authoring every route that mentions it.
              'documents.routing_notification_channels',
              'documents.qr_enabled', 'documents.qr_public_detail',
+             // WHIT-920: whether applicants see who reviewed their form.
+             'forms.show_reviewer_names',
              // #999: how many people a USER GROUP preview SHOWS beside its
              // (always exact) count. Tenant-overridable — see the governance
              // test below for why this one is not operator-only.
@@ -281,7 +283,9 @@ final class SettingsRegistryTest extends TestCase
         // 40 since WHIT-788: three billing.seller_* out, five company.* in.
         // 41 since WHIT-742 slice 3: documents.background_issuing.
         // 42 since #1019: labels.resolve_max_ids, each workspace's own cap.
-        self::assertCount(42, SettingsRegistry::tenantTextKeys());
+        // 43 since WHIT-920: forms.show_reviewer_names, each workspace's choice
+        // of whether applicants see who reviewed their form.
+        self::assertCount(43, SettingsRegistry::tenantTextKeys());
 
         // The desktop-login TTL is per-tenant overridable (NOT global-only) and a
         // plain numeric string key.
@@ -441,7 +445,8 @@ final class SettingsRegistryTest extends TestCase
         // 101 since #1019: labels.resolve_max_ids.
         // 102 since #1733: app.installable, the instance's install switch.
         // 103 since WHIT-1014: plugins.mcp_prompts_require_mark.
-        self::assertCount(103, $describe);
+        // 104 since WHIT-920: forms.show_reviewer_names.
+        self::assertCount(104, $describe);
         self::assertSame(
             ['key' => 'site_name', 'type' => 'string', 'default' => 'Whity'],
             $describe[0]
@@ -654,9 +659,11 @@ final class SettingsRegistryTest extends TestCase
 
     // ---- documents.render_* (ADR 0012 / WC-docdesigner Track 2) ----
 
-    public function testDocumentsRenderEnabledIsGlobalOnlyBooleanDefaultFalse(): void
+    public function testDocumentsRenderEnabledIsGlobalOnlyBooleanDefaultTrue(): void
     {
-        self::assertSame('false', SettingsRegistry::defaultFor('documents.render_enabled'));
+        // WHIT-1001: on unless switched off. Printing also needs a ready render
+        // service, which is what keeps an install without one from printing.
+        self::assertSame('true', SettingsRegistry::defaultFor('documents.render_enabled'));
         self::assertSame('bool', SettingsRegistry::typeFor('documents.render_enabled'));
         self::assertTrue(SettingsRegistry::isGlobalOnly('documents.render_enabled'));
         self::assertNotContains('documents.render_enabled', SettingsRegistry::tenantTextKeys());

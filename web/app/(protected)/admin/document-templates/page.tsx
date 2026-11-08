@@ -35,6 +35,7 @@ import { CopyDialog } from './copy-dialog';
 import { describeAudience } from './audience';
 import { NewTemplateDialog } from './new-template-dialog';
 import { ForbiddenError, editorHref, listTemplates } from './api';
+import { useLocalizedUnits } from '@/hooks/useLocalizedUnits';
 import type { OuOption, PermissionOption, PermissionSource, TemplateRow } from './types';
 
 /**
@@ -104,6 +105,7 @@ export default function DocumentTemplatesPage() {
     }
     return result.items;
   }, [apiClient]);
+  const units = useLocalizedUnits(ous.data);
 
   /**
    * Options for the permission tag: the catalogue when the caller may read it
@@ -139,9 +141,9 @@ export default function DocumentTemplatesPage() {
   const ouName = useCallback(
     (ouId: number | null): string | null => {
       if (ouId === null) return null;
-      return (ous.data ?? []).find((o) => o.id === ouId)?.name ?? null;
+      return units.find((o) => o.id === ouId)?.name ?? null;
     },
-    [ous.data]
+    [units]
   );
 
   const createTemplate = async () => {
@@ -436,7 +438,7 @@ export default function DocumentTemplatesPage() {
         <ScopeDialog
           row={scoping}
           name={nameOf(scoping)}
-          ous={ous.data ?? []}
+          ous={units}
           ousUnavailable={ous.error !== null}
           permissionNames={permissionOptions.data?.names ?? []}
           permissionSource={permissionOptions.data?.source ?? 'own'}

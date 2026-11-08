@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api/client';
 import { fetchAllPagesTyped } from '@/lib/api/fetch-all-pages';
 import { useToast } from '@/lib/toast-context';
+import { useLocalizedUnits } from '@/hooks/useLocalizedUnits';
 import type { components } from '@/lib/api/schema';
 
 /**
@@ -55,7 +56,7 @@ export function useOuOptions(enabled: boolean): {
   ouLoadFailure: OuLoadFailure | null;
 } {
   const { addToast } = useToast();
-  const [ouOptions, setOuOptions] = useState<OuOption[]>([]);
+  const [units, setUnits] = useState<components['schemas']['OrganizationalUnit'][]>([]);
   const [isLoadingOus, setIsLoadingOus] = useState(false);
   const [ouLoadFailure, setOuLoadFailure] = useState<OuLoadFailure | null>(null);
 
@@ -74,22 +75,17 @@ export function useOuOptions(enabled: boolean): {
         >((query) => api.GET('/api/v1/ous', { params: { query } }));
 
         if (!result.complete) {
-          setOuOptions([]);
+          setUnits([]);
           setOuLoadFailure({ loaded: result.items.length, total: result.total });
           addToast('Failed to fetch organisational units', 'error');
           return;
         }
 
-        setOuOptions(
-          result.items.map((ou) => ({
-            value: String(ou.id),
-            label: ou.name,
-          }))
-        );
+        setUnits(result.items);
       } catch (error) {
         const message =
           error instanceof Error ? error.message : 'Failed to fetch organisational units';
-        setOuOptions([]);
+        setUnits([]);
         setOuLoadFailure({ loaded: 0, total: null });
         addToast(message, 'error');
       } finally {
@@ -99,6 +95,13 @@ export function useOuOptions(enabled: boolean): {
 
     void fetchOus();
   }, [enabled, addToast]);
+
+  // Named here rather than in the fetch, so a language switch needs no refetch.
+  const localizedUnits = useLocalizedUnits(units);
+  const ouOptions = useMemo<OuOption[]>(
+    () => localizedUnits.map((ou) => ({ value: String(ou.id), label: ou.name })),
+    [localizedUnits]
+  );
 
   return { ouOptions, isLoadingOus, ouLoadFailure };
 }

@@ -84,12 +84,6 @@ final class FormStaffFieldsApiRealEngineTest extends TestCase
         $this->issuer = new SubmissionIssuer(
             $this->pdo,
             $this->submissions,
-            new DocumentIssuer(
-                $this->pdo,
-                new DocumentRepository($this->pdo),
-                $artifacts,
-                new DocumentArtifactStore(new LocalStorageDriver(sys_get_temp_dir())),
-            ),
             new RouteTemplateRepository($this->pdo),
             new DocumentRouter(
                 $this->pdo,
@@ -103,7 +97,8 @@ final class FormStaffFieldsApiRealEngineTest extends TestCase
                 null
             ),
             new FormUploadRepository($this->pdo),
-            $artifacts,
+            new RouteRepository($this->pdo),
+            new RouteRecipientRepository($this->pdo),
         );
         $this->reviews = new FormSubmissionReviewsApiHandler(
             $this->fields,

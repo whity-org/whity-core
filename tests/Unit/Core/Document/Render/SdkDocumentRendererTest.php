@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Core\Document\Render;
 
+use Whity\Core\CoreVersion;
+use Whity\Core\Document\Render\RenderReadiness;
 use Whity\Sdk\Hooks\Events;
 use Whity\Core\Hooks\HookManager;
 use Whity\Core\Document\Embed\DocumentEmbedRegistry;
@@ -93,6 +95,10 @@ final class SdkDocumentRendererTest extends TestCase
             new TenantSettingsRepository($pdo)
         );
         $this->client = new FakeRenderServiceClient();
+        // A fresh install has no renderer (WHIT-1001): printing needs a ready
+        // one, so the double starts as "not set up" and enableRendering() is
+        // what running one looks like.
+        $this->client->readiness = RenderReadiness::notConfigured(CoreVersion::VERSION);
         $this->storageRoot = sys_get_temp_dir() . '/whity-sdk-render-' . bin2hex(random_bytes(6));
 
         $this->renderer = new SdkDocumentRenderer(
@@ -442,6 +448,7 @@ final class SdkDocumentRendererTest extends TestCase
     private function enableRendering(): void
     {
         $this->settings->setGlobal(SettingsRegistry::DOCUMENTS_RENDER_ENABLED, 'true');
+        $this->client->readiness = null;
     }
 
     private function document(): FlowDocument

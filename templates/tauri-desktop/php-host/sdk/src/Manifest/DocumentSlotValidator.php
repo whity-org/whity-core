@@ -61,10 +61,13 @@ final class DocumentSlotValidator
             return;
         }
         foreach (array_keys($documents) as $key) {
-            if ($key !== 'slots') {
+            if ($key !== 'slots' && $key !== 'starters') {
                 $errors[] = "documents: unknown key '{$key}'";
             }
         }
+        // SDK 1.81: starter templates, checked against the slots declared here.
+        DocumentStarterValidator::check($documents['starters'] ?? null, $documents['slots'] ?? null, $records, $label, $errors);
+
         $slots = $documents['slots'] ?? null;
         if ($slots === null) {
             return;

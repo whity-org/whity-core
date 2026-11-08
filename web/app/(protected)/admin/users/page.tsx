@@ -35,6 +35,7 @@ import { ConfirmAction } from '@whity/ui/confirm-action';
 import { ToggleGroup } from '@whity/ui/toggle-group';
 import { IconMenu2, IconPlus } from '@tabler/icons-react';
 import { useTranslation } from '@whity/features/i18n';
+import { useLocalizedUnits, type UnitNames } from '@/hooks/useLocalizedUnits';
 import { useDateDisplay } from '@whity/features/datetime';
 import { CreateUserModal } from './create-modal';
 import { DeleteUserModal } from './delete-modal';
@@ -127,9 +128,10 @@ export default function UsersPage() {
   }, [canReadRoles]);
   const unitOptions = useFetch(async () => {
     if (!canReadUnits) return [];
-    const result = await fetchAllPages<{ id: number; name: string }>(apiClient, '/api/v1/ous');
+    const result = await fetchAllPages<{ id: number } & UnitNames>(apiClient, '/api/v1/ous');
     return result.complete ? result.items : [];
   }, [canReadUnits]);
+  const units = useLocalizedUnits(unitOptions.data);
 
   const changeFilter = <T,>(set: (value: T) => void) => (value: T) => {
     set(value);
@@ -473,11 +475,11 @@ export default function UsersPage() {
                     onChange={changeFilter(setRoleFilter)}
                   />
                 )}
-                {(unitOptions.data?.length ?? 0) > 0 && (
+                {units.length > 0 && (
                   <FilterMenu
                     testId="users-filter-unit"
                     label={t('users.filter.unit', 'Unit')}
-                    options={(unitOptions.data ?? []).map((unit) => ({ value: String(unit.id), label: unit.name }))}
+                    options={units.map((unit) => ({ value: String(unit.id), label: unit.name }))}
                     selected={unitFilter}
                     onChange={changeFilter(setUnitFilter)}
                   />

@@ -150,7 +150,8 @@ final class SettingsApiRealEngineTest extends TestCase
         // 41 since WHIT-742 slice 3: documents.background_issuing.
         // 42 since #1019: labels.resolve_max_ids, each workspace's cap on one
         // label-resolution request.
-        self::assertCount(42, $data['registry']);
+        // 43 since WHIT-920: forms.show_reviewer_names.
+        self::assertCount(43, $data['registry']);
         self::assertArrayNotHasKey('auth.self_registration_enabled', $data['effective']);
         self::assertSame([], $data['overridden']);
     }

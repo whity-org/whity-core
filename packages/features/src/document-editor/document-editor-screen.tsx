@@ -221,6 +221,10 @@ export function DocumentEditorScreen({
         version.current = result.version;
         // The saved row's theme: a change of theme or of the workspace shows at once.
         if (result.resolvedTheme) setTheme(result.resolvedTheme);
+        // The status bar's "Last edited" follows the save, not the load.
+        setDoc((prev) =>
+          prev ? { ...prev, updatedAt: result.updatedAt, updatedBy: result.updatedBy ?? prev.updatedBy } : prev
+        );
         setSave({ state: 'saved', at: time(new Date()) });
       } else {
         conflictRef.current = true;
@@ -264,7 +268,17 @@ export function DocumentEditorScreen({
     if (pending.current || saving.current) return;
     const loaded = await adapter.load(id);
     version.current = loaded.version;
-    setDoc((prev) => (prev ? { ...prev, blocks: loaded.document.blocks, title: loaded.document.title } : loaded.document));
+    setDoc((prev) =>
+      prev
+        ? {
+            ...prev,
+            blocks: loaded.document.blocks,
+            title: loaded.document.title,
+            updatedAt: loaded.document.updatedAt,
+            updatedBy: loaded.document.updatedBy,
+          }
+        : loaded.document
+    );
     setRevision((n) => n + 1);
   }, [adapter, id]);
 

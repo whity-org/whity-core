@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Support;
 
+use Whity\Core\CoreVersion;
 use Whity\Core\Document\Render\DocumentRenderRejectedException;
+use Whity\Core\Document\Render\RenderReadiness;
 use Whity\Core\Document\Render\RenderedDocument;
 use Whity\Core\Document\Render\RenderServiceClientInterface;
 use Whity\Core\Document\Render\RenderServiceUnavailableException;
@@ -92,6 +94,22 @@ final class FakeRenderServiceClient implements RenderServiceClientInterface
     public function isConfigured(): bool
     {
         return $this->configured;
+    }
+
+    /**
+     * What readiness() answers when the double is configured. Null means
+     * ready, so every existing test keeps rendering; set one of the
+     * {@see RenderReadiness} states to prove a gate refuses with its reason.
+     */
+    public ?RenderReadiness $readiness = null;
+
+    public function readiness(bool $fresh = false): RenderReadiness
+    {
+        if (!$this->configured) {
+            return RenderReadiness::secretMissing(CoreVersion::VERSION);
+        }
+
+        return $this->readiness ?? RenderReadiness::ready(CoreVersion::VERSION, CoreVersion::VERSION);
     }
 
     /**

@@ -11,7 +11,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@whity/ui/button';
-import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -22,6 +21,9 @@ import {
 import { Textarea } from '@whity/ui/textarea';
 import { useTranslation } from '@whity/features/i18n';
 import type { OU } from './types';
+import { LocalizedNameField } from '@/components/localized-name-field';
+import { cleanNames, type NameLanguage } from '@/lib/localized-name';
+import type { BilingualValue } from '@whity/ui/bilingual-input';
 import { buildOuTree, getDescendantIds } from './ou-tree-util';
 
 interface EditOuModalProps {
@@ -41,20 +43,31 @@ export function EditOuModal({ isOpen, onClose, onSuccess, ou, ous }: EditOuModal
   // `key={ou.id}` whenever a different OU is edited, so these initializers re-run
   // on the new record instead of synchronising state inside an effect (which the
   // React lint rules disallow).
-  const [name, setName] = useState(ou.name);
+  // #821: the name in Arabic and English, and which one is the original.
+  const originalLanguage: NameLanguage = ou.name_language === 'ar' ? 'ar' : 'en';
+  const [names, setNames] = useState<BilingualValue>(() =>
+    ou.names && Object.keys(ou.names).length > 0 ? { ...ou.names } : { [originalLanguage]: ou.name }
+  );
+  const [nameLanguage, setNameLanguage] = useState<NameLanguage>(originalLanguage);
+  const [nameError, setNameError] = useState<string | null>(null);
   const [description, setDescription] = useState(ou.description || '');
   const [parentId, setParentId] = useState<string>(ou.parent_id ? ou.parent_id.toString() : 'null');
 
   const handleUpdate = async () => {
-    if (!name.trim()) {
-      addToast(t('ous.edit.validation.nameRequired', 'Name is required'), 'error');
+    const cleaned = cleanNames(names);
+    const original = cleaned[nameLanguage] ?? '';
+    if (original === '') {
+      setNameError(t('ous.edit.validation.originalRequired', 'Fill in the name in the original language.'));
       return;
     }
+    setNameError(null);
 
     try {
       setIsLoading(true);
       const payload: Record<string, unknown> = {
-        name: name.trim(),
+        name: original,
+        names: cleaned,
+        name_language: nameLanguage,
         description: description.trim(),
       };
 
@@ -115,15 +128,16 @@ export function EditOuModal({ isOpen, onClose, onSuccess, ou, ous }: EditOuModal
         </DialogHeader>
 
         <div className="space-y-4">
-          <div>
-            <label className="text-sm font-medium">{t('ous.edit.name.label', 'Name *')}</label>
-            <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder={t('ous.edit.name.placeholder', 'e.g., Engineering')}
-              disabled={isLoading}
-            />
-          </div>
+          <LocalizedNameField
+            id="ou-edit-name"
+            label={t('ous.edit.name.label', 'Name *')}
+            names={names}
+            originalLanguage={nameLanguage}
+            onNamesChange={setNames}
+            onOriginalLanguageChange={setNameLanguage}
+            disabled={isLoading}
+            error={nameError}
+          />
 
           <div>
             <label className="text-sm font-medium">

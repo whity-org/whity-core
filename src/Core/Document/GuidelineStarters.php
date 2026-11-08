@@ -581,7 +581,7 @@ final class GuidelineStarters
     private function f(string $key, string $en, string $ar, string $sample, ?string $sampleAr = null, bool $bold = false): array
     {
         $label = $this->t($en, $ar);
-        $this->own[$key] = ['key' => $key, 'label' => $label, 'sample' => $this->lang === 'ar' ? ($sampleAr ?? $sample) : $sample];
+        $this->own[$key] = ['key' => $key, 'label' => $label, 'sample' => $this->lang === 'ar' ? self::arabicSample($sampleAr ?? $sample) : $sample];
 
         return ['type' => 'field', 'path' => 'template.' . $key, 'label' => $label] + ($bold ? ['marks' => [['type' => 'bold']]] : []);
     }
@@ -599,6 +599,42 @@ final class GuidelineStarters
     private function t(string $en, string $ar): string
     {
         return $this->lang === 'ar' ? $ar : $en;
+    }
+
+    /** Example names in Arabic (the design system's Example Bakery and friends). */
+    private const ARABIC_NAMES = [
+        'Example Bakery' => 'مخبز المثال',
+        'Example Clinic' => 'عيادة المثال',
+        'Example Café' => 'مقهى المثال',
+        'Example Mills' => 'مطاحن المثال',
+        'Rana Haddad' => 'رنا حداد',
+        'Omar Saleh' => 'عمر صالح',
+    ];
+
+    /** Month names as they are written in Jordan. */
+    private const ARABIC_MONTHS = [
+        'January' => 'كانون الثاني', 'February' => 'شباط', 'March' => 'آذار', 'April' => 'نيسان',
+        'May' => 'أيار', 'June' => 'حزيران', 'July' => 'تموز', 'August' => 'آب',
+        'September' => 'أيلول', 'October' => 'تشرين الأول', 'November' => 'تشرين الثاني', 'December' => 'كانون الأول',
+        'Jan' => 'كانون الثاني', 'Feb' => 'شباط', 'Mar' => 'آذار', 'Apr' => 'نيسان', 'Jun' => 'حزيران', 'Jul' => 'تموز',
+        'Aug' => 'آب', 'Sep' => 'أيلول', 'Oct' => 'تشرين الأول', 'Nov' => 'تشرين الثاني', 'Dec' => 'كانون الأول',
+    ];
+
+    /**
+     * An Arabic starter's sample in Arabic (WHIT-995): example names and month
+     * names are translated, while numbers, codes and amounts stay Western
+     * digits, left to right. A sample with its own Arabic text keeps it, with
+     * any English month in it translated.
+     */
+    public static function arabicSample(string $sample): string
+    {
+        $sample = self::ARABIC_NAMES[$sample] ?? $sample;
+
+        return (string) preg_replace_callback(
+            '/\b(' . implode('|', array_keys(self::ARABIC_MONTHS)) . ')\b/u',
+            static fn (array $m): string => self::ARABIC_MONTHS[$m[1]],
+            $sample,
+        );
     }
 
     /**

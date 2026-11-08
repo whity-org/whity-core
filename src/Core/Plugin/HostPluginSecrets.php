@@ -10,7 +10,6 @@ use Whity\Core\Security\EncryptedSecretStore;
 use Whity\Sdk\PluginInterface;
 use Whity\Sdk\PluginNamespace;
 use Whity\Sdk\Secrets\PluginSecrets;
-use Whity\Sdk\Secrets\SecretStore;
 
 /**
  * The host's plugin secret store (SDK 1.60, WHIT-838; migration 187).
@@ -45,7 +44,7 @@ final class HostPluginSecrets implements PluginSecrets
     ) {
     }
 
-    public function for(PluginInterface $plugin): SecretStore
+    public function for(PluginInterface $plugin): HostPluginSecretStore
     {
         $slug = PluginNamespace::slug($plugin->getName());
         if ($slug === null) {
