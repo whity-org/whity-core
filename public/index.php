@@ -5162,6 +5162,19 @@ $promptRegistry->setPluginGate(static fn (string $plugin): bool =>
     $globalSettingsRepository->get(\Whity\Core\Settings\SettingsRegistry::PLUGINS_MCP_PROMPTS_REQUIRE_MARK) !== 'true'
     || $storeMarks->isVerified($plugin));
 CorePrompts::register($promptRegistry);
+// WHIT-993 (SDK 1.80): plugin prompts and resources reach AI agents only from
+// plugins the operator granted agent context (`whity-cli plugin agent-context`).
+// Collected from the grants as they stand at boot and on every reload, and asked
+// again on every call, so a revoke applies at once.
+$agentContextGrants = new \Whity\Core\Plugin\Trust\AgentContextGrants($db->getPdo(), new \Whity\Core\Plugin\Trust\CodePluginVerification($db->getPdo(), $storeMarks), $auditLogger);
+$agentContextGranted = static fn (string $plugin): bool => $agentContextGrants->isGranted($plugin);
+$agentContextGrantedNow = static function () use ($agentContextGrants): \Closure {
+    $names = array_flip($agentContextGrants->granted());
+
+    return static fn (string $plugin): bool => isset($names[$plugin]);
+};
+$pluginResources = new \Whity\Mcp\Resources\PluginResourceRegistry();
+\Whity\register_service(\Whity\Mcp\Resources\PluginResourceRegistry::class, $pluginResources);
 // WC-a89ece0d: per-tenant and per-principal call budgets. Limits are tunable
 // via env vars so operators can adjust without a code deploy.
 $mcpRateLimiter = new McpRateLimiter(
@@ -5362,10 +5375,10 @@ $mcpHandlers = [
     'notifications/cancelled' => new CancelledNotificationHandler(),
     'tools/list'              => $mcpToolsListHandler,
     'tools/call'              => $mcpToolsCallHandler,
-    'resources/list'          => new ResourcesListHandler($resourceDeriver, $roleChecker, $tokenValidator),
-    'resources/read'          => new ResourcesReadHandler($router, $roleChecker, $tokenValidator, auditLogger: $auditLogger, resourceDeriver: $resourceDeriver),
-    'prompts/list'            => new PromptsListHandler($promptRegistry, $roleChecker, $tokenValidator),
-    'prompts/get'             => new PromptsGetHandler($promptRegistry, $roleChecker, $tokenValidator),
+    'resources/list'          => new ResourcesListHandler($resourceDeriver, $roleChecker, $tokenValidator, $pluginResources, $agentContextGranted),
+    'resources/read'          => new ResourcesReadHandler($router, $roleChecker, $tokenValidator, auditLogger: $auditLogger, resourceDeriver: $resourceDeriver, pluginResources: $pluginResources, pluginGranted: $agentContextGranted),
+    'prompts/list'            => new PromptsListHandler($promptRegistry, $roleChecker, $tokenValidator, $agentContextGranted),
+    'prompts/get'             => new PromptsGetHandler($promptRegistry, $roleChecker, $tokenValidator, $agentContextGranted),
 ];
 // WHIT-697: "last used", which the connect wizard waits on.
 $mcpRecordTokenUse = static function (\Whity\Mcp\Auth\McpPrincipal $principal) use ($mcpTokenService, $agentAssignments): void {
@@ -5583,7 +5596,8 @@ $pluginLoader->setBillingPortals($pluginBillingPortals);
 // Code plugins' template slots and record types as merge fields (SDK 1.56, WHIT-742).
 $pluginLoader->setDocumentRegistries($templateSlotRegistry, $documentFieldRegistry);
 $pluginLoader->load();
-$pluginLoader->collectMcpPrompts($promptRegistry);
+$pluginLoader->collectMcpPrompts($promptRegistry, $agentContextGrantedNow());
+$pluginLoader->collectMcpResources($pluginResources, $agentContextGrantedNow());
 // SDK 1.43. Collect FIRST, then hand the deriver the suppressions: a plugin
 // that authors its own tools may ask for its routes not to be derived, and the
 // deriver has to know that before anything asks it for a tool list.
@@ -5607,12 +5621,17 @@ $refreshMcpCatalog = static function (string $trigger) use (
     $pluginLoader,
     $mcpCatalogSignature,
     $authoredMcpTools,
-    $toolDeriver
+    $toolDeriver,
+    $pluginResources,
+    $agentContextGrantedNow
 ): void {
     ToolDeriver::clearCache();
     $promptRegistry->reset();
     CorePrompts::register($promptRegistry);
-    $pluginLoader->collectMcpPrompts($promptRegistry);
+    $granted = $agentContextGrantedNow();
+    $pluginLoader->collectMcpPrompts($promptRegistry, $granted);
+    $pluginResources->reset();
+    $pluginLoader->collectMcpResources($pluginResources, $granted);
     // #952 applies to TOOLS at least as hard as to prompts: a plugin turned off
     // whose tools stayed listed would leave them CALLABLE, which is an action
     // rather than a listing. Rebuilt from the current plugin set, suppressions
