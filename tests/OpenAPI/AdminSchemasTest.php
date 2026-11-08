@@ -59,6 +59,8 @@ final class AdminSchemasTest extends TestCase
         // DemoCatalog is likewise a committed reference plugin (the multi-client
         // feature-extraction pilot, see packages/features) — same reasoning.
         self::copyDirectory($source . '/DemoCatalog', self::$referencePluginsDir . '/DemoCatalog');
+        // Glossary is the committed reference for translatable fields (#521).
+        self::copyDirectory($source . '/Glossary', self::$referencePluginsDir . '/Glossary');
     }
 
     public static function tearDownAfterClass(): void

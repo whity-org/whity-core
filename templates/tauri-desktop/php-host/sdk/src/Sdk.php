@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.92).
+ * SDK identity (v1.93).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1185,12 +1185,18 @@ namespace Whity\Sdk;
  * address and workspace come from the request or job (WHIT-1032).
  *
  * Purely additive.)
+ *
+ * 1.93 (TRANSLATABLE FIELDS: {@see I18n\LocalizedText} holds the `x-whity-localized-text`
+ * OpenAPI marker and the `{ar?, en?}` value contract the schema-driven screens read,
+ * with helpers to check a value and pick the text for a language (#521).
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.92.0';
+    public const VERSION = '1.93.0';
 
     /**
      * Static identity only — never instantiated.
