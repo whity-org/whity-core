@@ -73,7 +73,10 @@ export type TrailAction =
   | 'returned'
   | 'noted'
   | 'sent_back'
-  | 'resubmitted';
+  | 'resubmitted'
+  | 'signed'
+  | 'declined'
+  | 'stamped';
 
 /**
  * One entry in the append-only trail, as `RoutingPresenter::event()` sends it.

@@ -91,7 +91,7 @@ final class RouteRecipientRepository
      * between "resolved" and "delivered" rather than as a missing row nobody
      * can account for.
      *
-     * @param array{document_id: int, route_id: int, step_id: int, profile_id: int,
+     * @param array{document_id: ?int, route_id: int, step_id: int, profile_id: int,
      *              ou_id?: ?int, parent_recipient_id?: ?int, created_by_event_id: int,
      *              role?: string} $rec
      *
@@ -492,13 +492,20 @@ final class RouteRecipientRepository
                 'SELECT r.id, r.tenant_id, r.document_id, r.route_id, r.step_id, r.profile_id, r.ou_id,
                         r.parent_recipient_id, r.created_by_event_id, r.closed_by_event_id, r.role, r.created_at,
                         d.title AS document_title, d.template_name AS document_template_name,
-                        d.withdrawn_at AS document_withdrawn_at,
+                        COALESCE(d.withdrawn_at, (
+                            SELECT fs.withdrawn_at FROM form_submissions fs
+                             WHERE fs.tenant_id = :tenant_id AND fs.id = dr.subject_id
+                               AND dr.subject_type = :submission_type
+                        )) AS document_withdrawn_at,
+                        dr.title AS route_title, dr.subject_type AS subject_type, dr.subject_id AS subject_id,
                         e.action AS arrived_by, e.actor_profile_id AS arrived_from,
                         s.decision AS step_decision, s.satisfied_by AS step_satisfied_by,
                         ce.action AS closed_by_action, ce.verdict AS closed_by_verdict,
                         sp.id AS sender_profile_id, sp.display_name AS sender_display_name, spe.email AS sender_email
                    FROM document_route_recipients r
-                   JOIN documents d
+                   JOIN document_routes dr
+                     ON dr.id = r.route_id AND dr.tenant_id = :tenant_id
+                   LEFT JOIN documents d
                      ON d.id = r.document_id AND d.tenant_id = :tenant_id
                    JOIN document_route_events e
                      ON e.id = r.created_by_event_id AND e.tenant_id = :tenant_id
@@ -522,13 +529,20 @@ final class RouteRecipientRepository
                 'SELECT r.id, r.tenant_id, r.document_id, r.route_id, r.step_id, r.profile_id, r.ou_id,
                         r.parent_recipient_id, r.created_by_event_id, r.closed_by_event_id, r.role, r.created_at,
                         d.title AS document_title, d.template_name AS document_template_name,
-                        d.withdrawn_at AS document_withdrawn_at,
+                        COALESCE(d.withdrawn_at, (
+                            SELECT fs.withdrawn_at FROM form_submissions fs
+                             WHERE fs.tenant_id = :tenant_id AND fs.id = dr.subject_id
+                               AND dr.subject_type = :submission_type
+                        )) AS document_withdrawn_at,
+                        dr.title AS route_title, dr.subject_type AS subject_type, dr.subject_id AS subject_id,
                         e.action AS arrived_by, e.actor_profile_id AS arrived_from,
                         s.decision AS step_decision, s.satisfied_by AS step_satisfied_by,
                         ce.action AS closed_by_action, ce.verdict AS closed_by_verdict,
                         sp.id AS sender_profile_id, sp.display_name AS sender_display_name, spe.email AS sender_email
                    FROM document_route_recipients r
-                   JOIN documents d
+                   JOIN document_routes dr
+                     ON dr.id = r.route_id AND dr.tenant_id = :tenant_id
+                   LEFT JOIN documents d
                      ON d.id = r.document_id AND d.tenant_id = :tenant_id
                    JOIN document_route_events e
                      ON e.id = r.created_by_event_id AND e.tenant_id = :tenant_id
@@ -552,6 +566,7 @@ final class RouteRecipientRepository
         $stmt->bindValue(':profile_id', $profileId, PDO::PARAM_INT);
         $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
         $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $stmt->bindValue(':submission_type', 'form_submission');
         $stmt->execute();
 
         /** @var list<array<string, mixed>> $rows */
@@ -608,6 +623,84 @@ final class RouteRecipientRepository
         ]);
 
         return $stmt->fetchColumn() !== false;
+    }
+
+    /**
+     * Whether a profile has ever held a STEP item on any route on one subject
+     * (WHIT-920). The subject-keyed twin of {@see hasAnyForProfile()}: a reviewer
+     * a submission reached may read it after they have acted. An item sent back
+     * to the author does not count: the author reads their own submission
+     * through its own view, which shows stages rather than reviewers.
+     */
+    public function hasAnyOnSubject(int $tenantId, string $subjectType, int $subjectId, int $profileId): bool
+    {
+        $stmt = $this->db->prepare(
+            'SELECT 1 FROM document_route_recipients r
+               JOIN document_routes dr ON dr.id = r.route_id AND dr.tenant_id = :tenant_id
+              WHERE r.tenant_id = :tenant_id AND r.profile_id = :profile_id AND r.role = :role
+                AND dr.subject_type = :subject_type AND dr.subject_id = :subject_id
+              LIMIT 1'
+        );
+        $stmt->execute([
+            ':tenant_id' => $tenantId,
+            ':profile_id' => $profileId,
+            ':role' => self::ROLE_STEP,
+            ':subject_type' => $subjectType,
+            ':subject_id' => $subjectId,
+        ]);
+
+        return $stmt->fetchColumn() !== false;
+    }
+
+    /**
+     * Whether a profile holds or held a STEP item on one route (WHIT-920): the
+     * people a route reached, as opposed to somebody who can merely read it.
+     */
+    public function hasStepItemOnRoute(int $tenantId, int $routeId, int $profileId): bool
+    {
+        $stmt = $this->db->prepare(
+            'SELECT 1 FROM document_route_recipients
+              WHERE tenant_id = :tenant_id AND route_id = :route_id AND profile_id = :profile_id AND role = :role
+              LIMIT 1'
+        );
+        $stmt->execute([
+            ':tenant_id' => $tenantId,
+            ':route_id' => $routeId,
+            ':profile_id' => $profileId,
+            ':role' => self::ROLE_STEP,
+        ]);
+
+        return $stmt->fetchColumn() !== false;
+    }
+
+    /**
+     * Every recipient row of one route, oldest first (WHIT-920): who the route
+     * reached, read by route for a subject that has no document.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function listForRoute(int $routeId, int $tenantId): array
+    {
+        $stmt = $this->db->prepare(
+            'SELECT r.id, r.tenant_id, r.document_id, r.route_id, r.step_id, r.profile_id, r.ou_id,
+                    r.parent_recipient_id, r.created_by_event_id, r.closed_by_event_id, r.role, r.created_at,
+                    e.withdrawal AS closed_by_withdrawal
+               FROM document_route_recipients r
+               LEFT JOIN document_route_events e
+                 ON e.id = r.closed_by_event_id AND e.tenant_id = :tenant_id
+              WHERE r.tenant_id = :tenant_id AND r.route_id = :route_id
+              ORDER BY r.id ASC'
+        );
+        $stmt->execute([':tenant_id' => $tenantId, ':route_id' => $routeId]);
+
+        /** @var list<array<string, mixed>> $rows */
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return array_map(
+            static fn (array $row): array => self::normalize($row)
+                + ['closed_by_withdrawal' => DbBool::of($row['closed_by_withdrawal'] ?? false)],
+            $rows
+        );
     }
 
     /** Whether anyone still has an open item on this route. */
@@ -674,7 +767,8 @@ final class RouteRecipientRepository
         return [
             'id' => (int) $row['id'],
             'tenant_id' => (int) $row['tenant_id'],
-            'document_id' => (int) $row['document_id'],
+            // WHIT-920: null on a route whose subject has no document yet.
+            'document_id' => isset($row['document_id']) ? (int) $row['document_id'] : null,
             'route_id' => (int) $row['route_id'],
             'step_id' => (int) $row['step_id'],
             'profile_id' => (int) $row['profile_id'],
@@ -696,8 +790,12 @@ final class RouteRecipientRepository
     private static function normalizeInboxRow(array $row): array
     {
         return self::normalize($row) + [
-            'document_title' => (string) $row['document_title'],
-            'document_template_name' => (string) $row['document_template_name'],
+            // WHIT-920: a route on a subject with no document yet is named by
+            // the route's own title (a form's name) instead.
+            'document_title' => (string) ($row['document_title'] ?? $row['route_title'] ?? ''),
+            'document_template_name' => (string) ($row['document_template_name'] ?? ''),
+            'subject_type' => isset($row['subject_type']) ? (string) $row['subject_type'] : DocumentRouteSubject::TYPE,
+            'subject_id' => isset($row['subject_id']) ? (int) $row['subject_id'] : (int) ($row['document_id'] ?? 0),
             'document_withdrawn' => ($row['document_withdrawn_at'] ?? null) !== null,
             // The ACTION of the creating trail event — how this reached you.
             // Read through the pointer rather than stored beside it, so it can

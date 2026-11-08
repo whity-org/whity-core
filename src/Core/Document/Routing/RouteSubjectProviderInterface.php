@@ -9,7 +9,7 @@ namespace Whity\Core\Document\Routing;
  *
  * A route names a subject by TYPE and ID (migration 224). The provider for a type
  * is the one place that knows what such a subject is. Today there is one type,
- * `document`; form submissions (#1724) and plugin records (#1728) follow, and
+ * `document`, and `form_submission` (#1724); plugin records (#1728) follow, and
  * this contract grows with them: authors, versions and editing arrived with
  * #1723, and final values follow with #1725. It moves to the SDK in #1728, once two core types have
  * proved its shape.
@@ -58,4 +58,11 @@ interface RouteSubjectProviderInterface
      * new revision. Form submissions can (#1724).
      */
     public function editableWhenSentBack(): bool;
+
+    /**
+     * Whether the subject was taken back (WHIT-920), so nothing further can
+     * happen on its routes. Asked only for a route with no document: a route on
+     * a document is held by the document's own withdrawal.
+     */
+    public function isWithdrawn(int $tenantId, int $subjectId): bool;
 }

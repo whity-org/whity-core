@@ -10,6 +10,7 @@ use Whity\Sdk\Http\Response;
 use Whity\Sdk\PluginFrontendInterface;
 use Whity\Sdk\PluginInterface;
 use Whity\Sdk\PluginRequirementsInterface;
+use Whity\Sdk\Secrets\PluginSecretFieldsInterface;
 
 /**
  * UiKitShowcasePlugin (WC-228 / WC-232 / WC-236 / WC-240 / WC-241)
@@ -59,7 +60,7 @@ use Whity\Sdk\PluginRequirementsInterface;
  * resolves it under the `UiKitShowcase` namespace prefix (directory name) and
  * auto-discovers it without any manual registration.
  */
-final class UiKitShowcasePlugin implements PluginInterface, PluginRequirementsInterface, PluginFrontendInterface
+final class UiKitShowcasePlugin implements PluginInterface, PluginRequirementsInterface, PluginFrontendInterface, PluginSecretFieldsInterface
 {
     /**
      * @inheritDoc
@@ -676,6 +677,12 @@ final class UiKitShowcasePlugin implements PluginInterface, PluginRequirementsIn
      *
      * @inheritDoc
      */
+    /** The secret the `secretField` demo stores (SDK 1.88). */
+    public function getSecretFields(): array
+    {
+        return ['demo_api_key' => ['permission' => 'uikit:view']];
+    }
+
     public function getPermissions(): array
     {
         // `uikit:manage` is declared and NEVER granted, on purpose (#909). The
@@ -1937,6 +1944,18 @@ final class UiKitShowcasePlugin implements PluginInterface, PluginRequirementsIn
                             . 'versioned URL. The web renderer gates the trigger via PermissionButton.',
                         'tone' => 'muted',
                     ],
+                    $this->dataBoundDemo(
+                        'secretField',
+                        'A write-only field the host draws and stores. The plugin declares the key '
+                            . 'and who may change it; the browser only learns whether a value is set.',
+                        [
+                            'type' => 'secretField',
+                            'secret' => 'demo_api_key',
+                            'label' => 'Demo API key',
+                        ],
+                        "['type' => 'secretField', 'secret' => 'demo_api_key', 'label' => 'Demo API key']",
+                        "// The host decides where this field reads and writes",
+                    ),
                     $this->dataBoundDemo(
                         'form',
                         'A form container with input leaves and a submitButton. '

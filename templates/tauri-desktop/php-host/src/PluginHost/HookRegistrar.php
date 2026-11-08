@@ -38,46 +38,60 @@ final class HookRegistrar
                 continue;
             }
 
-            foreach (self::normalize($hookData) as [$callback, $priority]) {
-                $hookManager->listen($eventName, self::wrap($pluginName, $callback), $priority);
+            foreach (self::normalize($hookData) as [$callback, $priority, $observe]) {
+                $hookManager->listen(
+                    $eventName,
+                    $observe ? self::wrapObserveOnly($pluginName, $callback) : self::wrap($pluginName, $callback),
+                    $priority
+                );
             }
         }
     }
 
     /**
-     * Normalize a getHooks() entry into a flat list of [callable, priority] pairs.
+     * Normalize a getHooks() entry into a flat list of [callable, priority, observe] entries.
      *
-     * @return list<array{0: callable, 1: int}>
+     * @return list<array{0: callable, 1: int, 2: bool}>
      */
     private static function normalize(mixed $hookData): array
     {
         if (is_callable($hookData)) {
-            return [[$hookData, 10]];
+            return [[$hookData, 10, false]];
         }
 
         if (!is_array($hookData)) {
             return [];
         }
 
-        // A single structured subscription: ['callback' => ..., 'priority' => ...].
+        // A single structured subscription: ['callback' => ..., 'priority' => ..., 'observe' => ...].
         if (isset($hookData['callback']) && is_callable($hookData['callback'])) {
-            $priority = is_int($hookData['priority'] ?? null) ? $hookData['priority'] : 10;
-
-            return [[$hookData['callback'], $priority]];
+            return [self::structured($hookData)];
         }
 
         // A list of callables or structured subscriptions.
         $entries = [];
         foreach ($hookData as $item) {
             if (is_callable($item)) {
-                $entries[] = [$item, 10];
+                $entries[] = [$item, 10, false];
             } elseif (is_array($item) && isset($item['callback']) && is_callable($item['callback'])) {
-                $priority = is_int($item['priority'] ?? null) ? $item['priority'] : 10;
-                $entries[] = [$item['callback'], $priority];
+                $entries[] = self::structured($item);
             }
         }
 
         return $entries;
+    }
+
+    /**
+     * @param array<mixed> $subscription Has a callable 'callback'.
+     * @return array{0: callable, 1: int, 2: bool}
+     */
+    private static function structured(array $subscription): array
+    {
+        /** @var callable $callback */
+        $callback = $subscription['callback'];
+        $priority = is_int($subscription['priority'] ?? null) ? $subscription['priority'] : 10;
+
+        return [$callback, $priority, ($subscription['observe'] ?? false) === true];
     }
 
     private static function wrap(string $pluginName, callable $callback): callable
@@ -94,6 +108,24 @@ final class HookRegistrar
                 error_log("[php-host] plugin '{$pluginName}' hook callback threw " . get_class($e) . ': ' . $e->getMessage());
 
                 return $data;
+            }
+        };
+    }
+
+    /**
+     * An observe-only listener (SDK 1.89): its return value is ignored, it holds
+     * its own copy of the payload, and a veto it throws does not cross this
+     * boundary. Matches production's PluginLoader::wrapObserveOnlyCallback().
+     */
+    private static function wrapObserveOnly(string $pluginName, callable $callback): callable
+    {
+        return function (array $data, array $context = []) use ($pluginName, $callback): void {
+            try {
+                $callback($data, $context);
+            } catch (HookVetoException $e) {
+                error_log("[php-host] plugin '{$pluginName}' threw a veto from an observe-only listener on \"{$e->eventName()}\"; ignored.");
+            } catch (\Throwable $e) {
+                error_log("[php-host] plugin '{$pluginName}' hook callback threw " . get_class($e) . ': ' . $e->getMessage());
             }
         };
     }

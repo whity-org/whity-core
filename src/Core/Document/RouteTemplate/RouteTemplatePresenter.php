@@ -110,6 +110,9 @@ final class RouteTemplatePresenter
             'satisfied_by' => $step['satisfied_by'],
             // WHIT-919: whether this stage may send the subject back to its author.
             'allow_send_back' => $step['allow_send_back'] ?? true,
+            // WHIT-921: `finalise` on the final document stage, null on the rest.
+            'kind' => $step['kind'] ?? null,
+            'final_template_id' => $step['final_template_id'] ?? null,
             'canvas_x' => $step['canvas_x'],
             'canvas_y' => $step['canvas_y'],
         ];

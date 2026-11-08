@@ -48,9 +48,13 @@ final class ScheduleRunCommand implements CliCommand
     private LoggerInterface $logger;
     /** @var \Closure(int): void */
     private \Closure $sleeper;
+    /** @var (\Closure(): void)|null */
+    private ?\Closure $syncPluginSchedules;
+    private bool $pluginSchedulesSynced = false;
 
     /**
      * @param \Closure(int): void|null $sleeper Idle sleeper (seconds); default sleep(), a no-op in tests.
+     * @param (\Closure(): void)|null $syncPluginSchedules Reconciles plugins' declared schedules (WHIT-1031).
      */
     public function __construct(
         ?ScheduledJobRepository $schedules = null,
@@ -59,17 +63,20 @@ final class ScheduleRunCommand implements CliCommand
         ?JobRepository $jobs = null,
         ?LoggerInterface $logger = null,
         ?\Closure $sleeper = null,
-        private ?\Whity\Core\Plugin\PluginRecords $pluginRecords = null
+        private ?\Whity\Core\Plugin\PluginRecords $pluginRecords = null,
+        ?\Closure $syncPluginSchedules = null
     ) {
         $this->logger = $logger ?? new NullLogger();
         if ($schedules === null || $queue === null || $store === null || $jobs === null) {
             $pdo = Database::connect()->getPdo();
             $this->pluginRecords ??= new \Whity\Core\Plugin\PluginRecords($pdo);
             $schedules ??= new ScheduledJobRepository($pdo);
+            $syncPluginSchedules ??= $this->pluginScheduleSync($schedules);
             $queue ??= new QueueService(new JobRepository($pdo));
             $store ??= new DatabaseSharedStore($pdo);
             $jobs ??= new JobRepository($pdo);
         }
+        $this->syncPluginSchedules = $syncPluginSchedules;
         $this->schedules = $schedules;
         $this->queue = $queue;
         $this->store = $store;
@@ -124,6 +131,16 @@ final class ScheduleRunCommand implements CliCommand
             return 0;
         }
 
+        // WHIT-1031: declared plugin schedules, on start and every five minutes.
+        if ($this->syncPluginSchedules !== null && (!$this->pluginSchedulesSynced || (int) $now->format('i') % 5 === 0)) {
+            $this->pluginSchedulesSynced = true;
+            try {
+                ($this->syncPluginSchedules)();
+            } catch (\Throwable $e) {
+                $this->logger->error('[schedule:run] plugin schedule sync failed', ['error' => $e->getMessage()]);
+            }
+        }
+
         $nowStr = $now->format('Y-m-d H:i:s');
         $dispatched = 0;
         foreach ($this->schedules->claimDue($nowStr) as $schedule) {
@@ -136,6 +153,8 @@ final class ScheduleRunCommand implements CliCommand
                     'tenant_id'       => $tenantId,
                     'queue'           => (string) $schedule['queue'],
                     'idempotency_key' => 'sched:' . $id . ':' . $bucket,
+                    // A plugin can read its own scheduled runs back (WHIT-1031).
+                    'retain_result'   => str_contains($name, ':'),
                 ]);
                 $next = (new CronExpression((string) $schedule['cron_expression']))->nextRunAfter($now)->format('Y-m-d H:i:s');
                 $this->schedules->markRan($id, $nowStr, $next);
@@ -181,6 +200,25 @@ final class ScheduleRunCommand implements CliCommand
         ]);
 
         return $dispatched;
+    }
+
+    /**
+     * @return \Closure(): void
+     */
+    private function pluginScheduleSync(ScheduledJobRepository $schedules): \Closure
+    {
+        $loader = null;
+
+        return function () use (&$loader, $schedules): void {
+            if ($loader === null) {
+                $loader = \Whity\Core\Queue\PluginJobs::register(new \Whity\Core\Queue\JobRegistry(), null, $this->logger);
+            } else {
+                $loader->reload();
+            }
+            if ($loader !== null) {
+                (new \Whity\Core\Scheduler\PluginSchedules($schedules, $this->logger))->sync($loader->collectSchedules());
+            }
+        };
     }
 
     /**

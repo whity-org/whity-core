@@ -57,7 +57,8 @@ final class FormRepository
                              created_by_profile_id, created_at, updated_at,
                              open_to_members, members_opened_at, members_opened_by_profile_id,
                              public_enabled, public_slug, public_opens_at, public_closes_at,
-                             public_enabled_at, public_enabled_by_profile_id,
+                             public_enabled_at, public_enabled_by_profile_id, public_requires_sign_in,
+                             final_template_id, final_document_to_applicant,
                              ' . self::WINDOW_OPEN_SQL . ' AS public_window_open';
 
     /**
@@ -532,6 +533,19 @@ final class FormRepository
             $sets[] = 'route_template_id = :route_template_id';
             $params[':route_template_id'] = $changes['route_template_id'];
         }
+        if (array_key_exists('public_requires_sign_in', $changes)) {
+            // A literal, not a bound PHP bool: PDO binds `false` as '' on PostgreSQL.
+            $sets[] = 'public_requires_sign_in = ' . ($changes['public_requires_sign_in'] === true ? 'TRUE' : 'FALSE');
+        }
+        // WHIT-921: the form's "Final document template", and whether the person
+        // who sent it can open the final document.
+        if (array_key_exists('final_template_id', $changes)) {
+            $sets[] = 'final_template_id = :final_template_id';
+            $params[':final_template_id'] = $changes['final_template_id'];
+        }
+        if (array_key_exists('final_document_to_applicant', $changes)) {
+            $sets[] = 'final_document_to_applicant = ' . ($changes['final_document_to_applicant'] === true ? 'TRUE' : 'FALSE');
+        }
         if (array_key_exists('reference_format', $changes)) {
             $sets[] = 'reference_format = :reference_format';
             $params[':reference_format'] = $changes['reference_format'];
@@ -605,6 +619,21 @@ final class FormRepository
      * binds `tenant_id`, so a template id from another tenant is absent — a form
      * cannot be wired to another organisation's flow by guessing an integer.
      */
+    /**
+     * WHIT-921: whether this workspace has a document template with this id,
+     * for the form's "Final document template".
+     */
+    public function documentTemplateExists(int $tenantId, int $sourceId): bool
+    {
+        $stmt = $this->db->prepare(
+            "SELECT 1 FROM document_sources
+              WHERE tenant_id = :tenant_id AND id = :id AND kind = 'template' LIMIT 1"
+        );
+        $stmt->execute([':tenant_id' => $tenantId, ':id' => $sourceId]);
+
+        return $stmt->fetch(PDO::FETCH_ASSOC) !== false;
+    }
+
     public function routeTemplateExists(int $tenantId, int $routeTemplateId): bool
     {
         $stmt = $this->db->prepare(
@@ -701,6 +730,10 @@ final class FormRepository
             'status' => $status,
             'version' => (int) $row['version'],
             'route_template_id' => $row['route_template_id'] === null ? null : (int) $row['route_template_id'],
+            // WHIT-921: the template a route's final document is made with, when
+            // the finalise stage names none; and whether the applicant gets it.
+            'final_template_id' => ($row['final_template_id'] ?? null) === null ? null : (int) $row['final_template_id'],
+            'final_document_to_applicant' => DbBool::of($row['final_document_to_applicant'] ?? true),
             // S5: so the builder can say "Routed to" without `route_templates:read`.
             'route_template_name' => isset($row['route_template_name']) ? (string) $row['route_template_name'] : null,
             'created_by_profile_id' => $row['created_by_profile_id'] === null
@@ -722,6 +755,8 @@ final class FormRepository
             // would report every form in the install as open to the public. See
             // {@see \Whity\Core\Db\DbBool} and scripts/ci-db-bool-guard.php.
             'public_enabled' => DbBool::of($row['public_enabled'] ?? false),
+            // WHIT-920: the public link asks visitors to sign in first.
+            'public_requires_sign_in' => DbBool::of($row['public_requires_sign_in'] ?? false),
             // The slug is returned to tenant members, and that is a decision
             // rather than an oversight: it is not a secret FROM them. The point
             // of enabling a link is to hand it out, so an author who cannot read

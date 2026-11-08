@@ -337,7 +337,11 @@ final class DocumentOrganizerApiRealEngineTest extends TestCase
         // notify somebody, so it points at the trail as well. Same argument on
         // the scenario's terms — an installation with no route events has never
         // reached a stage, so nothing could have fired an effect at one.
+        // `route_signatures` (migration 232) is the fourth: a signature points at
+        // the trail entry it was made on, and no signature can exist where no
+        // route event ever did.
         $this->pdo->exec('DROP TABLE meeting_decisions');
+        $this->pdo->exec('DROP TABLE route_signatures');
         $this->pdo->exec('DROP TABLE document_route_effect_attempts');
         $this->pdo->exec('DROP TABLE document_route_recipients');
         $this->pdo->exec('DROP TABLE document_route_events');

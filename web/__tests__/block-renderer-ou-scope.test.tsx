@@ -35,6 +35,8 @@ import { ToastProvider } from '@/lib/toast-context';
 
 jest.mock('@/lib/api-client', () => ({ apiClient: jest.fn() }));
 jest.mock('@/hooks/useActionPermission', () => ({ useActionPermission: jest.fn() }));
+let mockLanguage: string | null = null;
+jest.mock('../../packages/features/src/i18n/useLanguageCode', () => ({ useLanguageCode: () => mockLanguage }));
 
 const mockApiClient = apiClient as jest.MockedFunction<typeof apiClient>;
 const mockUseActionPermission =
@@ -86,6 +88,7 @@ function stubHost(options: { units?: unknown[]; types?: unknown[]; unitsFail?: b
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockLanguage = null;
   mockUseActionPermission.mockReturnValue({
     allowed: true,
     hidden: false,
@@ -363,5 +366,38 @@ describe('ouScopePicker — what the author controls', () => {
     const options = (await screen.findAllByRole('option')).map((el) => (el.textContent ?? '').trim());
     expect(options).not.toContain('All organizational units');
     expect(options).toContain('Engineering');
+  });
+});
+
+describe('ouScopePicker: unit names (#821)', () => {
+  const NAMED_UNITS = [
+    { id: 1, name: 'الموارد البشرية', name_language: 'ar', names: { ar: 'الموارد البشرية', en: 'Human Resources' }, parent_id: null },
+    { id: 2, name: 'المالية', name_language: 'ar', names: { ar: 'المالية' }, parent_id: null },
+  ];
+
+  it("offers units in the reader's language, the original when there is none, and writes the id", async () => {
+    mockLanguage = 'en';
+    stubHost({ units: NAMED_UNITS });
+    renderWrapped(<BlockRenderer blocks={[pickerForm()]} />);
+    await ready();
+
+    await userEvent.click(screen.getByRole('combobox', { name: /applies to/i }));
+    expect(await screen.findByRole('option', { name: /المالية/ })).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole('option', { name: /Human Resources/ }));
+    await userEvent.click(screen.getByRole('button', { name: /save/i }));
+
+    await waitFor(() => expect(submittedPayload()).toBeDefined());
+    expect(JSON.stringify(submittedPayload())).toContain('"unit":1');
+  });
+
+  it('shows the Arabic name to an Arabic reader', async () => {
+    mockLanguage = 'ar';
+    stubHost({ units: NAMED_UNITS });
+    renderWrapped(<BlockRenderer blocks={[pickerForm()]} />);
+    await ready();
+
+    await userEvent.click(screen.getByRole('combobox', { name: /applies to/i }));
+    expect(await screen.findByRole('option', { name: /الموارد البشرية/ })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: /Human Resources/ })).not.toBeInTheDocument();
   });
 });

@@ -21,10 +21,14 @@ import { IconAlertCircle, IconCopy, IconForms, IconPlus } from '@tabler/icons-re
 import { useTranslation, type TranslateFn } from '@whity/features/i18n';
 import { SETTINGS_MANAGE, SYSTEM_TENANT_ID } from '../settings-shared';
 
+/** What a key opens: a form takes submissions, a read shows something. Null: its plugin isn't loaded. */
+type RouteKind = 'form' | 'read' | null;
+
 interface FormKey {
   id: number;
   plugin: string;
   form: string;
+  kind: RouteKind;
   label: string;
   key_hint: string;
   allowed_origins: string[];
@@ -35,6 +39,7 @@ interface FormKey {
 interface FormRoute {
   plugin: string;
   form: string;
+  kind: RouteKind;
 }
 
 interface KeysPayload {
@@ -55,6 +60,7 @@ interface BotSettings {
 interface IssuedKey {
   key: string;
   path: string;
+  kind: RouteKind;
 }
 
 const PROVIDER_LABELS: Readonly<Record<string, string>> = { turnstile: 'Cloudflare Turnstile' };
@@ -99,6 +105,13 @@ async function readError(res: Response, fallback: string, t: TranslateFn): Promi
     // no JSON body
   }
   return fallback;
+}
+
+/** A key's kind in words, on its card and in the list of what a key can open. */
+function kindLabel(t: TranslateFn, kind: 'form' | 'read'): string {
+  return kind === 'read'
+    ? t('settings.publicForms.kind.read', 'Read-only link')
+    : t('settings.publicForms.kind.form', 'Form');
 }
 
 function splitOrigins(text: string): string[] {
@@ -163,7 +176,12 @@ export default function PublicFormsPage() {
       addToast(await readError(res, t('settings.publicForms.revoke.failed', 'The key could not be revoked'), t), 'error');
       return;
     }
-    addToast(t('settings.publicForms.revoke.done', 'Key revoked. Its form no longer takes submissions.'), 'success');
+    addToast(
+      revoking.kind === 'read'
+        ? t('settings.publicForms.revoke.doneRead', 'Key revoked. Its link no longer works.')
+        : t('settings.publicForms.revoke.done', 'Key revoked. Its form no longer takes submissions.'),
+      'success'
+    );
     setRevoking(null);
     refetch();
   };
@@ -271,10 +289,17 @@ export default function PublicFormsPage() {
           if (!open) setRevoking(null);
         }}
         title={t('settings.publicForms.revoke.title', 'Revoke {{label}}?').replace('{{label}}', revoking?.label ?? '')}
-        description={t(
-          'settings.publicForms.revoke.description',
-          'Its form stops taking submissions straight away, on every site using this key. This can’t be undone: to open the form again you’ll issue a new key and update those sites.'
-        )}
+        description={
+          revoking?.kind === 'read'
+            ? t(
+                'settings.publicForms.revoke.descriptionRead',
+                'Its link stops working straight away, on every site using this key. This can’t be undone: to share it again you’ll issue a new key and update those sites.'
+              )
+            : t(
+                'settings.publicForms.revoke.description',
+                'Its form stops taking submissions straight away, on every site using this key. This can’t be undone: to open the form again you’ll issue a new key and update those sites.'
+              )
+        }
         confirmLabel={t('settings.publicForms.revoke.action', 'Revoke key')}
         cancelLabel={t('settings.publicForms.cancel', 'Cancel')}
         onConfirm={handleRevoke}
@@ -294,6 +319,7 @@ function KeyCard({
 }) {
   const t = useTranslation('admin');
   const revoked = formKey.revoked_at !== null;
+  const isRead = formKey.kind === 'read';
 
   return (
     <Card data-testid={`public-form-key-${formKey.id}`} className="border border-border bg-card shadow-sm">
@@ -306,9 +332,14 @@ function KeyCard({
                 ? t('settings.publicForms.status.revoked', 'Revoked')
                 : t('settings.publicForms.status.live', 'Live')}
             </Badge>
+            {formKey.kind !== null && (
+              <Badge variant="outline" className="text-xs" data-testid={`public-form-key-kind-${formKey.id}`}>
+                {kindLabel(t, formKey.kind)}
+              </Badge>
+            )}
           </div>
           <p className="text-sm text-muted-foreground">
-            {t('settings.publicForms.keyFor', 'Opens')}{' '}
+            {isRead ? t('settings.publicForms.keyForRead', 'Shows') : t('settings.publicForms.keyFor', 'Opens')}{' '}
             <span dir="ltr" className="font-mono text-sm">
               {formKey.plugin}/{formKey.form}
             </span>
@@ -359,12 +390,16 @@ function FieldRow({ id, label, hint, children }: { id: string; label: string; hi
   );
 }
 
-function OriginsField({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+function OriginsField({ value, onChange, isRead }: { value: string; onChange: (value: string) => void; isRead: boolean }) {
   const t = useTranslation('admin');
   return (
     <FieldRow
       id="public-form-origins"
-      label={t('settings.publicForms.origins.label', 'Sites that may send this form')}
+      label={
+        isRead
+          ? t('settings.publicForms.origins.labelRead', 'Sites that may read this')
+          : t('settings.publicForms.origins.label', 'Sites that may send this form')
+      }
       hint={t(
         'settings.publicForms.origins.hint',
         'One per line, like https://www.example-bakery.com, with no path. Leave empty to allow only this instance’s own allowed sites.'
@@ -396,6 +431,7 @@ function IssueCard({
   const [label, setLabel] = useState('');
   const [origins, setOrigins] = useState('');
   const [busy, setBusy] = useState(false);
+  const chosen = forms.find((f) => `${f.plugin}/${f.form}` === form);
 
   const submit = async () => {
     const [plugin, name] = form.split('/');
@@ -410,8 +446,13 @@ function IssueCard({
       addToast(await readError(res, t('settings.publicForms.issue.failed', 'The key could not be issued'), t), 'error');
       return;
     }
-    const body = (await res.json()) as { data: { key: string; plugin: string; form: string } };
-    onIssued({ key: body.data.key, path: `/api/v1/${body.data.plugin}/forms/${body.data.form}/${body.data.key}` });
+    const body = (await res.json()) as { data: { key: string; plugin: string; form: string; kind: RouteKind } };
+    const segment = body.data.kind === 'read' ? 'public' : 'forms';
+    onIssued({
+      key: body.data.key,
+      path: `/api/v1/${body.data.plugin}/${segment}/${body.data.form}/${body.data.key}`,
+      kind: body.data.kind,
+    });
   };
 
   return (
@@ -420,13 +461,16 @@ function IssueCard({
         <CardTitle>{t('settings.publicForms.issue', 'Issue a key')}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <FieldRow id="public-form-route" label={t('settings.publicForms.form', 'Form')}>
+        <FieldRow id="public-form-route" label={t('settings.publicForms.route', 'What this key opens')}>
           <FieldSelect
             id="public-form-route"
             value={form}
             onChange={setForm}
-            placeholder={t('settings.publicForms.form.placeholder', 'Choose a form')}
-            options={forms.map((f) => ({ value: `${f.plugin}/${f.form}`, label: `${f.plugin} · ${f.form}` }))}
+            placeholder={t('settings.publicForms.route.placeholder', 'Choose one')}
+            options={forms.map((f) => ({
+              value: `${f.plugin}/${f.form}`,
+              label: `${f.plugin} · ${f.form}${f.kind === null ? '' : ` (${kindLabel(t, f.kind)})`}`,
+            }))}
           />
         </FieldRow>
         <FieldRow
@@ -436,7 +480,7 @@ function IssueCard({
         >
           <Input id="public-form-label" value={label} maxLength={120} onChange={(e) => setLabel(e.target.value)} />
         </FieldRow>
-        <OriginsField value={origins} onChange={setOrigins} />
+        <OriginsField value={origins} onChange={setOrigins} isRead={chosen?.kind === 'read'} />
         <div className="flex items-center gap-2">
           <Button
             data-testid="public-forms-issue-submit"
@@ -478,7 +522,14 @@ function IssuedCard({ issued, onDone }: { issued: IssuedKey; onDone: () => void 
       <CardContent className="space-y-3">
         {[
           { id: 'key', label: t('settings.publicForms.issued.key', 'Key'), value: issued.key },
-          { id: 'path', label: t('settings.publicForms.issued.path', 'Address to send the form to'), value: issued.path },
+          {
+            id: 'path',
+            label:
+              issued.kind === 'read'
+                ? t('settings.publicForms.issued.pathRead', 'Address to read it from')
+                : t('settings.publicForms.issued.path', 'Address to send the form to'),
+            value: issued.path,
+          },
         ].map((row) => (
           <div key={row.id} className="space-y-1 rounded-md border border-border bg-muted/20 p-3">
             <p className="text-sm text-muted-foreground">{row.label}</p>
@@ -538,7 +589,7 @@ function EditCard({
         <FieldRow id="public-form-label" label={t('settings.publicForms.label', 'Name')}>
           <Input id="public-form-label" value={label} maxLength={120} onChange={(e) => setLabel(e.target.value)} />
         </FieldRow>
-        <OriginsField value={origins} onChange={setOrigins} />
+        <OriginsField value={origins} onChange={setOrigins} isRead={formKey.kind === 'read'} />
         <div className="flex items-center gap-2">
           <Button variant="outline" disabled={busy || label.trim() === ''} onClick={() => void save()}>
             {t('settings.publicForms.save', 'Save')}

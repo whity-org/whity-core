@@ -43,6 +43,9 @@ final class StoreCatalogueEntry
             // Decides only which install path is offered; each path checks for itself.
             'kind' => ($raw['kind'] ?? null) === 'declarative' ? 'declarative' : 'code',
             'price' => self::price($raw['price'] ?? null),
+            // Store licensing (PR-4): every way to buy it, and whether it needs a licence at all.
+            'paid' => ($raw['paid'] ?? false) === true,
+            'prices' => self::prices($raw['prices'] ?? null),
             'used_by' => is_int($raw['used_by'] ?? null) && $raw['used_by'] >= 0 ? $raw['used_by'] : null,
             'updated_at' => self::date($raw['updated_at'] ?? null),
             'adds' => self::adds($raw['adds'] ?? null),
@@ -75,6 +78,43 @@ final class StoreCatalogueEntry
             self::textList($value, 128),
             static fn (string $slug): bool => preg_match('/^[a-z][a-z0-9_-]*(:[a-z][a-z0-9_-]*)+$/', $slug) === 1
         ));
+    }
+
+    /**
+     * @return list<array{plan: string, period: string, currency: string, amount: string, trial_days: int|null}>
+     */
+    private static function prices(mixed $value): array
+    {
+        if (!is_array($value)) {
+            return [];
+        }
+        $prices = [];
+        foreach (array_slice($value, 0, 12) as $price) {
+            if (!is_array($price)) {
+                continue;
+            }
+            $plan = $price['plan'] ?? null;
+            $period = $price['period'] ?? null;
+            $currency = $price['currency'] ?? null;
+            $amount = $price['amount'] ?? null;
+            $trial = $price['trial_days'] ?? null;
+            if (!is_string($plan) || preg_match('/^[a-z0-9][a-z0-9_-]{0,63}$/', $plan) !== 1
+                || !in_array($period, ['month', 'year', 'once'], true)
+                || !is_string($currency) || preg_match('/^[A-Z]{3}$/', $currency) !== 1
+                || !is_string($amount) || preg_match('/^\d{1,12}(\.\d{1,3})?$/', $amount) !== 1
+            ) {
+                continue;
+            }
+            $prices[] = [
+                'plan' => $plan,
+                'period' => $period,
+                'currency' => $currency,
+                'amount' => $amount,
+                'trial_days' => is_int($trial) && $trial > 0 && $trial <= 365 ? $trial : null,
+            ];
+        }
+
+        return $prices;
     }
 
     /** @return array{amount: string, currency: string, interval: string|null}|null */

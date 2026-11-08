@@ -89,7 +89,10 @@ export type UserActivityResult = UserActivityEntry[] | 'forbidden';
 /** One selectable organisational unit. */
 export interface OuOption {
   id: number;
+  /** The original name. */
   name: string;
+  /** The name in every language it has, original included. */
+  names?: Record<string, string | undefined> | null;
 }
 
 /**

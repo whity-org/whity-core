@@ -298,6 +298,22 @@ final class PluginManifest
     }
 
     /**
+     * Starter templates (SDK 1.81), as declared under `documents.starters`,
+     * keyed by local name. The host seeds each into a workspace when the
+     * plugin goes live there; see {@see DocumentStarterValidator}.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    public function documentStarters(): array
+    {
+        $documents = $this->map('documents');
+        $starters = $documents['starters'] ?? [];
+
+        /** @var array<string, array<string, mixed>> */
+        return is_array($starters) ? $starters : [];
+    }
+
+    /**
      * Agent presets (SDK 1.61), as declared under `agentPresets`, keyed by local
      * name. The host addresses each as `<plugin toolset root>.<key>`.
      *
