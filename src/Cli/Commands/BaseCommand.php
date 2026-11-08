@@ -380,7 +380,8 @@ abstract class BaseCommand implements CliCommand, CommandHelp
         $settingsService = new \Whity\Core\Settings\SettingsService(
             new \Whity\Core\Settings\GlobalSettingsRepository($db->getPdo()),
             new \Whity\Core\Settings\TenantSettingsRepository($db->getPdo()),
-            $settingsCatalog
+            $settingsCatalog,
+            $hookManager,
         );
         \Whity\register_service(\Whity\Core\Settings\SettingsService::class, $settingsService);
 
@@ -588,6 +589,11 @@ abstract class BaseCommand implements CliCommand, CommandHelp
             $db->getPdo(),
             static fn (): \Whity\Core\Security\EncryptedSecretStore => \Whity\Core\Security\EncryptedSecretStore::fromEnv($_ENV),
             $auditLogger,
+        ));
+        // WHIT-1016 (SDK 1.88): a plugin's own settings, as in public/index.php.
+        \Whity\register_service(\Whity\Sdk\Settings\PluginSettings::class, new \Whity\Core\Plugin\HostPluginSettings(
+            $settingsService,
+            static fn (): array => $pluginLoader->getPlugins(),
         ));
         // SDK 1.63 (WHIT-886): plugin files and plugin documents with QR
         // tracking, as in public/index.php, so a plugin's job reaches the same

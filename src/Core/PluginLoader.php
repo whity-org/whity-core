@@ -31,6 +31,7 @@ use Whity\Core\Queue\InvalidPluginJobException;
 use Whity\Core\Queue\JobRegistry;
 use Whity\Core\Settings\InvalidSettingDeclarationException;
 use Whity\Core\Settings\PluginSettingsRegistry;
+use Whity\Sdk\Secrets\PluginSecretFieldsInterface;
 use Whity\Sdk\Settings\PluginSettingsInterface;
 use Whity\Sdk\DataType\PluginDataTypesInterface;
 use Whity\Sdk\Ou\PluginOuTypesInterface;
@@ -4037,6 +4038,15 @@ class PluginLoader
 
         $validated = [];
         $dropped = [];
+        // SDK 1.88: the secrets a `secretField` block may name.
+        $secretFields = [];
+        if ($plugin instanceof PluginSecretFieldsInterface) {
+            try {
+                $secretFields = $plugin->getSecretFields();
+            } catch (Throwable $e) {
+                $this->handlePluginThrowable($pluginKey, $e, 'getSecretFields');
+            }
+        }
         foreach ($declared as $descriptor) {
             $normalized = $this->validateFrontendFeature(
                 $descriptor,
@@ -4045,7 +4055,8 @@ class PluginLoader
                 $ownPermissions,
                 $registeredGetRoutes,
                 $registeredWriteRoutes,
-                $dropped
+                $dropped,
+                $secretFields
             );
             if ($normalized !== null) {
                 $validated[] = $normalized;
@@ -4157,6 +4168,7 @@ class PluginLoader
      *        method reports through the one `$drop` closure, so recording there
      *        captures the whole catalogue at once — and a rule added later
      *        cannot forget to surface itself.
+     * @param array<string, mixed> $secretFields The secrets a `secretField` block may name (SDK 1.88).
      * @return array<string, mixed>|null The normalized descriptor, or null when dropped.
      */
     private function validateFrontendFeature(
@@ -4166,7 +4178,8 @@ class PluginLoader
         array $ownPermissions,
         array $registeredGetRoutes,
         array $registeredWriteRoutes = [],
-        array &$dropped = []
+        array &$dropped = [],
+        array $secretFields = []
     ): ?array {
         $drop = function (string $reason, ?string $id) use ($pluginKey, $pluginName, &$dropped): null {
             $idLabel = $id !== null ? "'{$id}'" : '(no id)';
@@ -4469,8 +4482,12 @@ class PluginLoader
             // closure, so it has no `$this` to call `versionedPath()` on.
             $router = $this->router;
 
+            $slug = \Whity\Sdk\PluginNamespace::slug($pluginName);
+
             $walkNode = null;
             $walkNode = static function (array $node) use (
+                $slug,
+                $secretFields,
                 $registeredGetRoutes,
                 $registeredWriteRoutes,
                 $router,
@@ -4480,6 +4497,18 @@ class PluginLoader
             ): ?array {
                 $type = $node['type'] ?? null;
                 if (is_string($type)) {
+                    // SDK 1.88: the host, not the screen, decides where a secret
+                    // field reads and writes.
+                    if ($type === 'secretField') {
+                        $secret = $node['secret'] ?? null;
+                        if (!is_string($secret) || $slug === null || !array_key_exists($secret, $secretFields)) {
+                            $dropReason = "secretField '" . (is_string($secret) ? $secret : '') . "' is not a secret this plugin declares";
+
+                            return null;
+                        }
+                        $node['endpoint'] = $router->versionedPath('/api/plugin-secrets/' . $slug . '/' . $secret);
+                    }
+
                     $rule = \Whity\Sdk\Frontend\Blocks\BlockContract::rulesFor($type);
                     $sourceKind = $rule !== null ? ($rule['props']['source']['type'] ?? null) : null;
                     // `array_key_exists` and not just the kind: since `fieldArray`

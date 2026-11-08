@@ -1698,6 +1698,39 @@ public function getMcpResources(): array
 
 Scope what `read` returns to `$context->tenantId`. At most 1 MB is served. A revoke (`agent-context revoke <name>`) applies to the next call. A new grant applies once workers reload plugins (`plugin reload`) or restart.
 
+## Step 12f — Read your settings, and take a secret from a screen (SDK 1.88)
+
+Declare keys with `PluginSettingsInterface`, then read and write them for the
+current workspace. No call names a workspace, and only your own keys resolve:
+
+```php
+$settings = \Whity\app(\Whity\Sdk\Settings\PluginSettings::class)->for($this);
+$interval = $settings->get('sync_interval'); // int, as declared
+$settings->set('sync_interval', 600);        // checked against the declaration
+$settings->reset('sync_interval');           // follow the deployment's value again
+```
+
+`Events::PLUGIN_SETTINGS_CHANGED` fires after a change, including one made on a
+settings screen. It carries `tenant_id` (null for a deployment-wide change),
+`plugin`, `key` and `actor_profile_id`, never the value.
+
+For an API key or password, implement `PluginSecretFieldsInterface` and put a
+`secretField` block on a screen:
+
+```php
+public function getSecretFields(): array
+{
+    return ['api_key' => ['permission' => 'acme:settings:manage']];
+}
+
+// In a blocks screen:
+['type' => 'secretField', 'secret' => 'api_key', 'label' => 'API key']
+```
+
+The host draws the field, checks the permission and stores the value in your
+`SecretStore` for that person's workspace. The browser only learns whether it is
+set. A block naming a secret you did not declare drops the screen at load.
+
 ## Step 13 — Declare it in `plugin.json` instead (SDK 1.47)
 
 Everything a plugin only *declares* can live in a JSON file instead of PHP methods: its identity and requirements, permissions, roles, `blocks` screens, owned tables, data types and limits. Put `plugin.json` next to an empty class:

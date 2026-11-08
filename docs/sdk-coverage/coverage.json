@@ -1,6 +1,6 @@
 {
     "$comment": "Plugin SDK coverage matrix: the single source of truth. Edit this file, then run `php scripts/sdk-coverage.php` to regenerate docs/wiki/Plugin-SDK-Coverage.md. CI fails when sdk_version is behind Sdk::VERSION, when an SDK minor in the Sdk.php ledger is not named by any `since`, or when the generated page is stale. Security notes say only that a design is needed; vulnerabilities go through SECURITY.md, never here.",
-    "sdk_version": "1.87.0",
+    "sdk_version": "1.88.0",
     "core_version": "0.2.26",
     "updated": "2026-11-06",
     "ratings": {
@@ -635,14 +635,16 @@
                 {
                     "what": "Declared, typed, namespaced settings keys",
                     "since": "1.21"
+                },
+                {
+                    "what": "Read and write the plugin's own keys in the current workspace, and a settings-changed event",
+                    "since": "1.88"
                 }
             ],
             "missing": [
-                "An SDK reader and writer for the plugin's own keys",
-                "A settings-changed event",
                 "A settings page per plugin and per workspace"
             ],
-            "security": "The internal settings service also covers core and install-wide keys. The SDK reader must be limited to the plugin's own keys in the current workspace.",
+            "security": null,
             "plan": "0.2.27"
         },
         {
@@ -654,10 +656,13 @@
                 {
                     "what": "PluginSecrets: encrypted per plugin and workspace",
                     "since": "1.60"
+                },
+                {
+                    "what": "A host-rendered secret entry field that never returns the value",
+                    "since": "1.88"
                 }
             ],
             "missing": [
-                "A host-rendered secret entry field",
                 "Listing and rotation"
             ],
             "security": "The host, not the caller, must decide which plugin and workspace a store belongs to.",
