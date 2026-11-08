@@ -47,7 +47,7 @@ final class ActingAs
      */
     public static function engine(int $tenantId): self
     {
-        return new self($tenantId, 0, static fn (string $permission): bool => false, null, true);
+        return new self($tenantId, 0, static fn (string $permission): bool => false, engine: true);
     }
 
     /** The profile to record as the issuer: none for a plugin in the background, or for the engine. */

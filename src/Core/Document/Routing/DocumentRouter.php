@@ -2327,24 +2327,8 @@ final class DocumentRouter
         foreach ($steps as $i => $step) {
             $position = $i + 1;
 
-            // WHIT-921: `kind` is needed only for what the older fields cannot
-            // say. `finalise` is the one that can be authored today.
-            $stepKind = $step['kind'] ?? null;
-            if ($stepKind !== null && (!is_string($stepKind) || !RouteStepKind::isValid($stepKind))) {
-                throw RoutingRejectedException::because(sprintf(
-                    "Step %d: 'kind' must be one of: %s.",
-                    $position,
-                    implode(', ', RouteStepKind::all()),
-                ));
-            }
-            if ($stepKind === RouteStepKind::SIGN || $stepKind === RouteStepKind::STAMP) {
-                throw RoutingRejectedException::because(sprintf(
-                    "Step %d: '%s' steps are not available yet.",
-                    $position,
-                    $stepKind,
-                ));
-            }
-            if ($stepKind === RouteStepKind::FINALISE) {
+            // WHIT-921: a finalise step names no rule, so it is checked on its own.
+            if (($step['kind'] ?? null) === RouteStepKind::FINALISE) {
                 $out[] = $this->validateFinaliseStep($tenantId, $step, $position, count($steps));
                 continue;
             }
@@ -2410,7 +2394,7 @@ final class DocumentRouter
                     implode(', ', RouteStepKind::all()),
                 ));
             }
-            if ($stepKind === RouteStepKind::STAMP || $stepKind === RouteStepKind::FINALISE) {
+            if ($stepKind === RouteStepKind::STAMP) {
                 throw RoutingRejectedException::because(sprintf(
                     "Step %d: '%s' steps are not available yet.",
                     $position,
@@ -2603,7 +2587,7 @@ final class DocumentRouter
      * @return array{rule_kind: string, rule_config: array<string, mixed>, label: ?string,
      *               decision: bool, decision_quorum: ?string, satisfied_by: string,
      *               allow_send_back: bool, edges: array<string, int>, kind: ?string,
-     *               final_template_id: ?int}
+     *               sign_capacity: ?string, sign_on_behalf_of: ?string, final_template_id: ?int}
      *
      * @throws RoutingRejectedException
      */
@@ -2658,6 +2642,8 @@ final class DocumentRouter
             'allow_send_back' => false,
             'edges' => [],
             'kind' => RouteStepKind::FINALISE,
+            'sign_capacity' => null,
+            'sign_on_behalf_of' => null,
             'final_template_id' => $templateId,
         ];
     }

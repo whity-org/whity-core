@@ -4210,6 +4210,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/form-submissions/{id}/final-document": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The final document of the caller's own submission
+         * @description When its route made one and the form lets the person who sent it have it. Anybody else's submission, and a document still waiting, is a 404.
+         */
+        get: operations["get_api_v1_me_form_submissions_id_final_document"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/form-submissions/{id}/withdraw": {
         parameters: {
             query?: never;
@@ -6541,6 +6561,46 @@ export interface paths {
         get: operations["get_api_v1_routes_routeid_files_fileid"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/routes/{routeId}/final-document": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The final document a route's finalise step made
+         * @description For a person who may read the route. A 404 while the final document is still waiting.
+         */
+        get: operations["get_api_v1_routes_routeid_final_document"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/routes/{routeId}/final-document/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Try again to make the final document of a route
+         * @description For a failed or waiting final document. The caller may read the route and either started it, or may route documents (a document) or manage forms (a form submission). The queue makes it.
+         */
+        post: operations["post_api_v1_routes_routeid_final_document_retry"];
         delete?: never;
         options?: never;
         head?: never;
@@ -9457,7 +9517,7 @@ export interface components {
             title?: string | null;
             /** @description Ordered steps, at least one. Each names a `rule_kind` (see GET /api/routing-rules) and its `rule_config`, deciding who receives the document at that step. A step with `decision: true` is an approval gate whose `on_approved`/`on_rejected` name 1-based step positions. */
             steps: {
-                rule_kind: string;
+                rule_kind?: string;
                 rule_config?: {
                     [key: string]: unknown;
                 };
@@ -9471,11 +9531,13 @@ export interface components {
                 satisfied_by?: "act" | "delivery";
                 allow_send_back?: boolean;
                 /** @enum {string|null} */
-                kind?: "sign" | null;
+                kind?: "sign" | "finalise" | null;
                 /** @description On a signing step: the capacity the signer signs in, such as "Director". At most 200 characters. */
                 sign_capacity?: string | null;
                 /** @description On a signing step: whom the signer signs for, such as the workspace. At most 200 characters. */
                 sign_on_behalf_of?: string | null;
+                /** @description On a `finalise` step: the document template to render with. Absent uses the template the subject names: the final document template of a form, or the template of a document. */
+                final_template_id?: number | null;
             }[];
         };
         DocumentRouteEdge: {
@@ -9538,6 +9600,7 @@ export interface components {
             allow_send_back?: boolean;
             sign_capacity?: string | null;
             sign_on_behalf_of?: string | null;
+            final_template_id?: number | null;
             rejection_count: number;
         };
         DocumentSignature: {
@@ -10333,6 +10396,8 @@ export interface components {
             accepts_submissions: boolean;
             public_enabled: boolean;
             public_requires_sign_in?: boolean;
+            final_template_id?: number | null;
+            final_document_to_applicant?: boolean;
             public_slug?: string | null;
             public_url?: string | null;
             public_opens_at?: string | null;
@@ -10722,6 +10787,8 @@ export interface components {
                 /** @enum {string|null} */
                 outcome: "approved" | "rejected" | null;
                 reviewers?: string[];
+                /** @enum {string} */
+                kind?: "finalise";
             }[];
             notes: {
                 /** @enum {string} */
@@ -10736,6 +10803,11 @@ export interface components {
             /** @enum {string|null} */
             resume_from: "sender" | "start" | null;
             shows_reviewers: boolean;
+            final_document?: {
+                /** @enum {string} */
+                status: "waiting" | "ready" | "failed";
+                can_open: boolean;
+            } | null;
         };
         FormSubmissionResubmitRequest: {
             /** @description The changed answers, keyed by field key. A file question left unanswered keeps the file already attached. */
@@ -10804,6 +10876,10 @@ export interface components {
             reference_format?: string | null;
             /** @description The public link asks visitors to sign in: only the workspace's members and customers can send it, under their own name, so it can be sent back to them for changes. */
             public_requires_sign_in?: boolean;
+            /** @description The document template a route's final document stage uses when it names none; null for none. */
+            final_template_id?: number | null;
+            /** @description Whether the person who sent the form can open its final document from My submissions. */
+            final_document_to_applicant?: boolean;
         };
         FormUploadResponse: {
             data: {
@@ -12828,6 +12904,28 @@ export interface components {
             /** @description The complete new permission set, replacing the current one: `[]` revokes everything, omitting the key leaves grants unchanged. */
             permissions?: (number | string)[];
         };
+        RouteFinalisation: {
+            step_id: number;
+            /**
+             * @description `waiting`: being made, or the render service is down and it will be tried again.
+             * @enum {string}
+             */
+            status: "waiting" | "done" | "failed";
+            /** @description Why it waits or failed. Waiting: `render_unavailable`, `error`. Failed: `pdfs_off`, `limit`, `template_missing`, `template_unpublished`, `render_refused`, `refused_by_plugin`, `document_conflict`, `withdrawn`, `no_subject`, `not_approved`, `gave_up`. */
+            reason: string | null;
+            subject_version: number | null;
+            /** @description SHA-256 of the approved version the final document was made from. */
+            content_hash: string | null;
+            document_id: number | null;
+            has_pdf: boolean;
+            reached_at: string;
+            finalised_at: string | null;
+            /** @description On GET /api/routes: the caller may ask for another try (POST .../final-document/retry). */
+            can_retry?: boolean;
+        };
+        RouteFinalisationResponse: {
+            data: components["schemas"]["RouteFinalisation"];
+        };
         RouteTemplate: {
             id: number;
             name: string;
@@ -12874,6 +12972,7 @@ export interface components {
                     id: number;
                     name: string;
                 }[];
+                can_finalise?: boolean;
             };
         };
         RouteTemplateListResponse: {
@@ -12895,6 +12994,9 @@ export interface components {
             /** @enum {string} */
             satisfied_by?: "act" | "delivery";
             allow_send_back?: boolean;
+            /** @enum {string|null} */
+            kind?: "finalise" | null;
+            final_template_id?: number | null;
             canvas_x?: number;
             canvas_y?: number;
         };
@@ -12930,6 +13032,7 @@ export interface components {
                         }[];
                     };
                     can_send_back?: boolean;
+                    finalisation?: components["schemas"]["RouteFinalisation"];
                 })[];
                 /** @description Display names by profile id, for the people on these routes. */
                 people: {
@@ -36519,6 +36622,82 @@ export interface operations {
             };
         };
     };
+    get_api_v1_me_form_submissions_id_final_document: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The PDF */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No final document the caller may open */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The file could not be read from storage */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     post_api_v1_me_form_submissions_id_withdraw: {
         parameters: {
             query?: never;
@@ -48457,6 +48636,158 @@ export interface operations {
             };
             /** @description The file could not be read from storage */
             503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_routes_routeid_final_document: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                routeId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The PDF */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No final document yet, or the route is not visible to the caller */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The file could not be read from storage */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_routes_routeid_final_document_retry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                routeId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Queued again */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RouteFinalisationResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The caller may not manage this route */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Route not found, or not visible to the caller */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description There is no final document to try again */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };

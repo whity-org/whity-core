@@ -28373,6 +28373,99 @@
                 }
             }
         },
+        "/api/v1/me/form-submissions/{id}/final-document": {
+            "get": {
+                "operationId": "get_api_v1_me_form_submissions_id_final_document",
+                "summary": "The final document of the caller's own submission",
+                "tags": [
+                    "forms"
+                ],
+                "description": "When its route made one and the form lets the person who sent it have it. Anybody else's submission, and a document still waiting, is a 404.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The PDF",
+                        "content": {
+                            "application/pdf": {
+                                "schema": {
+                                    "type": "string",
+                                    "format": "binary"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No final document the caller may open",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "The file could not be read from storage",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/me/form-submissions/{id}/withdraw": {
             "post": {
                 "operationId": "post_api_v1_me_form_submissions_id_withdraw",
@@ -43297,6 +43390,191 @@
                     },
                     "503": {
                         "description": "The file could not be read from storage",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/routes/{routeId}/final-document": {
+            "get": {
+                "operationId": "get_api_v1_routes_routeid_final_document",
+                "summary": "The final document a route's finalise step made",
+                "tags": [
+                    "documents"
+                ],
+                "description": "For a person who may read the route. A 404 while the final document is still waiting.",
+                "parameters": [
+                    {
+                        "name": "routeId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The PDF",
+                        "content": {
+                            "application/pdf": {
+                                "schema": {
+                                    "type": "string",
+                                    "format": "binary"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No final document yet, or the route is not visible to the caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "The file could not be read from storage",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/routes/{routeId}/final-document/retry": {
+            "post": {
+                "operationId": "post_api_v1_routes_routeid_final_document_retry",
+                "summary": "Try again to make the final document of a route",
+                "tags": [
+                    "documents"
+                ],
+                "description": "For a failed or waiting final document. The caller may read the route and either started it, or may route documents (a document) or manage forms (a form submission). The queue makes it.",
+                "parameters": [
+                    {
+                        "name": "routeId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Queued again",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RouteFinalisationResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The caller may not manage this route",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Route not found, or not visible to the caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "There is no final document to try again",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -59576,7 +59854,8 @@
                                 "kind": {
                                     "type": "string",
                                     "enum": [
-                                        "sign"
+                                        "sign",
+                                        "finalise"
                                     ],
                                     "nullable": true
                                 },
@@ -59589,11 +59868,13 @@
                                     "type": "string",
                                     "nullable": true,
                                     "description": "On a signing step: whom the signer signs for, such as the workspace. At most 200 characters."
+                                },
+                                "final_template_id": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "description": "On a `finalise` step: the document template to render with. Absent uses the template the subject names: the final document template of a form, or the template of a document."
                                 }
-                            },
-                            "required": [
-                                "rule_kind"
-                            ]
+                            }
                         },
                         "description": "Ordered steps, at least one. Each names a `rule_kind` (see GET /api/routing-rules) and its `rule_config`, deciding who receives the document at that step. A step with `decision: true` is an approval gate whose `on_approved`/`on_rejected` name 1-based step positions."
                     }
@@ -59822,6 +60103,10 @@
                     },
                     "sign_on_behalf_of": {
                         "type": "string",
+                        "nullable": true
+                    },
+                    "final_template_id": {
+                        "type": "integer",
                         "nullable": true
                     },
                     "rejection_count": {
@@ -62350,6 +62635,13 @@
                     "public_requires_sign_in": {
                         "type": "boolean"
                     },
+                    "final_template_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "final_document_to_applicant": {
+                        "type": "boolean"
+                    },
                     "public_slug": {
                         "type": "string",
                         "nullable": true
@@ -63743,6 +64035,12 @@
                                     "items": {
                                         "type": "string"
                                     }
+                                },
+                                "kind": {
+                                    "type": "string",
+                                    "enum": [
+                                        "finalise"
+                                    ]
                                 }
                             },
                             "required": [
@@ -63806,6 +64104,27 @@
                     },
                     "shows_reviewers": {
                         "type": "boolean"
+                    },
+                    "final_document": {
+                        "type": "object",
+                        "properties": {
+                            "status": {
+                                "type": "string",
+                                "enum": [
+                                    "waiting",
+                                    "ready",
+                                    "failed"
+                                ]
+                            },
+                            "can_open": {
+                                "type": "boolean"
+                            }
+                        },
+                        "required": [
+                            "status",
+                            "can_open"
+                        ],
+                        "nullable": true
                     }
                 },
                 "required": [
@@ -64030,6 +64349,15 @@
                     "public_requires_sign_in": {
                         "type": "boolean",
                         "description": "The public link asks visitors to sign in: only the workspace's members and customers can send it, under their own name, so it can be sent back to them for changes."
+                    },
+                    "final_template_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "The document template a route's final document stage uses when it names none; null for none."
+                    },
+                    "final_document_to_applicant": {
+                        "type": "boolean",
+                        "description": "Whether the person who sent the form can open its final document from My submissions."
                     }
                 },
                 "minProperties": 1
@@ -71769,6 +72097,77 @@
                     }
                 }
             },
+            "RouteFinalisation": {
+                "type": "object",
+                "properties": {
+                    "step_id": {
+                        "type": "integer"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "waiting",
+                            "done",
+                            "failed"
+                        ],
+                        "description": "`waiting`: being made, or the render service is down and it will be tried again."
+                    },
+                    "reason": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Why it waits or failed. Waiting: `render_unavailable`, `error`. Failed: `pdfs_off`, `limit`, `template_missing`, `template_unpublished`, `render_refused`, `refused_by_plugin`, `document_conflict`, `withdrawn`, `no_subject`, `not_approved`, `gave_up`."
+                    },
+                    "subject_version": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "content_hash": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "SHA-256 of the approved version the final document was made from."
+                    },
+                    "document_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "has_pdf": {
+                        "type": "boolean"
+                    },
+                    "reached_at": {
+                        "type": "string"
+                    },
+                    "finalised_at": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "can_retry": {
+                        "type": "boolean",
+                        "description": "On GET /api/routes: the caller may ask for another try (POST .../final-document/retry)."
+                    }
+                },
+                "required": [
+                    "step_id",
+                    "status",
+                    "reason",
+                    "subject_version",
+                    "content_hash",
+                    "document_id",
+                    "has_pdf",
+                    "reached_at",
+                    "finalised_at"
+                ]
+            },
+            "RouteFinalisationResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/RouteFinalisation"
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
             "RouteTemplate": {
                 "type": "object",
                 "properties": {
@@ -71948,6 +72347,9 @@
                                         "name"
                                     ]
                                 }
+                            },
+                            "can_finalise": {
+                                "type": "boolean"
                             }
                         },
                         "required": [
@@ -72026,6 +72428,17 @@
                     },
                     "allow_send_back": {
                         "type": "boolean"
+                    },
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "finalise"
+                        ],
+                        "nullable": true
+                    },
+                    "final_template_id": {
+                        "type": "integer",
+                        "nullable": true
                     },
                     "canvas_x": {
                         "type": "integer"
@@ -72165,6 +72578,10 @@
                                                 },
                                                 "can_send_back": {
                                                     "type": "boolean"
+                                                },
+                                                "finalisation": {
+                                                    "$ref": "#/components/schemas/RouteFinalisation",
+                                                    "nullable": true
                                                 }
                                             },
                                             "required": [
