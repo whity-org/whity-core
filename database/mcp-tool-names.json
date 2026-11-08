@@ -1320,6 +1320,10 @@
     "en": "Add permissions to a role",
     "ar": "إضافة صلاحيات إلى دور"
   },
+  "post_api_routes_routeid_actions": {
+    "en": "Act on your item on a route",
+    "ar": "اتخاذ إجراء على عنصرك في مسار"
+  },
   "post_api_signup_requests_id_approve": {
     "en": "Let a waiting person join as a customer",
     "ar": "قبول انضمام شخص كعميل"
