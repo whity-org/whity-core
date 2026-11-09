@@ -57,7 +57,39 @@ final class BrandingService
             faviconUrl: $favicon ?? $square,
             mainColor: $mainColor,
             theme: $theme,
+            installable: self::installableFrom(
+                $this->settings->storedGlobals()[SettingsRegistry::APP_INSTALLABLE] ?? null,
+                $_ENV['PWA_ENABLED'] ?? getenv('PWA_ENABLED'),
+            ),
         );
+    }
+
+    /**
+     * Whether the web app is installable (#1733), from the value an operator
+     * STORED on the settings screen, else the `PWA_ENABLED` environment
+     * variable, else on.
+     *
+     * The stored value is read without registry defaults on purpose: against
+     * the merged view the default 'true' would always be "set", and the
+     * environment variable could never turn an installation off. An env value
+     * that is not a boolean is ignored rather than guessed at.
+     *
+     * @param string|null       $stored The stored global, or null when never set.
+     * @param string|false|null $env    The environment value, false/null when unset.
+     */
+    public static function installableFrom(?string $stored, string|false|null $env): bool
+    {
+        if ($stored !== null && $stored !== '') {
+            return $stored === 'true';
+        }
+        if (is_string($env) && trim($env) !== '') {
+            $parsed = filter_var(trim($env), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+            if ($parsed !== null) {
+                return $parsed;
+            }
+        }
+
+        return true;
     }
 
     /**

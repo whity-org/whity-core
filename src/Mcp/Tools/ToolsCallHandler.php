@@ -8,8 +8,10 @@ use Whity\Auth\RoleChecker;
 use Whity\Auth\TokenValidator;
 use Whity\Core\Audit\AuditContext;
 use Whity\Core\Audit\AuditLoggerInterface;
+use Whity\Core\i18n\RequestLanguageResolver;
 use Whity\Core\Router;
 use Whity\Core\Tenant\TenantContext;
+use Whity\Http\RequestContext;
 use Whity\Mcp\Auth\McpPrincipal;
 use Whity\Sdk\Mcp\McpToolContext;
 use Whity\Mcp\JsonRpc\ErrorCode;
@@ -68,6 +70,8 @@ final class ToolsCallHandler implements MethodHandler
         // declares an undo, what its inverse needs is recorded here for the
         // person to undo it. Null: nothing is recorded and nothing undone.
         private readonly ?AgentActionRepository $actions = null,
+        // WHIT-1015: the language a plugin's route handler reads on its Request.
+        private readonly ?RequestLanguageResolver $languages = null,
     ) {}
 
     /** WHIT-812: on an agent's result, the action to undo and until when. */
@@ -200,15 +204,7 @@ final class ToolsCallHandler implements MethodHandler
         // PHP ignores the extra argument.
         // SDK 1.59 (WHIT-837): and who is calling, so a tool can record
         // "agent X for person Y".
-        $context = new McpToolContext(
-            $tenantId,
-            $principal->profileId,
-            $principal->isAgent() ? McpToolContext::ACTOR_AGENT : McpToolContext::ACTOR_PERSON,
-            $principal->principalKind,
-            $principal->isAgent() ? $principal->agentPrincipalId() : null,
-            $principal->isAgent() ? $principal->agentName : null,
-            $principal->subject,
-        );
+        $context = self::contextFor($principal, $tenantId);
 
         try {
             $result = ($tool['handler'])($arguments, $context);
@@ -689,7 +685,7 @@ final class ToolsCallHandler implements MethodHandler
             array_values(array_filter($principal->scope, 'is_string')),
             $permission !== null ? [$permission] : [],
             $summary,
-            diff: $this->proposalDiffs?->diffFor($toolName, $arguments, $principal->tenantId),
+            diff: $this->proposalDiffs?->diffFor($toolName, $arguments, $principal->tenantId, self::contextFor($principal, $principal->tenantId)),
             // WHIT-812: the card says how long it can be undone once it runs.
             undoWindowSeconds: is_int($tool['_meta'][ToolSurface::META_UNDO_WINDOW] ?? null) ? $tool['_meta'][ToolSurface::META_UNDO_WINDOW] : null,
         );
@@ -709,6 +705,20 @@ final class ToolsCallHandler implements MethodHandler
                 ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
             ]],
         ];
+    }
+
+    /** Who is calling, for a plugin's handler or preview (SDK 1.46, 1.59). */
+    private static function contextFor(McpPrincipal $principal, int $tenantId): McpToolContext
+    {
+        return new McpToolContext(
+            $tenantId,
+            $principal->profileId,
+            $principal->isAgent() ? McpToolContext::ACTOR_AGENT : McpToolContext::ACTOR_PERSON,
+            $principal->principalKind,
+            $principal->isAgent() ? $principal->agentPrincipalId() : null,
+            $principal->isAgent() ? $principal->agentName : null,
+            $principal->subject,
+        );
     }
 
     /**
@@ -944,6 +954,12 @@ final class ToolsCallHandler implements MethodHandler
         ];
         $request->setAttribute(Request::ATTR_JWT_CLAIMS, $claims);
         $request->user = (object) $claims;
+        RequestContext::stamp(
+            $request,
+            $principal->tenantId > 0 ? $principal->tenantId : null,
+            RequestContext::languageOf($this->languages, $principal->userId),
+            $principal->actor()->kind,
+        );
 
         return $request;
     }

@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api/client';
 import type { components } from '@/lib/api/schema';
 import { useToast } from '@/lib/toast-context';
 import { useNavigation } from '@/lib/navigation-context';
 import { useCapabilities } from '@/hooks/useCapabilities';
+import { PaidPluginLicence } from '@/components/plugins/paid-plugin-licence';
 import { useTranslation } from '@whity/features/i18n';
 import { Button } from '@whity/ui/button';
 import { Badge } from '@whity/ui/badge';
@@ -23,6 +24,8 @@ const PLUGINS_ENABLE = 'plugins:enable';
 export interface InstallPluginDialogProps {
   plugin: CataloguePlugin | null;
   storeUrl: string;
+  /** WHIT-1003: this installation is connected to the store, so no token is asked for. */
+  connected?: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
@@ -31,7 +34,7 @@ export interface InstallPluginDialogProps {
  * need price and settings data no API returns yet, so they are left out, and
  * the Stepper counts only the steps shown: Access, then Done.
  */
-export function InstallPluginDialog({ plugin, storeUrl, onOpenChange }: InstallPluginDialogProps) {
+export function InstallPluginDialog({ plugin, storeUrl, connected = false, onOpenChange }: InstallPluginDialogProps) {
   const t = useTranslation('admin');
   const { addToast } = useToast();
   const { hasPermission } = useCapabilities();
@@ -41,6 +44,10 @@ export function InstallPluginDialog({ plugin, storeUrl, onOpenChange }: InstallP
   const [token, setToken] = useState('');
   const [minting, setMinting] = useState(false);
   const [installing, setInstalling] = useState(false);
+  // PR-4: a paid plugin installs only once it is licensed (or in grace) here.
+  const [licenceUsable, setLicenceUsable] = useState(false);
+  const onLicence = useCallback((usable: boolean) => setLicenceUsable(usable), []);
+  const paid = plugin?.paid === true;
   const [error, setError] = useState<string | null>(null);
   const [installed, setInstalled] = useState<PluginEntry | null>(null);
   const [installedSlug, setInstalledSlug] = useState<string | null>(null);
@@ -237,6 +244,13 @@ export function InstallPluginDialog({ plugin, storeUrl, onOpenChange }: InstallP
                   ) : null}
                 </TechnicalDetails>
 
+                {paid ? <PaidPluginLicence plugin={plugin} storeUrl={storeUrl} connected={connected} onUsable={onLicence} /> : null}
+
+                {connected ? (
+                  <p className="text-sm text-muted-foreground">
+                    {t('pluginStore.connect.usesConnection', 'Installed with this installation\'s Whity store connection.')}
+                  </p>
+                ) : (
                 <div className="space-y-1.5">
                   <label htmlFor="plugin-store-token" className="font-medium">
                     {t('pluginStore.field.token', 'Access token')}
@@ -264,6 +278,7 @@ export function InstallPluginDialog({ plugin, storeUrl, onOpenChange }: InstallP
                     </Button>
                   </div>
                 </div>
+                )}
 
                 {error ? (
                   <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-destructive">
@@ -290,7 +305,7 @@ export function InstallPluginDialog({ plugin, storeUrl, onOpenChange }: InstallP
                   <Button variant="outline" onClick={() => close(false)} disabled={installing}>
                     {t('pluginInstall.cancel', 'Cancel')}
                   </Button>
-                  <Button onClick={install} loading={installing} disabled={installing}>
+                  <Button onClick={install} loading={installing} disabled={installing || (paid && !licenceUsable)}>
                     {t('pluginInstall.allow', 'Allow and continue')}
                   </Button>
                 </>

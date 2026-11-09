@@ -12,15 +12,21 @@
 # Next.js process it does not use. To run the bundled admin, enable the profile
 # (COMPOSE_PROFILES=web, or `--profile web`); without it you get the API alone,
 # which nobody can log in to through a browser unless you supply a frontend.
-# The release job tags the tiers together, so when you run both, run them at
-# the same tag.
+# The release job tags the tiers together, so run them at the same tag. ONE
+# variable does that (WHIT-1001): WHITY_VERSION=v0.2.27 picks the app, web and
+# render images together. WHITY_IMAGE / WHITY_WEB_IMAGE / WHITY_RENDER_IMAGE
+# still override one image each, for a deploy that pins by digest.
 #
 # A third, OPTIONAL tier sits behind the `render` profile: the document/label
 # PDF renderer (ADR 0012), published as `ghcr.io/<repo>/render` by the same
 # release job and under the same tag. Off unless you ask for it — most
-# deployments never export a PDF and should not carry a Chromium container —
-# but when it IS run it must be run at the tag that matches the other two.
-# See docs/wiki/Document-Render-Service.md.
+# deployments never export a PDF and should not carry a Chromium container.
+# To print documents: add `render` to COMPOSE_PROFILES and set
+# RENDER_SHARED_SECRET (>= 32 chars, e.g. `openssl rand -hex 32`) in the env
+# file. Nothing else: printing turns on by itself once the app can reach a
+# renderer of its own version that accepts the secret, and the admin Stats
+# page (or `php bin/whity-cli render:check`) says what is missing if not.
+# See docs/wiki/Document-Render-Service.md, "Set up rendering".
 #
 # It is driven by .github/workflows/deploy-staging.yml, which copies this file
 # to the staging host and runs:
@@ -73,7 +79,7 @@ services:
   frankenphp:
     # The published release image (code baked in). Override the tag per deploy
     # with WHITY_IMAGE; defaults to :latest so a bare `up` pulls the newest release.
-    image: ${WHITY_IMAGE:-ghcr.io/whity-org/whity-core:latest}
+    image: ${WHITY_IMAGE:-ghcr.io/whity-org/whity-core:${WHITY_VERSION:-latest}}
     container_name: whity_staging_frankenphp
     restart: unless-stopped
     pull_policy: always
@@ -140,7 +146,7 @@ services:
   # COMPOSE_PROFILES=web (in the env file or the shell), or pass `--profile web`.
   # Without it, an ordinary `up` is the API alone: no login page.
   web:
-    image: ${WHITY_WEB_IMAGE:-ghcr.io/whity-org/whity-core/web:latest}
+    image: ${WHITY_WEB_IMAGE:-ghcr.io/whity-org/whity-core/web:${WHITY_VERSION:-latest}}
     container_name: whity_staging_web
     restart: unless-stopped
     pull_policy: always
@@ -175,17 +181,19 @@ services:
 
   # The published RENDER image (#947) — the third tier of the same release.
   #
-  # Opt-in twice over, on purpose: this profile has to be requested
-  # (`--profile render`) AND `documents.render_enabled` has to be turned on
-  # before core will call it. Without the image, an operator wanting server-side
+  # Opt-in by running it: request this profile and set RENDER_SHARED_SECRET,
+  # and core starts printing once the service answers at its own version and
+  # accepts the secret (WHIT-1001). `documents.render_enabled` stays as the
+  # operator's off switch. Without the image, an operator wanting server-side
   # PDF had to hand-assemble a build context from the app and web images and
   # redo it on every core bump; a miss there does not fail loudly, it exports
   # documents that quietly stop matching the designer preview.
   #
-  # Pin WHITY_RENDER_IMAGE to the SAME tag as WHITY_IMAGE and WHITY_WEB_IMAGE.
-  # `GET /health` on this service reports the CoreVersion it was built from, so
-  # a mismatched trio is one curl away from being obvious rather than showing up
-  # as an export that looks subtly wrong.
+  # WHITY_VERSION keeps it at the app's tag. If you override WHITY_RENDER_IMAGE,
+  # keep it at the SAME tag as the app: `GET /health` on this service reports
+  # the CoreVersion it was built from, and core refuses to print with a
+  # renderer of another version (a 503 naming both versions, and the fix on
+  # the admin Stats page) instead of quietly printing the old layout.
   #
   # Resource note: a render holds a live Chromium (~210 MB retained from the
   # first request onward, ~813 MB peak for a 1500-page batch), and a batch that
@@ -195,7 +203,7 @@ services:
   # container a mem_limit you chose and read
   # docs/wiki/Document-Render-Service.md before raising any limit.
   render:
-    image: ${WHITY_RENDER_IMAGE:-ghcr.io/whity-org/whity-core/render:latest}
+    image: ${WHITY_RENDER_IMAGE:-ghcr.io/whity-org/whity-core/render:${WHITY_VERSION:-latest}}
     container_name: whity_staging_render
     restart: unless-stopped
     pull_policy: always
@@ -212,7 +220,8 @@ services:
       # what deploy-staging.yml runs, with no render secret in scope) fail on a
       # service it never intended to start. The service itself covers the gap:
       # it logs a loud warning at boot and refuses every POST /render/* with 401
-      # until the secret is at least 32 chars.
+      # until the secret is at least 32 chars, and core reports that as
+      # "renderer not set up" rather than printing.
       RENDER_SHARED_SECRET: ${RENDER_SHARED_SECRET:-}
     # Not published to the host by default: this is an INTERNAL service reached
     # only by the app over the compose network, and the shared secret is the

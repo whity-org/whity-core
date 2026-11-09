@@ -24,15 +24,42 @@ import { useCurrentLanguage, useTranslation } from '@whity/features/i18n';
 import { useThemeMode } from '@/lib/theme-mode-context';
 import { PublicShell } from '@/components/auth/public-shell';
 import { TurnstileWidget } from '@/components/auth/turnstile-widget';
+import { ProviderIcon } from '@/components/sso-login-buttons';
+
+interface JoinProvider {
+  provider_key: string;
+  display_name: string;
+}
 
 interface SignupInfo {
   workspaceName: string;
   approvalRequired: boolean;
   allowedDomains: string[];
   botCheck: { provider: string; siteKey: string } | null;
+  /** Whether the email form can work here (WHIT-917), said up front. */
+  emailSignup: boolean;
+  /** The instance's sign-in providers a visitor may join with. */
+  providers: JoinProvider[];
 }
 
-type Phase = 'loading' | 'closed' | 'form' | 'sent' | 'error';
+/**
+ * `notReady`: sign-up is on, but nothing a visitor could use works yet (no bot
+ * check for the email form, and no sign-in provider). `pending`: back from a
+ * provider, waiting for the workspace's approval.
+ */
+type Phase = 'loading' | 'closed' | 'notReady' | 'form' | 'sent' | 'pending' | 'error';
+
+/** What a provider round trip came back with: `?sso=` on this page. */
+type SsoOutcome = 'pending' | 'domain' | 'refused' | 'closed' | 'email_unverified' | 'link_conflict' | 'provider_unavailable' | 'failed';
+
+const SSO_OUTCOMES: readonly SsoOutcome[] = [
+  'pending', 'domain', 'refused', 'closed', 'email_unverified', 'link_conflict', 'provider_unavailable', 'failed',
+];
+
+/** A full-page navigation: the backend 302s to the provider and back. */
+function joinStartUrl(providerKey: string, workspace: string): string {
+  return `/api/v1/auth/sso/${encodeURIComponent(providerKey)}/start?join=${encodeURIComponent(workspace)}`;
+}
 
 export default function JoinWorkspacePage({ params }: { params: Promise<{ workspace: string }> }) {
   const { workspace } = use(params);
@@ -49,9 +76,12 @@ export default function JoinWorkspacePage({ params }: { params: Promise<{ worksp
   const [resetKey, setResetKey] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [ssoOutcome, setSsoOutcome] = useState<SsoOutcome | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+    const returned = new URLSearchParams(window.location.search).get('sso');
+    const outcome = SSO_OUTCOMES.find((o) => o === returned) ?? null;
     fetch(`/api/v1/public/signup/workspaces/${encodeURIComponent(workspace)}`, {
       headers: { Accept: 'application/json' },
     })
@@ -71,17 +101,29 @@ export default function JoinWorkspacePage({ params }: { params: Promise<{ worksp
             approval_required: boolean;
             allowed_domains: string[];
             bot_check: { provider: string; site_key: string } | null;
+            email_signup?: boolean;
+            providers?: JoinProvider[];
           };
         };
-        setInfo({
+        const next: SignupInfo = {
           workspaceName: body.data.workspace_name,
           approvalRequired: body.data.approval_required,
           allowedDomains: body.data.allowed_domains,
           botCheck: body.data.bot_check
             ? { provider: body.data.bot_check.provider, siteKey: body.data.bot_check.site_key }
             : null,
-        });
-        setPhase('form');
+          emailSignup: body.data.email_signup !== false,
+          providers: Array.isArray(body.data.providers) ? body.data.providers : [],
+        };
+        setInfo(next);
+        if (outcome === 'pending') {
+          setPhase('pending');
+        } else if (!next.emailSignup && next.providers.length === 0) {
+          setPhase('notReady');
+        } else {
+          setSsoOutcome(outcome);
+          setPhase('form');
+        }
       })
       .catch(() => {
         if (!cancelled) setPhase('error');
@@ -133,6 +175,11 @@ export default function JoinWorkspacePage({ params }: { params: Promise<{ worksp
 
       if (res.status === 404) {
         setPhase('closed');
+        return;
+      }
+      if (res.status === 409) {
+        // No bot check on the instance: a setting, not an outage (WHIT-917).
+        setPhase('notReady');
         return;
       }
       if (res.status === 429) {
@@ -198,6 +245,48 @@ export default function JoinWorkspacePage({ params }: { params: Promise<{ worksp
     );
   }
 
+  if (phase === 'notReady') {
+    return (
+      <PublicShell>
+        <Card className="border-t-4 border-t-primary" data-testid="join-not-ready">
+          <CardHeader>
+            <CardTitle>{t('join.notReady.title', 'This workspace isn’t taking sign-ups yet')}</CardTitle>
+            <CardDescription>
+              {t(
+                'join.notReady.description',
+                'Sign-up is being set up here. Please come back later, or contact the workspace if you were told to join now.'
+              )}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link href="/login" className="text-sm font-medium text-primary hover:underline">
+              {t('join.signIn', 'Already have access? Sign in')}
+            </Link>
+          </CardContent>
+        </Card>
+      </PublicShell>
+    );
+  }
+
+  if (phase === 'pending') {
+    return (
+      <PublicShell>
+        <Card className="border-t-4 border-t-primary" data-testid="join-sso-pending">
+          <CardHeader>
+            <CardTitle>{t('joinConfirm.pending.title', 'Waiting for approval')}</CardTitle>
+            <CardDescription>
+              {t(
+                'join.sso.pending',
+                '{workspace} will review your request. You can sign in once it’s approved.',
+                { workspace: info.workspaceName }
+              )}
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </PublicShell>
+    );
+  }
+
   if (phase === 'sent') {
     return (
       <PublicShell>
@@ -229,7 +318,11 @@ export default function JoinWorkspacePage({ params }: { params: Promise<{ worksp
         <CardHeader>
           <CardTitle>{t('join.title', 'Join {workspace}', { workspace: info.workspaceName })}</CardTitle>
           <CardDescription>
-            {info.approvalRequired
+            {!info.emailSignup
+              ? t('join.description.providerOnly', 'Sign up to use {workspace} with the account below.', {
+                  workspace: info.workspaceName,
+                })
+              : info.approvalRequired
               ? t(
                   'join.description.approval',
                   'Sign up to use {workspace}. After you confirm your email, the workspace reviews your request.',
@@ -240,7 +333,46 @@ export default function JoinWorkspacePage({ params }: { params: Promise<{ worksp
                 })}
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          {ssoOutcome !== null && (
+            <Alert variant="destructive" data-testid="join-sso-outcome">
+              <AlertDescription>{ssoOutcomeText(ssoOutcome, t)}</AlertDescription>
+            </Alert>
+          )}
+
+          {info.providers.length > 0 && (
+            <div className="space-y-3" data-testid="join-providers">
+              {info.providers.map((provider) => (
+                <Button
+                  key={provider.provider_key}
+                  asChild
+                  variant="outline"
+                  className="w-full gap-2"
+                  data-testid={`join-provider-${provider.provider_key}`}
+                >
+                  <a href={joinStartUrl(provider.provider_key, workspace)}>
+                    <ProviderIcon providerKey={provider.provider_key} />
+                    {t('sso.signInWith', 'Continue with {provider}', { provider: provider.display_name })}
+                  </a>
+                </Button>
+              ))}
+              {info.emailSignup && (
+                <div className="flex items-center gap-3">
+                  <span className="h-px flex-1 bg-border" />
+                  <span className="text-sm text-muted-foreground">{t('sso.divider', 'or with email')}</span>
+                  <span className="h-px flex-1 bg-border" />
+                </div>
+              )}
+            </div>
+          )}
+
+          {!info.emailSignup ? (
+            <p className="text-center text-sm text-muted-foreground">
+              <Link href="/login" className="font-medium text-primary hover:underline">
+                {t('join.signIn', 'Already have access? Sign in')}
+              </Link>
+            </p>
+          ) : (
           <form onSubmit={submit} className="space-y-4" data-testid="join-form" noValidate>
             {error && (
               <Alert variant="destructive">
@@ -311,8 +443,29 @@ export default function JoinWorkspacePage({ params }: { params: Promise<{ worksp
               </Link>
             </p>
           </form>
+          )}
         </CardContent>
       </Card>
     </PublicShell>
   );
+}
+
+/** What came back from the provider, in the reader's words. */
+function ssoOutcomeText(outcome: SsoOutcome, t: ReturnType<typeof useTranslation>): string {
+  switch (outcome) {
+    case 'domain':
+      return t('join.sso.domain', 'This workspace only accepts sign-ups from some email domains, and that account’s email isn’t on one of them.');
+    case 'refused':
+      return t('join.sso.refused', 'That account can’t join this workspace by signing up. Contact the workspace if you think this is wrong.');
+    case 'closed':
+      return t('join.sso.closed', 'This workspace isn’t taking sign-ups right now.');
+    case 'email_unverified':
+      return t('join.sso.unverified', 'That account’s email isn’t verified yet. Verify it with the provider, then try again.');
+    case 'link_conflict':
+      return t('join.sso.conflict', 'An account with that email already exists but its email isn’t confirmed. Sign in with email and confirm it first.');
+    case 'provider_unavailable':
+      return t('join.sso.unavailable', 'The sign-in service couldn’t be reached. Try again later.');
+    default:
+      return t('join.sso.failed', 'Signing in didn’t work. Try again.');
+  }
 }

@@ -187,7 +187,7 @@ final class TwoFactorRecoveryService
      */
     public function listPendingForTenant(int $tenantId, int $limit = PHP_INT_MAX, int $offset = 0): array
     {
-        // @tenant-guard-ignore: joins the global two_factor_recovery_requests/profiles tables to memberships, scoped by the tenant_id predicate below
+        // Joins the global two_factor_recovery_requests/profiles tables to memberships, scoped by the tenant_id predicate below
         $stmt = $this->db->prepare(
             "SELECT DISTINCT tfr.id, tfr.profile_id, tfr.created_at, tfr.reason,
                     p.display_name,
@@ -226,7 +226,7 @@ final class TwoFactorRecoveryService
      */
     public function countPendingForTenant(int $tenantId): int
     {
-        // @tenant-guard-ignore: joins the global two_factor_recovery_requests table to memberships, scoped by the tenant_id predicate below
+        // Joins the global two_factor_recovery_requests table to memberships, scoped by the tenant_id predicate below
         $stmt = $this->db->prepare(
             "SELECT COUNT(DISTINCT tfr.id)
              FROM two_factor_recovery_requests tfr
@@ -261,7 +261,7 @@ final class TwoFactorRecoveryService
         }
 
         try {
-            // @tenant-guard-ignore: joins the global two_factor_recovery_requests table to memberships, scoped by the tenant_id predicate below
+            // Joins the global two_factor_recovery_requests table to memberships, scoped by the tenant_id predicate below
             $stmt = $this->db->prepare(
                 "SELECT tfr.id, tfr.profile_id, pe.email, p.two_factor_backup_codes_version
                  FROM two_factor_recovery_requests tfr
@@ -344,7 +344,7 @@ final class TwoFactorRecoveryService
      */
     public function rejectForTenant(int $requestId, int $tenantId): ?array
     {
-        // @tenant-guard-ignore: joins the global two_factor_recovery_requests table to memberships, scoped by the tenant_id predicate below
+        // Joins the global two_factor_recovery_requests table to memberships, scoped by the tenant_id predicate below
         $lookup = $this->db->prepare(
             "SELECT tfr.profile_id
              FROM two_factor_recovery_requests tfr
@@ -358,7 +358,7 @@ final class TwoFactorRecoveryService
             return null;
         }
 
-        // @tenant-guard-ignore: joins the global two_factor_recovery_requests table to memberships; tenant_id predicate is on the correlated subquery below
+        // Joins the global two_factor_recovery_requests table to memberships; tenant_id predicate is on the correlated subquery below
         $stmt = $this->db->prepare(
             "UPDATE two_factor_recovery_requests
                 SET status = '" . self::STATUS_REJECTED . "', updated_at = NOW()
@@ -395,7 +395,7 @@ final class TwoFactorRecoveryService
         }
 
         try {
-            // @tenant-guard-ignore: joins the global profiles table to memberships, scoped by the tenant_id predicate below
+            // Joins the global profiles table to memberships, scoped by the tenant_id predicate below
             $stmt = $this->db->prepare(
                 "SELECT p.id, pe.email, p.two_factor_backup_codes_version
                  FROM profiles p
@@ -457,7 +457,7 @@ final class TwoFactorRecoveryService
             $this->backupCodes->invalidateOldCodes($profileId, $currentBackupCodesVersion);
         }
 
-        // @tenant-guard-ignore: profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
+        // Profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
         $this->db->prepare(
             'UPDATE profiles
                 SET two_factor_secret = NULL, two_factor_enabled = false,

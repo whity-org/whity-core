@@ -38,7 +38,12 @@ export function CopyDialog({
   onCopied: (id: number) => void;
 }) {
   const t = useTranslation('admin');
-  const [title, setTitle] = useState(() => t('documentTemplates.copy.defaultTitle', '{name} (copy)', { name }));
+  // A starter's copy is the person's first invoice, not a copy of one: its
+  // title prints on every document issued from it, so "(copy)" would too.
+  const fromStarter = row.starter_key !== null;
+  const [title, setTitle] = useState(() =>
+    fromStarter ? name : t('documentTemplates.copy.defaultTitle', '{name} (copy)', { name })
+  );
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -58,12 +63,21 @@ export function CopyDialog({
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{t('documentTemplates.copy.title', 'Use a copy of “{name}”', { name })}</DialogTitle>
+          <DialogTitle>
+            {fromStarter
+              ? t('documentTemplates.copy.starterTitle', 'Start from “{name}”', { name })
+              : t('documentTemplates.copy.title', 'Use a copy of “{name}”', { name })}
+          </DialogTitle>
           <DialogDescription>
-            {t(
-              'documentTemplates.copy.description',
-              'The copy is your own draft: only you see it until you publish and share it. The original stays as it is.'
-            )}
+            {fromStarter
+              ? t(
+                  'documentTemplates.copy.starterDescription',
+                  'You get your own draft of Whity’s starter: only you see it until you publish and share it. The title prints on every document issued from it.'
+                )
+              : t(
+                  'documentTemplates.copy.description',
+                  'The copy is your own draft: only you see it until you publish and share it. The original stays as it is.'
+                )}
           </DialogDescription>
         </DialogHeader>
 
@@ -75,7 +89,9 @@ export function CopyDialog({
           }}
         >
           <label className="text-sm font-medium" htmlFor="copy-title">
-            {t('documentTemplates.copy.label', 'Title of the copy')}
+            {fromStarter
+              ? t('documentTemplates.copy.starterLabel', 'Title')
+              : t('documentTemplates.copy.label', 'Title of the copy')}
           </label>
           <Input id="copy-title" dir="auto" autoFocus value={title} onChange={(e) => setTitle(e.target.value)} />
         </form>
@@ -87,7 +103,9 @@ export function CopyDialog({
             {t('documentTemplates.cancel', 'Cancel')}
           </Button>
           <Button onClick={() => void submit()} loading={submitting}>
-            {t('documentTemplates.copy.submit', 'Make a copy')}
+            {fromStarter
+              ? t('documentTemplates.copy.starterSubmit', 'Create template')
+              : t('documentTemplates.copy.submit', 'Make a copy')}
           </Button>
         </DialogFooter>
       </DialogContent>

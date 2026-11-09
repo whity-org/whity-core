@@ -422,11 +422,25 @@ export function fieldMeta(t: TranslateFn): Record<string, FieldMeta> {
         'Let people choose the language the interface is shown in, and mirror it for right-to-left languages. Off means everyone sees the default language, left-to-right, with no language control anywhere — stored preferences and translations are kept, so turning it back on restores them.'
       ),
     },
+    'app.installable': {
+      label: t('settings.meta.app.installable.label', 'Install as an app'),
+      help: t(
+        'settings.meta.app.installable.help',
+        'Let people add this site to their phone or computer as an app that opens in its own window and shows a page of its own when there is no connection. Off removes the option and uninstalls the app’s offline support from browsers the next time they open a page. Until this is saved here, the PWA_ENABLED setting of the server decides.'
+      ),
+    },
     'plugins.store_allowed_hosts': {
       label: t('settings.meta.plugins.store_allowed_hosts.label', 'Trusted plugin stores'),
       help: t(
         'settings.meta.plugins.store_allowed_hosts.help',
         'The addresses of the stores people may install plugins from, separated by commas, for example store.example.com. Only secure (https) stores on the public internet are accepted when a plugin is installed. Leave this empty to keep the plugin store off.'
+      ),
+    },
+    'plugins.mcp_prompts_require_mark': {
+      label: t('settings.meta.plugins.mcp_prompts_require_mark.label', 'Prompts only from Verified plugins'),
+      help: t(
+        'settings.meta.plugins.mcp_prompts_require_mark.help',
+        'Offer AI agents the prompts of a server plugin only while the Whity store has marked its installed version Verified. Plugins added by hand or from another store have no mark, so their prompts stop while this is on. Tools are not affected.'
       ),
     },
     'plugins.store_enabled': {
@@ -513,9 +527,9 @@ export function settingsSections(t: TranslateFn): readonly SectionDef[] {
       title: t('settings.section.pluginStore.title', 'Plugin store'),
       description: t(
         'settings.section.pluginStore.description',
-        'Which stores plugins can be installed from. The plugin marketplace switch is in Feature flags.'
+        'Which stores plugins can be installed from, and whether agents get prompts only from Verified plugins. The plugin marketplace switch is in Feature flags.'
       ),
-      keys: ['plugins.store_allowed_hosts'],
+      keys: ['plugins.store_allowed_hosts', 'plugins.mcp_prompts_require_mark'],
     },
     {
       id: 'storage',

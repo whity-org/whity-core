@@ -239,6 +239,68 @@ final class EntryPointServiceWiringRealBootTest extends TestCase
     }
 
     /**
+     * #1151: the CLI kernel resolves the SDK rendering seam too, wired as the
+     * HTTP one is: the host adapter, over the process's one document stack, so
+     * its issuer is the very one the template issuing service raises through.
+     */
+    public function testCliEntryPointResolvesTheSdkRenderingSeamOverTheSameDocumentStack(): void
+    {
+        $result = $this->runProbe(<<<'PHP'
+            require __DIR__ . '/vendor/autoload.php';
+            require __DIR__ . '/src/helpers.php';
+
+            $command = new class extends \Whity\Cli\Commands\BaseCommand {
+                public function execute(array $argv): int
+                {
+                    return 0;
+                }
+
+                public function boot(): void
+                {
+                    $this->setupKernel();
+                }
+            };
+
+            ob_start();
+            $command->boot();
+            ob_end_clean();
+
+            $renderer = \Whity\app(\Whity\Sdk\Render\DocumentRenderer::class);
+            $read = static function (object $object, string $property): mixed {
+                $p = new \ReflectionProperty($object, $property);
+                $p->setAccessible(true);
+
+                return $p->getValue($object);
+            };
+            // Build the deferred adapter the way its first call would.
+            $inner = (new \ReflectionMethod($renderer, 'inner'))->invoke($renderer);
+            $issuing = $read($inner, 'issuing');
+
+            whity_probe_emit([
+                'implements_contract'  => $renderer instanceof \Whity\Sdk\Render\DocumentRenderer,
+                'stable_identity'      => $renderer === \Whity\app(\Whity\Sdk\Render\DocumentRenderer::class),
+                'is_the_host_adapter'  => $inner instanceof \Whity\Core\Document\Render\SdkDocumentRenderer,
+                'qr_service_wired'     => $read($inner, 'qr') !== null,
+                'issuing_wired'        => $issuing instanceof \Whity\Core\Document\Issuing\DocumentIssuing,
+                'one_issuer'           => $issuing !== null && $read($issuing, 'issuer') === $read($inner, 'issuer'),
+                'availability_answers' => $renderer->isAvailable() === false,
+            ]);
+            PHP);
+
+        self::assertTrue($result['implements_contract'], 'The CLI kernel must register the SDK rendering seam (#1151).');
+        self::assertTrue($result['stable_identity'], 'Resolving twice must return one instance.');
+        self::assertTrue($result['is_the_host_adapter'], 'It must build the same host adapter the HTTP entry point registers.');
+        self::assertTrue($result['qr_service_wired'], 'Documents a job issues must carry verification codes like any other.');
+        self::assertTrue($result['issuing_wired'], 'The seam must raise through the one issuing service, so vetoes and events apply.');
+        self::assertTrue(
+            $result['one_issuer'],
+            'The seam and the issuing service must share one issuer, and so one storage driver: two '
+            . 'drivers from one set of settings can disagree about where a tenant\'s files live (#947 item 1).'
+        );
+        self::assertTrue($result['availability_answers'], 'isAvailable() must answer, not throw, with no tenant context.');
+    }
+
+    /**
      * The same property through the CLI kernel. A registry wired in only one
      * entry point is the divergence bug class this repo has already paid for in
      * #717 and #724: the same plugin, reached two ways, would disagree about

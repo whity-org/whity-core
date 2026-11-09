@@ -51,6 +51,7 @@ final class WorkspaceSignupApiHandler
         private readonly CustomerSignupService $service,
         private readonly AuditLogger $audit,
         private readonly ?BotCheck $bot = null,
+        private readonly ?\Whity\Core\Signup\JoinProviders $joinProviders = null,
     ) {
     }
 
@@ -277,6 +278,13 @@ final class WorkspaceSignupApiHandler
             'pending_count' => $this->service->pendingCount($tenantId),
             'workspace_slug' => $slug,
             'bot_check_ready' => $this->bot?->isReady() ?? false,
+            // WHIT-917: whether the email form can work (a bot check is set up,
+            // or the operator chose to go without), and what else people can
+            // join with, so the page can warn before sign-up is turned on.
+            'email_signup_ready' => $this->bot === null
+                ? false
+                : ($this->bot->isRequired() ? $this->bot->isReady() : $this->bot->allowsNoBotCheck()),
+            'join_providers' => $this->joinProviders?->list() ?? [],
             'updated_at' => $current['updated_at'],
         ];
     }
@@ -284,7 +292,7 @@ final class WorkspaceSignupApiHandler
     /** The workspace's slug, or null when it has none: its sign-up page lives at /join/<slug>. */
     private function slugOf(int $tenantId): ?string
     {
-        // @tenant-guard-ignore: tenants registry, the caller's own row by id
+        // Tenants registry, the caller's own row by id
         $stmt = $this->db->prepare('SELECT slug FROM tenants WHERE id = :id');
         $stmt->execute([':id' => $tenantId]);
         $slug = $stmt->fetchColumn();

@@ -55,6 +55,7 @@ export {
 } from './useRichTranslation'
 export { useCurrentLanguage, type UseCurrentLanguageReturn } from './useCurrentLanguage'
 export { useLanguageDirection } from './useLanguageDirection'
+export { useLanguageCode } from './useLanguageCode'
 export { useFormattingLocale } from './useFormattingLocale'
 export { useI18nEnabled, useI18nAvailability, type I18nAvailability } from './useI18nEnabled'
 export { LanguageSwitcher, type LanguageSwitcherProps } from './LanguageSwitcher'

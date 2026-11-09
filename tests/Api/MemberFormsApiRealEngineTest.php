@@ -97,7 +97,6 @@ final class MemberFormsApiRealEngineTest extends TestCase
         $issuer = new SubmissionIssuer(
             $this->pdo,
             $submissions,
-            new DocumentIssuer($this->pdo, new DocumentRepository($this->pdo), $artifacts, new DocumentArtifactStore($storage)),
             new RouteTemplateRepository($this->pdo),
             new DocumentRouter(
                 $this->pdo,
@@ -111,7 +110,8 @@ final class MemberFormsApiRealEngineTest extends TestCase
                 null
             ),
             $uploadRows,
-            $artifacts,
+            new RouteRepository($this->pdo),
+            new RouteRecipientRepository($this->pdo),
         );
 
         $this->manage = new FormsApiHandler($this->forms, $this->fields, $renderer, $submissions, new PublicFormLink('https://records.example.test'));
@@ -263,7 +263,7 @@ final class MemberFormsApiRealEngineTest extends TestCase
         $listed = self::data($this->members->list($this->asCaller(self::MEMBER)));
 
         self::assertSame(
-            ['id', 'name', 'description', 'description_i18n', 'submit_label', 'status'],
+            ['id', 'name', 'description', 'description_i18n', 'submit_label', 'title', 'banner', 'status'],
             array_keys((array) array_values($listed)[0]),
         );
     }

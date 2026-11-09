@@ -7,6 +7,7 @@ namespace Whity\Core\Document\RouteTemplate;
 use InvalidArgumentException;
 use Whity\Core\Document\Routing\RouteQuorum;
 use Whity\Core\Document\Routing\RouteSatisfaction;
+use Whity\Core\Document\Routing\RouteStepKind;
 use Whity\Core\Document\Routing\RouteVerdict;
 use Whity\Core\Document\Routing\RoutingRuleRegistry;
 
@@ -81,8 +82,17 @@ use Whity\Core\Document\Routing\RoutingRuleRegistry;
  */
 final class RouteTemplateGraph
 {
-    public function __construct(private readonly RoutingRuleRegistry $rules)
+    /** @var (\Closure(int): bool)|null */
+    private ?\Closure $finaliseAvailable;
+
+    /**
+     * @param (\Closure(int): bool)|null $finaliseAvailable WHIT-921: tenant id =>
+     *        whether final documents can be made there (a render service is
+     *        configured). Without it no design may end with a final document.
+     */
+    public function __construct(private readonly RoutingRuleRegistry $rules, ?\Closure $finaliseAvailable = null)
     {
+        $this->finaliseAvailable = $finaliseAvailable;
     }
 
     /**
@@ -95,28 +105,34 @@ final class RouteTemplateGraph
      * @param mixed $steps    The raw `steps` value from the request body.
      * @param mixed $edges    The raw `edges` value from the request body.
      * @param int   $maxSteps The tenant's effective `documents.routing_max_steps`.
-     * @return array{steps: list<array{position: int, rule_kind: string, rule_config: array<string, mixed>, label: ?string, decision: bool, decision_quorum: ?string, satisfied_by: string, canvas_x: int, canvas_y: int}>, edges: list<array{from: int, to: int, verdict: string}>}
+     * @param int   $tenantId Whose design it is, for whether it may end with a final document.
+     * @return array{steps: list<array{position: int, rule_kind: string, rule_config: array<string, mixed>, label: ?string, decision: bool, decision_quorum: ?string, satisfied_by: string, allow_send_back?: bool, kind?: ?string, final_template_id?: ?int, canvas_x: int, canvas_y: int}>, edges: list<array{from: int, to: int, verdict: string}>}
      */
-    public function validate(mixed $steps, mixed $edges, int $maxSteps): array
+    public function validate(mixed $steps, mixed $edges, int $maxSteps, int $tenantId = 0): array
     {
-        $validSteps = $this->validateSteps($steps, $maxSteps);
+        $validSteps = $this->validateSteps($steps, $maxSteps, $tenantId);
 
         /** @var array<int, bool> $decisionByPosition */
         $decisionByPosition = [];
+        /** @var array<int, true> $finaliseAt */
+        $finaliseAt = [];
         foreach ($validSteps as $step) {
             $decisionByPosition[$step['position']] = $step['decision'];
+            if (($step['kind'] ?? null) === RouteStepKind::FINALISE) {
+                $finaliseAt[$step['position']] = true;
+            }
         }
 
         return [
             'steps' => $validSteps,
-            'edges' => $this->validateEdges($edges, $decisionByPosition),
+            'edges' => $this->validateEdges($edges, $decisionByPosition, $finaliseAt),
         ];
     }
 
     /**
-     * @return list<array{position: int, rule_kind: string, rule_config: array<string, mixed>, label: ?string, decision: bool, decision_quorum: ?string, satisfied_by: string, canvas_x: int, canvas_y: int}>
+     * @return list<array{position: int, rule_kind: string, rule_config: array<string, mixed>, label: ?string, decision: bool, decision_quorum: ?string, satisfied_by: string, allow_send_back?: bool, kind?: ?string, final_template_id?: ?int, canvas_x: int, canvas_y: int}>
      */
-    private function validateSteps(mixed $steps, int $maxSteps): array
+    private function validateSteps(mixed $steps, int $maxSteps, int $tenantId): array
     {
         if (!is_array($steps)) {
             throw RouteTemplateRejectedException::because("'steps' must be an array of template steps.");
@@ -165,6 +181,23 @@ final class RouteTemplateGraph
                 );
             }
             $seenPositions[$position] = true;
+
+            // WHIT-921: a stage that makes the final document names no rule.
+            $stageKind = $step['kind'] ?? null;
+            if ($stageKind !== null && $stageKind !== RouteStepKind::FINALISE) {
+                throw RouteTemplateRejectedException::because(
+                    "Step {$position}: 'kind' must be 'finalise' or absent."
+                );
+            }
+            if ($stageKind === RouteStepKind::FINALISE) {
+                $out[] = $this->finaliseStage($step, $position, $tenantId);
+                continue;
+            }
+            if (($step['final_template_id'] ?? null) !== null) {
+                throw RouteTemplateRejectedException::because(
+                    "Step {$position}: 'final_template_id' only means something on the final document stage."
+                );
+            }
 
             $kind = $step['rule_kind'] ?? null;
             if (!is_string($kind) || $kind === '') {
@@ -252,6 +285,15 @@ final class RouteTemplateGraph
                 ));
             }
 
+            // WHIT-919: whether people at this stage may send it back to the
+            // author for changes. On unless the design turns it off.
+            $allowSendBack = $step['allow_send_back'] ?? true;
+            if (!is_bool($allowSendBack)) {
+                throw RouteTemplateRejectedException::because(
+                    "Step {$position}: 'allow_send_back' must be true or false."
+                );
+            }
+
             $quorum = $step['decision_quorum'] ?? null;
             if ($quorum !== null) {
                 if (!is_string($quorum) || !RouteQuorum::isValid($quorum)) {
@@ -282,19 +324,92 @@ final class RouteTemplateGraph
                 'decision' => $decision,
                 'decision_quorum' => is_string($quorum) ? $quorum : null,
                 'satisfied_by' => $satisfiedBy,
+                'allow_send_back' => $allowSendBack,
+                'kind' => null,
+                'final_template_id' => null,
                 'canvas_x' => self::coordinate($step['canvas_x'] ?? 0, $position, 'canvas_x'),
                 'canvas_y' => self::coordinate($step['canvas_y'] ?? 0, $position, 'canvas_y'),
             ];
+        }
+
+        // WHIT-921: one final document stage at most, and it comes last.
+        $finalise = array_values(array_filter(
+            $out,
+            static fn (array $step): bool => $step['kind'] === RouteStepKind::FINALISE,
+        ));
+        if (count($finalise) > 1) {
+            throw RouteTemplateRejectedException::because(
+                'A route makes one final document, so it can have only one final document stage.'
+            );
+        }
+        if ($finalise !== [] && $finalise[0]['position'] !== max([0, ...array_column($out, 'position')])) {
+            throw RouteTemplateRejectedException::because(
+                'The final document stage must be the last stage: it is made once everything before it is done.'
+            );
         }
 
         return $out;
     }
 
     /**
+     * A stage that makes the final document (WHIT-921): nobody acts on it, so it
+     * names no rule, asks no decision and sends nothing; it may name the
+     * template to render with.
+     *
+     * @param array<string, mixed> $step
+     * @return array{position: int, rule_kind: string, rule_config: array<string, mixed>, label: ?string, decision: bool, decision_quorum: ?string, satisfied_by: string, allow_send_back: bool, kind: string, final_template_id: ?int, canvas_x: int, canvas_y: int}
+     */
+    private function finaliseStage(array $step, int $position, int $tenantId): array
+    {
+        if ($this->finaliseAvailable === null || !($this->finaliseAvailable)($tenantId)) {
+            throw RouteTemplateRejectedException::because(
+                'PDFs can\'t be made on this install, so a route cannot end with a final document. '
+                . 'Ask your administrator to set up the render service.'
+            );
+        }
+        if (($step['decision'] ?? false) !== false || ($step['decision_quorum'] ?? null) !== null
+            || ($step['satisfied_by'] ?? RouteSatisfaction::ACT) !== RouteSatisfaction::ACT) {
+            throw RouteTemplateRejectedException::because(
+                "Step {$position} makes the final document. Nobody acts on it, so it is not a decision "
+                . 'and sends nothing to anybody.'
+            );
+        }
+        $label = $step['label'] ?? null;
+        if ($label !== null && (!is_string($label) || mb_strlen($label) > 160)) {
+            throw RouteTemplateRejectedException::because(
+                "Step {$position}: 'label' must be text of 160 characters or fewer."
+            );
+        }
+        $templateId = $step['final_template_id'] ?? null;
+        if ($templateId !== null && (!is_int($templateId) || $templateId < 1)) {
+            throw RouteTemplateRejectedException::because(
+                "Step {$position}: 'final_template_id' must be the id of a document template, or absent to use "
+                . "the form's final document template."
+            );
+        }
+
+        return [
+            'position' => $position,
+            'rule_kind' => RouteStepKind::FINALISE_RULE,
+            'rule_config' => [],
+            'label' => is_string($label) && trim($label) !== '' ? $label : null,
+            'decision' => false,
+            'decision_quorum' => null,
+            'satisfied_by' => RouteSatisfaction::ACT,
+            'allow_send_back' => false,
+            'kind' => RouteStepKind::FINALISE,
+            'final_template_id' => $templateId,
+            'canvas_x' => self::coordinate($step['canvas_x'] ?? 0, $position, 'canvas_x'),
+            'canvas_y' => self::coordinate($step['canvas_y'] ?? 0, $position, 'canvas_y'),
+        ];
+    }
+
+    /**
      * @param array<int, bool> $decisionByPosition
+     * @param array<int, true>  $finaliseAt
      * @return list<array{from: int, to: int, verdict: string}>
      */
-    private function validateEdges(mixed $edges, array $decisionByPosition): array
+    private function validateEdges(mixed $edges, array $decisionByPosition, array $finaliseAt = []): array
     {
         if ($edges === null) {
             return [];
@@ -351,6 +466,13 @@ final class RouteTemplateGraph
                 throw RouteTemplateRejectedException::because(
                     "Edge {$nth}: step {$from} is not a decision step, so it never produces a verdict and this "
                     . 'edge could never be taken. Mark step ' . $from . ' as a decision, or remove the edge.'
+                );
+            }
+
+            if ($verdict === RouteVerdict::REJECTED && isset($finaliseAt[$to])) {
+                // WHIT-921: a final document is made from what was approved.
+                throw RouteTemplateRejectedException::because(
+                    "Edge {$nth}: a rejection cannot lead to the final document stage."
                 );
             }
 

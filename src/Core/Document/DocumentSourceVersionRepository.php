@@ -24,12 +24,15 @@ final class DocumentSourceVersionRepository
      * number, or null when the draft has moved on since (someone saved after the
      * check was run), so what was checked is exactly what is published.
      *
+     * `$publishedBy` is null for a version nobody published by hand: a plugin's
+     * starter template (WHIT-995).
+     *
      * `$themeResolved` is the draft's theme resolved now (editor M4d, E.44): the
      * version keeps it, and printing the version never resolves again.
      *
      * @param array<string, mixed>|null $themeResolved
      */
-    public function publish(int $sourceId, int $tenantId, int $draftVersion, int $publishedBy, ?array $themeResolved = null): ?int
+    public function publish(int $sourceId, int $tenantId, int $draftVersion, ?int $publishedBy, ?array $themeResolved = null): ?int
     {
         $own = !$this->db->inTransaction();
         if ($own) {

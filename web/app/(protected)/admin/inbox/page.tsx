@@ -70,6 +70,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useFetch } from '@/hooks/useFetch';
 import {
   routingMeta,
+  routingHref,
   type InboxItem,
   type InboxListResponse,
   type InboxSource,
@@ -158,6 +159,9 @@ export default function InboxPage() {
     if (meta.decision) return { label: t('inbox.state.decision', 'Your decision'), done: false };
     if (meta.arrived_by === 'returned') {
       return { label: t('inbox.state.returned', 'Returned to you'), done: false };
+    }
+    if (meta.arrived_by === 'sent_back') {
+      return { label: t('inbox.state.sentBack', 'Sent back to you for changes'), done: false };
     }
     if (meta.arrived_by === 'noted' || meta.arrived_by === 'acknowledged') {
       return { label: t('inbox.state.info', 'For your information'), done: false };
@@ -304,7 +308,7 @@ export default function InboxPage() {
           ariaLabel={t('inbox.table.label', 'Inbox items')}
           onRowClick={(row) => {
             const meta = routingMeta(row);
-            if (meta !== null) router.push(`/admin/document-library/${meta.document_id}?tab=routing`);
+            if (meta !== null) router.push(routingHref(meta));
           }}
           emptyState={{
             title: openOnly

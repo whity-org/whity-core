@@ -45,7 +45,7 @@ final class ProfileProvisioner
      */
     public function findOrCreate(string $email, string $passwordHash): int
     {
-        // @tenant-guard-ignore: profile_emails is a sanctioned GLOBAL identity table (ADR 0005 §2); UNIQUE(email)
+        // Profile_emails is a sanctioned GLOBAL identity table (ADR 0005 §2); UNIQUE(email)
         $existing = $this->db->prepare('SELECT profile_id FROM profile_emails WHERE email = ? LIMIT 1');
         $existing->execute([$email]);
         $profileId = $existing->fetchColumn();
@@ -54,7 +54,7 @@ final class ProfileProvisioner
             return (int) $profileId;
         }
 
-        // @tenant-guard-ignore: profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
+        // Profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
         $profile = $this->db->prepare(
             'INSERT INTO profiles
                  (display_name, password_hash, two_factor_enabled,
@@ -64,7 +64,7 @@ final class ProfileProvisioner
         $profile->execute([self::localPart($email), $passwordHash]);
         $newId = (int) $this->db->lastInsertId();
 
-        // @tenant-guard-ignore: profile_emails is a sanctioned GLOBAL identity table (ADR 0005 §2)
+        // Profile_emails is a sanctioned GLOBAL identity table (ADR 0005 §2)
         $this->db->prepare(
             'INSERT INTO profile_emails (profile_id, email, verified, is_primary, created_at)
              VALUES (?, ?, true, true, NOW())'

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Noto_Sans, Noto_Sans_Arabic, Geist_Mono, Readex_Pro } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
@@ -12,7 +12,7 @@ import { ToastContainerMount } from "@/components/ui/toast-container-mount";
 import { PluginScreenRegistrations } from "@/lib/plugin-screens";
 import { ReferralCapture } from "@/components/referral-capture";
 import { getBranding, getBrandThemeCss } from "@/lib/branding";
-import { BrandingProvider } from "@/lib/branding-context";
+import { BrandingProvider, BrandingSync } from "@/lib/branding-context";
 import { getThemeOverrides } from "@/lib/theme";
 import { ThemeModeProvider, ThemeModeInitScript } from "@/lib/theme-mode-context";
 import { DisplayPreferencesProvider, DisplayPreferencesInitScript } from "@/lib/display-preferences-context";
@@ -20,6 +20,9 @@ import { DirectionInitScript } from "@/lib/direction-context";
 import { AppLanguageProvider } from "@/lib/app-language-provider";
 import { getUiPreferences } from "@/lib/ui-preferences";
 import { UiPreferencesProvider } from "@/lib/ui-preferences-context";
+import { getAppInstall } from "@/lib/pwa/app-install";
+import { appIconUrl } from "@/lib/pwa/shared";
+import { AppInstall } from "@/components/pwa/app-install";
 
 // Design-token font families (see src/design/tokens/base.json): Noto Sans
 // (latin) + Noto Sans Arabic together drive --font-sans / --font-heading (see
@@ -54,10 +57,34 @@ const readexPro = Readex_Pro({
 
 export async function generateMetadata(): Promise<Metadata> {
   const b = await getBranding();
+  // #1733: the manifest link and the iOS home-screen tags exist only while the
+  // operator lets the app be installed.
+  const install = await getAppInstall();
+  const installable = install.state === "on";
   return {
     title: b.siteName,
     description: "Authentication and plugin management platform",
-    ...(b.faviconUrl ? { icons: { icon: b.faviconUrl } } : {}),
+    icons: {
+      ...(b.faviconUrl ? { icon: b.faviconUrl } : {}),
+      ...(installable ? { apple: appIconUrl("180", install.version) } : {}),
+    },
+    ...(installable
+      ? {
+          manifest: "/manifest.webmanifest",
+          appleWebApp: { capable: true, title: b.siteName, statusBarStyle: "default" as const },
+        }
+      : {}),
+  };
+}
+
+export async function generateViewport(): Promise<Viewport> {
+  const install = await getAppInstall();
+  return {
+    width: "device-width",
+    initialScale: 1,
+    // #1733: an installed app draws edge to edge; globals.css keeps content
+    // inside the safe area (the notch, the home indicator).
+    ...(install.state === "on" ? { themeColor: install.themeColor, viewportFit: "cover" as const } : {}),
   };
 }
 
@@ -77,9 +104,10 @@ export default async function RootLayout({
   // and values to strict '#rrggbb' hex, so building this CSS string by plain
   // concatenation is safe — neither component can contain quotes or braces.
   const themeOverrides = await getThemeOverrides();
-  // Decision 2.8: the workspace main colour's light and dark sets. Emitted
-  // before the plugin overrides in the JSX below, so a plugin's colours still win.
+  // Decision 2.8: the workspace main colour's light and dark sets, as the HOST
+  // resolves them (see BrandingProvider, which takes over in the browser).
   const brandCss = await getBrandThemeCss();
+  const appInstall = await getAppInstall();
   const overrideCss = Object.entries(themeOverrides)
     .map(([key, value]) => `--${key}:${value};`)
     .join("");
@@ -151,12 +179,17 @@ export default async function RootLayout({
           customers who did not stop to think. Renders nothing.
         */}
         <ReferralCapture />
-        {/* React 19 hoists <style> into <head> regardless of nesting position. */}
-        {brandCss !== "" && <style>{brandCss}</style>}
-        {overrideCss !== "" && <style>{`:root{${overrideCss}}`}</style>}
-        <BrandingProvider initial={branding}>
+        {/*
+          Decision 2.8: the main colour's <style> is rendered by BrandingProvider,
+          not here, because only the browser knows the signed-in tenant (the
+          session cookies are Path=/api, so this server render resolves branding
+          by host alone). The provider starts from this server CSS and replaces
+          it once it has asked as the reader (#1716).
+        */}
+        <BrandingProvider initial={branding} initialThemeCss={brandCss}>
           <ThemeModeProvider>
             <AuthProvider>
+              <BrandingSync />
               {/*
                 Inside AuthProvider for the reason the language provider below
                 is: `ui.hide_dates` resolves per TENANT, and a tenant switch
@@ -181,6 +214,7 @@ export default async function RootLayout({
                           <PluginFeaturesProvider>
                             {children}
                             <ToastContainerMount />
+                            <AppInstall state={appInstall.state} />
                           </PluginFeaturesProvider>
                         </NavigationProvider>
                       </ToastProvider>
@@ -192,6 +226,8 @@ export default async function RootLayout({
             </AuthProvider>
           </ThemeModeProvider>
         </BrandingProvider>
+        {/* After the brand <style> above, so a plugin's colours still win. */}
+        {overrideCss !== "" && <style>{`:root{${overrideCss}}`}</style>}
       </body>
     </html>
   );

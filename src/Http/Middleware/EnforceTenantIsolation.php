@@ -195,6 +195,9 @@ class EnforceTenantIsolation
         // the reader asking whether the service is down. Exposes component states
         // and uptime only, never deployment internals.
         '/api/v1/status',
+        // WHIT-922: the instance's public signing keys, so anyone holding a
+        // signature record can check its seal. Public keys only.
+        '/api/v1/signing-keys',
     ];
 
     /**
@@ -299,6 +302,17 @@ class EnforceTenantIsolation
         // path; a parametrised form would make the next route added under
         // `/billing/` public by default, on the surface where that is worst.
         '#^/api/v1/billing/webhook$#',
+        // The payment-provider twin of the entry above (WHIT-1010): a provider
+        // such as Stripe, Paddle or Polar, through the billing plugin. Same
+        // reasoning and the same safety: the plugin verifies the provider's
+        // signature over the raw bytes, and the payload only names a subject to
+        // go and ask about. One fixed path, no parameter, for the same reason.
+        '#^/api/v1/billing/provider-webhook$#',
+        // The page a payment provider's link opens (Paddle runs its checkout on
+        // the seller's own page). The payer has no session there. The plugin
+        // checks the transaction in the query with its provider before showing
+        // anything, and the page carries no tenant data of its own.
+        '#^/api/v1/billing/checkout-page$#',
         // Migration 132: an OPT-IN public form. The person filling in an
         // external application has no account and, in the case this exists for,
         // never will — so there is nothing here for this middleware to resolve.
@@ -373,6 +387,20 @@ class EnforceTenantIsolation
         '#^/api/v1/plugin-store/index\.json$#',                          // registry index
         '#^/api/v1/plugin-store/plugins/[^/]+$#',                        // show {slug}
         '#^/api/v1/plugin-store/plugins/[^/]+/versions/[^/]+/download$#', // token-gated download
+        '#^/api/v1/plugin-store/auth$#',                                  // which Whity ID to use (WHIT-1003)
+        '#^/api/v1/plugin-store/keys$#',                                  // licence statement keys (PR-4)
+        '#^/api/v1/plugin-store/licences/[^/]+$#',                        // signed licence, Whity ID token (PR-4)
+    ];
+
+    /**
+     * The one store WRITE a consuming host makes without a session on the store: buying a plugin
+     * or starting its trial (PR-4). Self-authenticating, like the download: the handler accepts
+     * only a Whity ID access token for this store's resource.
+     *
+     * @var list<string>
+     */
+    private const PLUGIN_STORE_PUBLIC_POST_PATTERNS = [
+        '#^/api/v1/plugin-store/plugins/[^/]+/checkout$#',
     ];
 
     private JwtParser $jwtParser;
@@ -445,6 +473,19 @@ class EnforceTenantIsolation
         // path it registered, and only when its own route is what would run.
         if (\Whity\Core\Plugin\PluginPublicRoutes::admits($request, $this->router, $path)) {
             return $next($request);
+        }
+        // A plugin's SERVICE route (WHIT-1011): no person and no tenant, so it
+        // never reaches the session path below. It runs only with a verified
+        // token from the trusted issuer for exactly this route's scope; anything
+        // else, a person's session included, is refused here.
+        $serviceScope = \Whity\Core\Plugin\PluginServiceRoutes::scopeFor($request, $this->router);
+        if ($serviceScope !== null) {
+            return \Whity\Core\Plugin\PluginServiceRoutes::admit($request, $serviceScope)
+                ? $next($request)
+                : Response::error('Unauthorized', 401)->withHeaders([
+                    'WWW-Authenticate' => 'Bearer error="invalid_token"',
+                    'Cache-Control' => 'no-store',
+                ]);
         }
 
         // Single decode (WC-159): parse the JWT exactly once per request and
@@ -904,6 +945,15 @@ class EnforceTenantIsolation
      */
     private function isPublicPluginStoreRead(string $method, string $path): bool
     {
+        if (strtoupper($method) === 'POST') {
+            foreach (self::PLUGIN_STORE_PUBLIC_POST_PATTERNS as $pattern) {
+                if (preg_match($pattern, $path) === 1) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
         if (strtoupper($method) !== 'GET') {
             return false;
         }

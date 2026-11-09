@@ -56,6 +56,10 @@ interface SignupSettings {
   pending_count: number;
   workspace_slug: string | null;
   bot_check_ready: boolean;
+  /** Whether the email form can work: a bot check is set up, or going without is allowed (WHIT-917). */
+  email_signup_ready?: boolean;
+  /** The instance's sign-in providers people can join with instead. */
+  join_providers?: { provider_key: string; display_name: string }[];
 }
 
 interface SignupRequest {
@@ -287,13 +291,29 @@ export default function CustomerSignupSettingsPage() {
               </AlertDescription>
             </Alert>
           )}
-          {settings.mode !== 'off' && !settings.bot_check_ready && (
-            <Alert data-testid="customer-signup-no-bot-check">
-              <AlertDescription>
-                {t(
-                  'settings.customerSignup.noBotCheck',
-                  'The sign-up page stays closed until the instance’s operator sets up the bot check in Public forms.'
-                )}
+          {/* WHIT-917: warn while choosing, not only after saving, so nobody
+              shares a sign-up link that can't work. */}
+          {current.mode !== 'off' && settings.email_signup_ready === false && (
+            <Alert variant="destructive" data-testid="customer-signup-no-bot-check">
+              <AlertDescription className="space-y-1">
+                <span className="block font-medium">
+                  {t('settings.customerSignup.noBotCheck.title', 'Sign-up won’t work until the operator sets up a bot check')}
+                </span>
+                <span className="block">
+                  {(settings.join_providers ?? []).length > 0
+                    ? t(
+                        'settings.customerSignup.noBotCheck.withProviders',
+                        'Signing up with email stays closed until then. People can still join with {providers}.',
+                        { providers: (settings.join_providers ?? []).map((p) => p.display_name).join(', ') }
+                      )
+                    : t(
+                        'settings.customerSignup.noBotCheck.description',
+                        'Until then, your sign-up page tells visitors this workspace isn’t taking sign-ups yet. The person who runs this Whity sets it up in Settings, Public forms.'
+                      )}
+                </span>
+                <a href="/admin/settings/public-forms" className="block font-medium underline" data-testid="customer-signup-bot-check-link">
+                  {t('settings.customerSignup.noBotCheck.link', 'Bot check settings (for the operator)')}
+                </a>
               </AlertDescription>
             </Alert>
           )}

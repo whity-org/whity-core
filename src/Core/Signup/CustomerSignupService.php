@@ -58,6 +58,8 @@ final class CustomerSignupService
     public const CONFIRM_PENDING = 'pending_approval';
     public const CONFIRM_ALREADY_MEMBER = 'already_member';
     public const CONFIRM_REFUSED = 'refused';
+    /** {@see self::joinVerified()} only: the address is outside the workspace's domain list. */
+    public const CONFIRM_DOMAIN = 'domain';
 
     /** {@see self::approve()} / {@see self::reject()} outcomes. */
     public const DECIDE_DONE = 'done';
@@ -268,6 +270,119 @@ final class CustomerSignupService
         }
 
         return $result;
+    }
+
+    /**
+     * Whether this workspace takes sign-ups at all right now: on, with a
+     * customer-safe starting role. Asked before a visitor is sent to an identity
+     * provider (WHIT-917), and again by {@see self::joinVerified()} afterwards.
+     */
+    public function isOpen(int $tenantId): bool
+    {
+        $settings = $this->settings->get($tenantId);
+        $roleId = $settings['role_id'];
+
+        return $settings['mode'] !== WorkspaceSignupSettings::MODE_OFF
+            && $roleId !== null
+            && $this->safeRoles->isCustomerSafe($roleId, $tenantId);
+    }
+
+    /**
+     * Join a workspace as a customer with an identity a sign-in provider has
+     * already verified (WHIT-917: "Continue with Whity ID" on /join/<slug>).
+     *
+     * The same rules as {@see self::confirm()}: sign-up must be on, the
+     * provider-verified address must be on the workspace's domain list, the
+     * starting role must be customer-safe, staff stay staff, a suspension, an
+     * open invitation or an earlier rejection is not bypassed, and Approval
+     * required puts the person in the queue. The provider's verified email
+     * stands in for the emailed link, and the provider round trip for the bot
+     * check. The profile was found or created by the federated sign-in itself
+     * (FederatedIdentityLinker, `auth_method = 'idp'`), so nothing here touches
+     * credentials, and no workspace is ever created.
+     *
+     * @param string $verifiedEmail The address the provider asserted as verified.
+     * @return array{result: string, tenant_id: int, profile_id: int}
+     */
+    public function joinVerified(int $tenantId, int $profileId, string $verifiedEmail, string $displayName): array
+    {
+        $announce = null;
+        $out = static fn (string $result): array => ['result' => $result, 'tenant_id' => $tenantId, 'profile_id' => $profileId];
+
+        $ownTx = !$this->db->inTransaction();
+        if ($ownTx) {
+            $this->db->beginTransaction();
+        }
+
+        try {
+            $settings = $this->settings->get($tenantId);
+            $roleId = $settings['role_id'];
+            if ($settings['mode'] === WorkspaceSignupSettings::MODE_OFF
+                || $roleId === null
+                || !$this->safeRoles->isCustomerSafe($roleId, $tenantId)
+            ) {
+                return $this->finishJoin($ownTx, $out(self::CONFIRM_CLOSED));
+            }
+            if (!WorkspaceSignupSettings::emailAllowed(strtolower(trim($verifiedEmail)), $settings['allowed_domains'])) {
+                return $this->finishJoin($ownTx, $out(self::CONFIRM_DOMAIN));
+            }
+
+            $statuses = $this->membershipStatuses($profileId, $tenantId);
+            $earlier = $this->earlierDecision($tenantId, $profileId, 0);
+
+            if ($statuses['active']) {
+                return $this->finishJoin($ownTx, $out(self::CONFIRM_ALREADY_MEMBER));
+            }
+            if ($statuses['suspended'] || $statuses['invited'] || $earlier === self::STATUS_REJECTED) {
+                return $this->finishJoin($ownTx, $out(self::CONFIRM_REFUSED));
+            }
+            if ($earlier === self::STATUS_PENDING) {
+                return $this->finishJoin($ownTx, $out(self::CONFIRM_PENDING));
+            }
+
+            $approval = $settings['mode'] === WorkspaceSignupSettings::MODE_APPROVAL;
+            $this->db->prepare(
+                'INSERT INTO customer_signups
+                    (tenant_id, email, display_name, token_hash, status, profile_id, expires_at, verified_at, created_at)
+                 VALUES (:tid, :email, :name, NULL, :status, :pid, NOW(), NOW(), NOW())'
+            )->execute([
+                ':tid' => $tenantId,
+                ':email' => strtolower(trim($verifiedEmail)),
+                ':name' => trim($displayName) !== '' ? mb_substr(trim($displayName), 0, 255) : strtolower(trim($verifiedEmail)),
+                ':status' => $approval ? self::STATUS_PENDING : self::STATUS_JOINED,
+                ':pid' => $profileId,
+            ]);
+
+            if ($approval) {
+                return $this->finishJoin($ownTx, $out(self::CONFIRM_PENDING));
+            }
+
+            $membershipId = $this->grant($profileId, $tenantId, $roleId, 'customer_signup_open');
+            $announce = $this->joinedPayload($profileId, $tenantId, $membershipId, $roleId, 'open', null);
+            $result = $this->finishJoin($ownTx, $out(self::CONFIRM_JOINED));
+        } catch (\Throwable $e) {
+            if ($ownTx && $this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $e;
+        }
+
+        $this->announce(self::HOOK_CUSTOMER_JOINED, $announce);
+
+        return $result;
+    }
+
+    /**
+     * @param array{result: string, tenant_id: int, profile_id: int} $outcome
+     * @return array{result: string, tenant_id: int, profile_id: int}
+     */
+    private function finishJoin(bool $ownTx, array $outcome): array
+    {
+        if ($ownTx && $this->db->inTransaction()) {
+            $this->db->commit();
+        }
+
+        return $outcome;
     }
 
     /**
@@ -489,7 +604,7 @@ final class CustomerSignupService
         // `local`, stated rather than left to migration 104's default: this
         // path only creates a profile when the person chose a password (an
         // address that already has one keeps its own profile).
-        // @tenant-guard-ignore: profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
+        // Profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
         $this->db->prepare(
             "INSERT INTO profiles
                  (display_name, password_hash, auth_method, two_factor_enabled,
@@ -499,7 +614,7 @@ final class CustomerSignupService
         $profileId = (int) $this->db->lastInsertId();
 
         // Verified: the person reached this point by following the mailed link.
-        // @tenant-guard-ignore: profile_emails is a sanctioned GLOBAL identity table (ADR 0005 §2)
+        // Profile_emails is a sanctioned GLOBAL identity table (ADR 0005 §2)
         $this->db->prepare(
             'INSERT INTO profile_emails (profile_id, email, verified, is_primary, created_at)
              VALUES (?, ?, true, true, NOW())'
@@ -510,7 +625,7 @@ final class CustomerSignupService
 
     private function profileIdForEmail(string $email): ?int
     {
-        // @tenant-guard-ignore: profile_emails is a sanctioned GLOBAL identity table (ADR 0005 §2); UNIQUE(email)
+        // Profile_emails is a sanctioned GLOBAL identity table (ADR 0005 §2); UNIQUE(email)
         $stmt = $this->db->prepare('SELECT profile_id FROM profile_emails WHERE email = :email LIMIT 1');
         $stmt->execute([':email' => $email]);
         $id = $stmt->fetchColumn();

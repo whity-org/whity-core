@@ -267,6 +267,9 @@ final class PublicFormView
             'description' => $form['description'] ?? null,
             'description_i18n' => $form['description_i18n'] ?? new \stdClass(),
             'submit_label' => $form['submit_label'] ?? null,
+            // The heading and picture written for the person filling it in (WHIT-944).
+            'title' => $form['title'] ?? null,
+            'banner' => $form['banner'] ?? null,
             'fields' => $public,
             'sections' => FormRenderer::sectionsOf($public, FormRenderer::sectionMeta($form)),
             // The single fact a renderer branches on: draw a submit button, or
@@ -288,6 +291,12 @@ final class PublicFormView
             'accepts_submissions' => PublicFormLink::acceptsPublicSubmissions($form) && $fields !== [],
             'opens_at' => $form['public_opens_at'] ?? null,
             'closes_at' => $form['public_closes_at'] ?? null,
+            // WHIT-920: the link asks the visitor to sign in first, and the form
+            // is filled in at /forms/{form_id} under their own name. The id is
+            // given only then, because only then is there a signed-in page to
+            // send them to.
+            'sign_in_required' => ($form['public_requires_sign_in'] ?? false) === true,
+            'form_id' => ($form['public_requires_sign_in'] ?? false) === true ? (int) ($form['id'] ?? 0) : null,
         ];
     }
 }

@@ -110,7 +110,7 @@ final class BootstrapIdentity
             return self::DEFAULT_EMAIL;
         }
 
-        // @tenant-guard-ignore: profile_emails is a sanctioned GLOBAL table (ADR 0005 §2)
+        // Profile_emails is a sanctioned GLOBAL table (ADR 0005 §2)
         $current = $db->query(
             'SELECT profile_id FROM profile_emails WHERE email = :email',
             [':email' => self::DEFAULT_EMAIL]
@@ -124,7 +124,7 @@ final class BootstrapIdentity
             return $configured;
         }
 
-        // @tenant-guard-ignore: profile_emails is a sanctioned GLOBAL table (ADR 0005 §2)
+        // Profile_emails is a sanctioned GLOBAL table (ADR 0005 §2)
         $collision = $db->query(
             'SELECT profile_id FROM profile_emails WHERE email = :email',
             [':email' => $configured]
@@ -141,7 +141,7 @@ final class BootstrapIdentity
             return self::DEFAULT_EMAIL;
         }
 
-        // @tenant-guard-ignore: profile_emails is a sanctioned GLOBAL table (ADR 0005 §2)
+        // Profile_emails is a sanctioned GLOBAL table (ADR 0005 §2)
         $db->query(
             'UPDATE profile_emails SET email = :new WHERE email = :old',
             [':new' => $configured, ':old' => self::DEFAULT_EMAIL]
@@ -164,7 +164,7 @@ final class BootstrapIdentity
             return;
         }
 
-        // @tenant-guard-ignore: profile_emails is a sanctioned GLOBAL table (ADR 0005 §2)
+        // Profile_emails is a sanctioned GLOBAL table (ADR 0005 §2)
         $current = $db->query(
             'SELECT profile_id FROM profile_emails WHERE email = :email',
             [':email' => $configured]
@@ -174,7 +174,7 @@ final class BootstrapIdentity
             return;
         }
 
-        // @tenant-guard-ignore: profile_emails is a sanctioned GLOBAL table (ADR 0005 §2)
+        // Profile_emails is a sanctioned GLOBAL table (ADR 0005 §2)
         $collision = $db->query(
             'SELECT profile_id FROM profile_emails WHERE email = :email',
             [':email' => self::DEFAULT_EMAIL]
@@ -184,7 +184,7 @@ final class BootstrapIdentity
             return;
         }
 
-        // @tenant-guard-ignore: profile_emails is a sanctioned GLOBAL table (ADR 0005 §2)
+        // Profile_emails is a sanctioned GLOBAL table (ADR 0005 §2)
         $db->query(
             'UPDATE profile_emails SET email = :new WHERE email = :old',
             [':new' => self::DEFAULT_EMAIL, ':old' => $configured]

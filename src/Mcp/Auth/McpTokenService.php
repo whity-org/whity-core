@@ -34,6 +34,8 @@ final class McpTokenService
     public function __construct(
         private readonly PDO $db,
         private readonly JwtParser $jwtParser,
+        // WHIT-992: connection events for plugins. Null: none.
+        private readonly ?McpConnectionEvents $events = null,
     ) {}
 
     /**
@@ -102,6 +104,7 @@ final class McpTokenService
             $bind = $this->db->prepare('UPDATE mcp_tokens SET agent_assignment_id = ? WHERE jti = ? AND tenant_id = ?');
             $bind->execute([$assignmentId, $claims['jti'], $tenantId]);
         }
+        $this->events?->created((string) $claims['jti'], $tenantId);
 
         return ['token' => $token, 'jti' => (string) $claims['jti']];
     }
@@ -175,6 +178,9 @@ final class McpTokenService
     {
         $stmt = $this->db->prepare('UPDATE mcp_tokens SET scope = ? WHERE jti = ? AND profile_id = ? AND tenant_id = ?');
         $stmt->execute([json_encode($scope, JSON_THROW_ON_ERROR), $jti, $profileId, $tenantId]);
+        if ($stmt->rowCount() === 1) {
+            $this->events?->grantChanged($jti, $tenantId, $profileId);
+        }
     }
 
     /**
@@ -231,6 +237,9 @@ final class McpTokenService
             ON CONFLICT (jti) DO NOTHING
         ");
         $stmt->execute([$jti, (string) $row['expires_at']]);
+        if ($stmt->rowCount() === 1) {
+            $this->events?->revoked($jti, $tenantId, $profileId, McpConnectionEvents::BY_OWNER);
+        }
 
         return true;
     }

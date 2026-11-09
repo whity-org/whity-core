@@ -672,12 +672,22 @@ export function DocumentRecordScreen({ documentId, onBack }: DocumentRecordScree
             {t('record.trail.pastEnd', 'There are no entries on this page of the trail.')}
           </p>
         ) : (
-          <DocumentTrail
-            events={trailEvents}
-            pagination={trailPagination}
-            directory={resolvedDirectory}
-            onPageChange={onTrailPage}
-          />
+          <>
+            <DocumentTrail
+              events={trailEvents}
+              pagination={trailPagination}
+              directory={resolvedDirectory}
+              onPageChange={onTrailPage}
+            />
+            {/* WHIT-922: every act and signature, and whether the trail is intact. */}
+            <Link
+              href={`/admin/document-library/${documentId}/audit`}
+              className="inline-block text-sm text-primary underline-offset-4 hover:underline"
+              data-testid="document-record-audit-link"
+            >
+              {t('record.audit.link', 'Audit trail and signatures')}
+            </Link>
+          </>
         )}
       </div>
     ),

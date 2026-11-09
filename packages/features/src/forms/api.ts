@@ -1,8 +1,11 @@
 import type {
+  DocumentFit,
+  FormBannerValue,
   FieldDraft,
   FieldOption,
   FieldValidation,
   FieldVocabulary,
+  FinalTemplateOption,
   FormRow,
   FormSectionDef,
   FormDraftRow,
@@ -50,6 +53,10 @@ function data<T>(body: unknown): T {
   return (typeof body === "object" && body !== null && "data" in body ? (body as { data: T }).data : body) as T
 }
 
+function visibleFit(fit: DocumentFit | { hidden: true } | null): DocumentFit | null {
+  return fit === null || fit.hidden ? null : fit
+}
+
 /** The API calls the forms screens make, over whichever transport a client has. */
 export function createFormsApi(transport: Transport) {
   return {
@@ -68,6 +75,24 @@ export function createFormsApi(transport: Transport) {
       call(transport, "POST", "/api/v1/forms", input, fallback, (b) => data<FormRow>(b)),
     updateForm: (id: number, changes: Record<string, unknown>, fallback: string) =>
       call(transport, "PATCH", `/api/v1/forms/${id}`, changes, fallback, (b) => data<FormRow>(b)),
+    /** WHIT-921: published document templates, for the form's final document. */
+    listFinalTemplates: (fallback: string) =>
+      call(transport, "GET", "/api/v1/document-sources?kind=template", undefined, fallback, (b) =>
+        data<Array<{ id: number; title: string; published_version: number | null }>>(b)
+          .filter((row) => row.published_version !== null)
+          .map((row): FinalTemplateOption => ({ id: row.id, title: row.title }))
+      ),
+    /** The form against its final document template; null with no template, or one the caller can't see. */
+    documentFit: (id: number, fallback: string) =>
+      call(transport, "GET", `/api/v1/forms/${id}/document-fit`, undefined, fallback, (b) => visibleFit(data<DocumentFit | { hidden: true } | null>(b))),
+    /** Put questions in the template's draft. What prints doesn't change until it is published. */
+    addToTemplate: (id: number, fieldKeys: string[], fallback: string) =>
+      call(transport, "POST", `/api/v1/forms/${id}/document-fit/template-fields`, { field_keys: fieldKeys }, fallback, (b) =>
+        visibleFit(data<DocumentFit | { hidden: true } | null>(b))
+      ),
+    /** Make a template from the form, publish it and choose it. */
+    makeTemplate: (id: number, title: string, lang: "en" | "ar", fallback: string) =>
+      call(transport, "POST", `/api/v1/forms/${id}/document-template`, { title, lang }, fallback, (b) => data<FinalTemplateOption>(b)),
     replaceFields: (id: number, fields: unknown[], fallback: string) =>
       call(transport, "PUT", `/api/v1/forms/${id}/fields`, { fields }, fallback, (b) => data<FieldDraft[]>(b)),
     publish: (id: number, fallback: string) =>
@@ -80,6 +105,12 @@ export function createFormsApi(transport: Transport) {
       call(transport, "DELETE", `/api/v1/forms/${id}/public-link`, undefined, fallback, () => true),
     deleteForm: (id: number, fallback: string) =>
       call(transport, "DELETE", `/api/v1/forms/${id}`, undefined, fallback, () => true),
+    /** Multipart: a transport sends a `FormData` body as it is (WHIT-944). */
+    uploadBanner: (id: number, file: File, fallback: string) => {
+      const body = new FormData()
+      body.append("file", file)
+      return call(transport, "POST", `/api/v1/forms/${id}/banner`, body, fallback, (b) => data<{ banner: FormBannerValue | null }>(b).banner)
+    },
     openToMembers: (id: number, open: boolean, fallback: string) =>
       call(transport, open ? "POST" : "DELETE", `/api/v1/forms/${id}/member-access`, open ? {} : undefined, fallback, (b) => data<FormRow>(b)),
     listMyForms: (fallback: string) =>
@@ -99,6 +130,9 @@ export function createFormsApi(transport: Transport) {
       call(transport, "GET", "/api/v1/me/form-submissions?limit=200", undefined, fallback, (b) => data<SubmissionRow[]>(b)),
     getMySubmission: (id: number, fallback: string) =>
       call(transport, "GET", `/api/v1/me/form-submissions/${id}`, undefined, fallback, (b) => data<SubmissionDetail>(b)),
+    /** WHIT-920: change a submission that was sent back, and send it again. */
+    resubmitMySubmission: (id: number, answers: Record<string, unknown>, note: string | null, fallback: string) =>
+      call(transport, "PUT", `/api/v1/me/form-submissions/${id}`, { data: answers, ...(note ? { note } : {}) }, fallback, (b) => data<SubmissionRow>(b)),
     withdrawMySubmission: (id: number, fallback: string) =>
       call(transport, "POST", `/api/v1/me/form-submissions/${id}/withdraw`, {}, fallback, (b) => data<SubmissionRow>(b)),
     listMyDrafts: (fallback: string) =>

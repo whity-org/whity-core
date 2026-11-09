@@ -406,13 +406,14 @@ const TableWithAlign = Table.extend({
         if (node.attrs.id) dom.dataset.blockId = node.attrs.id
         const columns = (node.attrs.columns ?? []) as { align?: string }[]
         dom.style.setProperty("--wy-columns", String(columns.length))
-        requestAnimationFrame(() => {
-          contentDOM.querySelectorAll("tr").forEach((tr) =>
-            Array.from(tr.children).forEach((cell, i) => {
-              ;(cell as HTMLElement).dataset.align = columns[i]?.align === "end" ? "end" : "start"
-            })
-          )
-        })
+        // End-aligned columns are named on the table itself ("2 4") and the
+        // stylesheet aligns those cells. Writing data-align onto each cell
+        // after ProseMirror drew it read as an edit: ProseMirror redrew the
+        // cells, which were written again, thousands of times a second, and a
+        // click on a field chip in a table landed on a node already gone.
+        const ends = columns.flatMap((c, i) => (c?.align === "end" ? [String(i + 1)] : [])).join(" ")
+        if (ends) dom.dataset.endColumns = ends
+        else delete dom.dataset.endColumns
       }
       paint()
       return {
@@ -423,6 +424,10 @@ const TableWithAlign = Table.extend({
           node = next
           paint()
           return true
+        },
+        // Its own attributes are painted here, not edits to read back.
+        ignoreMutation(mutation) {
+          return mutation.type === "attributes" && mutation.target === dom
         },
       }
     }

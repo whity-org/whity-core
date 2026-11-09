@@ -70,8 +70,8 @@ final class RouteEffectRunner
      */
     public function subscribe(HookManager $hooks): void
     {
-        $hooks->listen('document.routed', [$this, 'onRoutingEvent']);
-        $hooks->listen('document.route_acted', [$this, 'onRoutingEvent']);
+        $hooks->listen(\Whity\Sdk\Hooks\Events::DOCUMENT_ROUTED, [$this, 'onRoutingEvent']);
+        $hooks->listen(\Whity\Sdk\Hooks\Events::DOCUMENT_ROUTE_ACTED, [$this, 'onRoutingEvent']);
     }
 
     /**
@@ -100,13 +100,15 @@ final class RouteEffectRunner
     private function run(array $data): void
     {
         $tenantId = self::intOrNull($data['tenant_id'] ?? null);
+        // WHIT-920: null on a route whose subject has no document yet. Its
+        // stage effects still run; their attempts are recorded without one.
         $documentId = self::intOrNull($data['document_id'] ?? null);
         $stepId = self::intOrNull($data['step_id'] ?? null);
 
         // No step means no declarations to read. `document.routed` carries a
         // step_count rather than a step_id, and an act that opened nothing has
         // none either — neither is an error, and neither is worth a row.
-        if ($tenantId === null || $documentId === null || $stepId === null) {
+        if ($tenantId === null || $stepId === null) {
             return;
         }
 
@@ -126,7 +128,7 @@ final class RouteEffectRunner
      * @param array<string, mixed> $declaration
      * @param array<string, mixed> $data
      */
-    private function runEffect(int $tenantId, int $documentId, int $stepId, array $declaration, array $data): void
+    private function runEffect(int $tenantId, ?int $documentId, int $stepId, array $declaration, array $data): void
     {
         $kind = (string) ($declaration['effect_kind'] ?? '');
         $effectId = self::intOrNull($declaration['id'] ?? null);
@@ -170,6 +172,10 @@ final class RouteEffectRunner
             self::stringOrNull($data['decided'] ?? null),
             is_array($data['recipients'] ?? null) ? array_values($data['recipients']) : [],
             is_array($declaration['effect_config'] ?? null) ? $declaration['effect_config'] : [],
+            is_string($data['subject_type'] ?? null) && $data['subject_type'] !== ''
+                ? (string) $data['subject_type']
+                : DocumentRouteSubject::TYPE,
+            self::intOrNull($data['subject_id'] ?? null) ?? $documentId,
         );
 
         try {

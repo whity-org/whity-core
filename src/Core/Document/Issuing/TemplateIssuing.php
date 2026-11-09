@@ -499,8 +499,9 @@ final class TemplateIssuing
             return;
         }
         $effective = $this->settings->effective($tenantId);
-        if (($effective[SettingsRegistry::DOCUMENTS_RENDER_ENABLED] ?? 'false') !== 'true') {
-            throw new DocumentIssueRefused('render_unavailable', 'Server-side document rendering is disabled on this instance', 503);
+        $unavailable = $this->issuing()->renderUnavailable($tenantId);
+        if ($unavailable !== null) {
+            throw new DocumentIssueRefused('render_unavailable', $unavailable, 503);
         }
         // The artifact half only: an operator who capped storage can still raise documents.
         if (($effective[SettingsRegistry::DOCUMENTS_PERSIST_ENABLED] ?? 'true') !== 'true') {

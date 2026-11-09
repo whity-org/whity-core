@@ -218,7 +218,9 @@ test.describe('the document library', () => {
 
   test('the sort the toolbar offers is one the server accepts', async ({ page }) => {
     await openLibrary(page);
-    await expect(page.getByRole('table', { name: 'Documents' })).toBeVisible();
+    // Not the `Documents` table: on the CI stack (zero documents) the only such
+    // table is the loading skeleton, so waiting for it is a race with the fetch.
+    await paneSettled(page);
 
     // The server refuses an unknown sort with a 400 rather than ignoring it, so
     // this asserts the parameter NAMES agree — which is the whole reason to run

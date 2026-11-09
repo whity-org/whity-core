@@ -20,6 +20,7 @@ use Whity\Core\Document\Print\LabelCsv;
 use Whity\Core\Document\Print\LetterheadLogo;
 use Whity\Core\Document\Print\PrintLabels;
 use Whity\Core\Document\Print\SourceDocumentPrinter;
+use Whity\Core\Document\Print\WorkspaceName;
 use Whity\Core\Document\Qr\DocumentQrService;
 use Whity\Core\Document\Render\DocumentRenderRejectedException;
 use Whity\Core\Document\Render\FlowDocumentRenderer;
@@ -87,8 +88,10 @@ final class DocumentPublishingApiHandler
         ?DocumentThemeRepository $themes = null,
         // Open suggestions block publishing (editor M5, E.37).
         private readonly ?DocumentCollab $collab = null,
+        // The workspace's own name for a letterhead with none set (WHIT-999).
+        ?WorkspaceName $workspace = null,
     ) {
-        $this->print = new SourceDocumentPrinter($fields, $embeds, $settings, $files, $printLabels, $logo, $themes);
+        $this->print = new SourceDocumentPrinter($fields, $embeds, $settings, $files, $printLabels, $logo, $themes, $workspace);
         $this->issuing = $issuing ?? ($issuer !== null
             ? new DocumentIssuing($this->print, $versions, $issuer, $settings, $renderer, $qr, $meters)
             : null);
@@ -189,6 +192,22 @@ final class DocumentPublishingApiHandler
         return Response::json(['data' => ['published_version' => $version]], 201);
     }
 
+    /**
+     * Publish the draft as it stands, under the same check as {@see publish()}.
+     * Null when something blocks it or the draft moved on.
+     *
+     * @param array<string, mixed> $row
+     */
+    public function publishChecked(int $tenantId, int $callerId, array $row): ?int
+    {
+        if ($this->blockers($tenantId, $callerId, $row) !== []) {
+            return null;
+        }
+        $theme = $this->print->theme($tenantId, $row['theme'] ?? null, (string) $row['kind']);
+
+        return $this->versions->publish((int) $row['id'], $tenantId, (int) $row['draft_version'], $callerId, $theme);
+    }
+
     /** @param array<string, string> $params */
     public function history(Request $request, array $params): Response
     {
@@ -267,8 +286,14 @@ final class DocumentPublishingApiHandler
             return $found;
         }
         [$tenantId, $callerId, $row] = $found;
-        if ($this->renderer === null || !$this->renderer->isEnabled($tenantId)) {
-            return Response::error('Document rendering is not enabled on this instance', 503);
+        if ($this->renderer === null) {
+            return Response::error('Document rendering is not set up on this instance', 503);
+        }
+        $unavailable = $this->renderer->unavailableReason($tenantId);
+        if ($unavailable !== null) {
+            // WHIT-1001: the reason (switched off, not set up, not reachable,
+            // key or version mismatch), never a bare "not enabled".
+            return Response::error($unavailable, 503);
         }
 
         $body = JsonBody::parsed($request);
@@ -385,7 +410,7 @@ final class DocumentPublishingApiHandler
             $this->refund($tenantId, $metered);
             error_log('[DocumentPublishingApiHandler] render failed: ' . $e->getMessage());
 
-            return Response::error('Document rendering is temporarily unavailable', 503);
+            return Response::error($this->renderer->failureReason($tenantId), 503);
         }
 
         return new Response(200, $pdf, [
@@ -419,8 +444,14 @@ final class DocumentPublishingApiHandler
         if ($row['kind'] !== 'label') {
             return Response::error('Only label sheets print labels', 409);
         }
-        if ($this->renderer === null || !$this->renderer->isEnabled($tenantId)) {
-            return Response::error('Document rendering is not enabled on this instance', 503);
+        if ($this->renderer === null) {
+            return Response::error('Document rendering is not set up on this instance', 503);
+        }
+        $unavailable = $this->renderer->unavailableReason($tenantId);
+        if ($unavailable !== null) {
+            // WHIT-1001: the reason (switched off, not set up, not reachable,
+            // key or version mismatch), never a bare "not enabled".
+            return Response::error($unavailable, 503);
         }
 
         $body = JsonBody::parsed($request);
@@ -534,7 +565,7 @@ final class DocumentPublishingApiHandler
             $this->refund($tenantId, $metered);
             error_log('[DocumentPublishingApiHandler] label render failed: ' . $e->getMessage());
 
-            return Response::error('Document rendering is temporarily unavailable', 503);
+            return Response::error($this->renderer->failureReason($tenantId), 503);
         }
 
         return new Response(200, $rendered->bytes, [

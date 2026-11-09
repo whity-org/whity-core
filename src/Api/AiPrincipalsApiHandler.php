@@ -46,6 +46,8 @@ final class AiPrincipalsApiHandler
     public function __construct(
         private readonly PDO $db,
         private readonly RoleChecker $roleChecker,
+        // WHIT-992: tells plugins a connection was disconnected.
+        private readonly ?\Whity\Mcp\Auth\McpConnectionEvents $events = null,
     ) {}
 
     /**
@@ -212,8 +214,8 @@ final class AiPrincipalsApiHandler
             // Ownership check: verify the JTI belongs to this tenant before
             // revoking. SYSTEM tenant (id 0) may revoke any token.
             $ownershipQuery = $tenantId === self::SYSTEM_TENANT_ID
-                ? 'SELECT expires_at FROM mcp_tokens WHERE jti = ? LIMIT 1'
-                : 'SELECT expires_at FROM mcp_tokens WHERE jti = ? AND tenant_id = ? LIMIT 1';
+                ? 'SELECT expires_at, tenant_id FROM mcp_tokens WHERE jti = ? LIMIT 1'
+                : 'SELECT expires_at, tenant_id FROM mcp_tokens WHERE jti = ? AND tenant_id = ? LIMIT 1';
             $ownershipStmt  = $this->db->prepare($ownershipQuery);
 
             if ($tenantId === self::SYSTEM_TENANT_ID) {
@@ -234,6 +236,9 @@ final class AiPrincipalsApiHandler
                 ON CONFLICT (jti) DO NOTHING
             ");
             $stmt->execute([$jti, (string) $row['expires_at']]);
+            if ($stmt->rowCount() === 1) {
+                $this->events?->revoked($jti, (int) $row['tenant_id'], $userId, \Whity\Mcp\Auth\McpConnectionEvents::BY_ADMIN);
+            }
 
             return new Response(204, '', ['Content-Type' => 'application/json']);
         } catch (\Exception $e) {

@@ -12,6 +12,7 @@ use Whity\Core\Document\RouteTemplate\RouteTemplateRejectedException;
 use Whity\Core\Document\RouteTemplate\RouteTemplateRepository;
 use Whity\Core\Document\Routing\DocumentRouter;
 use Whity\Core\Document\Routing\RouteAction;
+use Whity\Core\Document\Routing\RouteResume;
 use Whity\Core\Document\Routing\RouteEdgeRepository;
 use Whity\Core\Document\Routing\RouteEventRepository;
 use Whity\Core\Document\Routing\RouteRecipientRepository;
@@ -492,6 +493,48 @@ final class DocumentRoutingApiHandler
             return Response::error('Route not found', 404);
         }
 
+        $parsed = self::parseAct($request);
+        if ($parsed instanceof Response) {
+            return $parsed;
+        }
+        ['action' => $action, 'note' => $note, 'verdict' => $verdict, 'resume_from' => $resumeFrom, 'to_author' => $toAuthor] = $parsed;
+
+        try {
+            $outcome = $this->router->act(
+                $tenantId,
+                $callerId,
+                $route,
+                $action,
+                $note,
+                $verdict,
+                $resumeFrom,
+                $toAuthor,
+            );
+        } catch (RoutingRejectedException $e) {
+            return Response::error($e->clientMessage, 422);
+        }
+
+        return Response::json([
+            'data' => RoutingPresenter::event($outcome['event']),
+            'resolved' => $outcome['resolved'],
+            'delivered' => $outcome['delivered'],
+            // What the STEP concluded, which is not what the caller said: under a
+            // quorum of `all`, two of three approvals conclude nothing. Null
+            // while the step is still open, and the reason it is on the envelope
+            // rather than on the event is the reason `resolved`/`delivered` are —
+            // it describes what THIS request did, not a property of the record.
+            'decided' => $outcome['decided'],
+        ], 201);
+    }
+
+    /**
+     * Read and shape-check an act's body (shared with the subject-neutral
+     * {@see RoutesApiHandler}, WHIT-920). Shape here, fitness in the engine.
+     *
+     * @return array{action: string, note: ?string, verdict: ?string, resume_from: ?string, to_author: bool}|Response
+     */
+    public static function parseAct(Request $request): array|Response
+    {
         $body = JsonBody::parsed($request);
         $action = $body['action'] ?? null;
         if (!is_string($action) || $action === '') {
@@ -502,7 +545,12 @@ final class DocumentRoutingApiHandler
         // the schema. Not redundancy: the boundary check produces a message
         // naming the four available verbs, where the constraint would produce a
         // driver error the caller cannot act on.
-        $allowed = array_merge(RouteAction::recipientActions(), [RouteAction::NOTED]);
+        $allowed = array_merge(
+            RouteAction::recipientActions(),
+            // WHIT-922: declining to sign. Signing has its own endpoint, because it
+            // needs consent, a drawn signature and a second check.
+            [RouteAction::NOTED, RouteAction::SENT_BACK, RouteAction::RESUBMITTED, RouteAction::DECLINED],
+        );
         if (!in_array($action, $allowed, true)) {
             return Response::error(
                 "'action' must be one of: " . implode(', ', $allowed),
@@ -533,30 +581,27 @@ final class DocumentRoutingApiHandler
             );
         }
 
-        try {
-            $outcome = $this->router->act(
-                $tenantId,
-                $callerId,
-                $route,
-                $action,
-                $note,
-                is_string($verdict) ? $verdict : null,
+        // WHIT-919: where a send-back asks the route to resume, and whether a
+        // note is meant for the author. Shape here, fitness in the engine.
+        $resumeFrom = $body['resume_from'] ?? null;
+        if ($resumeFrom !== null && (!is_string($resumeFrom) || !RouteResume::isValid($resumeFrom))) {
+            return Response::error(
+                "'resume_from' must be one of: " . implode(', ', RouteResume::all()),
+                422
             );
-        } catch (RoutingRejectedException $e) {
-            return Response::error($e->clientMessage, 422);
+        }
+        $toAuthor = $body['to_author'] ?? false;
+        if (!is_bool($toAuthor)) {
+            return Response::error("'to_author' must be true or false when present", 422);
         }
 
-        return Response::json([
-            'data' => RoutingPresenter::event($outcome['event']),
-            'resolved' => $outcome['resolved'],
-            'delivered' => $outcome['delivered'],
-            // What the STEP concluded, which is not what the caller said: under a
-            // quorum of `all`, two of three approvals conclude nothing. Null
-            // while the step is still open, and the reason it is on the envelope
-            // rather than on the event is the reason `resolved`/`delivered` are —
-            // it describes what THIS request did, not a property of the record.
-            'decided' => $outcome['decided'],
-        ], 201);
+        return [
+            'action' => $action,
+            'note' => is_string($note) ? $note : null,
+            'verdict' => is_string($verdict) ? $verdict : null,
+            'resume_from' => is_string($resumeFrom) ? $resumeFrom : null,
+            'to_author' => $toAuthor,
+        ];
     }
 
     /**
@@ -570,7 +615,7 @@ final class DocumentRoutingApiHandler
      * per-tenant limits on an append-only table would make the same trail legal
      * to write and illegal to re-write after a tenant move.
      */
-    private const MAX_NOTE_LENGTH = 4000;
+    public const MAX_NOTE_LENGTH = 4000;
 
     // -- helpers -------------------------------------------------------------
 

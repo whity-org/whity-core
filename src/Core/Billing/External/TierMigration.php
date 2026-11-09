@@ -220,7 +220,7 @@ final class TierMigration
      * legitimate tidy-up, and refusing it would force an operator to put a tier
      * back on sale as a step in cleaning up.
      *
-     * @tenant-guard-ignore: the plan catalogue is operator-owned and global by
+     * The plan catalogue is operator-owned and global by
      * design — there is no tenant column to bind.
      */
     private function externalPriceRefFor(int $planId): ?string

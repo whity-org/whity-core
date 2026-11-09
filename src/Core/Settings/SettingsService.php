@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace Whity\Core\Settings;
 
+use Whity\Core\Audit\AuditContext;
+use Whity\Core\Hooks\HookManager;
+use Whity\Sdk\Hooks\Events;
+use Whity\Sdk\PluginNamespace;
+
 /**
  * Resolves and mutates website settings across the global + per-tenant layers
  * (Website Settings feature).
@@ -51,7 +56,8 @@ final class SettingsService
     public function __construct(
         GlobalSettingsRepository $globals,
         TenantSettingsRepository $tenants,
-        ?SettingsCatalog $catalog = null
+        ?SettingsCatalog $catalog = null,
+        private readonly ?HookManager $hooks = null,
     ) {
         $this->globals = $globals;
         $this->tenants = $tenants;
@@ -186,13 +192,18 @@ final class SettingsService
             );
         }
 
+        $before = $this->isPluginKey($key) ? ($this->globals->all()[$key] ?? null) : null;
+
         if ($value === null) {
             $this->globals->delete($key);
+            $this->announcePluginKey(null, $key, $before, null);
             return;
         }
 
         $this->assertValid($key, $value);
-        $this->globals->set($key, $this->catalog->normalize($key, $value));
+        $stored = $this->catalog->normalize($key, $value);
+        $this->globals->set($key, $stored);
+        $this->announcePluginKey(null, $key, $before, $stored);
     }
 
     /**
@@ -228,13 +239,18 @@ final class SettingsService
             );
         }
 
+        $before = $this->isPluginKey($key) ? ($this->tenants->allForTenant($tenantId)[$key] ?? null) : null;
+
         if ($value === null) {
             $this->tenants->delete($tenantId, $key);
+            $this->announcePluginKey($tenantId, $key, $before, null);
             return;
         }
 
         $this->assertValid($key, $value);
-        $this->tenants->set($tenantId, $key, $this->catalog->normalize($key, $value));
+        $stored = $this->catalog->normalize($key, $value);
+        $this->tenants->set($tenantId, $key, $stored);
+        $this->announcePluginKey($tenantId, $key, $before, $stored);
     }
 
     /**
@@ -274,6 +290,34 @@ final class SettingsService
             return;
         }
         $this->tenants->set($tenantId, $key, $storageKey);
+    }
+
+    private function isPluginKey(string $key): bool
+    {
+        return $this->hooks !== null && $this->catalog->sourceOf($key) !== SettingsCatalog::CORE_SOURCE;
+    }
+
+    /**
+     * Tells listeners a plugin's setting changed, whoever changed it: the plugin
+     * or a settings screen. By key, never by value, so a plugin can't read
+     * another's settings by listening. A listener can't stop or undo the change.
+     */
+    private function announcePluginKey(?int $tenantId, string $key, ?string $before, ?string $after): void
+    {
+        if (!$this->isPluginKey($key) || $before === $after) {
+            return;
+        }
+        $source = (string) $this->catalog->sourceOf($key);
+        try {
+            $this->hooks?->dispatch(Events::PLUGIN_SETTINGS_CHANGED, [
+                'tenant_id'        => $tenantId,
+                'plugin'           => PluginNamespace::slug($source),
+                'key'              => substr($key, (int) strpos($key, PluginSettingsRegistry::NAMESPACE_SEPARATOR) + 1),
+                'actor_profile_id' => AuditContext::getActorUserId(),
+            ]);
+        } catch (\Throwable $e) {
+            error_log('[settings] a listener on ' . Events::PLUGIN_SETTINGS_CHANGED . ' failed: ' . $e->getMessage());
+        }
     }
 
     /**

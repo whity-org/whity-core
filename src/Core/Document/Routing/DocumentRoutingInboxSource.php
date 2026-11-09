@@ -8,6 +8,8 @@ use Whity\Core\Identity\PersonName;
 use Whity\Core\Inbox\InboxItem;
 use Whity\Core\Inbox\InboxSourceInterface;
 use Whity\Core\RBAC\ResourceTypeRegistry;
+use Whity\Core\Settings\SettingsRegistry;
+use Whity\Core\Settings\SettingsService;
 
 /**
  * Routing's recipients, presented as an #881 INBOX SOURCE (#947 item 3).
@@ -61,8 +63,12 @@ use Whity\Core\RBAC\ResourceTypeRegistry;
  */
 final class DocumentRoutingInboxSource implements InboxSourceInterface
 {
-    public function __construct(private readonly RouteRecipientRepository $recipients)
-    {
+    public function __construct(
+        private readonly RouteRecipientRepository $recipients,
+        // WHIT-920: whether the person who sent a form may see who reviewed it
+        // (`forms.show_reviewer_names`). Without it they never do.
+        private readonly ?SettingsService $settings = null,
+    ) {
     }
 
     public function label(): string
@@ -76,8 +82,20 @@ final class DocumentRoutingInboxSource implements InboxSourceInterface
     public function list(int $tenantId, int $profileId, bool $openOnly, int $limit, int $offset): array
     {
         $rows = $this->recipients->listForProfile($tenantId, $profileId, $openOnly, $limit, $offset);
+        $showReviewers = $this->showsReviewerNames($tenantId);
 
-        return array_map(self::toItem(...), $rows);
+        return array_map(static fn (array $row): InboxItem => self::toItem($row, $showReviewers), $rows);
+    }
+
+    /** WHIT-920: `forms.show_reviewer_names`, off unless the workspace turned it on. */
+    private function showsReviewerNames(int $tenantId): bool
+    {
+        if ($this->settings === null) {
+            return false;
+        }
+        $value = $this->settings->effective($tenantId)[SettingsRegistry::FORMS_SHOW_REVIEWER_NAMES] ?? null;
+
+        return $value === 'true';
     }
 
     public function count(int $tenantId, int $profileId, bool $openOnly): int
@@ -90,15 +108,26 @@ final class DocumentRoutingInboxSource implements InboxSourceInterface
      *
      * @param array<string, mixed> $row A row from {@see RouteRecipientRepository::listForProfile()}.
      */
-    private static function toItem(array $row): InboxItem
+    private static function toItem(array $row, bool $showReviewers = false): InboxItem
     {
+        // WHIT-920 (A9): an item sent back to the person who SENT a form, on a
+        // route with no document, comes from a reviewer the applicant does not
+        // see by default. Unnamed unless the workspace shows reviewer names, and
+        // even then never by e-mail address.
+        $toApplicant = ($row['role'] ?? RouteRecipientRepository::ROLE_STEP) === RouteRecipientRepository::ROLE_AUTHOR
+            && $row['document_id'] === null;
+        $hideSender = $toApplicant && !$showReviewers;
+
         // The person whose act put it here. The query names them only if they belong
         // to this workspace; a profile's name elsewhere is not this tenant's to read.
-        $sender = isset($row['sender_profile_id'])
+        $sender = isset($row['sender_profile_id']) && !$hideSender
             ? [
                 'kind' => 'person',
                 'profile_id' => (int) $row['sender_profile_id'],
-                'name' => PersonName::of((string) ($row['sender_display_name'] ?? ''), (string) ($row['sender_email'] ?? '')),
+                'name' => PersonName::of(
+                    (string) ($row['sender_display_name'] ?? ''),
+                    $toApplicant ? '' : (string) ($row['sender_email'] ?? ''),
+                ),
             ]
             : null;
 
@@ -123,8 +152,10 @@ final class DocumentRoutingInboxSource implements InboxSourceInterface
                 // that was taken away from them.
                 ? 'Withdrawn'
                 : self::statusFor($arrivedBy, $row['closed_by_event_id'] !== null, $decision, $delivery),
-            resourceType: ResourceTypeRegistry::TYPE_DOCUMENT,
-            resourceId: (string) $row['document_id'],
+            // WHIT-920: a route on a subject without a document (a form
+            // submission) has no resource to scope a grant to.
+            resourceType: $row['document_id'] !== null ? ResourceTypeRegistry::TYPE_DOCUMENT : null,
+            resourceId: $row['document_id'] !== null ? (string) $row['document_id'] : null,
             meta: [
                 // Enough for a client to offer the right actions without a
                 // second request: which route to act on, and whether the item is
@@ -133,11 +164,18 @@ final class DocumentRoutingInboxSource implements InboxSourceInterface
                 // depend on them.
                 'route_id' => (int) $row['route_id'],
                 'step_id' => (int) $row['step_id'],
-                'document_id' => (int) $row['document_id'],
+                // Null on a route whose subject has no document yet (WHIT-920);
+                // the subject then says what to open.
+                'document_id' => $row['document_id'] !== null ? (int) $row['document_id'] : null,
+                'subject_type' => (string) ($row['subject_type'] ?? DocumentRouteSubject::TYPE),
+                'subject_id' => (int) ($row['subject_id'] ?? $row['document_id'] ?? 0),
+                // WHIT-919/920: `author` on the item a send-back opened for the
+                // person who sent it, so a client offers Edit and resubmit.
+                'role' => (string) ($row['role'] ?? RouteRecipientRepository::ROLE_STEP),
                 'open' => $row['closed_by_event_id'] === null,
                 'document_withdrawn' => ($row['document_withdrawn'] ?? false) === true,
                 'arrived_by' => $arrivedBy,
-                'arrived_from_profile_id' => $row['arrived_from'] ?? null,
+                'arrived_from_profile_id' => $hideSender ? null : ($row['arrived_from'] ?? null),
                 // How it was closed, so a client can say "You approved" and not just
                 // "Done". Null while it is open.
                 'closed_by' => $row['closed_by_action'] ?? null,

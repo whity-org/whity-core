@@ -127,8 +127,8 @@ final class RoutingNotifications
      */
     public function subscribe(HookManager $hooks): void
     {
-        $hooks->listen('document.routed', [$this, 'onRoutingEvent']);
-        $hooks->listen('document.route_acted', [$this, 'onRoutingEvent']);
+        $hooks->listen(\Whity\Sdk\Hooks\Events::DOCUMENT_ROUTED, [$this, 'onRoutingEvent']);
+        $hooks->listen(\Whity\Sdk\Hooks\Events::DOCUMENT_ROUTE_ACTED, [$this, 'onRoutingEvent']);
     }
 
     /**
@@ -182,7 +182,8 @@ final class RoutingNotifications
             return;
         }
 
-        $documentId = (int) ($payload['document_id'] ?? 0);
+        // WHIT-920: null on a route whose subject has no document yet.
+        $documentId = isset($payload['document_id']) ? (int) $payload['document_id'] : null;
         $routeId = (int) ($payload['route_id'] ?? 0);
         $title = is_string($payload['title'] ?? null) && trim((string) $payload['title']) !== ''
             ? trim((string) $payload['title'])
@@ -222,6 +223,8 @@ final class RoutingNotifications
                     // on it without core shipping two of everything.
                     'data' => [
                         'document_id' => $documentId,
+                        'subject_type' => isset($payload['subject_type']) ? (string) $payload['subject_type'] : null,
+                        'subject_id' => isset($payload['subject_id']) ? (int) $payload['subject_id'] : null,
                         'route_id' => $routeId,
                         'step_id' => isset($recipient['step_id']) ? (int) $recipient['step_id'] : null,
                         'recipient_id' => isset($recipient['recipient_id'])

@@ -30,6 +30,7 @@ import { Button } from '@whity/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
 import { Input } from '@/components/ui/input';
 import { BrandingMainColour } from '@/components/branding-main-colour';
+import { useRefreshBranding } from '@/lib/branding-context';
 import { useTranslation } from '@whity/features/i18n';
 import {
   IconDeviceFloppy,
@@ -321,9 +322,13 @@ export function BrandingSettings({ tenantOverridable = true, variant = 'tenant' 
     return meta ? t(meta.labelKey, meta.label) : key;
   };
 
+  // Logos and the favicon show in the sidebar too: refresh the app's copy.
+  const refreshAppBranding = useRefreshBranding();
+
   const handleSuccess = (_scope: 'tenant' | 'global', key: AssetKey, updated: Branding) => {
     setMutationResult(updated);
     refetchBranding();
+    void refreshAppBranding();
     addToast(
       t('branding.upload.success', '{asset} uploaded successfully.', { asset: assetLabel(key) }),
       'success'
@@ -333,6 +338,7 @@ export function BrandingSettings({ tenantOverridable = true, variant = 'tenant' 
   const handleClearSuccess = (_scope: 'tenant' | 'global', key: AssetKey, updated: Branding) => {
     setMutationResult(updated);
     refetchBranding();
+    void refreshAppBranding();
     addToast(
       t('branding.clear.success', '{asset} cleared.', { asset: assetLabel(key) }),
       'success'

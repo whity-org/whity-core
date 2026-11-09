@@ -109,9 +109,41 @@ final class RouteAction
     public const NOTED = 'noted';
 
     /**
+     * A recipient sent the subject back to its AUTHOR for edits (WHIT-919).
+     *
+     * Unlike {@see RETURNED}, which goes one hop back to a colleague, this goes
+     * to the person who submitted the thing. It needs a note for them. It closes
+     * every open item on the route (on a committee step one member's send-back
+     * goes at once, without a vote) and opens one item for the author. The
+     * event records where the route resumes when the author resubmits
+     * ({@see RouteResume}). A step can turn it off in the route design.
+     */
+    public const SENT_BACK = 'sent_back';
+
+    /**
+     * The author resubmitted after a send-back (WHIT-919). Closes the author's
+     * item, writes a new subject version, and resumes the route at the sending
+     * step or at step 1, as the sender chose. Earlier approvals stand.
+     */
+    public const RESUBMITTED = 'resubmitted';
+
+    /**
+     * A signer signed (#1726). In the vocabulary now so the trail's CHECK is
+     * widened once for the whole routes plan; nothing writes it yet.
+     */
+    public const SIGNED = 'signed';
+
+    /** A stamp was applied (#1729). In the vocabulary now; nothing writes it yet. */
+    public const STAMPED = 'stamped';
+
+    /** A signer declined to sign (#1726). In the vocabulary now; nothing writes it yet. */
+    public const DECLINED = 'declined';
+
+    /**
      * Every action, in the order a reader meets them.
      *
-     * Must stay in step with the CHECK constraint in migration 112.
+     * Must stay in step with the trail's CHECK constraint (migration 112,
+     * widened once by migration 226).
      * {@see \Tests\Core\Document\Routing\RouteActionVocabularyTest} reads the
      * migration source and asserts the two agree, so a verb added to one and not
      * the other fails a build rather than producing either a constant the
@@ -122,7 +154,10 @@ final class RouteAction
      */
     public static function all(): array
     {
-        return [self::ISSUED, self::FORWARDED, self::ACKNOWLEDGED, self::RETURNED, self::NOTED];
+        return [
+            self::ISSUED, self::FORWARDED, self::ACKNOWLEDGED, self::RETURNED, self::NOTED,
+            self::SENT_BACK, self::RESUBMITTED, self::SIGNED, self::STAMPED, self::DECLINED,
+        ];
     }
 
     /**
@@ -147,6 +182,8 @@ final class RouteAction
      */
     public static function closesRecipient(string $action): bool
     {
-        return in_array($action, self::recipientActions(), true);
+        return in_array($action, self::recipientActions(), true)
+            || $action === self::SENT_BACK
+            || $action === self::RESUBMITTED;
     }
 }

@@ -38,11 +38,11 @@ final class AgentActivityRepository
     }
 
     /**
-     * Newest first.
+     * Newest first. With $onBehalfOf, only rows on that person's behalf (WHIT-990).
      *
      * @return list<array<string, mixed>>
      */
-    public function forWorkspace(int $tenantId, ?int $agentId = null, ?string $status = null, ?string $since = null, int $limit = 50, int $offset = 0): array
+    public function forWorkspace(int $tenantId, ?int $agentId = null, ?string $status = null, ?string $since = null, int $limit = 50, int $offset = 0, ?int $onBehalfOf = null): array
     {
         $sql = "SELECT u.kind, u.id, u.agent_principal_id, u.on_behalf_of_profile_id, u.tool, u.summary, u.permissions,
                        u.undo_window_seconds, u.undoable_until, u.status, u.created_at,
@@ -84,6 +84,10 @@ final class AgentActivityRepository
         if ($agentId !== null) {
             $sql .= ' AND asg.agent_id = :agent';
             $params[':agent'] = $agentId;
+        }
+        if ($onBehalfOf !== null) {
+            $sql .= ' AND u.on_behalf_of_profile_id = :on_behalf_of';
+            $params[':on_behalf_of'] = $onBehalfOf;
         }
         if ($status !== null) {
             $sql .= ' AND u.status = :status';

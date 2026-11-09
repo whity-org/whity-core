@@ -30,6 +30,7 @@ import { SlashCommand, type SlashState } from "./slash"
 import { EditorToolbar, insertField, type EditorView, type PageZoom } from "./toolbar"
 import { UnknownBlock } from "./schema"
 import { BlockToolbar } from "./block-toolbar"
+import { FieldBar } from "./field-bar"
 import { EditorServicesProvider, type EditorServices, type FieldPreview } from "./services"
 import { FieldTrigger, filterFields, type FieldDef, type FieldGroup, type FieldTriggerState } from "./fields"
 import { FieldPicker, flatFields } from "./field-picker"
@@ -115,6 +116,11 @@ export interface DocEditorProps {
    * so each edit shows with the record's values as it will print.
    */
   editWhilePreviewing?: boolean
+  /**
+   * Issuing from a template (M4c): nothing in the formatting toolbar works on
+   * the published version, so it isn't shown.
+   */
+  hideToolbar?: boolean
   /** Starts a preview (the screen asks which record) or changes the record. */
   onPreview?: () => void
   /** Show fields: leaves the preview. */
@@ -200,6 +206,7 @@ function DocEditor({
   pageFields,
   preview = null,
   editWhilePreviewing = false,
+  hideToolbar = false,
   onPreview,
   onClosePreview,
   publish,
@@ -332,7 +339,8 @@ function DocEditor({
   })
 
   React.useEffect(() => {
-    editor?.setEditable(editable)
+    // Not an edit: left to emit its update, this saved a draft on every open.
+    editor?.setEditable(editable, false)
   }, [editor, editable])
 
   /* ------------------------------------------- Comments and suggestions */
@@ -921,6 +929,13 @@ function DocEditor({
               {labels.preview}
             </Button>
           )}
+          {/* Preview takes its own button's place, so the way back is where
+              the way in was: the pill's Show fields was easy to miss. */}
+          {preview && onClosePreview && (
+            <Button variant="outline" size="sm" icon="edit" onClick={onClosePreview}>
+              {labels.backToEditing}
+            </Button>
+          )}
           {isLabel && onPrintLabels && (
             <Button variant="outline" size="sm" icon="print" onClick={onPrintLabels}>
               {labels.printLabels}
@@ -940,7 +955,7 @@ function DocEditor({
       </header>
 
       {/* Toolbar (44px) */}
-      {editor ? (
+      {hideToolbar ? null : editor ? (
         <EditorToolbar
           editor={editor}
           labels={labels}
@@ -1019,7 +1034,7 @@ function DocEditor({
               <Icon name="view" size={14} />
               <span>{labels.previewingWith}</span>
               <b>{preview.label}</b>
-              {onPreview && (
+              {onPreview && !preview.noRecord && (
                 <Button variant="ghost" size="sm" onClick={onPreview}>
                   {labels.changeRecord}
                 </Button>
@@ -1039,6 +1054,7 @@ function DocEditor({
                 {editor && (
                   <>
                     <BlockToolbar editor={editor} labels={labels} container={contentRef} />
+                    <FieldBar editor={editor} labels={labels} groups={allFields} container={contentRef} />
                     <BlockGutter editor={editor} labels={labels} container={contentRef} menuAt={menuAt} onMenuAtChange={setMenuAt} blockUrl={blockUrl} />
                     <SelectionBubble
                       editor={editor}
@@ -1206,7 +1222,11 @@ function DocEditor({
         <span>
           {preview
             ? fill(editable ? labels.previewEditingStatus : labels.previewStatus, { record: preview.label })
-            : fill(labels.lastEdited, { name: actorName(doc.updatedBy), time: formatTime(doc.updatedAt) })}
+            : actorName(doc.updatedBy)
+              ? fill(labels.lastEdited, { name: actorName(doc.updatedBy), time: formatTime(doc.updatedAt) })
+              : // No name yet (the people lookup isn't wired for every screen):
+                // "Last edited at 21:51", not "Last edited by  at".
+                fill(labels.lastEditedAt, { time: formatTime(doc.updatedAt) })}
         </span>
       </footer>
       {publish && (
@@ -1278,7 +1298,10 @@ function LetterheadField({ field, preview, labels }: { field: FieldDef; preview:
 
 /** 24-hour times in Western digits (stage 5). */
 function formatTime(iso: string): string {
-  const d = new Date(iso)
+  // The server writes UTC without a zone ("2026-11-07 18:51:02"), which
+  // Date reads as local time: the bar said 18:51 beside "Draft saved 21:51".
+  const zoned = /(Z|[+-]\d{2}:?\d{2})$/.test(iso) ? iso : `${iso.replace(" ", "T")}Z`
+  const d = new Date(zoned)
   if (Number.isNaN(d.getTime())) return iso
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`
 }

@@ -199,7 +199,7 @@ final class TenantProvisioner
 
     private function findByName(string $name): ?int
     {
-        // @tenant-guard-ignore: `tenants` is the tenant registry itself, not a tenant-owned table
+        // `tenants` is the tenant registry itself, not a tenant-owned table
         $stmt = $this->db->prepare('SELECT id FROM tenants WHERE name = :name');
         $stmt->execute([':name' => $name]);
         $id = $stmt->fetchColumn();

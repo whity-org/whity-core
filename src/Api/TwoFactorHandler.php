@@ -156,7 +156,7 @@ class TwoFactorHandler
      */
     private function readIdentityRow(int $profileId): ?array
     {
-        // @tenant-guard-ignore: profiles / profile_emails are sanctioned GLOBAL identity tables (ADR 0005 §1-2)
+        // Profiles / profile_emails are sanctioned GLOBAL identity tables (ADR 0005 §1-2)
         $pStmt = $this->db->prepare(
             'SELECT p.two_factor_enabled, p.two_factor_backup_codes_version,
                     pe.email
@@ -188,7 +188,7 @@ class TwoFactorHandler
         ?int $backupCodesVersion
     ): void {
         if ($backupCodesVersion !== null) {
-            // @tenant-guard-ignore: profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
+            // Profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
             $this->db->prepare(
                 'UPDATE profiles
                  SET two_factor_secret = ?, two_factor_enabled = ?,
@@ -196,7 +196,7 @@ class TwoFactorHandler
                  WHERE id = ?'
             )->execute([$encryptedSecretOrNull, $enabled ? 1 : 0, $backupCodesVersion, $profileId]);
         } else {
-            // @tenant-guard-ignore: profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
+            // Profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
             $this->db->prepare(
                 'UPDATE profiles
                  SET two_factor_secret = ?, two_factor_enabled = ?, updated_at = CURRENT_TIMESTAMP
@@ -213,7 +213,7 @@ class TwoFactorHandler
      */
     private function readProofRow(int $profileId): ?array
     {
-        // @tenant-guard-ignore: profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
+        // Profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
         $stmt = $this->db->prepare(
             'SELECT two_factor_secret, two_factor_backup_codes_version, password_hash, auth_method
              FROM profiles WHERE id = ? LIMIT 1'
@@ -601,7 +601,7 @@ class TwoFactorHandler
             // and enabled state are unchanged by a regenerate, so only the
             // version is written here (null secret arg is not passed — we call
             // the version-only profile write directly).
-            // @tenant-guard-ignore: profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
+            // Profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
             $this->db->prepare(
                 'UPDATE profiles
                  SET two_factor_backup_codes_version = ?, updated_at = CURRENT_TIMESTAMP

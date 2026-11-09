@@ -128,12 +128,6 @@ final class PublicFormsApiRealEngineTest extends TestCase
         $issuer = new SubmissionIssuer(
             $this->pdo,
             $submissions,
-            new DocumentIssuer(
-                $this->pdo,
-                new DocumentRepository($this->pdo),
-                $artifacts,
-                new DocumentArtifactStore($storage),
-            ),
             new RouteTemplateRepository($this->pdo),
             new DocumentRouter(
                 $this->pdo,
@@ -147,7 +141,8 @@ final class PublicFormsApiRealEngineTest extends TestCase
                 null
             ),
             $uploadRows,
-            $artifacts,
+            new RouteRepository($this->pdo),
+            new RouteRecipientRepository($this->pdo),
         );
 
         $this->manage = new FormsApiHandler(
@@ -338,40 +333,36 @@ final class PublicFormsApiRealEngineTest extends TestCase
         self::assertSame(201, $response->getStatusCode());
         self::assertTrue(self::meta($response)['routed']);
 
-        $documentId = (int) $this->onlySubmission()['document_id'];
-        self::assertGreaterThan(0, $documentId);
+        // WHIT-920: the route travels on the submission; no document yet.
+        $submission = $this->onlySubmission();
+        self::assertNull($submission['document_id']);
         self::assertTrue(
-            $this->recipients->hasAnyForProfile(self::TENANT, $documentId, self::APPROVER),
+            $this->recipients->hasAnyOnSubject(self::TENANT, 'form_submission', (int) $submission['id'], self::APPROVER),
             'the approver the FORM named must have been reached'
         );
 
-        // The library and the record show this, so it is the form's name and not its key.
-        $origin = $this->pdo->query('SELECT template_name FROM documents');
+        // Inboxes show the route's title, so it is the form's name and not its key.
+        $origin = $this->pdo->query('SELECT title FROM document_routes');
         self::assertNotFalse($origin);
         self::assertStringNotContainsString('form:', (string) $origin->fetchColumn());
     }
 
     /**
-     * The document a public submission mints has NO author, and that is what
-     * keeps it out of the wrong hands rather than into them.
-     *
-     * `documents.created_by` is null, so
-     * {@see \Whity\Core\Document\DocumentVisibilityPolicy}'s "is this mine" test
-     * — an identity comparison against an int caller id — can never match, and
-     * an anonymous document is never accidentally somebody's.
+     * A public submission has NO author (WHIT-920), so its route can never send
+     * it back to anybody: the send-back is refused for want of somebody to send
+     * it to, and no document exists yet to be somebody's.
      */
     public function testTheDocumentAPublicSubmissionMintsHasNoAuthor(): void
     {
         $slug = $this->openLink($this->publishedForm($this->routeTemplateNaming(self::APPROVER)));
         $this->submit($slug, ['full_name' => 'Layla Haddad']);
 
-        $statement = $this->pdo->query('SELECT created_by, origin_ou_id FROM documents');
-        self::assertNotFalse($statement);
-        $row = $statement->fetch(PDO::FETCH_ASSOC);
-
-        self::assertIsArray($row);
-        self::assertNull($row['created_by']);
-        self::assertNull($row['origin_ou_id'], 'no membership to derive a unit from, and none invented');
+        $submission = $this->onlySubmission();
+        self::assertNull($submission['submitted_by_profile_id']);
+        $documents = $this->pdo->query('SELECT COUNT(*) FROM documents');
+        self::assertNotFalse($documents);
+        self::assertSame(0, (int) $documents->fetchColumn());
+        self::assertNull((new \Whity\Core\Form\FormSubmissionRouteSubject($this->pdo))->author(self::TENANT, (int) $submission['id']));
     }
 
     // ── it is not an oracle ──────────────────────────────────────────────────
@@ -442,8 +433,12 @@ final class PublicFormsApiRealEngineTest extends TestCase
 
         self::assertSame(
             [
-                'slug', 'name', 'description', 'description_i18n', 'submit_label', 'fields', 'sections',
+                // `title` and `banner` (WHIT-944) are written for this very reader.
+                'slug', 'name', 'description', 'description_i18n', 'submit_label', 'title', 'banner', 'fields', 'sections',
                 'accepts_submissions', 'opens_at', 'closes_at',
+                // WHIT-920: whether the visitor must sign in, and only then the
+                // form's id, so the page can send them to the signed-in form.
+                'sign_in_required', 'form_id',
             ],
             array_keys($data)
         );

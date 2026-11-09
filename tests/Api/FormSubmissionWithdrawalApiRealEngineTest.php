@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Api;
 
+use Whity\Core\Hooks\HookManager;
+use Whity\Sdk\Hooks\Events;
 use PDO;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\SchemaFromMigrations;
@@ -36,6 +38,9 @@ final class FormSubmissionWithdrawalApiRealEngineTest extends TestCase
     private FormSubmissionWithdrawalApiHandler $api;
     private int $formId;
 
+    /** @var list<array{0: string, 1: array<string, mixed>}> */
+    private array $fired = [];
+
     protected function setUp(): void
     {
         $this->pdo = SchemaFromMigrations::make();
@@ -50,6 +55,8 @@ final class FormSubmissionWithdrawalApiRealEngineTest extends TestCase
             ->create(self::TENANT, 'supplier_request', ['en' => 'Supplier request'], null, null, null);
         $this->submissions = new FormSubmissionRepository($this->pdo);
         $this->documents = new DocumentRepository($this->pdo);
+        $hooks = new HookManager();
+        $this->recordOn($hooks, Events::SUBMISSION_WITHDRAWN);
         $this->api = new FormSubmissionWithdrawalApiHandler(
             $this->pdo,
             $this->submissions,
@@ -63,6 +70,7 @@ final class FormSubmissionWithdrawalApiRealEngineTest extends TestCase
                 new AuditLogger($this->pdo),
             ),
             new AuditLogger($this->pdo),
+            hooks: $hooks,
         );
         TenantContext::setTenantId(self::TENANT);
     }
@@ -104,6 +112,27 @@ final class FormSubmissionWithdrawalApiRealEngineTest extends TestCase
         self::assertNotNull($data['withdrawn_at']);
         self::assertSame('withdrawn', $data['state']);
         self::assertSame(['supplier' => 'a'], $data['data'], 'the answers stay');
+    }
+
+    public function testItIsAnnouncedWithIdsOnly(): void
+    {
+        $id = $this->send();
+
+        $this->withdraw($id);
+
+        $fired = $this->firedOf(Events::SUBMISSION_WITHDRAWN);
+        self::assertCount(1, $fired);
+        self::assertSame($id, $fired[0]['id']);
+        self::assertSame($this->formId, $fired[0]['form_id']);
+        self::assertSame(self::SENDER, $fired[0]['actor_profile_id']);
+        self::assertArrayNotHasKey('data', $fired[0]);
+    }
+
+    public function testSomebodyElsesWithdrawalAnnouncesNothing(): void
+    {
+        $this->withdraw($this->send(), self::SOMEBODY_ELSE);
+
+        self::assertSame([], $this->firedOf(Events::SUBMISSION_WITHDRAWN));
     }
 
     public function testItIsAudited(): void
@@ -200,5 +229,28 @@ final class FormSubmissionWithdrawalApiRealEngineTest extends TestCase
              VALUES (:tenant_id, :document_id, 'Approval', :created_by, NOW())"
         );
         $stmt->execute([':tenant_id' => self::TENANT, ':document_id' => $documentId, ':created_by' => self::SENDER]);
+    }
+
+    private function recordOn(HookManager $hooks, string ...$events): void
+    {
+        foreach ($events as $event) {
+            $hooks->listen($event, function (array $payload) use ($event): array {
+                $this->fired[] = [$event, $payload];
+
+                return $payload;
+            });
+        }
+    }
+
+    /**
+     * @phpstan-impure
+     * @return list<array<string, mixed>>
+     */
+    private function firedOf(string $event): array
+    {
+        return array_values(array_map(
+            static fn (array $f): array => $f[1],
+            array_filter($this->fired, static fn (array $f): bool => $f[0] === $event)
+        ));
     }
 }

@@ -2,10 +2,12 @@
 declare(strict_types=1);
 namespace Whity\Api;
 
+use Whity\Auth\JwtParser;
 use Whity\Auth\RoleChecker;
 use Whity\Core\Branding\BrandingAssetKind;
 use Whity\Core\Branding\BrandingAssetRejectedException;
 use Whity\Core\Branding\BrandingService;
+use Whity\Core\Branding\DisplayTenantResolver;
 use Whity\Core\Branding\HostResolver;
 use Whity\Core\Branding\TenantHostRepository;
 use Whity\Core\RBAC\CorePermissions;
@@ -37,29 +39,30 @@ final class BrandingApiHandler
         private readonly ?RoleChecker $roleChecker = null,
         private readonly ?TenantHostRepository $hostRepo = null,
         private readonly ?StorageDriverInterface $storage = null,
+        private readonly ?JwtParser $jwtParser = null,
     ) {}
 
     /** GET /api/v1/branding — public effective branding. */
     public function get(Request $request): Response
     {
         try {
-            $tenantId = $this->resolveDisplayTenant($request);
-            $res = Response::json(['data' => $this->branding->effective($tenantId)->toArray()], 200);
-            return new Response(200, $res->getBody(), $res->getHeaders() + ['Cache-Control' => 'public, max-age=60']);
+            $tenantId = (new DisplayTenantResolver($this->hostResolver, $this->jwtParser))->resolve($request);
+
+            // NOT CACHEABLE (#1716). The answer varies by WHO IS ASKING (the
+            // tenant comes from the caller's token when there is one), so a
+            // `public, max-age=60` copy was reused by the browser after a
+            // colour save, and the card and theme kept the old colour for a
+            // minute; a shared cache could hand one tenant's branding to
+            // another's reader. Same reasoning as UiPreferencesApiHandler.
+            return Response::json(['data' => $this->branding->effective($tenantId)->toArray()], 200)
+                ->withHeaders([
+                    'Cache-Control' => 'no-store',
+                    'Vary' => 'Cookie, Authorization',
+                ]);
         } catch (\Throwable $e) {
             error_log('[BrandingApiHandler] get failed: ' . $e->getMessage());
             return Response::error('Failed to resolve branding', 500);
         }
-    }
-
-    private function resolveDisplayTenant(Request $request): int
-    {
-        $ctx = TenantContext::getTenantId();
-        if ($ctx !== null) {
-            return $ctx;
-        }
-        $host = $request->getHeader('X-Forwarded-Host') ?? $request->getHeader('Host') ?? '';
-        return $this->hostResolver->resolveTenantIdByHost($host) ?? 0;
     }
 
     /**

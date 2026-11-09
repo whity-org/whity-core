@@ -81,6 +81,19 @@ type Editing = { key: string; label: string; value: string; apply: (v: string) =
 function BlockToolbar({ editor, labels, container }: { editor: Editor; labels: EditorLabels; container: React.RefObject<HTMLDivElement | null> }) {
   const { services } = useEditorServices()
   const target = useEditorState({ editor, selector: ({ editor: e }) => (e.isEditable ? selectedRich(e) : null) })
+  // A document opens with its caret at the start, which in most starters is
+  // inside the first table: shown then, the bar sat over the letterhead before
+  // the author had touched anything. It waits for the first focus and stays
+  // after it, so typing in its own fields (which blurs the editor) keeps it.
+  const [engaged, setEngaged] = React.useState(() => editor.isFocused)
+  React.useEffect(() => {
+    if (engaged) return
+    const onFocus = () => setEngaged(true)
+    editor.on("focus", onFocus)
+    return () => {
+      editor.off("focus", onFocus)
+    }
+  }, [editor, engaged])
   const [editing, setEditing] = React.useState<Editing>(null)
   const [busy, setBusy] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
@@ -106,7 +119,7 @@ function BlockToolbar({ editor, labels, container }: { editor: Editor; labels: E
     setTop((inLabel ? rect.bottom + 10 : rect.top) - box.top)
   }, [editor, pos, container, target?.node])
 
-  if (!target || top === null) return null
+  if (!engaged || !target || top === null) return null
   const { node } = target
   const type = node.type.name
   const attrs = node.attrs as Record<string, unknown>

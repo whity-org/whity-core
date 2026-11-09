@@ -7,41 +7,16 @@ namespace Whity\Core\Document\Issuing;
 use PDO;
 use Whity\Auth\RoleChecker;
 use Whity\Core\Document\DocumentAccessPolicy;
-use Whity\Core\Document\DocumentArtifactRepository;
-use Whity\Core\Document\DocumentArtifactStore;
-use Whity\Core\Document\DocumentIssuer;
-use Whity\Core\Document\DocumentRepository;
-use Whity\Core\Document\DocumentSourceFileStore;
 use Whity\Core\Document\DocumentSourceRepository;
-use Whity\Core\Document\DocumentSourceVersionRepository;
 use Whity\Core\Document\Embed\DocumentEmbedRegistry;
 use Whity\Core\Document\Fields\DocumentFieldRegistry;
-use Whity\Core\Document\Print\LetterheadLogo;
-use Whity\Core\Document\Print\PrintLabels;
-use Whity\Core\Document\Print\SourceDocumentPrinter;
-use Whity\Core\Document\Qr\DocumentQrScanRepository;
-use Whity\Core\Document\Qr\DocumentQrService;
-use Whity\Core\Document\Qr\DocumentQrTokenRepository;
-use Whity\Core\Document\Render\FlowDocumentRenderer;
-use Whity\Core\Document\Render\RenderServiceClient;
 use Whity\Core\Document\Slots\TemplateSlotRegistry;
-use Whity\Core\Document\Theme\DocumentThemeRepository;
-use Whity\Core\Entitlement\EntitlementService;
-use Whity\Core\Entitlement\MeterService;
-use Whity\Core\Entitlement\TenantEntitlementRepository;
-use Whity\Core\Http\FrontendUrls;
 use Whity\Core\Hooks\HookManager;
 use Whity\Core\Ou\OuReachResolver;
 use Whity\Core\RBAC\ResourceRoleAssignmentRepository;
 use Whity\Core\RBAC\ResourceTypeRegistry;
 use Whity\Core\RBAC\ScopedPermissionSet;
-use Whity\Core\Security\EncryptedSecretStore;
 use Whity\Core\Settings\SettingsService;
-use Whity\Core\Store\DatabaseSharedStore;
-use Whity\Storage\StorageDriverFactory;
-use Whity\Storage\TenantRoutingStorageDriver;
-use Whity\Storage\TenantStorageConfigRepository;
-use Whity\Storage\TenantStorageResolver;
 
 /**
  * The issuing service outside a request (WHIT-742, DOCUMENT-AUTOMATION.md
@@ -61,7 +36,13 @@ final class WorkerDocumentIssuing
     {
     }
 
-    /** @param array<string, mixed> $env */
+    /**
+     * Pass the process's {@see WorkerDocumentParts} when something else in it
+     * renders too (the SDK's DocumentRenderer, #1151), so both share one
+     * storage driver.
+     *
+     * @param array<string, mixed> $env
+     */
     public static function build(
         PDO $pdo,
         SettingsService $settings,
@@ -73,7 +54,9 @@ final class WorkerDocumentIssuing
         TemplateSlotRegistry $slots,
         array $env,
         string $storageRoot,
+        ?WorkerDocumentParts $parts = null,
     ): TemplateIssuing {
+        $parts ??= new WorkerDocumentParts($pdo, $settings, $hooks, $fields, $embeds, $env, $storageRoot);
         $sources = new DocumentSourceRepository($pdo);
         $policy = new DocumentAccessPolicy();
         $reach = new OuReachResolver($pdo, new ResourceRoleAssignmentRepository($pdo, $resourceTypes));
@@ -81,7 +64,7 @@ final class WorkerDocumentIssuing
         return new TemplateIssuing(
             // Built on the first issue: a command that never issues (migrate,
             // a backup) must not need the render service, storage or the key.
-            static fn (): DocumentIssuing => self::issuing($pdo, $settings, $hooks, $fields, $embeds, $env, $storageRoot),
+            static fn (): DocumentIssuing => $parts->issuing(),
             $fields,
             $settings,
             static function (int $id, int $tenantId, int $profileId) use ($sources, $policy, $reach, $roleChecker): ?array {
@@ -101,61 +84,6 @@ final class WorkerDocumentIssuing
             // A plugin's job issuing with no person (WHIT-742 slice 3): its slot's
             // binding names the template, which is shared with the workspace.
             static fn (int $id, int $tenantId): ?array => $sources->findById($id, $tenantId),
-        );
-    }
-
-    /** @param array<string, mixed> $env */
-    private static function issuing(
-        PDO $pdo,
-        SettingsService $settings,
-        HookManager $hooks,
-        DocumentFieldRegistry $fields,
-        DocumentEmbedRegistry $embeds,
-        array $env,
-        string $storageRoot,
-    ): DocumentIssuing {
-        $entitlements = new EntitlementService(new TenantEntitlementRepository($pdo));
-        $defaultStorage = StorageDriverFactory::fromSettings($settings, $env, $storageRoot);
-        $storage = new TenantRoutingStorageDriver($defaultStorage, new TenantStorageResolver(
-            $defaultStorage,
-            new TenantStorageConfigRepository($pdo),
-            $entitlements,
-            EncryptedSecretStore::fromEnv($env),
-        ));
-
-        $documents = new DocumentRepository($pdo);
-        $artifacts = new DocumentArtifactRepository($pdo);
-        $urls = FrontendUrls::fromEnv();
-
-        return new DocumentIssuing(
-            new SourceDocumentPrinter(
-                $fields,
-                $embeds,
-                $settings,
-                new DocumentSourceFileStore($storage, $pdo),
-                new PrintLabels(),
-                new LetterheadLogo($settings, $storage),
-                new DocumentThemeRepository($pdo),
-            ),
-            new DocumentSourceVersionRepository($pdo),
-            new DocumentIssuer($pdo, $documents, $artifacts, new DocumentArtifactStore($storage)),
-            $settings,
-            new FlowDocumentRenderer($settings, new RenderServiceClient(
-                (string) ($env['RENDER_SERVICE_URL'] ?? 'http://render:8130'),
-                (string) ($env['RENDER_SHARED_SECRET'] ?? ''),
-                (int) ($env['RENDER_TIMEOUT_SECONDS'] ?? 30),
-            )),
-            new DocumentQrService(
-                $pdo,
-                new DocumentQrTokenRepository($pdo),
-                new DocumentQrScanRepository($pdo),
-                $urls->base(),
-                $urls->link(FrontendUrls::DOCUMENT_VERIFY),
-            ),
-            new MeterService(new DatabaseSharedStore($pdo), $entitlements, $settings),
-            $hooks,
-            $documents,
-            $artifacts,
         );
     }
 }

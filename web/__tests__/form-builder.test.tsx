@@ -278,6 +278,24 @@ describe('FormBuilderScreen', () => {
     expect((put?.body as { fields: Array<{ is_required: boolean }> }).fields[0].is_required).toBe(false);
   });
 
+  it('keeps the question settings in view while the questions scroll, and starts each question at the top', async () => {
+    render(<FormBuilderScreen env={fakeEnv([])} formId={7} canManage />);
+    await screen.findByText(/Supplier name/);
+    await userEvent.click(screen.getByText(/Supplier name/));
+    const scroller = screen.getByTestId('question-panel-scroll');
+    expect(scroller.className).toMatch(/lg:sticky/);
+    expect(scroller.className).toMatch(/lg:overflow-y-auto/);
+    // A box between the panel and the page that clips with `overflow-hidden`
+    // becomes the sticky's scroll container, and the panel scrolls away (WHIT-1713).
+    for (let el = scroller.parentElement; el !== null; el = el.parentElement) {
+      expect(el.className).not.toMatch(/(^|\s)overflow-hidden(\s|$)/);
+    }
+    scroller.scrollTop = 120;
+    await userEvent.click(screen.getByRole('button', { name: /Add question/ }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Short text' }));
+    await waitFor(() => expect(scroller.scrollTop).toBe(0));
+  });
+
   it('offers only the kinds this server can store', async () => {
     render(<FormBuilderScreen env={fakeEnv([])} formId={7} canManage />);
     await screen.findByText(/Supplier name/);

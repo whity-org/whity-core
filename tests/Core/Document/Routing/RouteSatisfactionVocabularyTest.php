@@ -182,11 +182,14 @@ final class RouteSatisfactionVocabularyTest extends TestCase
             );
         }
 
+        // Ten since WHIT-919: migration 226 widened the trail once for the whole
+        // routes plan (sent_back, resubmitted, signed, stamped, declined). None
+        // of them is a satisfaction value, which the loop above checks.
         self::assertCount(
-            5,
+            10,
             RouteAction::all(),
-            '#1054 must not have added a sixth action verb. If this fails, read migration 125 and '
-            . 'migration 119 before changing the number.'
+            'An action verb was added or removed. If this fails, read migrations 119, 125 and 226 '
+            . 'before changing the number.'
         );
     }
 }

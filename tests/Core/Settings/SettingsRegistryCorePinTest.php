@@ -130,6 +130,7 @@ final class SettingsRegistryCorePinTest extends TestCase
             'dunning.lock_after_days',
             'plugins.store_allowed_hosts',
             'plugins.store_enabled',
+            'plugins.mcp_prompts_require_mark',
             'documents.render_enabled',
             'documents.theme',
             'documents.theme_by_kind',
@@ -157,6 +158,8 @@ final class SettingsRegistryCorePinTest extends TestCase
             // them was the pin working; they are added here deliberately.
             'documents.qr_enabled',
             'documents.qr_public_detail',
+            // WHIT-920: whether an applicant sees who reviewed their form. Off.
+            'forms.show_reviewer_names',
             // #999 — how many people a USER GROUP preview SHOWS. Not a ceiling
             // on resolution: the count a preview reports is exact and unbounded,
             // this is the size of the sample beside it.
@@ -176,6 +179,8 @@ final class SettingsRegistryCorePinTest extends TestCase
             'ui.hide_dates',
             // #1019. The cap on one label-resolution request.
             'labels.resolve_max_ids',
+            // #1733. Whether the web app can be installed (instance-wide).
+            'app.installable',
         ];
     }
 
@@ -304,9 +309,12 @@ final class SettingsRegistryCorePinTest extends TestCase
             'affiliate.withholding_bp' => '0',
             'dunning.retry_schedule_days' => '1,3,7',
             'dunning.lock_after_days' => '14',
-            'plugins.store_allowed_hosts' => '',
+            'plugins.store_allowed_hosts' => 'app.whity.dev',
             'plugins.store_enabled' => 'true',
-            'documents.render_enabled' => 'false',
+            'plugins.mcp_prompts_require_mark' => 'false',
+            // WHIT-1001: on by default; printing also needs a ready render
+            // service, so an install without one still prints nothing.
+            'documents.render_enabled' => 'true',
             // Whity's standard theme until a workspace chooses its own (editor M4d).
             'documents.theme' => 'whity.standard',
             'documents.theme_by_kind' => '',
@@ -351,6 +359,8 @@ final class SettingsRegistryCorePinTest extends TestCase
             // leak where a document sits internally.
             'documents.qr_enabled' => 'false',
             'documents.qr_public_detail' => 'minimal',
+            // WHIT-920: OFF. Applicants see stages and outcomes, not reviewers.
+            'forms.show_reviewer_names' => 'false',
             // Ten faces: enough to recognise a group at a glance, small enough
             // that nobody mistakes the sample for the list.
             'groups.preview_sample_size' => '10',
@@ -374,6 +384,9 @@ final class SettingsRegistryCorePinTest extends TestCase
             // argument i18n.enabled won above, pointing the other way.
             'ui.hide_dates' => 'false',
             'labels.resolve_max_ids' => '100',
+            // #1733: on, which is what app.whity.dev wants; an operator turns
+            // it off here or with PWA_ENABLED.
+            'app.installable' => 'true',
         ];
     }
 
@@ -526,6 +539,8 @@ final class SettingsRegistryCorePinTest extends TestCase
             ['labels.resolve_max_ids', '500', true],
             ['labels.resolve_max_ids', '501', false],
             ['labels.resolve_max_ids', '0', false],
+            ['app.installable', 'false', true],
+            ['app.installable', '1', false],
             ['branding_favicon', 'anything', false],
             ['not_a_setting_at_all', 'x', false],
         ];
@@ -593,6 +608,8 @@ final class SettingsRegistryCorePinTest extends TestCase
         // Languages are a PLATFORM catalogue with no tenant_id column, and the
         // sign-in screen resolves one before any tenant is known.
         self::assertTrue(SettingsRegistry::isGlobalOnly('i18n.enabled'));
+        // Code plugins are install-wide, so whose prompts are served is too (WHIT-1014).
+        self::assertTrue(SettingsRegistry::isGlobalOnly('plugins.mcp_prompts_require_mark'));
 
         self::assertTrue(SettingsRegistry::isFeatureFlag('mcp.enabled'));
         self::assertFalse(SettingsRegistry::isFeatureFlag('mail.events.welcome_enabled'));

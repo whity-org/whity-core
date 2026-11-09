@@ -68,4 +68,40 @@ final class PromptRegistryTest extends TestCase
 
         self::assertSame($first, $this->registry->find('dup'));
     }
+
+    public function testAPluginGateHidesThatPluginsPromptsAtEveryCall(): void
+    {
+        $this->registry->register(new Prompt(name: 'core-one', description: 'core'));
+        $this->registry->register(new Prompt(name: 'crm-one', description: 'crm', plugin: 'Crm'));
+        $this->registry->register(new Prompt(name: 'hand-one', description: 'hand', plugin: 'Hand'));
+
+        $verified = ['Crm' => true];
+        $this->registry->setPluginGate(static function (string $plugin) use (&$verified): bool {
+            return $verified[$plugin] ?? false;
+        });
+
+        self::assertSame(['core-one', 'crm-one'], array_map(static fn (Prompt $p): string => $p->name, $this->registry->all()));
+        self::assertNull($this->registry->find('hand-one'));
+        self::assertTrue($this->registry->has('hand-one'), 'a hidden prompt keeps its name');
+
+        // A revoked mark hides the prompts at the next call, with no reload.
+        $verified['Crm'] = false;
+        self::assertSame(['core-one'], array_map(static fn (Prompt $p): string => $p->name, $this->registry->all()));
+        self::assertNull($this->registry->find('crm-one'));
+        self::assertNotNull($this->registry->find('core-one'), 'core prompts are never gated');
+    }
+
+    public function testAGateThatThrowsHidesThePlugin(): void
+    {
+        $this->registry->register(new Prompt(name: 'crm-one', description: 'crm', plugin: 'Crm'));
+        $this->registry->setPluginGate(static function (string $plugin): bool {
+            throw new \RuntimeException('settings unavailable');
+        });
+
+        self::assertSame([], $this->registry->all());
+        self::assertNull($this->registry->find('crm-one'));
+
+        $this->registry->setPluginGate(null);
+        self::assertNotNull($this->registry->find('crm-one'), 'no gate serves everything, as before');
+    }
 }

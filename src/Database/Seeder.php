@@ -177,7 +177,7 @@ class Seeder
             $normEmail = strtolower(trim($account['email']));
 
             // ── a. Check whether a profile_email already exists ──────────────
-            // @tenant-guard-ignore: profile_emails is a sanctioned GLOBAL table (ADR 0005 §2)
+            // Profile_emails is a sanctioned GLOBAL table (ADR 0005 §2)
             $existing = $db->query(
                 'SELECT profile_id FROM profile_emails WHERE email = :email',
                 [':email' => $normEmail]
@@ -194,7 +194,7 @@ class Seeder
             } else {
                 // ── b. INSERT a profiles row ──────────────────────────────────
                 // Use RETURNING id on PostgreSQL; lastInsertId() on SQLite.
-                // @tenant-guard-ignore: profiles is a sanctioned GLOBAL table (ADR 0005 §1)
+                // Profiles is a sanctioned GLOBAL table (ADR 0005 §1)
                 $profileParams = [
                     ':display_name'                    => self::localPart($normEmail),
                     ':password_hash'                   => InitialPassword::hashFor($account['password_env'], $normEmail),
@@ -237,7 +237,7 @@ class Seeder
                 }
 
                 // ── c. INSERT the primary verified profile_email ──────────────
-                // @tenant-guard-ignore: profile_emails is a sanctioned GLOBAL table (ADR 0005 §2)
+                // Profile_emails is a sanctioned GLOBAL table (ADR 0005 §2)
                 $db->query(
                     "INSERT INTO profile_emails
                          (profile_id, email, verified, is_primary, created_at)
@@ -254,7 +254,7 @@ class Seeder
             }
 
             // ── d. INSERT the membership (idempotent via UNIQUE(profile_id, tenant_id))
-            // @tenant-guard-ignore: seed-time bootstrap; system-tenant rows use tenant_id = 0
+            // Seed-time bootstrap; system-tenant rows use tenant_id = 0
             $db->query(
                 "INSERT INTO memberships
                      (profile_id, tenant_id, role_id, ou_id, status, created_at)
@@ -304,7 +304,7 @@ class Seeder
             return;
         }
 
-        // @tenant-guard-ignore: profiles is a sanctioned GLOBAL table (ADR 0005 §1)
+        // Profiles is a sanctioned GLOBAL table (ADR 0005 §1)
         $row = $db->query(
             'SELECT password_hash, auth_method FROM profiles WHERE id = :id',
             [':id' => $profileId]

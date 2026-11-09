@@ -172,7 +172,7 @@ final class AuthMethod
      */
     public function of(int $profileId): ?string
     {
-        // @tenant-guard-ignore: profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
+        // Profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
         $stmt = $this->db->prepare('SELECT auth_method FROM profiles WHERE id = :id LIMIT 1');
         $stmt->execute([':id' => $profileId]);
         $value = $stmt->fetchColumn();
@@ -240,7 +240,7 @@ final class AuthMethod
             $refusal .= ' AND auth_method <> :refused';
         }
 
-        // @tenant-guard-ignore: profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
+        // Profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
         $stmt = $this->db->prepare(
             'UPDATE profiles
                 SET password_hash = :hash,
@@ -285,7 +285,7 @@ final class AuthMethod
      */
     public function onExternalIdentityLinked(int $profileId): void
     {
-        // @tenant-guard-ignore: profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
+        // Profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
         $this->db->prepare(
             'UPDATE profiles
                 SET auth_method = CASE
@@ -320,7 +320,7 @@ final class AuthMethod
      */
     public function onExternalIdentityUnlinked(int $profileId): void
     {
-        // @tenant-guard-ignore: profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
+        // Profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
         $this->db->prepare(
             'UPDATE profiles
                 SET auth_method = :local, updated_at = NOW()

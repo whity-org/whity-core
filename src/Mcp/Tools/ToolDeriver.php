@@ -353,6 +353,11 @@ final class ToolDeriver
                 if (\Whity\Core\Plugin\PluginPublicRoutes::allows($route['method'], $route['path'])) {
                     continue;
                 }
+                // A plugin's service route answers another server's token, not
+                // a person, so it is never an MCP tool either (WHIT-1011).
+                if (\Whity\Core\Plugin\PluginServiceRoutes::isService($route['method'], $route['path'])) {
+                    continue;
+                }
                 $declarations[] = $route;
             }
         }

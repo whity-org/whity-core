@@ -26,6 +26,8 @@
 
 import { use, useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
+import { Button } from '@whity/ui/button';
+import { FormHeader, type FormBannerValue } from '@whity/features/forms';
 import { BuiltOnWhity } from '@whity/ui/built-on-whity';
 import { TenantLogo } from '@whity/ui/tenant-logo';
 import { useBranding } from '@/lib/branding-context';
@@ -47,11 +49,17 @@ interface PublicForm {
   description: string | null;
   description_i18n?: LocalizedText | [] | null;
   submit_label?: LocalizedText | null;
+  /** The heading and picture written for the person filling it in (WHIT-944). */
+  title?: LocalizedText | null;
+  banner?: FormBannerValue | null;
   fields: FillableField[];
   sections: FormSectionSpec[];
   accepts_submissions: boolean;
   opens_at: string | null;
   closes_at: string | null;
+  /** WHIT-920: the visitor signs in and fills it in at /forms/{form_id}, under their own name. */
+  sign_in_required?: boolean;
+  form_id?: number | null;
 }
 
 export default function PublicFormPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -220,7 +228,8 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
     );
   }
 
-  const title = localized(form.name, preferArabic) || t('fill.untitled', 'Form');
+  const title =
+    localized(form.title ?? null, preferArabic) || localized(form.name, preferArabic) || t('fill.untitled', 'Form');
   const closedOn = dateTime(form.closes_at);
   const translatedDescription = Array.isArray(form.description_i18n) ? null : form.description_i18n;
   const description = localized(translatedDescription, preferArabic) || form.description;
@@ -243,14 +252,21 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
   }
 
   return shell(
-    <Card className="border-t-4 border-t-primary">
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-        {description !== null && description !== '' && <CardDescription>{description}</CardDescription>}
-      </CardHeader>
+    // A banner leads in place of the brand-coloured top edge.
+    <Card className={form.banner ? undefined : 'border-t-4 border-t-primary'}>
+      <FormHeader title={title} description={description} banner={form.banner} />
 
       <CardContent>
-        {!form.accepts_submissions ? (
+        {form.accepts_submissions && form.sign_in_required === true && typeof form.form_id === 'number' ? (
+          <div className="space-y-3 py-6">
+            <p className="text-sm text-muted-foreground">
+              {t('fill.signInRequired', 'Sign in to fill in this form. It is sent under your own name, so you can follow it and make changes if you are asked to.')}
+            </p>
+            <Button asChild>
+              <a href={`/forms/${form.form_id}`}>{t('fill.signIn', 'Sign in to fill it in')}</a>
+            </Button>
+          </div>
+        ) : !form.accepts_submissions ? (
           <p className="py-6 text-sm text-muted-foreground">
             {/*
               No `?? form.closes_at` fallback: when the formatter declines, the

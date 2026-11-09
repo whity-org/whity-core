@@ -125,6 +125,58 @@ describe('whity_render server', () => {
     expect(res.status).toBe(401);
   });
 
+  test('every answer carries the core version it was built for, when it knows one (WHIT-1001)', async () => {
+    const res = await request(app).get('/health');
+    if (res.body.core_version) {
+      expect(res.headers['x-render-core-version']).toBe(res.body.core_version);
+    } else {
+      expect(res.headers['x-render-core-version']).toBeUndefined();
+    }
+  });
+
+  test('GET /auth-check answers 204 for the right secret and never renders (WHIT-1001)', async () => {
+    const res = await request(app).get('/auth-check').set('X-Render-Secret', SECRET);
+    expect(res.status).toBe(204);
+    expect(renderFlowToPdf).not.toHaveBeenCalled();
+  });
+
+  test('GET /auth-check answers a bare refusal for a wrong secret', async () => {
+    const res = await request(app).get('/auth-check').set('X-Render-Secret', 'b'.repeat(32));
+    expect(res.status).toBe(401);
+    expect(res.body).toEqual({ error: 'refused' });
+    expect(JSON.stringify(res.body)).not.toContain(SECRET);
+  });
+
+  test('GET /auth-check says nothing more when the render service has no secret', async () => {
+    jest.resetModules();
+    delete process.env.RENDER_SHARED_SECRET;
+    const { app: unconfiguredApp } = loadServer();
+
+    const res = await request(unconfiguredApp).get('/auth-check').set('X-Render-Secret', 'a'.repeat(32));
+    expect(res.status).toBe(401);
+    expect(res.body).toEqual({ error: 'refused' });
+  });
+
+  test('GET /auth-check does not spend the render rate limit', async () => {
+    jest.resetModules();
+    process.env.RENDER_SHARED_SECRET = SECRET;
+    process.env.RENDER_RATE_LIMIT_MAX = '1';
+    const { app: limitedApp } = loadServer();
+
+    for (let i = 0; i < 3; i += 1) {
+      expect((await request(limitedApp).get('/auth-check').set('X-Render-Secret', SECRET)).status).toBe(204);
+    }
+    const render = await request(limitedApp).post('/render/flow').set('X-Render-Secret', SECRET).send(flowPayload());
+    expect(render.status).not.toBe(429);
+    delete process.env.RENDER_RATE_LIMIT_MAX;
+  });
+
+  test('a render route refused for a wrong secret names which side to fix', async () => {
+    const res = await request(app).post('/render/flow').set('X-Render-Secret', 'b'.repeat(32)).send(flowPayload());
+    expect(res.body.error).toMatch(/does not match/);
+    expect(JSON.stringify(res.body)).not.toContain(SECRET);
+  });
+
   test('a secret of the right length but the wrong value is 401', async () => {
     const res = await request(app).post('/render/flow').set('X-Render-Secret', 'b'.repeat(32)).send(flowPayload());
     expect(res.status).toBe(401);

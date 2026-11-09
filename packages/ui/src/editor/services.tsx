@@ -63,6 +63,14 @@ export interface FieldPreview {
   /** "INV-1042 · Example Clinic" */
   label: string
   values: Record<string, string | null>
+  /**
+   * The values are the fields' examples, not a record's: a template with no
+   * record type previews with them instead of flagging every field missing.
+   * There is no record to change.
+   */
+  examples?: boolean
+  /** No record behind the values (examples, or values typed to issue): nothing to change. */
+  noRecord?: boolean
 }
 
 interface ServicesValue {

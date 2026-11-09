@@ -291,7 +291,7 @@ class UsersApiHandler
                 $countRow = $countStmt->fetch(PDO::FETCH_ASSOC);
                 $total = $countRow !== false ? (int)($countRow['cnt'] ?? 0) : 0;
 
-                // @tenant-guard-ignore: system-tenant (id 0) lists active memberships across all tenants; scoped else-branch binds m.tenant_id = :tenant_id
+                // System-tenant (id 0) lists active memberships across all tenants; scoped else-branch binds m.tenant_id = :tenant_id
                 $stmt = $this->db->prepare(
                     "SELECT m.profile_id AS id, pe.email, r.name AS role,
                             m.tenant_id, m.ou_id, m.created_at, m.status, m.role_id,
@@ -892,7 +892,7 @@ class UsersApiHandler
                 if ($tooLong = InputLimits::firstViolation(['email' => [(string) $body['email'], InputLimits::NAME_MAX]])) {
                     return $tooLong;
                 }
-                // @tenant-guard-ignore: profile_emails is a sanctioned GLOBAL identity table (ADR 0005 §2); UNIQUE(email)
+                // Profile_emails is a sanctioned GLOBAL identity table (ADR 0005 §2); UNIQUE(email)
                 $checkStmt = $this->db->prepare(
                     'SELECT profile_id FROM profile_emails WHERE email = ? AND profile_id != ?'
                 );
@@ -1068,7 +1068,7 @@ class UsersApiHandler
             try {
                 // Identity writes (global tables).
                 if ($emailChanged) {
-                    // @tenant-guard-ignore: profile_emails is a sanctioned GLOBAL identity table (ADR 0005 §2); scoped to the target profile's PRIMARY email
+                    // Profile_emails is a sanctioned GLOBAL identity table (ADR 0005 §2); scoped to the target profile's PRIMARY email
                     $this->db->prepare(
                         'UPDATE profile_emails SET email = ? WHERE profile_id = ? AND is_primary = true'
                     )->execute([$newEmail, $profileId]);
@@ -1104,13 +1104,13 @@ class UsersApiHandler
                     );
                 }
                 if ($displayNameChanged) {
-                    // @tenant-guard-ignore: profiles is a sanctioned GLOBAL identity table (ADR 0005 §1); the shared-profile refusal above keeps this to the caller's own people
+                    // Profiles is a sanctioned GLOBAL identity table (ADR 0005 §1); the shared-profile refusal above keeps this to the caller's own people
                     $this->db->prepare(
                         'UPDATE profiles SET display_name = ?, updated_at = NOW() WHERE id = ?'
                     )->execute([$newDisplayName, $profileId]);
                 }
                 if ($accountStatusChanged) {
-                    // @tenant-guard-ignore: profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
+                    // Profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
                     $this->db->prepare(
                         'UPDATE profiles SET status = ?, updated_at = NOW() WHERE id = ?'
                     )->execute([$newAccountStatus, $profileId]);
@@ -1302,7 +1302,7 @@ class UsersApiHandler
             // the tenant predicate itself; the SYSTEM tenant edits across tenants
             // and stays unscoped.
             if ($currentTenantId === self::SYSTEM_TENANT_ID) {
-                // @tenant-guard-ignore: system-tenant (id 0) removes a membership in any tenant; scoped else-branch binds tenant_id
+                // System-tenant (id 0) removes a membership in any tenant; scoped else-branch binds tenant_id
                 $deleteStmt = $this->db->prepare('DELETE FROM memberships WHERE profile_id = ? AND tenant_id = ?');
                 $deleteStmt->execute([$profileId, $ownerTenantId]);
             } else {
@@ -1327,7 +1327,7 @@ class UsersApiHandler
             $recipientEmail = '';
             $tenantName = '';
             try {
-                // @tenant-guard-ignore: profile_emails is a sanctioned GLOBAL table (ADR 0005 §2)
+                // Profile_emails is a sanctioned GLOBAL table (ADR 0005 §2)
                 $peStmt = $this->db->prepare(
                     'SELECT email FROM profile_emails WHERE profile_id = :pid AND is_primary = true'
                 );
@@ -1805,7 +1805,7 @@ class UsersApiHandler
     private function fetchMembershipRow(int $profileId, int $tenantId): ?array
     {
         if ($tenantId === self::SYSTEM_TENANT_ID) {
-            // @tenant-guard-ignore: system-tenant (id 0) resolves a profile's membership in any tenant; scoped else-branch binds m.tenant_id = ?
+            // System-tenant (id 0) resolves a profile's membership in any tenant; scoped else-branch binds m.tenant_id = ?
             $stmt = $this->db->prepare("
                 SELECT m.profile_id AS id, pe.email, r.name AS role,
                        m.tenant_id, m.ou_id, m.created_at, m.status, m.role_id,
@@ -2086,7 +2086,7 @@ class UsersApiHandler
      */
     private function belongsToAnotherTenant(int $profileId, int $tenantId): bool
     {
-        // @tenant-guard-ignore: asks only whether another tenant exists for this profile, and returns nothing about it
+        // Asks only whether another tenant exists for this profile, and returns nothing about it
         $stmt = $this->db->prepare('SELECT 1 FROM memberships WHERE profile_id = ? AND tenant_id <> ? LIMIT 1');
         $stmt->execute([$profileId, $tenantId]);
 
@@ -2102,7 +2102,7 @@ class UsersApiHandler
      */
     private function profileExists(int $profileId): bool
     {
-        // @tenant-guard-ignore: profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
+        // Profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
         $stmt = $this->db->prepare('SELECT 1 FROM profiles WHERE id = ? LIMIT 1');
         $stmt->execute([$profileId]);
 

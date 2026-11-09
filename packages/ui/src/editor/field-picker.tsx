@@ -46,7 +46,7 @@ function FieldPicker({
   return (
     <div
       data-slot="field-picker"
-      className="wy-fpick grid w-[300px] gap-0.5 rounded-lg border border-border bg-popover p-1 text-sm text-popover-foreground shadow-float"
+      className="wy-fpick grid w-[340px] max-w-[calc(100vw-2rem)] gap-0.5 rounded-lg border border-border bg-popover p-1 text-sm text-popover-foreground shadow-float"
     >
       {search ??
         (query !== undefined && (
@@ -82,9 +82,11 @@ function FieldPicker({
                     on && "bg-primary-tint text-primary-tint-foreground"
                   )}
                 >
-                  <span className="wy-mf">{field.label}</span>
+                  <span className="wy-mf shrink-0">{field.label}</span>
+                  {/* min-w-0 lets the sample give way: without it a long chip
+                      pushed "7 November 2026" past the picker's edge. */}
                   {field.sample && (
-                    <span dir="auto" className="ms-auto max-w-[120px] truncate text-xs text-muted-foreground">
+                    <span dir="auto" title={field.sample} className="ms-auto min-w-0 truncate text-xs text-muted-foreground">
                       {field.sample}
                     </span>
                   )}

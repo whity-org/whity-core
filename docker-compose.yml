@@ -52,6 +52,10 @@ services:
       # Master switch for the /mcp transport. Off by default, as everywhere; the
       # e2e job turns it on to drive the connect wizard end to end (WHIT-697).
       MCP_ENABLED: ${MCP_ENABLED:-false}
+      # Whether the web app can be installed as a phone app (#1733): manifest,
+      # service worker, offline page. Empty leaves it on. The app.installable
+      # system setting, once an operator saves it, wins over this.
+      PWA_ENABLED: ${PWA_ENABLED:-}
       DB_USER: ${DB_USER:-whity}
       DB_PASSWORD: ${DB_PASSWORD:-whity_dev}
       DB_NAME: ${DB_NAME:-whity_core}
@@ -75,9 +79,9 @@ services:
       # if this is unset/empty (mirroring JWT_SECRET). Override in production with a strong secret.
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-dev_encryption_key_change_in_production}
       # Document/label designer server-side render tier (ADR 0012). In-network
-      # base URL of the opt-in `render` compose service below; only reachable
-      # (and only ever called) when documents.render_enabled is ALSO true — see
-      # SettingsRegistry. RENDER_SHARED_SECRET must match the render service's
+      # base URL of the opt-in `render` compose service below; printing uses it
+      # once it answers at this checkout's version and accepts the secret, unless
+      # documents.render_enabled is switched off (WHIT-1001). RENDER_SHARED_SECRET must match the render service's
       # own value (dev default below is for local use only, like JWT_SECRET).
       RENDER_SERVICE_URL: ${RENDER_SERVICE_URL:-http://render:8130}
       RENDER_SHARED_SECRET: ${RENDER_SHARED_SECRET:-dev_render_shared_secret_change_in_production}
@@ -360,11 +364,12 @@ services:
   # Deliberately OPT-IN (like `cron`/`queue`/`scheduler`): render load is
   # bursty/seasonal (a whole cohort's labels exported at once) and Chromium is
   # heavy, so a minimal sovereign deploy omits this profile entirely and the
-  # core render endpoint degrades to a clean 503 when it is absent. The core
-  # service ALSO gates on the documents.render_enabled setting (default off)
-  # independent of whether this container happens to be running — run
-  # `docker compose --profile render up` to include it. RENDER_SHARED_SECRET
-  # MUST match the frankenphp service's value above.
+  # core render endpoint degrades to a clean 503 naming why when it is absent.
+  # `docker compose --profile render up -d` is all it takes locally: both
+  # sides share the dev secret below, this image is built from the same
+  # checkout (so the versions match), and core starts printing as soon as it
+  # can reach it (WHIT-1001). documents.render_enabled stays as the off switch.
+  # RENDER_SHARED_SECRET MUST match the frankenphp service's value above.
   render:
     build:
       context: .
@@ -374,8 +379,11 @@ services:
     environment:
       PORT: "8130"
       RENDER_SHARED_SECRET: ${RENDER_SHARED_SECRET:-dev_render_shared_secret_change_in_production}
+    # Loopback only (WHIT-1001): the app reaches it over the compose network,
+    # and this port is just for `curl localhost:8130/health` while debugging.
+    # The renderer must never be on a public interface.
     ports:
-      - "${RENDER_PORT_HOST:-8130}:8130"
+      - "127.0.0.1:${RENDER_PORT_HOST:-8130}:8130"
     profiles:
       - render
     restart: unless-stopped

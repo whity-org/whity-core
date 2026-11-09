@@ -13,11 +13,15 @@ import { useToast } from '@/lib/toast-context';
  */
 const webTransport: Transport = {
   async request(method: string, path: string, body?: unknown) {
+    // A FormData body is a multipart upload: the browser writes its own
+    // Content-Type with the boundary, so none is set here.
     const response = await apiClient(path, {
       method,
-      ...(body !== undefined
-        ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
-        : {}),
+      ...(body instanceof FormData
+        ? { body }
+        : body !== undefined
+          ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+          : {}),
     });
     const parsed: unknown = await response.json().catch(() => null);
     return { status: response.status, body: parsed };

@@ -19,6 +19,90 @@ itself) · [Feature Flags](Feature-Flags.md) (`documents.render_enabled`) ·
 
 ---
 
+## Set up rendering
+
+Printing turns on by itself once the app can reach a renderer **of its own
+version** that **accepts its shared secret** (WHIT-1001). There is nothing to
+switch on in the admin screens.
+
+**`whity install` (production).** Nothing to do. The installer writes
+`COMPOSE_PROFILES=render`, generates `RENDER_SHARED_SECRET`, and one
+`WHITY_VERSION` picks the app, web and render images, so they always match.
+`whity update` adds a secret to an older install that runs the renderer
+without one.
+
+**Local checkout (`docker-compose.yml`).**
+
+```bash
+docker compose --profile render up -d --build
+```
+
+The dev secret is shared by both services and the render image is built from
+the same checkout, so the versions match.
+
+**Published images (`docker-compose.staging-remote.yml`).** Put three lines in
+your env file and start it:
+
+```bash
+WHITY_VERSION=v0.2.27                          # app, web and render, one tag
+COMPOSE_PROFILES=web,render
+RENDER_SHARED_SECRET=<output of: openssl rand -hex 32>
+```
+
+```bash
+docker compose -f docker-compose.staging-remote.yml --env-file .env.staging up -d
+```
+
+**Check it.** Two places say the same thing, with the exact fix when it is not
+working:
+
+- **Admin, Stats, System card**: "Document renderer: Connected · 0.2.27", or
+  what is wrong and what to change (system administrators only).
+- **The command line**, inside the app container:
+
+  ```bash
+  docker compose exec frankenphp php bin/whity-cli render:check
+  ```
+
+  Exit code 0 when ready, 1 when not.
+
+| What it says | What to do |
+|---|---|
+| Not set up | Set `RENDER_SHARED_SECRET` (32+ characters) on the app and the render service, and `RENDER_SERVICE_URL` on the app (default `http://render:8130`). |
+| Not reachable | Start the render service (`render` in `COMPOSE_PROFILES`), and check `RENDER_SERVICE_URL` reaches it from the app container. |
+| Key mismatch | The two `RENDER_SHARED_SECRET` values differ, or the render service has none. Set the same value on both and restart both. |
+| Version mismatch | The render image is another release. Run `render:v<app version>`; with `WHITY_VERSION` that is automatic. Printing stays paused until they match, because a mismatched renderer prints the other release's layout. |
+| Switched off | The renderer works, but an administrator turned off `documents.render_enabled` (Settings, Feature flags). |
+
+A print that cannot happen answers `503` with the same plain sentence
+("The document renderer is not reachable", "...is version 0.2.26 but this app
+is 0.2.27..."), never a bare "unavailable". The URL and the secret never
+appear in it. A document issued meanwhile is saved without its PDF and its
+page says "PDF not available yet" with the same reason (and, for system
+administrators, the fix); print it again once the renderer is fixed.
+
+A renderer swapped for another version between checks cannot slip a print
+through either: every answer carries an `X-Render-Core-Version` header, and
+core refuses a PDF whose version is not its own.
+
+**Upgrading from before 0.2.27.** An install that already has a renderer and
+never set `documents.render_enabled` stays off after the upgrade, and the Stats
+line says "Switched off". To start printing, turn on Render Enabled in Settings,
+Feature flags. A saved value is kept. An install with no renderer settings gets
+the new default if one is set up later.
+
+An install with renderer settings but no renderer running stays off until
+someone turns it on.
+
+**Security does not change.** The renderer stays on the compose network only
+(`expose`, not `ports`, in the published files; the dev files bind it to
+`127.0.0.1`), every render still needs the shared secret, and the secret
+check (`GET /auth-check`) renders nothing and has its own rate limit, so it
+neither spends the 30-renders-a-minute budget nor serves as a free guessing
+oracle.
+
+---
+
 ## The published image
 
 | | |
@@ -87,20 +171,30 @@ ships.
 
 ## Running it
 
-The render tier is **opt-in at two independent levels**, and both must be on:
+The render tier is **opt-in by running it**: the container is behind a
+Compose `profile`, like `cron`/`queue`/`scheduler`, and needs a shared secret.
+A deployment that never exports PDFs should not carry a Chromium container.
 
-1. **Infrastructure** — the container is behind a Compose `profile`, like
-   `cron`/`queue`/`scheduler`. A deployment that never exports PDFs should not
-   carry a Chromium container.
-2. **Setting** — `documents.render_enabled` (default `false`). With the
-   container running but the setting off, `POST /api/document-sources/{id}/render`
-   returns a clean `503` and never contacts the service.
+Core then decides for itself whether it can print (WHIT-1001), and asks the
+service before the first print and about once a minute after that:
+
+1. **Configured** — `RENDER_SERVICE_URL` set and `RENDER_SHARED_SECRET` at
+   least 32 characters.
+2. **Reachable** — `GET /health` answers.
+3. **Same release** — `/health`'s `core_version` equals the app's. A renderer
+   at another version is treated as no renderer, because it would print the
+   other release's layout without a word.
+4. **Same secret** — `GET /auth-check` accepts the app's `X-Render-Secret`.
+
+The **setting** `documents.render_enabled` (default `true` since WHIT-1001,
+`false` before) is the operator's off switch. Switched off, the render routes
+return a clean `503` and never contact the service.
 
 ```bash
-# Published images (docker-compose.staging-remote.yml):
-WHITY_IMAGE=ghcr.io/<repo>:v0.3.0 \
-WHITY_WEB_IMAGE=ghcr.io/<repo>/web:v0.3.0 \
-WHITY_RENDER_IMAGE=ghcr.io/<repo>/render:v0.3.0 \
+# Published images (docker-compose.staging-remote.yml). WHITY_VERSION picks
+# all three images; WHITY_IMAGE / WHITY_WEB_IMAGE / WHITY_RENDER_IMAGE still
+# override one each.
+WHITY_VERSION=v0.3.0 \
 RENDER_SHARED_SECRET=<at least 32 chars> \
   docker compose -f docker-compose.staging-remote.yml --profile web --profile render up -d
 
@@ -113,7 +207,9 @@ docker compose --profile render up -d --build
 | Variable | Where | Default | Notes |
 |---|---|---|---|
 | `RENDER_SERVICE_URL` | app | `http://render:8130` | In-network base URL of the render container. |
-| `RENDER_SHARED_SECRET` | app **and** render | — | Must match on both sides and be **≥ 32 chars**, or every render is refused (`401`). |
+| `WHITY_VERSION` | compose | `latest` | The tag for the app, web and render images together (published compose files). |
+| `RENDER_SHARED_SECRET` | app **and** render | — | Must match on both sides and be **≥ 32 chars**, or every render is refused (`401`, with a body naming which side to fix). |
+| `RENDER_AUTH_CHECK_RATE_LIMIT_MAX` | render | `120` | Per-minute cap on `GET /auth-check`, separate from the render cap. |
 | `RENDER_TIMEOUT_SECONDS` | app | `30` | HTTP timeout for one render call. Large batches need this raised — see below. |
 | `RENDER_FLOW_PDF_TIMEOUT_MS` / `RENDER_FLOW_READY_TIMEOUT_MS` / `RENDER_FLOW_NAV_TIMEOUT_MS` | render | `180000` / `180000` / `30000` | `page.pdf()`, pagination, and loading the generated page — see [Flowing-mode configuration](#flowing-mode-configuration). |
 | `RENDER_RATE_LIMIT_MAX` / `_WINDOW_MS` | render | `30` / `60000` | Per-window cap, shared by `POST /render/flow` and `POST /render/labels` (one Chromium). |

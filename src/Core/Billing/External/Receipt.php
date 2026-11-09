@@ -70,6 +70,8 @@ final class Receipt
          * this field rather than leave us guessing at a hole.
          */
         public readonly ?string $refundedAt = null,
+        /** The provider's id for this payment, what an operator refunds. Null from the hosted service. */
+        public readonly ?string $reference = null,
     ) {
     }
 
@@ -142,7 +144,7 @@ final class Receipt
     /** @return array<string, mixed> */
     public function toArray(): array
     {
-        return [
+        $row = [
             'number' => $this->number,
             'status' => $this->status,
             'total_minor' => $this->totalMinor,
@@ -150,6 +152,14 @@ final class Receipt
             'paid_at' => $this->paidAt,
             'issued_at' => $this->issuedAt,
         ];
+
+        // Only a provider plugin's receipts carry one; the hosted service's
+        // shape is left exactly as it was.
+        if ($this->reference !== null) {
+            $row['reference'] = $this->reference;
+        }
+
+        return $row;
     }
 
     private static function intOrZero(mixed $value): int

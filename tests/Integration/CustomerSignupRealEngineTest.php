@@ -497,6 +497,33 @@ final class CustomerSignupRealEngineTest extends TestCase
         self::assertSame(1, $this->membershipCount(self::TENANT_A, 'second.chance@example.test'));
     }
 
+    public function testWithNoBotCheckTheFormSaysSoUpFrontAndRefusesWithACode(): void
+    {
+        // WHIT-917: the instance has no bot check and the operator has not allowed
+        // going without. That is a setting, not an outage.
+        (new GlobalSettingsRepository($this->pdo))->delete(BotCheck::SETTING_ALLOW_NONE);
+        $this->configure(self::TENANT_A, self::ADMIN_A, 'open', $this->customerRole);
+
+        $info = $this->decode($this->info('tenant-a'))['data'];
+        self::assertFalse($info['email_signup']);
+        self::assertSame('bot_check_unavailable', $info['email_signup_reason']);
+        self::assertSame([], $info['providers']);
+
+        $res = $this->request('tenant-a', 'someone@example.test');
+        self::assertSame(409, $res->getStatusCode());
+        self::assertSame('email_signup_unavailable', $this->decode($res)['details']['code']);
+        self::assertSame(0, (int) $this->scalar('SELECT COUNT(*) FROM customer_signups'));
+        self::assertSame([], $this->sent);
+
+        // The admin's settings say so too, before anyone tries.
+        self::assertFalse($this->decode($this->getSettings(self::TENANT_A, self::ADMIN_A))['data']['email_signup_ready']);
+
+        // Allowed again: the form works and says so.
+        (new GlobalSettingsRepository($this->pdo))->set(BotCheck::SETTING_ALLOW_NONE, '1');
+        self::assertTrue($this->decode($this->info('tenant-a'))['data']['email_signup']);
+        self::assertNull($this->decode($this->info('tenant-a'))['data']['email_signup_reason']);
+    }
+
     public function testPrivilegedPermissionClassification(): void
     {
         foreach (['roles:write', 'users:read', 'settings:read', 'forms:manage', 'documents:approve', 'shop:manage', '*', 'nonsense'] as $p) {

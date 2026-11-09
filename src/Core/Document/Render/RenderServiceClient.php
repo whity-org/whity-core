@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Whity\Core\Document\Render;
 
+use Whity\Core\CoreVersion;
+
 /**
  * Internal HTTP client for the `whity_render` microservice (ADR 0012 /
  * WC-docdesigner Track 2): POSTs the assembled render payload
@@ -33,12 +35,157 @@ final class RenderServiceClient implements RenderServiceClientInterface
     /** Longest relayed sentence. A field name and a rule, not a document. */
     private const MAX_ERROR_CHARS = 500;
 
+    /** How long a READY answer is trusted before the service is asked again. */
+    private const READY_TTL_SECONDS = 60;
+
+    /**
+     * How long a NOT-ready answer is trusted. Short, so a renderer that comes
+     * up after the app is picked up within seconds, without a restart.
+     */
+    private const NOT_READY_TTL_SECONDS = 10;
+
+    /** Ceiling on each readiness request. A health check must not hang a print. */
+    private const PROBE_TIMEOUT_SECONDS = 2;
+
+    /**
+     * Readiness answers, per base URL, secret and app version, shared by every
+     * client in this process. In FrankenPHP worker mode one process serves many
+     * requests, so this is what keeps the check off the hot path.
+     *
+     * @var array<string, array{0: int, 1: RenderReadiness}>
+     */
+    private static array $readinessCache = [];
+
+    /** @var \Closure(string, array<string, string>, int): (array{0: int, 1: string}|null) */
+    private readonly \Closure $httpGet;
+
+    /**
+     * @param (\Closure(string, array<string, string>, int): (array{0: int, 1: string}|null))|null $httpGet
+     *        GET transport for the readiness check: url, headers and timeout in;
+     *        status and body out, or null when nothing answered. Tests replace it.
+     */
     public function __construct(
         private readonly string $baseUrl,
         private readonly string $sharedSecret,
         private readonly int $timeoutSeconds = 30,
         private readonly int $maxBytes = 52428800, // 50 MiB PDF read cap
+        ?\Closure $httpGet = null,
+        private readonly string $appVersion = CoreVersion::VERSION,
     ) {
+        $this->httpGet = $httpGet ?? self::defaultGet(...);
+    }
+
+    /** Forgets every cached readiness answer. For tests. */
+    public static function resetReadinessCache(): void
+    {
+        self::$readinessCache = [];
+    }
+
+    public function readiness(bool $fresh = false): RenderReadiness
+    {
+        $key = hash('sha256', $this->baseUrl . "\0" . $this->sharedSecret . "\0" . $this->appVersion);
+        $now = time();
+        if (!$fresh && isset(self::$readinessCache[$key]) && self::$readinessCache[$key][0] > $now) {
+            return self::$readinessCache[$key][1];
+        }
+
+        $readiness = $this->probe();
+        $ttl = $readiness->isReady() ? self::READY_TTL_SECONDS : self::NOT_READY_TTL_SECONDS;
+        self::$readinessCache[$key] = [$now + $ttl, $readiness];
+
+        return $readiness;
+    }
+
+    /**
+     * Asks the service, in the order an operator fixes things: is there a URL
+     * and a secret, does anything answer, is it this release, and does it take
+     * this app's secret.
+     *
+     * The version is asked before the secret on purpose: a render image from
+     * before WHIT-1001 has no `/auth-check`, and "wrong version" is the true and
+     * more useful answer for it.
+     */
+    private function probe(): RenderReadiness
+    {
+        $app = $this->appVersion;
+        if (trim($this->baseUrl) === '') {
+            return RenderReadiness::notConfigured($app);
+        }
+        if (strlen($this->sharedSecret) < RenderReadiness::MIN_SECRET_LENGTH) {
+            return RenderReadiness::secretMissing($app);
+        }
+
+        $base = rtrim($this->baseUrl, '/');
+        $health = ($this->httpGet)($base . '/health', [], self::PROBE_TIMEOUT_SECONDS);
+        if ($health === null || $health[0] !== 200) {
+            error_log('[RenderServiceClient] readiness: GET ' . $base . '/health did not answer 200');
+
+            return RenderReadiness::unreachable($app, $base);
+        }
+
+        $decoded = json_decode($health[1], true);
+        $reported = is_array($decoded) && is_string($decoded['core_version'] ?? null) && $decoded['core_version'] !== ''
+            ? $decoded['core_version']
+            : null;
+        if ($reported === null || $reported !== $app) {
+            error_log('[RenderServiceClient] readiness: render service reports core ' . ($reported ?? 'unknown') . ', app is ' . $app);
+
+            return RenderReadiness::versionMismatch($app, $reported);
+        }
+
+        $auth = ($this->httpGet)($base . '/auth-check', ['X-Render-Secret' => $this->sharedSecret], self::PROBE_TIMEOUT_SECONDS);
+        if ($auth === null) {
+            return RenderReadiness::unreachable($app, $base);
+        }
+        if ($auth[0] === 401 || $auth[0] === 403) {
+            error_log('[RenderServiceClient] readiness: render service refused the shared secret');
+
+            return RenderReadiness::secretMismatch($app, $reported);
+        }
+        if ($auth[0] < 200 || $auth[0] >= 300) {
+            error_log('[RenderServiceClient] readiness: GET ' . $base . '/auth-check answered HTTP ' . $auth[0]);
+
+            return RenderReadiness::unreachable($app, $base);
+        }
+
+        return RenderReadiness::ready($app, $reported);
+    }
+
+    /**
+     * @param array<string, string> $headers
+     * @return array{0: int, 1: string}|null
+     */
+    private static function defaultGet(string $url, array $headers, int $timeout): ?array
+    {
+        $lines = '';
+        foreach ($headers as $name => $value) {
+            $lines .= $name . ': ' . $value . "\r\n";
+        }
+        $context = stream_context_create([
+            'http' => [
+                'method'          => 'GET',
+                'header'          => $lines,
+                'timeout'         => $timeout,
+                'ignore_errors'   => true,
+                'max_redirects'   => 0,
+                'follow_location' => 0,
+            ],
+        ]);
+        $http_response_header = [];
+        $body = @file_get_contents($url, false, $context, 0, 65536);
+        /** @var list<string> $responseLines */
+        $responseLines = $http_response_header;
+        if ($responseLines === []) {
+            return null;
+        }
+
+        return [self::parseStatus($responseLines), is_string($body) ? $body : ''];
+    }
+
+    /** A failed print means a cached "ready" may be stale: ask again next time. */
+    private function forgetReadiness(): void
+    {
+        self::$readinessCache = [];
     }
 
     /**
@@ -144,6 +291,7 @@ final class RenderServiceClient implements RenderServiceClientInterface
 
         if (!is_string($raw) && $lines === []) {
             error_log('[RenderServiceClient] request failed: POST ' . $url . ' (connection/transport error)');
+            $this->forgetReadiness();
             throw new RenderServiceUnavailableException('POST ' . $url . ' failed (connection/transport error)');
         }
 
@@ -182,7 +330,19 @@ final class RenderServiceClient implements RenderServiceClientInterface
 
         if ($status !== 200) {
             error_log('[RenderServiceClient] render service returned HTTP ' . $status . ' for POST ' . $url);
+            $this->forgetReadiness();
             throw new RenderServiceUnavailableException('Render service returned HTTP ' . $status);
+        }
+
+        // A renderer at another release prints that release's layout. Readiness
+        // is cached for a minute, so a renderer swapped in between checks is
+        // caught here, on the answer itself (WHIT-1001). An image too old to
+        // send the header was refused by readiness already.
+        $renderVersion = self::headerString($lines, 'x-render-core-version');
+        if ($renderVersion !== null && $renderVersion !== $this->appVersion) {
+            error_log('[RenderServiceClient] render service answered as core ' . $renderVersion . ', app is ' . $this->appVersion . '; PDF refused');
+            $this->forgetReadiness();
+            throw new RenderServiceUnavailableException('Render service is core ' . $renderVersion . ', app is ' . $this->appVersion);
         }
 
         if (!is_string($raw) || !str_starts_with($raw, '%PDF-')) {
@@ -243,6 +403,25 @@ final class RenderServiceClient implements RenderServiceClientInterface
         }
 
         return 0;
+    }
+
+    /**
+     * A response header's trimmed value, or null when it is absent or empty.
+     *
+     * @param list<string> $lines Raw response header lines.
+     */
+    private static function headerString(array $lines, string $name): ?string
+    {
+        $needle = strtolower($name) . ':';
+        foreach ($lines as $line) {
+            if (str_starts_with(strtolower($line), $needle)) {
+                $value = trim(substr($line, strlen($needle)));
+
+                return $value === '' ? null : $value;
+            }
+        }
+
+        return null;
     }
 
     /**

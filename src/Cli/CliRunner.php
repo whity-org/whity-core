@@ -26,6 +26,8 @@ class CliRunner
         'schedule:run' => 'Whity\Cli\Commands\ScheduleRunCommand',
         'scale:seed' => 'Whity\Cli\Commands\ScaleSeedCommand',
         'health:watch' => 'Whity\Cli\Commands\HealthWatchCommand',
+        // WHIT-1001: can this deployment print documents, and if not, the fix.
+        'render:check' => 'Whity\Cli\Commands\RenderCheckCommand',
         'payments:secret' => 'Whity\Cli\Commands\PaymentsCommand',
         'i18n:extract' => 'Whity\Cli\Commands\I18nCommand',
         'i18n:sync' => 'Whity\Cli\Commands\I18nCommand',

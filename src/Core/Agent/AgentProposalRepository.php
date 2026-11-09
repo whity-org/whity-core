@@ -30,8 +30,17 @@ final class AgentProposalRepository
                              permissions, summary, undo_window_seconds, status, result, decided_by_profile_id,
                              decided_at, expires_at, created_at';
 
-    public function __construct(private readonly PDO $db)
+    public function __construct(
+        private readonly PDO $db,
+        // WHIT-991: proposal events for plugins. Null: none (tests, the CLI).
+        private readonly ?AgentProposalEvents $events = null,
+    ) {
+    }
+
+    /** Where the proposal events go, for the handlers that decide and undo (WHIT-991). */
+    public function events(): ?AgentProposalEvents
     {
+        return $this->events;
     }
 
     /**
@@ -75,7 +84,10 @@ final class AgentProposalRepository
             ':expires_at'  => gmdate('Y-m-d H:i:s', time() + self::LIFETIME_SECONDS),
         ]);
 
-        return (int) $this->db->lastInsertId();
+        $id = (int) $this->db->lastInsertId();
+        $this->events?->created($tenantId, $id, $agentPrincipalId, $onBehalfOfProfileId, $tool);
+
+        return $id;
     }
 
     /** @return array<string, mixed>|null */
@@ -277,6 +289,10 @@ final class AgentProposalRepository
     /** Mark the tenant's waiting proposals past their expiry as expired ("Ask again"). */
     public function expireDue(int $tenantId): void
     {
+        if ($this->events !== null) {
+            $this->expireDueOneByOne($tenantId, $this->events);
+            return;
+        }
         $stmt = $this->db->prepare(
             'UPDATE agent_proposals SET status = :expired
               WHERE tenant_id = :tenant_id AND status = :waiting AND expires_at <= :now'
@@ -287,6 +303,30 @@ final class AgentProposalRepository
             ':waiting'   => self::WAITING,
             ':now'       => gmdate('Y-m-d H:i:s'),
         ]);
+    }
+
+    /**
+     * Expire each due proposal on its own conditional UPDATE, so exactly one
+     * caller expires it and announces it, however many read at once (WHIT-991).
+     */
+    private function expireDueOneByOne(int $tenantId, AgentProposalEvents $events): void
+    {
+        $now  = gmdate('Y-m-d H:i:s');
+        $due  = $this->db->prepare(
+            'SELECT id, on_behalf_of_profile_id, tool FROM agent_proposals
+              WHERE tenant_id = :tenant_id AND status = :waiting AND expires_at <= :now'
+        );
+        $due->execute([':tenant_id' => $tenantId, ':waiting' => self::WAITING, ':now' => $now]);
+        $expire = $this->db->prepare(
+            'UPDATE agent_proposals SET status = :expired
+              WHERE id = :id AND tenant_id = :tenant_id AND status = :waiting'
+        );
+        foreach ($due->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $expire->execute([':expired' => self::EXPIRED, ':id' => (int) $row['id'], ':tenant_id' => $tenantId, ':waiting' => self::WAITING]);
+            if ($expire->rowCount() === 1) {
+                $events->decided($tenantId, (int) $row['id'], AgentProposalEvents::EXPIRED, null, (int) $row['on_behalf_of_profile_id'], (string) $row['tool']);
+            }
+        }
     }
 
     /**

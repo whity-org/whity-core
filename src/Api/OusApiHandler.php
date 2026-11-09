@@ -16,6 +16,8 @@ use Whity\Core\Hooks\HookManager;
 use Whity\Core\Tenant\TenantContext;
 use Whity\Sdk\Hooks\HookVetoException;
 use PDO;
+use Whity\Core\i18n\LocalizedTextRejected;
+use Whity\Core\i18n\LocalizedTexts;
 
 /**
  * Organizational Units API Handler
@@ -44,7 +46,7 @@ class OusApiHandler
      *
      * Requires the `ou` / `t` aliases the read paths declare.
      */
-    private const LIST_COLUMNS = 'SELECT ou.id, ou.tenant_id, ou.parent_id, ou.name, ou.slug,'
+    private const LIST_COLUMNS = 'SELECT ou.id, ou.tenant_id, ou.parent_id, ou.name, ou.name_language, ou.slug,'
         . ' ou.description, ou.created_at, ou.ou_type_id,'
         . ' t.type_key AS ou_type_key, t.label AS ou_type_label,'
         // People directly in the unit, with the same "active" the members list uses.
@@ -122,7 +124,7 @@ class OusApiHandler
             $bindType = $typeKey !== null && $typeKey !== OuTypeRegistry::UNTYPED;
 
             if ($tenantId === 0) {
-                // @tenant-guard-ignore: system-tenant (id 0) lists OUs across all tenants; scoped else-branch binds tenant_id
+                // System-tenant (id 0) lists OUs across all tenants; scoped else-branch binds tenant_id
                 $countSql = 'SELECT COUNT(*) AS cnt FROM organizational_units ou'
                     . ' LEFT JOIN ou_types t ON t.id = ou.ou_type_id AND t.tenant_id = ou.tenant_id'
                     . ' WHERE 1 = 1' . $filters;
@@ -145,7 +147,7 @@ class OusApiHandler
             $total = $countRow !== false ? (int)($countRow['cnt'] ?? 0) : 0;
 
             if ($tenantId === 0) {
-                // @tenant-guard-ignore: system-tenant (id 0) lists all OUs; scoped else-branch binds tenant_id
+                // System-tenant (id 0) lists all OUs; scoped else-branch binds tenant_id
                 $sql = self::LIST_COLUMNS . ' FROM organizational_units ou'
                     . ' LEFT JOIN ou_types t ON t.id = ou.ou_type_id AND t.tenant_id = ou.tenant_id'
                     . ' WHERE 1 = 1' . $filters
@@ -170,10 +172,10 @@ class OusApiHandler
             $stmt->bindValue(':offset', $p->offset, PDO::PARAM_INT);
             $stmt->execute();
 
-            $ous = array_map(
+            $ous = $this->withNames(array_map(
                 [self::class, 'withTypeFields'],
                 $stmt->fetchAll(PDO::FETCH_ASSOC)
-            );
+            ));
 
             return Response::json(['data' => $ous, 'pagination' => $p->meta($total)], 200);
         } catch (\Exception $e) {
@@ -274,11 +276,34 @@ class OusApiHandler
             $tenantId = TenantContext::getTenantId();
 
             // Validation: name is required
-            if (empty($body['name'])) {
+            if (empty($body['name']) && empty($body['names'])) {
                 return Response::error('Organizational unit name is required', 400);
             }
 
-            $name = $body['name'];
+            // An over-long `name` keeps its field-level 422.
+            if (is_string($body['name'] ?? null) && ($tooLong = InputLimits::firstViolation([
+                'name' => [$body['name'], InputLimits::NAME_MAX],
+            ]))) {
+                return $tooLong;
+            }
+
+            // `name` alone is the original, in the language its letters are
+            // written in; `names` with `name_language` carries every language (#821).
+            try {
+                $naming = LocalizedTexts::fromBody(
+                    $body,
+                    '',
+                    is_string($body['name'] ?? null)
+                        ? LocalizedTexts::guessLanguage($body['name'])
+                        : (is_array($body['names'] ?? null) ? (string) (array_key_first(array_filter($body['names'], 'is_string')) ?? 'en') : 'en'),
+                    [],
+                    InputLimits::NAME_MAX
+                );
+            } catch (LocalizedTextRejected $e) {
+                return Response::error($e->clientMessage, 422);
+            }
+
+            $name = $naming['name'];
             $parentId = $body['parent_id'] ?? null;
             $description = $body['description'] ?? '';
 
@@ -354,11 +379,17 @@ class OusApiHandler
             // Insert OU
             $stmt = $this->db->prepare('
                 INSERT INTO organizational_units
-                    (tenant_id, parent_id, name, slug, description, ou_type_id, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, NOW())
+                    (tenant_id, parent_id, name, name_language, slug, description, ou_type_id, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
             ');
-            $stmt->execute([$tenantId, $parentId, $name, $slug, $description, $ouTypeId]);
+            $stmt->execute([$tenantId, $parentId, $name, $naming['language'], $slug, $description, $ouTypeId]);
             $ouId = $this->db->lastInsertId();
+            (new LocalizedTexts($this->db))->replace(
+                (int) $tenantId,
+                LocalizedTexts::ENTITY_OU,
+                (int) $ouId,
+                $naming['others']
+            );
 
             // Dispatch synchronous hook after OU is created
             $this->hookManager->dispatch('ou.created', [
@@ -386,6 +417,8 @@ class OusApiHandler
                     'tenant_id' => $tenantId,
                     'parent_id' => $parentId,
                     'name' => $name,
+                    'name_language' => $naming['language'],
+                    'names' => self::namesMap(LocalizedTexts::merge((string) $name, $naming['language'], $naming['others'])),
                     'slug' => $slug,
                     'description' => $description,
                     'ou_type_id' => $ouTypeId,
@@ -424,7 +457,7 @@ class OusApiHandler
             if (!$ou) {
                 return Response::error('Organizational unit not found', 404);
             }
-            $ou = self::withTypeFields($ou);
+            $ou = $this->withNames([self::withTypeFields($ou)])[0];
 
             // Get children
             $childrenStmt = $this->db->prepare('
@@ -528,15 +561,34 @@ class OusApiHandler
                 $params_array[] = $newParentId;
             }
 
+            // Names (#821). `name` alone renames the original; `names` replaces
+            // every language at once; `name_language` says which one is the
+            // original.
+            $naming = null;
+            if (isset($body['name']) || array_key_exists('names', $body) || array_key_exists('name_language', $body)) {
+                $currentLanguage = (string) ($ou['name_language'] ?? '') !== '' ? (string) $ou['name_language'] : 'en';
+                try {
+                    $naming = LocalizedTexts::fromBody(
+                        $body,
+                        (string) $ou['name'],
+                        $currentLanguage,
+                        (new LocalizedTexts($this->db))->forEntities((int) $tenantId, LocalizedTexts::ENTITY_OU, [(int) $id])[(int) $id] ?? [],
+                        InputLimits::NAME_MAX
+                    );
+                } catch (LocalizedTextRejected $e) {
+                    return Response::error($e->clientMessage, 422);
+                }
+            }
+
             // Sibling-name check (#822). Both a rename AND a re-parent can move a
             // unit into a sibling set that already holds its name, so the check
             // runs against the TARGET pair rather than only when the name is the
             // thing being edited — a pure re-parent that collides would otherwise
             // hit the partial unique index and surface as a 500 instead of the
             // 409 it is.
-            $targetName = isset($body['name']) ? (string) $body['name'] : (string) $ou['name'];
+            $targetName = $naming !== null ? $naming['name'] : (string) $ou['name'];
             $targetParentId = $parentChanged ? $requestedParentId : $currentParentId;
-            $nameChanged = isset($body['name']) && $body['name'] !== $ou['name'];
+            $nameChanged = $naming !== null && $naming['name'] !== $ou['name'];
 
             if (($nameChanged || $parentChanged)
                 && $this->siblingNameTaken($tenantId, $targetParentId, $targetName, (int) $id)
@@ -553,9 +605,9 @@ class OusApiHandler
             // the derived slug can legitimately already be taken.
             if ($nameChanged) {
                 $updates[] = 'name = ?';
-                $params_array[] = $body['name'];
+                $params_array[] = $targetName;
 
-                $newSlug = $this->uniqueSlug($tenantId, (string) $body['name'], (int) $id);
+                $newSlug = $this->uniqueSlug($tenantId, $targetName, (int) $id);
                 if ($newSlug === null) {
                     return Response::error('Could not derive a unique slug for this name', 409);
                 }
@@ -575,11 +627,24 @@ class OusApiHandler
                 $params_array[] = $type['id'];
             }
 
+            if ($naming !== null) {
+                $updates[] = 'name_language = ?';
+                $params_array[] = $naming['language'];
+            }
+
             if (!empty($updates)) {
                 // WC-190: the UPDATE itself carries the tenant predicate, not just
                 // the prior guard SELECT, so a cross-tenant id can never mutate
                 // another tenant's OU even if the guard were bypassed (TOCTOU).
                 $this->updateOuScoped((int)$id, $updates, $params_array, $tenantId);
+            }
+            if ($naming !== null) {
+                (new LocalizedTexts($this->db))->replace(
+                    (int) $tenantId,
+                    LocalizedTexts::ENTITY_OU,
+                    (int) $id,
+                    $naming['others']
+                );
             }
 
             // Dispatch synchronous hook after OU is updated
@@ -715,6 +780,8 @@ class OusApiHandler
                 ]);
 
                 // Delete OU
+                // Its names in other languages (#821).
+                (new LocalizedTexts($this->db))->forget((int) $tenantId, LocalizedTexts::ENTITY_OU, (int) $id);
                 $deleteStmt = $this->db->prepare('DELETE FROM organizational_units WHERE id = ? AND tenant_id = ?');
                 $deleteStmt->execute([$id, $tenantId]);
 
@@ -1342,6 +1409,51 @@ class OusApiHandler
         $row['ou_type_label'] = isset($row['ou_type_label']) ? (string) $row['ou_type_label'] : null;
 
         return $row;
+    }
+
+    /**
+     * Add each unit's names (#821): `name_language` is the original's language
+     * and `names` every language it has, original included. `name` stays the
+     * original. One read per workspace present in the rows.
+     *
+     * @param array<int, array<string, mixed>> $rows
+     * @return array<int, array<string, mixed>>
+     */
+    private function withNames(array $rows): array
+    {
+        $idsByTenant = [];
+        foreach ($rows as $row) {
+            $idsByTenant[(int) $row['tenant_id']][] = (int) $row['id'];
+        }
+
+        $store = new LocalizedTexts($this->db);
+        $others = [];
+        foreach ($idsByTenant as $tenantId => $ids) {
+            $others[$tenantId] = $store->forEntities($tenantId, LocalizedTexts::ENTITY_OU, $ids);
+        }
+
+        foreach ($rows as $i => $row) {
+            $language = (string) ($row['name_language'] ?? '') !== '' ? (string) $row['name_language'] : 'en';
+            $rows[$i]['name_language'] = $language;
+            $rows[$i]['names'] = self::namesMap(LocalizedTexts::merge(
+                (string) ($row['name'] ?? ''),
+                $language,
+                $others[(int) $row['tenant_id']][(int) $row['id']] ?? []
+            ));
+        }
+
+        return $rows;
+    }
+
+    /**
+     * An empty map is `{}` on the wire, never `[]`.
+     *
+     * @param array<string, string> $names
+     * @return array<string, string>|\stdClass
+     */
+    private static function namesMap(array $names): array|\stdClass
+    {
+        return $names === [] ? new \stdClass() : $names;
     }
 
     /**

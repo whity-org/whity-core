@@ -118,6 +118,10 @@
     "en": "Retire a plan price",
     "ar": "إنهاء سعر باقة"
   },
+  "delete_api_plugins_store_connection": {
+    "en": "Disconnect from the Whity store",
+    "ar": "فصل الربط بمتجر Whity"
+  },
   "delete_api_promotions_id": {
     "en": "Retire a promotion",
     "ar": "إنهاء عرض ترويجي"
@@ -378,6 +382,10 @@
     "en": "Download one earlier or current file of a document",
     "ar": "تنزيل نسخة محددة من مستند"
   },
+  "get_api_documents_id_audit": {
+    "en": "See a document's audit: its signatures and the history of its routes",
+    "ar": "عرض سجل تدقيق مستند: تواقيعه وتاريخ مساراته"
+  },
   "get_api_documents_id_content": {
     "en": "Download a document's current file",
     "ar": "تنزيل المستند"
@@ -438,6 +446,10 @@
   },
   "get_api_forms_id": {
     "ar": "عرض نموذج وحقوله"
+  },
+  "get_api_forms_id_document_fit": {
+    "en": "Check how a form fits its document template",
+    "ar": "فحص توافق نموذج مع قالب مستنده"
   },
   "get_api_forms_id_fields": {
     "en": "See a form's fields in order",
@@ -619,6 +631,14 @@
   "get_api_plugins_store_catalog": {
     "en": "Browse and search a trusted plugin store",
     "ar": "تصفح متجر الإضافات والبحث فيه"
+  },
+  "get_api_plugins_store_connection": {
+    "en": "See this installation's Whity store connection",
+    "ar": "عرض ربط هذا التثبيت بمتجر Whity"
+  },
+  "get_api_plugins_store_licences_slug": {
+    "en": "See a store plugin's licence",
+    "ar": "عرض ترخيص إضافة من المتجر"
   },
   "get_api_profiles_id_relations": {
     "en": "See a user's person record and relationships",
@@ -950,6 +970,10 @@
     "en": "Start paying an invoice",
     "ar": "بدء دفع فاتورة"
   },
+  "post_api_billing_portal": {
+    "en": "Open the payment provider's page to manage this workspace's card and invoices",
+    "ar": "فتح صفحة مزوّد الدفع لإدارة بطاقة مساحة العمل وفواتيرها"
+  },
   "post_api_billing_quantity": {
     "ar": "زيادة عدد المقاعد أو تقليلها"
   },
@@ -1113,6 +1137,17 @@
     "en": "Archive a form so it stops taking answers",
     "ar": "أرشفة نموذج وإيقاف استقبال إجاباته"
   },
+  "post_api_forms_id_banner": {
+    "ar": "رفع صورة لأعلى نموذج"
+  },
+  "post_api_forms_id_document_fit_template_fields": {
+    "en": "Add a form's questions to its template draft",
+    "ar": "إضافة أسئلة نموذج إلى مسودة قالبه"
+  },
+  "post_api_forms_id_document_template": {
+    "en": "Make a document template from a form",
+    "ar": "إنشاء قالب مستند من نموذج"
+  },
   "post_api_forms_id_fields": {
     "ar": "إضافة حقل إلى نموذج"
   },
@@ -1258,6 +1293,18 @@
     "en": "Reload the list of plugins",
     "ar": "إعادة تحميل الإضافات"
   },
+  "post_api_plugins_store_checkout": {
+    "en": "Buy a plugin from the Whity store",
+    "ar": "شراء إضافة من متجر Whity"
+  },
+  "post_api_plugins_store_connect": {
+    "en": "Start connecting to the Whity store",
+    "ar": "بدء الربط بمتجر Whity"
+  },
+  "post_api_plugins_store_connect_complete": {
+    "en": "Finish connecting to the Whity store",
+    "ar": "إكمال الربط بمتجر Whity"
+  },
   "post_api_plugins_upload": {
     "en": "Upload a plugin package, left switched off",
     "ar": "رفع حزمة إضافة دون تفعيلها"
@@ -1284,6 +1331,10 @@
   "post_api_roles_id_permissions": {
     "en": "Add permissions to a role",
     "ar": "إضافة صلاحيات إلى دور"
+  },
+  "post_api_routes_routeid_actions": {
+    "en": "Act on your item on a route",
+    "ar": "اتخاذ إجراء على عنصرك في مسار"
   },
   "post_api_signup_requests_id_approve": {
     "en": "Let a waiting person join as a customer",

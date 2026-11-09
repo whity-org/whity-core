@@ -25,7 +25,7 @@ final class TotpStepFloor
      */
     public static function advance(PDO $db, int $profileId, int $step): bool
     {
-        // @tenant-guard-ignore: profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
+        // Profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
         $stmt = $db->prepare(
             'UPDATE profiles
                 SET two_factor_last_used_step = :step, updated_at = CURRENT_TIMESTAMP

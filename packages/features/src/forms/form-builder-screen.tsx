@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Badge } from "@whity/ui/badge"
 import { Button } from "@whity/ui/button"
 import { Icon } from "@whity/ui/icon"
@@ -10,6 +10,7 @@ import { ConfirmAction } from "@whity/ui/confirm-action"
 import { SaveBar } from "@whity/ui/save-bar"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@whity/ui/sheet"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@whity/ui/tabs"
+import { cn } from "@whity/ui/utils"
 
 import { useTranslation } from "../i18n"
 import { useCurrentLanguage } from "./language"
@@ -31,12 +32,13 @@ import {
   reorder,
   snapshot,
 } from "./builder-model"
+import { FormDocumentFit, MakeTemplateFromForm } from "./form-document-fit"
 import { FormSettingsTab, type FormSettings } from "./form-settings-tab"
 import { useStatusLabel } from "./forms-list-screen"
 import { QuestionPanel } from "./question-panel"
 import { ResponsesTab } from "./responses-tab"
 import { asMap, pickText, statusVariant } from "./text"
-import type { FieldDraft, FieldKind, FormRow, FormSectionDef, FormsScreenEnv } from "./types"
+import type { DocumentFit, DocumentFitNeed, FieldDraft, FieldKind, FinalTemplateOption, FormRow, FormSectionDef, FormsScreenEnv } from "./types"
 
 interface Loaded {
   form: FormRow
@@ -47,7 +49,11 @@ interface Loaded {
   kinds: FieldKind[]
 }
 
-function settingsOf(form: FormRow, rendered: Array<{ key: string | null; title?: unknown; description?: unknown }>): FormSettings {
+function settingsOf(
+  form: FormRow,
+  rendered: Array<{ key: string | null; title?: unknown; description?: unknown }>,
+  fields: FieldDraft[] = []
+): FormSettings {
   const sections: FormSectionDef[] = rendered
     .filter((s): s is { key: string; title?: unknown; description?: unknown } => typeof s.key === "string")
     .map((s) => ({
@@ -55,8 +61,21 @@ function settingsOf(form: FormRow, rendered: Array<{ key: string | null; title?:
       title: asMap(s.title as FormSectionDef["title"] | []),
       description: asMap(s.description as FormSectionDef["description"] | []),
     }))
+  // A section can exist only as the key its questions carry, with no title stored
+  // (a form imported through the API, such as an ethics application). It is still a
+  // section: list it, untitled, so it can be named here and so saving the settings
+  // doesn't take every question out of it.
+  const listed = new Set(sections.map((s) => s.key))
+  for (const field of fields) {
+    if (field.section_key !== null && !listed.has(field.section_key)) {
+      listed.add(field.section_key)
+      sections.push({ key: field.section_key, title: {}, description: {} })
+    }
+  }
   return {
     name: asMap(form.name),
+    title: asMap(form.title),
+    banner: form.banner ?? null,
     description: asMap(form.description_i18n),
     submit_label: asMap(form.submit_label),
     reference_format: form.reference_format ?? "",
@@ -132,7 +151,7 @@ function FormBuilder({ env, formId, canManage }: { env: FormsScreenEnv; formId: 
     const kinds = KIND_ORDER.filter((k) => vocabulary.field_types.length === 0 || vocabulary.field_types.includes(k))
     const drafts = draftsOf(rows)
     const form = formResult.data
-    const next = settingsOf(form, form.sections as unknown as Array<{ key: string | null; title?: unknown; description?: unknown }>)
+    const next = settingsOf(form, form.sections as unknown as Array<{ key: string | null; title?: unknown; description?: unknown }>, drafts)
     setLoaded({ form, fields: drafts, savedBodies: snapshot(drafts.map(fieldBody)), settings: next, kinds })
     setFields(drafts)
     setSettings(next)
@@ -165,6 +184,12 @@ function FormBuilder({ env, formId, canManage }: { env: FormsScreenEnv; formId: 
     query.addEventListener("change", update)
     return () => query.removeEventListener("change", update)
   }, [])
+  // The side panel keeps its own scroll (WHIT-1713); a newly chosen question
+  // starts at the top of its settings, not wherever the last one was left.
+  const panelScroll = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (panelScroll.current !== null) panelScroll.current.scrollTop = 0
+  }, [selected])
 
   const { enabled: enabledLanguages } = useFormLanguages()
   const problems = useMemo(() => problemsOf(fields, settings?.name ?? {}, enabledLanguages), [fields, settings, enabledLanguages])
@@ -212,6 +237,15 @@ function FormBuilder({ env, formId, canManage }: { env: FormsScreenEnv; formId: 
           name: settings.name,
           description: hasText(settings.description) ? settings.description : null,
           submit_label: hasText(settings.submit_label) ? settings.submit_label : null,
+          title: hasText(settings.title) ? settings.title : null,
+          // An uploaded picture goes back as `{ kind: "image" }`, which keeps it; its
+          // URL is the server's to give.
+          banner:
+            settings.banner === null
+              ? null
+              : settings.banner.kind === "image"
+                ? { kind: "image" }
+                : { kind: "pattern", style: settings.banner.style, seed: settings.banner.seed },
           reference_format: settings.reference_format.trim() === "" ? null : settings.reference_format.trim(),
           sections: settings.sections,
         },
@@ -319,6 +353,118 @@ function FormBuilder({ env, formId, canManage }: { env: FormsScreenEnv; formId: 
     }
   }
 
+  // WHIT-921: the templates a form's final document can be made with.
+  const [finalTemplates, setFinalTemplates] = useState<FinalTemplateOption[]>([])
+  useEffect(() => {
+    let live = true
+    void api.listFinalTemplates(t("builder.action.failed", "That did not work. Try again.")).then((result) => {
+      if (live && result.ok) setFinalTemplates(result.data)
+    })
+    return () => {
+      live = false
+    }
+  }, [api, t])
+
+  /** WHIT-921: the form's final document template, and whether the applicant gets the final document. */
+  async function setFinalDocument(changes: { final_template_id?: number | null; final_document_to_applicant?: boolean; document_left_out?: string[] }) {
+    if (loaded === null) return
+    setPublicBusy(true)
+    const result = await api.updateForm(formId, changes, t("builder.action.failed", "That did not work. Try again."))
+    setPublicBusy(false)
+    if (!result.ok) {
+      env.notify(result.message, "error")
+      return
+    }
+    setLoaded((current) => (current === null ? current : { ...current, form: { ...current.form, ...result.data } }))
+  }
+
+  // How the chosen template and the form fit. Fetched again when either changes.
+  const [documentFit, setDocumentFit] = useState<DocumentFit | null>(null)
+  const finalTemplateId = loaded?.form.final_template_id ?? null
+  const savedFields = loaded?.fields
+  const leftOut = loaded?.form.document_left_out
+  useEffect(() => {
+    if (finalTemplateId === null || !canManage) {
+      setDocumentFit(null)
+      return
+    }
+    let live = true
+    void api.documentFit(formId, t("builder.action.failed", "That did not work. Try again.")).then((result) => {
+      if (live) setDocumentFit(result.ok ? result.data : null)
+    })
+    return () => {
+      live = false
+    }
+  }, [api, canManage, finalTemplateId, formId, leftOut, savedFields, t])
+
+  /** Add questions for what the template asks, unsaved, as if they had been added by hand. */
+  function addQuestionsFor(needs: DocumentFitNeed[]) {
+    const language = documentFit?.template.lang === "ar" ? "ar" : "en"
+    setFields((current) => {
+      const next = [...current]
+      for (const need of needs) {
+        if (need.field_key === null) continue
+        next.push({ ...newField("text", next, null), field_key: need.field_key, label: { [language]: need.label } })
+      }
+      return next
+    })
+    env.notify(t("builder.fit.needs.added", "Added to the questions. Check them, then save."), "success", {
+      label: t("builder.fit.needs.show", "Show questions"),
+      onClick: () => setTab("questions"),
+    })
+  }
+
+  async function addToTemplate(keys: string[]) {
+    setPublicBusy(true)
+    const result = await api.addToTemplate(formId, keys, t("builder.action.failed", "That did not work. Try again."))
+    setPublicBusy(false)
+    if (!result.ok) {
+      env.notify(
+        result.status === 409 ? t("builder.fit.unused.conflict", "Someone changed the template just now. Try again.") : result.message,
+        "error"
+      )
+      return
+    }
+    setDocumentFit(result.data)
+    env.notify(t("builder.fit.unused.added", "Added to the template's draft. Publish the template for them to print."), "success")
+  }
+
+  async function setLeftOut(keys: string[]) {
+    await setFinalDocument({ document_left_out: keys })
+  }
+
+  async function makeTemplate(title: string, language: "en" | "ar"): Promise<boolean> {
+    const result = await api.makeTemplate(formId, title, language, t("builder.action.failed", "That did not work. Try again."))
+    if (!result.ok) {
+      env.notify(
+        result.status === 403 ? t("builder.fromForm.denied", "You need permission to publish document templates to do this.") : result.message,
+        "error"
+      )
+      return false
+    }
+    const made = result.data
+    setFinalTemplates((current) => [...current, made])
+    setLoaded((current) => (current === null ? current : { ...current, form: { ...current.form, final_template_id: made.id, document_left_out: [] } }))
+    env.notify(t("builder.fromForm.done", "The template is made and chosen for this form."), "success", {
+      label: t("builder.fit.draft.open", "Open the template"),
+      onClick: () => env.navigate(`/admin/document-sources/${made.id}`),
+    })
+    return true
+  }
+
+  /** WHIT-920: the public link asks visitors to sign in, so their submission can be sent back to them. */
+  async function setSignInRequired(required: boolean) {
+    if (loaded === null) return
+    setPublicBusy(true)
+    const result = await api.updateForm(formId, { public_requires_sign_in: required }, t("builder.action.failed", "That did not work. Try again."))
+    setPublicBusy(false)
+    if (!result.ok) {
+      env.notify(result.message, "error")
+      return
+    }
+    setLoaded((current) => (current === null ? current : { ...current, form: { ...current.form, ...result.data } }))
+  }
+
   async function setMemberAccess(open: boolean) {
     if (loaded === null) return
     setPublicBusy(true)
@@ -329,6 +475,30 @@ function FormBuilder({ env, formId, canManage }: { env: FormsScreenEnv; formId: 
       return
     }
     setLoaded((current) => (current === null ? current : { ...current, form: { ...current.form, ...result.data } }))
+  }
+
+  /**
+   * Upload a picture as the banner. The server keeps it at once, so it is set on
+   * both the saved and the edited settings and doesn't show as an unsaved change.
+   * Resolves true when it was kept.
+   */
+  async function uploadBanner(file: File): Promise<boolean> {
+    const result = await api.uploadBanner(formId, file, t("builder.banner.uploadFailed", "The picture could not be uploaded. Try again."))
+    if (!result.ok) {
+      env.notify(
+        result.status === 422
+          ? t("builder.banner.refused", "Use a PNG, JPEG or WebP picture of 5 MB or less.")
+          : result.message,
+        "error"
+      )
+      return false
+    }
+    const banner = result.data
+    setLoaded((current) =>
+      current === null ? current : { ...current, form: { ...current.form, banner }, settings: { ...current.settings, banner } }
+    )
+    setSettings((current) => (current === null ? current : { ...current, banner }))
+    return true
   }
 
   function copyLink() {
@@ -364,6 +534,8 @@ function FormBuilder({ env, formId, canManage }: { env: FormsScreenEnv; formId: 
   const { form, kinds } = loaded
   const readOnly = !canManage
   const title = pickText(settings.name, currentLanguage) || form.form_key
+  // The canvas shows the form as the person filling it in sees it.
+  const shownTitle = pickText(settings.title, currentLanguage) || title
   const description = pickText(settings.description, currentLanguage)
   const selectedField = selected !== null ? fields[selected] : undefined
 
@@ -469,10 +641,14 @@ function FormBuilder({ env, formId, canManage }: { env: FormsScreenEnv; formId: 
         </TabsList>
 
         <TabsContent value="questions" className="pt-4">
-          <div className="grid overflow-hidden rounded-card border border-border bg-muted lg:grid-cols-[minmax(0,1fr)_26rem]">
+          {/* `overflow-clip`, not `overflow-hidden`: hidden makes this box a scroll
+              container, and then the panel's `sticky` sticks to it instead of the
+              page and scrolls away with the questions (WHIT-1713). */}
+          <div className="grid overflow-clip rounded-card border border-border bg-muted lg:grid-cols-[minmax(0,1fr)_26rem]">
             <BuilderCanvas
-              title={title}
+              title={shownTitle}
               description={description}
+              banner={settings.banner}
               fields={fields}
               sections={settings.sections}
               kinds={kinds}
@@ -504,8 +680,20 @@ function FormBuilder({ env, formId, canManage }: { env: FormsScreenEnv; formId: 
               }}
             />
             {wide && (
-              <aside className="border-t border-border bg-card p-5 lg:border-s lg:border-t-0">
-                <div className="lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto lg:pe-1">{panel}</div>
+              <aside aria-label={t("builder.panel.title", "Question settings")} className="border-t border-border bg-card lg:border-s lg:border-t-0">
+                {/* Sticks below the top bar while the questions scroll, and scrolls
+                    by itself when the settings are taller than the window. While
+                    the save bar shows, it stops above it. */}
+                <div
+                  ref={panelScroll}
+                  data-testid="question-panel-scroll"
+                  className={cn(
+                    "p-5 lg:sticky lg:top-20 lg:overflow-y-auto lg:overscroll-contain",
+                    dirty ? "lg:max-h-[calc(100dvh-10rem)]" : "lg:max-h-[calc(100dvh-6rem)]",
+                  )}
+                >
+                  {panel}
+                </div>
               </aside>
             )}
           </div>
@@ -525,6 +713,37 @@ function FormBuilder({ env, formId, canManage }: { env: FormsScreenEnv; formId: 
             onPublicLink={(enabled) => void setPublicLink(enabled)}
             onCopyLink={copyLink}
             onMemberAccess={(open) => void setMemberAccess(open)}
+            onSignInRequired={(required) => void setSignInRequired(required)}
+            onUploadBanner={uploadBanner}
+            finalTemplates={finalTemplates}
+            onFinalDocument={(changes) => void setFinalDocument(changes)}
+            documentFit={
+              <>
+                {documentFit !== null && (
+                  <FormDocumentFit
+                    fit={documentFit}
+                    fields={fields}
+                    formClosed={form.status === "archived"}
+                    formOpen={form.status === "published"}
+                    readOnly={readOnly}
+                    busy={publicBusy}
+                    dirty={dirty}
+                    onAddToForm={addQuestionsFor}
+                    onAddToTemplate={(keys) => void addToTemplate(keys)}
+                    onLeaveOut={(keys) => void setLeftOut([...(form.document_left_out ?? []), ...keys])}
+                    onAskAgain={() => void setLeftOut([])}
+                    onOpenTemplate={(id) => env.navigate(`/admin/document-sources/${id}`)}
+                  />
+                )}
+                {!readOnly && (
+                  <MakeTemplateFromForm
+                    disabled={publicBusy || dirty || fields.length === 0}
+                    defaultTitle={(language) => pickText(settings.name, language) || title}
+                    onMake={makeTemplate}
+                  />
+                )}
+              </>
+            }
           />
         </TabsContent>
       </Tabs>
@@ -553,6 +772,11 @@ function FormBuilder({ env, formId, canManage }: { env: FormsScreenEnv; formId: 
                 required: fields.filter((f) => f.is_required).length,
               })}
             </span>
+            {documentFit !== null && documentFit.needs.some((need) => !fields.some((f) => f.field_key === need.field_key)) && (
+              <span className="block">
+                {t("builder.publish.documentGaps", "The final document has fields this form doesn't collect, and they would print empty. You can see them in Settings.")}
+              </span>
+            )}
             {problems.length > 0 && (
               <span className="block">
                 {t("builder.publish.warnings", "Worth a look first:")} {problems.slice(0, 5).map(problemText).join(" ")}

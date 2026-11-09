@@ -295,7 +295,7 @@ final class DeviceQuantitySyncRun
      *
      * @return array<string, true>
      *
-     * @tenant-guard-ignore: the plan catalogue is operator-owned and global by
+     * The plan catalogue is operator-owned and global by
      * design — there is no tenant column to bind. Every read that follows binds
      * a tenant id.
      */
@@ -330,7 +330,7 @@ final class DeviceQuantitySyncRun
      *
      * @return list<int>
      *
-     * @tenant-guard-ignore: this sweep has no tenant context by design — it is
+     * This sweep has no tenant context by design — it is
      * the job that FINDS which tenants to check, exactly as the billing run's
      * dueSubscriptions() does. Every read and write that follows binds the
      * tenant id this returns.

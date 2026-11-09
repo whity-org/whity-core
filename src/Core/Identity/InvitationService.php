@@ -517,7 +517,7 @@ final class InvitationService
             return null;
         }
 
-        // @tenant-guard-ignore: reached from the PUBLIC accept endpoint, which has no tenant context by construction — the 256-bit single-use token is the authority, and the row's own tenant_id is what the membership is then created in
+        // Reached from the PUBLIC accept endpoint, which has no tenant context by construction — the 256-bit single-use token is the authority, and the row's own tenant_id is what the membership is then created in
         $stmt = $this->db->prepare(
             'SELECT i.id, i.tenant_id, i.email, i.role_id, i.ou_id, t.name AS tenant_name,
                     p.display_name AS inviter_name, r.name AS role_name
@@ -562,7 +562,7 @@ final class InvitationService
     /** The profile owning an address, or null when the address is unknown. */
     private function profileIdForEmail(string $email): ?int
     {
-        // @tenant-guard-ignore: profile_emails is a sanctioned GLOBAL identity table (ADR 0005 §2); UNIQUE(email)
+        // Profile_emails is a sanctioned GLOBAL identity table (ADR 0005 §2); UNIQUE(email)
         $stmt = $this->db->prepare('SELECT profile_id FROM profile_emails WHERE email = :email LIMIT 1');
         $stmt->execute([':email' => $email]);
         $profileId = $stmt->fetchColumn();

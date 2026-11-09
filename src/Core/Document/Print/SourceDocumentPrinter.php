@@ -40,6 +40,9 @@ final class SourceDocumentPrinter
         // The workspace's themes (editor M4d). Without them, documents print
         // in Whity's standard theme with the workspace main colour.
         ?DocumentThemeRepository $themes = null,
+        // The workspace's own name, for a letterhead with no company or site
+        // name of its own (it printed Whity's default otherwise).
+        private readonly ?WorkspaceName $workspace = null,
     ) {
         $this->printLabels = $printLabels ?? new PrintLabels();
         $this->themes = new DocumentThemeResolver($settings, $themes);
@@ -132,8 +135,14 @@ final class SourceDocumentPrinter
     {
         $effective = $this->settings->effective($tenantId);
         $name = trim((string) ($effective[SettingsRegistry::COMPANY_NAME] ?? ''));
+        $site = trim((string) ($effective[SettingsRegistry::SITE_NAME] ?? ''));
+        if ($name === '' && $site !== '' && $site !== SettingsRegistry::defaultFor(SettingsRegistry::SITE_NAME)) {
+            $name = $site;
+        }
         if ($name === '') {
-            $name = trim((string) ($effective[SettingsRegistry::SITE_NAME] ?? ''));
+            // Neither set: the workspace's own name before Whity's default
+            // site name, which is not this workspace's to print.
+            $name = $this->workspace?->of($tenantId) ?? $site;
         }
         $address = trim((string) ($effective[SettingsRegistry::COMPANY_ADDRESS] ?? ''));
         $tax = trim((string) ($effective[SettingsRegistry::COMPANY_TAX_ID] ?? ''));

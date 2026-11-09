@@ -100,13 +100,21 @@ final class RouteStepRepository
         bool $decision = false,
         ?string $decisionQuorum = null,
         string $satisfiedBy = RouteSatisfaction::ACT,
+        bool $allowSendBack = true,
+        ?string $kind = null,
+        ?string $signCapacity = null,
+        ?string $signOnBehalfOf = null,
+        ?int $finalTemplateId = null,
     ): int {
+        $isFinalise = $kind === RouteStepKind::FINALISE;
         $stmt = $this->db->prepare(
             'INSERT INTO document_route_steps
                  (tenant_id, route_id, position, rule_kind, rule_config, label,
-                  decision, decision_quorum, satisfied_by, created_at)
+                  decision, decision_quorum, satisfied_by, kind, allow_send_back,
+                  sign_capacity, sign_on_behalf_of, final_template_id, created_at)
              VALUES (:tenant_id, :route_id, :position, :rule_kind, :rule_config, :label,
-                     :decision, :decision_quorum, :satisfied_by, NOW())'
+                     :decision, :decision_quorum, :satisfied_by, :kind, :allow_send_back,
+                     :sign_capacity, :sign_on_behalf_of, :final_template_id, NOW())'
         );
         $stmt->execute([
             ':tenant_id' => $tenantId,
@@ -131,6 +139,18 @@ final class RouteStepRepository
             // text on both engines, so execute()'s PARAM_STR binding is already
             // the right one.
             ':satisfied_by' => $satisfiedBy,
+            // WHIT-918: derived from the two columns above on every write, so the
+            // three cannot disagree while the engine still reads the old pair.
+            // WHIT-922, WHIT-921: a `sign` or finalise step names its kind; the old two columns cannot.
+            ':kind' => $kind === RouteStepKind::SIGN
+                ? $kind
+                : ($isFinalise ? RouteStepKind::FINALISE : RouteStepKind::derive($decision, $satisfiedBy)),
+            // WHIT-919. 1/0 for the reason `decision` gives above.
+            ':allow_send_back' => $allowSendBack ? 1 : 0,
+            ':sign_capacity' => $kind === RouteStepKind::SIGN ? $signCapacity : null,
+            ':sign_on_behalf_of' => $kind === RouteStepKind::SIGN ? $signOnBehalfOf : null,
+            // WHIT-921: the template a finalise step renders with; nothing else has one.
+            ':final_template_id' => $isFinalise ? $finalTemplateId : null,
         ]);
 
         return (int) $this->db->lastInsertId();
@@ -145,7 +165,8 @@ final class RouteStepRepository
     {
         $stmt = $this->db->prepare(
             'SELECT id, tenant_id, route_id, position, rule_kind, rule_config, label,
-                    decision, decision_quorum, satisfied_by, created_at
+                    decision, decision_quorum, satisfied_by, kind, allow_send_back,
+                    sign_capacity, sign_on_behalf_of, final_template_id, created_at
                FROM document_route_steps
               WHERE id = :id AND tenant_id = :tenant_id'
         );
@@ -164,7 +185,8 @@ final class RouteStepRepository
     {
         $stmt = $this->db->prepare(
             'SELECT id, tenant_id, route_id, position, rule_kind, rule_config, label,
-                    decision, decision_quorum, satisfied_by, created_at
+                    decision, decision_quorum, satisfied_by, kind, allow_send_back,
+                    sign_capacity, sign_on_behalf_of, final_template_id, created_at
                FROM document_route_steps
               WHERE tenant_id = :tenant_id AND route_id = :route_id
               ORDER BY position ASC'
@@ -206,7 +228,8 @@ final class RouteStepRepository
     {
         $stmt = $this->db->prepare(
             'SELECT id, tenant_id, route_id, position, rule_kind, rule_config, label,
-                    decision, decision_quorum, satisfied_by, created_at
+                    decision, decision_quorum, satisfied_by, kind, allow_send_back,
+                    sign_capacity, sign_on_behalf_of, final_template_id, created_at
                FROM document_route_steps
               WHERE tenant_id = :tenant_id AND route_id = :route_id AND position > :position
               ORDER BY position ASC
@@ -260,7 +283,38 @@ final class RouteStepRepository
             'satisfied_by' => isset($row['satisfied_by']) && RouteSatisfaction::isValid((string) $row['satisfied_by'])
                 ? (string) $row['satisfied_by']
                 : RouteSatisfaction::fallback(),
+            // WHIT-918. While `decision` and `satisfied_by` still drive the engine,
+            // the three kinds they can express are DERIVED from them, so a row
+            // inserted without `kind` (a fixture, a seeder) cannot read as a
+            // different step than the engine treats it as. Only the kinds the old
+            // columns cannot express are taken from `kind` itself.
+            'kind' => self::kindOf($row),
+            // WHIT-919: whether a person on this step may send it back to the
+            // author. TRUE when absent, which is the column's default.
+            'allow_send_back' => DbBool::of($row['allow_send_back'] ?? true),
+            // WHIT-922: the capacity and on-behalf-of a `sign` step fixes.
+            'sign_capacity' => isset($row['sign_capacity']) ? (string) $row['sign_capacity'] : null,
+            'sign_on_behalf_of' => isset($row['sign_on_behalf_of']) ? (string) $row['sign_on_behalf_of'] : null,
+            // WHIT-921: the template a finalise step renders with, or null.
+            'final_template_id' => isset($row['final_template_id']) ? (int) $row['final_template_id'] : null,
             'created_at' => (string) $row['created_at'],
         ];
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     */
+    private static function kindOf(array $row): string
+    {
+        $stored = isset($row['kind']) ? (string) $row['kind'] : '';
+        if (in_array($stored, [RouteStepKind::SIGN, RouteStepKind::STAMP, RouteStepKind::FINALISE], true)) {
+            return $stored;
+        }
+
+        $satisfiedBy = isset($row['satisfied_by']) && RouteSatisfaction::isValid((string) $row['satisfied_by'])
+            ? (string) $row['satisfied_by']
+            : RouteSatisfaction::fallback();
+
+        return RouteStepKind::derive(DbBool::of($row['decision'] ?? false), $satisfiedBy);
     }
 }

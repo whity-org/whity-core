@@ -6,15 +6,20 @@
  * which the real fill page refuses. Nothing here is sent: the button says so.
  */
 
-import { use, useEffect, useState } from 'react';
+import { use, useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
+import { FormHeader, type FormBannerValue } from '@whity/features/forms';
 import { Alert, AlertDescription } from '@whity/ui/alert';
 import { useDirection } from '@/lib/direction-context';
 import { apiClient } from '@/lib/api-client';
 import { useTranslation } from '@whity/features/i18n';
+import { useLocalizedUnits, type UnitNames } from '@/hooks/useLocalizedUnits';
 import { localized, type Answer, type LocalizedText, type ReferenceOption } from '@/components/forms/form-fields';
 import { FormFill, type FillableField, type FormSectionSpec } from '@/components/forms/form-fill';
 import type { RefusalBody } from '@/components/forms/form-refusals';
+
+/** A unit from `GET /api/ous`, reduced to what the `ou_ref` picker reads. */
+type UnitRow = UnitNames & { id: number; ou_type_key?: string | null };
 
 interface PreviewForm {
   form: {
@@ -22,6 +27,9 @@ interface PreviewForm {
     description: string | null;
     description_i18n?: LocalizedText | [] | null;
     submit_label?: LocalizedText | null;
+    /** The heading and picture written for the person filling it in (WHIT-944). */
+    title?: LocalizedText | null;
+    banner?: FormBannerValue | null;
   };
   fields: FillableField[];
   sections: FormSectionSpec[];
@@ -36,7 +44,12 @@ export default function PreviewFormPage({ params }: { params: Promise<{ id: stri
   const [rendered, setRendered] = useState<PreviewForm | null>(null);
   const [failed, setFailed] = useState(false);
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
-  const [units, setUnits] = useState<ReferenceOption[]>([]);
+  const [unitRows, setUnitRows] = useState<UnitRow[]>([]);
+  const localizedUnits = useLocalizedUnits(unitRows);
+  const units = useMemo<ReferenceOption[]>(
+    () => localizedUnits.map((ou) => ({ value: String(ou.id), label: ou.name, type: ou.ou_type_key ?? null })),
+    [localizedUnits]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -56,14 +69,12 @@ export default function PreviewFormPage({ params }: { params: Promise<{ id: stri
       .then(async (response) => {
         if (!response.ok) return;
         const body = (await response.json().catch(() => ({}))) as {
-          data?: Array<{ id?: number; name?: string; ou_type_key?: string | null }>;
+          data?: Array<Partial<UnitRow>>;
         };
         if (cancelled) return;
-        setUnits(
-          (body.data ?? [])
-            .filter((ou): ou is { id: number; name: string; ou_type_key?: string | null } =>
-              typeof ou.id === 'number' && typeof ou.name === 'string')
-            .map((ou) => ({ value: String(ou.id), label: ou.name, type: ou.ou_type_key ?? null }))
+        setUnitRows(
+          (body.data ?? []).filter((ou): ou is UnitRow =>
+            typeof ou.id === 'number' && typeof ou.name === 'string')
         );
       })
       .catch(() => {});
@@ -91,7 +102,8 @@ export default function PreviewFormPage({ params }: { params: Promise<{ id: stri
     );
   }
 
-  const title = localized(rendered.form.name, preferArabic) || t('fill.untitled', 'Form');
+  const title =
+    localized(rendered.form.title ?? null, preferArabic) || localized(rendered.form.name, preferArabic) || t('fill.untitled', 'Form');
   const translatedDescription = Array.isArray(rendered.form.description_i18n) ? null : rendered.form.description_i18n;
   const description = localized(translatedDescription, preferArabic) || rendered.form.description;
   const submitLabel = localized(rendered.form.submit_label, preferArabic) || t('fill.send', 'Send');
@@ -108,10 +120,7 @@ export default function PreviewFormPage({ params }: { params: Promise<{ id: stri
         </AlertDescription>
       </Alert>
       <Card>
-        <CardHeader>
-          <CardTitle>{title}</CardTitle>
-          {description !== null && description !== '' && <CardDescription>{description}</CardDescription>}
-        </CardHeader>
+        <FormHeader title={title} description={description} banner={rendered.form.banner} />
         <CardContent>
           <FormFill
             fields={rendered.fields}

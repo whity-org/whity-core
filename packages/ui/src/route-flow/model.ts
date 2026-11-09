@@ -66,6 +66,13 @@ export type RouteFlowQuorum = 'all' | 'any' | 'majority';
 export type RouteFlowSatisfaction = 'act' | 'delivery';
 
 /**
+ * What a stage IS when the older fields cannot say it (WHIT-921). `finalise`
+ * makes the final document: nobody acts on it, it names no rule, and it is
+ * always the last stage.
+ */
+export type RouteFlowStepKind = 'finalise';
+
+/**
  * One stage of a flow.
  *
  * `position` is the identity on the wire and within this module. Database ids
@@ -109,6 +116,20 @@ export interface RouteFlowStep {
    * an ordinary one the first time anybody moved a node.
    */
   satisfiedBy: RouteFlowSatisfaction;
+  /**
+   * Whether a person at this stage may send it back to the applicant for
+   * changes (WHIT-919/920). Held for the same reason {@link satisfiedBy} is: a
+   * field the model does not carry is one a save resets, and the server reads a
+   * missing value as `true`. Absent means on.
+   */
+  allowSendBack?: boolean;
+  /** WHIT-921: `finalise` on the stage that makes the final document; absent on every other. */
+  kind?: RouteFlowStepKind | null;
+  /**
+   * WHIT-921: on a `finalise` stage, the document template it renders with.
+   * Null uses the form's "Final document template".
+   */
+  finalTemplateId?: number | null;
   canvasX: number;
   canvasY: number;
 }

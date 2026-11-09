@@ -35,6 +35,25 @@ final class JobRepository
     }
 
     /**
+     * A tenant's jobs whose name begins with $prefix, newest first.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function listByNamePrefix(int $tenantId, string $prefix, int $limit): array
+    {
+        // Escaped: a plugin slug can hold `_`, which LIKE would read as any character.
+        $pattern = addcslashes($prefix, '\\%_') . '%';
+        $stmt = $this->pdo->prepare(
+            "SELECT * FROM jobs WHERE tenant_id = :tenant_id AND name LIKE :pattern ESCAPE '\\' ORDER BY id DESC LIMIT " . max(1, $limit)
+        );
+        $stmt->execute([':tenant_id' => $tenantId, ':pattern' => $pattern]);
+        /** @var list<array<string, mixed>> $rows */
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return array_map(static fn (array $row): array => self::mapJob($row), $rows);
+    }
+
+    /**
      * Enqueue a job for a tenant. Returns the new id, or null when a live job
      * with the same (tenant, idempotency_key) already exists (deduped).
      *
@@ -43,6 +62,8 @@ final class JobRepository
      */
     public function enqueue(int $tenantId, string $name, array $payload, array $opts = []): ?int
     {
+        // WHIT-991: no jobs from a proposal preview.
+        \Whity\Core\Sandbox\SideEffectGuard::assertAllowed('Queueing a job');
         $queue = (string) ($opts['queue'] ?? 'default');
         $priority = (int) ($opts['priority'] ?? 0);
         $maxAttempts = max(1, (int) ($opts['max_attempts'] ?? 3));
@@ -98,7 +119,7 @@ final class JobRepository
         // SQLite has no such clause but serialises writes, so the plain form is
         // already race-free there.
         if ($this->driver() === 'pgsql') {
-            // @tenant-guard-ignore: the queue worker claims the next runnable job ACROSS all
+            // The queue worker claims the next runnable job ACROSS all
             // tenants (system infra); the job's origin tenant is restored per-handler via
             // TenantContext before user code runs.
             $sql = "UPDATE jobs

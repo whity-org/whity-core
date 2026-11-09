@@ -9,6 +9,7 @@ Welcome to the Whity Core documentation.
 - **[Architecture](Architecture.md)** — How a request flows through the worker, the plugin loader and the tenant context
 - **[Plugin Development](Plugin-Development.md)** — Build plugins
 - **[Public forms for plugins](Plugin-Public-Forms.md)** — Take anonymous form submissions with no proxy
+- **[Translatable fields for plugins](Plugin-Localized-Text.md)** — Keep a plugin's data in Arabic and English
 
 ## System documentation
 

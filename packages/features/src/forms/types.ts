@@ -39,8 +39,27 @@ export interface FormRow {
   public_closes_at: string | null
   /** Present once the server offers the switch (WHIT-859). */
   open_to_members?: boolean
+  /** WHIT-920: the public link asks visitors to sign in first. */
+  public_requires_sign_in?: boolean
+  /** WHIT-921: the "Final document template" a route's final document stage uses when it names none. */
+  final_template_id?: number | null
+  /** WHIT-921: whether the person who sent it can open its final document. */
+  final_document_to_applicant?: boolean
+  /** Questions a person chose to keep out of that document. */
+  document_left_out?: string[]
   submission_count?: number
+  /** The heading the person filling it in reads; null shows the name (WHIT-944). */
+  title?: LocalizedMap | null
+  banner?: FormBannerValue | null
 }
+
+/**
+ * The picture at the top of a form: a pattern drawn from the brand colour, or an
+ * uploaded image. A PATCH sends `{ kind: "image" }` back to keep the uploaded one.
+ */
+export type FormBannerValue =
+  | { kind: "pattern"; style: string; seed: number }
+  | { kind: "image"; image_url?: string }
 
 export type FieldKind =
   | "text"
@@ -142,10 +161,70 @@ export interface SubmissionFile {
   filename: string | null
 }
 
+/** WHIT-920: where the caller's own submission is — stages, outcomes, and the notes written for them. */
+export interface SubmissionProgress {
+  state: string
+  stages: Array<{
+    position: number
+    /** Null when the route gives the stage no name. */
+    label: string | null
+    status: "done" | "current" | "waiting" | "sent_back" | "not_approved"
+    outcome: "approved" | "rejected" | null
+    /** WHIT-921: the stage that makes the final document. */
+    kind?: "finalise"
+    /** Only when the workspace shows who reviewed it. */
+    reviewers?: string[]
+  }>
+  notes: Array<{
+    kind: "sent_back" | "not_approved" | "note"
+    note: string
+    stage: string | null
+    stage_position?: number | null
+    at: string
+    from?: string | null
+  }>
+  can_resubmit: boolean
+  resume_from: "sender" | "start" | null
+  shows_reviewers: boolean
+  /**
+   * WHIT-921: the route's final document, once its final stage is reached.
+   * `can_open`: the PDF exists and the form lets the applicant have it.
+   */
+  final_document?: { status: "waiting" | "ready" | "failed"; can_open: boolean } | null
+}
+
+/** WHIT-921: a published document template a form's final document can be made with. */
+export interface FinalTemplateOption {
+  id: number
+  title: string
+}
+
+/** A field the template prints that nothing on the form fills. */
+export interface DocumentFitNeed {
+  path: string
+  label: string
+  reason: "not_asked" | "staff_only" | "other_record"
+  /** The question to add for it, or null when a question can't fill it. */
+  field_key: string | null
+}
+
+/** How a form and its final document template fit, both ways. */
+export interface DocumentFit {
+  hidden: false
+  template: { id: number; title: string; lang: string; published: boolean }
+  filled: number
+  needs: DocumentFitNeed[]
+  unused: Array<{ field_key: string; label: LocalizedMap; in_draft: boolean; left_out: boolean }>
+  can_edit_template: boolean
+  route_uses_other_template: boolean
+}
+
 export interface SubmissionDetail extends SubmissionRow {
   fields: FieldDraft[]
   files?: SubmissionFile[]
   form_version_now: number | null
+  /** On the caller's own submission only (WHIT-920). */
+  progress?: SubmissionProgress | null
 }
 
 export interface FormsScreenCaps {
