@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Core;
 
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * SDK 1.29: both entry points must hand an audit writer to the plugin loader,
@@ -55,9 +56,7 @@ final class PluginAuditEventsEntryPointWiringTest extends TestCase
         ];
     }
 
-    /**
-     * @dataProvider entryPoints
-     */
+    #[DataProvider('entryPoints')]
     public function testBothEntryPointsPassTheAuditLoggerToThePluginLoader(string $path, string $label): void
     {
         $source = $this->read($path);
@@ -98,9 +97,8 @@ final class PluginAuditEventsEntryPointWiringTest extends TestCase
     /**
      * The loader subscribes into the hook manager it was given, so a host that
      * wires a writer but no hook manager has a declaration it can never bind.
-     *
-     * @dataProvider entryPoints
      */
+    #[DataProvider('entryPoints')]
     public function testTheLoaderAlsoReceivesTheHookManagerThePluginsDispatchInto(string $path, string $label): void
     {
         $source = $this->read($path);

@@ -6,6 +6,7 @@ namespace Tests\Unit\Core\Agent;
 
 use PHPUnit\Framework\TestCase;
 use Whity\Core\Agent\AgentDefinition;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 final class AgentDefinitionTest extends TestCase
 {
@@ -51,9 +52,9 @@ final class AgentDefinitionTest extends TestCase
     }
 
     /**
-     * @dataProvider invalid
      * @param array<string, mixed> $input
      */
+    #[DataProvider('invalid')]
     public function testInvalidInputIsRefused(array $input): void
     {
         self::assertNotSame([], AgentDefinition::validate($input)[1]);

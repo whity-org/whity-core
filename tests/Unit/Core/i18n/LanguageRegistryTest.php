@@ -105,7 +105,7 @@ class LanguageRegistryTest extends TestCase
         ];
 
         $this->languageRepository
-            ->method('findAll')
+            ->expects($this->atLeastOnce())->method('findAll')
             ->with(true)
             ->willReturn($languages);
 
@@ -218,7 +218,7 @@ class LanguageRegistryTest extends TestCase
         ];
 
         $this->languageRepository
-            ->method('findAll')
+            ->expects($this->atLeastOnce())->method('findAll')
             ->with(true)
             ->willReturn($languages);
 
@@ -264,7 +264,7 @@ class LanguageRegistryTest extends TestCase
         ];
 
         $this->languageRepository
-            ->method('findAll')
+            ->expects($this->atLeastOnce())->method('findAll')
             ->with(true)
             ->willReturn($languages);
 
@@ -335,7 +335,7 @@ class LanguageRegistryTest extends TestCase
         ];
 
         $this->languageRepository
-            ->method('findAll')
+            ->expects($this->atLeastOnce())->method('findAll')
             ->with(true)
             ->willReturn($languages);
 
@@ -359,7 +359,7 @@ class LanguageRegistryTest extends TestCase
         ];
 
         $this->languageRepository
-            ->method('findAll')
+            ->expects($this->atLeastOnce())->method('findAll')
             ->with(true)
             ->willReturn($languages);
 
@@ -384,7 +384,7 @@ class LanguageRegistryTest extends TestCase
         ];
 
         $this->languageRepository
-            ->method('findAll')
+            ->expects($this->atLeastOnce())->method('findAll')
             ->with(true)
             ->willReturn($languages);
 
@@ -411,7 +411,7 @@ class LanguageRegistryTest extends TestCase
         ];
 
         $this->languageRepository
-            ->method('findAll')
+            ->expects($this->atLeastOnce())->method('findAll')
             ->with(true)
             ->willReturn($languages);
 
@@ -479,12 +479,12 @@ class LanguageRegistryTest extends TestCase
         ];
 
         $this->languageRepository
-            ->method('findAll')
+            ->expects($this->atLeastOnce())->method('findAll')
             ->with(true)
             ->willReturn($languages);
 
         $this->translationRepository
-            ->method('findAllSystemDefaults')
+            ->expects($this->atLeastOnce())->method('findAllSystemDefaults')
             ->with(1)
             ->willReturn($enTranslations);
 
@@ -534,7 +534,7 @@ class LanguageRegistryTest extends TestCase
         ];
 
         $this->languageRepository
-            ->method('findAll')
+            ->expects($this->atLeastOnce())->method('findAll')
             ->with(true)
             ->willReturn($languages);
 
@@ -569,7 +569,7 @@ class LanguageRegistryTest extends TestCase
         }
 
         $this->languageRepository
-            ->method('findAll')
+            ->expects($this->atLeastOnce())->method('findAll')
             ->with(true)
             ->willReturn($languages);
 

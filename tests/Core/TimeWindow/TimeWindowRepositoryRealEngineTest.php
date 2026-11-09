@@ -15,6 +15,7 @@ use Whity\Core\TimeWindow\WindowResolver;
 use Whity\Core\TimeWindow\WindowState;
 use Whity\Core\TimeWindow\WindowTypeRegistry;
 use Whity\Core\TimeWindow\WindowTypeRepository;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Real-engine tests for #1070 — NAMED PERIODS THAT CAN BE CLOSED.
@@ -120,9 +121,7 @@ final class TimeWindowRepositoryRealEngineTest extends TestCase
         self::assertCount(3, array_unique($lengths), 'The three sub-periods must all differ in length.');
     }
 
-    /**
-     * @dataProvider impossibleDateProvider
-     */
+    #[DataProvider('impossibleDateProvider')]
     public function testADateThatDoesNotExistIsRefusedRatherThanRolledForward(string $date): void
     {
         $this->expectException(WindowRejectedException::class);

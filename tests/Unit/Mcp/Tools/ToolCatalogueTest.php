@@ -10,6 +10,7 @@ use Whity\Mcp\Tools\ToolCatalogue;
 use Whity\Mcp\Tools\ToolDeriver;
 use Whity\Mcp\Tools\ToolSurface;
 use Whity\OpenAPI\CoreApiSchemas;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Every action AI can take, in plain words (WHIT-867). The page must never say an
@@ -43,7 +44,7 @@ final class ToolCatalogueTest extends TestCase
         yield 'a refused read is never'             => [true, ToolSurface::AGENT_REFUSE, false, ToolCatalogue::NEVER];
     }
 
-    /** @dataProvider accessCases */
+    #[DataProvider('accessCases')]
     public function testAccessFollowsTheCeilings(bool $readOnly, string $policy, bool $undoable, string $expected): void
     {
         self::assertSame($expected, ToolCatalogue::agentAccess($readOnly, $policy, $undoable, 'documents:write'));

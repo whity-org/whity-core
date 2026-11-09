@@ -8,6 +8,7 @@ use PDO;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\SchemaFromMigrations;
 use Whity\Core\Affiliate\AffiliateAttribution;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Linking a new workspace to whoever sent it.
@@ -64,9 +65,8 @@ final class AffiliateAttributionRealEngineTest extends TestCase
      * A CODE IS TYPED BY A HUMAN. It was written on a slide, read aloud, or
      * pasted with a trailing space — and every one of those must reach the same
      * affiliate as the link did.
-     *
-     * @dataProvider humanVariations
      */
+    #[DataProvider('humanVariations')]
     public function testACodeIsMatchedAsAHumanWouldType(string $typed): void
     {
         $affiliateId = $this->affiliate('SPRING26');
@@ -98,9 +98,7 @@ final class AffiliateAttributionRealEngineTest extends TestCase
 
     // ── Never breaking a signup ─────────────────────────────────────────────
 
-    /**
-     * @dataProvider codesThatEarnNothing
-     */
+    #[DataProvider('codesThatEarnNothing')]
     public function testACodeThatEarnsNothingStillLeavesTheSignupIntact(string $code): void
     {
         $this->affiliate('SPRING26');

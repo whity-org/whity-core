@@ -9,6 +9,7 @@ use PHPUnit\Framework\TestCase;
 use Whity\Core\Tenant\CoreTables;
 use Whity\Sdk\Schema\ReferenceDeclarations;
 use Whity\Sdk\Schema\UndeclaredReferenceLinter;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 require_once dirname(__DIR__, 2) . '/plugins/DemoCatalog/DemoCatalogPlugin.php';
 
@@ -89,9 +90,9 @@ final class DemoCatalogReferenceDeclarationTest extends TestCase
      * what proves the linter is reading BOTH lists rather than one of them and
      * getting lucky.
      *
-     * @dataProvider oneListAtATime
      * @param 'blocks_delete'|'cascade_delete' $keep
      */
+    #[DataProvider('oneListAtATime')]
     public function testEachDeclarationListIsReadIndependently(string $keep, string $expectedFlagged): void
     {
         $plugin = new DemoCatalogPlugin();

@@ -11,6 +11,7 @@ use Tests\Support\SchemaFromMigrations;
 use Whity\Core\Affiliate\PayoutAssembler;
 use Whity\Core\Affiliate\PayoutRaceException;
 use Whity\Core\Affiliate\PayoutStateException;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Turning what an affiliate is owed into a payment somebody can make.
@@ -225,9 +226,8 @@ final class PayoutAssemblerRealEngineTest extends TestCase
     /**
      * ROUNDED HALF UP, matching how invoices compute sales tax. Two tax
      * roundings in one codebase disagree at exactly the amounts somebody queries.
-     *
-     * @dataProvider withholdingRoundings
      */
+    #[DataProvider('withholdingRoundings')]
     public function testWithholdingRoundsTheSameWayInvoiceTaxDoes(int $gross, int $rateBp, int $expected): void
     {
         self::assertSame($expected, PayoutAssembler::withholdingOn($gross, $rateBp));

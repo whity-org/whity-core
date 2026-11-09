@@ -14,6 +14,7 @@ use Whity\Core\Hooks\HookManager;
 use Whity\Core\Request;
 use Whity\Core\Tenant\TenantContext;
 use Tests\Support\MockRequestFactory;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Real-engine tests for {@see UsersApiHandler} under the identity hard cutover
@@ -1996,9 +1997,9 @@ final class UsersApiHandlerRealEngineTest extends TestCase
      * is asking for, and substituting the least-privileged role there is the
      * silent downgrade.
      *
-     * @dataProvider emptyRoleFields
      * @param array<string, mixed> $body
      */
+    #[DataProvider('emptyRoleFields')]
     public function testCreateRejectsARoleFieldSuppliedEmpty(array $body, string $label): void
     {
         MockRequestFactory::setTestTenant(1);

@@ -97,7 +97,7 @@ class JwtSingleDecodeTest extends TestCase
         $request = new Request('GET', '/api/users', ['Authorization' => "Bearer {$token}"]);
 
         $roleChecker = $this->createMock(RoleChecker::class);
-        $roleChecker->method('hasPermissionForProfile')->with(7, 'users:read', 1)->willReturn(true);
+        $roleChecker->expects($this->atLeastOnce())->method('hasPermissionForProfile')->with(7, 'users:read', 1)->willReturn(true);
 
         $tenantMiddleware = new EnforceTenantIsolation($parser);
         $rbacMiddleware = new RbacMiddleware($parser, $roleChecker);
@@ -149,7 +149,7 @@ class JwtSingleDecodeTest extends TestCase
         $request->setAttribute(Request::ATTR_JWT_CLAIMS, ['profile_id' => 7, 'active_tenant_id' => 1, 'token_epoch' => 0]);
 
         $roleChecker = $this->createMock(RoleChecker::class);
-        $roleChecker->method('hasPermissionForProfile')->with(7, 'users:read', 1)->willReturn(true);
+        $roleChecker->expects($this->atLeastOnce())->method('hasPermissionForProfile')->with(7, 'users:read', 1)->willReturn(true);
 
         $middleware = new RbacMiddleware($parser, $roleChecker);
         $response = $middleware->handle(
@@ -176,7 +176,7 @@ class JwtSingleDecodeTest extends TestCase
         $request = new Request('GET', '/api/users', ['Authorization' => "Bearer {$token}"]);
 
         $roleChecker = $this->createMock(RoleChecker::class);
-        $roleChecker->method('hasPermissionForProfile')->with(7, 'users:read', 1)->willReturn(true);
+        $roleChecker->expects($this->atLeastOnce())->method('hasPermissionForProfile')->with(7, 'users:read', 1)->willReturn(true);
 
         $middleware = new RbacMiddleware($parser, $roleChecker);
         $response = $middleware->handle(
@@ -246,7 +246,7 @@ class JwtSingleDecodeTest extends TestCase
         $request = new Request('GET', '/api/users', ['Authorization' => "Bearer {$token}"]);
 
         $roleChecker = $this->createMock(RoleChecker::class);
-        $roleChecker->method('hasPermissionForProfile')->with(7, 'users:read', 1)->willReturn(true);
+        $roleChecker->expects($this->atLeastOnce())->method('hasPermissionForProfile')->with(7, 'users:read', 1)->willReturn(true);
 
         $router = new Router('');
         $router->register(
@@ -281,7 +281,7 @@ class JwtSingleDecodeTest extends TestCase
         $request = new Request('GET', '/api/users', ['Authorization' => "Bearer  {$token}"]);
 
         $roleChecker = $this->createMock(RoleChecker::class);
-        $roleChecker->method('hasPermissionForProfile')->with(7, 'users:read', 1)->willReturn(true);
+        $roleChecker->expects($this->atLeastOnce())->method('hasPermissionForProfile')->with(7, 'users:read', 1)->willReturn(true);
 
         $middleware = new RbacMiddleware($parser, $roleChecker);
         $response = $middleware->handle(

@@ -76,7 +76,7 @@ class DeactivationEndsSessionsTest extends TestCase
     {
         $this->assertSame(200, $this->refresh()->getStatusCode(), 'precondition: the session works');
 
-        $this->setStatus('inactive');
+        $this->setProfileStatus('inactive');
 
         $this->assertSame(401, $this->refresh()->getStatusCode());
     }
@@ -84,7 +84,7 @@ class DeactivationEndsSessionsTest extends TestCase
     /** The refusal has to be attributable, or nobody can answer "when did they lose access?". */
     public function testTheRefusalIsAuditedWithItsReason(): void
     {
-        $this->setStatus('inactive');
+        $this->setProfileStatus('inactive');
         $this->pdo->exec('DELETE FROM audit_log');
 
         $this->refresh();
@@ -105,10 +105,10 @@ class DeactivationEndsSessionsTest extends TestCase
      */
     public function testReactivatingRestoresTheAbilityToRefresh(): void
     {
-        $this->setStatus('inactive');
+        $this->setProfileStatus('inactive');
         $this->assertSame(401, $this->refresh()->getStatusCode());
 
-        $this->setStatus('active');
+        $this->setProfileStatus('active');
         $this->assertSame(200, $this->refresh()->getStatusCode());
     }
 
@@ -152,7 +152,7 @@ class DeactivationEndsSessionsTest extends TestCase
      */
     public function testAnUnrecognisedStatusIsTreatedTheSameWayLoginTreatsIt(): void
     {
-        $this->setStatus('pending_review');
+        $this->setProfileStatus('pending_review');
 
         $this->assertSame(200, $this->refresh()->getStatusCode());
     }
@@ -191,7 +191,7 @@ class DeactivationEndsSessionsTest extends TestCase
         ], 604800, 'refresh');
     }
 
-    private function setStatus(string $status): void
+    private function setProfileStatus(string $status): void
     {
         $this->pdo->prepare('UPDATE profiles SET status = ? WHERE id = ?')
             ->execute([$status, self::TEST_USER_ID]);
