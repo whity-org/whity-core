@@ -107,6 +107,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: [resolve]
     if: needs.resolve.outputs.go == 'true'
+    # Far more than the steps below need, so only a hung run reaches it, and it
+    # is cut off within the hour instead of at the six-hour default.
+    timeout-minutes: 60
 
     permissions:
       contents: read
@@ -152,8 +155,11 @@ jobs:
           fi
           echo "Releasing version ${VERSION}"
 
+      # Parallel, as the suite runs on every PR. One process running all of it
+      # took 53 minutes at v0.2.26, then 1h43m at v0.2.27, when the runner was
+      # lost partway through with no test failing.
       - name: Run PHPUnit
-        run: vendor/bin/phpunit
+        run: vendor/bin/paratest --processes "$(nproc)"
 
       # Same paths and memory limit as every PR (the composer script, #934):
       # this used to list its own paths, without `ops`.
