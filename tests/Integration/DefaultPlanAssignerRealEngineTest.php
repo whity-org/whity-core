@@ -130,8 +130,10 @@ final class DefaultPlanAssignerRealEngineTest extends TestCase
 
         $tenantId = $this->register(paymentRequired: true);
 
-        $row = $this->pdo->query("SELECT plan_id, status, enforcement_mode FROM tenant_plan WHERE tenant_id = {$tenantId}")
-            ->fetch(PDO::FETCH_ASSOC);
+        $statement = $this->pdo->query("SELECT plan_id, status, enforcement_mode FROM tenant_plan WHERE tenant_id = {$tenantId}");
+        self::assertNotFalse($statement);
+        $row = $statement->fetch(PDO::FETCH_ASSOC);
+        self::assertIsArray($row);
         self::assertNull($row['plan_id']);
         self::assertSame('expired', $row['status']);
         self::assertSame('block_all', $row['enforcement_mode']);
@@ -186,6 +188,9 @@ final class DefaultPlanAssignerRealEngineTest extends TestCase
         ])));
         self::assertSame(201, $response->getStatusCode(), (string) $response->getBody());
 
-        return (int) $this->pdo->query("SELECT id FROM tenants WHERE name = 'Example Bakery'")->fetchColumn();
+        $statement = $this->pdo->query("SELECT id FROM tenants WHERE name = 'Example Bakery'");
+        self::assertNotFalse($statement);
+
+        return (int) $statement->fetchColumn();
     }
 }

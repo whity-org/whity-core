@@ -34,8 +34,7 @@ final class CatalogueImporterRealEngineTest extends TestCase
     {
         $report = $this->importer->apply($this->catalogue());
 
-        $plan = $this->plans->findByKey('sample');
-        self::assertNotNull($plan);
+        $plan = $this->plan('sample');
         self::assertSame('Sample', $plan['name']);
         self::assertSame(20, $plan['sort_order']);
 
@@ -56,7 +55,7 @@ final class CatalogueImporterRealEngineTest extends TestCase
 
         $this->importer->apply($catalogue);
 
-        $flag = $this->pdo->query("SELECT is_addon FROM plans WHERE plan_key = 'sample'")->fetchColumn();
+        $flag = $this->column("SELECT is_addon FROM plans WHERE plan_key = 'sample'");
         self::assertTrue(\Whity\Core\Db\DbBool::of($flag));
     }
 
@@ -79,7 +78,7 @@ final class CatalogueImporterRealEngineTest extends TestCase
 
         $this->importer->apply($this->catalogue());
 
-        $plan = $this->plans->findByKey('sample');
+        $plan = $this->plan('sample');
         self::assertSame(9999, $this->prices->findActive($plan['id'], 'JOD', 'month')['unit_amount'] ?? null);
     }
 
@@ -87,8 +86,10 @@ final class CatalogueImporterRealEngineTest extends TestCase
     public function testARetiredPriceIsNotBroughtBack(): void
     {
         $this->importer->apply($this->catalogue());
-        $plan = $this->plans->findByKey('sample');
-        $this->prices->deactivate($this->prices->findActive($plan['id'], 'JOD', 'month')['id']);
+        $plan = $this->plan('sample');
+        $price = $this->prices->findActive($plan['id'], 'JOD', 'month');
+        self::assertNotNull($price);
+        $this->prices->deactivate($price['id']);
 
         $this->importer->apply($this->catalogue());
 
@@ -99,13 +100,13 @@ final class CatalogueImporterRealEngineTest extends TestCase
     public function testAnEditedPlanAndLimitSurviveARerun(): void
     {
         $this->importer->apply($this->catalogue());
-        $plan = $this->plans->findByKey('sample');
+        $plan = $this->plan('sample');
         $this->plans->updatePlan($plan['id'], ['name' => 'Renamed']);
         $this->plans->setEntitlement($plan['id'], 'members.max', '99');
 
         $this->importer->apply($this->catalogue());
 
-        self::assertSame('Renamed', $this->plans->findByKey('sample')['name']);
+        self::assertSame('Renamed', $this->plan('sample')['name']);
         self::assertSame('99', $this->plans->getEntitlements($plan['id'])['members.max']);
     }
 
@@ -115,7 +116,7 @@ final class CatalogueImporterRealEngineTest extends TestCase
 
         $report = $this->importer->apply($this->catalogue());
 
-        self::assertSame('Sample', $this->plans->findByKey('sample')['name']);
+        self::assertSame('Sample', $this->plan('sample')['name']);
         self::assertNotNull($this->prices->findActive($id, 'JOD', 'month'));
         self::assertContains('plan sample: already exists', $report['skipped']);
     }
@@ -155,8 +156,8 @@ final class CatalogueImporterRealEngineTest extends TestCase
         } catch (\Whity\Core\Plan\PlanValidationException) {
         }
 
-        self::assertSame(0, (int) $this->pdo->query('SELECT COUNT(*) FROM plans')->fetchColumn());
-        self::assertSame(0, (int) $this->pdo->query('SELECT COUNT(*) FROM plan_prices')->fetchColumn());
+        self::assertSame(0, (int) $this->column('SELECT COUNT(*) FROM plans'));
+        self::assertSame(0, (int) $this->column('SELECT COUNT(*) FROM plan_prices'));
     }
 
     /** @return array<string, array{0: callable, 1: string}> */
@@ -218,14 +219,33 @@ final class CatalogueImporterRealEngineTest extends TestCase
         return $bundle;
     }
 
-    /** @return array<string, list<array<string, mixed>>> */
+    /** @return array<string, array<mixed>> */
     private function snapshot(): array
     {
         $out = [];
         foreach (['plans', 'plan_prices', 'plan_entitlements'] as $table) {
-            $out[$table] = $this->pdo->query("SELECT * FROM {$table} ORDER BY 1, 2")->fetchAll(PDO::FETCH_ASSOC);
+            $statement = $this->pdo->query("SELECT * FROM {$table} ORDER BY 1, 2");
+            self::assertNotFalse($statement);
+            $out[$table] = $statement->fetchAll(PDO::FETCH_ASSOC);
         }
 
         return $out;
+    }
+
+    /** @return array<string, mixed> */
+    private function plan(string $key): array
+    {
+        $plan = $this->plans->findByKey($key);
+        self::assertNotNull($plan);
+
+        return $plan;
+    }
+
+    private function column(string $sql): mixed
+    {
+        $statement = $this->pdo->query($sql);
+        self::assertNotFalse($statement);
+
+        return $statement->fetchColumn();
     }
 }
