@@ -22,8 +22,7 @@ use PHPUnit\TextUI\Configuration\Configuration;
  *
  * The cost does not show on memory_limit, because SQLite allocates outside PHP's
  * heap: the serial suite reached 1.2 GB of resident memory by test 540 with only
- * 142 MB on PHP's books. Nothing caps that, and the process grows until the host
- * runs out.
+ * 142 MB on PHP's books, and nothing caps it.
  */
 final class FinishedTestCycleCollector implements Extension, FinishedSubscriber
 {
