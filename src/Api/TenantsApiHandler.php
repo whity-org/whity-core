@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Whity\Api;
 
 use Whity\Api\Exception\SystemTenantProtectedException;
+use Whity\Core\Plan\DefaultPlanAssigner;
 use Whity\Core\Request;
 use Whity\Core\Response;
 use Whity\Core\Hooks\HookManager;
@@ -475,6 +476,10 @@ class TenantsApiHandler
                 }
                 throw $e;
             }
+
+            // After the commit: applying a plan opens its own transaction, and a
+            // problem with it must not cost the workspace that was just created.
+            DefaultPlanAssigner::forDatabase($this->db)->assign((int) $tenantId);
 
             // Post-commit, unlike `tenant.created` above — that one runs inside
             // the transaction on purpose, so a listener can seed tenant roles

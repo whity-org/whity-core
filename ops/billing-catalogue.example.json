@@ -1,0 +1,48 @@
+{
+  "plans": [
+    {
+      "plan_key": "starter",
+      "name": "Starter",
+      "description": "For a small team finding its feet.",
+      "sort_order": 10,
+      "is_addon": false,
+      "prices": [
+        { "currency": "JOD", "amount": 0, "period": "month", "per_seat": false }
+      ],
+      "limits": {
+        "members.max": 3,
+        "documents.render.per_month": 20,
+        "sso.tenant_idp": false
+      }
+    },
+    {
+      "plan_key": "professional",
+      "name": "Professional",
+      "description": "Per seat, for a growing organisation.",
+      "sort_order": 20,
+      "prices": [
+        { "currency": "JOD", "amount": 8000, "period": "month", "per_seat": true },
+        { "currency": "JOD", "amount": 80000, "period": "year", "per_seat": true }
+      ],
+      "limits": {
+        "members.max": 40,
+        "documents.render.per_month": 500,
+        "storage.quota_bytes": 21474836480,
+        "sso.tenant_idp": true
+      }
+    },
+    {
+      "plan_key": "enterprise",
+      "name": "Enterprise",
+      "description": "Negotiated. A plan with no prices cannot be bought, only quoted.",
+      "sort_order": 30,
+      "prices": [],
+      "limits": {
+        "members.max": -1,
+        "documents.render.per_month": -1,
+        "storage.quota_bytes": -1,
+        "sso.tenant_idp": true
+      }
+    }
+  ]
+}

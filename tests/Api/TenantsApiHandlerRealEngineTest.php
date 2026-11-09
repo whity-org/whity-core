@@ -967,6 +967,21 @@ final class TenantsApiHandlerRealEngineTest extends TestCase
      * The block is optional, so every existing caller must be unaffected —
      * including the userCount the response reports.
      */
+    public function testCreateLandsTheNewWorkspaceOnTheDefaultPlan(): void
+    {
+        $plans = new \Whity\Core\Plan\PlanRepository($this->pdo);
+        $planId = $plans->createPlan('starter', 'Starter', null, true, 0);
+        (new \Whity\Core\Settings\GlobalSettingsRepository($this->pdo))
+            ->set(\Whity\Core\Settings\SettingsRegistry::BILLING_DEFAULT_PLAN, 'starter');
+
+        MockRequestFactory::setTestTenant(0);
+        $response = $this->handler()->create($this->createRequest(['name' => 'Planned Tenant']));
+
+        $this->assertSame(201, $response->getStatusCode(), $response->getBody());
+        $tenantId = (int) json_decode($response->getBody(), true)['data']['id'];
+        $this->assertSame($planId, $plans->getTenantPlan($tenantId)['plan_id'] ?? null);
+    }
+
     public function testCreateWithoutAnAdministratorIsUnchanged(): void
     {
         MockRequestFactory::setTestTenant(0);

@@ -28,11 +28,18 @@ final class PlanRepository
 
     // ── plans (global catalog) ──────────────────────────────────────────────
 
-    public function createPlan(string $key, string $name, ?string $description, bool $isActive, int $sortOrder): int
+    public function createPlan(
+        string $key,
+        string $name,
+        ?string $description,
+        bool $isActive,
+        int $sortOrder,
+        bool $isAddon = false,
+    ): int
     {
         $stmt = $this->db->prepare(
-            'INSERT INTO plans (plan_key, name, description, is_active, sort_order, created_at, updated_at)
-             VALUES (:key, :name, :description, :is_active, :sort_order, NOW(), NOW())'
+            'INSERT INTO plans (plan_key, name, description, is_active, sort_order, is_addon, created_at, updated_at)
+             VALUES (:key, :name, :description, :is_active, :sort_order, :is_addon, NOW(), NOW())'
         );
         $stmt->execute([
             ':key'         => $key,
@@ -40,6 +47,7 @@ final class PlanRepository
             ':description' => $description,
             ':is_active'   => $isActive ? 1 : 0,
             ':sort_order'  => $sortOrder,
+            ':is_addon'    => $isAddon ? 1 : 0,
         ]);
 
         return (int) $this->db->lastInsertId();

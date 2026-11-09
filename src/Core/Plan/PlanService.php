@@ -72,16 +72,17 @@ final class PlanService
         ?string $description = null,
         bool $isActive = true,
         int $sortOrder = 0,
+        bool $isAddon = false,
     ): int {
         $key = strtolower(trim($key));
-        $this->assertValidKey($key);
+        self::assertValidKey($key);
         $name = trim($name);
         if ($name === '') {
             throw new PlanValidationException('name', 'name is required');
         }
 
         try {
-            return $this->plans->createPlan($key, $name, $this->trimOrNull($description), $isActive, $sortOrder);
+            return $this->plans->createPlan($key, $name, $this->trimOrNull($description), $isActive, $sortOrder, $isAddon);
         } catch (\PDOException $e) {
             if (stripos($e->getMessage(), 'unique') !== false) {
                 throw new PlanValidationException('plan_key', "A plan with key '{$key}' already exists");
@@ -484,9 +485,12 @@ final class PlanService
     }
 
     /**
+     * Public so a catalogue file and the default-plan setting are held to the
+     * same rule as a plan created on the screen.
+     *
      * @throws PlanValidationException When the key is empty or malformed.
      */
-    private function assertValidKey(string $key): void
+    public static function assertValidKey(string $key): void
     {
         if ($key === '') {
             throw new PlanValidationException('plan_key', 'plan_key is required');

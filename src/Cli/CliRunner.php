@@ -29,6 +29,7 @@ class CliRunner
         // WHIT-1001: can this deployment print documents, and if not, the fix.
         'render:check' => 'Whity\Cli\Commands\RenderCheckCommand',
         'payments:secret' => 'Whity\Cli\Commands\PaymentsCommand',
+        'billing:catalogue:apply' => 'Whity\Cli\Commands\BillingCatalogueCommand',
         'i18n:extract' => 'Whity\Cli\Commands\I18nCommand',
         'i18n:sync' => 'Whity\Cli\Commands\I18nCommand',
         'i18n:coverage' => 'Whity\Cli\Commands\I18nCommand',
@@ -246,6 +247,7 @@ class CliRunner
         echo "  schedule:run Run the cron-tick scheduler (exactly-once per minute across workers)\n";
         echo "  scale:seed Bulk-insert a parameterized, deterministic large-scale multi-tenant dataset\n";
         echo "  health:watch Sample service health for the public /status page (runs outside the app)\n";
+        echo "  billing:catalogue:apply Add plans, prices and limits from a JSON file (never overwrites)\n";
         echo "  i18n:extract Rebuild the English translation catalogue from the t() calls in the source\n";
         echo "  i18n:sync    Seed catalogue keys missing from the translations table (never overwrites)\n";
         echo "  i18n:coverage Per-domain translated/missing counts for every committed language\n";
