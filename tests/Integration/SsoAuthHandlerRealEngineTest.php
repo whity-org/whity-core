@@ -155,7 +155,7 @@ final class SsoAuthHandlerRealEngineTest extends TestCase
         $this->exec("INSERT INTO profiles
             (display_name, password_hash, two_factor_enabled, two_factor_secret,
              two_factor_backup_codes_version, token_epoch, created_at, updated_at)
-            VALUES ('Alice', '" . password_hash('x', PASSWORD_BCRYPT) . "', false, NULL, 0, 0, NOW(), NOW())");
+            VALUES ('Alice', '" . password_hash('x', PASSWORD_BCRYPT, ['cost' => 4]) . "', false, NULL, 0, 0, NOW(), NOW())");
         $this->profileId = (int) $this->pdo->lastInsertId();
         (new ProfileEmailRepository($this->pdo))->insert($this->profileId, 'alice@acme.test', true, true);
 
@@ -500,7 +500,7 @@ final class SsoAuthHandlerRealEngineTest extends TestCase
         $this->exec("INSERT INTO profiles
             (display_name, password_hash, two_factor_enabled, two_factor_secret,
              two_factor_backup_codes_version, token_epoch, created_at, updated_at)
-            VALUES ('Bob', '" . password_hash('x', PASSWORD_BCRYPT) . "', false, NULL, 0, 0, NOW(), NOW())");
+            VALUES ('Bob', '" . password_hash('x', PASSWORD_BCRYPT, ['cost' => 4]) . "', false, NULL, 0, 0, NOW(), NOW())");
         $bobId = (int) $this->pdo->lastInsertId();
         (new ProfileEmailRepository($this->pdo))->insert($bobId, 'bob@other.test', true, true);
         $this->pdo->prepare("INSERT INTO memberships (profile_id, tenant_id, role_id, ou_id, status, created_at)

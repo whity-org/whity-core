@@ -180,7 +180,7 @@ final class SystemTenantRefreshRealEngineTest extends TestCase
             "INSERT INTO profiles (display_name, password_hash, two_factor_enabled,
                 two_factor_backup_codes_version, token_epoch, created_at, updated_at)
              VALUES (?, ?, false, 0, 0, datetime('now'), datetime('now'))"
-        )->execute([explode('@', $email)[0], password_hash(self::PASSWORD, PASSWORD_BCRYPT)]);
+        )->execute([explode('@', $email)[0], password_hash(self::PASSWORD, PASSWORD_BCRYPT, ['cost' => 4])]);
         $profileId = (int) $this->pdo->lastInsertId();
 
         $this->pdo->prepare(

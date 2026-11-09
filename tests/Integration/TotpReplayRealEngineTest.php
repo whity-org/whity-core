@@ -81,7 +81,7 @@ final class TotpReplayRealEngineTest extends TestCase
         $this->pdo->exec(
             "INSERT INTO profiles (id, display_name, password_hash, two_factor_enabled,
                 two_factor_secret, two_factor_backup_codes_version, token_epoch, created_at, updated_at)
-             VALUES (" . self::PROFILE_ID . ", 'test-profile', '" . password_hash('irrelevant', PASSWORD_BCRYPT) . "',
+             VALUES (" . self::PROFILE_ID . ", 'test-profile', '" . password_hash('irrelevant', PASSWORD_BCRYPT, ['cost' => 4]) . "',
                 true, '" . $encryptedSecret . "', 0, 0, {$now}, {$now})"
         );
         $this->pdo->prepare(

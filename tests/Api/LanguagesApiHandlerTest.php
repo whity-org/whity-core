@@ -782,7 +782,7 @@ final class LanguagesApiHandlerTest extends TestCase
             INSERT INTO profiles (display_name, password_hash, created_at, updated_at)
             VALUES (?, ?, NOW(), NOW())
         ');
-        $stmt->execute(['Test User', password_hash('password', PASSWORD_BCRYPT)]);
+        $stmt->execute(['Test User', password_hash('password', PASSWORD_BCRYPT, ['cost' => 4])]);
         return (int) $this->pdo->lastInsertId();
     }
 

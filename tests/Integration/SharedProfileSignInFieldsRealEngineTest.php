@@ -252,7 +252,7 @@ final class SharedProfileSignInFieldsRealEngineTest extends TestCase
                 (2, 'user',  '', NULL, datetime('now'))
         ");
 
-        $hash = password_hash('the original password', PASSWORD_BCRYPT);
+        $hash = password_hash('the original password', PASSWORD_BCRYPT, ['cost' => 4]);
         $insert = $pdo->prepare(
             "INSERT INTO profiles (id, display_name, password_hash, status, two_factor_enabled,
                  two_factor_backup_codes_version, token_epoch, created_at, updated_at)

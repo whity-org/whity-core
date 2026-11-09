@@ -197,7 +197,7 @@ final class DispatcherTenantBindingTest extends TestCase
     {
         $this->pdo->exec("INSERT INTO tenants (id, name) VALUES (" . self::TENANT_ID . ", 'Tenant Five') ON CONFLICT DO NOTHING");
         $this->pdo->exec("INSERT INTO roles (id, tenant_id, name) VALUES (1, " . self::TENANT_ID . ", 'admin') ON CONFLICT DO NOTHING");
-        $hash = password_hash('pw', PASSWORD_BCRYPT);
+        $hash = password_hash('pw', PASSWORD_BCRYPT, ['cost' => 4]);
 
         // Identity is on the profile model; the legacy `users` table was retired
         // by the identity hard cutover (migration 042).

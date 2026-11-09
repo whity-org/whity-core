@@ -365,7 +365,7 @@ final class UpdateMeRealEngineTest extends TestCase
      */
     private function seedProfile(string $email, string $plainPassword, int $epoch = 0): int
     {
-        $hash = password_hash($plainPassword, PASSWORD_BCRYPT);
+        $hash = password_hash($plainPassword, PASSWORD_BCRYPT, ['cost' => 4]);
 
         $stmt = $this->pdo->prepare(
             "INSERT INTO profiles (display_name, password_hash, two_factor_enabled,

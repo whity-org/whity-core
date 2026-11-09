@@ -279,7 +279,7 @@ final class TwoFactorBackupCodeProfileKeyRealEngineTest extends TestCase
         $this->pdo->exec(
             "INSERT INTO profiles (id, display_name, password_hash, two_factor_enabled,
                 two_factor_secret, two_factor_backup_codes_version, token_epoch, created_at, updated_at)
-             VALUES ({$id}, 'test-profile', '" . password_hash(self::PASSWORD, PASSWORD_BCRYPT) . "',
+             VALUES ({$id}, 'test-profile', '" . password_hash(self::PASSWORD, PASSWORD_BCRYPT, ['cost' => 4]) . "',
                 " . ($twoFactorEnabled ? 'true' : 'false') . ", {$secret}, 1, 0, {$now}, {$now})"
         );
 

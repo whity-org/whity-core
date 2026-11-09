@@ -130,7 +130,7 @@ final class ServicePrincipalRealEngineTest extends TestCase
         self::assertTrue($authMethod->refusesLocalPassword($id));
 
         $this->expectException(LocalPasswordRefusedException::class);
-        $authMethod->setPasswordHash($id, password_hash('irrelevant', PASSWORD_BCRYPT));
+        $authMethod->setPasswordHash($id, password_hash('irrelevant', PASSWORD_BCRYPT, ['cost' => 4]));
     }
 
     /**
@@ -145,7 +145,7 @@ final class ServicePrincipalRealEngineTest extends TestCase
         $id = $this->principalId();
 
         try {
-            $authMethod->setPasswordHash($id, password_hash('irrelevant', PASSWORD_BCRYPT), true);
+            $authMethod->setPasswordHash($id, password_hash('irrelevant', PASSWORD_BCRYPT, ['cost' => 4]), true);
             self::fail('override must not reach a service principal');
         } catch (LocalPasswordRefusedException) {
             // expected

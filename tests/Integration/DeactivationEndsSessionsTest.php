@@ -217,7 +217,7 @@ class DeactivationEndsSessionsTest extends TestCase
             "INSERT INTO profiles (id, display_name, password_hash, two_factor_enabled,
                 two_factor_backup_codes_version, token_epoch, created_at, updated_at)
              VALUES (?, ?, ?, false, 0, 0, datetime('now'), datetime('now'))"
-        )->execute([self::TEST_USER_ID, 'leaver', password_hash('irrelevant-for-refresh', PASSWORD_BCRYPT)]);
+        )->execute([self::TEST_USER_ID, 'leaver', password_hash('irrelevant-for-refresh', PASSWORD_BCRYPT, ['cost' => 4])]);
 
         $pdo->prepare(
             "INSERT INTO profile_emails (profile_id, email, verified, is_primary, created_at)

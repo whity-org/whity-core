@@ -74,7 +74,7 @@ final class TenantEmailDomainPolicyRealEngineTest extends TestCase
         if ($stmt === false) {
             self::fail('prepare failed');
         }
-        $stmt->execute([':dn' => 'User', ':ph' => password_hash('x', PASSWORD_BCRYPT)]);
+        $stmt->execute([':dn' => 'User', ':ph' => password_hash('x', PASSWORD_BCRYPT, ['cost' => 4])]);
         $profileId = (int) $this->pdo->lastInsertId();
         $this->emails->insert($profileId, $email, true, true);
         return $profileId;
