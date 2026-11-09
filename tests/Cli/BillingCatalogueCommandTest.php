@@ -27,7 +27,7 @@ final class BillingCatalogueCommandTest extends TestCase
 
     public function testTheExampleFilePassesCheck(): void
     {
-        [$code, $output] = $this->run_(__DIR__ . '/../../docs/billing-catalogue.example.json', '--check');
+        [$code, $output] = $this->run_(__DIR__ . '/../../ops/billing-catalogue.example.json', '--check');
 
         self::assertSame(0, $code, $output);
         self::assertStringContainsString('3 plan(s)', $output);
