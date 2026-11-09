@@ -387,7 +387,7 @@ final class McpTokenServiceTest extends TestCase
             ON CONFLICT DO NOTHING
         ");
         // Seed two profiles (mcp_tokens references profiles.id after migration 040).
-        $hash = password_hash('password123', PASSWORD_BCRYPT);
+        $hash = password_hash('password123', PASSWORD_BCRYPT, ['cost' => 4]);
         $this->pdo->prepare("
             INSERT INTO profiles (id, display_name, password_hash, two_factor_enabled,
                 two_factor_backup_codes_version, token_epoch, created_at, updated_at)

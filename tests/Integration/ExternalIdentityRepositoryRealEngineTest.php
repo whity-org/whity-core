@@ -39,7 +39,7 @@ final class ExternalIdentityRepositoryRealEngineTest extends TestCase
         if ($stmt === false) {
             self::fail('prepare failed');
         }
-        $stmt->execute([':dn' => $displayName, ':ph' => password_hash('x', PASSWORD_BCRYPT)]);
+        $stmt->execute([':dn' => $displayName, ':ph' => password_hash('x', PASSWORD_BCRYPT, ['cost' => 4])]);
         return (int) $this->pdo->lastInsertId();
     }
 

@@ -598,7 +598,7 @@ final class AiPrincipalsApiHandlerRealEngineTest extends TestCase
         $this->pdo->exec("INSERT INTO tenants (id, name) VALUES (1, 'Tenant One') ON CONFLICT DO NOTHING");
         $this->pdo->exec("INSERT INTO tenants (id, name) VALUES (2, 'Tenant Two') ON CONFLICT DO NOTHING");
 
-        $hash = password_hash('pw', PASSWORD_BCRYPT);
+        $hash = password_hash('pw', PASSWORD_BCRYPT, ['cost' => 4]);
         // Profile 10 for tenant 1 tokens
         $this->pdo->prepare("
             INSERT INTO profiles (id, display_name, password_hash, two_factor_enabled,

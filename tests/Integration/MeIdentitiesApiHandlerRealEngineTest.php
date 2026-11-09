@@ -29,8 +29,8 @@ final class MeIdentitiesApiHandlerRealEngineTest extends TestCase
     {
         $this->pdo = SchemaFromMigrations::make(true);
         $this->identities = new ExternalIdentityRepository($this->pdo);
-        $this->profileId = $this->seedProfile('with-pw', password_hash('x', PASSWORD_BCRYPT));
-        $this->otherProfileId = $this->seedProfile('other', password_hash('x', PASSWORD_BCRYPT));
+        $this->profileId = $this->seedProfile('with-pw', password_hash('x', PASSWORD_BCRYPT, ['cost' => 4]));
+        $this->otherProfileId = $this->seedProfile('other', password_hash('x', PASSWORD_BCRYPT, ['cost' => 4]));
     }
 
     /**

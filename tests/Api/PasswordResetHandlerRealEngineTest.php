@@ -389,7 +389,7 @@ final class PasswordResetHandlerRealEngineTest extends TestCase
                  two_factor_backup_codes_version, token_epoch, created_at, updated_at)
              VALUES (:dn, :ph, false, NULL, 0, 0, datetime(\'now\'), datetime(\'now\'))'
         );
-        $stmt->execute([':dn' => 'Test User', ':ph' => password_hash($passwordSeed, PASSWORD_BCRYPT)]);
+        $stmt->execute([':dn' => 'Test User', ':ph' => password_hash($passwordSeed, PASSWORD_BCRYPT, ['cost' => 4])]);
         $profileId = (int) $this->pdo->lastInsertId();
         $this->emails->insert($profileId, $email, true, true);
 

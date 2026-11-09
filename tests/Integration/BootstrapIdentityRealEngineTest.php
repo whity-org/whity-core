@@ -421,7 +421,7 @@ final class BootstrapIdentityRealEngineTest extends TestCase
               WHERE id = (SELECT profile_id FROM profile_emails WHERE email = :email)'
         );
         $stmt->execute([
-            ':hash'  => password_hash($plaintext, PASSWORD_BCRYPT),
+            ':hash'  => password_hash($plaintext, PASSWORD_BCRYPT, ['cost' => 4]),
             ':email' => $email,
         ]);
     }

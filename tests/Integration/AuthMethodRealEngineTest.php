@@ -217,7 +217,7 @@ final class AuthMethodRealEngineTest extends TestCase
         $epochBefore = $this->tokenEpoch($id);
 
         try {
-            $this->authMethod->setPasswordHash($id, password_hash('injected', PASSWORD_BCRYPT));
+            $this->authMethod->setPasswordHash($id, password_hash('injected', PASSWORD_BCRYPT, ['cost' => 4]));
             self::fail('setting a local password on an IdP-backed profile must be refused');
         } catch (LocalPasswordRefusedException $e) {
             self::assertStringContainsString('identity provider', $e->getMessage());
@@ -241,7 +241,7 @@ final class AuthMethodRealEngineTest extends TestCase
         $id = $this->seedIdpProfile('sso-override@example.com', 'sub-ovr');
         $epochBefore = $this->tokenEpoch($id);
 
-        $this->authMethod->setPasswordHash($id, password_hash('deliberate', PASSWORD_BCRYPT), true);
+        $this->authMethod->setPasswordHash($id, password_hash('deliberate', PASSWORD_BCRYPT, ['cost' => 4]), true);
 
         self::assertTrue(password_verify('deliberate', $this->passwordHash($id)));
         self::assertSame(AuthMethod::BOTH, $this->stored($id));
@@ -262,7 +262,7 @@ final class AuthMethodRealEngineTest extends TestCase
         $this->link($id, 'sub-both-rotate');
         self::assertSame(AuthMethod::BOTH, $this->stored($id));
 
-        $this->authMethod->setPasswordHash($id, password_hash('rotated', PASSWORD_BCRYPT));
+        $this->authMethod->setPasswordHash($id, password_hash('rotated', PASSWORD_BCRYPT, ['cost' => 4]));
 
         self::assertTrue(password_verify('rotated', $this->passwordHash($id)));
         self::assertSame(AuthMethod::BOTH, $this->stored($id), 'rotation must not change the held fact');
@@ -272,7 +272,7 @@ final class AuthMethodRealEngineTest extends TestCase
     {
         $id = $this->seedProfile('local-rotate@example.com', 'pw');
 
-        $this->authMethod->setPasswordHash($id, password_hash('rotated', PASSWORD_BCRYPT));
+        $this->authMethod->setPasswordHash($id, password_hash('rotated', PASSWORD_BCRYPT, ['cost' => 4]));
 
         self::assertTrue(password_verify('rotated', $this->passwordHash($id)));
         self::assertSame(AuthMethod::LOCAL, $this->stored($id));
@@ -287,7 +287,7 @@ final class AuthMethodRealEngineTest extends TestCase
         $this->expectException(LocalPasswordRefusedException::class);
         $this->expectExceptionMessage('no profile with id 987654');
 
-        $this->authMethod->setPasswordHash(987654, password_hash('x', PASSWORD_BCRYPT));
+        $this->authMethod->setPasswordHash(987654, password_hash('x', PASSWORD_BCRYPT, ['cost' => 4]));
     }
 
     // ==================== keeping the fact true ====================
@@ -496,7 +496,7 @@ final class AuthMethodRealEngineTest extends TestCase
      */
     private function seedProfile(string $email, string $password): int
     {
-        $hash = $password === '' ? '' : password_hash($password, PASSWORD_BCRYPT);
+        $hash = $password === '' ? '' : password_hash($password, PASSWORD_BCRYPT, ['cost' => 4]);
 
         $stmt = $this->pdo->prepare(
             'INSERT INTO profiles
