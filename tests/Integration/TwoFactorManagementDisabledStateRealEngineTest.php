@@ -74,7 +74,7 @@ final class TwoFactorManagementDisabledStateRealEngineTest extends TestCase
                 two_factor_secret, two_factor_backup_codes_version, token_epoch, created_at, updated_at)
              VALUES ('Disabled', ?, false, NULL, 0, 0, datetime('now'), datetime('now'))"
         );
-        $profStmt->execute([password_hash('pw', PASSWORD_BCRYPT)]);
+        $profStmt->execute([password_hash('pw', PASSWORD_BCRYPT, ['cost' => 4])]);
         $this->profileId = (int) $this->pdo->lastInsertId();
 
         $emailStmt = $this->pdo->prepare(

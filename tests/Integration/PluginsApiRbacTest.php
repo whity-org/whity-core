@@ -19,6 +19,7 @@ use Whity\Core\Router;
 use Whity\Core\Tenant\TenantContext;
 use Whity\Database\Database;
 use Whity\Http\RbacMiddleware;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Integration tests for the WC-10 plugin management API (issue #8).
@@ -356,9 +357,7 @@ class PluginsApiRbacTest extends TestCase
         ];
     }
 
-    /**
-     * @dataProvider forbiddenWriteRouteProvider
-     */
+    #[DataProvider('forbiddenWriteRouteProvider')]
     public function testWriteRouteWithoutItsPermissionIsForbidden(string $method, string $path, string $required): void
     {
         $userId = 30;
@@ -384,9 +383,8 @@ class PluginsApiRbacTest extends TestCase
     /**
      * A principal holding ONLY plugins:read can list plugins but is forbidden on
      * every write route — read access must never imply mutate access (WC-218).
-     *
-     * @dataProvider forbiddenWriteRouteProvider
      */
+    #[DataProvider('forbiddenWriteRouteProvider')]
     public function testReadOnlyPrincipalIsForbiddenOnWriteRoutes(string $method, string $path, string $required): void
     {
         $userId = 31;
@@ -424,9 +422,7 @@ class PluginsApiRbacTest extends TestCase
         ];
     }
 
-    /**
-     * @dataProvider allPluginRouteProvider
-     */
+    #[DataProvider('allPluginRouteProvider')]
     public function testPluginsManageOpensNoPluginRoute(string $method, string $path): void
     {
         $userId = 40;

@@ -60,6 +60,11 @@ use Whity\Database\Database;
  *   - DROP TABLE … CASCADE → CASCADE stripped
  *   - ALTER SEQUENCE … / ALTER TABLE … ALTER COLUMN … TYPE → silently skipped
  *   - Multi-column ADD COLUMN (PG extension) → split into separate statements
+ *
+ * SQLite fast path: the first make() in a process runs the migrations once and
+ * keeps the result as a template file; every later make() copies it into a
+ * private in-memory database, about 20 times faster. See
+ * {@see buildSqliteTemplate()}. PHPUNIT_SQLITE_NO_TEMPLATE=1 turns this off.
  */
 final class SchemaFromMigrations
 {
@@ -98,8 +103,14 @@ final class SchemaFromMigrations
         }
 
         $pdo = self::buildTranslatingPdo($stringifyFetches);
-        $pdo->sqliteCreateFunction('NOW', static fn(): string => date('Y-m-d H:i:s'), 0);
-        self::runMigrations($pdo);
+
+        $script = self::sqliteTemplateScript();
+        if ($script === null) {
+            self::runMigrations($pdo);
+            return $pdo;
+        }
+
+        self::execVerbatim($pdo, $script);
         return $pdo;
     }
 
@@ -815,7 +826,204 @@ final class SchemaFromMigrations
         };
     }
 
-    // ─── SQLite path (unchanged) ──────────────────────────────────────────────
+    // ─── SQLite template fast path ───────────────────────────────────────────
+    //
+    // What one make() costs on the SQLite path, measured on PHP 8.4.27 with 234
+    // migrations, 149 tables, 375 indexes and 12,436 seeded rows:
+    //
+    //     run every migration (the slow path)                       1219 ms
+    //     replay a captured SQL dump into :memory:                   155 ms
+    //     ATTACH a template, create the schema, copy the rows         56 ms
+    //     copy a template file and open that file                     16 ms
+    //
+    // The file copy is fastest, but it would move every test onto an on-disk
+    // database and leave a 4.7 MB file behind for as long as a test holds its
+    // handle. ATTACH keeps `sqlite::memory:` and copies at the b-tree level: an
+    // `INSERT … SELECT *` between tables with identical schemas moves rows
+    // without decoding them, so values keep their storage class and rowid.
+    //
+    // The template is built per process and never shared, so ParaTest workers
+    // cannot race for it and a stale one cannot outlive the run.
+
+    /**
+     * Connection settings a migration could leave changed. The stored schema
+     * does not record them, so a copy has to be given them.
+     *
+     * @var list<string>
+     */
+    private const SQLITE_CONNECTION_PRAGMAS = [
+        'foreign_keys',
+        'recursive_triggers',
+        'legacy_alter_table',
+        'defer_foreign_keys',
+        'ignore_check_constraints',
+        'user_version',
+        'application_id',
+    ];
+
+    /**
+     * What make() runs to fill a new database, keyed by fingerprint.
+     *
+     * A map for the reason {@see $pgTemplates} is one: a test may change an
+     * environment variable the migrations read, and gets a template of its own.
+     *
+     * @var array<string, array{file: string, script: string}>
+     */
+    private static array $sqliteTemplates = [];
+
+    /**
+     * The SQL that fills a new connection from a template, or null when the
+     * template path is switched off.
+     *
+     * The file is checked on every call because the tests share a temp directory
+     * and some of them clean it up. A missing file costs one more migration run.
+     */
+    private static function sqliteTemplateScript(): ?string
+    {
+        $optOut = $_ENV['PHPUNIT_SQLITE_NO_TEMPLATE'] ?? getenv('PHPUNIT_SQLITE_NO_TEMPLATE') ?: null;
+        // `?: null` above already turns '' and '0' into null.
+        if (is_string($optOut)) {
+            return null;
+        }
+
+        $fingerprint = self::migrationsFingerprint();
+        $template    = self::$sqliteTemplates[$fingerprint] ?? null;
+        if ($template === null || !is_file($template['file'])) {
+            $template = self::$sqliteTemplates[$fingerprint] = self::buildSqliteTemplate($fingerprint);
+        }
+
+        return $template['script'];
+    }
+
+    /**
+     * Run the migrations once, save the result to a file and work out the SQL
+     * that copies it.
+     *
+     * Order matters in the script. Rows go in before any trigger exists: the
+     * migrations already wrote them, so nothing may fire a second time, and
+     * SQLite will not use its row-level copy on a table with triggers. Foreign
+     * keys stay off until the end, so the order tables are filled in is free.
+     *
+     * @return array{file: string, script: string}
+     */
+    private static function buildSqliteTemplate(string $fingerprint): array
+    {
+        $source = self::buildTranslatingPdo(false);
+        self::runMigrations($source);
+
+        $file = sys_get_temp_dir() . DIRECTORY_SEPARATOR
+            . 'whity-phpunit-sqlite-' . getmypid() . '-' . $fingerprint . '.db';
+        if (is_file($file)) {
+            unlink($file);
+        }
+        self::execVerbatim($source, 'VACUUM INTO ' . $source->quote($file));
+        self::registerSqliteTemplateCleanup();
+
+        /** @var list<array{type: string, name: string, sql: string}> $objects */
+        $objects = self::queryVerbatim(
+            $source,
+            "SELECT type, name, sql FROM sqlite_master
+             WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%'
+             ORDER BY rowid"
+        );
+
+        $schema   = '';
+        $triggers = '';
+        $copies   = '';
+        foreach ($objects as $object) {
+            $statement = $object['sql'] . ";\n";
+            if ($object['type'] === 'trigger') {
+                $triggers .= $statement;
+                continue;
+            }
+
+            $schema .= $statement;
+            if ($object['type'] === 'table') {
+                $table = '"' . str_replace('"', '""', $object['name']) . '"';
+                if (self::queryVerbatim($source, 'SELECT 1 FROM ' . $table . ' LIMIT 1') !== []) {
+                    $copies .= 'INSERT INTO main.' . $table . ' SELECT * FROM whity_tpl.' . $table . ";\n";
+                }
+            }
+        }
+
+        // Copying a table moves its AUTOINCREMENT counter only as far as the
+        // largest id present, which need not be where the migrations left it.
+        $hasSequences = self::queryVerbatim(
+            $source,
+            "SELECT 1 FROM sqlite_master WHERE name = 'sqlite_sequence'"
+        ) !== [];
+        $sequences = $hasSequences
+            ? "DELETE FROM main.sqlite_sequence;\n"
+                . "INSERT INTO main.sqlite_sequence SELECT * FROM whity_tpl.sqlite_sequence;\n"
+            : '';
+
+        $pragmas = '';
+        foreach (self::SQLITE_CONNECTION_PRAGMAS as $pragma) {
+            $rows = self::queryVerbatim($source, 'PRAGMA ' . $pragma);
+            $pragmas .= 'PRAGMA ' . $pragma . ' = ' . (int) array_values($rows[0] ?? [0])[0] . ";\n";
+        }
+
+        return [
+            'file'   => $file,
+            'script' => 'ATTACH DATABASE ' . $source->quote($file) . " AS whity_tpl;\n"
+                . "BEGIN;\n" . $schema . $copies . $sequences . $triggers . "COMMIT;\n"
+                . "DETACH DATABASE whity_tpl;\n"
+                . $pragmas,
+        ];
+    }
+
+    /**
+     * Delete this process's template files when it exits.
+     *
+     * Only in the process that made them: a forked child runs the same shutdown
+     * functions and would delete the parent's templates mid-run.
+     */
+    private static function registerSqliteTemplateCleanup(): void
+    {
+        static $registered = false;
+        if ($registered) {
+            return;
+        }
+        $registered = true;
+
+        $owner = getmypid();
+        register_shutdown_function(static function () use ($owner): void {
+            if (getmypid() !== $owner) {
+                return;
+            }
+            foreach (self::$sqliteTemplates as $template) {
+                @unlink($template['file']);
+            }
+        });
+    }
+
+    /**
+     * Run SQL without the PostgreSQL translation.
+     *
+     * The script holds SQL that SQLite itself stored, already in its own
+     * dialect, and translating it again could only damage it. Reflection reaches
+     * the parent's method past the translating override.
+     */
+    private static function execVerbatim(PDO $pdo, string $sql): void
+    {
+        (new \ReflectionMethod(PDO::class, 'exec'))->invoke($pdo, $sql);
+    }
+
+    /**
+     * Query without the PostgreSQL translation. See {@see execVerbatim()}.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private static function queryVerbatim(PDO $pdo, string $sql): array
+    {
+        /** @var \PDOStatement $statement */
+        $statement = (new \ReflectionMethod(PDO::class, 'query'))->invoke($pdo, $sql);
+
+        /** @var list<array<string, mixed>> */
+        return $statement->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    // ─── SQLite path ──────────────────────────────────────────────────────────
 
     /**
      * Build an anonymous PDO subclass that opens sqlite::memory: and applies

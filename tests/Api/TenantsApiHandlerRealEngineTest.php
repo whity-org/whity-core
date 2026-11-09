@@ -12,6 +12,7 @@ use Whity\Api\TenantsApiHandler;
 use Whity\Core\Hooks\HookManager;
 use Whity\Core\Request;
 use Whity\Core\Tenant\TenantContext;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Real-engine (in-memory SQLite) tests for {@see TenantsApiHandler::list()} (WC-122).
@@ -149,9 +150,9 @@ final class TenantsApiHandlerRealEngineTest extends TestCase
      * Every key the endpoint offers actually reorders the list, in both
      * directions, and the default is the `created_at DESC` it always used.
      *
-     * @dataProvider tenantSortCases
      * @param list<int> $expected Tenant ids in the order the endpoint must return them.
      */
+    #[DataProvider('tenantSortCases')]
     public function testEachSortKeyReordersTheList(string $query, array $expected): void
     {
         $this->seedSortableTenants();
@@ -927,9 +928,9 @@ final class TenantsApiHandlerRealEngineTest extends TestCase
      * anything left behind here could only be finished or removed by the direct
      * SQL this endpoint exists to eliminate.
      *
-     * @dataProvider badAdminProvider
      * @param array<mixed> $admin
      */
+    #[DataProvider('badAdminProvider')]
     public function testARejectedAdministratorLeavesNoTenantBehind(array $admin, int $expectedStatus): void
     {
         MockRequestFactory::setTestTenant(0);

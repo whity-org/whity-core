@@ -7,6 +7,7 @@ namespace Tests\Unit\Storage;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 use Whity\Storage\StorageKey;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * StorageKey::pluginPath() is the one place a plugin's file name becomes a
@@ -49,7 +50,7 @@ final class StorageKeyPluginPathTest extends TestCase
         yield 'control character' => ["a\nb.txt"];
     }
 
-    /** @dataProvider traversalAttempts */
+    #[DataProvider('traversalAttempts')]
     public function testRefusesAPathThatWouldLeaveThePluginsPrefix(string $path): void
     {
         $this->expectException(InvalidArgumentException::class);

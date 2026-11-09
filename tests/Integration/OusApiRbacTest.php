@@ -17,6 +17,7 @@ use Whity\Core\Tenant\TenantContext;
 use Whity\Database\Database;
 use Whity\Http\RbacMiddleware;
 use Whity\Sdk\Http\Response;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * The OU routes must be gated on the seeded `ous:*` PERMISSIONS, not on the bare
@@ -143,9 +144,7 @@ final class OusApiRbacTest extends TestCase
 
     // ==================== Enforcement, both directions ====================
 
-    /**
-     * @dataProvider liveOuRouteProvider
-     */
+    #[DataProvider('liveOuRouteProvider')]
     public function testHolderOfTheDeclaredPermissionReachesTheHandler(
         string $method,
         string $path,
@@ -167,9 +166,7 @@ final class OusApiRbacTest extends TestCase
         );
     }
 
-    /**
-     * @dataProvider liveOuRouteProvider
-     */
+    #[DataProvider('liveOuRouteProvider')]
     public function testCallerLackingTheDeclaredPermissionIsRefused(
         string $method,
         string $path,

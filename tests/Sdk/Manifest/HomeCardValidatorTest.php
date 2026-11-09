@@ -6,6 +6,7 @@ namespace Tests\Sdk\Manifest;
 
 use PHPUnit\Framework\TestCase;
 use Whity\Sdk\Manifest\HomeCardValidator;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * `homeCard` in `plugin.json` (SDK 1.62, WHIT-872).
@@ -54,9 +55,9 @@ final class HomeCardValidatorTest extends TestCase
     }
 
     /**
-     * @dataProvider badCards
      * @param array<string, mixed> $card
      */
+    #[DataProvider('badCards')]
     public function testABadCardNamesWhatIsWrong(array $card): void
     {
         self::assertNotSame([], HomeCardValidator::errors($card));

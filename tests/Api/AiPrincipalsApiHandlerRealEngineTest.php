@@ -11,6 +11,7 @@ use Whity\Api\AiPrincipalsApiHandler;
 use Whity\Auth\RoleChecker;
 use Whity\Core\Request;
 use Whity\Core\Tenant\TenantContext;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Real-engine (in-memory SQLite) tests for {@see AiPrincipalsApiHandler} (WC-0208ce4d).
@@ -251,9 +252,9 @@ final class AiPrincipalsApiHandlerRealEngineTest extends TestCase
      * Every key the endpoint offers actually reorders the list, and the default
      * is the `created_at DESC` it always used.
      *
-     * @dataProvider principalSortCases
      * @param list<string> $expected JTIs in the order the endpoint must return them.
      */
+    #[DataProvider('principalSortCases')]
     public function testEachSortKeyReordersTheList(string $query, array $expected): void
     {
         $this->seedSortablePrincipals();
@@ -598,7 +599,7 @@ final class AiPrincipalsApiHandlerRealEngineTest extends TestCase
         $this->pdo->exec("INSERT INTO tenants (id, name) VALUES (1, 'Tenant One') ON CONFLICT DO NOTHING");
         $this->pdo->exec("INSERT INTO tenants (id, name) VALUES (2, 'Tenant Two') ON CONFLICT DO NOTHING");
 
-        $hash = password_hash('pw', PASSWORD_BCRYPT);
+        $hash = password_hash('pw', PASSWORD_BCRYPT, ['cost' => 4]);
         // Profile 10 for tenant 1 tokens
         $this->pdo->prepare("
             INSERT INTO profiles (id, display_name, password_hash, two_factor_enabled,

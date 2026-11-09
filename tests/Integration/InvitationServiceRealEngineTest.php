@@ -219,7 +219,7 @@ final class InvitationServiceRealEngineTest extends TestCase
 
         self::assertSame(
             InvitationService::ACCEPT_JOINED,
-            $this->service->accept($invite['token'], password_hash('correct horse', PASSWORD_BCRYPT))['result']
+            $this->service->accept($invite['token'], password_hash('correct horse', PASSWORD_BCRYPT, ['cost' => 4]))['result']
         );
     }
 
@@ -229,7 +229,7 @@ final class InvitationServiceRealEngineTest extends TestCase
     {
         $invite = $this->service->invite(self::TENANT_A, 'new@example.test', self::ROLE_USER);
 
-        $result = $this->service->accept($invite['token'], password_hash('correct horse', PASSWORD_BCRYPT));
+        $result = $this->service->accept($invite['token'], password_hash('correct horse', PASSWORD_BCRYPT, ['cost' => 4]));
 
         self::assertSame(InvitationService::ACCEPT_JOINED, $result['result']);
         self::assertSame(self::TENANT_A, $result['tenant_id']);
@@ -284,7 +284,7 @@ final class InvitationServiceRealEngineTest extends TestCase
         $invite = $this->service->invite(self::TENANT_A, 'bob@elsewhere.example', self::ROLE_USER);
         // A password is supplied anyway — accepting must ignore it rather than
         // quietly resetting a credential the invitee never asked to change.
-        $this->service->accept($invite['token'], password_hash('someone elses idea', PASSWORD_BCRYPT));
+        $this->service->accept($invite['token'], password_hash('someone elses idea', PASSWORD_BCRYPT, ['cost' => 4]));
 
         $after = $this->credentialOf($this->existingProfileId);
 
@@ -342,9 +342,9 @@ final class InvitationServiceRealEngineTest extends TestCase
     public function testATokenCannotBeUsedTwice(): void
     {
         $invite = $this->service->invite(self::TENANT_A, 'new@example.test', self::ROLE_USER);
-        $this->service->accept($invite['token'], password_hash('correct horse', PASSWORD_BCRYPT));
+        $this->service->accept($invite['token'], password_hash('correct horse', PASSWORD_BCRYPT, ['cost' => 4]));
 
-        $replay = $this->service->accept($invite['token'], password_hash('correct horse', PASSWORD_BCRYPT));
+        $replay = $this->service->accept($invite['token'], password_hash('correct horse', PASSWORD_BCRYPT, ['cost' => 4]));
 
         self::assertSame(InvitationService::ACCEPT_INVALID, $replay['result']);
     }

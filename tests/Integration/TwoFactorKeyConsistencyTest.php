@@ -143,7 +143,7 @@ class TwoFactorKeyConsistencyTest extends TestCase
         $encryptedSecret = $storeTotpService->encryptSecret($plainSecret);
 
         $backupCode = 'ABCD-EFGH-IJKL';
-        $hashedBackupCode = password_hash($backupCode, PASSWORD_BCRYPT);
+        $hashedBackupCode = password_hash($backupCode, PASSWORD_BCRYPT, ['cost' => 4]);
 
         $tempToken = $this->jwtParser->create([
             'profile_id' => self::TEST_PROFILE_ID,

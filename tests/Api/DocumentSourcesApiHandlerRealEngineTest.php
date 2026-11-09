@@ -30,6 +30,7 @@ use Whity\Core\Tenant\TenantContext;
 use Whity\Database\Database;
 use Whity\Sdk\Http\Response;
 use Whity\Storage\LocalStorageDriver;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Real-engine tests for {@see DocumentSourcesApiHandler} (editor M2): the
@@ -374,9 +375,7 @@ final class DocumentSourcesApiHandlerRealEngineTest extends TestCase
         yield 'a string' => ['paragraph'];
     }
 
-    /**
-     * @dataProvider badBlocks
-     */
+    #[DataProvider('badBlocks')]
     public function testBlocksThatBreakTheContractAreRefused(mixed $blocks): void
     {
         self::assertSame(422, $this->create(self::WRITER, ['kind' => 'note', 'blocks' => $blocks])->getStatusCode());

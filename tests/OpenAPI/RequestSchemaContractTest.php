@@ -18,6 +18,7 @@ use Whity\Core\Router;
 use Whity\Http\InputLimits;
 use Whity\OpenAPI\CoreApiSchemas;
 use Whity\OpenAPI\SchemaGenerator;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * The first-party request-body contract, from three angles.
@@ -560,9 +561,8 @@ final class RequestSchemaContractTest extends TestCase
      * declarations carry literals. Read the constants reflectively and pin them,
      * which gives the same drift protection without the OpenAPI layer reaching
      * into the Api layer.
-     *
-     * @dataProvider taxonomyBoundCases
      */
+    #[DataProvider('taxonomyBoundCases')]
     public function testTaxonomyBoundsMatchTheHandlerConstants(
         string $component,
         string $field,

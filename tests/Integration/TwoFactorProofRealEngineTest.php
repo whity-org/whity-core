@@ -57,7 +57,7 @@ final class TwoFactorProofRealEngineTest extends TestCase
                 two_factor_secret, two_factor_backup_codes_version, token_epoch, created_at, updated_at)
              VALUES ('Proof', ?, 'local', true, ?, 1, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
         );
-        $stmt->execute([password_hash(self::PASSWORD, PASSWORD_BCRYPT), $this->totp->encryptSecret(self::TOTP_SECRET)]);
+        $stmt->execute([password_hash(self::PASSWORD, PASSWORD_BCRYPT, ['cost' => 4]), $this->totp->encryptSecret(self::TOTP_SECRET)]);
         $this->profileId = (int) $this->pdo->lastInsertId();
 
         $this->pdo->prepare(

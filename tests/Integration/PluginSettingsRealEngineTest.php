@@ -20,6 +20,7 @@ use Whity\Sdk\Hooks\Events;
 use Whity\Sdk\Hooks\HookVetoException;
 use Whity\Sdk\PluginInterface;
 use Whity\Sdk\Settings\PluginSettingsStore;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * A plugin's own settings for the current workspace (WHIT-1016).
@@ -128,14 +129,14 @@ final class PluginSettingsRealEngineTest extends TestCase
         yield 'undeclared' => ['nope'];
     }
 
-    /** @dataProvider keysOutOfReach */
+    #[DataProvider('keysOutOfReach')]
     public function testOnlyTheKeysItDeclaredResolve(string $key): void
     {
         $this->expectException(\InvalidArgumentException::class);
         $this->settings->get($key);
     }
 
-    /** @dataProvider keysOutOfReach */
+    #[DataProvider('keysOutOfReach')]
     public function testOnlyTheKeysItDeclaredCanBeWritten(string $key): void
     {
         $this->expectException(\InvalidArgumentException::class);

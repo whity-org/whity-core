@@ -6,6 +6,7 @@ namespace Tests\Unit\Core\Http;
 
 use PHPUnit\Framework\TestCase;
 use Whity\Core\Http\HttpFetcher;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Unit tests for the SSRF guard on {@see HttpFetcher} (WC-ae16). Uses IP-literal
@@ -34,9 +35,7 @@ final class HttpFetcherTest extends TestCase
         ];
     }
 
-    /**
-     * @dataProvider blockedUrls
-     */
+    #[DataProvider('blockedUrls')]
     public function testBlocksNonPublicOrNonHttpsUrls(string $url): void
     {
         self::assertFalse(HttpFetcher::isPubliclyRoutableUrl($url), "must block: {$url}");
@@ -54,9 +53,7 @@ final class HttpFetcherTest extends TestCase
         ];
     }
 
-    /**
-     * @dataProvider allowedUrls
-     */
+    #[DataProvider('allowedUrls')]
     public function testAllowsPubliclyRoutableHttpsUrls(string $url): void
     {
         self::assertTrue(HttpFetcher::isPubliclyRoutableUrl($url), "must allow: {$url}");

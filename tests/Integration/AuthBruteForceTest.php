@@ -194,7 +194,7 @@ final class AuthBruteForceTest extends TestCase
         )->execute([
             self::TEST_USER_ID,          // use same id for simplicity
             'throttle-test',
-            password_hash(self::VALID_PASSWORD, PASSWORD_BCRYPT),
+            password_hash(self::VALID_PASSWORD, PASSWORD_BCRYPT, ['cost' => 4]),
         ]);
 
         $pdo->prepare(

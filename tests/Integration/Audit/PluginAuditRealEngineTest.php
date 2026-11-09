@@ -14,6 +14,7 @@ use Whity\Core\Audit\HostPluginAudit;
 use Whity\Core\Plugin\PluginIdentity;
 use Whity\Sdk\Audit\AuditTrail;
 use Whity\Sdk\PluginInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * A plugin's own audit entries (WHIT-1032), against the migration-built schema:
@@ -77,7 +78,7 @@ final class PluginAuditRealEngineTest extends TestCase
         self::assertNull($entry->actorProfileId);
     }
 
-    /** @dataProvider forgedNames */
+    #[DataProvider('forgedNames')]
     public function testANameCannotClaimAnotherPluginOrCore(string $action, ?string $targetType): void
     {
         try {
@@ -168,7 +169,7 @@ final class PluginAuditRealEngineTest extends TestCase
         self::assertSame(['order' => 7], $trail->entries()[0]->metadata);
     }
 
-    /** @dataProvider noWorkspace */
+    #[DataProvider('noWorkspace')]
     public function testNoWorkspaceIsRefused(?int $tenant): void
     {
         $trail = $this->trail('audit-acme');

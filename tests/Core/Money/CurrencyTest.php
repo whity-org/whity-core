@@ -7,6 +7,7 @@ namespace Tests\Core\Money;
 use PHPUnit\Framework\TestCase;
 use Whity\Core\Money\Currency;
 use Whity\Core\Money\MoneyException;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * The exponent table and the two conversions that need it.
@@ -211,9 +212,8 @@ final class CurrencyTest extends TestCase
      * Round-tripping is the property that matters: whatever `format` writes,
      * `parse` must read back as the same number of minor units. A drift between
      * them is an amount that changes when it is displayed and re-entered.
-     *
-     * @dataProvider roundTrippableAmounts
      */
+    #[DataProvider('roundTrippableAmounts')]
     public function testFormattingAndParsingAreInverses(int $minorUnits, string $currency): void
     {
         $formatted = Currency::format($minorUnits, $currency);

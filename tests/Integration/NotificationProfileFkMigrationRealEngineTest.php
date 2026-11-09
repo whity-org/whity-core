@@ -9,6 +9,7 @@ use PDO;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\SchemaFromMigrations;
 use Whity\Database\Database;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * #751 — migration 105 gives `notifications.recipient_profile_id` and
@@ -92,9 +93,7 @@ final class NotificationProfileFkMigrationRealEngineTest extends TestCase
         ];
     }
 
-    /**
-     * @dataProvider fkProvider
-     */
+    #[DataProvider('fkProvider')]
     public function testColumnCarriesAForeignKeyToProfiles(string $table, string $column): void
     {
         self::assertNotNull(
@@ -103,9 +102,7 @@ final class NotificationProfileFkMigrationRealEngineTest extends TestCase
         );
     }
 
-    /**
-     * @dataProvider fkProvider
-     */
+    #[DataProvider('fkProvider')]
     public function testTheForeignKeyCascadesRatherThanNullingOrRefusing(string $table, string $column): void
     {
         self::assertSame(

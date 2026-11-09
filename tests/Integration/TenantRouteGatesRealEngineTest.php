@@ -9,6 +9,7 @@ use PHPUnit\Framework\TestCase;
 use Tests\Support\SchemaFromMigrations;
 use Whity\Core\RBAC\CorePermissions;
 use Whity\OpenAPI\CoreApiSchemas;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * The tenants and permission-catalogue routes are gated on permission slugs, and
@@ -114,9 +115,8 @@ final class TenantRouteGatesRealEngineTest extends TestCase
      * is gated on `tenants:delete`, which is separately grantable, and a role
      * holding only that one would otherwise be able to delete a tenant it had no
      * way to find — the id comes from the list this grant unlocks.
-     *
-     * @dataProvider audienceAnchors
      */
+    #[DataProvider('audienceAnchors')]
     public function testTenantsReadIsGrantedToEveryRoleThatMayAdministerTenants(string $anchor): void
     {
         $stmt = $this->pdo->prepare(
@@ -181,9 +181,8 @@ final class TenantRouteGatesRealEngineTest extends TestCase
 
     /**
      * No re-gated route may go back to a role-name gate, in the CATALOGUE.
-     *
-     * @dataProvider reGatedRoutes
      */
+    #[DataProvider('reGatedRoutes')]
     public function testEveryReGatedRouteIsDeclaredOnAPermissionAndNotARole(
         string $key,
         string $expected,
@@ -213,9 +212,8 @@ final class TenantRouteGatesRealEngineTest extends TestCase
      * `register()` call per line here, so a line match is exact — and the
      * assertion that the line was FOUND is what stops this passing silently if
      * somebody moves the registration.
-     *
-     * @dataProvider reGatedRoutes
      */
+    #[DataProvider('reGatedRoutes')]
     public function testEveryReGatedRouteIsRegisteredOnAPermissionAndNotARole(
         string $key,
         string $expected,

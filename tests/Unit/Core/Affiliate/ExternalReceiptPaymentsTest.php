@@ -11,6 +11,7 @@ use Whity\Core\Affiliate\ReferredPayment;
 use Whity\Core\Affiliate\ReferredPaymentSourceException;
 use Whity\Core\Billing\External\BillingPortalException;
 use Whity\Core\Billing\External\Receipt;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Reading a referred workspace's payments out of the billing service.
@@ -92,9 +93,8 @@ final class ExternalReceiptPaymentsTest extends TestCase
 
     /**
      * NO PAYMENT DATE MEANS NO MONEY MOVED — for everything except a refund.
-     *
-     * @dataProvider receiptsThatWereNeverPaid
      */
+    #[DataProvider('receiptsThatWereNeverPaid')]
     public function testAReceiptThatWasNeverPaidIsNotAPayment(string $status): void
     {
         $payments = $this->read([$this->receipt('INV-1', status: $status, paidAt: null, paid: 0)]);

@@ -11,6 +11,7 @@ use Whity\Core\Entitlement\PluginEntitlements;
 use Whity\Core\PluginEntitlementRegistrar;
 use Whity\Sdk\PluginEntitlementsInterface;
 use Whity\Sdk\PluginInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * A plugin selling its own limits, through the host's own registrar.
@@ -91,10 +92,10 @@ final class PluginDeclaredEntitlementsTest extends TestCase
     // ── One bad row must not cost the plugin ────────────────────────────────
 
     /**
-     * @dataProvider malformedEntries
      *
      * @param array<string, mixed> $bad
      */
+    #[DataProvider('malformedEntries')]
     public function testAMalformedEntryIsDroppedAndTheRestStillLand(array $bad): void
     {
         $added = $this->register([

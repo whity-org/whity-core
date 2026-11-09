@@ -6,6 +6,352 @@ uses tag-based releases (see the `v*` tags in the repository).
 
 ## [Unreleased]
 
+## [0.2.28] - 2026-11-09
+
+### Fixed
+
+- **Upgrading an existing install no longer takes the API down.** The app
+  container now starts on a database that has not been migrated yet, so the
+  migrations can run inside it. On v0.2.27 it restarted forever until they were
+  run some other way. The upgrade steps now say which command to use for image
+  deployments, and every change is tested by upgrading from the last release
+  (WHIT-930).
+
+## [0.2.27] - 2026-11-09
+
+### Added
+
+- **Join a workspace with Whity ID.** A workspace's sign-up page now offers "Continue with" the
+  instance's sign-in providers, such as Whity ID. Joining this way follows the same rules as signing up
+  with email: the workspace's mode, its email domains (checked against the email the provider verified),
+  a starting role with no admin permissions, and approval when required. It never creates a workspace,
+  and staff who use it stay staff (WHIT-917).
+- **Send back to the author, and resubmit.** A person holding an item on a route can send it back to
+  its author for changes, with a note the author sees. On a committee step, one member's send-back
+  goes at once, without a vote. The sender chooses where the route resumes: their own step, with its
+  people resolved again, or step 1. Earlier approvals stay in the trail. A route design can turn
+  send-back off for a step (`allow_send_back`). Returning an item one step back to a colleague works
+  as before.
+- **Versions of what was reviewed.** Each submit and resubmit records a version of the subject and
+  its SHA-256, and every trail entry names the version it was made on, so the trail shows which
+  version each approval was given on.
+- **Notes for the author.** A note can be marked for the author (`to_author`). Notes are internal by
+  default and never reach the author.
+
+The routing API accepts `sent_back` (with `resume_from`) and `resubmitted`. The trail's action list
+is widened once for the whole routes plan; on SQLite this edits the stored table definition and
+rewrites no rows (WHIT-919, #1723).
+- **Form submissions travel on their own routes.** Sending a form no longer makes a document. The
+  route travels on the submission, and its reviewers open it from their inbox on a page that shows
+  the answers, the trail and what they can do. Routes on submissions sent before this now travel on
+  the submission too; their documents stay.
+- **Edit and send again.** When a reviewer sends a submission back for changes, the person who sent
+  it can change it under My submissions and send it again. Each version is kept, and a reviewer sees
+  what changed since the version they last acted on.
+- **What the sender sees.** Under My submissions the sender sees each stage and its outcome, and the
+  notes written for them. Reviewers are not named unless the workspace turns on
+  `forms.show_reviewer_names`.
+- **Not approved.** On a submission, a rejection needs a reason, ends the route, and the sender reads
+  "Not approved" with the reason. They can start a new submission filled in from the rejected one.
+- **Sign in on a public form.** A form's public link can ask visitors to sign in, so only the
+  workspace's members and customers send it, under their own name. A submission from somebody who
+  did not sign in cannot be sent back, and the route editor says so when a public form uses a route
+  that allows it.
+
+Routes can be read and acted on by their subject: `GET /api/v1/routes?subject_type=…&subject_id=…`
+and `POST /api/v1/routes/{id}/actions`. The document routing endpoints work as before
+(WHIT-920, #1724).
+- **A final document at the end of a route.** A route can end with a final document stage. Nobody
+  acts on it: when everything before it is done and approved, Whity makes the PDF from the approved
+  version with a document template, gives it its number and verification code, and keeps it on the
+  document. For a form submission, that is when its document is made. The PDF says which version it
+  was made from, with its SHA-256.
+- **Choose the template.** The stage can name its own template, or use the form's new setting
+  "Final document template". Add the stage in the route editor with "Add the final document". It is
+  always the last stage, a route has at most one, and it is only offered where PDFs can be made.
+- **When the PDF can't be made right away.** The route still finishes, the stage shows "Final
+  document waiting", and Whity tries again until it is made.
+- **The sender gets it.** Under My submissions the sender sees "Final document waiting" and then a
+  link to open the final document, unless the form turns that off. Reviewers open it from the
+  route's page.
+
+`GET /api/v1/me/form-submissions/{id}/final-document` and `GET /api/v1/routes/{id}/final-document`
+serve the final PDF. A form template can print a submission's answers: each form is a record type,
+`form.<key>`, with fields `submission.<question>` (WHIT-921, #1725).
+- **Electronic signatures with an audit trail.** A route can have a signing step (`kind: sign`),
+  answered by signing, declining with a reason, or sending back. Every signer must sign (`all`, the
+  default) or any one of them may (`any`). The step can say the capacity the signer signs in and on
+  whose behalf, and the signer sees both.
+- **Signing.** The signer ticks the consent line, draws their signature (or uses the one they saved
+  for reuse) and confirms it is them: with a code from their authenticator app when they use one,
+  by signing in again through their sign-in provider when they sign in that way, and otherwise with
+  a one-time code sent by email. They sign exactly the content on the screen: if it changed since
+  they opened it, they are asked to read it again.
+- **The signature record.** Each signature records the signer, capacity, on behalf of, step, the
+  document version and its SHA-256, how the signer confirmed, the time to the second, the address
+  and browser, and the version of the consent wording. It is bound to that version and does not
+  carry over to a new one. Each record is sealed with this site's Ed25519 key; the public keys are
+  published at `GET /api/signing-keys`.
+- **A linked trail.** Every new trail entry stores the hash of the entry before it on the same
+  document. Entries written earlier are not changed: the first linked entry covers them.
+- **Audit page.** A document's audit page lists every act and signature, whether each seal checks,
+  and whether the trail is intact (`GET /api/documents/{id}/audit`).
+- `GET /api/documents/{id}` returns `signatures`: who signed the current version, in what capacity,
+  and when.
+
+These are electronic signatures with an audit trail. Certified signatures through licensed
+providers come later (WHIT-922, #1726).
+- **Route and form events for plugins (SDK 1.94).** Plugins can now react when a route is sent back,
+  resubmitted, signed or completed, when its final document is made, and when a form is submitted,
+  reviewed or withdrawn. Each event carries ids only. A form submission's final document fires the
+  usual issue events too.
+- **A form has a title and a banner for the person filling it in.** Settings has a
+  new card, What people filling it in see: a title separate from the form's internal
+  name (empty shows the name), the description, the send button text, and a banner.
+  The banner is one of six patterns drawn from the workspace's main colour (Show new
+  options draws six more), or an uploaded PNG, JPEG or WebP up to 5 MB. The title sits
+  on the banner in a colour chosen to reach 4.5:1 contrast against every colour in
+  the pattern, and over a dark scrim on an uploaded picture. It shows on the
+  signed-in page, the preview and the public link (WHIT-944, #1715).
+- **A new sign-in page, and a way to check a printed document without an account.** On wide
+  screens the sign-in form now sits beside a brand panel, mirrored in Arabic and stacked on
+  phones. Whity's own console shows the sheets-on-paper pattern; a white-labelled workspace
+  shows its own logo and colour instead. "Verify a document" opens the camera, reads the QR
+  code on a Whity document and goes to its public check, or takes the link or code typed by
+  hand. It only follows this site's own verification links, explains the camera before
+  asking for it, and turns the camera off when the scan ends or the window closes (WHIT-956,
+  #1734).
+- **Whity installs as an app on phones and computers.** It opens in its own window with the
+  workspace's name, icon and main colour (a tenant's own domain installs as that tenant), under
+  its Arabic name and right to left for Arabic readers, and keeps clear of the notch and home
+  indicator. With no connection it shows a page saying so instead of the browser's error, and when
+  a new version ships it offers to reload. Nothing anyone sees after signing in, and no API
+  response, is stored on the device (WHIT-957, #1733).
+- **Operators can switch installing off.** The "Install as an app" feature flag
+  (`app.installable`), or the `PWA_ENABLED` environment variable until that flag is saved, removes
+  the manifest, serves no service worker, and removes the one browsers installed earlier. It is on
+  by default (WHIT-957, #1733).
+- **Every route is now tested against crossing between workspaces.** A new
+  test starts the real app, signs in as one workspace's administrator and
+  calls every route and verb with another workspace's ids, also naming that
+  workspace or the system workspace in the request. It fails if anything comes
+  back from the other workspace, if a row outside the caller's workspace
+  changes, if the caller's rows end up pointing at the other workspace, or if a
+  sign-in token for another workspace is handed out. It also plants routes that
+  leak on purpose and fails if any of them goes unnoticed (WHIT-971, #1144).
+- Plugins can now limit who sees which of their records (SDK 1.74, #1074). `Whity\Sdk\Rbac\ResourceScope` returns the records of a plugin's resource type that a person may act on, which are the records where a role was granted to that person by name and the permission check passes. Two people with the same permission can now see different records. Permission checks on a single record only ever add access, so they could not filter a list before. The answer never includes more than the permission check allows. It covers every record only when the plugin names an "every record" permission and the person holds it as well.
+- **A workspace can have its name in Arabic and English, and say which one is
+  the original.** For many institutions the Arabic name is the legal one, so
+  English is no longer assumed. The workspace record edits both names, and the
+  workspace switcher, home page and workspaces list show the reader's language,
+  falling back to the original. Search finds a workspace by either name. The
+  names live in a new `localized_texts` table that organizational units use
+  next (#821, WHIT-973).
+- **Organizational units can have their names in Arabic and English, and say
+  which one is the original.** A faculty or department keeps its official name
+  and gets the other language beside it, in the same `localized_texts` table
+  workspaces use. The unit forms edit both names, and the units tree, graph and
+  details show the reader's language, falling back to the original (#821,
+  WHIT-978).
+- Plugins can now read a workspace's AI agents and what they did (SDK 1.75, #1742). `Whity\Sdk\Agents\Agents` lists the agents and their activity as the person whose request it is. Someone who manages agents sees the whole workspace. Anyone else sees only the agents they use and what was done on their behalf. New events say when an agent is created, changed, archived, restored, paused or resumed.
+- Plugins now hear when an agent's proposal is filed, decided (approved, declined or expired) or undone, and can show the person deciding what the proposal would change (SDK 1.78, #1685). A tool's `preview` runs in a transaction that is always rolled back, so it can't change anything. Only the person who granted the agent can decide a proposal, never a plugin.
+- Plugins can now see a workspace's AI connections, and hear when one is made, has its access changed or is disconnected (SDK 1.79, #1743). Someone who manages AI connections sees the whole workspace, and anyone else sees their own. No token or token id is ever shared.
+- Plugins can now offer AI agents resources as well as prompts, and prompts now include their messages (SDK 1.80, #1744). Both reach agents only from a Verified plugin that the operator has approved with `whity-cli plugin agent-context grant <name>`. Each one needs a permission, which is checked for every caller on every call. Revoking the approval, or losing the Verified mark, takes effect on the next call.
+- **Plugins ship starter templates.** A workspace plugin declares templates
+  under `documents.starters` in its plugin.json (SDK 1.81). When the plugin goes
+  live in a workspace, each is added as a published template every member can
+  see, and bound to the plugin's slot when that slot has no template, so the
+  plugin can issue at once. It is added once per workspace. The workspace's
+  edits are never overwritten, and a copy nobody changed follows the plugin's
+  updates (#1739).
+- **Arabic starters have Arabic samples.** The editor's Arabic starter
+  templates showed English example names and months in their field samples;
+  they are Arabic now (codes and amounts stay as they are). New workspaces get
+  the fix; an existing workspace keeps the copy it has.
+- **Plugins can read the workspace's templates.** The SDK's `Templates` reader
+  (SDK 1.82) lists and reads the published templates the caller can see, with
+  the merge fields each one prints and where their values come from. A plugin
+  can then offer a choice of template, or check what an issue needs before it
+  issues. In a background job it sees only the templates bound to its own slots
+  (#1740).
+- **Plugins issue documents in bulk.** `Documents::issueMany()` (SDK 1.83)
+  issues up to 500 documents from one template as a background job, and
+  `Documents::batch()` reads its progress with a result per document. Each
+  document is checked and preflighted as the sender when it runs. A batch key
+  makes a resend return the same batch, and per-document origin keys mean a
+  resumed batch never issues twice. Migration 229 (#1741).
+- **Document printing works as soon as the renderer runs.** Start the render
+  service with a shared secret and documents print, with no setting to find
+  first. `whity install` already sets up both, and `whity update` adds a secret
+  to an older install that runs the renderer without one. The admin Stats page
+  and `php bin/whity-cli render:check` say whether the renderer is connected,
+  whether its version matches, and the exact fix when it doesn't (WHIT-1001).
+- **Connect to Whity store.** An operator can connect this installation to a plugin store under Admin > Plugins > Store with one Whity ID sign-in (OAuth with PKCE; the installation registers itself with Whity ID). After that, catalogue, install and update calls to that store carry a fresh, short-lived Whity ID token, so nobody pastes a store token. The page shows the connected account and a Disconnect button, which also revokes the connection at Whity ID. The refresh token is kept encrypted with the platform secret store and is never returned by the API. Whity ID issuers come from `WHITY_ID_ISSUERS` (default `https://id.whity.dev`). The installation needs an https address, or a loopback one for local use (WHIT-1003).
+- **A plugin can sell this deployment's plans through a payment provider.** SDK 1.77
+  adds `PluginBillingPortalInterface`: a plugin such as Whity Pay connects one
+  provider (Stripe, Paddle or Polar) and core's existing billing screens use it
+  for checkout, plan and seat changes, receipts and the provider's own
+  self-service page. Provider notifications arrive at
+  `POST /api/billing/provider-webhook`. The plugin checks their signatures, and
+  core then asks the provider for the current state before it records the
+  subscription, the plan and its entitlements. Operators can refund a
+  workspace's payment with `POST /api/billing/refunds`. A hosted billing
+  service set in the environment still takes precedence (WHIT-1010).
+- **Plugins can answer other Whity services server to server.** A plugin route
+  declared `'service' => '<scope>'` accepts a short-lived token from the
+  deployment's trusted issuer (Whity ID) for a client the operator allows
+  (`SERVICE_TOKEN_CLIENTS`), and nothing else. The plugin can then look up the
+  person the call is about, and gets only the workspaces where that person holds
+  the permission it asks for. Whity ID's account Billing page uses this to read a
+  person's subscriptions from Whity Pay. Billing plugins can also read the plan
+  catalogue's prices, read-only (SDK 1.84, WHIT-1011).
+- **Paid plugins from the Whity store.** A paid store plugin shows its prices in the install dialog. An operator can buy it for this installation through Whity Pay on the store, or start its free trial, and installs it once it is licensed. Plugins ask the host whether they are licensed through the new SDK 1.85 service `Whity\Sdk\Licensing\StoreLicence`, which answers `licensed`, `grace` (with an until date) or `unlicensed`. The host fetches the store's signed licence over the installation's Whity ID connection and checks it against the store's pinned key. It keeps answering for up to 7 days when the store cannot be reached, so a plugin never sees a token or a key. New: `POST /api/plugins/store/checkout`, `GET /api/plugins/store/licences/{slug}`; the store's `/auth`, `/keys`, `/licences/{slug}` and checkout paths pass tenant isolation on a store host (store licensing PR-4).
+- **The plugin store can sell paid plugin licences through Whity Pay.** SDK 1.86
+  adds `Billing\LicenceSales`: the store starts a licence checkout for an
+  installation and reads a licence's status. Exactly one billing plugin answers.
+  The host stamps it with its plugin name and refuses a second, so no other
+  plugin can change a checkout link or a licence status. A licence bought in
+  a provider's test mode is marked and never counts as active. Billing plugins
+  can also ask the host to re-read a workspace's access, which Whity Pay does
+  when it switches from test to live (WHIT-1013).
+- **Code plugins can be Verified by the Whity store.** When the store's operator reviews an
+  exact plugin version, the store signs a mark for that package. A code plugin installed from
+  app.whity.dev shows as Verified, with "Reviewed on app.whity.dev on [date]; its code runs on
+  your server", only while a mark signed with the store's pinned key names its installed
+  version and sha256. Marks are fetched every 15 minutes. A revoked mark counts at the next
+  fetch, and an offline installation keeps a mark for up to 7 days. A new operator setting,
+  off by default, serves a code plugin's MCP prompts only while it is Verified (WHIT-1014).
+- **Plugin routes know their workspace, language and caller.** The SDK Request now says which workspace a request runs in, which language to answer in, and whether a person, an AI agent or the system is calling, so a plugin can hold agents to stricter rules (SDK 1.87, WHIT-1015).
+- **Plugins keep their own settings per workspace.** A plugin can read and write the settings it declared for the current workspace and hear when one changes, and can show a secret field the platform draws and stores. A saved secret is never sent back to the browser (SDK 1.88, WHIT-1016).
+- **Forms warn when they don't match their document template.** Choosing a final
+  document template now lists what the template asks for that the form doesn't
+  collect, and what the form collects that the template has no place for. You can
+  add the missing questions, add the answers to the template's draft, or leave them
+  out on purpose. If no template fits, you can make one from the form with every
+  question already in place. A template's own fields now print the answer of the
+  question with the same key or wording.
+- **Plugins can notify people.** A plugin declares notification types in English and Arabic and sends them to a person, role or unit in the current workspace. Only active members are reached, opt-outs apply, and a plugin cannot pose as a security or billing notice.
+- **Plugins can run their own jobs.** A plugin enqueues the jobs it declared in the current workspace, reads their status, and declares cron schedules that run once per workspace.
+- **Plugins can write and read their own audit entries.** A plugin records an entry with a target and reads back its own entries in the current workspace. The host attributes every entry: the plugin cannot write under another plugin or core, or name the actor.
+- **Plugins can listen without being able to change anything.** A hook subscribed with
+  `'observe' => true` sees the event, but what it returns is ignored and it can't refuse the
+  operation. The SDK also publishes constants for events core already fired: membership
+  changes, registration, federated sign-in, resource grants, the period close report, data
+  type lifecycle and boot-time registrations. The plugin guide now lists exactly which events
+  let a listener change the payload, and which fields (WHIT-1033, #1673).
+- Plugins can declare translatable fields with the new `LocalizedText` class in the SDK (SDK 1.93, #521). It holds the `x-whity-localized-text` marker core already used, and helpers to check a value and pick the text for a reader's language. There is a guide, `Plugin-Localized-Text`, and a new `Glossary` example plugin.
+
+### Changed
+
+- **Routes now say what they travel on and what each step is.** A route records its subject (today
+  always a document), and each step records its kind: review, decide or deliver. Both appear in the
+  routing API (`subject` on a route, `kind` on a step). Nothing about how routes behave has changed;
+  this prepares one routing engine for documents, form submissions and plugin records (WHIT-918, #1722).
+- **Unit pickers now show each unit in the reader's language.** The users
+  screens, delegations, the document library, sources and templates, two-step
+  policies, form unit fields and plugin unit pickers use the name in the
+  reader's language, falling back to the original when there is none (#821,
+  WHIT-924).
+- **A long form shows one section at a time with a short step indicator.** A form
+  with more sections than the stepper holds (an ethics application has ten) no
+  longer lists every section above the questions. It says "Step 3 of 11" with a
+  progress bar, names the section in a heading, and has an All sections menu to go
+  back to any section already reached. Continue still checks the section's required
+  questions, answers are kept between sections, and Review and Submit stay last. This
+  applies to signed-in and public forms (WHIT-943, #1714).
+- **Upgrade note: plugin prompts stop reaching AI agents until you approve the plugin.** A code plugin's MCP prompts used to be offered to every agent. Now they come only from a Verified plugin that the operator has approved with `whity-cli plugin agent-context grant <name>`, and a prompt without a `requiredPermission` is ignored. If an agent relied on a plugin prompt, check that the plugin is Verified (installed from the Whity store with its signed mark), approve it, then reload plugins. A plugin that isn't Verified can't be approved (#1744).
+- **Templates lists your own templates, not Whity's 24 starters.** The starters
+  sit under New template as one card each, named in your language, with a
+  button for each language they come in; a starter joins the list once you
+  publish or change it. The list gains All, Published and Drafts, loses its
+  second search box, and its row menu is ⋯ (WHIT-998).
+- **A merge field has its own bar.** Select a field chip to see what fills it
+  (its group and an example) and to change it for another field or remove it.
+  The field menu no longer cuts off its example values (WHIT-999).
+- **Preview shows what a template will look like.** A template with no record
+  type previews with its fields' examples ("Previewing with example values")
+  instead of flagging every field missing, and Back to editing sits where the
+  Preview button was. The publish dialog says what publishing does in plain
+  words: the draft becomes the version new documents are issued from
+  (WHIT-1000).
+- **Issuing has room for a template's own values.** The form gets up to 40% of
+  the screen, says how many are filled ("2 of 25 filled"), and the formatting
+  toolbar, which does nothing while issuing, is hidden (WHIT-1000).
+- **A renderer at another version no longer prints.** It used to print the
+  previous release's layout without a word. Now printing pauses with a message
+  naming both versions until they match, and a failed print says why (not set
+  up, not reachable, key mismatch, version mismatch) instead of a bare 503.
+  A document issued while printing is unavailable shows "PDF not available
+  yet" with that reason, instead of "This document has no stored file".
+  On a new install `documents.render_enabled` now defaults to on and works as
+  the off switch. **When you upgrade:** an install that already has a renderer
+  and never set this switch stays off. To start printing, turn on Render
+  Enabled in Settings, Feature flags. A saved value is kept, and an install
+  with no renderer settings gets the new default if one is set up later.
+  The published staging compose file takes one `WHITY_VERSION` for the app,
+  web and render images, and the dev compose files bind the renderer's debug
+  port to 127.0.0.1 only (WHIT-1001).
+- **app.whity.dev is a trusted plugin store by default.** `plugins.store_allowed_hosts` now defaults to `app.whity.dev`, Whity's own store. Operators can still add or remove stores, and an empty list still turns installing from a store off (WHIT-1003).
+
+### Fixed
+
+- **Sign-up says when it can't work yet.** With no bot check on the instance, Settings, Sign-up warns as
+  soon as sign-up is turned on and links the operator to the setting, and the sign-up page says the
+  workspace isn't taking sign-ups yet instead of "try again later" after the form is filled in (WHIT-917).
+- **The form builder's question settings stay in view.** Choose a question far down a
+  long form and its settings sit beside it instead of at the top of the page; the
+  panel scrolls by itself when the settings are taller than the window, and stops
+  above the save bar (WHIT-941, #1713).
+- **Saving a form's settings no longer takes questions out of their sections.** A
+  form whose sections had no titles stored (one built through the API, such as an
+  ethics application) lost every question's section on the next settings save, and
+  turned into one long page. Those sections now show in Settings, untitled, ready to
+  be named (WHIT-944).
+- **The workspace main colour saves and applies straight away.** Changing it in Settings, Branding
+  seemed to fail: the card snapped back and the app kept the platform's colour, because branding was
+  looked up by the web address instead of the signed-in workspace. It now re-themes the whole app
+  without a reload, in light and dark mode, and signed-in people see their own workspace's logos and
+  name on a shared address too (WHIT-951, #1716).
+- **Plugin jobs can render and issue documents.** The SDK's `DocumentRenderer`
+  now resolves in queue jobs and CLI commands as well as in requests (SDK 1.76).
+  Each process builds one per-tenant storage stack, so a document a job issues
+  is stored where the same workspace's request would store it (#1151).
+- **A template started from a starter is no longer called "Invoice (copy)".**
+  It keeps the starter's name, so documents issued from it don't print
+  "(copy)" in their title (WHIT-998).
+- **The editor no longer opens with a table toolbar over the letterhead.** The
+  block toolbar waits until you click into the document (WHIT-999).
+- **The letterhead prints the workspace's name, not "Whity",** when no company
+  name or site name of its own is set (WHIT-999).
+- **"Last edited by at 18:51" is fixed.** The status bar reads "Last edited at
+  21:51" until it knows who, in your own time zone rather than UTC (WHIT-999).
+- **Tables in the editor stopped redrawing themselves nonstop.** A table with
+  end-aligned columns rebuilt its cells thousands of times a second, which made
+  a field chip inside it hard to click and kept the page busy (WHIT-999).
+- **Opening a document no longer saves it.** Opening a template or any other document in the editor used to save a new draft version with nothing changed. The status bar now names who edited last and moves on with each save (WHIT-1017).
+- **The Settings menu follows a language switch straight away.** Its list of pages used to stay in the old language until the page was reloaded (WHIT-1017).
+- **Public read keys are labelled as their own kind.** On Settings, Public forms, a key now says whether it is a Form or a Read-only link, in its wording too. Issuing a read key now gives its real address; it used to show a form's address (WHIT-1017).
+- **Upgrading doesn't start printing on its own.** An install that already has
+  a renderer and never set `documents.render_enabled` stays off after the
+  upgrade, until someone turns on Render Enabled in Settings, Feature flags. New
+  installs still print by default, and a saved value is never changed (WHIT-1018).
+
+### Security
+
+- **Workspace isolation exemptions are now only the ones that matter.** Of the
+  248 places marked as reviewed exceptions to the "every query names its
+  workspace" rule, 136 exempted nothing. They sat on tables shared by every
+  workspace, which the check already allows. They are now plain comments, and
+  the check fails if a marking that exempts nothing comes back. Looking up a
+  translation by id now only finds the global text and the caller's own
+  workspace's text. Two lookups that read across workspaces are held to the
+  callers that check the result themselves (WHIT-974, #1144).
+- **A delegated permission now follows its grantor.** It counts only while the
+  person who delegated it still holds that permission in the workspace, so
+  moving them to a smaller role or ending their membership takes effect for
+  everyone they delegated to. The server also drops its cached permissions
+  after every request, whichever way it is hosted (WHIT-975, #1144).
+
 ## [0.2.26] - 2026-11-06
 
 ### Added

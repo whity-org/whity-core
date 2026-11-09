@@ -291,7 +291,7 @@ final class AuthHandlerTwoFactorPolicyRealEngineTest extends TestCase
 
     private function seedProfile(string $email, int $tenantId, ?int $ouId, bool $twoFactorEnabled = false): int
     {
-        $hash = password_hash(self::PASSWORD, PASSWORD_BCRYPT);
+        $hash = password_hash(self::PASSWORD, PASSWORD_BCRYPT, ['cost' => 4]);
 
         $stmt = $this->pdo->prepare(
             "INSERT INTO profiles (display_name, password_hash, two_factor_enabled,

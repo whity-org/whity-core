@@ -6,6 +6,7 @@ namespace Tests\Unit\Mcp\Tools;
 
 use PHPUnit\Framework\TestCase;
 use Whity\Mcp\Tools\AuthoredToolRegistry;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Hand-authored MCP tools contributed by plugins (SDK 1.43, WC-adoption 6.4).
@@ -122,9 +123,9 @@ final class AuthoredToolRegistryTest extends TestCase
     }
 
     /**
-     * @dataProvider malformed
      * @param array<string, mixed> $over
      */
+    #[DataProvider('malformed')]
     public function testAMalformedDescriptorIsRefusedWithASpecificReason(array $over, string $expected): void
     {
         $registry = new AuthoredToolRegistry();

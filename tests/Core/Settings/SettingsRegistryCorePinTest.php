@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 use Whity\Core\Settings\PluginSettingsRegistry;
 use Whity\Core\Settings\SettingsCatalog;
 use Whity\Core\Settings\SettingsRegistry;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * The regression net for opening the settings registry to plugins (#713 item 1).
@@ -550,9 +551,7 @@ final class SettingsRegistryCorePinTest extends TestCase
         ];
     }
 
-    /**
-     * @dataProvider validationSamples
-     */
+    #[DataProvider('validationSamples')]
     public function testCoreValidationOutcomesAreUnchanged(string $key, string $value, bool $valid): void
     {
         $reason = SettingsRegistry::validate($key, $value);
@@ -568,9 +567,8 @@ final class SettingsRegistryCorePinTest extends TestCase
      * The same sample, through the UNION with a plugin loaded. This is the
      * assertion that actually protects the 330 call sites: whatever a plugin
      * declares, a core key's answer does not move.
-     *
-     * @dataProvider validationSamples
      */
+    #[DataProvider('validationSamples')]
     public function testCoreValidationOutcomesSurviveAPluginContribution(string $key, string $value, bool $valid): void
     {
         $plugins = new PluginSettingsRegistry();

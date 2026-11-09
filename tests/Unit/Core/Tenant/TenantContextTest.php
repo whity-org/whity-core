@@ -124,7 +124,7 @@ class TenantContextTest extends TestCase
     public function testResolveExtractsTenantIdFromBearerToken(): void
     {
         $parser = $this->createMock(JwtParser::class);
-        $parser->method('parse')->with('valid.jwt.token')->willReturn([
+        $parser->expects($this->atLeastOnce())->method('parse')->with('valid.jwt.token')->willReturn([
             'user_id' => 123,
             'tenant_id' => 42,
             'jti' => 'abc',
@@ -149,7 +149,7 @@ class TenantContextTest extends TestCase
     public function testResolveExtractsTenantIdFromCookie(): void
     {
         $parser = $this->createMock(JwtParser::class);
-        $parser->method('parse')->with('cookie.jwt.token')->willReturn([
+        $parser->expects($this->atLeastOnce())->method('parse')->with('cookie.jwt.token')->willReturn([
             'user_id' => 5,
             'tenant_id' => 11,
             'jti' => 'abc',

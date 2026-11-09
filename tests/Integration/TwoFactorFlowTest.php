@@ -289,7 +289,7 @@ class TwoFactorFlowTest extends TestCase
         $mockPdo = $this->createMockPdo([
             'two_factor_enabled' => true,
             'auth_method' => 'local',
-            'password_hash' => password_hash('the password', PASSWORD_BCRYPT),
+            'password_hash' => password_hash('the password', PASSWORD_BCRYPT, ['cost' => 4]),
         ]);
         $tokenValidator = new TokenValidator($this->jwtParser, $mockPdo);
         $backupCodesService = $this->createMock(BackupCodesService::class);
@@ -313,7 +313,7 @@ class TwoFactorFlowTest extends TestCase
             'two_factor_enabled' => true,
             'two_factor_backup_codes_version' => 1,
             'auth_method' => 'local',
-            'password_hash' => password_hash('the password', PASSWORD_BCRYPT),
+            'password_hash' => password_hash('the password', PASSWORD_BCRYPT, ['cost' => 4]),
         ]);
         $tokenValidator = new TokenValidator($this->jwtParser, $mockPdo);
         $backupCodesService = $this->createMock(BackupCodesService::class);

@@ -1936,7 +1936,7 @@ final class CrossTenantRejectionRealEngineTest extends TestCase
     private function passwordProofFor(int $profileId): array
     {
         $this->pdo->prepare('UPDATE profiles SET password_hash = ? WHERE id = ?')
-            ->execute([password_hash('the password', PASSWORD_BCRYPT), $profileId]);
+            ->execute([password_hash('the password', PASSWORD_BCRYPT, ['cost' => 4]), $profileId]);
 
         return ['password' => 'the password'];
     }

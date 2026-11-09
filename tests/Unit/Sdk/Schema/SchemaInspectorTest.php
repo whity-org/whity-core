@@ -9,6 +9,7 @@ use PHPUnit\Framework\TestCase;
 use Whity\Sdk\Schema\MigrationSchema;
 use Whity\Sdk\MigrationInterface;
 use Whity\Sdk\Schema\SchemaInspector;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * The contract of {@see SchemaInspector} that does NOT depend on which engine
@@ -38,9 +39,8 @@ final class SchemaInspectorTest extends TestCase
      * interpolation. The shape check is what makes that safe — and it must
      * refuse rather than sanitise, because a silently-rewritten table name
      * would operate on the wrong table.
-     *
-     * @dataProvider malformedIdentifiers
      */
+    #[DataProvider('malformedIdentifiers')]
     public function testMalformedIdentifiersAreRefused(string $identifier): void
     {
         $this->expectException(\InvalidArgumentException::class);

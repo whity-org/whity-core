@@ -7,6 +7,7 @@ namespace Tests\Sdk;
 use PHPUnit\Framework\TestCase;
 use Whity\Sdk\Render\FlowDocument;
 use Whity\Sdk\Render\RenderRejectedException;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Inline runs on the SDK's flowing-document façade (WHIT-681, SDK 1.44).
@@ -99,7 +100,7 @@ final class FlowDocumentRunsTest extends TestCase
         return [['https://example.test/a'], ['http://example.test/a'], ['mailto:someone@example.test']];
     }
 
-    /** @dataProvider legitimateSchemes */
+    #[DataProvider('legitimateSchemes')]
     public function testALinkMayUseHttpHttpsOrMailto(string $href): void
     {
         $block = $this->firstBlock(
@@ -122,7 +123,7 @@ final class FlowDocumentRunsTest extends TestCase
         ];
     }
 
-    /** @dataProvider dangerousOrUnusableSchemes */
+    #[DataProvider('dangerousOrUnusableSchemes')]
     public function testAnHrefOutsideTheAllowListIsRefused(string $href): void
     {
         // What makes this safe is that the list is CLOSED and the match is

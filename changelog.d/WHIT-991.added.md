@@ -1,1 +1,0 @@
-- Plugins now hear when an agent's proposal is filed, decided (approved, declined or expired) or undone, and can show the person deciding what the proposal would change (SDK 1.78, #1685). A tool's `preview` runs in a transaction that is always rolled back, so it can't change anything. Only the person who granted the agent can decide a proposal, never a plugin.

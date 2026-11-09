@@ -6,6 +6,7 @@ namespace Tests\Http;
 
 use PHPUnit\Framework\TestCase;
 use Whity\Http\WorkerRuntime;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Unit tests for the FrankenPHP worker runtime decisions (WC-182).
@@ -38,9 +39,8 @@ class WorkerRuntimeTest extends TestCase
     /**
      * A truthy DEBUG flag enables lifecycle logging even outside development,
      * so an operator can opt into verbose tracing on a production-mode worker.
-     *
-     * @dataProvider truthyDebugProvider
      */
+    #[DataProvider('truthyDebugProvider')]
     public function testLifecycleLoggingIsEnabledByTruthyDebugFlag(mixed $debug): void
     {
         self::assertTrue(WorkerRuntime::shouldLogLifecycle(['APP_ENV' => 'production', 'DEBUG' => $debug]));
@@ -48,9 +48,8 @@ class WorkerRuntimeTest extends TestCase
 
     /**
      * A falsy DEBUG flag in production keeps lifecycle logging off.
-     *
-     * @dataProvider falsyDebugProvider
      */
+    #[DataProvider('falsyDebugProvider')]
     public function testLifecycleLoggingStaysOffForFalsyDebugFlag(mixed $debug): void
     {
         self::assertFalse(WorkerRuntime::shouldLogLifecycle(['APP_ENV' => 'production', 'DEBUG' => $debug]));

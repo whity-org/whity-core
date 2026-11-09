@@ -743,7 +743,7 @@ final class ProfileLoginRealEngineTest extends TestCase
         );
         $stmt->execute([
             explode('@', $email)[0], // display name from local-part
-            password_hash(self::PASSWORD, PASSWORD_BCRYPT),
+            password_hash(self::PASSWORD, PASSWORD_BCRYPT, ['cost' => 4]),
         ]);
         $profileId = (int) $this->pdo->lastInsertId();
 
