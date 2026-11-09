@@ -7,6 +7,7 @@ namespace Whity\Core\Tenant;
 use PDO;
 use Whity\Core\Hooks\HookManager;
 use Whity\Core\Identity\FederatedProviderContext;
+use Whity\Core\Plan\DefaultPlanAssigner;
 use Whity\Core\Settings\SettingsRegistry;
 use Whity\Core\Settings\SettingsService;
 
@@ -171,6 +172,10 @@ final class FederatedWorkspaceProvisioner
             }
             throw $e;
         }
+
+        // After the commit: applying a plan opens its own transaction. A closed
+        // payment gate is a plan row already, so it stays closed.
+        DefaultPlanAssigner::forDatabase($this->db)->assign($tenantId);
 
         // Post-commit, and only because this method owned the transaction: an
         // assertion for an append-only trail must not be made before the write

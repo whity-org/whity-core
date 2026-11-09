@@ -43,13 +43,14 @@ final class SettingsRegistryTest extends TestCase
              'billing.enforcement_default', 'billing.grace_days',
              'licensing.billing_basis',
              'seats.enforcement', 'seats.count_invited',
+             'meters.enforcement',
              // #billing: invoicing. Every one differs per deployment, which is
              // why none is a constant in the invoicing code. Tax defaults to
              // ZERO rather than to any country's rate — charging tax an
              // operator is not registered to collect is worse than not
              // charging it, and a default wrong for everyone outside one
              // jurisdiction ships unnoticed.
-             'billing.default_currency', 'billing.tax_rate_bp',
+             'billing.default_currency', 'billing.default_plan', 'billing.tax_rate_bp',
              'billing.tax_label', 'billing.tax_inclusive',
              'billing.payment_terms_days',
              'company.name', 'company.address',
@@ -446,7 +447,8 @@ final class SettingsRegistryTest extends TestCase
         // 102 since #1733: app.installable, the instance's install switch.
         // 103 since WHIT-1014: plugins.mcp_prompts_require_mark.
         // 104 since WHIT-920: forms.show_reviewer_names.
-        self::assertCount(104, $describe);
+        // 106 since WHIT-925: meters.enforcement and billing.default_plan.
+        self::assertCount(106, $describe);
         self::assertSame(
             ['key' => 'site_name', 'type' => 'string', 'default' => 'Whity'],
             $describe[0]

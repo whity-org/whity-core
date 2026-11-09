@@ -95,12 +95,14 @@ final class SettingsRegistryCorePinTest extends TestCase
             'licensing.billing_basis',
             'seats.enforcement',
             'seats.count_invited',
+            'meters.enforcement',
             // #billing — invoicing. Eight tenant-overridable (tax treatment
             // and seller identity both differ per tenant in a white-label
             // deployment) and three global-only (numbering, whose per-tenant
             // override would make the uniqueness index mean something a tenant
             // admin can change).
             'billing.default_currency',
+            'billing.default_plan',
             'billing.tax_rate_bp',
             'billing.tax_label',
             'billing.tax_inclusive',
@@ -280,11 +282,13 @@ final class SettingsRegistryCorePinTest extends TestCase
             'licensing.billing_basis' => 'activated',
             'seats.enforcement' => 'warn',
             'seats.count_invited' => 'true',
+            'meters.enforcement' => 'block',
             // Tax defaults to ZERO, not to any country's rate: charging tax
             // an operator is not registered to collect is a worse failure than
             // not charging it, and a default correct for one jurisdiction and
             // wrong for every other gets shipped unnoticed.
             'billing.default_currency' => 'JOD',
+            'billing.default_plan' => '',
             'billing.tax_rate_bp' => '0',
             'billing.tax_label' => '',
             'billing.tax_inclusive' => 'false',

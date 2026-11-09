@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Whity\Api;
 
 use PDO;
+use Whity\Core\Plan\DefaultPlanAssigner;
 use Whity\Core\i18n\LocalizedTexts;
 use Whity\Core\Identity\AccountActivationPolicy;
 use Whity\Core\Identity\EmailVerificationPolicy;
@@ -313,6 +314,11 @@ final class RegisterApiHandler
                 }
                 throw $e;
             }
+
+            // After the commit: applying a plan opens its own transaction, and a
+            // problem with it must not cost somebody their new account. A closed
+            // payment gate is a plan row already, so it stays closed.
+            DefaultPlanAssigner::forDatabase($this->db)->assign($tenantId);
 
             // Hand off to the verification provider AFTER commit (never inside the
             // transaction), and only when enforced. A delivery failure must not

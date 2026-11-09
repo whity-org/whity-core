@@ -10,6 +10,8 @@ use Whity\Core\Document\Slots\BackgroundIssuing;
 use Whity\Core\Document\Slots\SlotBindings;
 use Whity\Core\Document\Theme\DocumentThemeRef;
 use Whity\Core\Identity\InvitationService;
+use Whity\Core\Plan\PlanService;
+use Whity\Core\Plan\PlanValidationException;
 
 /**
  * The code registry of known website-settings keys (Website Settings feature).
@@ -237,6 +239,11 @@ final class SettingsRegistry
     public const SEATS_ENFORCEMENT = 'seats.enforcement';
     public const SEATS_COUNT_INVITED = 'seats.count_invited';
 
+    // METERED LIMITS (documents rendered per day or month). 'block' refuses past
+    // the limit, as metering always has; 'warn' counts and lets the action go
+    // ahead. Global-only for the same reason as seats.enforcement.
+    public const METERS_ENFORCEMENT = 'meters.enforcement';
+
     // INVOICING (#billing). Every one of these differs per deployment, which
     // is exactly why none of them is a constant in the invoicing code.
     //
@@ -253,6 +260,10 @@ final class SettingsRegistry
     //
     // The seller an invoice is from is the workspace's company (COMPANY_*).
     public const BILLING_DEFAULT_CURRENCY = 'billing.default_currency';
+    // The plan_key a new workspace is put on. Empty means none, which is every
+    // install that does not sell plans. Global-only: a workspace does not get to
+    // choose what the operator gives new workspaces.
+    public const BILLING_DEFAULT_PLAN = 'billing.default_plan';
     public const BILLING_TAX_RATE_BP = 'billing.tax_rate_bp';
     public const BILLING_TAX_LABEL = 'billing.tax_label';
     public const BILLING_TAX_INCLUSIVE = 'billing.tax_inclusive';
@@ -836,6 +847,8 @@ final class SettingsRegistry
         self::LICENSING_BILLING_BASIS,
         self::SEATS_ENFORCEMENT,
         self::SEATS_COUNT_INVITED,
+        self::METERS_ENFORCEMENT,
+        self::BILLING_DEFAULT_PLAN,
         self::PLUGINS_STORE_ALLOWED_HOSTS,
         self::PLUGINS_STORE_ENABLED,
         self::PLUGINS_MCP_PROMPTS_REQUIRE_MARK,
@@ -971,6 +984,7 @@ final class SettingsRegistry
         // "block writes" and "block everything" would be the same rule.
         self::LICENSING_BILLING_BASIS => ['activated', 'provisioned', 'active_in_period'],
         self::SEATS_ENFORCEMENT => ['off', 'warn', 'block'],
+        self::METERS_ENFORCEMENT => ['block', 'warn'],
         self::BILLING_INVOICE_NUMBER_SCOPE => ['shared', 'per_tenant'],
         self::BILLING_INVOICE_NUMBER_RESET => ['never', 'yearly', 'monthly'],
         // What a STRANGER holding a printed document is told when they scan it
@@ -1077,8 +1091,10 @@ final class SettingsRegistry
         self::LICENSING_BILLING_BASIS => 'activated',
         self::SEATS_ENFORCEMENT => 'warn',
         self::SEATS_COUNT_INVITED => 'true',
+        self::METERS_ENFORCEMENT => 'block',
         // Zero tax until an operator says otherwise — see the constant.
         self::BILLING_DEFAULT_CURRENCY => 'JOD',
+        self::BILLING_DEFAULT_PLAN => '',
         self::BILLING_TAX_RATE_BP => '0',
         self::BILLING_TAX_LABEL => '',
         self::BILLING_TAX_INCLUSIVE => 'false',
@@ -1503,7 +1519,9 @@ final class SettingsRegistry
             self::BILLING_ENFORCEMENT_DEFAULT => self::validateEnum($key, $value),
             self::BILLING_GRACE_DAYS => self::validateGraceDays($value),
             self::SEATS_ENFORCEMENT => self::validateEnum($key, $value),
+            self::METERS_ENFORCEMENT => self::validateEnum($key, $value),
             self::BILLING_DEFAULT_CURRENCY => self::validateCurrencyCode($value),
+            self::BILLING_DEFAULT_PLAN => self::validatePlanKey($value),
             self::BILLING_TAX_RATE_BP => self::validateTaxRateBasisPoints($value),
             self::BILLING_TAX_INCLUSIVE => self::validateBoolean($value, self::BILLING_TAX_INCLUSIVE),
             self::BILLING_PAYMENT_TERMS_DAYS => self::validatePaymentTermsDays($value),
@@ -1839,6 +1857,26 @@ final class SettingsRegistry
         return preg_match('/^[A-Z]{3}$/', strtoupper(trim($value))) === 1
             ? null
             : 'must be a three-letter ISO 4217 currency code, such as JOD';
+    }
+
+    /**
+     * Empty, or a well-formed plan key. Whether that plan exists is not asked
+     * here: it can be retired after this is saved, so creating a workspace has
+     * to cope with a missing plan anyway.
+     */
+    private static function validatePlanKey(string $value): ?string
+    {
+        if ($value === '') {
+            return null;
+        }
+
+        try {
+            PlanService::assertValidKey($value);
+        } catch (PlanValidationException $e) {
+            return $e->getMessage();
+        }
+
+        return null;
     }
 
     /**
