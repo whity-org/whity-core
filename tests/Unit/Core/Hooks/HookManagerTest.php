@@ -6,6 +6,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\AbstractLogger;
 use Whity\Core\Hooks\HookManager;
 use Whity\Core\Tenant\TenantContext;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Tests for HookManager class
@@ -358,9 +359,8 @@ class HookManagerTest extends TestCase
      * otherwise flood a production log with a message only its author can act
      * on, and an unset APP_ENV counts as production — the same fail-quiet
      * default the rest of the codebase's APP_ENV gates use.
-     *
-     * @dataProvider nonDebugEnvironments
      */
+    #[DataProvider('nonDebugEnvironments')]
     public function testTheDiagnosticIsSilentWhenTheDevGateIsOff(?string $appEnv): void
     {
         if ($appEnv === null) {

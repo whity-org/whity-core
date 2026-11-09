@@ -7,6 +7,7 @@ namespace Tests\Unit\Core\Ou;
 use PHPUnit\Framework\TestCase;
 use Whity\Core\Ou\InvalidOuTypeException;
 use Whity\Core\Ou\OuTypeRegistry;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * The OU-type catalogue's governance rules (#822).
@@ -176,9 +177,7 @@ final class OuTypeRegistryTest extends TestCase
         ];
     }
 
-    /**
-     * @dataProvider keyShapes
-     */
+    #[DataProvider('keyShapes')]
     public function testKeyShapeValidation(string $key, bool $valid): void
     {
         $this->assertSame($valid, OuTypeRegistry::isValidKey($key));

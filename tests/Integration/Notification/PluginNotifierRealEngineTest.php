@@ -22,6 +22,7 @@ use Whity\Sdk\Notification\Notice;
 use Whity\Sdk\Notification\Notifier;
 use Whity\Sdk\Notification\PluginNotificationsInterface;
 use Whity\Sdk\PluginInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * The plugin Notifier (WHIT-1030), against the migration-built schema: bound to
@@ -110,7 +111,7 @@ final class PluginNotifierRealEngineTest extends TestCase
         self::assertSame(self::OTHER_WORKSPACE, (int) $this->rows()[0]['tenant_id']);
     }
 
-    /** @dataProvider noWorkspace */
+    #[DataProvider('noWorkspace')]
     public function testSendingWithNoWorkspaceIsRefused(?int $tenant): void
     {
         $this->tenant = $tenant;
@@ -126,7 +127,7 @@ final class PluginNotifierRealEngineTest extends TestCase
         yield 'the system tenant' => [0];
     }
 
-    /** @dataProvider undeclaredTypes */
+    #[DataProvider('undeclaredTypes')]
     public function testOnlyTheDeclaredTypesCanBeSent(string $type): void
     {
         try {
@@ -189,9 +190,9 @@ final class PluginNotifierRealEngineTest extends TestCase
     }
 
     /**
-     * @dataProvider malformedDeclarations
      * @param array<mixed> $types
      */
+    #[DataProvider('malformedDeclarations')]
     public function testAMalformedDeclarationIsRefusedWhole(array $types): void
     {
         $plugin = self::plugin('notifier-bad', $types);

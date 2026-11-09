@@ -9,6 +9,7 @@ use Whity\Core\Hooks\HookManager;
 use Whity\Core\PluginLoader;
 use Whity\Core\RBAC\PermissionRegistry;
 use Whity\Core\Router;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * A `rowActionList` prop may carry a `{method, endpoint}` mutation entry, and
@@ -339,9 +340,7 @@ PHP);
         ];
     }
 
-    /**
-     * @dataProvider refusedFeatures
-     */
+    #[DataProvider('refusedFeatures')]
     public function testAnUnownedRowActionEndpointDropsTheFeature(string $featureId): void
     {
         $byId = $this->featuresIn(self::$foreignDir, new Router('/v1'));

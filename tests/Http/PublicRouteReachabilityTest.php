@@ -6,6 +6,7 @@ namespace Tests\Http;
 
 use PHPUnit\Framework\TestCase;
 use Whity\Http\Middleware\EnforceTenantIsolation;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Which paths are reachable WITHOUT a session, asked of the middleware that
@@ -47,7 +48,7 @@ final class PublicRouteReachabilityTest extends TestCase
         yield 'a student redeeming an activation code' => ['/api/v1/public/licensing/redeem'];
     }
 
-    /** @dataProvider pathsWithNoPossibleSession */
+    #[DataProvider('pathsWithNoPossibleSession')]
     public function testAPathWithNoPossibleSessionIsReachable(string $path): void
     {
         self::assertTrue(
@@ -65,9 +66,8 @@ final class PublicRouteReachabilityTest extends TestCase
      * public reachability silently. The payment surface is where that mistake
      * would be most expensive, so anything deeper than the provider name must
      * still be refused.
-     *
-     * @dataProvider pathsThatMustStayPrivate
      */
+    #[DataProvider('pathsThatMustStayPrivate')]
     public function testTheOpeningDoesNotExtendBeyondTheCallbackItself(string $path): void
     {
         self::assertFalse(

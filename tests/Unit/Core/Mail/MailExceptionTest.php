@@ -6,6 +6,7 @@ namespace Tests\Unit\Core\Mail;
 
 use PHPUnit\Framework\TestCase;
 use Whity\Core\Mail\MailException;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * {@see MailException::publicHint()} maps the (safe) internal message to a
@@ -31,9 +32,7 @@ final class MailExceptionTest extends TestCase
         ];
     }
 
-    /**
-     * @dataProvider cases
-     */
+    #[DataProvider('cases')]
     public function testPublicHintCategorises(string $message, string $expectedFragment): void
     {
         self::assertStringContainsString($expectedFragment, (new MailException($message))->publicHint());

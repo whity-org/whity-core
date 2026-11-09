@@ -11,6 +11,7 @@ use Whity\Sdk\Audience\AudienceRuleContext;
 use Whity\Sdk\Audience\AudienceRuleResolverInterface;
 use Whity\Sdk\Routing\RoutingRuleContext;
 use Whity\Sdk\Routing\RoutingRuleResolverInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * {@see ExplicitRuleResolver} — the enumerated case, expressed as a RULE (#999).
@@ -132,9 +133,7 @@ final class ExplicitRuleResolverTest extends TestCase
         (new ExplicitRuleResolver())->validate(['profile_ids' => ['a' => 11]]);
     }
 
-    /**
-     * @dataProvider notAProfileId
-     */
+    #[DataProvider('notAProfileId')]
     public function testAnEntryThatIsNotAPositiveWholeNumberIsRefused(mixed $entry): void
     {
         $this->expectException(InvalidArgumentException::class);

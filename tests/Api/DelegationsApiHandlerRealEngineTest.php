@@ -16,6 +16,7 @@ use Whity\Core\RBAC\PermissionRegistry;
 use Whity\Core\Request;
 use Whity\Core\Tenant\TenantContext;
 use Whity\Database\Database;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Real-engine (in-memory SQLite) tests for {@see DelegationsApiHandler} (WC-34).
@@ -252,9 +253,9 @@ final class DelegationsApiHandlerRealEngineTest extends TestCase
      * Every key the endpoint offers actually reorders the list, and the default
      * is the `granted_at DESC` this table has always been read with.
      *
-     * @dataProvider delegationSortCases
      * @param list<string> $expected Permissions in the order the endpoint must return them.
      */
+    #[DataProvider('delegationSortCases')]
     public function testEachSortKeyReordersTheList(string $query, array $expected): void
     {
         $this->seedSortableDelegations();

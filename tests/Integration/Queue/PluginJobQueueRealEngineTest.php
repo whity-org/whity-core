@@ -16,6 +16,7 @@ use Whity\Sdk\JobInterface;
 use Whity\Sdk\Jobs\JobQueue;
 use Whity\Sdk\PluginInterface;
 use Whity\Sdk\PluginJobsInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * A plugin's own jobs (WHIT-1031), against the migration-built schema: enqueued
@@ -46,7 +47,7 @@ final class PluginJobQueueRealEngineTest extends TestCase
         self::assertSame(['page' => 1], $row['payload']);
     }
 
-    /** @dataProvider notItsOwn */
+    #[DataProvider('notItsOwn')]
     public function testOnlyThePluginsOwnDeclaredJobsCanBeEnqueued(string $name): void
     {
         try {
@@ -120,7 +121,7 @@ final class PluginJobQueueRealEngineTest extends TestCase
         self::assertSame(['done' => 3], $status->result);
     }
 
-    /** @dataProvider noWorkspace */
+    #[DataProvider('noWorkspace')]
     public function testNoWorkspaceIsRefused(?int $tenant): void
     {
         $queue = $this->queue('jobs-acme');

@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 use Whity\Core\Container\HostWiredService;
 use Whity\Core\TimeWindow\InvalidWindowTypeException;
 use Whity\Core\TimeWindow\WindowTypeRegistry;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * The declarable TIME-WINDOW TYPE catalogue (#1070).
@@ -290,9 +291,7 @@ final class WindowTypeRegistryTest extends TestCase
         );
     }
 
-    /**
-     * @dataProvider malformedSlugProvider
-     */
+    #[DataProvider('malformedSlugProvider')]
     public function testMalformedSlugsAreRefused(string $slug): void
     {
         self::assertFalse(WindowTypeRegistry::isValidSlug($slug));
@@ -313,9 +312,7 @@ final class WindowTypeRegistryTest extends TestCase
         ];
     }
 
-    /**
-     * @dataProvider keyValidityProvider
-     */
+    #[DataProvider('keyValidityProvider')]
     public function testKeyValidity(string $key, bool $valid): void
     {
         self::assertSame($valid, WindowTypeRegistry::isValidKey($key));

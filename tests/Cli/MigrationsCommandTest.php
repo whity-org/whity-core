@@ -6,6 +6,7 @@ use PHPUnit\Framework\TestCase;
 use Tests\Support\RequiresConfiguredDatabase;
 use Whity\Database\Database;
 use Whity\Cli\Commands\MigrationsCommand;
+use PHPUnit\Framework\Attributes\RequiresPhpExtension;
 
 /**
  * Tests for MigrationsCommand CLI handler
@@ -50,9 +51,8 @@ class MigrationsCommandTest extends TestCase
 
     /**
      * Test migration status with database available
-     *
-     * @requires extension pdo_pgsql
      */
+    #[RequiresPhpExtension('pdo_pgsql')]
     public function testMigrationStatusWithDatabase(): void
     {
         // Skips only when nothing says where a database is; fails loudly when
@@ -73,9 +73,8 @@ class MigrationsCommandTest extends TestCase
 
     /**
      * Test migration run with database available
-     *
-     * @requires extension pdo_pgsql
      */
+    #[RequiresPhpExtension('pdo_pgsql')]
     public function testMigrationRunWithDatabase(): void
     {
         // Skips only when nothing says where a database is; fails loudly when

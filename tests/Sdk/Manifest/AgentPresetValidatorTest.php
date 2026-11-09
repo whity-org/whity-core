@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 use Whity\Sdk\Manifest\AgentPresetValidator;
 use Whity\Sdk\Manifest\ManifestValidator;
 use Whity\Sdk\Manifest\PluginManifest;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * `agentPresets` in plugin.json (SDK 1.61, WHIT-818), including owner decision
@@ -58,9 +59,9 @@ final class AgentPresetValidatorTest extends TestCase
     }
 
     /**
-     * @dataProvider writesStartingAllowed
      * @param array<string, string> $grant
      */
+    #[DataProvider('writesStartingAllowed')]
     public function testAWriteCanNeverStartAllowed(array $grant, string $message): void
     {
         self::assertStringContainsString($message, implode("\n", self::errors(self::preset(['grant' => $grant]))));
@@ -83,9 +84,9 @@ final class AgentPresetValidatorTest extends TestCase
     }
 
     /**
-     * @dataProvider invalid
      * @param array<string, mixed> $preset
      */
+    #[DataProvider('invalid')]
     public function testInvalidPresetsAreRefused(array $preset): void
     {
         self::assertNotSame([], self::errors($preset));
