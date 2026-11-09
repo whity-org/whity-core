@@ -554,6 +554,20 @@ jobs:
           docker pull "${{ steps.image.outputs.web }}:${{ needs.resolve.outputs.tag }}"
           docker pull "${{ steps.image.outputs.render }}:${{ needs.resolve.outputs.tag }}"
 
+      # The rest of this job is a fresh install, which is the one deployment that
+      # can never hit an upgrade bug: v0.2.27 passed it and then crash-looped on
+      # every existing database. This is that upgrade, on the image being
+      # released. The latest GitHub Release is still the previous one here,
+      # because this job gates the step that creates the new one.
+      - name: Checkout the upgrade check
+        uses: actions/checkout@v7
+
+      - name: Upgrade from the previous release boots and migrates
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WHITY_UPGRADE_TO_IMAGE: ${{ steps.image.outputs.name }}:${{ needs.resolve.outputs.tag }}
+        run: bash scripts/ci-upgrade-boot-check.sh
+
       # Run migrations and seed inside the release image on the same network so
       # the app can reach Postgres by the container name `postgres`. APP_ENV is
       # set to `development` so the seed command actually inserts the initial

@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Whity\Core\Plugin\Trust;
 
 use PDO;
+use PDOException;
 use Whity\Core\Audit\AuditLoggerInterface;
+use Whity\Database\UndefinedTable;
 
 /**
  * Which code plugins the operator trusts to put text in front of AI agents
@@ -39,16 +41,29 @@ final class AgentContextGrants
      */
     public function isGranted(string $plugin): bool
     {
-        $stmt = $this->db->prepare('SELECT 1 FROM plugin_agent_context_grants WHERE plugin_name = ?');
-        $stmt->execute([$plugin]);
+        try {
+            $stmt = $this->db->prepare('SELECT 1 FROM plugin_agent_context_grants WHERE plugin_name = ?');
+            $stmt->execute([$plugin]);
+            $found = $stmt->fetchColumn() !== false;
+        } catch (PDOException $e) {
+            self::rethrowUnlessNotMigrated($e);
 
-        return $stmt->fetchColumn() !== false && $this->verification->isVerified($plugin);
+            return false;
+        }
+
+        return $found && $this->verification->isVerified($plugin);
     }
 
     /** @return list<string> the plugins that may reach agents now: granted and still Verified */
     public function granted(): array
     {
-        $rows = $this->db->query('SELECT plugin_name FROM plugin_agent_context_grants ORDER BY plugin_name');
+        try {
+            $rows = $this->db->query('SELECT plugin_name FROM plugin_agent_context_grants ORDER BY plugin_name');
+        } catch (PDOException $e) {
+            self::rethrowUnlessNotMigrated($e);
+
+            return [];
+        }
         if ($rows === false) {
             return [];
         }
@@ -62,7 +77,13 @@ final class AgentContextGrants
     /** @return list<array{plugin: string, grantedBy: int|null, grantedAt: string}> */
     public function list(): array
     {
-        $rows = $this->db->query('SELECT plugin_name, granted_by_profile_id, granted_at FROM plugin_agent_context_grants ORDER BY plugin_name');
+        try {
+            $rows = $this->db->query('SELECT plugin_name, granted_by_profile_id, granted_at FROM plugin_agent_context_grants ORDER BY plugin_name');
+        } catch (PDOException $e) {
+            self::rethrowUnlessNotMigrated($e);
+
+            return [];
+        }
         if ($rows === false) {
             return [];
         }
@@ -72,6 +93,18 @@ final class AgentContextGrants
             'grantedBy' => $row['granted_by_profile_id'] === null ? null : (int) $row['granted_by_profile_id'],
             'grantedAt' => (string) $row['granted_at'],
         ], $rows->fetchAll(PDO::FETCH_ASSOC)));
+    }
+
+    /**
+     * The worker reads the grants while it boots, and on an upgrade it boots
+     * before `migrate run`. A table that is not there yet means nothing has been
+     * granted, which is also the safe answer. Every other database error is real.
+     */
+    private static function rethrowUnlessNotMigrated(PDOException $e): void
+    {
+        if (!UndefinedTable::is($e, 'plugin_agent_context_grants')) {
+            throw $e;
+        }
     }
 
     /**
