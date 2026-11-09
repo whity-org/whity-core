@@ -191,7 +191,7 @@ final class CatalogueImporterRealEngineTest extends TestCase
 
     public function testTheShippedExampleIsValid(): void
     {
-        $raw = (string) file_get_contents(__DIR__ . '/../../docs/examples/billing-catalogue.example.json');
+        $raw = (string) file_get_contents(__DIR__ . '/../../docs/billing-catalogue.example.json');
 
         self::assertSame([], CatalogueImporter::problems(json_decode($raw, true, 32, JSON_THROW_ON_ERROR)));
     }
