@@ -5,6 +5,7 @@ namespace Whity\Tests\Cli;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\RequiresConfiguredDatabase;
 use Whity\Cli\Commands\SeedCommand;
+use PHPUnit\Framework\Attributes\RequiresPhpExtension;
 
 /**
  * Tests for SeedCommand CLI handler
@@ -30,9 +31,8 @@ class SeedCommandTest extends TestCase
 
     /**
      * Test seed command with database available
-     *
-     * @requires extension pdo_pgsql
      */
+    #[RequiresPhpExtension('pdo_pgsql')]
     public function testSeedCommandWithDatabase(): void
     {
         // Skips only when nothing says where a database is; fails loudly when

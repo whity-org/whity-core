@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 use Whity\Core\Request;
 use Whity\Core\Response;
 use Whity\Http\Middleware\CsrfGuard;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * WC-160 CSRF defense-in-depth for the state-changing auth endpoints.
@@ -56,9 +57,8 @@ class CsrfGuardTest extends TestCase
     /**
      * A forged cross-site POST (no custom header — exactly what an attacker's
      * auto-submitting form produces) is refused with 403 before the handler.
-     *
-     * @dataProvider protectedAuthPosts
      */
+    #[DataProvider('protectedAuthPosts')]
     public function testRejectsAuthPostWithoutCsrfHeader(string $path): void
     {
         $request = new Request('POST', $path, ['Content-Type' => 'application/json'], '{}');
@@ -74,9 +74,8 @@ class CsrfGuardTest extends TestCase
 
     /**
      * The same POSTs WITH the custom header pass through untouched.
-     *
-     * @dataProvider protectedAuthPosts
      */
+    #[DataProvider('protectedAuthPosts')]
     public function testAllowsAuthPostWithCsrfHeader(string $path): void
     {
         $request = new Request(

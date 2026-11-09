@@ -8,6 +8,7 @@ use PDO;
 use PHPUnit\Framework\TestCase;
 use Whity\Cli\Commands\MigrationsCommand;
 use Whity\Database\Database;
+use PHPUnit\Framework\Attributes\RequiresPhpExtension;
 
 /**
  * Live forward + rollback cycle tests for the RBAC schema migrations (WC-12).
@@ -19,9 +20,8 @@ use Whity\Database\Database;
  *
  * To run locally against a disposable database, export:
  *   DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD
- *
- * @requires extension pdo_pgsql
  */
+#[RequiresPhpExtension('pdo_pgsql')]
 final class MigrationCycleTest extends TestCase
 {
     private const RBAC_TABLES = [

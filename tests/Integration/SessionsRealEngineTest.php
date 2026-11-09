@@ -303,7 +303,7 @@ final class SessionsRealEngineTest extends TestCase
                 two_factor_backup_codes_version, token_epoch, created_at, updated_at)
              VALUES (?, ?, false, 0, 0, datetime('now'), datetime('now'))"
         );
-        $stmt->execute([$email, password_hash('secret-123', PASSWORD_BCRYPT)]);
+        $stmt->execute([$email, password_hash('secret-123', PASSWORD_BCRYPT, ['cost' => 4])]);
         $profileId = (int) $this->pdo->lastInsertId();
 
         $this->pdo->prepare(

@@ -7,6 +7,7 @@ namespace Tests\Unit\Core\Affiliate;
 use DateTimeImmutable;
 use PHPUnit\Framework\TestCase;
 use Whity\Core\Affiliate\CommissionCalculator;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * The arithmetic somebody will one day check by hand against their statement.
@@ -25,9 +26,7 @@ final class CommissionCalculatorTest extends TestCase
         self::assertSame(3000, CommissionCalculator::amountFor(15000, 2000));
     }
 
-    /**
-     * @dataProvider rates
-     */
+    #[DataProvider('rates')]
     public function testKnownRates(int $base, int $rateBp, int $expected): void
     {
         self::assertSame($expected, CommissionCalculator::amountFor($base, $rateBp));

@@ -7,6 +7,7 @@ namespace Tests\Sdk\Frontend;
 use PHPUnit\Framework\TestCase;
 use Whity\Sdk\Frontend\Blocks\BlockContract;
 use Whity\Sdk\Frontend\Blocks\BlockValidator;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * WC-225: SDK plugin-UI block contract + validator (SP1 slice 1).
@@ -107,10 +108,10 @@ final class BlockValidatorTest extends TestCase
      * Each provided value is a single (malformed) NODE; we wrap it in a
      * one-element list so the validator is exercised on a real tree shape.
      *
-     * @dataProvider malformedNodes
      *
      * @param mixed $node
      */
+    #[DataProvider('malformedNodes')]
     public function testNeverThrowsOnMalformedInput(mixed $node): void
     {
         $result = BlockValidator::validate([$node]);
@@ -707,10 +708,10 @@ final class BlockValidatorTest extends TestCase
      * twins are guarded independently — otherwise the same sentence would be
      * refused in one place and permitted three lines away.
      *
-     * @dataProvider callerFlagBindingProvider
      *
      * @param array<string, mixed> $node
      */
+    #[DataProvider('callerFlagBindingProvider')]
     public function testACallerPermissionFieldCannotBeBoundAsAFact(array $node, string $expectedField): void
     {
         $result = BlockValidator::validate([$node]);
@@ -759,9 +760,8 @@ final class BlockValidatorTest extends TestCase
      * The same flag arrives spelled differently from different serializers, and
      * a guard that only knows one spelling fails on the payload shape it was not
      * written against.
-     *
-     * @dataProvider callerFlagSpellingProvider
      */
+    #[DataProvider('callerFlagSpellingProvider')]
     public function testCallerPermissionFieldsAreMatchedAcrossSpellings(string $spelling): void
     {
         $result = BlockValidator::validate([[
@@ -796,9 +796,8 @@ final class BlockValidatorTest extends TestCase
      * `issued` is not `sued` — the `is`/`has` prefix is tried as a SECOND
      * candidate rather than stripped unconditionally — and a field whose name
      * merely CONTAINS a reserved word is a different field.
-     *
-     * @dataProvider honestFieldProvider
      */
+    #[DataProvider('honestFieldProvider')]
     public function testHonestFieldNamesAreNotRefused(string $field): void
     {
         $result = BlockValidator::validate([[
@@ -1027,9 +1026,8 @@ final class BlockValidatorTest extends TestCase
      * A `recordPath` accepts an ordinary owned API path, with or without context
      * tokens — a singleton record source is judged exactly as a collection
      * source is.
-     *
-     * @dataProvider recordPathProvider
      */
+    #[DataProvider('recordPathProvider')]
     public function testRecordPathShapes(string $source, bool $valid): void
     {
         $result = BlockValidator::validate([[

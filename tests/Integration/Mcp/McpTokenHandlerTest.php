@@ -399,7 +399,7 @@ final class McpTokenHandlerTest extends TestCase
         $this->pdo->exec("INSERT INTO tenants (id, name) VALUES (1, 'Test') ON CONFLICT DO NOTHING");
         $this->pdo->exec("INSERT INTO roles (id, name) VALUES (1, 'admin') ON CONFLICT DO NOTHING");
 
-        $hash = password_hash('pw', PASSWORD_BCRYPT);
+        $hash = password_hash('pw', PASSWORD_BCRYPT, ['cost' => 4]);
 
         // Seed profiles for both test subjects.
         $this->pdo->prepare("

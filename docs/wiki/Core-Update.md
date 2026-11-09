@@ -178,10 +178,30 @@ For a compose-based deployment (the per-product deployment anatomy in
    same step; leaving it behind is a silent export-drift bug, not an
    outage.)
 
-3. **Run migrations** (also applies any new migrations from installed
-   plugins): `php public/index.php migrate run` — in compose,
-   `docker exec <app>_frankenphp php public/index.php migrate run`.
-   This also loads the release's new labels in every language, and leaves
+3. **Run migrations, using the new version** (also applies any new migrations
+   from installed plugins). This has to be the new code, so how you run it
+   depends on the deployment:
+
+   - **Source checkout**, after the checkout in step 2:
+     `docker exec <app>_frankenphp php public/index.php migrate run`, or
+     `php public/index.php migrate run` outside compose.
+   - **Container image**, after changing the image references in step 2, in a
+     one-off container of the new image:
+
+     ```bash
+     docker compose -p <app> run --rm frankenphp php public/index.php migrate run
+     ```
+
+     `docker exec` is the wrong command here. It runs inside the container that
+     is already up, which is still the old image until step 6, so it applies the
+     old release's migrations (none) and reports success.
+
+   The one-off container also works when the app container will not start, which
+   is the way out if an upgrade leaves it restarting.
+   **v0.2.27 is such an upgrade:** its app container cannot start on a database
+   that has not been migrated to it, so run this before starting it.
+
+   Migrating also loads the release's new labels in every language, and leaves
    strings edited in `/admin/translations` alone. A running app reads labels
    when it starts, so restart it if it's already on the new version.
 
@@ -285,7 +305,7 @@ For a compose-based deployment (the per-product deployment anatomy in
      so the old build serves indefinitely and `/api/health` stays green. In an
      image deployment `checkout_commit` is `null` and there is nothing to
      compare — `booted_at` is the field to read instead.
-   - `pending_migration_count` **must be 0.** Anything else means step 4 did
+   - `pending_migration_count` **must be 0.** Anything else means step 3 did
      not run or did not finish: the code is new and the schema is not, which
      500s the first query against a table the update added. Staging was found
      15 migrations behind its own checkout in exactly this state, by hand,

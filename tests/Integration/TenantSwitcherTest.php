@@ -497,7 +497,7 @@ final class TenantSwitcherTest extends TestCase
                 two_factor_backup_codes_version, token_epoch, created_at, updated_at)
              VALUES (?, ?, false, 0, 0, datetime('now'), datetime('now'))"
         );
-        $stmt->execute([$displayName, password_hash(self::PASSWORD, PASSWORD_BCRYPT)]);
+        $stmt->execute([$displayName, password_hash(self::PASSWORD, PASSWORD_BCRYPT, ['cost' => 4])]);
         $profileId = (int) $this->pdo->lastInsertId();
 
         $emailStmt = $this->pdo->prepare(

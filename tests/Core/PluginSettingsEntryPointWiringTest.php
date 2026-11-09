@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Core;
 
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * #713 item 1: both entry points must build the settings catalogue, and build it
@@ -42,9 +43,7 @@ final class PluginSettingsEntryPointWiringTest extends TestCase
         ];
     }
 
-    /**
-     * @dataProvider entryPoints
-     */
+    #[DataProvider('entryPoints')]
     public function testBothEntryPointsRegisterThePluginSettingsRegistry(string $path, string $label): void
     {
         $source = $this->read($path);
@@ -57,9 +56,7 @@ final class PluginSettingsEntryPointWiringTest extends TestCase
         );
     }
 
-    /**
-     * @dataProvider entryPoints
-     */
+    #[DataProvider('entryPoints')]
     public function testBothEntryPointsRegisterTheUnionCatalogue(string $path, string $label): void
     {
         $source = $this->read($path);
@@ -80,9 +77,7 @@ final class PluginSettingsEntryPointWiringTest extends TestCase
         );
     }
 
-    /**
-     * @dataProvider entryPoints
-     */
+    #[DataProvider('entryPoints')]
     public function testBothEntryPointsPassTheRegistryToThePluginLoader(string $path, string $label): void
     {
         $source = $this->read($path);
@@ -101,9 +96,8 @@ final class PluginSettingsEntryPointWiringTest extends TestCase
      * it. A settings service built without it silently resolves core-only, so
      * every plugin key would read as its default forever — values written to the
      * database and never read back.
-     *
-     * @dataProvider entryPoints
      */
+    #[DataProvider('entryPoints')]
     public function testBothEntryPointsGiveTheCatalogueToTheSettingsService(string $path, string $label): void
     {
         $source = $this->read($path);

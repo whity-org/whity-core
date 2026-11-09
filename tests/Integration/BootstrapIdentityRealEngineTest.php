@@ -13,6 +13,7 @@ use Whity\Auth\TokenValidator;
 use Whity\Core\Request;
 use Whity\Database\Database;
 use Whity\Database\Seeder;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * WC-779 (secondary): the bootstrap identity is configurable, the dev fixtures
@@ -255,7 +256,7 @@ final class BootstrapIdentityRealEngineTest extends TestCase
         yield 'staging'    => ['staging'];
     }
 
-    /** @dataProvider nonDevelopmentEnvironments */
+    #[DataProvider('nonDevelopmentEnvironments')]
     public function testSeederOmitsDevFixturesOutsideDevelopment(string $appEnv): void
     {
         $this->putEnv('APP_ENV', $appEnv);
@@ -421,7 +422,7 @@ final class BootstrapIdentityRealEngineTest extends TestCase
               WHERE id = (SELECT profile_id FROM profile_emails WHERE email = :email)'
         );
         $stmt->execute([
-            ':hash'  => password_hash($plaintext, PASSWORD_BCRYPT),
+            ':hash'  => password_hash($plaintext, PASSWORD_BCRYPT, ['cost' => 4]),
             ':email' => $email,
         ]);
     }

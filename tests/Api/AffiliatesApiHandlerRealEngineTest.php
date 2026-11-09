@@ -15,6 +15,7 @@ use Whity\Core\RBAC\PermissionRegistry;
 use Whity\Core\Request;
 use Whity\Core\Tenant\TenantContext;
 use Whity\Database\Database;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * The operator surface over the people who send us customers.
@@ -171,9 +172,8 @@ final class AffiliatesApiHandlerRealEngineTest extends TestCase
      * A CODE TRAVELS IN A URL AND IS TYPED BY HAND. Anything needing escaping
      * produces a link that breaks in somebody's email client, and the affiliate
      * is the last person to find out.
-     *
-     * @dataProvider codesThatWouldBreakALink
      */
+    #[DataProvider('codesThatWouldBreakALink')]
     public function testACodeThatWouldNotSurviveALinkIsRefused(string $code): void
     {
         $res = $this->create(['code' => $code, 'name' => 'A', 'commission_bp' => 1000]);
@@ -239,9 +239,8 @@ final class AffiliatesApiHandlerRealEngineTest extends TestCase
      * BASIS POINTS, AND THE REFUSAL SAYS SO. A caller sending 20 for "twenty
      * per cent" creates a 0.2% affiliate — nothing errors, the screen shows a
      * number, and it surfaces in somebody's first statement.
-     *
-     * @dataProvider ratesThatAreNotRates
      */
+    #[DataProvider('ratesThatAreNotRates')]
     public function testARateOutsideTheAllowedRangeIsRefused(mixed $rate): void
     {
         $res = $this->create(['code' => 'A', 'name' => 'A', 'commission_bp' => $rate]);
@@ -273,9 +272,7 @@ final class AffiliatesApiHandlerRealEngineTest extends TestCase
         ])->getStatusCode());
     }
 
-    /**
-     * @dataProvider windowsThatAreNotWindows
-     */
+    #[DataProvider('windowsThatAreNotWindows')]
     public function testAnImpossibleWindowIsRefused(mixed $window): void
     {
         $res = $this->create([

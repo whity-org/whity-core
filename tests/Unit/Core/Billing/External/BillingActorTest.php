@@ -6,6 +6,7 @@ namespace Tests\Unit\Core\Billing\External;
 
 use PHPUnit\Framework\TestCase;
 use Whity\Core\Billing\External\BillingActor;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Who asked for a change, in terms the billing service can write down.
@@ -92,9 +93,8 @@ final class BillingActorTest extends TestCase
      * A NEWLINE IS THE ONE THAT MATTERS. Their audit entry is a single line, so
      * `profile:1\nclient:someone-else` would forge a second one — an actor who
      * never acted, in a log somebody trusts.
-     *
-     * @dataProvider valuesThatAreNotPrintableAscii
      */
+    #[DataProvider('valuesThatAreNotPrintableAscii')]
     public function testAValueThatCouldForgeALogLineIsRefused(string $value): void
     {
         $this->expectExceptionMessageMatches('/printable ASCII/');

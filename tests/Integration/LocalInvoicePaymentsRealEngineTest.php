@@ -9,6 +9,7 @@ use PHPUnit\Framework\TestCase;
 use Tests\Support\SchemaFromMigrations;
 use Whity\Core\Affiliate\LocalInvoicePayments;
 use Whity\Core\Affiliate\ReferredPayment;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Reading a referred workspace's payments out of this deployment's own invoices.
@@ -118,9 +119,8 @@ final class LocalInvoicePaymentsRealEngineTest extends TestCase
      * commission on it would mean paying out of money that may never arrive —
      * from a customer who, on this path, is about to be chased for it by the
      * dunning machine.
-     *
-     * @dataProvider invoicesThatAreNotRevenue
      */
+    #[DataProvider('invoicesThatAreNotRevenue')]
     public function testAnInvoiceThatIsNotPaidIsNotAPayment(string $status): void
     {
         $this->invoice('INV-1', status: $status, subtotal: 15000, paidAt: null);
@@ -262,9 +262,8 @@ final class LocalInvoicePaymentsRealEngineTest extends TestCase
      * refund that has been initiated and not yet settled is money still with us;
      * treating it as gone would claw back a commission on the strength of
      * somebody having clicked refund.
-     *
-     * @dataProvider unsettledRefunds
      */
+    #[DataProvider('unsettledRefunds')]
     public function testARefundThatHasNotSettledDoesNotCountYet(string $status): void
     {
         $this->paidInvoice('INV-1', subtotal: 15000, tax: 0);

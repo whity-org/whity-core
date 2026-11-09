@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Whity\Tests\Cli;
 
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * #844: the CLI kernel must subscribe the audit writer to core's CRUD hooks,
@@ -107,9 +108,8 @@ final class CliAuditWiringTest extends TestCase
      * commands extend BaseCommand for its wiring, which would silently turn a
      * bootstrap into hundreds of actor-less `user.created` rows and bury the
      * first genuine administrator action under fixture noise.
-     *
-     * @dataProvider unauditedCommandProvider
      */
+    #[DataProvider('unauditedCommandProvider')]
     public function testSeedingAndMigrationsBuildNoAuditWriter(string $file): void
     {
         $source = $this->read(__DIR__ . '/../../src/Cli/Commands/' . $file);

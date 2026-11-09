@@ -68,6 +68,11 @@ final class CoreApiSchemas
     {
         $noop = static fn (): Response => new Response(501, '');
 
+        // One array shared by every route. components() builds a new 1.2 MB
+        // array on each call, and each route keeps what it is given: 533 routes
+        // held 640 MB.
+        $components = self::components();
+
         foreach (self::routes() as $route) {
             $unversioned = $route['unversioned'] ?? false;
             if ($unversioned) {
@@ -78,7 +83,7 @@ final class CoreApiSchemas
                     $route['requiredRole'],
                     null,
                     $route['requiredPermission'],
-                    $route['schema'] + ['components' => self::components()]
+                    $route['schema'] + ['components' => $components]
                 );
             } else {
                 $router->register(
@@ -88,7 +93,7 @@ final class CoreApiSchemas
                     $route['requiredRole'],
                     null,
                     $route['requiredPermission'],
-                    $route['schema'] + ['components' => self::components()]
+                    $route['schema'] + ['components' => $components]
                 );
             }
         }

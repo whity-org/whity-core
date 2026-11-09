@@ -9,6 +9,7 @@ use PHPUnit\Framework\TestCase;
 use Tests\Support\SchemaFromMigrations;
 use Whity\Core\RBAC\CorePermissions;
 use Whity\OpenAPI\CoreApiSchemas;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * The roles routes are gated on permission slugs, and the seeded admin still
@@ -156,9 +157,8 @@ final class RolesRouteGatesRealEngineTest extends TestCase
 
     /**
      * No roles route may go back to a role-name gate.
-     *
-     * @dataProvider rolesRoutes
      */
+    #[DataProvider('rolesRoutes')]
     public function testEveryRolesRouteIsGatedOnAPermissionAndNotARole(string $key, string $expected): void
     {
         $declaration = $this->routeDeclaration($key);

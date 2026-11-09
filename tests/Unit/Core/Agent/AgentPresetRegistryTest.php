@@ -11,6 +11,7 @@ use Whity\Mcp\Tools\CoreToolsets;
 use Whity\OpenAPI\CoreApiSchemas;
 use Whity\Sdk\Manifest\ManifestValidator;
 use Whity\Sdk\Manifest\PluginManifest;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Core's agent presets (WHIT-815, database/agent-presets) are our own data, so
@@ -145,9 +146,9 @@ final class AgentPresetRegistryTest extends TestCase
     }
 
     /**
-     * @dataProvider badPluginPresets
      * @param array<string, mixed> $overrides
      */
+    #[DataProvider('badPluginPresets')]
     public function testABadPluginPresetIsDroppedWithAReason(array $overrides, string $reason): void
     {
         $registry = new AgentPresetRegistry();

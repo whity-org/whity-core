@@ -18,6 +18,7 @@ use Whity\Core\Document\Routing\RoutingRuleRegistry;
 use Whity\Sdk\Routing\ResolvedRecipient;
 use Whity\Sdk\Routing\RoutingRuleContext;
 use Whity\Sdk\Routing\RoutingRuleResolverInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * {@see RoutingRuleRegistry} — the catalogue of declarable routing rule kinds
@@ -163,9 +164,7 @@ final class RoutingRuleRegistryTest extends TestCase
         );
     }
 
-    /**
-     * @dataProvider malformedSlugs
-     */
+    #[DataProvider('malformedSlugs')]
     public function testAMalformedSlugIsRefused(string $slug): void
     {
         $registry = $this->withCoreRules();
@@ -274,9 +273,7 @@ final class RoutingRuleRegistryTest extends TestCase
         );
     }
 
-    /**
-     * @dataProvider kindValidity
-     */
+    #[DataProvider('kindValidity')]
     public function testIsValidKindMatchesWhatTheColumnMustHold(string $kind, bool $valid): void
     {
         self::assertSame($valid, RoutingRuleRegistry::isValidKind($kind));

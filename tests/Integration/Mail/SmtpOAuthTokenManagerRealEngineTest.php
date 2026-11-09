@@ -23,6 +23,7 @@ use Whity\Core\Settings\SettingsRegistry;
 use Whity\Core\Settings\SettingsService;
 use Whity\Core\Settings\SettingsValidationException;
 use Whity\Core\Settings\TenantSettingsRepository;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 require_once __DIR__ . '/../../Support/FakeOAuth/ScriptedTokenHttp.php';
 
@@ -413,8 +414,7 @@ final class SmtpOAuthTokenManagerRealEngineTest extends TestCase
         yield 'newline after a guid' => [SettingsRegistry::MAIL_OAUTH_MICROSOFT_TENANT, "11111111-2222-3333-4444-555555555555\n"];
     }
 
-    /** @dataProvider badSettings */
-    #[\PHPUnit\Framework\Attributes\DataProvider('badSettings')]
+    #[DataProvider('badSettings')]
     public function testSettingsCannotSteerTheTokenRequestAnywhereElse(string $key, string $value): void
     {
         $this->expectException(SettingsValidationException::class);

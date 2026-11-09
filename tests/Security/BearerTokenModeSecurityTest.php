@@ -471,7 +471,7 @@ class BearerTokenModeSecurityTest extends TestCase
             "INSERT INTO profiles (id, display_name, password_hash, two_factor_enabled,
                 two_factor_backup_codes_version, token_epoch, created_at, updated_at)
              VALUES (?, ?, ?, false, 0, 0, datetime('now'), datetime('now'))"
-        )->execute([self::USER_ID, 'secbearer', password_hash(self::PASSWORD, PASSWORD_BCRYPT)]);
+        )->execute([self::USER_ID, 'secbearer', password_hash(self::PASSWORD, PASSWORD_BCRYPT, ['cost' => 4])]);
 
         $pdo->prepare(
             "INSERT INTO profile_emails (profile_id, email, verified, is_primary, created_at)
@@ -488,7 +488,7 @@ class BearerTokenModeSecurityTest extends TestCase
             "INSERT INTO profiles (id, display_name, password_hash, two_factor_enabled,
                 two_factor_backup_codes_version, token_epoch, created_at, updated_at)
              VALUES (?, ?, ?, false, 0, 0, datetime('now'), datetime('now'))"
-        )->execute([self::SWITCH_USER_ID, 'switchbearer', password_hash(self::PASSWORD, PASSWORD_BCRYPT)]);
+        )->execute([self::SWITCH_USER_ID, 'switchbearer', password_hash(self::PASSWORD, PASSWORD_BCRYPT, ['cost' => 4])]);
 
         $pdo->prepare(
             "INSERT INTO profile_emails (profile_id, email, verified, is_primary, created_at)

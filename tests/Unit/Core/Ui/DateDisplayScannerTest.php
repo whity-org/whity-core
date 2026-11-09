@@ -6,6 +6,7 @@ namespace Tests\Unit\Core\Ui;
 
 use PHPUnit\Framework\TestCase;
 use Whity\Core\Ui\DateDisplayScanner;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Detection-logic tests for the #1068 date-display guard.
@@ -305,9 +306,8 @@ final class DateDisplayScannerTest extends TestCase
      * copies are kept in step by hand — a PHP CI job cannot call the TypeScript
      * one — so a change to either that is not mirrored fails a test rather than
      * going quiet.
-     *
-     * @dataProvider fieldNames
      */
+    #[DataProvider('fieldNames')]
     public function testFieldNameHeuristic(string $name, bool $isDate): void
     {
         self::assertSame($isDate, DateDisplayScanner::isDateFieldName($name), $name);

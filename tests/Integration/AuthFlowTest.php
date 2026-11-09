@@ -299,7 +299,7 @@ class AuthFlowTest extends TestCase
         )->execute([
             self::TEST_USER_ID,
             'testuser',
-            password_hash(self::TEST_USER_PASSWORD, PASSWORD_BCRYPT),
+            password_hash(self::TEST_USER_PASSWORD, PASSWORD_BCRYPT, ['cost' => 4]),
         ]);
 
         $pdo->prepare(

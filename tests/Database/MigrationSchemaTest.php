@@ -6,6 +6,7 @@ namespace Whity\Tests\Database;
 
 use PHPUnit\Framework\TestCase;
 use Whity\Database\Database;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Structural tests for the RBAC schema migrations (WC-12).
@@ -161,6 +162,7 @@ final class MigrationSchemaTest extends TestCase
         // it. A branch may run as far ahead as it likes; removing 050 still
         // fails.
         $this->assertNotEmpty($prefixes);
+        assert($prefixes !== []);
         $highest = max($prefixes);
         $missing = array_values(array_diff(range(1, $highest), $prefixes));
 
@@ -214,9 +216,7 @@ final class MigrationSchemaTest extends TestCase
         );
     }
 
-    /**
-     * @dataProvider migrationFileProvider
-     */
+    #[DataProvider('migrationFileProvider')]
     public function testMigrationClassExposesUpAndDownMethods(string $file): void
     {
         $className = $this->loadMigrationClass($file);
@@ -846,9 +846,8 @@ final class MigrationSchemaTest extends TestCase
      * notation so a fresh database matches the RBAC registry (issue #55). The
      * after-the-fact dot->colon normalisation migration was removed because the
      * seeds now emit colon notation at source.
-     *
-     * @dataProvider permissionNotationProvider
      */
+    #[DataProvider('permissionNotationProvider')]
     public function testSeedMigrationsUseColonNotation(string $dotForm, string $colonForm): void
     {
         $seedSql = $this->readFile('002_create_permissions.php')
@@ -909,9 +908,8 @@ final class MigrationSchemaTest extends TestCase
      * Proves the dot<->colon transform is a correct, idempotent and reversible
      * round-trip for every core permission. Although the runtime normalisation
      * migration was removed, this guards the canonical mapping the seeds rely on.
-     *
-     * @dataProvider permissionNotationProvider
      */
+    #[DataProvider('permissionNotationProvider')]
     public function testDotColonTransformRoundTrips(string $dotForm, string $colonForm): void
     {
         $resources = ['users', 'roles', 'tenants', 'ous', 'permissions', 'plugins'];

@@ -7,6 +7,7 @@ namespace Tests\Unit\Sdk\Schema;
 use PHPUnit\Framework\TestCase;
 use Whity\Sdk\Schema\ReferenceDeclarations;
 use Whity\Sdk\Schema\UndeclaredReferenceLinter;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Teeth AND restraint. Both halves matter and each is worthless without the
@@ -362,9 +363,7 @@ final class UndeclaredReferenceLinterTest extends TestCase
 
     // ==================== plural resolution ====================
 
-    /**
-     * @dataProvider pluralForms
-     */
+    #[DataProvider('pluralForms')]
     public function testColumnStemsResolveThroughOrdinaryPlurals(string $column, string $expectedTarget): void
     {
         $linter = new UndeclaredReferenceLinter(self::KNOWN, new ReferenceDeclarations());

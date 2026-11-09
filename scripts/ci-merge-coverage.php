@@ -25,8 +25,8 @@ declare(strict_types=1);
  * memory_limit (CI uses `php -d memory_limit=-1`).
  */
 
-use SebastianBergmann\CodeCoverage\CodeCoverage;
-use SebastianBergmann\CodeCoverage\Report\Clover;
+use SebastianBergmann\CodeCoverage\Report\Facade;
+use SebastianBergmann\CodeCoverage\Serialization\Merger;
 
 require __DIR__ . '/../vendor/autoload.php';
 
@@ -70,40 +70,11 @@ if ($covFiles === []) {
     exit(2);
 }
 
-$merged = null;
+// Each shard is checked out from the same commit, so the shards' git details
+// have nothing to add; they can differ only by when each one recorded them.
+$merged = (new Merger())->merge($covFiles, false);
 
-foreach ($covFiles as $covFile) {
-    // The --coverage-php report is `<?php return \unserialize(...);`, so
-    // requiring it yields the CodeCoverage instance.
-    $coverage = require $covFile;
-
-    if (!$coverage instanceof CodeCoverage) {
-        fwrite(
-            STDERR,
-            sprintf(
-                "ci-merge-coverage: %s did not return a CodeCoverage instance"
-                . " — was it written with --coverage-php?\n",
-                $covFile,
-            ),
-        );
-        exit(2);
-    }
-
-    if ($merged === null) {
-        $merged = $coverage;
-    } else {
-        $merged->merge($coverage);
-    }
-
-    // Free the shard's copy before loading the next one.
-    unset($coverage);
-
-    printf("merged %s\n", $covFile);
-}
-
-assert($merged instanceof CodeCoverage);
-
-(new Clover())->process($merged, $target);
+Facade::fromSerializedData($merged)->renderClover($target);
 
 printf("ci-merge-coverage: merged %d shard(s) into %s\n", count($covFiles), $target);
 

@@ -6,6 +6,7 @@ namespace Tests\Unit\Core\Http;
 
 use PHPUnit\Framework\TestCase;
 use Whity\Core\Http\DeviceLabel;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Unit tests for {@see DeviceLabel} (WC-b3330495) — friendly session/device
@@ -13,9 +14,7 @@ use Whity\Core\Http\DeviceLabel;
  */
 final class DeviceLabelTest extends TestCase
 {
-    /**
-     * @dataProvider userAgents
-     */
+    #[DataProvider('userAgents')]
     public function testFromUserAgent(string $ua, string $expected): void
     {
         self::assertSame($expected, DeviceLabel::fromUserAgent($ua));
