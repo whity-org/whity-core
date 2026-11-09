@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Integration;
 
 use PDO;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\SchemaFromMigrations;
 use Whity\Core\Plan\CatalogueImporter;
@@ -136,9 +137,9 @@ final class CatalogueImporterRealEngineTest extends TestCase
     }
 
     /**
-     * @dataProvider badFiles
      * @param callable(array<string, mixed>): array<string, mixed> $spoil
      */
+    #[DataProvider('badFiles')]
     public function testABadFileWritesNothing(callable $spoil, string $expected): void
     {
         // The good plan comes first, so a check made while writing would have
