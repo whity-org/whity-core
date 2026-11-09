@@ -83,15 +83,14 @@
 
              STILL A CAP RATHER THAN -1, deliberately. Unbounded, a genuinely
              leaking test eats the whole runner and dies as an opaque OOM kill
-             instead of a clean PHP fatal naming the file. 2G is ~3.4x the
-             measured peak and ~3.5x below the runner's memory, so growth is
-             free and a leak is still caught.
+             instead of a clean PHP fatal naming the file.
 
-             Measured again without coverage: a worker's PHP heap peaks at 1.4G,
-             in the OpenAPI handler tests, which build the whole document, so
-             the cap cannot come down until that does. This limit only sees
-             PHP's own heap. SQLite allocates outside it, which is why leaked test
-             databases never tripped it: see FinishedTestCycleCollector. -->
+             Measured with coverage on and four workers: a worker peaks at
+             380M, but ParaTest's parent process reaches 1.8G merging their
+             coverage after the last test. 1G fails there, with every test
+             green, so 2G stays. This limit only sees PHP's own heap. SQLite
+             allocates outside it, which is why leaked test databases never
+             tripped it: see FinishedTestCycleCollector. -->
         <ini name="memory_limit" value="2G"/>
         <env name="INITIAL_ADMIN_PASSWORD" value="test_initial_admin_password_min_32_chars"/>
         <env name="INITIAL_USER_PASSWORD" value="test_initial_user_password_min_32_chars_"/>
