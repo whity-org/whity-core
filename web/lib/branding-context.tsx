@@ -30,6 +30,7 @@ const FALLBACK: Branding = {
   logoWideUrl: null,
   logoSquareUrl: null,
   faviconUrl: null,
+  builtOnWhity: true,
 };
 
 const BrandingContext = createContext<Branding>(FALLBACK);
@@ -48,6 +49,8 @@ export function parseBrandingResponse(body: unknown): { branding: Branding; them
       logoWideUrl: url(r.logoWideUrl),
       logoSquareUrl: url(r.logoSquareUrl),
       faviconUrl: url(r.faviconUrl),
+      // Shown unless the server says the plan removes it (WHIT-932).
+      builtOnWhity: r.builtOnWhity !== false,
     },
     themeCss: brandThemeCss(r.theme),
   };

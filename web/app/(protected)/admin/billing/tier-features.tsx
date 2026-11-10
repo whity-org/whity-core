@@ -112,10 +112,11 @@ export function TierFeatures() {
     const catalogue = ((await catRes.json()).data ?? {}) as Record<string, CatalogueEntry>;
     const all = ((await plansRes.json()).data ?? []) as Tier[];
 
-    // ADD-ONS ARE NOT TIERS and are left off. `devices` is bought beside a
-    // subscription; giving it a column would invite somebody to price the whole
-    // product into it.
-    const tiers = all.filter((p) => !p.is_addon);
+    // ADD-ON PACKS GET A COLUMN TOO, after the tiers and marked as packs
+    // (WHIT-932). A pack's numbers are ADDED to the tier's for each pack a
+    // workspace holds, so "10 extra staff" is priced here as members.max = 10.
+    // This screen is the only place a pack's limits can be edited.
+    const tiers = [...all.filter((p) => !p.is_addon), ...all.filter((p) => p.is_addon)];
 
     const bundles: Record<number, Bundle> = {};
     await Promise.all(
@@ -272,7 +273,10 @@ export function TierFeatures() {
                     {!tier.is_active && (
                       <Badge variant="secondary">{t('tiers.inactive', 'Not on sale')}</Badge>
                     )}
-                    {tier.provider !== null && (
+                    {tier.is_addon && (
+                      <Badge variant="info">{t('tiers.addon', 'Add-on pack')}</Badge>
+                    )}
+                    {tier.provider !== null && tier.provider !== undefined && (
                       <Badge variant="outline" title={tier.provider}>
                         {tier.provider}
                       </Badge>

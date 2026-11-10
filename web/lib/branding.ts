@@ -9,6 +9,8 @@ export type Branding = {
   logoWideUrl: string | null;
   logoSquareUrl: string | null;
   faviconUrl: string | null;
+  /** Whether public pages show "Built on Whity"; false when the plan removes it (WHIT-932). */
+  builtOnWhity: boolean;
 };
 
 const FALLBACK: Branding = {
@@ -16,6 +18,7 @@ const FALLBACK: Branding = {
   logoWideUrl: null,
   logoSquareUrl: null,
   faviconUrl: null,
+  builtOnWhity: true,
 };
 
 /**
@@ -59,6 +62,7 @@ export const getBranding = cache(async (): Promise<Branding> => {
     logoWideUrl: typeof d.logoWideUrl === 'string' ? d.logoWideUrl : null,
     logoSquareUrl: typeof d.logoSquareUrl === 'string' ? d.logoSquareUrl : null,
     faviconUrl: typeof d.faviconUrl === 'string' ? d.faviconUrl : null,
+    builtOnWhity: d.builtOnWhity !== false,
   };
 });
 

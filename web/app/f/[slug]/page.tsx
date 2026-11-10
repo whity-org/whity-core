@@ -60,6 +60,8 @@ interface PublicForm {
   /** WHIT-920: the visitor signs in and fills it in at /forms/{form_id}, under their own name. */
   sign_in_required?: boolean;
   form_id?: number | null;
+  /** WHIT-932: false when the workspace's plan removes "Built on Whity". */
+  built_on_whity?: boolean;
 }
 
 export default function PublicFormPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -196,7 +198,12 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
         {children}
       </div>
       <footer className="mt-10 flex w-full max-w-2xl flex-wrap items-center justify-between gap-3">
-        <BuiltOnWhity label={t('fill.builtOn', 'Built on Whity')} />
+        {/* WHIT-932: the workspace's plan may remove the credit. Until the form
+            is known nothing is shown, so a workspace that removed it never sees
+            it flash in while the page loads. */}
+        {form !== null && form.built_on_whity !== false && (
+          <BuiltOnWhity label={t('fill.builtOn', 'Built on Whity')} />
+        )}
         <LanguageSwitcher
           variant="dropdown"
           className="h-10 cursor-pointer rounded-control border border-input bg-card px-2.5 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"

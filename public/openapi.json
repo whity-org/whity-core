@@ -70581,6 +70581,9 @@
                     "sort_order": {
                         "type": "integer"
                     },
+                    "is_addon": {
+                        "type": "boolean"
+                    },
                     "created_at": {
                         "type": "string"
                     },
@@ -70920,6 +70923,9 @@
                     },
                     "sort_order": {
                         "type": "integer"
+                    },
+                    "is_addon": {
+                        "type": "boolean"
                     },
                     "created_at": {
                         "type": "string"

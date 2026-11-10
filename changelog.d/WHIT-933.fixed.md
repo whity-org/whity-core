@@ -1,0 +1,2 @@
+- **"Built on Whity" follows the plan.** Public pages, sign-in and public forms leave it off when the workspace's plan removes it (WHIT-933).
+- **The plans list says which plans are add-ons.** `GET /api/v1/plans` now returns `is_addon` and `provider`; the limits grid read both and never received them, so every add-on showed as a tier (WHIT-933).

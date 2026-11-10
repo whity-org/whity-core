@@ -25,6 +25,7 @@ import { useTranslation } from '@whity/features/i18n';
 import { formatMoney } from '@whity/ui/money/currency';
 import { navigateExternal } from '@/lib/external-navigate';
 import { SubscriptionPanel } from './subscription-panel';
+import { PlanLimits } from './plan-limits';
 
 /**
  * BILLING: what this tenant owes, and how to pay it.
@@ -251,6 +252,9 @@ export default function BillingPage() {
           Payment history lives here too, because a tenant billed externally has
           no LOCAL invoice and the table below is empty for them by design. */}
       {!forbidden && <SubscriptionPanel />}
+
+      {/* WHIT-932: a limit passed is told here, never enforced by a lock. */}
+      {!forbidden && <PlanLimits />}
 
       {/* A LOAD FAILURE IS SAID OUT LOUD. An empty table and a failed request
           look identical, and "no invoices" is a far more comforting thing to
