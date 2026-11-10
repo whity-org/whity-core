@@ -9,7 +9,7 @@ namespace Whity\Core\Entitlement;
  * capabilities/limits that gate what a tenant may configure or consume.
  *
  * Resolution for {@see effective()}, per known registry key:
- *   tenant_entitlements[key] ?? plan_entitlements[key] ?? EntitlementRegistry::default(key)
+ *   tenant_entitlements[key] ?? (plan_entitlements[key] ?? EntitlementRegistry::default(key)) + add-on packs
  *
  * THE MIDDLE LAYER IS WHAT MAKES A TIER MEAN ANYTHING, and it is read live. It
  * used to be materialised into `tenant_entitlements` when a plan was applied,
@@ -65,6 +65,7 @@ final class EntitlementService
 
         $overrides = $this->repo->allForTenant($tenantId);
         $plan = $this->repo->planBundleFor($tenantId);
+        $packs = $this->repo->addonBundlesFor($tenantId);
 
         $effective = [];
         foreach (EntitlementRegistry::keys() as $key) {
@@ -83,19 +84,67 @@ final class EntitlementService
             // resolving to "nothing": a tier is a list of what it CHANGES, not
             // a complete world, so adding a limit to the registry does not
             // silently revoke it from every existing tier.
-            $raw = $overrides[$key]
-                ?? $plan[$key]
-                ?? EntitlementRegistry::defaultFor($key);
+            if (array_key_exists($key, $overrides)) {
+                // An operator's hand-set value for this one customer is final:
+                // it is what they decided, packs included.
+                $effective[$key] = self::castOrDefault($key, $overrides[$key]);
+                continue;
+            }
 
-            // A stored value can be invalid if a plugin changed a key's type
-            // under data that was already written. Falling back to the default
-            // beats throwing on the path of a customer doing their work.
-            $effective[$key] = EntitlementRegistry::validate($key, $raw) === null
-                ? EntitlementRegistry::cast($key, $raw)
-                : EntitlementRegistry::cast($key, EntitlementRegistry::defaultFor($key));
+            $base = self::castOrDefault($key, $plan[$key] ?? EntitlementRegistry::defaultFor($key));
+
+            // ADD-ON PACKS STACK ON TOP OF THE TIER (WHIT-932). "10 extra
+            // staff" held twice on a 25-staff tier is 45 staff. A pack's flag
+            // grants it; nothing a pack says can take anything away.
+            foreach ($packs as $pack) {
+                if (!array_key_exists($key, $pack['values'])
+                    || EntitlementRegistry::validate($key, $pack['values'][$key]) !== null) {
+                    continue;
+                }
+                $extra = EntitlementRegistry::cast($key, $pack['values'][$key]);
+                $base = self::stack($base, $extra, $pack['quantity']);
+            }
+
+            $effective[$key] = $base;
         }
 
         return $effective;
+    }
+
+    /**
+     * A stored value cast to its type, or the default when it no longer fits.
+     *
+     * A stored value can be invalid if a plugin changed a key's type under data
+     * that was already written. Falling back to the default beats throwing on
+     * the path of a customer doing their work.
+     */
+    private static function castOrDefault(string $key, string $raw): bool|int
+    {
+        return EntitlementRegistry::validate($key, $raw) === null
+            ? EntitlementRegistry::cast($key, $raw)
+            : EntitlementRegistry::cast($key, EntitlementRegistry::defaultFor($key));
+    }
+
+    /**
+     * Add `$quantity` packs of `$extra` onto `$base`.
+     *
+     * Unlimited on either side stays unlimited: a pack cannot cap a tier that
+     * had no cap, and a pack that grants "unlimited" means it. Flags combine
+     * with OR, so a pack can grant a feature and never revoke one.
+     */
+    public static function stack(bool|int $base, bool|int $extra, int $quantity): bool|int
+    {
+        if ($quantity <= 0) {
+            return $base;
+        }
+        if (is_bool($base) || is_bool($extra)) {
+            return (bool) $base || (bool) $extra;
+        }
+        if ($base === EntitlementRegistry::UNLIMITED || $extra === EntitlementRegistry::UNLIMITED) {
+            return EntitlementRegistry::UNLIMITED;
+        }
+
+        return $base + ($extra * $quantity);
     }
 
     /**

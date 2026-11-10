@@ -905,6 +905,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/billing/limits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Where this workspace stands against its plan's limits
+         * @description Staff, customers this month, agent work and documents, each with what is used, the limit (null when unlimited) and whether it has been passed; plus any brand feature in use that the plan does not include. Passing a limit never locks anything: this is how the workspace's admins are told.
+         */
+        get: operations["get_api_v1_billing_limits"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/billing/methods": {
         parameters: {
             query?: never;
@@ -7130,6 +7150,27 @@ export interface paths {
         patch: operations["patch_api_v1_tenants_id"];
         trace?: never;
     };
+    "/api/v1/tenants/{id}/addons": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the add-on packs a tenant holds (operator) */
+        get: operations["get_api_v1_tenants_id_addons"];
+        /**
+         * Set how many packs of an add-on a tenant holds (operator)
+         * @description Packs stack onto the tier: each pack's numbers are added to the tier's, and its features are granted. A quantity of 0 removes the add-on. Lowering it removes nobody and nothing; limits only warn.
+         */
+        put: operations["put_api_v1_tenants_id_addons"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tenants/{id}/branding-host": {
         parameters: {
             query?: never;
@@ -8783,6 +8824,8 @@ export interface components {
             } | null;
             /** @description Whether the web app offers a manifest and service worker so it can be installed as an app. An instance setting (app.installable, else the PWA_ENABLED environment variable, else on). */
             installable: boolean;
+            /** @description Whether this workspace's public pages show "Built on Whity". False when its plan removes the credit. */
+            builtOnWhity?: boolean;
         };
         BrandingHostRequest: {
             host?: string | null;
@@ -8790,6 +8833,8 @@ export interface components {
         BrandingHostResponse: {
             data: {
                 branding_host: string | null;
+                /** @description Present when the workspace's plan does not include its own web address. The address is still set. */
+                warning?: string;
             };
         };
         BrandingResponse: {
@@ -12344,6 +12389,19 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        PlanLimit: {
+            key: string;
+            /** @enum {string} */
+            kind: "count" | "feature";
+            used: number | null;
+            /** @description Null when unlimited, and for a feature. */
+            limit: number | null;
+            over: boolean;
+            resets_at: string | null;
+        };
+        PlanLimitListResponse: {
+            data: components["schemas"]["PlanLimit"][];
+        };
         PlanListResponse: {
             data: components["schemas"]["PlanSummary"][];
         };
@@ -12722,6 +12780,8 @@ export interface components {
                 sign_in_required?: boolean;
                 /** @description Given only when sign-in is required: the form to fill in once signed in. */
                 form_id?: number | null;
+                /** @description Whether the page shows "Built on Whity". */
+                built_on_whity?: boolean;
             };
         };
         PublicFormSubmissionResponse: {
@@ -13768,6 +13828,23 @@ export interface components {
                 state: "active" | "trial" | "overdue" | "suspended";
                 daysLeft: number | null;
             };
+        };
+        TenantAddon: {
+            plan_id: number;
+            plan_key: string;
+            name: string;
+            quantity: number;
+            assigned_by?: number | null;
+            assigned_at: string;
+        };
+        TenantAddonListResponse: {
+            data: components["schemas"]["TenantAddon"][];
+        };
+        TenantAddonSetRequest: {
+            /** @description The add-on plan (a plan with is_addon set). */
+            plan_id: number;
+            /** @description How many packs; 0 removes the add-on. */
+            quantity: number;
         };
         TenantCreateRequest: {
             /** @description Original name of the new tenant (workspace). Required unless `names` is sent. */
@@ -18826,6 +18903,71 @@ export interface operations {
             };
             /** @description The provider could not be reached */
             502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_billing_limits: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description This workspace's limits */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanLimitListResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -52494,6 +52636,162 @@ export interface operations {
             };
             /** @description Tenant name or slug already exists */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_tenants_id_addons: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The tenant's add-on packs */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenantAddonListResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Tenant not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    put_api_v1_tenants_id_addons: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TenantAddonSetRequest"];
+            };
+        };
+        responses: {
+            /** @description The tenant's add-on packs after the change */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenantAddonListResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Tenant not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description plan_id missing, unknown or not an add-on, or a bad quantity */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

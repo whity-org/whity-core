@@ -446,6 +446,11 @@ final class PlanService
         if ($this->plans->findById($planId) === null) {
             throw new PlanValidationException('plan_id', "Plan {$planId} not found");
         }
+        // An add-on put on as the tier REPLACED the tier and took away
+        // everything it granted. Packs go beside it (WHIT-932).
+        if ($this->plans->isAddon($planId)) {
+            throw new PlanValidationException('plan_id', 'This plan is an add-on. Add it beside the workspace\'s plan instead.');
+        }
 
         $this->db->beginTransaction();
         try {
@@ -464,6 +469,55 @@ final class PlanService
             $this->db->rollBack();
             throw $e;
         }
+    }
+
+    /**
+     * Set how many packs of an add-on a tenant holds (WHIT-932). Zero removes it.
+     *
+     * Packs stack onto the tier rather than replacing it, which is the whole
+     * difference from {@see applyToTenant()}: applying "10 extra staff" as a
+     * tier used to take away everything the tier granted.
+     *
+     * Lowering a quantity takes nothing from anybody already there: limits only
+     * warn, so a workspace over its new staff limit keeps every member.
+     *
+     * @throws PlanValidationException When the plan is unknown or not an add-on,
+     *         the quantity is negative, or the tenant is the system tenant.
+     */
+    public function setTenantAddon(int $tenantId, int $planId, int $quantity, ?int $assignedBy = null): void
+    {
+        if ($tenantId === self::SYSTEM_TENANT_ID) {
+            throw new PlanValidationException('tenant_id', 'The system tenant is implicitly unlimited and has no add-ons');
+        }
+        if ($this->plans->findById($planId) === null) {
+            throw new PlanValidationException('plan_id', "Plan {$planId} not found");
+        }
+        if (!$this->plans->isAddon($planId)) {
+            throw new PlanValidationException('plan_id', 'This plan is a tier, not an add-on. Put the workspace on it as its plan instead.');
+        }
+        if ($quantity < 0) {
+            throw new PlanValidationException('quantity', 'quantity must be zero or more.');
+        }
+        if ($quantity > 10000) {
+            throw new PlanValidationException('quantity', 'quantity must be 10000 or fewer.');
+        }
+
+        if ($quantity === 0) {
+            $this->plans->removeTenantAddon($tenantId, $planId);
+            return;
+        }
+
+        $this->plans->setTenantAddon($tenantId, $planId, $quantity, $assignedBy);
+    }
+
+    /**
+     * The add-on packs a tenant holds.
+     *
+     * @return list<array{plan_id: int, plan_key: string, name: string, quantity: int, assigned_by: int|null, assigned_at: string}>
+     */
+    public function listTenantAddons(int $tenantId): array
+    {
+        return $this->plans->listTenantAddons($tenantId);
     }
 
     /**

@@ -1,0 +1,1 @@
+- **Staff seats count staff only.** `members.max` no longer counts customer memberships or service accounts. AI agents never took a seat and still do not (WHIT-932).

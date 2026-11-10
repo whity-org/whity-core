@@ -439,6 +439,8 @@ final class PublicFormsApiRealEngineTest extends TestCase
                 // WHIT-920: whether the visitor must sign in, and only then the
                 // form's id, so the page can send them to the signed-in form.
                 'sign_in_required', 'form_id',
+                // WHIT-932: whether the page shows "Built on Whity".
+                'built_on_whity',
             ],
             array_keys($data)
         );

@@ -228,6 +228,12 @@ final class AccessRecorder
             return;
         }
 
+        // An add-on is held beside the tier (WHIT-932); naming one here must
+        // not replace the tier the tenant is paying for.
+        if ($this->plans->isAddon((int) $plan['id'])) {
+            return;
+        }
+
         $current = $this->plans->getTenantPlan($tenantId);
         if (($current['plan_id'] ?? null) === (int) $plan['id']) {
             return;

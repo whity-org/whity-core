@@ -10,6 +10,8 @@ use Whity\Core\Branding\BrandingService;
 use Whity\Core\Branding\DisplayTenantResolver;
 use Whity\Core\Branding\HostResolver;
 use Whity\Core\Branding\TenantHostRepository;
+use Whity\Core\Entitlement\EntitlementRegistry;
+use Whity\Core\Entitlement\EntitlementService;
 use Whity\Core\RBAC\CorePermissions;
 use Whity\Core\Request;
 use Whity\Core\Response;
@@ -40,6 +42,8 @@ final class BrandingApiHandler
         private readonly ?TenantHostRepository $hostRepo = null,
         private readonly ?StorageDriverInterface $storage = null,
         private readonly ?JwtParser $jwtParser = null,
+        // WHIT-932: whether the target's plan includes its own web address.
+        private readonly ?EntitlementService $entitlements = null,
     ) {}
 
     /** GET /api/v1/branding — public effective branding. */
@@ -255,7 +259,18 @@ final class BrandingApiHandler
             return Response::error('That hostname is already claimed by another tenant.', 409, ['host' => $host]);
         }
         $this->hostRepo->setBrandingHost($targetTenant, $host);
-        return Response::json(['data' => ['branding_host' => $host]], 200);
+
+        // WHIT-932: own web address is a plan feature, and like every limit it
+        // warns rather than refuses. The address is set; the operator is told
+        // here and the workspace's admins see it on Billing.
+        $data = ['branding_host' => $host];
+        if ($this->entitlements !== null
+            && !$this->entitlements->isGranted($targetTenant, EntitlementRegistry::BRAND_CUSTOM_DOMAIN)) {
+            $data['warning'] = 'This workspace\'s plan does not include its own web address. '
+                . 'The address is set, and the workspace\'s admins are told on Billing.';
+        }
+
+        return Response::json(['data' => $data], 200);
     }
 
     /** @return array{tenantId:int,userId:int}|Response */

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Whity\Api;
 
+use Whity\Core\Branding\BrandingService;
 use Whity\Core\Form\FieldType;
 use Whity\Core\Form\FormFieldRepository;
 use Whity\Core\Form\FormRejectedException;
@@ -259,6 +260,9 @@ final class PublicFormsApiHandler
         private readonly SubmissionIssuer $issuer,
         private readonly SharedStoreInterface $store,
         private readonly FormUploadStore $uploads,
+        // WHIT-932: whether the workspace's plan removes "Built on Whity".
+        // Null: the page shows it, as it always has.
+        private readonly ?BrandingService $branding = null,
     ) {
     }
 
@@ -300,7 +304,9 @@ final class PublicFormsApiHandler
                 $this->fields->listForForm((int) $form['tenant_id'], (int) $form['id'])
             );
 
-            return Response::json(['data' => PublicFormView::form($form, $fields)]);
+            return Response::json(['data' => PublicFormView::form($form, $fields) + [
+                'built_on_whity' => $this->branding?->showsBuiltOnWhity((int) $form['tenant_id']) ?? true,
+            ]]);
         } catch (\Throwable $e) {
             // The generic sentence, never the exception's. A public endpoint that
             // echoed a driver message would leak schema to the audience that

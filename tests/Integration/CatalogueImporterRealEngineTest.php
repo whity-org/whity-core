@@ -167,7 +167,7 @@ final class CatalogueImporterRealEngineTest extends TestCase
         $with = static fn (array $changes): callable => static fn (array $plan): array => array_merge(['plan_key' => 'second'], $changes) + $plan;
 
         return [
-            'unknown entitlement' => [$with(['limits' => ['customers.per_month' => 500]]), 'unknown entitlement key "customers.per_month"'],
+            'unknown entitlement' => [$with(['limits' => ['visitors.per_month' => 500]]), 'unknown entitlement key "visitors.per_month"'],
             'wrong limit type' => [$with(['limits' => ['mcp.access' => 5]]), 'mcp.access must be a boolean'],
             'limit as text' => [$with(['limits' => ['members.max' => '5']]), 'must be a number or true/false'],
             'bad currency' => [$with(['prices' => [['currency' => 'dinars', 'amount' => 1, 'period' => 'month']]]), 'three-letter'],

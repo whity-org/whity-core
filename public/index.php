@@ -3048,6 +3048,29 @@ $router->register('GET',  '/api/billing/plans',    [$externalBillingHandler, 'pl
 // the local run stands down so nobody is charged twice — so without this the
 // billing screen showed an empty table to somebody who had just paid.
 $router->register('GET',  '/api/billing/receipts', [$externalBillingHandler, 'receipts'], null, null, CorePermissions::BILLING_VIEW);
+
+// WHIT-1040: the plan limits the business model sells, and where a workspace
+// stands against them. Every one of them warns and none refuses: customers are
+// counted from the events that serve them, agent work is metered as usage past
+// its allowance, and the workspace's admins read the result on Billing.
+$customerUsage = new \Whity\Core\Usage\CustomerUsage($db->getPdo(), $entitlementService, $settingsService);
+$customerUsage->subscribe($hookManager);
+$planLimitMeters = new \Whity\Core\Entitlement\MeterService(
+    new DatabaseSharedStore($db->getPdo()),
+    $entitlementService,
+    $settingsService
+);
+$planLimitsHandler = new \Whity\Api\PlanLimitsApiHandler(
+    new \Whity\Core\Usage\PlanLimitsReport(
+        $db->getPdo(),
+        $entitlementService,
+        new \Whity\Core\Seat\SeatService($db->getPdo(), $entitlementService, $settingsService),
+        $customerUsage,
+        $planLimitMeters
+    ),
+    $roleChecker
+);
+$router->register('GET',  '/api/billing/limits',   [$planLimitsHandler, 'show'],      null, null, CorePermissions::BILLING_VIEW);
 // More seats, or fewer. The only change the billing service supports in place:
 // a PLAN swap would mean cancelling and buying again, which either double-charges
 // or leaves a gap, so it is refused rather than faked.
@@ -3132,6 +3155,9 @@ $router->register('PATCH',  '/api/affiliate-payouts/{id:\d+}',  [$affiliatesHand
 $router->register('DELETE', '/api/affiliate-payouts/{id:\d+}',  [$affiliatesHandler, 'discardPayout'],  null, null, CorePermissions::PLANS_MANAGE);
 $router->register('POST',   '/api/tenants/{id:\d+}/plan',       [$plansHandler, 'applyToTenant'],   null, null, CorePermissions::PLANS_MANAGE);
 $router->register('GET',    '/api/tenants/{id:\d+}/plan',       [$plansHandler, 'getTenantPlan'],   null, null, CorePermissions::PLANS_MANAGE);
+// Add-on packs beside the tier (WHIT-1040): they stack onto its limits.
+$router->register('GET',    '/api/tenants/{id:\d+}/addons',     [$plansHandler, 'listTenantAddons'], null, null, CorePermissions::PLANS_MANAGE);
+$router->register('PUT',    '/api/tenants/{id:\d+}/addons',     [$plansHandler, 'setTenantAddon'],   null, null, CorePermissions::PLANS_MANAGE);
 
 // 13a-quinquies. Subscription (billing-state) API (WC-billing). Operator routes
 // (system-tenant gated) reflect an out-of-band payment into a tenant's state and
@@ -4497,7 +4523,9 @@ $publicFormsHandler = new \Whity\Api\PublicFormsApiHandler(
     // The SAME store the authenticated path uses. An anonymous upload differs
     // only in its ceiling, its throttle and its null uploader — none of which is
     // a reason for a second storage path.
-    $formUploadStore
+    $formUploadStore,
+    // WHIT-1040: whether the workspace's plan removes "Built on Whity".
+    new \Whity\Core\Branding\BrandingService($settingsService, entitlements: $entitlementService)
 );
 $publicFormKeysHandler = new \Whity\Api\PublicFormKeysApiHandler(
     $publicFormKeyRepository,
@@ -5114,7 +5142,8 @@ $router->register('POST', '/api/settings/mail/test',         [$mailSettingsHandl
 $brandingService = new \Whity\Core\Branding\BrandingService(
     $settingsService,
     $storageDriver,
-    new \Whity\Core\Branding\BrandingAssetValidator(new \Whity\Core\Branding\SvgSanitizer())
+    new \Whity\Core\Branding\BrandingAssetValidator(new \Whity\Core\Branding\SvgSanitizer()),
+    $entitlementService
 );
 $brandingHostRepo = new \Whity\Core\Branding\TenantHostRepository($db->getPdo());
 $hostResolver = new \Whity\Core\Branding\HostResolver(
@@ -5127,7 +5156,8 @@ $brandingHandler = new \Whity\Api\BrandingApiHandler(
     $roleChecker,
     $brandingHostRepo,
     $storageDriver,
-    $jwtParser
+    $jwtParser,
+    $entitlementService
 );
 $router->register('GET',    '/api/branding',                        [$brandingHandler, 'get'],          null, null, null);
 $router->register('GET',    '/api/branding/asset/{tenantId}/{name}', [$brandingHandler, 'serveAsset'],   null, null, null);
@@ -5531,7 +5561,7 @@ $proposalDiffs->useAuthoredTools($authoredMcpTools, new \Whity\Mcp\Tools\ReadOnl
 ))->registerOn($proposalDiffs);
 // WHIT-812: what an agent did that its person can still undo.
 $agentActions = new \Whity\Core\Agent\AgentActionRepository($db->getPdo());
-$mcpToolsCallHandler = new ToolsCallHandler($toolDeriver, $router, $roleChecker, $tokenValidator, auditLogger: $auditLogger, authoredTools: $authoredMcpTools, proposals: $agentProposals, proposalDiffs: $proposalDiffs, actions: $agentActions, languages: new \Whity\Core\i18n\RequestLanguageResolver($db->getPdo(), $languageRegistry, $settingsService));
+$mcpToolsCallHandler = new ToolsCallHandler($toolDeriver, $router, $roleChecker, $tokenValidator, auditLogger: $auditLogger, authoredTools: $authoredMcpTools, proposals: $agentProposals, proposalDiffs: $proposalDiffs, actions: $agentActions, languages: new \Whity\Core\i18n\RequestLanguageResolver($db->getPdo(), $languageRegistry, $settingsService), agentWork: $planLimitMeters);
 // The approvals inbox: the person an agent acts for approves, edits or
 // declines what it asked to do. Session-gated and never on the MCP surface:
 // an agent must not be able to approve its own proposal.

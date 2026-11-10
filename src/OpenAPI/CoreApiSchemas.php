@@ -5813,6 +5813,30 @@ final class CoreApiSchemas
                 'plan' => ['nullable' => true, 'allOf' => [SchemaBuilder::ref('PlanSummary')]],
             ], ['tenant_id', 'plan_id', 'assigned_at']),
             'TenantPlanResponse' => self::dataEnvelope(['nullable' => true, 'allOf' => [SchemaBuilder::ref('TenantPlan')]]),
+            // WHIT-932: add-on packs held beside the tier; they stack onto it.
+            'TenantAddon' => self::object([
+                'plan_id' => self::int(),
+                'plan_key' => self::str(),
+                'name' => self::str(),
+                'quantity' => self::int(),
+                'assigned_by' => self::int(true),
+                'assigned_at' => self::str(),
+            ], ['plan_id', 'plan_key', 'name', 'quantity', 'assigned_at']),
+            'TenantAddonListResponse' => self::dataEnvelope(['type' => 'array', 'items' => SchemaBuilder::ref('TenantAddon')]),
+            'TenantAddonSetRequest' => self::object([
+                'plan_id' => self::int() + ['description' => 'The add-on plan (a plan with is_addon set).'],
+                'quantity' => self::int() + ['minimum' => 0, 'description' => 'How many packs; 0 removes the add-on.'],
+            ], ['plan_id', 'quantity']),
+            // WHIT-932: where a workspace stands against its plan's limits.
+            'PlanLimit' => self::object([
+                'key' => self::str(),
+                'kind' => ['type' => 'string', 'enum' => ['count', 'feature']],
+                'used' => self::int(true),
+                'limit' => self::int(true) + ['description' => 'Null when unlimited, and for a feature.'],
+                'over' => self::bool(),
+                'resets_at' => self::str(true),
+            ], ['key', 'kind', 'used', 'limit', 'over', 'resets_at']),
+            'PlanLimitListResponse' => self::dataEnvelope(['type' => 'array', 'items' => SchemaBuilder::ref('PlanLimit')]),
 
             // ── Subscription / billing state (WC-billing) ─────────────────────
             'PlanRef' => self::object([
@@ -8694,6 +8718,8 @@ final class CoreApiSchemas
                 // WHIT-920: sign in first, then fill it in at /forms/{form_id}.
                 'sign_in_required' => self::bool(),
                 'form_id' => self::int(true) + ['description' => 'Given only when sign-in is required: the form to fill in once signed in.'],
+                // WHIT-932: false when the workspace's plan removes the credit.
+                'built_on_whity' => self::bool() + ['description' => 'Whether the page shows "Built on Whity".'],
             ], ['slug', 'name', 'fields', 'sections', 'accepts_submissions'])),
             // A field, reduced to what drawing it requires. `id`, `tenant_id` and
             // `form_id` are internal identifiers a stranger has no use for and
@@ -10224,13 +10250,19 @@ final class CoreApiSchemas
                 ],
                 // #1733: the instance switch for installing the web app.
                 'installable' => ['type' => 'boolean', 'description' => 'Whether the web app offers a manifest and service worker so it can be installed as an app. An instance setting (app.installable, else the PWA_ENABLED environment variable, else on).'],
+                // WHIT-932: the brand.remove_badge entitlement, read the other way round.
+                'builtOnWhity' => ['type' => 'boolean', 'description' => 'Whether this workspace\'s public pages show "Built on Whity". False when its plan removes the credit.'],
             ], ['siteName', 'logoWideUrl', 'logoSquareUrl', 'faviconUrl', 'mainColor', 'theme', 'installable']),
             // GET /api/branding — the standard data envelope around Branding.
             'BrandingResponse' => self::dataEnvelope(SchemaBuilder::ref('Branding')),
             // PUT /api/tenants/{id}/branding-host request body.
             'BrandingHostRequest' => self::object(['host' => self::str(true)], []),
             // PUT /api/tenants/{id}/branding-host response body.
-            'BrandingHostResponse' => self::dataEnvelope(self::object(['branding_host' => self::str(true)], ['branding_host'])),
+            'BrandingHostResponse' => self::dataEnvelope(self::object([
+                'branding_host' => self::str(true),
+                // WHIT-932: set when the workspace's plan does not include its own web address.
+                'warning' => self::str() + ['description' => 'Present when the workspace\'s plan does not include its own web address. The address is still set.'],
+            ], ['branding_host'])),
             // GET /api/theme response body (WC-242): a free-form map of known
             // design-token names to '#rrggbb' hex strings, contributed by at
             // most one installed plugin. Possibly empty.
@@ -12149,6 +12181,18 @@ final class CoreApiSchemas
                     503 => self::errorResponse('The billing service is temporarily unreachable'),
                 ] + self::authErrors(),
             ]),
+            self::permissionRoute('GET', '/api/billing/limits', 'billing:view', [
+                'summary' => 'Where this workspace stands against its plan\'s limits',
+                'description' =>
+                    'Staff, customers this month, agent work and documents, each with what is used, '
+                    . 'the limit (null when unlimited) and whether it has been passed; plus any brand '
+                    . 'feature in use that the plan does not include. Passing a limit never locks '
+                    . 'anything: this is how the workspace\'s admins are told.',
+                'tags' => ['billing'],
+                'responses' => [
+                    200 => self::jsonResponse('This workspace\'s limits', 'PlanLimitListResponse'),
+                ] + self::authErrors(),
+            ]),
             self::permissionRoute('GET', '/api/billing/receipts', 'billing:view', [
                 'summary' => 'What this tenant has paid',
                 'description' =>
@@ -12820,6 +12864,27 @@ final class CoreApiSchemas
                 'responses' => [
                     200 => self::jsonResponse('The tenant\'s plan assignment (null when unassigned)', 'TenantPlanResponse'),
                     404 => self::errorResponse('Tenant not found'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/tenants/{id:\d+}/addons', 'plans:manage', [
+                'summary' => 'List the add-on packs a tenant holds (operator)',
+                'tags' => ['plans'],
+                'responses' => [
+                    200 => self::jsonResponse('The tenant\'s add-on packs', 'TenantAddonListResponse'),
+                    404 => self::errorResponse('Tenant not found'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('PUT', '/api/tenants/{id:\d+}/addons', 'plans:manage', [
+                'summary' => 'Set how many packs of an add-on a tenant holds (operator)',
+                'description' => 'Packs stack onto the tier: each pack\'s numbers are added to the tier\'s, '
+                    . 'and its features are granted. A quantity of 0 removes the add-on. Lowering it '
+                    . 'removes nobody and nothing; limits only warn.',
+                'tags' => ['plans'],
+                'request' => 'TenantAddonSetRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The tenant\'s add-on packs after the change', 'TenantAddonListResponse'),
+                    404 => self::errorResponse('Tenant not found'),
+                    422 => self::errorResponse('plan_id missing, unknown or not an add-on, or a bad quantity'),
                 ] + self::authErrors(),
             ]),
         ];
